@@ -8,25 +8,57 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::{
     AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
 };
-use crate::ports::outbound::TicketRepository;
+use crate::ports::outbound::{CachePort, TicketRepository};
+
+const TICKETS_LIST_TTL: u64 = 60; // 1 minute
+const TICKET_DETAIL_TTL: u64 = 120; // 2 minutes
 
 pub struct ManageTicketsService {
     ticket_repo: Arc<dyn TicketRepository>,
+    cache: Arc<dyn CachePort>,
 }
 
 impl ManageTicketsService {
-    pub fn new(ticket_repo: Arc<dyn TicketRepository>) -> Self {
-        Self { ticket_repo }
+    pub fn new(ticket_repo: Arc<dyn TicketRepository>, cache: Arc<dyn CachePort>) -> Self {
+        Self { ticket_repo, cache }
+    }
+
+    async fn invalidate_tickets_cache(&self) {
+        self.cache.invalidate("tickets:all").await.ok();
+        self.cache.invalidate_pattern("ticket:*").await.ok();
     }
 }
 
 #[async_trait]
 impl ManageTicketsUseCase for ManageTicketsService {
     async fn list_tickets(&self) -> Result<Vec<Ticket>, DomainError> {
-        self.ticket_repo.find_all().await
+        // Cache-first
+        if let Some(json) = self.cache.get_json("tickets:all").await? {
+            if let Ok(tickets) = serde_json::from_str::<Vec<Ticket>>(&json) {
+                return Ok(tickets);
+            }
+        }
+
+        let tickets = self.ticket_repo.find_all().await?;
+
+        // Populate cache
+        if let Ok(json) = serde_json::to_string(&tickets) {
+            self.cache.set_json("tickets:all", &json, TICKETS_LIST_TTL).await.ok();
+        }
+
+        Ok(tickets)
     }
 
     async fn get_ticket_detail(&self, id: &str) -> Result<TicketDetail, DomainError> {
+        let cache_key = format!("ticket:{id}");
+
+        // Cache-first
+        if let Some(json) = self.cache.get_json(&cache_key).await? {
+            if let Ok(detail) = serde_json::from_str::<TicketDetail>(&json) {
+                return Ok(detail);
+            }
+        }
+
         let uuid = id
             .parse::<Uuid>()
             .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {id}")))?;
@@ -38,8 +70,14 @@ impl ManageTicketsUseCase for ManageTicketsService {
             .ok_or(DomainError::Internal(format!("Ticket introuvable : {id}")))?;
 
         let messages = self.ticket_repo.find_messages(uuid).await?;
+        let detail = TicketDetail { ticket, messages };
 
-        Ok(TicketDetail { ticket, messages })
+        // Populate cache
+        if let Ok(json) = serde_json::to_string(&detail) {
+            self.cache.set_json(&cache_key, &json, TICKET_DETAIL_TTL).await.ok();
+        }
+
+        Ok(detail)
     }
 
     async fn create_ticket(&self, cmd: CreateTicketCommand) -> Result<Ticket, DomainError> {
@@ -60,6 +98,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
         };
 
         self.ticket_repo.save(&ticket).await?;
+        self.invalidate_tickets_cache().await;
 
         Ok(ticket)
     }
@@ -73,19 +112,15 @@ impl ManageTicketsUseCase for ManageTicketsService {
         let message = TicketMessage {
             id: Uuid::new_v4(),
             ticket_id,
-            author_name: "staff".to_string(),
-            author_role: "moderator".to_string(),
+            author_name: cmd.author_name,
+            author_role: cmd.author_role,
             content: cmd.content,
             created_at: chrono::Utc::now(),
         };
 
         self.ticket_repo.save_message(&message).await?;
-
-        // Mettre à jour updated_at du ticket
-        self.ticket_repo
-            .update_status(ticket_id, "pending")
-            .await
-            .ok();
+        self.ticket_repo.update_status(ticket_id, "pending").await.ok();
+        self.invalidate_tickets_cache().await;
 
         Ok(())
     }
@@ -95,7 +130,10 @@ impl ManageTicketsUseCase for ManageTicketsService {
             .parse::<Uuid>()
             .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {id}")))?;
 
-        self.ticket_repo.update_status(uuid, "closed").await
+        self.ticket_repo.update_status(uuid, "closed").await?;
+        self.invalidate_tickets_cache().await;
+
+        Ok(())
     }
 
     async fn assign_ticket(&self, cmd: AssignTicketCommand) -> Result<(), DomainError> {
@@ -104,8 +142,9 @@ impl ManageTicketsUseCase for ManageTicketsService {
             .parse::<Uuid>()
             .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
 
-        self.ticket_repo
-            .update_assignee(uuid, &cmd.assignee)
-            .await
+        self.ticket_repo.update_assignee(uuid, &cmd.assignee).await?;
+        self.invalidate_tickets_cache().await;
+
+        Ok(())
     }
 }

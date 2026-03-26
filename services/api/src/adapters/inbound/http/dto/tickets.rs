@@ -16,6 +16,18 @@ pub struct CreateTicketDto {
 #[derive(Debug, Deserialize)]
 pub struct ReplyDto {
     pub content: String,
+    #[serde(default = "default_author_name")]
+    pub author_name: String,
+    #[serde(default = "default_author_role")]
+    pub author_role: String,
+}
+
+fn default_author_name() -> String {
+    "staff".to_string()
+}
+
+fn default_author_role() -> String {
+    "moderator".to_string()
 }
 
 #[derive(Debug, Deserialize)]

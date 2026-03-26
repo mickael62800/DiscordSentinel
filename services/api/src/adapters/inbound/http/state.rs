@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::ports::inbound::{
     AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
-    ManageRulesUseCase, ManageSecurityUseCase, ManageTicketsUseCase,
+    ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageTicketsUseCase,
 };
 
 #[derive(Clone)]
@@ -14,6 +14,9 @@ pub struct AppState {
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
     pub security_uc: Arc<dyn ManageSecurityUseCase>,
     pub moderation_uc: Arc<dyn ManageModerationUseCase>,
+    pub stats_uc: Arc<dyn ManageStatsUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
     pub api_key: String,
+    pub pg_pool: sqlx::PgPool,
+    pub redis_client: redis::Client,
 }

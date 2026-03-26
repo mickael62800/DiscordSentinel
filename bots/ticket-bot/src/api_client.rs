@@ -50,6 +50,8 @@ pub struct CreateTicketRequest {
 #[derive(Debug, Serialize)]
 struct ReplyPayload {
     content: String,
+    author_name: String,
+    author_role: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -111,12 +113,20 @@ impl ApiClient {
             .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
-    pub async fn reply_ticket(&self, ticket_id: &str, content: &str) -> Result<(), String> {
+    pub async fn reply_ticket(
+        &self,
+        ticket_id: &str,
+        content: &str,
+        author_name: &str,
+        author_role: &str,
+    ) -> Result<(), String> {
         let req = self
             .client
             .post(format!("{}/api/tickets/{ticket_id}/messages", self.base_url))
             .json(&ReplyPayload {
                 content: content.to_string(),
+                author_name: author_name.to_string(),
+                author_role: author_role.to_string(),
             });
 
         self.auth(req)

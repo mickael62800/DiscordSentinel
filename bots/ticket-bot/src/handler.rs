@@ -74,7 +74,30 @@ impl EventHandler for Handler {
             None => return,
         };
 
-        if let Err(e) = api.reply_ticket(ticket_id, &msg.content).await {
+        // Déterminer le rôle de l'auteur (modérateur si permission MANAGE_MESSAGES, sinon user)
+        let author_role = match msg.guild_id {
+            Some(guild_id) => {
+                if let Ok(member) = guild_id.member(&ctx.http, msg.author.id).await {
+                    if let Ok(permissions) = member.permissions(&ctx.cache) {
+                        if permissions.manage_messages() {
+                            "moderator"
+                        } else {
+                            "user"
+                        }
+                    } else {
+                        "user"
+                    }
+                } else {
+                    "user"
+                }
+            }
+            None => "user",
+        };
+
+        if let Err(e) = api
+            .reply_ticket(ticket_id, &msg.content, &msg.author.name, author_role)
+            .await
+        {
             error!(error = %e, ticket_id = %ticket_id, "Erreur sync message vers backend");
         }
     }

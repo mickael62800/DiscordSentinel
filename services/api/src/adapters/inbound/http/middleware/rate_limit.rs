@@ -1,0 +1,90 @@
+use std::collections::HashMap;
+use std::net::IpAddr;
+use std::sync::Arc;
+use std::time::Instant;
+
+use axum::extract::{ConnectInfo, Request};
+use axum::http::StatusCode;
+use axum::middleware::Next;
+use axum::response::{IntoResponse, Response};
+use tokio::sync::Mutex;
+
+/// Simple in-memory token bucket rate limiter per IP address.
+#[derive(Clone)]
+pub struct RateLimiter {
+    inner: Arc<Mutex<RateLimiterInner>>,
+    max_tokens: u64,
+    refill_per_sec: u64,
+}
+
+struct RateLimiterInner {
+    buckets: HashMap<IpAddr, Bucket>,
+}
+
+struct Bucket {
+    tokens: u64,
+    last_refill: Instant,
+}
+
+impl RateLimiter {
+    pub fn new(requests_per_sec: u64) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(RateLimiterInner {
+                buckets: HashMap::new(),
+            })),
+            max_tokens: requests_per_sec * 10, // burst = 10x per-second rate
+            refill_per_sec: requests_per_sec,
+        }
+    }
+
+    async fn check(&self, ip: IpAddr) -> bool {
+        let mut inner = self.inner.lock().await;
+        let now = Instant::now();
+
+        let bucket = inner.buckets.entry(ip).or_insert(Bucket {
+            tokens: self.max_tokens,
+            last_refill: now,
+        });
+
+        // Refill tokens based on elapsed time
+        let elapsed = now.duration_since(bucket.last_refill).as_secs_f64();
+        let refill = (elapsed * self.refill_per_sec as f64) as u64;
+        if refill > 0 {
+            bucket.tokens = (bucket.tokens + refill).min(self.max_tokens);
+            bucket.last_refill = now;
+        }
+
+        // Consume a token
+        if bucket.tokens > 0 {
+            bucket.tokens -= 1;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Periodically clean up stale entries (call every ~60s)
+    pub async fn cleanup(&self) {
+        let mut inner = self.inner.lock().await;
+        let now = Instant::now();
+        inner.buckets.retain(|_, b| now.duration_since(b.last_refill).as_secs() < 120);
+    }
+}
+
+pub async fn rate_limit_middleware(
+    ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>,
+    axum::extract::State(limiter): axum::extract::State<RateLimiter>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if limiter.check(addr.ip()).await {
+        next.run(request).await
+    } else {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            [("Retry-After", "1")],
+            "Rate limit exceeded",
+        )
+            .into_response()
+    }
+}

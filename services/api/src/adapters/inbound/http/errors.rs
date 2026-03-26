@@ -10,17 +10,34 @@ pub struct ApiError(pub DomainError);
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match &self.0 {
-            DomainError::RuleNotFound(_) | DomainError::InfractionNotFound(_) => {
-                (StatusCode::NOT_FOUND, self.0.to_string())
-            }
+            // 404
+            DomainError::RuleNotFound(_)
+            | DomainError::InfractionNotFound(_)
+            | DomainError::TicketNotFound(_)
+            | DomainError::NotFound(_) => (StatusCode::NOT_FOUND, self.0.to_string()),
+
+            // 400
             DomainError::InvalidRule(_) => (StatusCode::BAD_REQUEST, self.0.to_string()),
+
+            // 422
+            DomainError::ValidationError(_) => {
+                (StatusCode::UNPROCESSABLE_ENTITY, self.0.to_string())
+            }
+
+            // 409
+            DomainError::Conflict(_) => (StatusCode::CONFLICT, self.0.to_string()),
+
+            // 504
+            DomainError::Timeout(_) => (StatusCode::GATEWAY_TIMEOUT, self.0.to_string()),
+
+            // 500
             DomainError::Internal(_) => (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Erreur interne".to_string(),
             ),
         };
 
-        tracing::error!(error = %self.0, "Erreur API");
+        tracing::error!(status = %status, error = %self.0, "Erreur API");
 
         (status, Json(json!({ "error": message }))).into_response()
     }

@@ -15,6 +15,8 @@ pub struct CreateTicketCommand {
 pub struct ReplyTicketCommand {
     pub ticket_id: String,
     pub content: String,
+    pub author_name: String,
+    pub author_role: String,
 }
 
 pub struct AssignTicketCommand {

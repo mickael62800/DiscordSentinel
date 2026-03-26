@@ -17,12 +17,18 @@ impl RedisCache {
         Self { client }
     }
 
-    fn key(guild_id: &str) -> String {
+    fn rules_key(guild_id: &str) -> String {
         format!("rules:{guild_id}")
+    }
+
+    async fn conn(&self) -> Result<redis::aio::MultiplexedConnection, DomainError> {
+        self.client
+            .get_multiplexed_async_connection()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Redis connection: {e}")))
     }
 }
 
-/// Représentation sérialisable d'une Rule pour le cache.
 #[derive(serde::Serialize, serde::Deserialize)]
 struct CachedRule {
     id: String,
@@ -75,15 +81,13 @@ impl CachedRule {
 
 #[async_trait]
 impl CachePort for RedisCache {
+    // --- Rules cache ---
+
     async fn get_rules(&self, guild_id: &str) -> Result<Option<Vec<Rule>>, DomainError> {
-        let mut conn = self
-            .client
-            .get_multiplexed_async_connection()
-            .await
-            .map_err(|e| DomainError::Internal(format!("Redis: {e}")))?;
+        let mut conn = self.conn().await?;
 
         let data: Option<String> = conn
-            .get(Self::key(guild_id))
+            .get(Self::rules_key(guild_id))
             .await
             .map_err(|e| DomainError::Internal(format!("Redis GET: {e}")))?;
 
@@ -98,17 +102,13 @@ impl CachePort for RedisCache {
     }
 
     async fn set_rules(&self, guild_id: &str, rules: &[Rule]) -> Result<(), DomainError> {
-        let mut conn = self
-            .client
-            .get_multiplexed_async_connection()
-            .await
-            .map_err(|e| DomainError::Internal(format!("Redis: {e}")))?;
+        let mut conn = self.conn().await?;
 
         let cached: Vec<CachedRule> = rules.iter().map(CachedRule::from).collect();
         let json =
             serde_json::to_string(&cached).map_err(|e| DomainError::Internal(e.to_string()))?;
 
-        conn.set_ex::<_, _, ()>(Self::key(guild_id), json, RULES_TTL)
+        conn.set_ex::<_, _, ()>(Self::rules_key(guild_id), json, RULES_TTL)
             .await
             .map_err(|e| DomainError::Internal(format!("Redis SETEX: {e}")))?;
 
@@ -116,15 +116,57 @@ impl CachePort for RedisCache {
     }
 
     async fn invalidate_rules(&self, guild_id: &str) -> Result<(), DomainError> {
-        let mut conn = self
-            .client
-            .get_multiplexed_async_connection()
-            .await
-            .map_err(|e| DomainError::Internal(format!("Redis: {e}")))?;
+        let mut conn = self.conn().await?;
 
-        conn.del::<_, ()>(Self::key(guild_id))
+        conn.del::<_, ()>(Self::rules_key(guild_id))
             .await
             .map_err(|e| DomainError::Internal(format!("Redis DEL: {e}")))?;
+
+        Ok(())
+    }
+
+    // --- Generic JSON cache ---
+
+    async fn get_json(&self, key: &str) -> Result<Option<String>, DomainError> {
+        let mut conn = self.conn().await?;
+
+        conn.get(key)
+            .await
+            .map_err(|e| DomainError::Internal(format!("Redis GET {key}: {e}")))
+    }
+
+    async fn set_json(&self, key: &str, json: &str, ttl_secs: u64) -> Result<(), DomainError> {
+        let mut conn = self.conn().await?;
+
+        conn.set_ex::<_, _, ()>(key, json, ttl_secs)
+            .await
+            .map_err(|e| DomainError::Internal(format!("Redis SETEX {key}: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn invalidate(&self, key: &str) -> Result<(), DomainError> {
+        let mut conn = self.conn().await?;
+
+        conn.del::<_, ()>(key)
+            .await
+            .map_err(|e| DomainError::Internal(format!("Redis DEL {key}: {e}")))?;
+
+        Ok(())
+    }
+
+    async fn invalidate_pattern(&self, pattern: &str) -> Result<(), DomainError> {
+        let mut conn = self.conn().await?;
+
+        let keys: Vec<String> = redis::cmd("KEYS")
+            .arg(pattern)
+            .query_async(&mut conn)
+            .await
+            .map_err(|e| DomainError::Internal(format!("Redis KEYS {pattern}: {e}")))?;
+
+        for key in keys {
+            conn.del::<_, ()>(&key).await.ok();
+        }
 
         Ok(())
     }

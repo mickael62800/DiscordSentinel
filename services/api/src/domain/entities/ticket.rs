@@ -1,8 +1,8 @@
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ticket {
     pub id: Uuid,
     pub title: String,
@@ -18,7 +18,7 @@ pub struct Ticket {
     pub messages_count: u32,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TicketMessage {
     pub id: Uuid,
     pub ticket_id: Uuid,
@@ -28,7 +28,7 @@ pub struct TicketMessage {
     pub created_at: DateTime<Utc>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TicketDetail {
     pub ticket: Ticket,
     pub messages: Vec<TicketMessage>,

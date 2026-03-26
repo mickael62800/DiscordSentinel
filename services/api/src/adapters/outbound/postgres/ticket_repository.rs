@@ -79,8 +79,13 @@ impl TicketRepository for PgTicketRepository {
     async fn find_all(&self) -> Result<Vec<Ticket>, DomainError> {
         let rows = sqlx::query_as::<_, TicketRow>(
             r#"
-            SELECT t.*, (SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = t.id) AS messages_count
+            SELECT t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
+                   t.assigned_to, t.server, t.category, t.created_at, t.updated_at,
+                   COUNT(tm.id) AS messages_count
             FROM tickets t
+            LEFT JOIN ticket_messages tm ON tm.ticket_id = t.id
+            GROUP BY t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
+                     t.assigned_to, t.server, t.category, t.created_at, t.updated_at
             ORDER BY t.updated_at DESC
             "#,
         )
@@ -94,9 +99,14 @@ impl TicketRepository for PgTicketRepository {
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Ticket>, DomainError> {
         let row = sqlx::query_as::<_, TicketRow>(
             r#"
-            SELECT t.*, (SELECT COUNT(*) FROM ticket_messages WHERE ticket_id = t.id) AS messages_count
+            SELECT t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
+                   t.assigned_to, t.server, t.category, t.created_at, t.updated_at,
+                   COUNT(tm.id) AS messages_count
             FROM tickets t
+            LEFT JOIN ticket_messages tm ON tm.ticket_id = t.id
             WHERE t.id = $1
+            GROUP BY t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
+                     t.assigned_to, t.server, t.category, t.created_at, t.updated_at
             "#,
         )
         .bind(id)

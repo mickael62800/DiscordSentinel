@@ -49,11 +49,15 @@ pub async fn reply_ticket(
     Path(id): Path<String>,
     Json(dto): Json<ReplyDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let author_name = dto.author_name.clone();
+
     state
         .tickets_uc
         .reply_ticket(ReplyTicketCommand {
             ticket_id: id.clone(),
             content: dto.content,
+            author_name: dto.author_name,
+            author_role: dto.author_role,
         })
         .await?;
 
@@ -61,7 +65,7 @@ pub async fn reply_ticket(
         "ticket_message",
         serde_json::json!({
             "ticket_id": &id,
-            "author_name": "moderator",
+            "author_name": &author_name,
         }),
     );
 
