@@ -1,0 +1,77 @@
+use serde::{Deserialize, Serialize};
+
+use crate::domain::entities::{ModerationAction, UserModerationHistory};
+use crate::ports::inbound::LogModerationCommand;
+
+#[derive(Debug, Deserialize)]
+pub struct LogActionDto {
+    pub guild_id: String,
+    pub channel_id: String,
+    pub moderator_id: String,
+    pub moderator_name: String,
+    pub target_id: String,
+    pub target_name: String,
+    pub action_type: String,
+    pub reason: String,
+    pub gravity: Option<String>,
+    pub duration: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ModerationActionResponseDto {
+    pub id: String,
+    pub action_type: String,
+    pub target_name: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UserHistoryDto {
+    pub target_id: String,
+    pub target_name: String,
+    pub total_warns: u32,
+    pub total_mutes: u32,
+    pub total_bans: u32,
+    pub actions: Vec<ModerationActionResponseDto>,
+}
+
+impl From<LogActionDto> for LogModerationCommand {
+    fn from(dto: LogActionDto) -> Self {
+        Self {
+            guild_id: dto.guild_id,
+            channel_id: dto.channel_id,
+            moderator_id: dto.moderator_id,
+            moderator_name: dto.moderator_name,
+            target_id: dto.target_id,
+            target_name: dto.target_name,
+            action_type: dto.action_type,
+            reason: dto.reason,
+            gravity: dto.gravity,
+            duration: dto.duration,
+        }
+    }
+}
+
+impl From<ModerationAction> for ModerationActionResponseDto {
+    fn from(a: ModerationAction) -> Self {
+        Self {
+            id: a.id.to_string(),
+            action_type: a.action_type,
+            target_name: a.target_name,
+            reason: a.reason,
+        }
+    }
+}
+
+impl From<UserModerationHistory> for UserHistoryDto {
+    fn from(h: UserModerationHistory) -> Self {
+        Self {
+            target_id: h.target_id,
+            target_name: h.target_name,
+            total_warns: h.total_warns,
+            total_mutes: h.total_mutes,
+            total_bans: h.total_bans,
+            actions: h.actions.into_iter().map(ModerationActionResponseDto::from).collect(),
+        }
+    }
+}

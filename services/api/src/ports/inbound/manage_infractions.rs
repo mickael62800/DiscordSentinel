@@ -1,0 +1,20 @@
+use async_trait::async_trait;
+
+use crate::domain::entities::Infraction;
+use crate::domain::errors::DomainError;
+
+pub struct InfractionFilters {
+    pub user_id: Option<String>,
+    pub action: Option<String>,
+    pub limit: i64,
+    pub offset: i64,
+}
+
+#[async_trait]
+pub trait ManageInfractionsUseCase: Send + Sync {
+    async fn list_infractions(
+        &self,
+        guild_id: &str,
+        filters: InfractionFilters,
+    ) -> Result<Vec<Infraction>, DomainError>;
+}

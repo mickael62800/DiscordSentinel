@@ -1,0 +1,191 @@
+use serenity::all::{
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+};
+use tracing::{error, info};
+
+use crate::api_client::ModerationAction;
+use crate::handler::ApiClientKey;
+
+pub fn register() -> CreateCommand {
+    CreateCommand::new("mute")
+        .description("Mute un utilisateur (permanent ou temporaire)")
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur à mute")
+                .required(true),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::String, "reason", "Raison du mute")
+                .required(true),
+        )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Integer,
+                "duration",
+                "Durée en minutes (vide = permanent, max 40320 = 28 jours)",
+            ),
+        )
+}
+
+pub fn register_unmute() -> CreateCommand {
+    CreateCommand::new("unmute")
+        .description("Retirer le mute d'un utilisateur")
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur à unmute")
+                .required(true),
+        )
+}
+
+pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    let options = &command.data.options;
+
+    let target_id = options.iter().find(|o| o.name == "user")
+        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
+        .unwrap();
+
+    let reason = options.iter().find(|o| o.name == "reason")
+        .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
+        .unwrap_or("Aucune raison");
+
+    let duration_minutes = options.iter().find(|o| o.name == "duration")
+        .and_then(|o| match &o.value { CommandDataOptionValue::Integer(n) => Some(*n), _ => None });
+
+    let guild_id = match command.guild_id {
+        Some(id) => id,
+        None => { reply(ctx, command, "Commande serveur uniquement.").await; return; }
+    };
+
+    let target = match target_id.to_user(&ctx.http).await {
+        Ok(u) => u,
+        Err(_) => { reply(ctx, command, "Utilisateur introuvable.").await; return; }
+    };
+
+    // Appliquer le timeout Discord
+    let mut member = match guild_id.member(&ctx.http, target.id).await {
+        Ok(m) => m,
+        Err(_) => { reply(ctx, command, "Membre introuvable sur le serveur.").await; return; }
+    };
+
+    let duration_secs = duration_minutes.map(|m| (m as u64) * 60);
+    // Discord timeout max = 28 jours. Si permanent, on met 28 jours (le backend track le permanent).
+    let timeout_secs = duration_secs.unwrap_or(28 * 24 * 3600);
+    let timeout_secs = timeout_secs.min(28 * 24 * 3600); // cap à 28j
+
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+        + timeout_secs as i64;
+
+    let datetime = time::OffsetDateTime::from_unix_timestamp(ts).expect("timestamp invalide");
+    let timeout = serenity::model::Timestamp::from(datetime);
+
+    if let Err(e) = member.disable_communication_until_datetime(&ctx.http, timeout).await {
+        error!(error = %e, "Impossible de mute l'utilisateur");
+        reply(ctx, command, &format!("Erreur Discord : {e}")).await;
+        return;
+    }
+
+    let is_permanent = duration_minutes.is_none();
+    let duration_label = if is_permanent {
+        "permanent".to_string()
+    } else {
+        format!("{}min", duration_minutes.unwrap())
+    };
+
+    // Log dans le backend
+    let data = ctx.data.read().await;
+    let api = data.get::<ApiClientKey>().unwrap();
+
+    let action = ModerationAction {
+        guild_id: guild_id.to_string(),
+        channel_id: command.channel_id.to_string(),
+        moderator_id: command.user.id.to_string(),
+        moderator_name: command.user.name.clone(),
+        target_id: target.id.to_string(),
+        target_name: target.name.clone(),
+        action_type: if is_permanent { "mute_permanent".to_string() } else { "mute_temp".to_string() },
+        reason: reason.to_string(),
+        gravity: None,
+        duration: duration_secs,
+    };
+
+    if let Err(e) = api.log_action(&action).await {
+        error!(error = %e, "Erreur log mute");
+    }
+
+    info!(target = %target.name, duration = %duration_label, "Mute appliqué");
+
+    // DM
+    if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
+        dm.send_message(
+            &ctx.http,
+            serenity::builder::CreateMessage::new().content(format!(
+                "🔇 **Mute ({duration_label})** sur **{}**\nRaison : {reason}",
+                guild_id.to_partial_guild(&ctx.http).await
+                    .map(|g| g.name).unwrap_or_else(|_| "le serveur".into()),
+            )),
+        ).await.ok();
+    }
+
+    reply(ctx, command, &format!(
+        "🔇 **Mute ({duration_label})** appliqué à <@{}>.\nRaison : {reason}",
+        target.id
+    )).await;
+}
+
+pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
+    let target_id = command.data.options.iter().find(|o| o.name == "user")
+        .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
+        .unwrap();
+
+    let guild_id = match command.guild_id {
+        Some(id) => id,
+        None => { reply(ctx, command, "Commande serveur uniquement.").await; return; }
+    };
+
+    let mut member = match guild_id.member(&ctx.http, target_id).await {
+        Ok(m) => m,
+        Err(_) => { reply(ctx, command, "Membre introuvable.").await; return; }
+    };
+
+    if let Err(e) = member.enable_communication(&ctx.http).await {
+        error!(error = %e, "Impossible de unmute");
+        reply(ctx, command, &format!("Erreur : {e}")).await;
+        return;
+    }
+
+    // Log unmute
+    let data = ctx.data.read().await;
+    let api = data.get::<ApiClientKey>().unwrap();
+    let target = target_id.to_user(&ctx.http).await.ok();
+    let target_name = target.as_ref().map(|u| u.name.as_str()).unwrap_or("inconnu");
+
+    let action = ModerationAction {
+        guild_id: guild_id.to_string(),
+        channel_id: command.channel_id.to_string(),
+        moderator_id: command.user.id.to_string(),
+        moderator_name: command.user.name.clone(),
+        target_id: target_id.to_string(),
+        target_name: target_name.to_string(),
+        action_type: "unmute".to_string(),
+        reason: "Unmute manuel".to_string(),
+        gravity: None,
+        duration: None,
+    };
+
+    api.log_action(&action).await.ok();
+
+    info!(target = %target_name, "Unmute appliqué");
+
+    reply(ctx, command, &format!("🔊 <@{target_id}> a été unmute.")).await;
+}
+
+async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
+    command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().content(content).ephemeral(false),
+        ),
+    ).await.ok();
+}

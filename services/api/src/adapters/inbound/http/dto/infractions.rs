@@ -1,0 +1,46 @@
+use serde::{Deserialize, Serialize};
+
+use crate::domain::entities::Infraction;
+
+#[derive(Debug, Deserialize)]
+pub struct InfractionQueryParams {
+    pub user_id: Option<String>,
+    pub action: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct InfractionResponseDto {
+    pub id: String,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub user_id: String,
+    pub username: String,
+    pub message_id: String,
+    pub content: String,
+    pub score: f64,
+    pub action: String,
+    pub reason: String,
+    pub duration: Option<u64>,
+    pub created_at: String,
+}
+
+impl From<Infraction> for InfractionResponseDto {
+    fn from(inf: Infraction) -> Self {
+        Self {
+            id: inf.id.to_string(),
+            guild_id: inf.guild_id,
+            channel_id: inf.channel_id,
+            user_id: inf.user_id,
+            username: inf.username,
+            message_id: inf.message_id,
+            content: inf.content,
+            score: inf.score,
+            action: inf.action.as_str().to_string(),
+            reason: inf.reason,
+            duration: inf.duration,
+            created_at: inf.created_at.to_rfc3339(),
+        }
+    }
+}
