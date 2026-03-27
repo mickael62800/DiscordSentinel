@@ -66,6 +66,7 @@ function backToList() {
       <div v-if="detailLoading" class="loading">Chargement...</div>
       <div v-else class="detail-content">
         <h2>{{ detailPoints.username }}</h2>
+        <p class="user-id">ID : {{ detailPoints.user_id }}</p>
         <div class="points-display">
           <span class="points-value" :style="{ color: pointsColor(detailPoints.points, config?.max_points ?? 12) }">
             {{ detailPoints.points }}
@@ -108,6 +109,7 @@ function backToList() {
         <thead>
           <tr>
             <th>Utilisateur</th>
+            <th>ID</th>
             <th>Points</th>
             <th>Statut</th>
             <th>Derniere regen</th>
@@ -121,6 +123,7 @@ function backToList() {
             @click="selectUser(user.guild_id, user.user_id)"
           >
             <td>{{ user.username }}</td>
+            <td class="mono">{{ user.user_id }}</td>
             <td>
               <span :style="{ color: pointsColor(user.points, config?.max_points ?? 12), fontWeight: 700 }">
                 {{ user.points }}
@@ -231,7 +234,20 @@ function backToList() {
 
 .detail-content h2 {
   font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.user-id {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: monospace;
   margin-bottom: 8px;
+}
+
+.mono {
+  font-family: monospace;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .detail-content h3 {
