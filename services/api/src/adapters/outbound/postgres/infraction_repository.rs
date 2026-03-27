@@ -101,20 +101,15 @@ impl InfractionRepository for PgInfractionRepository {
         let mut param_idx = 2u32;
 
         if filters.user_id.is_some() {
-            query.push_str(&format!(" AND user_id = ${param_idx}"));
+            query.push_str(&format!(" AND user_id = ${}", param_idx));
             param_idx += 1;
         }
         if filters.action.is_some() {
-            query.push_str(&format!(" AND action = ${param_idx}"));
+            query.push_str(&format!(" AND action = ${}", param_idx));
             param_idx += 1;
         }
-        let _ = param_idx;
 
-        query.push_str(" ORDER BY created_at DESC LIMIT $");
-        let limit_idx = query.matches('$').count() + 1;
-        query.push_str(&limit_idx.to_string());
-        query.push_str(" OFFSET $");
-        query.push_str(&(limit_idx + 1).to_string());
+        query.push_str(&format!(" ORDER BY created_at DESC LIMIT ${} OFFSET ${}", param_idx, param_idx + 1));
 
         let mut q = sqlx::query_as::<_, InfractionRow>(&query).bind(guild_id);
 
