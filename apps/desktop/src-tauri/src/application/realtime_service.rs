@@ -50,11 +50,17 @@ impl RealtimeService {
         // Disconnect existing connection first
         self.disconnect().await;
 
-        // Convert http(s):// to ws(s)://
-        let ws_url = api_url
+        // Gateway WebSocket is on a separate port (API port + 1, default 3001)
+        // e.g. http://localhost:3000 -> ws://localhost:3001
+        let gateway_url = std::env::var("GATEWAY_URL").unwrap_or_else(|_| {
+            derive_gateway_url(&api_url)
+        });
+
+        let ws_url = gateway_url
             .replace("https://", "wss://")
             .replace("http://", "ws://");
-        let ws_url = format!("{}/ws", ws_url);
+        let ws_url = if ws_url.starts_with("ws") { ws_url } else { format!("ws://{}", ws_url) };
+        let ws_url = format!("{}/ws", ws_url.trim_end_matches('/'));
 
         *self.ws_url.lock().await = ws_url.clone();
         *self.api_key.lock().await = api_key.clone();
@@ -141,4 +147,20 @@ impl RealtimeService {
         }
         self.connected.store(false, Ordering::Relaxed);
     }
+}
+
+/// Derive gateway URL from API URL (port + 1).
+/// e.g. "http://localhost:3000" -> "http://localhost:3001"
+fn derive_gateway_url(api_url: &str) -> String {
+    // Try to parse and increment port
+    if let Some(colon_pos) = api_url.rfind(':') {
+        let (base, port_str) = api_url.split_at(colon_pos + 1);
+        // Remove trailing slash if any
+        let port_str = port_str.trim_end_matches('/');
+        if let Ok(port) = port_str.parse::<u16>() {
+            return format!("{}{}", base, port + 1);
+        }
+    }
+    // Fallback: append :3001
+    format!("{}:3001", api_url.trim_end_matches('/'))
 }
