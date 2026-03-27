@@ -18,7 +18,22 @@ export function useLogs() {
     });
   });
 
-  const bots = computed(() => Array.from(new Set(logs.value.map((l) => l.bot))));
+  // Liste statique de tous les bots + ceux présents dans les logs
+  const knownBots = [
+    "automod-bot",
+    "moderation-bot",
+    "security-bot",
+    "stats-bot",
+    "ticket-bot",
+    "image-bot",
+    "voice-bot",
+    "audit-bot",
+    "roles-bot",
+  ];
+  const bots = computed(() => {
+    const fromLogs = logs.value.map((l) => l.bot);
+    return Array.from(new Set([...knownBots, ...fromLogs])).sort();
+  });
 
   async function fetchLogs() {
     loading.value = true;
