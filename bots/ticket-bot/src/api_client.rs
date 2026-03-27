@@ -45,6 +45,8 @@ pub struct CreateTicketRequest {
     pub author_name: String,
     pub server: String,
     pub category: String,
+    pub ticket_type: String,
+    pub channel_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -84,6 +86,31 @@ impl ApiClient {
         } else {
             req.bearer_auth(&self.api_key)
         }
+    }
+
+    pub fn send_log(&self, level: &str, server: &str, message: &str) {
+        #[derive(serde::Serialize)]
+        struct LogPayload {
+            level: String,
+            bot: String,
+            server: String,
+            message: String,
+        }
+
+        let req = self.auth(
+            self.client
+                .post(format!("{}/api/logs", self.base_url))
+                .json(&LogPayload {
+                    level: level.to_string(),
+                    bot: Self::BOT_NAME.to_string(),
+                    server: server.to_string(),
+                    message: message.to_string(),
+                }),
+        );
+
+        tokio::spawn(async move {
+            let _ = req.send().await;
+        });
     }
 
     pub async fn heartbeat(&self, name: &str) -> Result<(), String> {

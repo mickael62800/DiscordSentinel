@@ -13,4 +13,6 @@ pub trait TicketRepository: Send + Sync {
     async fn update_assignee(&self, id: Uuid, assignee: &str) -> Result<(), DomainError>;
     async fn find_messages(&self, ticket_id: Uuid) -> Result<Vec<TicketMessage>, DomainError>;
     async fn save_message(&self, message: &TicketMessage) -> Result<(), DomainError>;
+    async fn update_voice_channel(&self, id: Uuid, voice_channel_id: Option<&str>) -> Result<(), DomainError>;
+    async fn update_invited_user(&self, id: Uuid, invited_user_id: Option<&str>) -> Result<(), DomainError>;
 }

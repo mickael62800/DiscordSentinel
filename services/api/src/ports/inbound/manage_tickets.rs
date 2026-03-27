@@ -10,6 +10,14 @@ pub struct CreateTicketCommand {
     pub author_name: String,
     pub server: String,
     pub category: String,
+    pub ticket_type: String,
+    pub channel_id: Option<String>,
+}
+
+pub struct UpdateTicketChannelCommand {
+    pub ticket_id: String,
+    pub voice_channel_id: Option<String>,
+    pub invited_user_id: Option<String>,
 }
 
 pub struct ReplyTicketCommand {
@@ -32,4 +40,5 @@ pub trait ManageTicketsUseCase: Send + Sync {
     async fn reply_ticket(&self, command: ReplyTicketCommand) -> Result<(), DomainError>;
     async fn close_ticket(&self, id: &str) -> Result<(), DomainError>;
     async fn assign_ticket(&self, command: AssignTicketCommand) -> Result<(), DomainError>;
+    async fn update_ticket_channel(&self, command: UpdateTicketChannelCommand) -> Result<(), DomainError>;
 }

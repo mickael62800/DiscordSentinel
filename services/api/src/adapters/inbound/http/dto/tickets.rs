@@ -6,11 +6,24 @@ use crate::ports::inbound::CreateTicketCommand;
 #[derive(Debug, Deserialize)]
 pub struct CreateTicketDto {
     pub title: String,
+    #[serde(default = "default_priority")]
     pub priority: String,
     pub author_id: String,
     pub author_name: String,
     pub server: String,
+    #[serde(default)]
     pub category: String,
+    #[serde(default = "default_ticket_type")]
+    pub ticket_type: String,
+    pub channel_id: Option<String>,
+}
+
+fn default_priority() -> String {
+    "medium".to_string()
+}
+
+fn default_ticket_type() -> String {
+    "autre".to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -35,6 +48,12 @@ pub struct AssignDto {
     pub assignee: String,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateTicketChannelDto {
+    pub voice_channel_id: Option<String>,
+    pub invited_user_id: Option<String>,
+}
+
 #[derive(Debug, Serialize)]
 pub struct TicketResponseDto {
     pub id: String,
@@ -46,6 +65,10 @@ pub struct TicketResponseDto {
     pub assigned_to: Option<String>,
     pub server: String,
     pub category: String,
+    pub ticket_type: String,
+    pub channel_id: Option<String>,
+    pub voice_channel_id: Option<String>,
+    pub invited_user_id: Option<String>,
     pub created_at: String,
     pub updated_at: String,
     pub messages_count: u32,
@@ -76,6 +99,8 @@ impl From<CreateTicketDto> for CreateTicketCommand {
             author_name: dto.author_name,
             server: dto.server,
             category: dto.category,
+            ticket_type: dto.ticket_type,
+            channel_id: dto.channel_id,
         }
     }
 }
@@ -92,6 +117,10 @@ impl From<Ticket> for TicketResponseDto {
             assigned_to: t.assigned_to,
             server: t.server,
             category: t.category,
+            ticket_type: t.ticket_type,
+            channel_id: t.channel_id,
+            voice_channel_id: t.voice_channel_id,
+            invited_user_id: t.invited_user_id,
             created_at: t.created_at.to_rfc3339(),
             updated_at: t.updated_at.to_rfc3339(),
             messages_count: t.messages_count,

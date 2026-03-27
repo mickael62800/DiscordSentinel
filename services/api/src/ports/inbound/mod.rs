@@ -25,6 +25,7 @@ pub use manage_security::{ManageSecurityUseCase, ReportSecurityEventCommand};
 pub use manage_stats::ManageStatsUseCase;
 pub use manage_tickets::{
     AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
+    UpdateTicketChannelCommand,
 };
 pub use manage_audit_logs::ManageAuditLogsUseCase;
 pub use manage_role_panels::ManageRolePanelsUseCase;

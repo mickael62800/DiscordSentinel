@@ -92,6 +92,10 @@ impl ManageTicketsUseCase for ManageTicketsService {
             assigned_to: None,
             server: cmd.server,
             category: cmd.category,
+            ticket_type: cmd.ticket_type,
+            channel_id: cmd.channel_id,
+            voice_channel_id: None,
+            invited_user_id: None,
             created_at: now,
             updated_at: now,
             messages_count: 0,
@@ -143,6 +147,23 @@ impl ManageTicketsUseCase for ManageTicketsService {
             .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
 
         self.ticket_repo.update_assignee(uuid, &cmd.assignee).await?;
+        self.invalidate_tickets_cache().await;
+
+        Ok(())
+    }
+
+    async fn update_ticket_channel(&self, cmd: crate::ports::inbound::UpdateTicketChannelCommand) -> Result<(), DomainError> {
+        let uuid = cmd
+            .ticket_id
+            .parse::<Uuid>()
+            .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
+
+        if let Some(ref vc_id) = cmd.voice_channel_id {
+            self.ticket_repo.update_voice_channel(uuid, Some(vc_id)).await?;
+        }
+        if let Some(ref inv_id) = cmd.invited_user_id {
+            self.ticket_repo.update_invited_user(uuid, Some(inv_id)).await?;
+        }
         self.invalidate_tickets_cache().await;
 
         Ok(())
