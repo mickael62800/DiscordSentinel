@@ -80,6 +80,32 @@ impl ApiClient {
         config.get(key).and_then(|v| v.parse().ok()).unwrap_or(default)
     }
 
+    /// Envoie un log au backend (POST /api/logs).
+    pub fn send_log(&self, level: &str, server: &str, message: &str) {
+        #[derive(serde::Serialize)]
+        struct LogPayload {
+            level: String,
+            bot: String,
+            server: String,
+            message: String,
+        }
+
+        let req = self.auth(
+            self.client
+                .post(format!("{}/api/logs", self.base_url))
+                .json(&LogPayload {
+                    level: level.to_string(),
+                    bot: Self::BOT_NAME.to_string(),
+                    server: server.to_string(),
+                    message: message.to_string(),
+                }),
+        );
+
+        tokio::spawn(async move {
+            let _ = req.send().await;
+        });
+    }
+
     /// Signale un événement de sécurité au backend.
     pub async fn report_event(&self, event: &SecurityEvent) -> Result<(), String> {
         let req = self

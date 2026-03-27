@@ -217,6 +217,28 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
         Ok(response) => {
             info!(action = ?response.action, reason = ?response.reason, "Reponse du backend");
 
+            // Log l'action dans le journal
+            if response.action != Action::None {
+                let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
+                let action_label = match &response.action {
+                    Action::Warn => "Avertissement",
+                    Action::Delete => "Suppression",
+                    Action::Mute => "Mute",
+                    Action::Ban => "Ban",
+                    Action::None => "",
+                };
+                api_client.send_log(
+                    if matches!(response.action, Action::Ban) { "error" } else { "warn" },
+                    &guild_id,
+                    &format!(
+                        "{} — {} : {}",
+                        action_label,
+                        msg.author.name,
+                        response.reason.as_deref().unwrap_or("Automod"),
+                    ),
+                );
+            }
+
             if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs).await {
                 error!(error = %e, "Erreur lors de l'execution de l'action");
             }

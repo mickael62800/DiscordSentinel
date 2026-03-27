@@ -1,8 +1,9 @@
 use serenity::async_trait;
 use serenity::model::application::Interaction;
+use serenity::model::channel::GuildChannel;
 use serenity::model::gateway::Ready;
 use serenity::model::guild::Member;
-use serenity::model::id::RoleId;
+use serenity::model::id::{GuildId, RoleId};
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
@@ -87,6 +88,15 @@ impl EventHandler for Handler {
         );
 
         let data = ctx.data.read().await;
+
+        // Log l'arrivée dans le journal
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "info",
+                &guild_id.to_string(),
+                &format!("Nouveau membre : {} ({})", user.name, user.id),
+            );
+        }
         let api = data.get::<ApiClientKey>().unwrap();
         let raid_detector = data.get::<RaidDetectorKey>().unwrap();
         let account_checker = data.get::<AccountCheckerKey>().unwrap();
@@ -273,6 +283,100 @@ impl EventHandler for Handler {
             if let Err(e) = api.report_event(&event).await {
                 error!(error = %e, "Erreur envoi événement compte suspect");
             }
+        }
+    }
+
+    /// Déclenché quand un membre quitte le serveur.
+    async fn guild_member_removal(
+        &self,
+        ctx: Context,
+        guild_id: GuildId,
+        user: serenity::model::user::User,
+        _member: Option<Member>,
+    ) {
+        info!(guild_id = %guild_id, user = %user.name, "Membre parti");
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "info",
+                &guild_id.to_string(),
+                &format!("Membre parti : {} ({})", user.name, user.id),
+            );
+        }
+    }
+
+    /// Déclenché quand un salon est créé.
+    async fn channel_create(&self, ctx: Context, channel: GuildChannel) {
+        let guild_id = channel.guild_id;
+        let kind = match channel.kind {
+            serenity::model::channel::ChannelType::Text => "texte",
+            serenity::model::channel::ChannelType::Voice => "vocal",
+            serenity::model::channel::ChannelType::Category => "categorie",
+            serenity::model::channel::ChannelType::Stage => "stage",
+            serenity::model::channel::ChannelType::Forum => "forum",
+            _ => "autre",
+        };
+
+        info!(guild_id = %guild_id, channel = %channel.name, kind, "Salon créé");
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "info",
+                &guild_id.to_string(),
+                &format!("Salon {} créé : {} ({})", kind, channel.name, channel.id),
+            );
+        }
+    }
+
+    /// Déclenché quand un salon est supprimé.
+    async fn channel_delete(&self, ctx: Context, channel: GuildChannel, _messages: Option<Vec<serenity::model::channel::Message>>) {
+        let guild_id = channel.guild_id;
+        let kind = match channel.kind {
+            serenity::model::channel::ChannelType::Text => "texte",
+            serenity::model::channel::ChannelType::Voice => "vocal",
+            serenity::model::channel::ChannelType::Category => "categorie",
+            _ => "autre",
+        };
+
+        info!(guild_id = %guild_id, channel = %channel.name, kind, "Salon supprimé");
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "warn",
+                &guild_id.to_string(),
+                &format!("Salon {} supprimé : {}", kind, channel.name),
+            );
+        }
+    }
+
+    /// Déclenché quand un membre est banni.
+    async fn guild_ban_addition(&self, ctx: Context, guild_id: GuildId, banned_user: serenity::model::user::User) {
+        info!(guild_id = %guild_id, user = %banned_user.name, "Membre banni");
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "warn",
+                &guild_id.to_string(),
+                &format!("Membre banni : {} ({})", banned_user.name, banned_user.id),
+            );
+        }
+    }
+
+    /// Déclenché quand un membre est débanni.
+    async fn guild_ban_removal(&self, ctx: Context, guild_id: GuildId, unbanned_user: serenity::model::user::User) {
+        info!(guild_id = %guild_id, user = %unbanned_user.name, "Membre débanni");
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "info",
+                &guild_id.to_string(),
+                &format!("Membre débanni : {} ({})", unbanned_user.name, unbanned_user.id),
+            );
         }
     }
 
