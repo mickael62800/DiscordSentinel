@@ -38,6 +38,7 @@ impl JobClient {
             }
         };
 
+        let job_type_owned = job_type.to_string();
         let redis = self.redis.clone();
         let key = self.queue_key.clone();
 
@@ -48,7 +49,7 @@ impl JobClient {
                     if let Err(e) = conn.lpush::<_, _, ()>(&key, &json).await {
                         error!(error = %e, "LPUSH job échoué");
                     } else {
-                        debug!(job_type = job.job_type, "Job enqueued");
+                        debug!(job_type = %job_type_owned, "Job enqueued");
                     }
                 }
                 Err(e) => error!(error = %e, "Redis connection pour job"),
