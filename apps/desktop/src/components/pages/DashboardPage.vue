@@ -94,17 +94,17 @@ const infractionsChartData = computed(() => ({
   labels: labels.value,
   datasets: [
     {
-      label: "Warns",
+      label: "Avertissements",
       data: activity.value.map((a) => a.warns),
       backgroundColor: "#5bc0eb",
     },
     {
-      label: "Mutes",
+      label: "Sourdines",
       data: activity.value.map((a) => a.mutes),
       backgroundColor: "#fee75c",
     },
     {
-      label: "Bans",
+      label: "Bannissements",
       data: activity.value.map((a) => a.bans),
       backgroundColor: "#ed4245",
     },
@@ -119,7 +119,7 @@ const totalInfractions = computed(() => {
 });
 
 const doughnutData = computed(() => ({
-  labels: ["Warns", "Mutes", "Bans"],
+  labels: ["Avertissements", "Sourdines", "Bannissements"],
   datasets: [
     {
       data: [totalInfractions.value.w, totalInfractions.value.m, totalInfractions.value.b],

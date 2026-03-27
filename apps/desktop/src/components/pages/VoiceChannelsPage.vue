@@ -46,7 +46,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
       </div>
       <div class="stat-card">
         <span class="stat-value">{{ privateCount }}</span>
-        <span class="stat-label">Private</span>
+        <span class="stat-label">Prive</span>
       </div>
     </div>
 
@@ -58,14 +58,14 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
       <div v-else class="detail-content">
         <h2>{{ detail.channel.channel_name }}</h2>
         <div class="detail-grid">
-          <div><strong>Owner:</strong> {{ detail.channel.owner_name }}</div>
-          <div><strong>Type:</strong> <AppBadge :variant="kindVariant(detail.channel.kind)">{{ detail.channel.kind }}</AppBadge></div>
-          <div><strong>Visibility:</strong> {{ detail.channel.visibility }}</div>
-          <div><strong>Locked:</strong> {{ detail.channel.locked ? 'Yes' : 'No' }}</div>
-          <div><strong>Queue:</strong> {{ detail.channel.queue_enabled ? 'Enabled' : 'Disabled' }}</div>
-          <div v-if="detail.channel.member_limit"><strong>Limit:</strong> {{ detail.channel.member_limit }}</div>
-          <div v-if="detail.channel.status"><strong>Status:</strong> {{ detail.channel.status }}</div>
-          <div><strong>Created:</strong> {{ new Date(detail.channel.created_at).toLocaleString() }}</div>
+          <div><strong>Proprietaire :</strong> {{ detail.channel.owner_name }}</div>
+          <div><strong>Type :</strong> <AppBadge :variant="kindVariant(detail.channel.kind)">{{ detail.channel.kind }}</AppBadge></div>
+          <div><strong>Visibilite :</strong> {{ detail.channel.visibility }}</div>
+          <div><strong>Verrouille :</strong> {{ detail.channel.locked ? 'Oui' : 'Non' }}</div>
+          <div><strong>File d'attente :</strong> {{ detail.channel.queue_enabled ? 'Active' : 'Desactive' }}</div>
+          <div v-if="detail.channel.member_limit"><strong>Limite :</strong> {{ detail.channel.member_limit }}</div>
+          <div v-if="detail.channel.status"><strong>Statut :</strong> {{ detail.channel.status }}</div>
+          <div><strong>Cree le :</strong> {{ new Date(detail.channel.created_at).toLocaleString() }}</div>
         </div>
 
         <h3 v-if="detail.co_admins.length">Co-admins ({{ detail.co_admins.length }})</h3>
@@ -77,9 +77,9 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
         <div v-if="detail.bans.length" class="bans-table">
           <div v-for="ban in detail.bans" :key="ban.id" class="ban-row">
             <span>{{ ban.user_name }}</span>
-            <span>by {{ ban.banned_by }}</span>
+            <span>par {{ ban.banned_by }}</span>
             <span v-if="ban.reason">{{ ban.reason }}</span>
-            <span v-if="ban.expires_at">Expires: {{ new Date(ban.expires_at).toLocaleString() }}</span>
+            <span v-if="ban.expires_at">Expire : {{ new Date(ban.expires_at).toLocaleString() }}</span>
             <AppBadge v-else variant="danger">Permanent</AppBadge>
           </div>
         </div>
@@ -90,9 +90,9 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
     <div v-else>
       <div class="filter-row">
         <select v-model="filterKind" class="filter-select">
-          <option value="all">All types</option>
+          <option value="all">Tous les types</option>
           <option value="public">Public</option>
-          <option value="private">Private</option>
+          <option value="private">Prive</option>
         </select>
       </div>
 

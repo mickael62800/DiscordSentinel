@@ -31,7 +31,7 @@ function typeIcon(type: string): string {
       <h3>Notifications</h3>
       <div class="panel-actions">
         <button v-if="unreadCount > 0" class="mark-all" @click="markAllAsRead">
-          Mark all read
+          Tout marquer comme lu
         </button>
         <button class="close-btn" @click="closePanel">&times;</button>
       </div>
@@ -59,7 +59,7 @@ function typeIcon(type: string): string {
       </div>
 
       <div v-if="notifications.length === 0" class="empty">
-        No notifications
+        Aucune notification
       </div>
     </div>
   </div>

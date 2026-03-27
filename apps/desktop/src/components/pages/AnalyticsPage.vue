@@ -62,10 +62,10 @@ const trendData = computed(() => {
       return `${date.getDate()}/${date.getMonth() + 1}`;
     }),
     datasets: [
-      { label: "Warns", data: t.map((d) => d.warns), borderColor: "#5bc0eb", backgroundColor: "rgba(91,192,235,0.1)", fill: true, tension: 0.3 },
-      { label: "Deletes", data: t.map((d) => d.deletes), borderColor: "#ffa500", backgroundColor: "rgba(255,165,0,0.1)", fill: true, tension: 0.3 },
-      { label: "Mutes", data: t.map((d) => d.mutes), borderColor: "#fee75c", backgroundColor: "rgba(254,231,92,0.1)", fill: true, tension: 0.3 },
-      { label: "Bans", data: t.map((d) => d.bans), borderColor: "#ed4245", backgroundColor: "rgba(237,66,69,0.1)", fill: true, tension: 0.3 },
+      { label: "Avertissements", data: t.map((d) => d.warns), borderColor: "#5bc0eb", backgroundColor: "rgba(91,192,235,0.1)", fill: true, tension: 0.3 },
+      { label: "Suppressions", data: t.map((d) => d.deletes), borderColor: "#ffa500", backgroundColor: "rgba(255,165,0,0.1)", fill: true, tension: 0.3 },
+      { label: "Sourdines", data: t.map((d) => d.mutes), borderColor: "#fee75c", backgroundColor: "rgba(254,231,92,0.1)", fill: true, tension: 0.3 },
+      { label: "Bannissements", data: t.map((d) => d.bans), borderColor: "#ed4245", backgroundColor: "rgba(237,66,69,0.1)", fill: true, tension: 0.3 },
     ],
   };
 });
@@ -109,10 +109,10 @@ const topInfractorsData = computed(() => {
   return {
     labels: t.map((u) => u.username),
     datasets: [
-      { label: "Warns", data: t.map((u) => u.warns), backgroundColor: "#5bc0eb" },
-      { label: "Deletes", data: t.map((u) => u.deletes), backgroundColor: "#ffa500" },
-      { label: "Mutes", data: t.map((u) => u.mutes), backgroundColor: "#fee75c" },
-      { label: "Bans", data: t.map((u) => u.bans), backgroundColor: "#ed4245" },
+      { label: "Avertissements", data: t.map((u) => u.warns), backgroundColor: "#5bc0eb" },
+      { label: "Suppressions", data: t.map((u) => u.deletes), backgroundColor: "#ffa500" },
+      { label: "Sourdines", data: t.map((u) => u.mutes), backgroundColor: "#fee75c" },
+      { label: "Bannissements", data: t.map((u) => u.bans), backgroundColor: "#ed4245" },
     ],
   };
 });
@@ -138,12 +138,12 @@ const peakHoursData = computed(() => {
     labels: p.map((h) => h.label),
     datasets: [
       {
-        label: "Messages (moy)",
+        label: "Messages (moy.)",
         data: p.map((h) => h.avg_messages),
         backgroundColor: "rgba(88, 101, 242, 0.7)",
       },
       {
-        label: "Infractions (moy)",
+        label: "Infractions (moy.)",
         data: p.map((h) => h.avg_infractions),
         backgroundColor: "rgba(237, 66, 69, 0.7)",
       },

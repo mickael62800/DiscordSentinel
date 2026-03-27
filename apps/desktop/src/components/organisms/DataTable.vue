@@ -26,7 +26,7 @@ defineProps<{
         </tr>
         <tr v-if="rows.length === 0">
           <td :colspan="columns.length" class="empty">
-            {{ emptyMessage ?? "No data" }}
+            {{ emptyMessage ?? "Aucune donnee" }}
           </td>
         </tr>
       </tbody>

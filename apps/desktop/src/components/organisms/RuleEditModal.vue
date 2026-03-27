@@ -55,10 +55,10 @@ watch(() => props.rule, (r) => {
 }, { immediate: true });
 
 function validate(): string | null {
-  if (weight.value < 0) return "Weight must be >= 0";
-  if (thresholdWarn.value >= thresholdDelete.value) return "warn must be < delete";
-  if (thresholdDelete.value >= thresholdMute.value) return "delete must be < mute";
-  if (thresholdMute.value >= thresholdBan.value) return "mute must be < ban";
+  if (weight.value < 0) return "Le poids doit etre >= 0";
+  if (thresholdWarn.value >= thresholdDelete.value) return "warn doit etre < delete";
+  if (thresholdDelete.value >= thresholdMute.value) return "delete doit etre < mute";
+  if (thresholdMute.value >= thresholdBan.value) return "mute doit etre < ban";
   return null;
 }
 
@@ -98,7 +98,7 @@ async function handleSave() {
       <div class="modal-body">
         <div class="field">
           <label>Guild ID</label>
-          <input v-model="guildId" type="text" placeholder="default" />
+          <input v-model="guildId" type="text" placeholder="defaut" />
           <span class="hint">Discord server ID this rule applies to</span>
         </div>
 
@@ -108,10 +108,10 @@ async function handleSave() {
             <input v-model.number="weight" type="range" min="0" max="10" step="0.5" />
             <span class="range-value">{{ weight }}</span>
           </div>
-          <span class="hint">How much this flag contributes to the total score</span>
+          <span class="hint">Contribution de ce flag au score total</span>
         </div>
 
-        <div class="separator">Thresholds (must be strictly increasing)</div>
+        <div class="separator">Seuils (doivent etre strictement croissants)</div>
 
         <div class="thresholds-grid">
           <div class="field">
@@ -156,9 +156,9 @@ async function handleSave() {
       </div>
 
       <div class="modal-footer">
-        <AppButton variant="secondary" @click="emit('close')">Cancel</AppButton>
+        <AppButton variant="secondary" @click="emit('close')">Annuler</AppButton>
         <AppButton variant="primary" :disabled="saving" @click="handleSave">
-          {{ saving ? "Saving..." : "Save" }}
+          {{ saving ? "Sauvegarde..." : "Sauvegarder" }}
         </AppButton>
       </div>
     </div>
