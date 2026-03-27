@@ -74,6 +74,11 @@ impl SlowmodeManager {
 
     /// Désactive le slowmode en restaurant les valeurs précédentes.
     pub async fn deactivate(&self, ctx: &Context, guild_id: GuildId) {
+        self.deactivate_with_http(&ctx.http, guild_id).await;
+    }
+
+    /// Désactive le slowmode via un Arc<Http> (pour les background tasks sans Context).
+    pub async fn deactivate_with_http(&self, http: &serenity::http::Http, guild_id: GuildId) {
         let entry = match self.active.remove(&guild_id) {
             Some((_, data)) => data,
             None => return,
@@ -84,7 +89,7 @@ impl SlowmodeManager {
         for (channel_id_raw, old_rate) in &previous_states {
             let channel_id = serenity::model::id::ChannelId::new(*channel_id_raw);
             let edit = EditChannel::new().rate_limit_per_user(*old_rate);
-            if let Err(e) = channel_id.edit(&ctx.http, edit).await {
+            if let Err(e) = channel_id.edit(http, edit).await {
                 error!(
                     error = %e,
                     channel_id = %channel_id,

@@ -114,7 +114,6 @@ async fn main() {
     // Background task: revert slowmode après expiration
     let data_for_slowmode = Arc::clone(&client.data);
     let http_for_slowmode = Arc::clone(&client.http);
-    let cache_for_slowmode = Arc::clone(&client.cache);
     let slowmode_duration = config.slowmode_duration_secs;
     tokio::spawn(async move {
         loop {
@@ -128,17 +127,7 @@ async fn main() {
 
             let expired = slowmode.expired_guilds(slowmode_duration);
             for guild_id in expired {
-                // Construire un faux Context pour passer à deactivate
-                // On utilise directement les channels via HTTP
-                let fake_ctx = serenity::client::Context {
-                    data: Arc::clone(&data_for_slowmode),
-                    shard: serenity::gateway::ShardMessenger::new(tokio::sync::mpsc::unbounded_channel().0),
-                    shard_id: serenity::model::id::ShardId(0),
-                    http: Arc::clone(&http_for_slowmode),
-                    cache: Arc::clone(&cache_for_slowmode),
-                };
-
-                slowmode.deactivate(&fake_ctx, guild_id).await;
+                slowmode.deactivate_with_http(&http_for_slowmode, guild_id).await;
             }
         }
     });

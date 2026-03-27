@@ -293,7 +293,8 @@ impl EventHandler for Handler {
             // Trouver dans quelle guild l'utilisateur est en quarantaine
             let mut released = false;
 
-            if let Some(cache) = ctx.cache.as_ref() {
+            {
+                let cache = &ctx.cache;
                 for guild_id in cache.guilds() {
                     if !quarantine.is_quarantined(guild_id, user_id) {
                         continue;
