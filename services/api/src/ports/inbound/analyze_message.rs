@@ -4,6 +4,7 @@ use crate::domain::entities::MessageAnalysis;
 use crate::domain::errors::DomainError;
 use crate::domain::value_objects::DetectionFlags;
 
+#[allow(dead_code)]
 pub struct AnalyzeMessageCommand {
     pub guild_id: String,
     pub channel_id: String,

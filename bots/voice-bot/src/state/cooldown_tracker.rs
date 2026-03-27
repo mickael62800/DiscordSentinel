@@ -31,10 +31,34 @@ impl CooldownTracker {
     pub fn set(&self, user_id: UserId) {
         self.map.insert(user_id, Instant::now());
     }
+}
 
-    /// Nettoie les entrees expirees.
-    #[allow(dead_code)]
-    pub fn cleanup(&self) {
-        self.map.retain(|_, instant| instant.elapsed().as_secs() < COOLDOWN_SECS * 2);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn uid(id: u64) -> UserId { UserId::new(id) }
+
+    #[test]
+    fn test_no_cooldown_initially() {
+        let tracker = CooldownTracker::new();
+        assert!(tracker.check(uid(1)).is_none());
+    }
+
+    #[test]
+    fn test_cooldown_after_set() {
+        let tracker = CooldownTracker::new();
+        tracker.set(uid(1));
+        let remaining = tracker.check(uid(1));
+        assert!(remaining.is_some());
+        assert!(remaining.unwrap() <= COOLDOWN_SECS);
+    }
+
+    #[test]
+    fn test_different_users_independent() {
+        let tracker = CooldownTracker::new();
+        tracker.set(uid(1));
+        assert!(tracker.check(uid(1)).is_some());
+        assert!(tracker.check(uid(2)).is_none());
     }
 }

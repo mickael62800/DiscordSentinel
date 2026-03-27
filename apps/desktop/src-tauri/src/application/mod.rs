@@ -11,3 +11,8 @@ pub mod rules_service;
 pub mod security_service;
 pub mod tickets_service;
 pub mod voice_channels_service;
+pub mod audit_logs_service;
+pub mod dashboard_charts_service;
+pub mod levels_service;
+pub mod role_panels_service;
+pub mod watched_users_service;

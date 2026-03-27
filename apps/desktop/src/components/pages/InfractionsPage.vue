@@ -3,6 +3,7 @@ import { useInfractions } from "../../composables/useInfractions";
 import type { TableColumn } from "../../types";
 import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
+import { infractionTypeVariant } from "../../utils/variants";
 
 const { infractions, loading } = useInfractions();
 
@@ -14,15 +15,6 @@ const columns: TableColumn[] = [
   { key: "moderator", label: "Moderateur" },
   { key: "created_at", label: "Date" },
 ];
-
-function typeVariant(type: string): "danger" | "warning" | "info" | "default" {
-  switch (type) {
-    case "ban": return "danger";
-    case "mute": return "warning";
-    case "warn": return "info";
-    default: return "default";
-  }
-}
 </script>
 
 <template>
@@ -44,7 +36,7 @@ function typeVariant(type: string): "danger" | "warning" | "info" | "default" {
         </div>
       </template>
       <template #cell-infraction_type="{ value }">
-        <AppBadge :label="String(value)" :variant="typeVariant(String(value))" />
+        <AppBadge :label="String(value)" :variant="infractionTypeVariant(String(value))" />
       </template>
       <template #cell-created_at="{ value }">
         <span class="mono">{{ value }}</span>

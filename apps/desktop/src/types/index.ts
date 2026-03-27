@@ -257,3 +257,130 @@ export interface ConductPointsLog {
   points_after: number;
   created_at: string;
 }
+
+// ── Role Panels ──
+
+export interface RolePanel {
+  id: string;
+  guild_id: string;
+  channel_id: string;
+  message_id: string | null;
+  title: string;
+  description: string;
+  mode: string;
+  max_roles: number | null;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface RolePanelEntry {
+  id: string;
+  role_id: string;
+  role_name: string;
+  emoji: string | null;
+  label: string;
+  style: string;
+  position: number;
+}
+
+export interface RolePanelDetail {
+  panel: RolePanel;
+  entries: RolePanelEntry[];
+}
+
+export interface AutoRoleConfig {
+  id: string;
+  guild_id: string;
+  role_id: string;
+  role_name: string;
+  delay_secs: number;
+  enabled: boolean;
+}
+
+// ── Dashboard Charts ──
+
+export interface DailyActivity {
+  day: string;
+  messages: number;
+  voice_minutes: number;
+  active_members: number;
+  new_members: number;
+  infractions: number;
+  warns: number;
+  mutes: number;
+  bans: number;
+}
+
+// ── Levels / XP ──
+
+export interface LevelConfig {
+  guild_id: string;
+  xp_per_message: number;
+  xp_per_voice_minute: number;
+  xp_cooldown_secs: number;
+  level_up_channel_id: string | null;
+  level_up_message: string;
+  excluded_channels: string[];
+  enabled: boolean;
+}
+
+export interface UserLevel {
+  id: string;
+  guild_id: string;
+  user_id: string;
+  username: string;
+  xp: number;
+  level: number;
+  xp_current: number;
+  xp_needed: number;
+  last_xp_at: string;
+}
+
+export interface LevelReward {
+  id: string;
+  guild_id: string;
+  level: number;
+  role_id: string;
+}
+
+// ── Audit Logs ──
+
+export interface AuditLog {
+  id: string;
+  guild_id: string;
+  event_type: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  target_id: string | null;
+  target_name: string | null;
+  channel_id: string | null;
+  channel_name: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}
+
+// ── Watched Users (Surveillance) ──
+
+export interface WatchedUser {
+  user_id: string;
+  username: string;
+  guild_id: string;
+  guild_name: string;
+  risk_level: string;
+  total_warns: number;
+  total_mutes: number;
+  total_bans: number;
+  conduct_points: number | null;
+  max_conduct_points: number | null;
+  last_incident_at: string | null;
+  security_events_count: number;
+  first_seen_at: string;
+}
+
+export interface UserDossier {
+  user: WatchedUser;
+  infractions: Infraction[];
+  moderation_actions: ModerationActionResponse[];
+  security_events: SecurityEvent[];
+  conduct_log: ConductPointsLog[];
+}

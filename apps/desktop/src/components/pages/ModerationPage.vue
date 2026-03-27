@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useModeration } from "../../composables/useModeration";
 import AppButton from "../atoms/AppButton.vue";
 import AppBadge from "../atoms/AppBadge.vue";
+import { actionVariant } from "../../utils/variants";
 
 const { submitting, history, historyLoading, logAction, fetchHistory } = useModeration();
 
@@ -56,14 +57,6 @@ async function handleLookup() {
   await fetchHistory(lookupGuildId.value, lookupUserId.value);
 }
 
-function actionVariant(action: string): "danger" | "warning" | "info" | "default" {
-  switch (action) {
-    case "ban": return "danger";
-    case "mute": return "warning";
-    case "warn": return "info";
-    default: return "default";
-  }
-}
 </script>
 
 <template>

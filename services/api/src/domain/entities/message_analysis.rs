@@ -2,6 +2,7 @@ use crate::domain::value_objects::Action;
 
 /// Résultat de l'analyse d'un message par le domaine.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct MessageAnalysis {
     pub action: Action,
     pub reason: String,

@@ -5,6 +5,7 @@ import type { TableColumn } from "../../types";
 import FilterBar from "../molecules/FilterBar.vue";
 import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
+import { levelVariant } from "../../utils/variants";
 
 const { filteredLogs, bots, loading, filterLevel, filterBot } = useLogs();
 
@@ -40,10 +41,6 @@ function onFilterUpdate(index: number, value: string) {
   if (index === 1) filterBot.value = value;
 }
 
-function levelVariant(level: string): "info" | "warn" | "error" | "default" {
-  if (level === "info" || level === "warn" || level === "error") return level;
-  return "default";
-}
 </script>
 
 <template>

@@ -18,6 +18,7 @@ pub struct Rule {
     pub updated_at: DateTime<Utc>,
 }
 
+#[allow(dead_code)]
 impl Rule {
     pub fn new(guild_id: String, flag_type: FlagType) -> Self {
         let now = Utc::now();
@@ -41,6 +42,13 @@ impl Rule {
             FlagType::Spam => 3.0,
             FlagType::Insult => 5.0,
             FlagType::Link => 1.0,
+            FlagType::Phishing => 7.0,
+            FlagType::Nsfw => 8.0,
+            FlagType::Illicit => 9.0,
+            FlagType::Anger => 3.0,
+            FlagType::Rage => 6.0,
+            FlagType::Threat => 8.0,
+            FlagType::Harassment => 7.0,
         }
     }
 }

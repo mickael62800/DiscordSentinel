@@ -4,8 +4,9 @@ use std::pin::Pin;
 use super::entities::{
     BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry,
     ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats,
-    Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel,
-    VoiceChannelDetail,
+    AuditLog, AutoRoleConfig, DailyActivity, LevelConfig, LevelReward, RolePanel, RolePanelDetail,
+    Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier,
+    UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser,
 };
 
 type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
@@ -68,6 +69,31 @@ pub trait ConductRepository: Send + Sync + 'static {
     fn get_log(&self, guild_id: String, user_id: String) -> BoxFut<Vec<ConductPointsLog>>;
 }
 
+pub trait RolePanelsRepository: Send + Sync + 'static {
+    fn get_panels(&self, guild_id: String) -> BoxFut<Vec<RolePanel>>;
+    fn get_panel(&self, panel_id: String) -> BoxFut<RolePanelDetail>;
+    fn get_auto_roles(&self, guild_id: String) -> BoxFut<Vec<AutoRoleConfig>>;
+}
+
+pub trait DashboardChartsRepository: Send + Sync + 'static {
+    fn get_activity_trend(&self, guild_id: Option<String>, days: Option<i32>) -> BoxFut<Vec<DailyActivity>>;
+}
+
+pub trait LevelRepository: Send + Sync + 'static {
+    fn get_level_config(&self, guild_id: String) -> BoxFut<LevelConfig>;
+    fn get_level_leaderboard(&self, guild_id: String) -> BoxFut<Vec<UserLevel>>;
+    fn get_level_rewards(&self, guild_id: String) -> BoxFut<Vec<LevelReward>>;
+}
+
+pub trait AuditLogRepository: Send + Sync + 'static {
+    fn get_audit_logs(&self, guild_id: Option<String>, event_type: Option<String>, limit: Option<i64>) -> BoxFut<Vec<AuditLog>>;
+}
+
+pub trait WatchedUsersRepository: Send + Sync + 'static {
+    fn get_watched_users(&self, guild_id: Option<String>) -> BoxFut<Vec<WatchedUser>>;
+    fn get_user_dossier(&self, guild_id: String, user_id: String) -> BoxFut<UserDossier>;
+}
+
 pub trait AppAdapter:
     GuildRepository
     + BotConfigRepository
@@ -80,5 +106,10 @@ pub trait AppAdapter:
     + ModerationRepository
     + VoiceChannelRepository
     + ConductRepository
+    + WatchedUsersRepository
+    + AuditLogRepository
+    + LevelRepository
+    + DashboardChartsRepository
+    + RolePanelsRepository
 {
 }

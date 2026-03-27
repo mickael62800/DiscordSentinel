@@ -116,3 +116,87 @@ impl StatsTracker {
         entries
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_record_messages() {
+        let tracker = StatsTracker::new();
+        tracker.record_message(1, 100).await;
+        tracker.record_message(1, 100).await;
+        tracker.record_message(1, 100).await;
+
+        let stats = tracker.get_user_stats(1, 100).await;
+        assert_eq!(stats.message_count, 3);
+        assert_eq!(stats.voice_seconds, 0);
+    }
+
+    #[tokio::test]
+    async fn test_different_users() {
+        let tracker = StatsTracker::new();
+        tracker.record_message(1, 100).await;
+        tracker.record_message(1, 100).await;
+        tracker.record_message(1, 200).await;
+
+        let s1 = tracker.get_user_stats(1, 100).await;
+        let s2 = tracker.get_user_stats(1, 200).await;
+        assert_eq!(s1.message_count, 2);
+        assert_eq!(s2.message_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_different_guilds() {
+        let tracker = StatsTracker::new();
+        tracker.record_message(1, 100).await;
+        tracker.record_message(2, 100).await;
+
+        let s1 = tracker.get_user_stats(1, 100).await;
+        let s2 = tracker.get_user_stats(2, 100).await;
+        assert_eq!(s1.message_count, 1);
+        assert_eq!(s2.message_count, 1);
+    }
+
+    #[tokio::test]
+    async fn test_voice_leave_without_join() {
+        let tracker = StatsTracker::new();
+        let duration = tracker.voice_leave(1, 100).await;
+        assert_eq!(duration, 0);
+    }
+
+    #[tokio::test]
+    async fn test_voice_join_then_leave() {
+        let tracker = StatsTracker::new();
+        tracker.voice_join(1, 100).await;
+        // Sleep tres court pour avoir une duree > 0
+        tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        let duration = tracker.voice_leave(1, 100).await;
+        // La duree en secondes sera 0 (< 1s) mais le code ne doit pas panic
+        assert!(duration < 2);
+    }
+
+    #[tokio::test]
+    async fn test_guild_stats_sorted_by_messages() {
+        let tracker = StatsTracker::new();
+        tracker.record_message(1, 100).await;
+        tracker.record_message(1, 200).await;
+        tracker.record_message(1, 200).await;
+        tracker.record_message(1, 200).await;
+
+        let guild_stats = tracker.get_guild_stats(1).await;
+        assert_eq!(guild_stats.len(), 2);
+        // uid 200 a 3 messages, uid 100 a 1 → 200 en premier
+        assert_eq!(guild_stats[0].0, 200);
+        assert_eq!(guild_stats[0].1.message_count, 3);
+        assert_eq!(guild_stats[1].0, 100);
+    }
+
+    #[tokio::test]
+    async fn test_unknown_user_returns_default() {
+        let tracker = StatsTracker::new();
+        let stats = tracker.get_user_stats(1, 999).await;
+        assert_eq!(stats.message_count, 0);
+        assert_eq!(stats.voice_seconds, 0);
+    }
+}

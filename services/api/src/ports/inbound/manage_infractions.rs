@@ -11,6 +11,7 @@ pub struct InfractionFilters {
 }
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait ManageInfractionsUseCase: Send + Sync {
     async fn list_infractions(
         &self,

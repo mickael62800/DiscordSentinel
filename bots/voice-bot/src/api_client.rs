@@ -107,23 +107,10 @@ pub struct VoiceChannelResponse {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
-pub struct WhitelistEntryResponse {
-    pub target_id: String,
-    pub target_name: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 pub struct VoiceChannelDetailResponse {
     pub channel: VoiceChannelResponse,
     pub co_admins: Vec<serde_json::Value>,
     pub bans: Vec<serde_json::Value>,
-}
-
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct BanCheckResponse {
-    pub banned: bool,
 }
 
 // ── Client ──
@@ -341,42 +328,7 @@ impl ApiClient {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub async fn remove_co_admin(&self, channel_id: &str, user_id: &str) -> Result<(), String> {
-        let req = self.client.delete(format!(
-            "{}/api/voice-channels/by-channel/{channel_id}/co-admins/{user_id}",
-            self.base_url
-        ));
-
-        self.auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
-        Ok(())
-    }
-
     // ── Whitelist ──
-
-    #[allow(dead_code)]
-    pub async fn get_whitelist(
-        &self,
-        guild_id: &str,
-        owner_id: &str,
-    ) -> Result<Vec<WhitelistEntryResponse>, String> {
-        let req = self.client.get(format!(
-            "{}/api/voice-channels/whitelist/{guild_id}/{owner_id}",
-            self.base_url
-        ));
-
-        self.auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Vec<WhitelistEntryResponse>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
-    }
 
     pub async fn add_to_whitelist(&self, request: &AddWhitelistRequest) -> Result<(), String> {
         let req = self
@@ -416,40 +368,6 @@ impl ApiClient {
             .map_err(|e| format!("Erreur reseau: {e}"))?;
 
         Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub async fn unban_user(&self, channel_id: &str, user_id: &str) -> Result<(), String> {
-        let req = self.client.delete(format!(
-            "{}/api/voice-channels/by-channel/{channel_id}/bans/{user_id}",
-            self.base_url
-        ));
-
-        self.auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
-        Ok(())
-    }
-
-    #[allow(dead_code)]
-    pub async fn check_ban(&self, channel_id: &str, user_id: &str) -> Result<bool, String> {
-        let req = self.client.get(format!(
-            "{}/api/voice-channels/by-channel/{channel_id}/bans/{user_id}",
-            self.base_url
-        ));
-
-        let resp = self
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<BanCheckResponse>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))?;
-
-        Ok(resp.banned)
     }
 
     // ── Guild registration ──

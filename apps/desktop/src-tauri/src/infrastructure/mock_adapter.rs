@@ -1,8 +1,8 @@
 use std::pin::Pin;
 use std::future::Future;
 
-use crate::domain::entities::{BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, TicketMessage, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel, VoiceChannelDetail};
-use crate::domain::ports::{AppAdapter, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository};
+use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, DailyActivity, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, TicketMessage, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, LevelRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
 
 pub struct MockAdapter;
 
@@ -433,6 +433,164 @@ impl ConductRepository for MockAdapter {
         Box::pin(async { Err("Not implemented in mock".into()) })
     }
     fn get_log(&self, _guild_id: String, _user_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<ConductPointsLog>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+}
+
+impl DashboardChartsRepository for MockAdapter {
+    fn get_activity_trend(&self, _guild_id: Option<String>, _days: Option<i32>) -> Pin<Box<dyn Future<Output = Result<Vec<DailyActivity>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+}
+
+impl LevelRepository for MockAdapter {
+    fn get_level_config(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<LevelConfig, String>> + Send>> {
+        Box::pin(async {
+            Ok(LevelConfig {
+                guild_id: String::new(),
+                xp_per_message: 15,
+                xp_per_voice_minute: 5,
+                xp_cooldown_secs: 60,
+                level_up_channel_id: None,
+                level_up_message: "GG {user}, tu es maintenant niveau **{level}** !".into(),
+                excluded_channels: vec![],
+                enabled: true,
+            })
+        })
+    }
+    fn get_level_leaderboard(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<UserLevel>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+    fn get_level_rewards(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<LevelReward>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+}
+
+impl AuditLogRepository for MockAdapter {
+    fn get_audit_logs(&self, _guild_id: Option<String>, _event_type: Option<String>, _limit: Option<i64>) -> Pin<Box<dyn Future<Output = Result<Vec<AuditLog>, String>> + Send>> {
+        Box::pin(async {
+            Ok(vec![
+                AuditLog {
+                    id: "al-1".into(),
+                    guild_id: "111222333".into(),
+                    event_type: "message_delete".into(),
+                    actor_id: None,
+                    actor_name: None,
+                    target_id: Some("msg-123".into()),
+                    target_name: None,
+                    channel_id: Some("444555666".into()),
+                    channel_name: Some("#general".into()),
+                    details: serde_json::json!({}),
+                    created_at: "2026-03-27 10:00:00".into(),
+                },
+                AuditLog {
+                    id: "al-2".into(),
+                    guild_id: "111222333".into(),
+                    event_type: "member_join".into(),
+                    actor_id: None,
+                    actor_name: None,
+                    target_id: Some("123456789".into()),
+                    target_name: Some("NewUser#0001".into()),
+                    channel_id: None,
+                    channel_name: None,
+                    details: serde_json::json!({"account_created_at": "2026-03-27"}),
+                    created_at: "2026-03-27 09:30:00".into(),
+                },
+            ])
+        })
+    }
+}
+
+fn mock_toxic_user() -> WatchedUser {
+    WatchedUser {
+        user_id: "123456789".into(),
+        username: "ToxicUser#1234".into(),
+        guild_id: "111222333".into(),
+        guild_name: "Community FR".into(),
+        risk_level: "critical".into(),
+        total_warns: 3,
+        total_mutes: 1,
+        total_bans: 1,
+        conduct_points: Some(2),
+        max_conduct_points: Some(12),
+        last_incident_at: Some("2026-03-26 10:32:15".into()),
+        security_events_count: 1,
+        first_seen_at: "2026-03-20 08:00:00".into(),
+    }
+}
+
+impl WatchedUsersRepository for MockAdapter {
+    fn get_watched_users(&self, _guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<WatchedUser>, String>> + Send>> {
+        Box::pin(async {
+            Ok(vec![
+                mock_toxic_user(),
+                WatchedUser {
+                    user_id: "987654321".into(),
+                    username: "Spammer#5678".into(),
+                    guild_id: "111222333".into(),
+                    guild_name: "Community FR".into(),
+                    risk_level: "high".into(),
+                    total_warns: 2,
+                    total_mutes: 1,
+                    total_bans: 0,
+                    conduct_points: Some(6),
+                    max_conduct_points: Some(12),
+                    last_incident_at: Some("2026-03-25 14:20:00".into()),
+                    security_events_count: 0,
+                    first_seen_at: "2026-03-22 12:00:00".into(),
+                },
+            ])
+        })
+    }
+
+    fn get_user_dossier(&self, _guild_id: String, _user_id: String) -> Pin<Box<dyn Future<Output = Result<UserDossier, String>> + Send>> {
+        Box::pin(async {
+            Ok(UserDossier {
+                user: mock_toxic_user(),
+                infractions: vec![
+                    Infraction {
+                        id: "1".into(),
+                        user_id: "123456789".into(),
+                        username: "ToxicUser#1234".into(),
+                        server: "Community FR".into(),
+                        infraction_type: "warn".into(),
+                        reason: "Spam in #general".into(),
+                        created_at: "2026-03-26 10:32:15".into(),
+                        moderator: "automod-bot".into(),
+                    },
+                ],
+                moderation_actions: vec![
+                    ModerationActionResponse {
+                        id: "mod-1".into(),
+                        action_type: "warn".into(),
+                        target_name: "ToxicUser#1234".into(),
+                        reason: "Spam in #general".into(),
+                    },
+                ],
+                security_events: vec![],
+                conduct_log: vec![
+                    ConductPointsLog {
+                        id: "cl-1".into(),
+                        delta: -1,
+                        reason: "warn".into(),
+                        points_before: 3,
+                        points_after: 2,
+                        created_at: "2026-03-26 10:32:15".into(),
+                    },
+                ],
+            })
+        })
+    }
+}
+
+impl RolePanelsRepository for MockAdapter {
+    fn get_panels(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<RolePanel>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+    fn get_panel(&self, _panel_id: String) -> Pin<Box<dyn Future<Output = Result<RolePanelDetail, String>> + Send>> {
+        Box::pin(async { Err("Not implemented in mock".into()) })
+    }
+    fn get_auto_roles(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<AutoRoleConfig>, String>> + Send>> {
         Box::pin(async { Ok(vec![]) })
     }
 }

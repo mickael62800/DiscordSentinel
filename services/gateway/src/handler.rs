@@ -6,36 +6,59 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use tracing::{info, warn};
 
-use super::broadcaster::EventBroadcaster;
+use crate::broadcaster::EventBroadcaster;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct WsQuery {
     pub token: Option<String>,
 }
 
+#[derive(Clone)]
+pub struct GatewayState {
+    pub broadcaster: Arc<EventBroadcaster>,
+    pub api_key: String,
+}
+
+/// Handler WebSocket — auth via query param ?token=
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Query(query): Query<WsQuery>,
-    State((broadcaster, api_key)): State<(Arc<EventBroadcaster>, String)>,
+    State(state): State<GatewayState>,
 ) -> Response {
     // Auth check
-    if !api_key.is_empty() {
+    if !state.api_key.is_empty() {
         match query.token {
-            Some(ref t) if t == &api_key => {}
+            Some(ref t) if t == &state.api_key => {}
             _ => {
-                warn!("WebSocket connection rejected: invalid token");
+                warn!("WebSocket rejected: invalid token");
                 return StatusCode::UNAUTHORIZED.into_response();
             }
         }
     }
 
-    ws.on_upgrade(move |socket| handle_socket(socket, broadcaster))
+    ws.on_upgrade(move |socket| handle_socket(socket, state.broadcaster))
 }
 
 async fn handle_socket(mut socket: WebSocket, broadcaster: Arc<EventBroadcaster>) {
-    info!("WebSocket client connected");
+    // Verifier la limite de connexions
+    let mut rx = match broadcaster.subscribe() {
+        Some(rx) => rx,
+        None => {
+            warn!("WebSocket rejected: max connections reached");
+            let _ = socket
+                .send(Message::Close(Some(axum::extract::ws::CloseFrame {
+                    code: 1013, // Try Again Later
+                    reason: "Too many connections".into(),
+                })))
+                .await;
+            return;
+        }
+    };
 
-    let mut rx = broadcaster.subscribe();
+    info!(
+        clients = broadcaster.connected_count(),
+        "WebSocket client connected"
+    );
 
     loop {
         tokio::select! {
@@ -49,12 +72,12 @@ async fn handle_socket(mut socket: WebSocket, broadcaster: Arc<EventBroadcaster>
                                 }
                             }
                             Err(e) => {
-                                warn!("Failed to serialize WS event: {}", e);
+                                warn!(error = %e, "Failed to serialize event");
                             }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        warn!("WebSocket client lagged, skipped {} events", n);
+                        warn!(skipped = n, "Client lagged");
                     }
                     Err(_) => break,
                 }
@@ -73,5 +96,9 @@ async fn handle_socket(mut socket: WebSocket, broadcaster: Arc<EventBroadcaster>
         }
     }
 
-    info!("WebSocket client disconnected");
+    broadcaster.unsubscribe();
+    info!(
+        clients = broadcaster.connected_count(),
+        "WebSocket client disconnected"
+    );
 }

@@ -49,6 +49,7 @@ impl From<InfractionRow> for Infraction {
                 spam: false,
                 insult: false,
                 link: false,
+                phishing: false,
             }),
             score: row.score,
             action: Action::from_str_lossy(&row.action),

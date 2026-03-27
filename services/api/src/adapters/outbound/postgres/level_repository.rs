@@ -1,0 +1,222 @@
+use async_trait::async_trait;
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::domain::entities::{LevelConfig, LevelReward, UserLevel};
+use crate::domain::errors::DomainError;
+use crate::ports::outbound::LevelRepository;
+
+pub struct PgLevelRepository {
+    pool: PgPool,
+}
+
+impl PgLevelRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct LevelConfigRow {
+    guild_id: String,
+    xp_per_message: i32,
+    xp_per_voice_minute: i32,
+    xp_cooldown_secs: i32,
+    level_up_channel_id: Option<String>,
+    level_up_message: String,
+    excluded_channels: Vec<String>,
+    enabled: bool,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct UserLevelRow {
+    id: Uuid,
+    guild_id: String,
+    user_id: String,
+    username: String,
+    xp: i64,
+    level: i32,
+    last_xp_at: chrono::DateTime<chrono::Utc>,
+    created_at: chrono::DateTime<chrono::Utc>,
+    updated_at: chrono::DateTime<chrono::Utc>,
+}
+
+#[derive(sqlx::FromRow)]
+struct LevelRewardRow {
+    id: Uuid,
+    guild_id: String,
+    level: i32,
+    role_id: String,
+}
+
+impl From<LevelConfigRow> for LevelConfig {
+    fn from(r: LevelConfigRow) -> Self {
+        Self {
+            guild_id: r.guild_id,
+            xp_per_message: r.xp_per_message,
+            xp_per_voice_minute: r.xp_per_voice_minute,
+            xp_cooldown_secs: r.xp_cooldown_secs,
+            level_up_channel_id: r.level_up_channel_id,
+            level_up_message: r.level_up_message,
+            excluded_channels: r.excluded_channels,
+            enabled: r.enabled,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+impl From<UserLevelRow> for UserLevel {
+    fn from(r: UserLevelRow) -> Self {
+        Self {
+            id: r.id,
+            guild_id: r.guild_id,
+            user_id: r.user_id,
+            username: r.username,
+            xp: r.xp,
+            level: r.level,
+            last_xp_at: r.last_xp_at,
+            created_at: r.created_at,
+            updated_at: r.updated_at,
+        }
+    }
+}
+
+impl From<LevelRewardRow> for LevelReward {
+    fn from(r: LevelRewardRow) -> Self {
+        Self {
+            id: r.id,
+            guild_id: r.guild_id,
+            level: r.level,
+            role_id: r.role_id,
+        }
+    }
+}
+
+#[async_trait]
+impl LevelRepository for PgLevelRepository {
+    async fn get_config(&self, guild_id: &str) -> Result<Option<LevelConfig>, DomainError> {
+        let row = sqlx::query_as::<_, LevelConfigRow>(
+            "SELECT * FROM level_config WHERE guild_id = $1",
+        )
+        .bind(guild_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.map(LevelConfig::from))
+    }
+
+    async fn upsert_config(&self, config: &LevelConfig) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"INSERT INTO level_config (guild_id, xp_per_message, xp_per_voice_minute, xp_cooldown_secs, level_up_channel_id, level_up_message, excluded_channels, enabled, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
+               ON CONFLICT (guild_id) DO UPDATE SET
+                 xp_per_message = $2, xp_per_voice_minute = $3, xp_cooldown_secs = $4,
+                 level_up_channel_id = $5, level_up_message = $6, excluded_channels = $7,
+                 enabled = $8, updated_at = NOW()"#,
+        )
+        .bind(&config.guild_id)
+        .bind(config.xp_per_message)
+        .bind(config.xp_per_voice_minute)
+        .bind(config.xp_cooldown_secs)
+        .bind(&config.level_up_channel_id)
+        .bind(&config.level_up_message)
+        .bind(&config.excluded_channels)
+        .bind(config.enabled)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<Option<UserLevel>, DomainError> {
+        let row = sqlx::query_as::<_, UserLevelRow>(
+            "SELECT * FROM user_levels WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.map(UserLevel::from))
+    }
+
+    async fn upsert_user_level(&self, user: &UserLevel) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"INSERT INTO user_levels (id, guild_id, user_id, username, xp, level, last_xp_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+               ON CONFLICT (guild_id, user_id) DO UPDATE SET
+                 username = $4, xp = $5, level = $6, last_xp_at = $7, updated_at = NOW()"#,
+        )
+        .bind(user.id)
+        .bind(&user.guild_id)
+        .bind(&user.user_id)
+        .bind(&user.username)
+        .bind(user.xp)
+        .bind(user.level)
+        .bind(user.last_xp_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+        let rows = sqlx::query_as::<_, UserLevelRow>(
+            "SELECT * FROM user_levels WHERE guild_id = $1 ORDER BY xp DESC LIMIT $2",
+        )
+        .bind(guild_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(UserLevel::from).collect())
+    }
+
+    async fn get_rewards(&self, guild_id: &str) -> Result<Vec<LevelReward>, DomainError> {
+        let rows = sqlx::query_as::<_, LevelRewardRow>(
+            "SELECT * FROM level_rewards WHERE guild_id = $1 ORDER BY level ASC",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(LevelReward::from).collect())
+    }
+
+    async fn upsert_reward(&self, reward: &LevelReward) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"INSERT INTO level_rewards (id, guild_id, level, role_id)
+               VALUES ($1, $2, $3, $4)
+               ON CONFLICT (guild_id, level) DO UPDATE SET role_id = $4"#,
+        )
+        .bind(reward.id)
+        .bind(&reward.guild_id)
+        .bind(reward.level)
+        .bind(&reward.role_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn delete_reward(&self, guild_id: &str, level: i32) -> Result<(), DomainError> {
+        sqlx::query("DELETE FROM level_rewards WHERE guild_id = $1 AND level = $2")
+            .bind(guild_id)
+            .bind(level)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+}

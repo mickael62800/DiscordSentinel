@@ -1,0 +1,45 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use chrono::Utc;
+use uuid::Uuid;
+
+use crate::domain::entities::AuditLog;
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::manage_audit_logs::{AuditLogFilters, CreateAuditLogCommand, ManageAuditLogsUseCase};
+use crate::ports::outbound::AuditLogRepository;
+
+pub struct ManageAuditLogsService {
+    repo: Arc<dyn AuditLogRepository>,
+}
+
+impl ManageAuditLogsService {
+    pub fn new(repo: Arc<dyn AuditLogRepository>) -> Self {
+        Self { repo }
+    }
+}
+
+#[async_trait]
+impl ManageAuditLogsUseCase for ManageAuditLogsService {
+    async fn create(&self, cmd: CreateAuditLogCommand) -> Result<AuditLog, DomainError> {
+        let log = AuditLog {
+            id: Uuid::new_v4(),
+            guild_id: cmd.guild_id,
+            event_type: cmd.event_type,
+            actor_id: cmd.actor_id,
+            actor_name: cmd.actor_name,
+            target_id: cmd.target_id,
+            target_name: cmd.target_name,
+            channel_id: cmd.channel_id,
+            channel_name: cmd.channel_name,
+            details: cmd.details,
+            created_at: Utc::now(),
+        };
+        self.repo.save(&log).await?;
+        Ok(log)
+    }
+
+    async fn list(&self, guild_id: Option<&str>, filters: AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> {
+        self.repo.find_all(guild_id, &filters).await
+    }
+}

@@ -4,6 +4,7 @@ use crate::domain::entities::UserStats;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
+#[allow(dead_code)]
 pub trait StatsRepository: Send + Sync {
     async fn upsert(&self, stats: &UserStats) -> Result<(), DomainError>;
     async fn find_by_user(&self, guild_id: &str, user_id: &str) -> Result<Option<UserStats>, DomainError>;

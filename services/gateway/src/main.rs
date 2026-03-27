@@ -1,0 +1,158 @@
+mod broadcaster;
+mod config;
+mod handler;
+mod health;
+mod redis_subscriber;
+
+use std::sync::Arc;
+
+use axum::http::{header, HeaderValue, Method};
+use axum::routing::get;
+use axum::Router;
+use tokio::signal;
+use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::trace::TraceLayer;
+use tracing::{info, Span};
+
+use crate::broadcaster::EventBroadcaster;
+use crate::config::Config;
+use crate::handler::{ws_handler, GatewayState};
+
+#[tokio::main]
+async fn main() {
+    dotenvy::dotenv().ok();
+
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "sentinel_gateway=info,tower_http=debug".into()),
+        )
+        .init();
+
+    let config = Config::from_env();
+
+    info!(
+        addr = %config.bind_addr(),
+        redis = %config.redis_url,
+        channel = %config.redis_channel,
+        max_connections = config.max_connections,
+        "Demarrage de Sentinel Gateway"
+    );
+
+    // Broadcaster local
+    let broadcaster = Arc::new(EventBroadcaster::new(512, config.max_connections));
+
+    // Lancer le subscriber Redis en background
+    let redis_broadcaster = broadcaster.clone();
+    let redis_url = config.redis_url.clone();
+    let redis_channel = config.redis_channel.clone();
+    tokio::spawn(async move {
+        redis_subscriber::run_redis_subscriber(&redis_url, &redis_channel, redis_broadcaster).await;
+    });
+
+    // CORS
+    let cors = build_cors(&config.allowed_origins);
+
+    // Routes
+    let ws_state = GatewayState {
+        broadcaster: broadcaster.clone(),
+        api_key: config.api_key.clone(),
+    };
+
+    let trace_layer = TraceLayer::new_for_http()
+        .make_span_with(|request: &axum::http::Request<_>| {
+            let request_id = request
+                .headers()
+                .get("x-request-id")
+                .and_then(|v| v.to_str().ok())
+                .unwrap_or("-");
+            tracing::info_span!(
+                "http_request",
+                method = %request.method(),
+                uri = %request.uri(),
+                request_id = %request_id,
+            )
+        })
+        .on_response(
+            |response: &axum::http::Response<_>, latency: std::time::Duration, _span: &Span| {
+                tracing::info!(
+                    status = response.status().as_u16(),
+                    latency_ms = latency.as_millis() as u64,
+                    "response"
+                );
+            },
+        );
+
+    let app = Router::new()
+        .route("/ws", get(ws_handler))
+        .with_state(ws_state)
+        .route("/health", get(health::health))
+        .with_state(broadcaster.clone())
+        .layer(PropagateRequestIdLayer::x_request_id())
+        .layer(trace_layer)
+        .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+        .layer(cors);
+
+    let listener = tokio::net::TcpListener::bind(config.bind_addr())
+        .await
+        .expect("Impossible de bind le port");
+
+    info!("Sentinel Gateway pret (WebSocket sur /ws)");
+
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .with_graceful_shutdown(shutdown_signal())
+    .await
+    .expect("Erreur serveur");
+
+    info!("Sentinel Gateway arrete proprement");
+}
+
+fn build_cors(allowed_origins: &str) -> CorsLayer {
+    let allow_origin = if allowed_origins.is_empty() || allowed_origins == "*" {
+        AllowOrigin::any()
+    } else {
+        let origins: Vec<HeaderValue> = allowed_origins
+            .split(',')
+            .filter_map(|o| o.trim().parse().ok())
+            .collect();
+        AllowOrigin::list(origins)
+    };
+
+    CorsLayer::new()
+        .allow_origin(allow_origin)
+        .allow_methods([Method::GET, Method::OPTIONS])
+        .allow_headers([
+            header::CONTENT_TYPE,
+            header::AUTHORIZATION,
+            header::HeaderName::from_static("x-request-id"),
+        ])
+        .max_age(std::time::Duration::from_secs(3600))
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("Impossible d'ecouter Ctrl+C");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("Impossible d'ecouter SIGTERM")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => info!("Signal Ctrl+C recu"),
+        _ = terminate => info!("Signal SIGTERM recu"),
+    }
+}

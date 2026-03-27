@@ -1,3 +1,4 @@
+mod analyze_image_service;
 mod analyze_message_service;
 mod manage_conduct_service;
 mod manage_infractions_service;
@@ -7,7 +8,12 @@ mod manage_security_service;
 mod manage_stats_service;
 mod manage_tickets_service;
 mod manage_voice_channels_service;
+mod manage_watched_users_service;
+mod manage_audit_logs_service;
+mod manage_role_panels_service;
+mod manage_levels_service;
 
+pub use analyze_image_service::AnalyzeImageService;
 pub use analyze_message_service::AnalyzeMessageService;
 pub use manage_conduct_service::ManageConductService;
 pub use manage_infractions_service::ManageInfractionsService;
@@ -17,3 +23,7 @@ pub use manage_security_service::ManageSecurityService;
 pub use manage_stats_service::ManageStatsService;
 pub use manage_tickets_service::ManageTicketsService;
 pub use manage_voice_channels_service::ManageVoiceChannelsService;
+pub use manage_audit_logs_service::ManageAuditLogsService;
+pub use manage_role_panels_service::ManageRolePanelsService;
+pub use manage_levels_service::ManageLevelsService;
+pub use manage_watched_users_service::ManageWatchedUsersService;

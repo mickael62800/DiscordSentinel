@@ -1,17 +1,9 @@
 <script setup lang="ts">
 import { useSecurity } from "../../composables/useSecurity";
 import AppBadge from "../atoms/AppBadge.vue";
+import { severityVariant } from "../../utils/variants";
 
 const { events, loading } = useSecurity();
-
-function severityVariant(severity: string): "danger" | "warning" | "info" | "default" {
-  switch (severity) {
-    case "critical": return "danger";
-    case "high": return "warning";
-    case "medium": return "info";
-    default: return "default";
-  }
-}
 
 function eventIcon(type: string): string {
   switch (type) {

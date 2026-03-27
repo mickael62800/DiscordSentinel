@@ -79,8 +79,6 @@ impl EventHandler for Handler {
 
         // Charger la config per-guild depuis l'API (fallback sur env vars)
         let guild_config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
-        let _raid_threshold = ApiClient::config_u64(&guild_config, "raid_join_threshold", env_config.raid_join_threshold);
-        let _raid_window = ApiClient::config_u64(&guild_config, "raid_join_window_secs", env_config.raid_join_window_secs);
         let min_account_age = ApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
 
         // ── 1. Détection anti-raid ──

@@ -14,7 +14,12 @@ use crate::application::bot_config_service::BotConfigService;
 use crate::application::guild_service::GuildService;
 use crate::application::voice_channels_service::VoiceChannelsService;
 use crate::application::conduct_service::ConductService;
-use crate::domain::entities::{ApiConfig, BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel, VoiceChannelDetail};
+use crate::application::audit_logs_service::AuditLogsService;
+use crate::application::dashboard_charts_service::DashboardChartsService;
+use crate::application::levels_service::LevelsService;
+use crate::application::role_panels_service::RolePanelsService;
+use crate::application::watched_users_service::WatchedUsersService;
+use crate::domain::entities::{ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, DailyActivity, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
 
 #[tauri::command]
 pub async fn get_dashboard_stats(
@@ -328,6 +333,100 @@ pub async fn delete_bot_config(
     config_key: String,
 ) -> Result<(), String> {
     service.delete_config(guild_id, bot_name, config_key).await
+}
+
+// ── Role Panels ──
+
+#[tauri::command]
+pub async fn get_role_panels(
+    service: State<'_, Arc<RolePanelsService>>,
+    guild_id: String,
+) -> Result<Vec<RolePanel>, String> {
+    service.get_panels(guild_id).await
+}
+
+#[tauri::command]
+pub async fn get_role_panel_detail(
+    service: State<'_, Arc<RolePanelsService>>,
+    panel_id: String,
+) -> Result<RolePanelDetail, String> {
+    service.get_panel(panel_id).await
+}
+
+#[tauri::command]
+pub async fn get_auto_roles(
+    service: State<'_, Arc<RolePanelsService>>,
+    guild_id: String,
+) -> Result<Vec<AutoRoleConfig>, String> {
+    service.get_auto_roles(guild_id).await
+}
+
+// ── Dashboard Charts ──
+
+#[tauri::command]
+pub async fn get_activity_trend(
+    service: State<'_, Arc<DashboardChartsService>>,
+    guild_id: Option<String>,
+    days: Option<i32>,
+) -> Result<Vec<DailyActivity>, String> {
+    service.get_activity_trend(guild_id, days).await
+}
+
+// ── Levels / XP ──
+
+#[tauri::command]
+pub async fn get_level_config(
+    service: State<'_, Arc<LevelsService>>,
+    guild_id: String,
+) -> Result<LevelConfig, String> {
+    service.get_config(guild_id).await
+}
+
+#[tauri::command]
+pub async fn get_level_leaderboard(
+    service: State<'_, Arc<LevelsService>>,
+    guild_id: String,
+) -> Result<Vec<UserLevel>, String> {
+    service.get_leaderboard(guild_id).await
+}
+
+#[tauri::command]
+pub async fn get_level_rewards(
+    service: State<'_, Arc<LevelsService>>,
+    guild_id: String,
+) -> Result<Vec<LevelReward>, String> {
+    service.get_rewards(guild_id).await
+}
+
+// ── Audit Logs ──
+
+#[tauri::command]
+pub async fn get_audit_logs(
+    service: State<'_, Arc<AuditLogsService>>,
+    guild_id: Option<String>,
+    event_type: Option<String>,
+    limit: Option<i64>,
+) -> Result<Vec<AuditLog>, String> {
+    service.get_audit_logs(guild_id, event_type, limit).await
+}
+
+// ── Watched Users (Surveillance) ──
+
+#[tauri::command]
+pub async fn get_watched_users(
+    service: State<'_, Arc<WatchedUsersService>>,
+    guild_id: Option<String>,
+) -> Result<Vec<WatchedUser>, String> {
+    service.get_watched_users(guild_id).await
+}
+
+#[tauri::command]
+pub async fn get_user_dossier(
+    service: State<'_, Arc<WatchedUsersService>>,
+    guild_id: String,
+    user_id: String,
+) -> Result<UserDossier, String> {
+    service.get_user_dossier(guild_id, user_id).await
 }
 
 // ── Conduct ──

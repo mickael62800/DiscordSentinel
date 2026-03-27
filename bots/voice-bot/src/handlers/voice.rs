@@ -728,23 +728,3 @@ async fn check_queue_join(
     }
 }
 
-#[allow(dead_code)]
-pub async fn purge_channel(
-    ctx: &Context,
-    channel_id: ChannelId,
-) -> Result<(), serenity::Error> {
-    for _ in 0..3 {
-        let messages = channel_id
-            .messages(
-                &ctx.http,
-                serenity::builder::GetMessages::new().limit(50),
-            )
-            .await?;
-        if messages.is_empty() {
-            break;
-        }
-        let message_ids: Vec<_> = messages.iter().map(|m| m.id).collect();
-        channel_id.delete_messages(&ctx.http, &message_ids).await?;
-    }
-    Ok(())
-}

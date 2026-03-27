@@ -238,6 +238,144 @@ pub struct VoiceChannelDetail {
     pub bans: Vec<VoiceChannelBan>,
 }
 
+// ── Role Panels ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RolePanel {
+    pub id: String,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub message_id: Option<String>,
+    pub title: String,
+    pub description: String,
+    pub mode: String,
+    pub max_roles: Option<i32>,
+    pub enabled: bool,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RolePanelEntry {
+    pub id: String,
+    pub role_id: String,
+    pub role_name: String,
+    pub emoji: Option<String>,
+    pub label: String,
+    pub style: String,
+    pub position: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct RolePanelDetail {
+    pub panel: RolePanel,
+    pub entries: Vec<RolePanelEntry>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AutoRoleConfig {
+    pub id: String,
+    pub guild_id: String,
+    pub role_id: String,
+    pub role_name: String,
+    pub delay_secs: i32,
+    pub enabled: bool,
+}
+
+// ── Dashboard Charts ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DailyActivity {
+    pub day: String,
+    pub messages: i64,
+    pub voice_minutes: i64,
+    pub active_members: i32,
+    pub new_members: i32,
+    pub infractions: i32,
+    pub warns: i32,
+    pub mutes: i32,
+    pub bans: i32,
+}
+
+// ── Levels / XP ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LevelConfig {
+    pub guild_id: String,
+    pub xp_per_message: i32,
+    pub xp_per_voice_minute: i32,
+    pub xp_cooldown_secs: i32,
+    pub level_up_channel_id: Option<String>,
+    pub level_up_message: String,
+    pub excluded_channels: Vec<String>,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserLevel {
+    pub id: String,
+    pub guild_id: String,
+    pub user_id: String,
+    pub username: String,
+    pub xp: i64,
+    pub level: i32,
+    pub xp_current: i64,
+    pub xp_needed: i64,
+    pub last_xp_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LevelReward {
+    pub id: String,
+    pub guild_id: String,
+    pub level: i32,
+    pub role_id: String,
+}
+
+// ── Audit Logs ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct AuditLog {
+    pub id: String,
+    pub guild_id: String,
+    pub event_type: String,
+    pub actor_id: Option<String>,
+    pub actor_name: Option<String>,
+    pub target_id: Option<String>,
+    pub target_name: Option<String>,
+    pub channel_id: Option<String>,
+    pub channel_name: Option<String>,
+    pub details: serde_json::Value,
+    pub created_at: String,
+}
+
+// ── Watched Users (Surveillance) ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct WatchedUser {
+    pub user_id: String,
+    pub username: String,
+    pub guild_id: String,
+    pub guild_name: String,
+    pub risk_level: String,
+    pub total_warns: i64,
+    pub total_mutes: i64,
+    pub total_bans: i64,
+    pub conduct_points: Option<i32>,
+    pub max_conduct_points: Option<i32>,
+    pub last_incident_at: Option<String>,
+    pub security_events_count: i64,
+    pub first_seen_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserDossier {
+    pub user: WatchedUser,
+    pub infractions: Vec<Infraction>,
+    pub moderation_actions: Vec<ModerationActionResponse>,
+    pub security_events: Vec<SecurityEvent>,
+    pub conduct_log: Vec<ConductPointsLog>,
+}
+
 // ── Conduct ──
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

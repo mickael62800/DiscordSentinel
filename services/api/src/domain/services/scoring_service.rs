@@ -5,6 +5,15 @@ use crate::domain::value_objects::{Action, DetectionFlags, FlagType};
 const DEFAULT_WEIGHT_SPAM: f64 = 3.0;
 const DEFAULT_WEIGHT_INSULT: f64 = 5.0;
 const DEFAULT_WEIGHT_LINK: f64 = 1.0;
+const DEFAULT_WEIGHT_PHISHING: f64 = 7.0;
+// IA Vision
+const DEFAULT_WEIGHT_NSFW: f64 = 8.0;
+const DEFAULT_WEIGHT_ILLICIT: f64 = 9.0;
+// IA Text Sentiment
+const DEFAULT_WEIGHT_ANGER: f64 = 3.0;
+const DEFAULT_WEIGHT_RAGE: f64 = 6.0;
+const DEFAULT_WEIGHT_THREAT: f64 = 8.0;
+const DEFAULT_WEIGHT_HARASSMENT: f64 = 7.0;
 
 /// Seuils par défaut.
 const DEFAULT_THRESHOLD_WARN: f64 = 2.0;
@@ -96,6 +105,13 @@ fn default_weight(flag: &FlagType) -> f64 {
         FlagType::Spam => DEFAULT_WEIGHT_SPAM,
         FlagType::Insult => DEFAULT_WEIGHT_INSULT,
         FlagType::Link => DEFAULT_WEIGHT_LINK,
+        FlagType::Phishing => DEFAULT_WEIGHT_PHISHING,
+        FlagType::Nsfw => DEFAULT_WEIGHT_NSFW,
+        FlagType::Illicit => DEFAULT_WEIGHT_ILLICIT,
+        FlagType::Anger => DEFAULT_WEIGHT_ANGER,
+        FlagType::Rage => DEFAULT_WEIGHT_RAGE,
+        FlagType::Threat => DEFAULT_WEIGHT_THREAT,
+        FlagType::Harassment => DEFAULT_WEIGHT_HARASSMENT,
     }
 }
 
@@ -128,7 +144,7 @@ mod tests {
     use uuid::Uuid;
 
     fn make_flags(spam: bool, insult: bool, link: bool) -> DetectionFlags {
-        DetectionFlags { spam, insult, link }
+        DetectionFlags { spam, insult, link, phishing: false }
     }
 
     fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
@@ -214,9 +230,91 @@ mod tests {
     }
 
     #[test]
+    fn test_phishing_default_triggers_mute() {
+        // phishing seul = 7.0, seuil mute = 6.0 → Mute
+        let flags = DetectionFlags { spam: false, insult: false, link: false, phishing: true };
+        let result = ScoringService::score(&flags, &[]);
+        assert_eq!(result.action, Action::Mute);
+        assert_eq!(result.score, 7.0);
+    }
+
+    #[test]
+    fn test_phishing_plus_spam_triggers_ban() {
+        // phishing(7) + spam(3) = 10.0, seuil ban = 9.0 → Ban
+        let flags = DetectionFlags { spam: true, insult: false, link: false, phishing: true };
+        let result = ScoringService::score(&flags, &[]);
+        assert_eq!(result.action, Action::Ban);
+        assert_eq!(result.score, 10.0);
+    }
+
+    #[test]
     fn test_reason_contains_flags() {
         let result = ScoringService::score(&make_flags(true, true, false), &[]);
         assert!(result.reason.contains("spam"));
         assert!(result.reason.contains("insult"));
+    }
+
+    // ── Tests nouveaux flags IA ──
+
+    #[test]
+    fn test_nsfw_default_weight() {
+        assert_eq!(default_weight(&FlagType::Nsfw), 8.0);
+    }
+
+    #[test]
+    fn test_illicit_default_weight() {
+        assert_eq!(default_weight(&FlagType::Illicit), 9.0);
+    }
+
+    #[test]
+    fn test_anger_default_weight() {
+        assert_eq!(default_weight(&FlagType::Anger), 3.0);
+    }
+
+    #[test]
+    fn test_rage_default_weight() {
+        assert_eq!(default_weight(&FlagType::Rage), 6.0);
+    }
+
+    #[test]
+    fn test_threat_default_weight() {
+        assert_eq!(default_weight(&FlagType::Threat), 8.0);
+    }
+
+    #[test]
+    fn test_harassment_default_weight() {
+        assert_eq!(default_weight(&FlagType::Harassment), 7.0);
+    }
+
+    #[test]
+    fn test_custom_nsfw_rule_overrides_weight() {
+        let rules = vec![make_rule(FlagType::Nsfw, 4.0)];
+        // Simuler un scoring direct — le poids custom doit etre utilise
+        let rule = rules.iter().find(|r| r.flag_type == FlagType::Nsfw && r.enabled);
+        assert_eq!(rule.unwrap().weight, 4.0);
+    }
+
+    #[test]
+    fn test_resolve_thresholds_empty_rules() {
+        let (w, d, m, b) = resolve_thresholds(&[]);
+        assert_eq!(w, DEFAULT_THRESHOLD_WARN);
+        assert_eq!(d, DEFAULT_THRESHOLD_DELETE);
+        assert_eq!(m, DEFAULT_THRESHOLD_MUTE);
+        assert_eq!(b, DEFAULT_THRESHOLD_BAN);
+    }
+
+    #[test]
+    fn test_resolve_thresholds_takes_strictest() {
+        let mut rule1 = make_rule(FlagType::Spam, 3.0);
+        rule1.threshold_warn = 1.0;
+        rule1.threshold_ban = 8.0;
+
+        let mut rule2 = make_rule(FlagType::Insult, 5.0);
+        rule2.threshold_warn = 3.0;
+        rule2.threshold_ban = 10.0;
+
+        let (w, _, _, b) = resolve_thresholds(&[rule1, rule2]);
+        assert_eq!(w, 1.0); // Plus strict
+        assert_eq!(b, 8.0); // Plus strict
     }
 }

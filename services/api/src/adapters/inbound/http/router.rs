@@ -12,7 +12,6 @@ use super::handlers;
 use super::middleware::auth::auth_middleware;
 use super::middleware::rate_limit::{rate_limit_middleware, RateLimiter};
 use super::state::AppState;
-use crate::adapters::inbound::ws::handler::ws_handler;
 
 fn build_cors(allowed_origins: &str) -> CorsLayer {
     let allow_origin = if allowed_origins.is_empty() || allowed_origins == "*" {
@@ -58,6 +57,7 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
     let protected = Router::new()
         // Bots
         .route("/analyze", post(handlers::analyze::analyze))
+        .route("/analyze/image", post(handlers::analyze_image::analyze_image))
         // Rules (scoring — format technique)
         .route("/rules/{guild_id}", get(handlers::rules::get_rules))
         .route("/rules", post(handlers::rules::create_rule))
@@ -183,6 +183,116 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
             "/api/conduct/{guild_id}/{user_id}/add",
             post(handlers::conduct::add_points),
         )
+        // Levels / XP
+        .route(
+            "/api/levels/config/{guild_id}",
+            get(handlers::levels::get_config),
+        )
+        .route(
+            "/api/levels/config",
+            post(handlers::levels::save_config),
+        )
+        .route(
+            "/api/levels/xp",
+            post(handlers::levels::add_xp),
+        )
+        .route(
+            "/api/levels/{guild_id}/{user_id}",
+            get(handlers::levels::get_user_level),
+        )
+        .route(
+            "/api/levels/{guild_id}/leaderboard",
+            get(handlers::levels::get_leaderboard),
+        )
+        .route(
+            "/api/levels/rewards/{guild_id}",
+            get(handlers::levels::get_rewards),
+        )
+        .route(
+            "/api/levels/rewards",
+            post(handlers::levels::set_reward),
+        )
+        .route(
+            "/api/levels/rewards/{guild_id}/{level}",
+            delete(handlers::levels::delete_reward),
+        )
+        // Role panels
+        .route(
+            "/api/role-panels",
+            post(handlers::role_panels::create_panel),
+        )
+        .route(
+            "/api/role-panels/{guild_id}",
+            get(handlers::role_panels::list_panels),
+        )
+        .route(
+            "/api/role-panels/detail/{panel_id}",
+            get(handlers::role_panels::get_panel).delete(handlers::role_panels::delete_panel),
+        )
+        .route(
+            "/api/role-panels/by-message/{message_id}",
+            get(handlers::role_panels::get_panel_by_message),
+        )
+        .route(
+            "/api/role-panels/set-message",
+            patch(handlers::role_panels::set_message_id),
+        )
+        .route(
+            "/api/auto-roles/{guild_id}",
+            get(handlers::role_panels::list_auto_roles),
+        )
+        .route(
+            "/api/auto-roles",
+            post(handlers::role_panels::add_auto_role),
+        )
+        .route(
+            "/api/auto-roles/{guild_id}/{role_id}",
+            delete(handlers::role_panels::delete_auto_role),
+        )
+        // Dashboard charts
+        .route(
+            "/api/charts/activity",
+            get(handlers::dashboard_charts::get_activity_trend),
+        )
+        // Analytics
+        .route(
+            "/api/analytics",
+            get(handlers::analytics::get_full_analytics),
+        )
+        .route(
+            "/api/analytics/heatmap",
+            get(handlers::analytics::get_heatmap),
+        )
+        .route(
+            "/api/analytics/actions",
+            get(handlers::analytics::get_action_distribution),
+        )
+        .route(
+            "/api/analytics/top-infractors",
+            get(handlers::analytics::get_top_infractors),
+        )
+        .route(
+            "/api/analytics/moderation-trend",
+            get(handlers::analytics::get_moderation_trend),
+        )
+        .route(
+            "/api/analytics/peak-hours",
+            get(handlers::analytics::get_peak_hours),
+        )
+        // Audit logs
+        .route(
+            "/api/audit-logs",
+            get(handlers::audit_logs::list_audit_logs).post(handlers::audit_logs::create_audit_log),
+        )
+        // Watched users (surveillance)
+        .route(
+            "/api/watched-users",
+            get(handlers::watched_users::list_watched_users),
+        )
+        .route(
+            "/api/watched-users/{guild_id}/{user_id}",
+            get(handlers::watched_users::get_user_dossier),
+        )
         // Configuration des bots
         .route(
             "/api/bots/definitions",
@@ -258,12 +368,6 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
             rate_limit_middleware,
         ));
 
-    // WebSocket (auth via query param ?token=)
-    let ws_state = (state.broadcaster.clone(), state.api_key.clone());
-    let ws_route = Router::new()
-        .route("/ws", get(ws_handler))
-        .with_state(ws_state);
-
     // Routes publiques
     let public = Router::new().route("/health", get(handlers::health::health));
 
@@ -291,7 +395,6 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
 
     Router::new()
         .merge(protected)
-        .merge(ws_route)
         .merge(public)
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(RequestBodyLimitLayer::new(max_body_size))

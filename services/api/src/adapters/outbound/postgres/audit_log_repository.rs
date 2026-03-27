@@ -1,0 +1,131 @@
+use async_trait::async_trait;
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::domain::entities::AuditLog;
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
+use crate::ports::outbound::AuditLogRepository;
+
+pub struct PgAuditLogRepository {
+    pool: PgPool,
+}
+
+impl PgAuditLogRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct AuditLogRow {
+    id: Uuid,
+    guild_id: String,
+    event_type: String,
+    actor_id: Option<String>,
+    actor_name: Option<String>,
+    target_id: Option<String>,
+    target_name: Option<String>,
+    channel_id: Option<String>,
+    channel_name: Option<String>,
+    details: serde_json::Value,
+    created_at: chrono::DateTime<chrono::Utc>,
+}
+
+impl From<AuditLogRow> for AuditLog {
+    fn from(row: AuditLogRow) -> Self {
+        Self {
+            id: row.id,
+            guild_id: row.guild_id,
+            event_type: row.event_type,
+            actor_id: row.actor_id,
+            actor_name: row.actor_name,
+            target_id: row.target_id,
+            target_name: row.target_name,
+            channel_id: row.channel_id,
+            channel_name: row.channel_name,
+            details: row.details,
+            created_at: row.created_at,
+        }
+    }
+}
+
+#[async_trait]
+impl AuditLogRepository for PgAuditLogRepository {
+    async fn save(&self, log: &AuditLog) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"INSERT INTO audit_logs (id, guild_id, event_type, actor_id, actor_name, target_id, target_name, channel_id, channel_name, details, created_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
+        )
+        .bind(log.id)
+        .bind(&log.guild_id)
+        .bind(&log.event_type)
+        .bind(&log.actor_id)
+        .bind(&log.actor_name)
+        .bind(&log.target_id)
+        .bind(&log.target_name)
+        .bind(&log.channel_id)
+        .bind(&log.channel_name)
+        .bind(&log.details)
+        .bind(log.created_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn find_all(
+        &self,
+        guild_id: Option<&str>,
+        filters: &AuditLogFilters,
+    ) -> Result<Vec<AuditLog>, DomainError> {
+        let mut query = String::from("SELECT * FROM audit_logs WHERE 1=1");
+        let mut param_idx = 1u32;
+
+        if guild_id.is_some() {
+            query.push_str(&format!(" AND guild_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        if filters.event_type.is_some() {
+            query.push_str(&format!(" AND event_type = ${param_idx}"));
+            param_idx += 1;
+        }
+        if filters.actor_id.is_some() {
+            query.push_str(&format!(" AND actor_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        if filters.target_id.is_some() {
+            query.push_str(&format!(" AND target_id = ${param_idx}"));
+            param_idx += 1;
+        }
+
+        query.push_str(&format!(" ORDER BY created_at DESC LIMIT ${param_idx}"));
+        param_idx += 1;
+        query.push_str(&format!(" OFFSET ${param_idx}"));
+
+        let mut q = sqlx::query_as::<_, AuditLogRow>(&query);
+
+        if let Some(gid) = guild_id {
+            q = q.bind(gid);
+        }
+        if let Some(ref et) = filters.event_type {
+            q = q.bind(et);
+        }
+        if let Some(ref aid) = filters.actor_id {
+            q = q.bind(aid);
+        }
+        if let Some(ref tid) = filters.target_id {
+            q = q.bind(tid);
+        }
+
+        q = q.bind(filters.limit).bind(filters.offset);
+
+        let rows = q
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(AuditLog::from).collect())
+    }
+}

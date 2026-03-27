@@ -14,7 +14,11 @@ RUN touch src/main.rs && cargo build --release
 # ── Runtime stage ──
 FROM alpine:3.21
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates libstdc++
+
+# ONNX Runtime est telecharge automatiquement par le crate ort au build.
+# La lib dynamique est linkee dans le binaire.
+# libstdc++ est necessaire pour le runtime ONNX.
 
 COPY --from=builder /app/target/release/sentinel-api /usr/local/bin/sentinel-api
 COPY --from=builder /app/migrations /app/migrations

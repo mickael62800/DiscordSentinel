@@ -129,7 +129,7 @@ impl EventHandler for Handler {
             info!(user = %msg.author.name, "Flood detecte");
 
             // Envoyer au backend comme spam
-            let flags = detectors::DetectionFlags { spam: true, insult: false, link: false };
+            let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
             send_to_backend(&ctx, &msg, flags, mute_duration_secs).await;
             return;
         }
@@ -147,7 +147,7 @@ impl EventHandler for Handler {
         // 3. Analyse locale (contenu : spam, insulte, lien)
         let flags = detectors::analyze(content);
 
-        if !flags.spam && !flags.insult && !flags.link {
+        if !flags.spam && !flags.insult && !flags.link && !flags.phishing {
             return;
         }
 
@@ -157,6 +157,7 @@ impl EventHandler for Handler {
             flags.spam = flags.spam,
             flags.insult = flags.insult,
             flags.link = flags.link,
+            flags.phishing = flags.phishing,
             "Message flagge"
         );
 
@@ -222,7 +223,13 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
         }
         Err(e) => {
             warn!(error = %e, "Backend injoignable — action locale par defaut");
-            if request.flags.insult {
+            if request.flags.phishing {
+                let _ = msg.reply(&ctx.http, format!(
+                    "<@{}> Ton message a ete supprime (lien suspect detecte).",
+                    msg.author.id
+                )).await;
+                let _ = msg.delete(&ctx.http).await;
+            } else if request.flags.insult {
                 let _ = msg.reply(&ctx.http, format!(
                     "<@{}> Ton message a ete supprime pour langage inapproprie.",
                     msg.author.id

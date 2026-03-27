@@ -1,0 +1,26 @@
+# Datasets (trop volumineux pour git)
+training/vision/datasets/nsfw/
+training/vision/datasets/illicit/
+training/vision/datasets/safe/
+training/text/datasets/toxic/
+training/text/datasets/neutral/
+
+# Checkpoints & exports
+training/*/checkpoints/
+training/*/exports/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+*.log
+wandb/
+runs/

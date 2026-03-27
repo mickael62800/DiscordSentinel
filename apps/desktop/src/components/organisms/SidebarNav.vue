@@ -28,6 +28,10 @@ const navItems = [
   { path: "/voice-channels", label: "Vocaux", icon: "mic" },
   { path: "/conduct", label: "Conduite", icon: "award" },
   { path: "/bot-config", label: "Config Bots", icon: "cpu" },
+  { path: "/role-panels", label: "Roles", icon: "users" },
+  { path: "/levels", label: "Niveaux", icon: "trending-up" },
+  { path: "/watched-users", label: "Surveillance", icon: "eye" },
+  { path: "/audit", label: "Audit", icon: "clipboard" },
   { path: "/settings", label: "Parametres", icon: "settings" },
 ];
 

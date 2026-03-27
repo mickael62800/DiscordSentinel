@@ -18,10 +18,14 @@ use application::bot_config_service::BotConfigService;
 use application::guild_service::GuildService;
 use application::voice_channels_service::VoiceChannelsService;
 use application::conduct_service::ConductService;
+use application::audit_logs_service::AuditLogsService;
+use application::dashboard_charts_service::DashboardChartsService;
+use application::levels_service::LevelsService;
+use application::role_panels_service::RolePanelsService;
+use application::watched_users_service::WatchedUsersService;
 use domain::ports::AppAdapter;
 use infrastructure::api_adapter::ApiAdapter;
 use infrastructure::config_store::ConfigStore;
-use infrastructure::mock_adapter::MockAdapter;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -55,6 +59,11 @@ pub fn run() {
     let guild_svc = Arc::new(GuildService::new(adapter.clone()));
     let voice_channels_svc = Arc::new(VoiceChannelsService::new(adapter.clone()));
     let conduct_svc = Arc::new(ConductService::new(adapter.clone()));
+    let audit_logs_svc = Arc::new(AuditLogsService::new(adapter.clone()));
+    let dashboard_charts_svc = Arc::new(DashboardChartsService::new(adapter.clone()));
+    let levels_svc = Arc::new(LevelsService::new(adapter.clone()));
+    let role_panels_svc = Arc::new(RolePanelsService::new(adapter.clone()));
+    let watched_users_svc = Arc::new(WatchedUsersService::new(adapter.clone()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -73,6 +82,11 @@ pub fn run() {
         .manage(guild_svc)
         .manage(voice_channels_svc)
         .manage(conduct_svc)
+        .manage(audit_logs_svc)
+        .manage(dashboard_charts_svc)
+        .manage(levels_svc)
+        .manage(role_panels_svc)
+        .manage(watched_users_svc)
         .invoke_handler(tauri::generate_handler![
             presentation::commands::discord_login,
             presentation::commands::get_current_user,
@@ -111,6 +125,16 @@ pub fn run() {
             presentation::commands::get_conduct_leaderboard,
             presentation::commands::get_conduct_points,
             presentation::commands::get_conduct_log,
+            presentation::commands::get_level_config,
+            presentation::commands::get_level_leaderboard,
+            presentation::commands::get_level_rewards,
+            presentation::commands::get_role_panels,
+            presentation::commands::get_role_panel_detail,
+            presentation::commands::get_auto_roles,
+            presentation::commands::get_activity_trend,
+            presentation::commands::get_audit_logs,
+            presentation::commands::get_watched_users,
+            presentation::commands::get_user_dossier,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

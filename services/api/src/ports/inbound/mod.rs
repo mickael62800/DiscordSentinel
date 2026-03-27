@@ -1,3 +1,4 @@
+mod analyze_image;
 mod analyze_message;
 mod manage_conduct;
 mod manage_infractions;
@@ -7,7 +8,12 @@ mod manage_security;
 pub mod manage_stats;
 mod manage_tickets;
 mod manage_voice_channels;
+pub mod manage_watched_users;
+pub mod manage_audit_logs;
+pub mod manage_levels;
+pub mod manage_role_panels;
 
+pub use analyze_image::{AnalyzeImageCommand, AnalyzeImageUseCase};
 pub use analyze_message::{AnalyzeMessageCommand, AnalyzeMessageUseCase};
 pub use manage_conduct::{
     AddPointsCommand, DeductPointsCommand, ManageConductUseCase, SaveConductConfigCommand,
@@ -20,6 +26,10 @@ pub use manage_stats::ManageStatsUseCase;
 pub use manage_tickets::{
     AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
 };
+pub use manage_audit_logs::ManageAuditLogsUseCase;
+pub use manage_role_panels::ManageRolePanelsUseCase;
+pub use manage_levels::ManageLevelsUseCase;
+pub use manage_watched_users::ManageWatchedUsersUseCase;
 pub use manage_voice_channels::{
     BanFromChannelCommand, CreateVoiceChannelCommand, ManageCoAdminCommand,
     ManageVoiceChannelsUseCase, ManageWhitelistCommand, TransferOwnershipCommand,

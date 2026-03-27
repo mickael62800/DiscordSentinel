@@ -1,11 +1,7 @@
 use std::collections::HashSet;
-use std::time::Instant;
 
 use dashmap::DashMap;
 use serenity::model::id::{ChannelId, UserId};
-
-#[allow(dead_code)]
-const VOTE_TIMEOUT_SECS: u64 = 60;
 
 #[derive(Clone, Debug)]
 pub struct ActiveVote {
@@ -14,8 +10,6 @@ pub struct ActiveVote {
     pub votes_yes: HashSet<UserId>,
     pub votes_no: HashSet<UserId>,
     pub total_members: usize,
-    #[allow(dead_code)]
-    pub started_at: Instant,
 }
 
 impl ActiveVote {
@@ -31,11 +25,6 @@ impl ActiveVote {
 
     pub fn all_voted(&self) -> bool {
         (self.votes_yes.len() + self.votes_no.len()) >= self.total_members
-    }
-
-    #[allow(dead_code)]
-    pub fn is_expired(&self) -> bool {
-        self.started_at.elapsed().as_secs() >= VOTE_TIMEOUT_SECS
     }
 
     pub fn status_text(&self) -> String {
@@ -83,7 +72,6 @@ impl VoteTracker {
                 votes_yes,
                 votes_no: HashSet::new(),
                 total_members,
-                started_at: Instant::now(),
             },
         );
 
@@ -122,5 +110,119 @@ impl VoteTracker {
 
     pub fn has_active_vote(&self, members_channel_id: ChannelId) -> bool {
         self.map.contains_key(&members_channel_id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn uid(id: u64) -> UserId { UserId::new(id) }
+    fn cid(id: u64) -> ChannelId { ChannelId::new(id) }
+
+    #[test]
+    fn test_majority_3_members() {
+        let mut v = ActiveVote {
+            target: uid(99),
+            voice_channel_id: cid(1),
+            votes_yes: HashSet::new(),
+            votes_no: HashSet::new(),
+            total_members: 3,
+        };
+        // Besoin de 2 votes pour majorite (3/2 + 1 = 2)
+        assert!(!v.majority_reached());
+        v.votes_yes.insert(uid(1));
+        assert!(!v.majority_reached());
+        v.votes_yes.insert(uid(2));
+        assert!(v.majority_reached());
+    }
+
+    #[test]
+    fn test_rejected_by_majority_no() {
+        let mut v = ActiveVote {
+            target: uid(99),
+            voice_channel_id: cid(1),
+            votes_yes: HashSet::new(),
+            votes_no: HashSet::new(),
+            total_members: 3,
+        };
+        v.votes_no.insert(uid(1));
+        assert!(!v.rejected());
+        v.votes_no.insert(uid(2));
+        assert!(v.rejected());
+    }
+
+    #[test]
+    fn test_rejected_when_all_voted() {
+        let mut v = ActiveVote {
+            target: uid(99),
+            voice_channel_id: cid(1),
+            votes_yes: HashSet::new(),
+            votes_no: HashSet::new(),
+            total_members: 2,
+        };
+        v.votes_yes.insert(uid(1));
+        v.votes_no.insert(uid(2));
+        assert!(v.all_voted());
+        // 1 oui, 1 non sur 2 → pas de majorite oui, mais all_voted → rejected
+        assert!(v.rejected());
+    }
+
+    #[test]
+    fn test_start_vote_prevents_duplicate() {
+        let tracker = VoteTracker::new();
+        assert!(tracker.start_vote(cid(10), cid(20), uid(99), uid(1), 5));
+        assert!(!tracker.start_vote(cid(10), cid(20), uid(99), uid(2), 5));
+    }
+
+    #[test]
+    fn test_cast_vote_prevents_duplicate_vote() {
+        let tracker = VoteTracker::new();
+        tracker.start_vote(cid(10), cid(20), uid(99), uid(1), 5);
+
+        // uid(1) a deja vote oui (initiateur)
+        let v = tracker.cast_vote(cid(10), uid(1), true).unwrap();
+        assert_eq!(v.votes_yes.len(), 1); // pas de double
+
+        // uid(2) vote oui
+        let v = tracker.cast_vote(cid(10), uid(2), true).unwrap();
+        assert_eq!(v.votes_yes.len(), 2);
+    }
+
+    #[test]
+    fn test_target_cannot_vote() {
+        let tracker = VoteTracker::new();
+        tracker.start_vote(cid(10), cid(20), uid(99), uid(1), 5);
+
+        let v = tracker.cast_vote(cid(10), uid(99), false).unwrap();
+        assert_eq!(v.votes_no.len(), 0); // target ignoree
+    }
+
+    #[test]
+    fn test_end_vote() {
+        let tracker = VoteTracker::new();
+        tracker.start_vote(cid(10), cid(20), uid(99), uid(1), 5);
+        assert!(tracker.has_active_vote(cid(10)));
+
+        let ended = tracker.end_vote(cid(10));
+        assert!(ended.is_some());
+        assert!(!tracker.has_active_vote(cid(10)));
+    }
+
+    #[test]
+    fn test_status_text() {
+        let mut v = ActiveVote {
+            target: uid(99),
+            voice_channel_id: cid(1),
+            votes_yes: HashSet::new(),
+            votes_no: HashSet::new(),
+            total_members: 5,
+        };
+        v.votes_yes.insert(uid(1));
+        v.votes_yes.insert(uid(2));
+        v.votes_no.insert(uid(3));
+        let text = v.status_text();
+        assert!(text.contains("2/3"));
+        assert!(text.contains("1"));
     }
 }

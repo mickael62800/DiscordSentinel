@@ -12,6 +12,10 @@ import TicketsPage from "../components/pages/TicketsPage.vue";
 import VoiceChannelsPage from "../components/pages/VoiceChannelsPage.vue";
 import ConductPage from "../components/pages/ConductPage.vue";
 import BotConfigPage from "../components/pages/BotConfigPage.vue";
+import WatchedUsersPage from "../components/pages/WatchedUsersPage.vue";
+import LevelsPage from "../components/pages/LevelsPage.vue";
+import RolePanelsPage from "../components/pages/RolePanelsPage.vue";
+import AuditPage from "../components/pages/AuditPage.vue";
 import SettingsPage from "../components/pages/SettingsPage.vue";
 
 export const routes: RouteRecordRaw[] = [
@@ -28,5 +32,9 @@ export const routes: RouteRecordRaw[] = [
   { path: "/voice-channels", name: "voice-channels", component: VoiceChannelsPage },
   { path: "/conduct", name: "conduct", component: ConductPage },
   { path: "/bot-config", name: "bot-config", component: BotConfigPage },
+  { path: "/watched-users", name: "watched-users", component: WatchedUsersPage },
+  { path: "/levels", name: "levels", component: LevelsPage },
+  { path: "/role-panels", name: "role-panels", component: RolePanelsPage },
+  { path: "/audit", name: "audit", component: AuditPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

@@ -4,6 +4,7 @@ import { useTickets, useTicketDetail } from "../../composables/useTickets";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppButton from "../atoms/AppButton.vue";
 import FilterBar from "../molecules/FilterBar.vue";
+import { statusVariant, priorityVariant } from "../../utils/variants";
 
 const { filteredTickets, loading, filterStatus, filterPriority, openCount, pendingCount } = useTickets();
 const { detail, loading: detailLoading, replying, fetchDetail, reply, close } = useTicketDetail();
@@ -60,24 +61,6 @@ function backToList() {
   detail.value = null;
 }
 
-function statusVariant(status: string): "success" | "warning" | "info" | "default" {
-  switch (status) {
-    case "open": return "info";
-    case "pending": return "warning";
-    case "closed": return "success";
-    default: return "default";
-  }
-}
-
-function priorityVariant(priority: string): "danger" | "warning" | "info" | "default" {
-  switch (priority) {
-    case "urgent": return "danger";
-    case "high": return "warning";
-    case "medium": return "info";
-    case "low": return "default";
-    default: return "default";
-  }
-}
 </script>
 
 <template>

@@ -16,17 +16,18 @@ use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
     PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgTicketRepository, PgVoiceChannelRepository,
+    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgLevelRepository, PgRolePanelRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
 };
 use crate::adapters::outbound::redis_cache::RedisCache;
 use crate::application::{
-    AnalyzeMessageService, ManageConductService, ManageInfractionsService,
+    AnalyzeImageService, AnalyzeMessageService, ManageConductService, ManageInfractionsService,
     ManageModerationService, ManageRulesService, ManageSecurityService, ManageStatsService,
-    ManageTicketsService, ManageVoiceChannelsService,
+    ManageAuditLogsService, ManageLevelsService, ManageRolePanelsService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
 };
+use crate::domain::services::{InferenceService, TextTokenizer};
 use crate::config::AppConfig;
 use crate::ports::inbound::ManageConductUseCase;
-use crate::ports::outbound::VoiceChannelRepository;
+use crate::ports::outbound::{DailyActivityRepository, GuildRepository, VoiceChannelRepository};
 
 #[tokio::main]
 async fn main() {
@@ -102,13 +103,46 @@ async fn main() {
     let log_repo = Arc::new(PgLogRepository::new(pg_pool.clone()));
     let cache = Arc::new(RedisCache::new(redis_client.clone()));
 
-    // ── WebSocket broadcaster ──
-    let broadcaster = Arc::new(EventBroadcaster::new(256));
+    // ── Event broadcaster (Redis pub/sub → gateway WebSocket) ──
+    let redis_channel = std::env::var("REDIS_CHANNEL")
+        .unwrap_or_else(|_| "sentinel:events".to_string());
+    let broadcaster = Arc::new(
+        EventBroadcaster::new()
+            .with_redis(redis_client.clone(), redis_channel)
+    );
+
+    // ── Inference ONNX ──
+    let vision_model_path = std::env::var("VISION_MODEL_PATH").ok();
+    let text_model_path = std::env::var("TEXT_MODEL_PATH").ok();
+    let tokenizer_path = std::env::var("TEXT_TOKENIZER_PATH").ok();
+    let text_max_length: usize = std::env::var("TEXT_MAX_LENGTH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(256);
+
+    let inference = Arc::new(InferenceService::new(
+        vision_model_path.as_deref(),
+        text_model_path.as_deref(),
+    ));
+    let tokenizer = Arc::new(TextTokenizer::new(
+        tokenizer_path.as_deref(),
+        text_max_length,
+    ));
 
     // ── Services applicatifs ──
     let conduct_uc = Arc::new(ManageConductService::new(conduct_repo.clone(), broadcaster.clone()));
 
-    let analyze_uc = Arc::new(AnalyzeMessageService::new(
+    let analyze_uc = Arc::new(
+        AnalyzeMessageService::new(
+            rule_repo.clone(),
+            infraction_repo.clone(),
+            cache.clone(),
+            conduct_uc.clone(),
+        )
+        .with_text_inference(inference.clone(), tokenizer)
+    );
+    let analyze_image_uc = Arc::new(AnalyzeImageService::new(
+        inference.clone(),
         rule_repo.clone(),
         infraction_repo.clone(),
         cache.clone(),
@@ -121,6 +155,22 @@ async fn main() {
     let moderation_uc = Arc::new(ManageModerationService::new(moderation_repo.clone(), cache.clone(), conduct_uc.clone()));
     let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone(), redis_client.clone()));
     let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone()));
+    let audit_log_repo = Arc::new(PgAuditLogRepository::new(pg_pool.clone()));
+    let audit_logs_uc = Arc::new(ManageAuditLogsService::new(audit_log_repo));
+    let role_panel_repo = Arc::new(PgRolePanelRepository::new(pg_pool.clone()));
+    let role_panels_uc = Arc::new(ManageRolePanelsService::new(role_panel_repo));
+    let analytics_repo = Arc::new(PgAnalyticsRepository::new(pg_pool.clone()));
+    let daily_activity_repo = Arc::new(PgDailyActivityRepository::new(pg_pool.clone()));
+    let level_repo = Arc::new(PgLevelRepository::new(pg_pool.clone()));
+    let levels_uc = Arc::new(ManageLevelsService::new(level_repo));
+    let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
+    let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
+        watched_user_repo,
+        infractions_uc.clone(),
+        moderation_uc.clone(),
+        security_uc.clone(),
+        conduct_uc.clone(),
+    ));
 
     // Regen des points de conduite toutes les heures
     let conduct_uc_regen = conduct_uc.clone();
@@ -148,9 +198,26 @@ async fn main() {
         }
     });
 
+    // Snapshot activite quotidienne toutes les 5 minutes
+    let daily_repo_snapshot = daily_activity_repo.clone();
+    let guild_repo_snapshot = guild_repo.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+            if let Ok(guilds) = guild_repo_snapshot.find_all().await {
+                for guild in &guilds {
+                    if let Err(e) = daily_repo_snapshot.record_daily_snapshot(&guild.guild_id).await {
+                        tracing::debug!(error = %e, guild = %guild.guild_id, "Erreur snapshot activite");
+                    }
+                }
+            }
+        }
+    });
+
     // ── State & Router ──
     let state = AppState {
         analyze_uc,
+        analyze_image_uc,
         rules_uc,
         infractions_uc,
         tickets_uc,
@@ -159,6 +226,12 @@ async fn main() {
         stats_uc,
         voice_channels_uc,
         conduct_uc,
+        watched_users_uc,
+        audit_logs_uc,
+        levels_uc,
+        role_panels_uc,
+        analytics_repo,
+        daily_activity_repo,
         log_repo,
         guild_repo,
         bot_config_repo,

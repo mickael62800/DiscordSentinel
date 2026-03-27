@@ -94,6 +94,41 @@ impl EventHandler for Handler {
             {
                 warn!(error = %e, "Impossible d'envoyer les stats messages au backend");
             }
+
+            // Ajouter de l'XP (15 XP par message par defaut, gere cote API)
+            match api
+                .add_xp(
+                    &guild_id.to_string(),
+                    &msg.author.id.to_string(),
+                    &msg.author.name,
+                    15,
+                )
+                .await
+            {
+                Ok(result) => {
+                    if result.leveled_up {
+                        let _ = msg.channel_id.say(
+                            &ctx.http,
+                            format!(
+                                "GG <@{}>, tu es maintenant niveau **{}** !",
+                                msg.author.id, result.user.level
+                            ),
+                        ).await;
+
+                        // Attribuer le role recompense si configure
+                        if let Some(role_id_str) = &result.reward_role_id {
+                            if let Ok(role_id) = role_id_str.parse::<u64>() {
+                                if let Ok(mut member) = guild_id.member(&ctx.http, msg.author.id).await {
+                                    let _ = member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await;
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::debug!(error = %e, "Erreur ajout XP message");
+                }
+            }
         }
     }
 
@@ -145,6 +180,19 @@ impl EventHandler for Handler {
                             {
                                 warn!(error = %e, "Impossible d'envoyer les stats vocal au backend");
                             }
+
+                            // Ajouter XP vocal (5 XP par minute)
+                            let xp_amount = (seconds / 60) as i64 * 5;
+                            if xp_amount > 0 {
+                                let _ = api
+                                    .add_xp(
+                                        &guild_id.to_string(),
+                                        &user_id.to_string(),
+                                        &username,
+                                        xp_amount,
+                                    )
+                                    .await;
+                            }
                         }
                     }
                 }
@@ -158,6 +206,7 @@ impl EventHandler for Handler {
         if let Interaction::Command(command) = interaction {
             match command.data.name.as_str() {
                 "stats" => commands::stats::handle(&ctx, &command).await,
+                "level" => commands::level::handle(&ctx, &command).await,
                 _ => {}
             }
         }

@@ -3,8 +3,8 @@ use std::pin::Pin;
 
 use reqwest::{Client, RequestBuilder, Response};
 
-use crate::domain::entities::{BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel, VoiceChannelDetail};
-use crate::domain::ports::{AppAdapter, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository};
+use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, DailyActivity, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, LevelRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
 
 pub struct ApiAdapter {
     client: Client,
@@ -354,6 +354,140 @@ impl ConductRepository for ApiAdapter {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             let resp = check_response(resp).await?;
             resp.json::<Vec<ConductPointsLog>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+// --- Dashboard Charts ---
+
+impl DashboardChartsRepository for ApiAdapter {
+    fn get_activity_trend(&self, guild_id: Option<String>, days: Option<i32>) -> Pin<Box<dyn Future<Output = Result<Vec<DailyActivity>, String>> + Send>> {
+        let mut url = format!("{}/api/charts/activity", self.base_url);
+        let mut params = Vec::new();
+        if let Some(gid) = guild_id {
+            params.push(format!("guild_id={gid}"));
+        }
+        if let Some(d) = days {
+            params.push(format!("days={d}"));
+        }
+        if !params.is_empty() {
+            url = format!("{}?{}", url, params.join("&"));
+        }
+        let req = self.auth(self.client.get(url));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<DailyActivity>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+// --- Levels ---
+
+impl LevelRepository for ApiAdapter {
+    fn get_level_config(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<LevelConfig, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/levels/config/{}", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<LevelConfig>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_level_leaderboard(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<UserLevel>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/levels/{}/leaderboard", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<UserLevel>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_level_rewards(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<LevelReward>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/levels/rewards/{}", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<LevelReward>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+// --- Audit Logs ---
+
+impl AuditLogRepository for ApiAdapter {
+    fn get_audit_logs(&self, guild_id: Option<String>, event_type: Option<String>, limit: Option<i64>) -> Pin<Box<dyn Future<Output = Result<Vec<AuditLog>, String>> + Send>> {
+        let mut url = format!("{}/api/audit-logs", self.base_url);
+        let mut params = Vec::new();
+        if let Some(gid) = guild_id {
+            params.push(format!("guild_id={gid}"));
+        }
+        if let Some(et) = event_type {
+            params.push(format!("event_type={et}"));
+        }
+        if let Some(l) = limit {
+            params.push(format!("limit={l}"));
+        }
+        if !params.is_empty() {
+            url = format!("{}?{}", url, params.join("&"));
+        }
+        let req = self.auth(self.client.get(url));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<AuditLog>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+// --- Watched Users ---
+
+impl WatchedUsersRepository for ApiAdapter {
+    fn get_watched_users(&self, guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<WatchedUser>, String>> + Send>> {
+        let url = self.url_with_guild("api/watched-users", &guild_id);
+        let req = self.auth(self.client.get(url));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<WatchedUser>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_user_dossier(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<UserDossier, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/watched-users/{}/{}", self.base_url, guild_id, user_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<UserDossier>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+// --- Role Panels ---
+
+impl RolePanelsRepository for ApiAdapter {
+    fn get_panels(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<RolePanel>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/role-panels/{}", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<RolePanel>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+    fn get_panel(&self, panel_id: String) -> Pin<Box<dyn Future<Output = Result<RolePanelDetail, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/role-panels/detail/{}", self.base_url, panel_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<RolePanelDetail>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+    fn get_auto_roles(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<AutoRoleConfig>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/auto-roles/{}", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<AutoRoleConfig>>().await.map_err(|e| format!("Parse error: {}", e))
         })
     }
 }

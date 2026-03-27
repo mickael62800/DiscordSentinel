@@ -31,25 +31,6 @@ pub async fn find_voice_from_members(ctx: &Context, members_channel_id: ChannelI
     map.get(&members_channel_id).map(|e| *e.value())
 }
 
-/// Check if a user is admin (owner or co-admin) for a given voice channel via the API.
-#[allow(dead_code)]
-pub async fn is_channel_admin(ctx: &Context, voice_channel_id: ChannelId, user_id: serenity::model::id::UserId) -> bool {
-    let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
-        Some(a) => a,
-        None => return false,
-    };
-
-    match api.get_channel(&voice_channel_id.get().to_string()).await {
-        Ok(Some(ch)) => ch.owner_id == user_id.get().to_string(),
-        Ok(None) => false,
-        Err(e) => {
-            warn!(error = %e, "Erreur verification admin channel");
-            false
-        }
-    }
-}
-
 /// Helper that checks admin + returns (voice_channel_id, channel_response).
 /// Sends an ephemeral error if the user is not admin or channel is not found.
 /// Returns None if the check fails (response already sent).
@@ -92,53 +73,6 @@ pub async fn require_admin(
 
     if ch.owner_id != user_id.get().to_string() {
         respond_ephemeral(ctx, component, "Seul le proprietaire du salon peut effectuer cette action.").await;
-        return None;
-    }
-
-    Some((voice_channel_id, ch))
-}
-
-/// Helper that checks admin OR co-admin + returns (voice_channel_id, channel_response).
-#[allow(dead_code)]
-pub async fn require_admin_or_coadmin(
-    ctx: &Context,
-    component: &ComponentInteraction,
-) -> Option<(ChannelId, VoiceChannelResponse)> {
-    let text_channel_id = component.channel_id;
-
-    let voice_channel_id = if let Some(vc) = find_voice_from_text(ctx, text_channel_id).await {
-        vc
-    } else if let Some(vc) = find_voice_from_members(ctx, text_channel_id).await {
-        vc
-    } else {
-        respond_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
-        return None;
-    };
-
-    let channel_resp = {
-        let data = ctx.data.read().await;
-        let api = data.get::<ApiClientKey>().expect("ApiClient");
-        api.get_channel(&voice_channel_id.get().to_string()).await
-    };
-
-    let ch = match channel_resp {
-        Ok(Some(ch)) => ch,
-        Ok(None) => {
-            respond_ephemeral(ctx, component, "Ce salon vocal n'existe plus dans la base.").await;
-            return None;
-        }
-        Err(e) => {
-            warn!(error = %e, "Erreur API get_channel dans require_admin_or_coadmin");
-            respond_ephemeral(ctx, component, "Erreur lors de la verification des droits.").await;
-            return None;
-        }
-    };
-
-    let user_str = component.user.id.get().to_string();
-    if ch.owner_id != user_str {
-        // Not owner - for co-admin check we'd need a co-admin list endpoint
-        // For now, only owner passes
-        respond_ephemeral(ctx, component, "Seul le proprietaire ou un co-admin peut effectuer cette action.").await;
         return None;
     }
 

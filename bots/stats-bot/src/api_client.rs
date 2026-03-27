@@ -42,6 +42,24 @@ pub struct GuildOverviewResponse {
     pub top_members: Vec<UserStatsResponse>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UserLevelResponse {
+    pub user_id: String,
+    pub username: String,
+    pub xp: i64,
+    pub level: i32,
+    pub xp_current: i64,
+    pub xp_needed: i64,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddXpResponse {
+    pub user: UserLevelResponse,
+    pub leveled_up: bool,
+    pub old_level: i32,
+    pub reward_role_id: Option<String>,
+}
+
 // ── Request DTOs ──
 
 #[derive(Debug, Serialize)]
@@ -237,6 +255,81 @@ impl ApiClient {
             .await
             .map_err(|e| format!("Erreur réseau: {e}"))?
             .json::<Vec<UserStatsResponse>>()
+            .await
+            .map_err(|e| format!("Erreur parsing: {e}"))
+    }
+
+    // ── Levels / XP ──
+
+    pub async fn add_xp(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        amount: i64,
+    ) -> Result<AddXpResponse, String> {
+        #[derive(Serialize)]
+        struct Payload {
+            guild_id: String,
+            user_id: String,
+            username: String,
+            amount: i64,
+        }
+
+        let req = self
+            .client
+            .post(format!("{}/api/levels/xp", self.base_url))
+            .json(&Payload {
+                guild_id: guild_id.to_string(),
+                user_id: user_id.to_string(),
+                username: username.to_string(),
+                amount,
+            });
+
+        self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur réseau: {e}"))?
+            .json::<AddXpResponse>()
+            .await
+            .map_err(|e| format!("Erreur parsing: {e}"))
+    }
+
+    pub async fn get_user_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<UserLevelResponse>, String> {
+        let req = self.client.get(format!(
+            "{}/api/levels/{guild_id}/{user_id}",
+            self.base_url
+        ));
+
+        let resp = self.auth(req).send().await.map_err(|e| format!("Erreur réseau: {e}"))?;
+        if resp.status().as_u16() == 404 {
+            return Ok(None);
+        }
+        resp.json::<UserLevelResponse>()
+            .await
+            .map(Some)
+            .map_err(|e| format!("Erreur parsing: {e}"))
+    }
+
+    pub async fn get_level_leaderboard(
+        &self,
+        guild_id: &str,
+        limit: u32,
+    ) -> Result<Vec<UserLevelResponse>, String> {
+        let req = self.client.get(format!(
+            "{}/api/levels/{guild_id}/leaderboard?limit={limit}",
+            self.base_url
+        ));
+
+        self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur réseau: {e}"))?
+            .json::<Vec<UserLevelResponse>>()
             .await
             .map_err(|e| format!("Erreur parsing: {e}"))
     }

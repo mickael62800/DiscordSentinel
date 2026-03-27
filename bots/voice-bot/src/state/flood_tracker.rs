@@ -34,3 +34,52 @@ impl FloodTracker {
         self.map.remove(&(channel_id, user_id));
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cid(id: u64) -> ChannelId { ChannelId::new(id) }
+    fn uid(id: u64) -> UserId { UserId::new(id) }
+
+    #[test]
+    fn test_no_flood_below_threshold() {
+        let tracker = FloodTracker::new();
+        for _ in 0..(MAX_MESSAGES - 1) {
+            assert!(!tracker.record_message(cid(1), uid(1)));
+        }
+    }
+
+    #[test]
+    fn test_flood_at_threshold() {
+        let tracker = FloodTracker::new();
+        for i in 0..MAX_MESSAGES {
+            let result = tracker.record_message(cid(1), uid(1));
+            if i < MAX_MESSAGES - 1 {
+                assert!(!result);
+            } else {
+                assert!(result);
+            }
+        }
+    }
+
+    #[test]
+    fn test_different_users_independent() {
+        let tracker = FloodTracker::new();
+        for _ in 0..(MAX_MESSAGES - 1) {
+            tracker.record_message(cid(1), uid(1));
+        }
+        // User 2 dans le meme channel ne devrait pas etre en flood
+        assert!(!tracker.record_message(cid(1), uid(2)));
+    }
+
+    #[test]
+    fn test_clear_resets() {
+        let tracker = FloodTracker::new();
+        for _ in 0..(MAX_MESSAGES - 1) {
+            tracker.record_message(cid(1), uid(1));
+        }
+        tracker.clear(cid(1), uid(1));
+        assert!(!tracker.record_message(cid(1), uid(1)));
+    }
+}

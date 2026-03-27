@@ -2,6 +2,7 @@ use thiserror::Error;
 use uuid::Uuid;
 
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum DomainError {
     // 404
     #[error("Règle introuvable : {0}")]

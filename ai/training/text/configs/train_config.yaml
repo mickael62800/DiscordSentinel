@@ -1,0 +1,34 @@
+model:
+  name: "text-sentinel"
+  backbone: "distilbert-base-multilingual-cased"  # Multilingue FR/EN, leger
+  num_classes: 5
+  max_length: 256
+
+training:
+  epochs: 20
+  batch_size: 64
+  learning_rate: 0.00002
+  weight_decay: 0.01
+  scheduler: "linear_warmup"
+  warmup_ratio: 0.1
+  early_stopping_patience: 5
+
+data:
+  train_split: 0.8
+  val_split: 0.1
+  test_split: 0.1
+  num_workers: 4
+
+classes:
+  0: "neutral"
+  1: "anger"       # Colere
+  2: "rage"         # Rage / haine
+  3: "threat"       # Menace
+  4: "harassment"   # Harcelement
+
+export:
+  format: "onnx"
+  opset_version: 17
+  dynamic_axes: true
+  simplify: true
+  output_path: "../exports/text_sentinel.onnx"
