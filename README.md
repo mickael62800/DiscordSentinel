@@ -61,12 +61,13 @@ Discord Messages / Events / Images
 | -------------------- | ---------------------------------------- | ---------------------------------------------------------- |
 | API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 62+ endpoints, 14 use cases       |
 | Gateway WebSocket    | Rust, Axum 0.8, Redis pub/sub            | Service dedie temps reel, auto-reconnect                   |
+| Worker               | Rust, Tokio, Redis, sqlx                 | Queue Redis (BRPOP), taches periodiques, jobs background   |
 | Base de donnees      | PostgreSQL 16                            | 20 migrations, 20+ tables                                  |
 | Cache                | Redis 7                                  | Cache regles TTL 5min, stats TTL 60s, pub/sub events       |
 | Inference IA         | ONNX Runtime 2.0, ndarray, tokenizers    | Vision (NSFW/illicite) + Text (sentiments)                 |
 | Automod Bot          | Rust, Serenity 0.12                      | Detection spam/insultes/liens/phishing + appel API         |
 | Moderation Bot       | Rust, Serenity 0.12                      | /warn /mute /ban /unmute /unban /history                   |
-| Security Bot         | Rust, Serenity 0.12, DashMap             | Anti-raid + detection comptes suspects                     |
+| Security Bot         | Rust, Serenity 0.12, DashMap             | Anti-raid, quarantaine, captcha DM, slowmode auto          |
 | Stats Bot            | Rust, Serenity 0.12                      | /stats user, server, top + tracking temps reel + XP/levels |
 | Ticket Bot           | Rust, Serenity 0.12                      | /ticket create, close, assign                              |
 | Image Bot            | Rust, Serenity 0.12                      | Detection images NSFW/illicites via API                    |
@@ -138,7 +139,18 @@ DiscordSentinel/
 |   |   +-- Cargo.toml
 |   |
 |   +-- worker/                         # Worker async (traitement background)
-|       +-- Dockerfile
+|       |-- src/
+|       |   |-- main.rs               # Bootstrap, connexions PG+Redis, graceful shutdown
+|       |   |-- config.rs             # DATABASE_URL, REDIS_URL, intervalles
+|       |   |-- queue.rs              # Redis job queue (LPUSH/BRPOP)
+|       |   |-- scheduler.rs          # Planificateur taches periodiques
+|       |   +-- jobs/
+|       |       |-- mod.rs            # Dispatch job par type
+|       |       |-- conduct_regen.rs  # Regen points de conduite
+|       |       |-- cleanup_bans.rs   # Nettoyage bans vocaux expires
+|       |       +-- daily_snapshot.rs # Snapshots activite quotidienne
+|       |-- Dockerfile
+|       +-- Cargo.toml
 |
 |-- bots/
 |   |-- automod-bot/                    # Bot auto-moderation
@@ -381,6 +393,9 @@ Si flags detectes -> appel `POST /analyze` -> scoring (regles + IA) -> execution
 
 - **Anti-raid** : detection joins massifs (configurable), activation verification, alerte
 - **Comptes suspects** : flag comptes < 24h (configurable)
+- **Quarantaine** : role restrictif assigne aux comptes suspects/raid, retrait apres captcha
+- **Captcha** : verification par bouton en DM, kick automatique si timeout (defaut 5min)
+- **Slowmode auto** : activation slowmode sur tous les salons texte pendant un raid, revert automatique
 
 ### Image Bot — Detection images IA
 
@@ -464,6 +479,21 @@ Tous les seuils et poids sont configurables par serveur via les regles.
 
 Les modeles sont charges au demarrage de l'API. Si absents, l'API fonctionne en mode degrade (scoring regles uniquement).
 
+### Config IA per-guild
+
+Les seuils de confiance IA sont configurables par serveur via la table `ia_config` et l'UI desktop.
+
+| Propriete         | Defaut | Description                                            |
+| ----------------- | ------ | ------------------------------------------------------ |
+| `text_enabled`    | true   | Active/desactive l'inference text (sentiments)         |
+| `text_threshold`  | 0.5    | Seuil de confiance minimum pour les sentiments IA      |
+| `vision_enabled`  | true   | Active/desactive l'inference vision (NSFW/illicite)    |
+| `vision_threshold`| 0.5    | Seuil de confiance minimum pour les classifications    |
+
+**Endpoints** : `GET /api/ia-config/{guild_id}`, `PUT /api/ia-config/{guild_id}`
+
+**Desktop** : Page dediee avec sliders pour ajuster les seuils en temps reel (route `/ia-config`).
+
 ---
 
 ## Gateway WebSocket
@@ -486,7 +516,7 @@ Service dedie au temps reel, separe de l'API.
 
 ## Desktop App (Tauri)
 
-### Pages (17 ecrans)
+### Pages (20 ecrans)
 
 | Page           | Fonctionnalite                                                   |
 | -------------- | ---------------------------------------------------------------- |
@@ -508,6 +538,8 @@ Service dedie au temps reel, separe de l'API.
 | Audit          | Logs d'audit                                                     |
 | Settings       | Configuration (URL API, cle, auto-refresh, logout)               |
 | Bot Config     | Configuration par bot et par serveur                             |
+| Analytics      | Heatmap, trends moderation, top infracteurs, peak hours, distribution |
+| IA Config      | Seuils de confiance IA par serveur (sliders text + vision)       |
 
 ### Frontend Vue 3
 
@@ -526,16 +558,71 @@ Service dedie au temps reel, separe de l'API.
 
 ---
 
+## Worker Service
+
+Service de traitement asynchrone, separe de l'API. Combine une queue Redis et des taches periodiques.
+
+**Architecture** : API enqueue des jobs via `LPUSH sentinel:jobs` -> Worker consomme via `BRPOP` -> execution + mise a jour BDD.
+
+### Queue Redis
+
+| Propriete  | Valeur                                                |
+| ---------- | ----------------------------------------------------- |
+| Queue key  | `sentinel:jobs` (configurable via `REDIS_QUEUE_KEY`)  |
+| Format job | JSON `{"type": "...", "payload": {...}, "created_at"}` |
+| Consommation | `BRPOP` bloquant avec timeout 2s                    |
+| Production | `LPUSH` via `JobClient` dans l'API                    |
+
+### Taches periodiques
+
+| Tache            | Intervalle | Description                                    |
+| ---------------- | ---------- | ---------------------------------------------- |
+| `conduct_regen`  | 1h         | Regeneration points de conduite (weekly/monthly)|
+| `cleanup_bans`   | 60s        | Nettoyage bans vocaux expires                  |
+| `daily_snapshot` | 5min       | Snapshots activite quotidienne par guild        |
+
+### Types de jobs supportes
+
+| Type              | Description                               |
+| ----------------- | ----------------------------------------- |
+| `conduct_regen`   | Regeneration manuelle des points          |
+| `cleanup_bans`    | Nettoyage bans a la demande               |
+| `daily_snapshot`  | Snapshot activite a la demande            |
+
+### Configuration
+
+| Variable                  | Defaut          | Description                    |
+| ------------------------- | --------------- | ------------------------------ |
+| `DATABASE_URL`            | requis          | URL PostgreSQL                 |
+| `REDIS_URL`               | requis          | URL Redis                      |
+| `REDIS_QUEUE_KEY`         | `sentinel:jobs` | Cle de la queue Redis          |
+| `CONDUCT_REGEN_INTERVAL`  | `3600`          | Intervalle regen conduite (s)  |
+| `BAN_CLEANUP_INTERVAL`    | `60`            | Intervalle cleanup bans (s)    |
+| `DAILY_SNAPSHOT_INTERVAL` | `300`           | Intervalle snapshots (s)       |
+| `SHUTDOWN_TIMEOUT`        | `10`            | Timeout arret gracieux (s)     |
+
+---
+
 ## Middleware API
 
-| Middleware    | Description                                                           |
-| ------------- | --------------------------------------------------------------------- |
-| Auth          | Bearer token, mode dev si API_KEY vide                                |
-| Rate Limiting | Token bucket par IP (defaut: 50 req/s, burst 10x), header Retry-After |
-| CORS          | Origins configurables                                                 |
-| Body Limit    | Defaut: 1 MB                                                          |
-| Tracing       | Logs structures (method, URI, request_id, status, latency_ms)         |
-| Request ID    | Propagation x-request-id                                              |
+| Middleware           | Description                                                           |
+| -------------------- | --------------------------------------------------------------------- |
+| Auth                 | Bearer token, mode dev si API_KEY vide                                |
+| Rate Limiting (HTTP) | Token bucket par IP (defaut: 50 req/s, burst 10x), header Retry-After |
+| Rate Limiting (IA)   | Semaphore + token bucket pour inference ONNX (defaut: 4 concurrent, 20/s) |
+| CORS                 | Origins configurables                                                 |
+| Body Limit           | Defaut: 1 MB                                                          |
+| Tracing              | Logs structures (method, URI, request_id, status, latency_ms)         |
+| Request ID           | Propagation x-request-id                                              |
+
+### Variables rate limiting inference
+
+| Variable                   | Defaut | Description                                  |
+| -------------------------- | ------ | -------------------------------------------- |
+| `INFERENCE_MAX_CONCURRENT` | `4`    | Nombre max d'inferences ONNX simultanées     |
+| `INFERENCE_MAX_PER_SEC`    | `20`   | Nombre max d'inferences par seconde (0=off)  |
+
+Retourne HTTP 429 si le rate limit est depasse.
 
 ---
 
@@ -664,6 +751,11 @@ cd apps/desktop && npm run tauri dev
 - [x] Docker Compose — 15 services orchestres
 - [x] Tests unitaires — 110+ tests (API, gateway, bots)
 - [x] Multi-stage Docker builds — Images Alpine optimisees
+- [x] Worker service — Queue Redis (LPUSH/BRPOP), taches periodiques, JobClient API
+- [x] Anti-raid avance — Quarantaine (role restrictif), captcha DM (bouton), slowmode auto, kick timeout
+- [x] Config seuils IA per-guild — Table ia_config, endpoints API, page desktop avec sliders, seuils dynamiques
+- [x] Rate limiting inference — Semaphore (4 concurrent) + token bucket (20/s), HTTP 429, configurable
+- [x] Page analytics desktop — Heatmap, trends moderation, top infracteurs, peak hours, distribution actions
 
 ### En cours
 
@@ -674,252 +766,8 @@ cd apps/desktop && npm run tauri dev
 
 - [ ] CI/CD — GitHub Actions (lint, test, build, deploy)
 - [ ] Tests e2e — Integration end-to-end (API + bots + DB)
-- [ ] Worker service — Traitement async via queue Redis (jobs background)
-- [ ] Anti-raid avance — Captcha, slowmode auto, quarantaine
-- [ ] Config seuils IA per-guild — UI desktop pour ajuster confidence threshold
-- [ ] Page analytics desktop — Graphiques heatmap, trends, top infracteurs dans l'app
-- [ ] Rate limiting inference — Limiter appels ONNX pour proteger le CPU
 - [ ] Infrastructure Kubernetes — Helm charts, HPA, monitoring
 - [ ] Monitoring avance — Prometheus, Grafana, alerting
 - [ ] Backup automatique — Snapshots PostgreSQL + export config
 
-# 🚀 Discord AI Moderation Platform – Feature Roadmap
-
-## 🎯 Objectif
-
-Améliorer un système de modération basé sur IA pour le rendre :
-
-- plus intelligent
-- adaptatif
-- scalable
-- différenciant
-
----
-
-# 🧠 1. Adaptive Moderation Engine
-
-## Description
-
-Système de modération dynamique qui s’adapte au serveur.
-
-## Fonctionnalités
-
-- Ajustement automatique des seuils
-- Adaptation selon le type de communauté
-- Pondération dynamique des infractions
-
-## Exemple
-
-- Serveur chill → tolérance élevée
-- Serveur strict → sanctions rapides
-
----
-
-# 🔍 2. Conversation Analyzer
-
-## Description
-
-Analyse multi-messages pour détecter les conflits.
-
-## Fonctionnalités
-
-- Détection d’escalade
-- Identification de provocation
-- Analyse de séquence conversationnelle
-
-## Exemple
-
-User A → pique  
-User B → répond  
-User A → insiste  
-→ Embrouille détectée
-
----
-
-# 🧬 3. User Risk Profile
-
-## Description
-
-Profil comportemental avancé par utilisateur.
-
-## Fonctionnalités
-
-- Score de toxicité
-- Détection de récidive
-- Classification utilisateurs
-
-## Types
-
-- Chill
-- À surveiller
-- Toxique
-
----
-
-# 🛡️ 4. Anti-Contournement
-
-## Description
-
-Empêche les abus et multi-comptes.
-
-## Fonctionnalités
-
-- Détection multi-comptes
-- Analyse comportementale
-- Fingerprint léger (style d’écriture)
-
----
-
-# 🧠 5. Explicabilité des décisions
-
-## Description
-
-Rendre les décisions compréhensibles.
-
-## Exemple
-
-Ban car :
-
-- insult (poids 5)
-- rage (0.82 confidence → 4.9)
-- total score = 9.9
-
-## Avantages
-
-- Transparence
-- Confiance admin
-- Debug facilité
-
----
-
-# ⚡ 6. Optimisation des performances
-
-## Fonctionnalités
-
-- Skip IA si inutile
-- Batch processing images
-- Cache embeddings texte
-
-## Objectif
-
-Réduire charge CPU / latence
-
----
-
-# 📊 7. Détection d’anomalies serveur
-
-## Description
-
-Détecte comportements anormaux.
-
-## Fonctionnalités
-
-- Spike messages
-- Hausse toxicité
-- Activité suspecte
-
-## Exemple
-
-⚠️ Toxicité +300% en 10 min
-
----
-
-# 🤖 8. Auto-modération intelligente
-
-## Description
-
-Système de sanctions progressif.
-
-## Fonctionnalités
-
-- Warn → Mute → Ban automatique
-- Basé sur historique utilisateur
-
----
-
-# 🧪 9. Sandbox / Simulation
-
-## Description
-
-Environnement de test.
-
-## Fonctionnalités
-
-- Simulation d’utilisateurs
-- Rejeu de scénarios
-- Tests sans impact réel
-
-## Cas
-
-- Raid
-- Embrouille
-- Spam
-
----
-
-# 🔗 10. Cross-server Intelligence
-
-## Description
-
-Partage d’intelligence entre serveurs.
-
-## Fonctionnalités
-
-- Blacklist globale
-- Détection raids coordonnés
-- Patterns partagés
-
-⚠️ Attention RGPD
-
----
-
-# 💥 11. Server Health Score
-
-## Description
-
-Score global de santé du serveur.
-
-## Basé sur
-
-- Toxicité
-- Infractions
-- Activité
-- Stabilité
-
-## Affichage
-
-🟢 Healthy  
-🟡 Tension  
-🔴 Dégradé
-
----
-
-# 🎯 Priorités recommandées
-
-## Phase 1 (Impact immédiat)
-
-1. Conversation Analyzer
-2. User Risk Profile
-3. Explicabilité
-
-## Phase 2
-
-4. Adaptive Moderation
-5. Auto-modération
-
-## Phase 3 (Avancé)
-
-6. Cross-server intelligence
-7. Anomaly detection avancée
-
----
-
-# ⚡ Conclusion
-
-Ce système permet de passer :
-
-- d’un bot classique → à une IA de modération avancée
-- d’un outil → à un produit SaaS différenciant
-
-Objectif final :
-👉 Modération proactive, intelligente et automatisée
+> Roadmap detaillee des features futures : [docs/ROADMAPV2.md](docs/ROADMAPV2.md)

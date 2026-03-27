@@ -15,8 +15,10 @@ mod level_repository;
 mod daily_activity_repository;
 mod role_panel_repository;
 mod analytics_repository;
+mod ia_config_repository;
 
 pub use analytics_repository::PgAnalyticsRepository;
+pub use ia_config_repository::PgIaConfigRepository;
 pub use audit_log_repository::PgAuditLogRepository;
 pub use daily_activity_repository::PgDailyActivityRepository;
 pub use role_panel_repository::PgRolePanelRepository;

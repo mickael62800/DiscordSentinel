@@ -29,6 +29,10 @@ pub enum DomainError {
     #[error("Conflit : {0}")]
     Conflict(String),
 
+    // 429
+    #[error("Rate limited : {0}")]
+    RateLimited(String),
+
     // 504
     #[error("Timeout : {0}")]
     Timeout(String),

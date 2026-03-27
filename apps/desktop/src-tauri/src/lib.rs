@@ -65,6 +65,17 @@ pub fn run() {
     let role_panels_svc = Arc::new(RolePanelsService::new(adapter.clone()));
     let watched_users_svc = Arc::new(WatchedUsersService::new(adapter.clone()));
 
+    // IA config uses direct HTTP (no repository trait needed)
+    let (ia_base_url, ia_api_key) = match &api_config {
+        Some(cfg) => (cfg.api_url.clone(), cfg.api_key.clone()),
+        None => (
+            std::env::var("API_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string()),
+            std::env::var("API_KEY").unwrap_or_default(),
+        ),
+    };
+    let ia_config_svc = Arc::new(application::ia_config_service::IaConfigService::new(ia_base_url.clone(), ia_api_key.clone()));
+    let analytics_svc = Arc::new(application::analytics_service::AnalyticsService::new(ia_base_url, ia_api_key));
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -87,6 +98,8 @@ pub fn run() {
         .manage(levels_svc)
         .manage(role_panels_svc)
         .manage(watched_users_svc)
+        .manage(ia_config_svc)
+        .manage(analytics_svc)
         .invoke_handler(tauri::generate_handler![
             presentation::commands::discord_login,
             presentation::commands::get_current_user,
@@ -135,6 +148,9 @@ pub fn run() {
             presentation::commands::get_audit_logs,
             presentation::commands::get_watched_users,
             presentation::commands::get_user_dossier,
+            presentation::commands::get_ia_config,
+            presentation::commands::save_ia_config,
+            presentation::commands::get_full_analytics,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

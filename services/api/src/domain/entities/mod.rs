@@ -17,8 +17,10 @@ mod image_analysis;
 mod level;
 mod daily_activity;
 mod role_panel;
+mod ia_config;
 pub mod analytics;
 
+pub use ia_config::IaConfig;
 pub use audit_log::AuditLog;
 pub use image_analysis::{ImageAnalysis, ImageClassification};
 pub use bot_config::{BotDefinition, BotGuildConfig};

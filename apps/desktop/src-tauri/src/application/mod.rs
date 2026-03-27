@@ -16,3 +16,5 @@ pub mod dashboard_charts_service;
 pub mod levels_service;
 pub mod role_panels_service;
 pub mod watched_users_service;
+pub mod ia_config_service;
+pub mod analytics_service;

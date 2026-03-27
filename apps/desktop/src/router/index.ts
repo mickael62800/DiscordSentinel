@@ -16,6 +16,8 @@ import WatchedUsersPage from "../components/pages/WatchedUsersPage.vue";
 import LevelsPage from "../components/pages/LevelsPage.vue";
 import RolePanelsPage from "../components/pages/RolePanelsPage.vue";
 import AuditPage from "../components/pages/AuditPage.vue";
+import AnalyticsPage from "../components/pages/AnalyticsPage.vue";
+import IaConfigPage from "../components/pages/IaConfigPage.vue";
 import SettingsPage from "../components/pages/SettingsPage.vue";
 
 export const routes: RouteRecordRaw[] = [
@@ -36,5 +38,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/levels", name: "levels", component: LevelsPage },
   { path: "/role-panels", name: "role-panels", component: RolePanelsPage },
   { path: "/audit", name: "audit", component: AuditPage },
+  { path: "/analytics", name: "analytics", component: AnalyticsPage },
+  { path: "/ia-config", name: "ia-config", component: IaConfigPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

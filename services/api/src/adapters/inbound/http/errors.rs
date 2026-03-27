@@ -27,6 +27,9 @@ impl IntoResponse for ApiError {
             // 409
             DomainError::Conflict(_) => (StatusCode::CONFLICT, self.0.to_string()),
 
+            // 429
+            DomainError::RateLimited(_) => (StatusCode::TOO_MANY_REQUESTS, self.0.to_string()),
+
             // 504
             DomainError::Timeout(_) => (StatusCode::GATEWAY_TIMEOUT, self.0.to_string()),
 

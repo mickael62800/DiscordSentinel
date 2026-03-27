@@ -1,13 +1,18 @@
 use serenity::async_trait;
+use serenity::model::application::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::model::guild::Member;
+use serenity::model::id::RoleId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use crate::account_checker::AccountChecker;
 use crate::api_client::{ApiClient, SecurityEvent};
+use crate::captcha;
 use crate::config::Config;
+use crate::quarantine::QuarantineManager;
 use crate::raid_detector::RaidDetector;
+use crate::slowmode::SlowmodeManager;
 
 // ── TypeMap keys ──
 
@@ -29,6 +34,16 @@ impl TypeMapKey for AccountCheckerKey {
 pub struct ConfigKey;
 impl TypeMapKey for ConfigKey {
     type Value = Config;
+}
+
+pub struct QuarantineKey;
+impl TypeMapKey for QuarantineKey {
+    type Value = QuarantineManager;
+}
+
+pub struct SlowmodeKey;
+impl TypeMapKey for SlowmodeKey {
+    type Value = SlowmodeManager;
 }
 
 pub struct Handler;
@@ -76,14 +91,32 @@ impl EventHandler for Handler {
         let raid_detector = data.get::<RaidDetectorKey>().unwrap();
         let account_checker = data.get::<AccountCheckerKey>().unwrap();
         let env_config = data.get::<ConfigKey>().unwrap();
+        let quarantine = data.get::<QuarantineKey>().unwrap();
+        let slowmode = data.get::<SlowmodeKey>().unwrap();
 
         // Charger la config per-guild depuis l'API (fallback sur env vars)
         let guild_config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
         let min_account_age = ApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
 
+        // Config quarantaine per-guild
+        let quarantine_enabled = guild_config
+            .get("quarantine_enabled")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(env_config.quarantine_enabled);
+        let quarantine_role_id = guild_config
+            .get("quarantine_role_id")
+            .and_then(|v| v.parse::<u64>().ok())
+            .or(env_config.quarantine_role_id);
+        let captcha_enabled = guild_config
+            .get("captcha_enabled")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(env_config.captcha_enabled);
+        let slowmode_secs: u16 = guild_config
+            .get("slowmode_seconds")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(env_config.slowmode_seconds);
+
         // ── 1. Détection anti-raid ──
-        // Note: le RaidDetector utilise les valeurs d'init (env vars).
-        // Pour un support complet per-guild, il faudrait un RaidDetector par guild.
         let is_raid = raid_detector.record_join(guild_id);
 
         if is_raid {
@@ -101,8 +134,10 @@ impl EventHandler for Handler {
                 event_type: "raid_detected".to_string(),
                 severity: "critical".to_string(),
                 description: format!(
-                    "Raid détecté : {} joins en quelques secondes",
-                    join_count
+                    "Raid détecté : {} joins en quelques secondes. Actions: lockdown{}{}",
+                    join_count,
+                    if slowmode_secs > 0 { ", slowmode auto" } else { "" },
+                    if quarantine_enabled { ", quarantaine" } else { "" },
                 ),
                 user_ids: vec![user.id.to_string()],
             };
@@ -123,20 +158,55 @@ impl EventHandler for Handler {
                 }
             }
 
+            // ── Slowmode auto ──
+            if slowmode_secs > 0 {
+                slowmode.activate(&ctx, guild_id, slowmode_secs).await;
+            }
+
+            // ── Quarantaine sur le membre qui a déclenché ──
+            if quarantine_enabled {
+                if let Some(role_id) = quarantine_role_id {
+                    quarantine
+                        .quarantine_user(&ctx, guild_id, user.id, RoleId::new(role_id))
+                        .await;
+
+                    if captcha_enabled {
+                        let guild_name = guild_id
+                            .to_partial_guild(&ctx.http)
+                            .await
+                            .map(|g| g.name.clone())
+                            .unwrap_or_else(|_| "Serveur".to_string());
+
+                        captcha::send_challenge(&ctx, user.id, &guild_name).await;
+                    }
+                }
+            }
+
             // Envoyer une alerte dans le premier salon texte trouvé
             if let Ok(channels) = guild_id.channels(&ctx.http).await {
                 if let Some(channel) = channels
                     .values()
                     .find(|c| c.kind == serenity::model::channel::ChannelType::Text)
                 {
+                    let mut alert = format!(
+                        "**🚨 ALERTE SÉCURITÉ** — Raid détecté ({} joins rapides).\n\
+                         Niveau de vérification augmenté automatiquement.",
+                        join_count
+                    );
+                    if slowmode_secs > 0 {
+                        alert.push_str(&format!(
+                            "\n⏱️ Slowmode activé ({}s) sur tous les salons.",
+                            slowmode_secs
+                        ));
+                    }
+                    if quarantine_enabled {
+                        alert.push_str("\n🔒 Nouveaux membres mis en quarantaine.");
+                    }
+
                     channel
                         .send_message(
                             &ctx.http,
-                            serenity::builder::CreateMessage::new().content(format!(
-                                "**ALERTE SÉCURITÉ** — Raid détecté ({} joins rapides). \
-                                 Niveau de vérification augmenté automatiquement.",
-                                join_count
-                            )),
+                            serenity::builder::CreateMessage::new().content(alert),
                         )
                         .await
                         .ok();
@@ -147,13 +217,13 @@ impl EventHandler for Handler {
         }
 
         // ── 2. Vérification compte suspect ──
-        // Utiliser le min_account_age per-guild si disponible
         let per_guild_checker = AccountChecker::new(min_account_age);
         let checker = if guild_config.contains_key("min_account_age_secs") {
             &per_guild_checker
         } else {
             account_checker
         };
+
         if checker.is_suspicious(user) {
             let age_h = checker.account_age_hours(user);
 
@@ -164,20 +234,115 @@ impl EventHandler for Handler {
                 "Compte suspect détecté (trop récent)"
             );
 
+            let mut description = format!(
+                "Compte suspect : {} (créé il y a {}h)",
+                user.name, age_h
+            );
+
+            // ── Quarantaine pour comptes suspects ──
+            if quarantine_enabled {
+                if let Some(role_id) = quarantine_role_id {
+                    let quarantined = quarantine
+                        .quarantine_user(&ctx, guild_id, user.id, RoleId::new(role_id))
+                        .await;
+
+                    if quarantined {
+                        description.push_str(" — mis en quarantaine");
+
+                        if captcha_enabled {
+                            let guild_name = guild_id
+                                .to_partial_guild(&ctx.http)
+                                .await
+                                .map(|g| g.name.clone())
+                                .unwrap_or_else(|_| "Serveur".to_string());
+
+                            captcha::send_challenge(&ctx, user.id, &guild_name).await;
+                        }
+                    }
+                }
+            }
+
             let event = SecurityEvent {
                 guild_id: guild_id.to_string(),
                 event_type: "suspicious_account".to_string(),
                 severity: "warning".to_string(),
-                description: format!(
-                    "Compte suspect : {} (créé il y a {}h)",
-                    user.name, age_h
-                ),
+                description,
                 user_ids: vec![user.id.to_string()],
             };
 
             if let Err(e) = api.report_event(&event).await {
                 error!(error = %e, "Erreur envoi événement compte suspect");
             }
+        }
+    }
+
+    /// Gère les interactions (bouton captcha).
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Component(component) = interaction {
+            if component.data.custom_id != captcha::CAPTCHA_BUTTON_ID {
+                return;
+            }
+
+            let user_id = component.user.id;
+
+            let data = ctx.data.read().await;
+            let quarantine = data.get::<QuarantineKey>().unwrap();
+            let env_config = data.get::<ConfigKey>().unwrap();
+            let api = data.get::<ApiClientKey>().unwrap();
+
+            // Trouver dans quelle guild l'utilisateur est en quarantaine
+            let mut released = false;
+
+            if let Some(cache) = ctx.cache.as_ref() {
+                for guild_id in cache.guilds() {
+                    if !quarantine.is_quarantined(guild_id, user_id) {
+                        continue;
+                    }
+
+                    let guild_config = api
+                        .get_guild_config(&guild_id.to_string())
+                        .await
+                        .unwrap_or_default();
+                    let role_id = guild_config
+                        .get("quarantine_role_id")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .or(env_config.quarantine_role_id);
+
+                    if let Some(role_id) = role_id {
+                        quarantine
+                            .release_user(&ctx, guild_id, user_id, RoleId::new(role_id))
+                            .await;
+
+                        let event = SecurityEvent {
+                            guild_id: guild_id.to_string(),
+                            event_type: "captcha_verified".to_string(),
+                            severity: "info".to_string(),
+                            description: format!(
+                                "Utilisateur {} a passé le captcha",
+                                component.user.name
+                            ),
+                            user_ids: vec![user_id.to_string()],
+                        };
+                        api.report_event(&event).await.ok();
+
+                        released = true;
+                    }
+                }
+            }
+
+            let content = if released {
+                "✅ **Vérification réussie !** Vous avez maintenant accès au serveur."
+            } else {
+                "⚠️ Vous n'êtes pas en quarantaine ou la vérification a déjà été effectuée."
+            };
+
+            let response = serenity::builder::CreateInteractionResponse::Message(
+                serenity::builder::CreateInteractionResponseMessage::new()
+                    .content(content)
+                    .ephemeral(true),
+            );
+
+            component.create_response(&ctx.http, response).await.ok();
         }
     }
 }

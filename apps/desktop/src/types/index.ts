@@ -384,3 +384,70 @@ export interface UserDossier {
   security_events: SecurityEvent[];
   conduct_log: ConductPointsLog[];
 }
+
+// ── IA Config (seuils confiance per-guild) ──
+
+export interface IaConfig {
+  guild_id: string;
+  text_enabled: boolean;
+  text_threshold: number;
+  vision_enabled: boolean;
+  vision_threshold: number;
+}
+
+export interface SaveIaConfigParams {
+  text_enabled: boolean;
+  text_threshold: number;
+  vision_enabled: boolean;
+  vision_threshold: number;
+}
+
+// ── Analytics ──
+
+export interface HeatmapPoint {
+  hour: number;
+  day_of_week: number;
+  day_name: string;
+  messages: number;
+  infractions: number;
+}
+
+export interface ActionDistribution {
+  action: string;
+  count: number;
+  percentage: number;
+}
+
+export interface TopInfractor {
+  user_id: string;
+  username: string;
+  total_infractions: number;
+  warns: number;
+  deletes: number;
+  mutes: number;
+  bans: number;
+}
+
+export interface ModerationTrend {
+  day: string;
+  total: number;
+  warns: number;
+  deletes: number;
+  mutes: number;
+  bans: number;
+}
+
+export interface PeakHour {
+  hour: number;
+  label: string;
+  avg_messages: number;
+  avg_infractions: number;
+}
+
+export interface FullAnalytics {
+  heatmap: HeatmapPoint[];
+  action_distribution: ActionDistribution[];
+  top_infractors: TopInfractor[];
+  moderation_trend: ModerationTrend[];
+  peak_hours: PeakHour[];
+}

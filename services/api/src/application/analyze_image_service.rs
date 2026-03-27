@@ -6,13 +6,13 @@ use uuid::Uuid;
 
 use crate::domain::entities::{ImageAnalysis, ImageClassification, Infraction};
 use crate::domain::errors::DomainError;
-use crate::domain::services::InferenceService;
+use crate::domain::services::{InferenceRateLimiter, InferenceService};
 use crate::domain::value_objects::{Action, DetectionFlags, FlagType};
 use crate::ports::inbound::{AnalyzeImageCommand, AnalyzeImageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::ports::outbound::{CachePort, InfractionRepository, RuleRepository};
+use crate::ports::outbound::{CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
 
-/// Seuil de confiance minimum pour considerer une classification IA comme positive.
-const CONFIDENCE_THRESHOLD: f32 = 0.5;
+/// Seuil de confiance par defaut (utilise si pas de config per-guild).
+const DEFAULT_VISION_THRESHOLD: f32 = 0.5;
 
 pub struct AnalyzeImageService {
     inference: Arc<InferenceService>,
@@ -20,6 +20,8 @@ pub struct AnalyzeImageService {
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
     conduct_uc: Arc<dyn ManageConductUseCase>,
+    ia_config_repo: Arc<dyn IaConfigRepository>,
+    inference_limiter: Arc<InferenceRateLimiter>,
 }
 
 impl AnalyzeImageService {
@@ -29,6 +31,8 @@ impl AnalyzeImageService {
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
         conduct_uc: Arc<dyn ManageConductUseCase>,
+        ia_config_repo: Arc<dyn IaConfigRepository>,
+        inference_limiter: Arc<InferenceRateLimiter>,
     ) -> Self {
         Self {
             inference,
@@ -36,6 +40,8 @@ impl AnalyzeImageService {
             infraction_repo,
             cache,
             conduct_uc,
+            ia_config_repo,
+            inference_limiter,
         }
     }
 }
@@ -43,8 +49,13 @@ impl AnalyzeImageService {
 #[async_trait]
 impl AnalyzeImageUseCase for AnalyzeImageService {
     async fn analyze_image(&self, cmd: AnalyzeImageCommand) -> Result<ImageAnalysis, DomainError> {
-        // 1. Verifier que le modele vision est disponible
-        if !self.inference.vision_available() {
+        // 0. Charger la config IA per-guild
+        let ia_config = self.ia_config_repo.get(&cmd.guild_id).await.ok().flatten();
+        let vision_enabled = ia_config.as_ref().map(|c| c.vision_enabled).unwrap_or(true);
+        let vision_threshold = ia_config.as_ref().map(|c| c.vision_threshold as f32).unwrap_or(DEFAULT_VISION_THRESHOLD);
+
+        // 1. Verifier que le modele vision est disponible et active
+        if !vision_enabled || !self.inference.vision_available() {
             return Ok(ImageAnalysis {
                 action: Action::None,
                 reason: "Modele vision non disponible".to_string(),
@@ -58,7 +69,8 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         let image_tensor = preprocess_image(&cmd.image_bytes)
             .map_err(|e| DomainError::Internal(format!("Erreur preprocessing image: {e}")))?;
 
-        // 3. Inference ONNX
+        // 3. Inference ONNX (rate limited)
+        let _permit = self.inference_limiter.acquire().await?;
         let classifications = self.inference.classify_image(image_tensor)
             .map_err(|e| DomainError::Internal(format!("Erreur inference: {e}")))?;
 
@@ -80,10 +92,10 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
 
         for c in &classifications {
             match c.label.as_str() {
-                "nsfw" if c.confidence >= CONFIDENCE_THRESHOLD => {
+                "nsfw" if c.confidence >= vision_threshold => {
                     detected_labels.push(FlagType::Nsfw);
                 }
-                "illicit" if c.confidence >= CONFIDENCE_THRESHOLD => {
+                "illicit" if c.confidence >= vision_threshold => {
                     detected_labels.push(FlagType::Illicit);
                 }
                 _ => {}

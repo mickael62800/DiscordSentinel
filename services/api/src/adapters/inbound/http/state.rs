@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use crate::adapters::outbound::job_client::JobClient;
 use crate::ports::inbound::{
     AnalyzeImageUseCase, AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
     ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageTicketsUseCase,
     ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
-use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, GuildRepository, LogRepository};
+use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, GuildRepository, IaConfigRepository, LogRepository};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -29,7 +30,9 @@ pub struct AppState {
     pub log_repo: Arc<dyn LogRepository>,
     pub guild_repo: Arc<dyn GuildRepository>,
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
+    pub ia_config_repo: Arc<dyn IaConfigRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
+    pub job_client: JobClient,
     pub api_key: String,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,

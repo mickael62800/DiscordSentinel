@@ -1,6 +1,6 @@
 use axum::http::{header, HeaderValue, Method};
 use axum::middleware;
-use axum::routing::{delete, get, patch, post};
+use axum::routing::{delete, get, patch, post, put};
 use axum::Router;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
@@ -309,6 +309,11 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route(
             "/api/bots/config",
             post(handlers::bot_config::set_config).delete(handlers::bot_config::delete_config),
+        )
+        // IA config (seuils confiance per-guild)
+        .route(
+            "/api/ia-config/{guild_id}",
+            get(handlers::ia_config::get_ia_config).put(handlers::ia_config::save_ia_config),
         )
         // Guilds (référentiel serveurs)
         .route("/api/guilds", get(handlers::dashboard::list_guilds))

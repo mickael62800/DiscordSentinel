@@ -19,6 +19,8 @@ use crate::application::dashboard_charts_service::DashboardChartsService;
 use crate::application::levels_service::LevelsService;
 use crate::application::role_panels_service::RolePanelsService;
 use crate::application::watched_users_service::WatchedUsersService;
+use crate::application::ia_config_service::{IaConfigService, IaConfig};
+use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
 use crate::domain::entities::{ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, DailyActivity, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
 
 #[tauri::command]
@@ -463,4 +465,39 @@ pub async fn get_conduct_log(
     user_id: String,
 ) -> Result<Vec<ConductPointsLog>, String> {
     service.get_log(guild_id, user_id).await
+}
+
+// ── IA Config ──
+
+#[tauri::command]
+pub async fn get_ia_config(
+    service: State<'_, Arc<IaConfigService>>,
+    guild_id: String,
+) -> Result<IaConfig, String> {
+    service.get_config(guild_id).await
+}
+
+#[tauri::command]
+pub async fn save_ia_config(
+    service: State<'_, Arc<IaConfigService>>,
+    guild_id: String,
+    text_enabled: bool,
+    text_threshold: f64,
+    vision_enabled: bool,
+    vision_threshold: f64,
+) -> Result<IaConfig, String> {
+    service
+        .save_config(guild_id, text_enabled, text_threshold, vision_enabled, vision_threshold)
+        .await
+}
+
+// ── Analytics ──
+
+#[tauri::command]
+pub async fn get_full_analytics(
+    service: State<'_, Arc<AnalyticsService>>,
+    guild_id: Option<String>,
+    days: Option<i32>,
+) -> Result<FullAnalytics, String> {
+    service.get_full_analytics(guild_id, days).await
 }

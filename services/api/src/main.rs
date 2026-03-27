@@ -16,8 +16,9 @@ use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
     PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgLevelRepository, PgRolePanelRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
+    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgIaConfigRepository, PgLevelRepository, PgRolePanelRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
 };
+use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::redis_cache::RedisCache;
 use crate::application::{
     AnalyzeImageService, AnalyzeMessageService, ManageConductService, ManageInfractionsService,
@@ -26,8 +27,6 @@ use crate::application::{
 };
 use crate::domain::services::{InferenceService, TextTokenizer};
 use crate::config::AppConfig;
-use crate::ports::inbound::ManageConductUseCase;
-use crate::ports::outbound::{DailyActivityRepository, GuildRepository, VoiceChannelRepository};
 
 #[tokio::main]
 async fn main() {
@@ -101,6 +100,7 @@ async fn main() {
     let conduct_repo = Arc::new(PgConductRepository::new(pg_pool.clone()));
     let guild_repo = Arc::new(PgGuildRepository::new(pg_pool.clone()));
     let log_repo = Arc::new(PgLogRepository::new(pg_pool.clone()));
+    let ia_config_repo = Arc::new(PgIaConfigRepository::new(pg_pool.clone()));
     let cache = Arc::new(RedisCache::new(redis_client.clone()));
 
     // ── Event broadcaster (Redis pub/sub → gateway WebSocket) ──
@@ -129,6 +129,26 @@ async fn main() {
         text_max_length,
     ));
 
+    // ── Inference rate limiter ──
+    let inference_max_concurrent: usize = std::env::var("INFERENCE_MAX_CONCURRENT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(4);
+    let inference_max_per_sec: u64 = std::env::var("INFERENCE_MAX_PER_SEC")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(20);
+
+    let inference_limiter = Arc::new(
+        crate::domain::services::InferenceRateLimiter::new(inference_max_concurrent, inference_max_per_sec)
+    );
+
+    info!(
+        max_concurrent = inference_max_concurrent,
+        max_per_sec = inference_max_per_sec,
+        "Inference rate limiter configuré"
+    );
+
     // ── Services applicatifs ──
     let conduct_uc = Arc::new(ManageConductService::new(conduct_repo.clone(), broadcaster.clone()));
 
@@ -138,6 +158,8 @@ async fn main() {
             infraction_repo.clone(),
             cache.clone(),
             conduct_uc.clone(),
+            ia_config_repo.clone(),
+            inference_limiter.clone(),
         )
         .with_text_inference(inference.clone(), tokenizer)
     );
@@ -147,6 +169,8 @@ async fn main() {
         infraction_repo.clone(),
         cache.clone(),
         conduct_uc.clone(),
+        ia_config_repo.clone(),
+        inference_limiter.clone(),
     ));
     let rules_uc = Arc::new(ManageRulesService::new(rule_repo.clone(), cache.clone()));
     let infractions_uc = Arc::new(ManageInfractionsService::new(infraction_repo.clone()));
@@ -172,47 +196,10 @@ async fn main() {
         conduct_uc.clone(),
     ));
 
-    // Regen des points de conduite toutes les heures
-    let conduct_uc_regen = conduct_uc.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
-            match conduct_uc_regen.run_regen().await {
-                Ok(count) if count > 0 => tracing::info!(count, "Points de conduite regeneres"),
-                Err(e) => tracing::error!(error = %e, "Erreur regen points de conduite"),
-                _ => {}
-            }
-        }
-    });
-
-    // Cleanup expired voice channel bans every 60s
-    let vc_repo_cleanup = voice_channel_repo.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-            if let Ok(count) = vc_repo_cleanup.cleanup_expired_bans().await {
-                if count > 0 {
-                    tracing::debug!(count, "Bans vocaux expirés nettoyés");
-                }
-            }
-        }
-    });
-
-    // Snapshot activite quotidienne toutes les 5 minutes
-    let daily_repo_snapshot = daily_activity_repo.clone();
-    let guild_repo_snapshot = guild_repo.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
-            if let Ok(guilds) = guild_repo_snapshot.find_all().await {
-                for guild in &guilds {
-                    if let Err(e) = daily_repo_snapshot.record_daily_snapshot(&guild.guild_id).await {
-                        tracing::debug!(error = %e, guild = %guild.guild_id, "Erreur snapshot activite");
-                    }
-                }
-            }
-        }
-    });
+    // ── Job client (queue Redis → worker) ──
+    let queue_key = std::env::var("REDIS_QUEUE_KEY")
+        .unwrap_or_else(|_| "sentinel:jobs".to_string());
+    let job_client = JobClient::new(redis_client.clone(), queue_key);
 
     // ── State & Router ──
     let state = AppState {
@@ -235,7 +222,9 @@ async fn main() {
         log_repo,
         guild_repo,
         bot_config_repo,
+        ia_config_repo,
         broadcaster,
+        job_client,
         api_key: config.api_key.clone(),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),

@@ -6,19 +6,22 @@ use uuid::Uuid;
 
 use crate::domain::entities::{Infraction, MessageAnalysis};
 use crate::domain::errors::DomainError;
-use crate::domain::services::{InferenceService, ScoringService, TextTokenizer};
+use crate::domain::services::{InferenceRateLimiter, InferenceService, ScoringService, TextTokenizer};
 use crate::domain::value_objects::{Action, FlagType};
 use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::ports::outbound::{CachePort, InfractionRepository, RuleRepository};
+use crate::domain::entities::IaConfig;
+use crate::ports::outbound::{CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
 
-/// Seuil de confiance minimum pour les flags sentiment IA.
-const SENTIMENT_CONFIDENCE_THRESHOLD: f32 = 0.5;
+/// Seuil de confiance par defaut (utilise si pas de config per-guild).
+const DEFAULT_TEXT_THRESHOLD: f32 = 0.5;
 
 pub struct AnalyzeMessageService {
     rule_repo: Arc<dyn RuleRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
     conduct_uc: Arc<dyn ManageConductUseCase>,
+    ia_config_repo: Arc<dyn IaConfigRepository>,
+    inference_limiter: Arc<InferenceRateLimiter>,
     inference: Option<Arc<InferenceService>>,
     tokenizer: Option<Arc<TextTokenizer>>,
 }
@@ -29,12 +32,16 @@ impl AnalyzeMessageService {
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
         conduct_uc: Arc<dyn ManageConductUseCase>,
+        ia_config_repo: Arc<dyn IaConfigRepository>,
+        inference_limiter: Arc<InferenceRateLimiter>,
     ) -> Self {
         Self {
             rule_repo,
             infraction_repo,
             cache,
             conduct_uc,
+            ia_config_repo,
+            inference_limiter,
             inference: None,
             tokenizer: None,
         }
@@ -69,9 +76,17 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         let mut result = ScoringService::score(&cmd.flags, &rules);
 
         // 3. Inference text IA (sentiment : anger, rage, threat, harassment)
+        // Charger la config IA per-guild pour le seuil de confiance
+        let ia_config = self.ia_config_repo.get(&cmd.guild_id).await.ok().flatten();
+        let text_enabled = ia_config.as_ref().map(|c| c.text_enabled).unwrap_or(true);
+        let text_threshold = ia_config.as_ref().map(|c| c.text_threshold as f32).unwrap_or(DEFAULT_TEXT_THRESHOLD);
+
         if let (Some(inference), Some(tokenizer)) = (&self.inference, &self.tokenizer) {
-            if inference.text_available() && tokenizer.available() && !cmd.content.is_empty() {
-                match self.run_text_inference(inference, tokenizer, &cmd.content, &rules) {
+            if text_enabled && inference.text_available() && tokenizer.available() && !cmd.content.is_empty() {
+                // Rate limit inference
+                let _permit = self.inference_limiter.acquire().await?;
+
+                match self.run_text_inference(inference, tokenizer, &cmd.content, &rules, text_threshold) {
                     Ok(Some((ia_score, _ia_flags, ia_reason))) => {
                         // Combiner : prendre le score le plus eleve
                         let combined_score = result.score + ia_score;
@@ -169,6 +184,7 @@ impl AnalyzeMessageService {
         tokenizer: &TextTokenizer,
         content: &str,
         rules: &[crate::domain::entities::Rule],
+        threshold: f32,
     ) -> Result<Option<(f64, Vec<FlagType>, String)>, String> {
         // Tokeniser
         let (input_ids, attention_mask) = tokenizer.tokenize(content)?;
@@ -176,15 +192,15 @@ impl AnalyzeMessageService {
         // Inference
         let classifications = inference.classify_text(input_ids, attention_mask)?;
 
-        // Filtrer les sentiments au-dessus du seuil
+        // Filtrer les sentiments au-dessus du seuil per-guild
         let mut detected: Vec<(FlagType, f32)> = Vec::new();
 
         for c in &classifications {
             let flag = match c.label.as_str() {
-                "anger" if c.confidence >= SENTIMENT_CONFIDENCE_THRESHOLD => Some(FlagType::Anger),
-                "rage" if c.confidence >= SENTIMENT_CONFIDENCE_THRESHOLD => Some(FlagType::Rage),
-                "threat" if c.confidence >= SENTIMENT_CONFIDENCE_THRESHOLD => Some(FlagType::Threat),
-                "harassment" if c.confidence >= SENTIMENT_CONFIDENCE_THRESHOLD => Some(FlagType::Harassment),
+                "anger" if c.confidence >= threshold => Some(FlagType::Anger),
+                "rage" if c.confidence >= threshold => Some(FlagType::Rage),
+                "threat" if c.confidence >= threshold => Some(FlagType::Threat),
+                "harassment" if c.confidence >= threshold => Some(FlagType::Harassment),
                 _ => None,
             };
 
@@ -319,8 +335,8 @@ mod tests {
     }
 
     #[test]
-    fn test_sentiment_confidence_threshold() {
-        assert_eq!(SENTIMENT_CONFIDENCE_THRESHOLD, 0.5);
+    fn test_default_text_threshold() {
+        assert_eq!(DEFAULT_TEXT_THRESHOLD, 0.5);
     }
 
     #[test]
