@@ -26,26 +26,57 @@ function actionVariant(action: string): "danger" | "warning" | "info" | "default
       return "default";
   }
 }
+
+function actionLabel(action: string): string {
+  const labels: Record<string, string> = {
+    ban: "Bannissement",
+    mute: "Sourdine",
+    delete: "Suppression",
+    warn: "Avertissement",
+    lockdown: "Verrouillage",
+  };
+  return labels[action] ?? action;
+}
+
+function typeLabel(type: string): string {
+  const labels: Record<string, string> = {
+    spam: "Spam",
+    insult: "Insulte",
+    link: "Lien",
+    phishing: "Hameconnage",
+    nsfw: "NSFW",
+    illicit: "Illicite",
+    anger: "Colere",
+    rage: "Rage",
+    threat: "Menace",
+    harassment: "Harcelement",
+  };
+  return labels[type] ?? type;
+}
+
+function ruleName(rule: ModerationRule): string {
+  return typeLabel(rule.rule_type);
+}
 </script>
 
 <template>
   <div :class="['rule-card', { disabled: !rule.enabled }]">
     <div class="rule-header">
       <div class="rule-title">
-        <h3>{{ rule.name }}</h3>
-        <AppBadge :label="rule.action" :variant="actionVariant(rule.action)" />
+        <h3>{{ ruleName(rule) }}</h3>
+        <AppBadge :label="actionLabel(rule.action)" :variant="actionVariant(rule.action)" />
       </div>
       <AppToggle :model-value="rule.enabled" @update:model-value="emit('toggle', rule)" />
     </div>
     <p class="rule-description">{{ rule.description }}</p>
     <div class="rule-footer">
-      <AppBadge :label="rule.rule_type" variant="default" />
+      <AppBadge :label="typeLabel(rule.rule_type)" variant="default" />
       <button class="edit-btn" @click="emit('edit', rule)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
           <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
         </svg>
-        Edit
+        Modifier
       </button>
     </div>
   </div>

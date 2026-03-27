@@ -91,19 +91,19 @@ async function handleSave() {
   <div class="modal-overlay" @click.self="emit('close')">
     <div class="modal">
       <div class="modal-header">
-        <h2>Edit Rule: {{ rule.name }}</h2>
+        <h2>Modifier la regle : {{ rule.name }}</h2>
         <button class="close-btn" @click="emit('close')">&times;</button>
       </div>
 
       <div class="modal-body">
         <div class="field">
-          <label>Guild ID</label>
+          <label>ID du serveur</label>
           <input v-model="guildId" type="text" placeholder="defaut" />
-          <span class="hint">Discord server ID this rule applies to</span>
+          <span class="hint">ID du serveur Discord auquel cette regle s'applique</span>
         </div>
 
         <div class="field">
-          <label>Weight</label>
+          <label>Poids</label>
           <div class="range-row">
             <input v-model.number="weight" type="range" min="0" max="10" step="0.5" />
             <span class="range-value">{{ weight }}</span>
@@ -115,7 +115,7 @@ async function handleSave() {
 
         <div class="thresholds-grid">
           <div class="field">
-            <label>Warn</label>
+            <label>Avertissement</label>
             <div class="range-row">
               <input v-model.number="thresholdWarn" type="range" min="0" max="10" step="0.5" />
               <span class="range-value warn">{{ thresholdWarn }}</span>
@@ -123,7 +123,7 @@ async function handleSave() {
           </div>
 
           <div class="field">
-            <label>Delete</label>
+            <label>Suppression</label>
             <div class="range-row">
               <input v-model.number="thresholdDelete" type="range" min="0" max="10" step="0.5" />
               <span class="range-value delete">{{ thresholdDelete }}</span>
@@ -131,7 +131,7 @@ async function handleSave() {
           </div>
 
           <div class="field">
-            <label>Mute</label>
+            <label>Sourdine</label>
             <div class="range-row">
               <input v-model.number="thresholdMute" type="range" min="0" max="15" step="0.5" />
               <span class="range-value mute">{{ thresholdMute }}</span>
@@ -139,7 +139,7 @@ async function handleSave() {
           </div>
 
           <div class="field">
-            <label>Ban</label>
+            <label>Bannissement</label>
             <div class="range-row">
               <input v-model.number="thresholdBan" type="range" min="0" max="20" step="0.5" />
               <span class="range-value ban">{{ thresholdBan }}</span>
@@ -148,7 +148,7 @@ async function handleSave() {
         </div>
 
         <div class="field toggle-field">
-          <label>Enabled</label>
+          <label>Active</label>
           <AppToggle v-model="enabled" />
         </div>
 

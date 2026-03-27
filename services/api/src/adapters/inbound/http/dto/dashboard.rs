@@ -109,6 +109,13 @@ impl From<Rule> for DashboardRuleDto {
             "spam" => "Anti-Spam",
             "insult" => "Anti-Insulte",
             "link" => "Anti-Lien",
+            "phishing" => "Anti-Hameconnage",
+            "nsfw" => "Anti-NSFW",
+            "illicit" => "Anti-Illicite",
+            "anger" => "Detection colere",
+            "rage" => "Detection rage",
+            "threat" => "Detection menace",
+            "harassment" => "Detection harcelement",
             other => other,
         };
 
