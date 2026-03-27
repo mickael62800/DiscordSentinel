@@ -1,47 +1,57 @@
 # DiscordSentinel
 
-Plateforme de moderation distribuee pour serveurs Discord. Architecture microservices : bots legers (interfaces), API centrale (intelligence), app desktop (administration).
+Plateforme de moderation distribuee pour serveurs Discord. Architecture microservices : bots legers (interfaces), API centrale (intelligence), gateway WebSocket (temps reel), app desktop (administration), inference IA (ONNX).
 
 ---
 
 ## Architecture globale
 
 ```
-Discord Messages / Events
+Discord Messages / Events / Images
        |
        v
-+---------------------+     +---------------------+     +---------------------+
-|   Automod Bot       |     |   Moderation Bot    |     |   Security Bot      |
-|   Detection locale  |     |   /warn /mute /ban  |     |   Anti-raid         |
-|   + appel API       |     |   + log API         |     |   Comptes suspects  |
-+--------+------------+     +--------+------------+     +--------+------------+
-         |                           |                           |
-         +---------------------------+---------------------------+
-                                     |
-                              POST /analyze, /api/...
-                                     |
-                                     v
-                          +---------------------+
-                          |   API Backend       |  <-- Scoring, decisions, persistance
-                          |   (Axum / Rust)     |
-                          +--------+------------+
-                             |         |      |
-                             v         v      v
-                          PostgreSQL  Redis  WebSocket
-                             16        7     (temps reel)
-                                     |
-         +---------------------------+---------------------------+
-         |                           |                           |
-         v                           v                           v
-+---------------------+     +---------------------+     +---------------------+
-|   Ticket Bot        |     |   Stats Bot         |     |   Desktop App       |
-|   /ticket create    |     |   /stats user       |     |   Tauri + Vue 3     |
-|   /ticket close     |     |   /stats server     |     |   Admin complete    |
-+---------------------+     |   /stats top        |     +---------------------+
-                             +---------------------+
++----------------+  +----------------+  +----------------+  +----------------+
+|  Automod Bot   |  | Moderation Bot |  | Security Bot   |  |  Image Bot     |
+|  Spam/insultes |  | /warn /mute    |  | Anti-raid      |  | NSFW/illicite  |
+|  + appel API   |  | /ban /history  |  | Comptes suspects|  | + appel API   |
++-------+--------+  +-------+--------+  +-------+--------+  +-------+--------+
+        |                    |                    |                    |
+        +--------------------+--------------------+--------------------+
+                             |
+                      POST /analyze, /analyze/image, /api/...
+                             |
+                             v
+                  +---------------------+
+                  |   API Backend       |  <-- Scoring, IA inference, decisions, persistance
+                  |   (Axum / Rust)     |
+                  +--------+------------+
+                      |    |    |    |
+                      v    v    v    v
+                   PgSQL Redis ONNX  Redis pub/sub
+                    16    7   Runtime     |
+                                         v
+                              +---------------------+
+                              |   Gateway WebSocket  |
+                              |   (temps reel dedie) |
+                              +--------+-------------+
+                                       |
+        +------------------------------+------------------------------+
+        |                              |                              |
+        v                              v                              v
++----------------+  +----------------+  +---------------------+
+|  Ticket Bot    |  |  Stats Bot     |  |   Desktop App       |
+|  /ticket       |  |  /stats        |  |   Tauri + Vue 3     |
+|  create/close  |  |  user/server   |  |   Admin complete    |
++----------------+  +----------------+  +---------------------+
+                              |
++----------------+  +----------------+  +----------------+
+|  Voice Bot     |  |  Audit Bot     |  |  Roles Bot     |
+|  Salons dyn.   |  |  Logs audit    |  |  Role panels   |
+|  Vote kick     |  |  Tracking      |  |  Auto-roles    |
++----------------+  +----------------+  +----------------+
 ```
 
-**Philosophie** : Bots = interfaces (legers, pas de logique metier) | API = cerveau (decisions) | App = controle (admin)
+**Philosophie** : Bots = interfaces (legers, pas de logique metier) | API = cerveau (decisions + IA) | Gateway = temps reel | App = controle (admin)
 
 ---
 
@@ -49,20 +59,26 @@ Discord Messages / Events
 
 | Composant | Technologie | Details |
 |-----------|------------|---------|
-| API Backend | Rust, Axum 0.8, Tokio | Architecture hexagonale (ports & adapters) |
-| Base de donnees | PostgreSQL 16 | 7 tables : rules, infractions, tickets, ticket_messages, security_events, moderation_actions, user_stats |
-| Cache | Redis 7 | Cache regles TTL 5min, cache stats overview TTL 60s |
-| Automod Bot | Rust, Serenity 0.12 | Detection spam/insultes/liens + appel API |
+| API Backend | Rust, Axum 0.8, Tokio | Architecture hexagonale, 62+ endpoints, 14 use cases |
+| Gateway WebSocket | Rust, Axum 0.8, Redis pub/sub | Service dedie temps reel, auto-reconnect |
+| Base de donnees | PostgreSQL 16 | 20 migrations, 20+ tables |
+| Cache | Redis 7 | Cache regles TTL 5min, stats TTL 60s, pub/sub events |
+| Inference IA | ONNX Runtime 2.0, ndarray, tokenizers | Vision (NSFW/illicite) + Text (sentiments) |
+| Automod Bot | Rust, Serenity 0.12 | Detection spam/insultes/liens/phishing + appel API |
 | Moderation Bot | Rust, Serenity 0.12 | /warn /mute /ban /unmute /unban /history |
 | Security Bot | Rust, Serenity 0.12, DashMap | Anti-raid + detection comptes suspects |
-| Stats Bot | Rust, Serenity 0.12 | /stats user, server, top + tracking temps reel |
+| Stats Bot | Rust, Serenity 0.12 | /stats user, server, top + tracking temps reel + XP/levels |
 | Ticket Bot | Rust, Serenity 0.12 | /ticket create, close, assign |
-| Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia | Atomic design (atoms/molecules/organisms), 11 pages |
+| Image Bot | Rust, Serenity 0.12 | Detection images NSFW/illicites via API |
+| Voice Bot | Rust, Serenity 0.12 | Salons dynamiques, vote kick, co-admins, whitelist/ban |
+| Audit Bot | Rust, Serenity 0.12 | Tracking audit logs Discord |
+| Roles Bot | Rust, Serenity 0.12 | Role panels + auto-roles |
+| Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia, Chart.js | 17 pages, 15 composants UI, 18 composables |
 | Desktop App Backend | Tauri 2.x, Rust | Architecture hexagonale, HEED/LMDB local, WebSocket |
-| Containerisation | Docker (Alpine), Docker Compose | Multi-stage builds |
-| Migrations SQL | sqlx 0.8 | 7 migrations |
+| Entrainement IA | Python, PyTorch, Transformers, ONNX | 2 modeles : vision + text sentiment |
+| Containerisation | Docker (Alpine), Docker Compose | Multi-stage builds, 15 services |
 
-**Dependances Rust cles** : serde, reqwest 0.12, sqlx 0.8, chrono, uuid, thiserror, tracing, async-trait, regex, tower-http (CORS, rate limiting, tracing), dashmap, futures-util, tokio-tungstenite
+**Dependances Rust cles** : serde, reqwest 0.12, sqlx 0.8, chrono, uuid, thiserror, tracing, async-trait, regex, tower-http (CORS, rate limiting, tracing), dashmap, futures-util, ort (ONNX Runtime), tokenizers, image, base64, ndarray
 
 ---
 
@@ -72,214 +88,182 @@ Discord Messages / Events
 DiscordSentinel/
 |
 |-- apps/
-|   +-- desktop/                    # App admin Tauri + Vue 3
-|       |-- src/                    # Frontend Vue 3 + TypeScript
-|       |   |-- components/         # Atomic design (atoms, molecules, organisms, pages)
-|       |   |-- router/             # Vue Router (11 routes)
-|       |   |-- composables/        # 12 composables Vue
-|       |   |-- types/              # TypeScript interfaces
-|       |   +-- styles/             # CSS global
-|       |-- src-tauri/              # Backend Tauri (Rust)
+|   +-- desktop/                        # App admin Tauri + Vue 3
+|       |-- src/                        # Frontend Vue 3 + TypeScript
+|       |   |-- components/             # Atomic design (6 atoms, 3 molecules, 6 organisms, 1 template)
+|       |   |-- router/                 # Vue Router (17 routes)
+|       |   |-- composables/            # 18 composables Vue
+|       |   |-- types/                  # TypeScript interfaces
+|       |   +-- styles/                 # CSS global
+|       |-- src-tauri/                  # Backend Tauri (Rust)
 |       |   +-- src/
-|       |       |-- application/    # 10 services (auth, dashboard, infractions, rules, tickets, logs, notifications, security, moderation, realtime)
-|       |       |-- domain/         # Entites & ports
-|       |       |-- infrastructure/ # Adapters (API client, config store LMDB, mock)
-|       |       +-- presentation/   # 26 Tauri commands (IPC)
+|       |       |-- application/        # 19 services
+|       |       |-- domain/             # Entites & ports
+|       |       |-- infrastructure/     # Adapters (API client, config store LMDB, mock)
+|       |       +-- presentation/       # Tauri commands (IPC)
 |       +-- package.json
 |
 |-- services/
-|   +-- api/                        # API centrale (Axum)
-|       |-- src/
-|       |   |-- main.rs             # Bootstrap, DI, demarrage serveur
-|       |   |-- config.rs           # Config env
-|       |   |-- domain/
-|       |   |   |-- entities/       # Rule, Infraction, Ticket, UserStats, SecurityEvent, ModerationAction, MessageAnalysis
-|       |   |   |-- value_objects/  # Action, DetectionFlags, FlagType
-|       |   |   |-- services/       # ScoringService
-|       |   |   +-- errors.rs       # Erreurs domaine -> HTTP
-|       |   |-- ports/
-|       |   |   |-- inbound/        # Traits UseCase
-|       |   |   +-- outbound/       # Traits Repository + Cache
-|       |   |-- application/        # Implementations use cases (analyze, rules, infractions, tickets, security, moderation, stats)
-|       |   +-- adapters/
-|       |       |-- inbound/
-|       |       |   |-- http/       # Handlers, DTOs, middleware (auth, rate_limit), router
-|       |       |   +-- ws/         # WebSocket broadcaster + handler
-|       |       +-- outbound/       # PostgreSQL repos, Redis cache
-|       |-- migrations/             # 7 SQL migrations
-|       |-- Dockerfile
-|       +-- Cargo.toml
+|   |-- api/                            # API centrale (Axum)
+|   |   |-- src/
+|   |   |   |-- main.rs                 # Bootstrap, DI, demarrage serveur
+|   |   |   |-- config.rs              # Config env
+|   |   |   |-- domain/
+|   |   |   |   |-- entities/           # 21 entites (Rule, Infraction, Ticket, Analytics, etc.)
+|   |   |   |   |-- value_objects/      # Action, DetectionFlags, FlagType (10 variants)
+|   |   |   |   |-- services/           # ScoringService, InferenceService, TextTokenizer
+|   |   |   |   +-- errors.rs           # Erreurs domaine -> HTTP
+|   |   |   |-- ports/
+|   |   |   |   |-- inbound/            # 14 traits UseCase
+|   |   |   |   +-- outbound/           # 19 traits Repository + Cache
+|   |   |   |-- application/            # 14 implementations use cases
+|   |   |   +-- adapters/
+|   |   |       |-- inbound/
+|   |   |       |   |-- http/           # 20 handlers, 19 DTOs, middleware (auth, rate_limit), router
+|   |   |       |   +-- ws/             # EventBroadcaster (Redis pub/sub)
+|   |   |       +-- outbound/           # 18 PostgreSQL repos, Redis cache
+|   |   |-- migrations/                 # 20 SQL migrations
+|   |   |-- Dockerfile
+|   |   +-- Cargo.toml
+|   |
+|   |-- gateway/                        # Gateway WebSocket dedie
+|   |   |-- src/
+|   |   |   |-- main.rs                 # Bootstrap, CORS, graceful shutdown
+|   |   |   |-- config.rs              # HOST, PORT, REDIS_URL, API_KEY, MAX_CONNECTIONS
+|   |   |   |-- broadcaster.rs         # Broadcast local + limite connexions
+|   |   |   |-- handler.rs             # WebSocket handler (auth, ping/pong)
+|   |   |   |-- health.rs              # GET /health (status + connected_clients)
+|   |   |   +-- redis_subscriber.rs    # Redis pub/sub listener, auto-reconnect
+|   |   |-- Dockerfile
+|   |   +-- Cargo.toml
+|   |
+|   +-- worker/                         # Worker async (traitement background)
+|       +-- Dockerfile
 |
 |-- bots/
-|   |-- automod-bot/                # Bot auto-moderation
+|   |-- automod-bot/                    # Bot auto-moderation
 |   |   +-- src/
-|   |       |-- main.rs
-|   |       |-- handler.rs          # EventHandler (message, ready)
-|   |       |-- api_client.rs       # Client HTTP vers API /analyze
-|   |       |-- config.rs
-|   |       +-- detectors/          # Detection locale (spam, insult, link)
-|   |-- moderation-bot/             # Bot moderation manuelle
+|   |       |-- main.rs, handler.rs, api_client.rs, config.rs
+|   |       +-- detectors/              # spam, insult, link, phishing (avec tests)
+|   |-- moderation-bot/                 # Bot moderation manuelle
 |   |   +-- src/
-|   |       |-- main.rs
-|   |       |-- handler.rs
-|   |       |-- api_client.rs
-|   |       |-- config.rs
-|   |       +-- commands/           # warn, mute, ban, history
-|   |-- security-bot/               # Bot securite serveur
+|   |       +-- commands/               # warn, mute, ban, history
+|   |-- security-bot/                   # Bot securite serveur
 |   |   +-- src/
-|   |       |-- main.rs
-|   |       |-- handler.rs
-|   |       |-- api_client.rs
-|   |       |-- config.rs
-|   |       |-- raid_detector.rs    # Detection anti-raid (DashMap, thread-safe)
-|   |       +-- account_checker.rs  # Verification age compte
-|   |-- stats-bot/                  # Bot statistiques
+|   |       |-- raid_detector.rs        # Anti-raid (DashMap, thread-safe, avec tests)
+|   |       +-- account_checker.rs      # Verification age compte
+|   |-- stats-bot/                      # Bot statistiques + XP
 |   |   +-- src/
-|   |       |-- main.rs
-|   |       |-- handler.rs          # Tracking messages + voice
-|   |       |-- api_client.rs
-|   |       |-- config.rs
-|   |       |-- tracker.rs          # Cache local (RwLock + HashMap)
-|   |       +-- commands/stats.rs   # /stats user, server, top
-|   +-- ticket-bot/                 # Bot tickets support
+|   |       |-- tracker.rs              # Cache local (RwLock + HashMap, avec tests)
+|   |       +-- commands/               # stats.rs, level.rs
+|   |-- ticket-bot/                     # Bot tickets support
+|   |   +-- src/
+|   |       +-- commands/               # ticket.rs
+|   |-- image-bot/                      # Bot detection images IA
+|   |   +-- src/
+|   |       |-- main.rs, handler.rs, api_client.rs, config.rs
+|   |-- voice-bot/                      # Bot salons vocaux dynamiques
+|   |   +-- src/
+|   |       |-- handlers/               # message.rs, voice.rs
+|   |       |-- interactions/           # access_control, channel_management, co_admin, queue, setup, transfer, vote_kick
+|   |       |-- state/                  # cooldown_tracker, flood_tracker, pending_channels, vote_tracker (tous avec tests)
+|   |       +-- utils/                  # embeds.rs
+|   |-- audit-bot/                      # Bot audit logs
+|   |   +-- src/
+|   |       +-- main.rs, handler.rs, api_client.rs, config.rs
+|   +-- roles-bot/                      # Bot role panels + auto-roles
 |       +-- src/
-|           |-- main.rs
-|           |-- handler.rs
-|           |-- api_client.rs
-|           |-- config.rs
-|           +-- commands/ticket.rs  # /ticket create, close, assign
+|           +-- commands/               # roles_panel.rs
 |
-|-- docs/                           # Documentation technique
-|   |-- api.md                      # Architecture API + endpoints
-|   |-- automod-bot.md              # Design automod bot
-|   |-- ticket-bot.md               # Design ticket bot
-|   |-- desktop-app.md              # Design app desktop
-|   |-- communication-bot-api.md    # Protocole bot <-> API
-|   +-- communication-app-api.md    # Protocole app <-> API
+|-- ai/                                 # Entrainement IA
+|   |-- requirements.txt                # Deps Python (torch, transformers, onnx)
+|   |-- .gitignore                      # Exclut datasets, checkpoints, exports
+|   |-- training/
+|   |   |-- vision/                     # Modele detection images
+|   |   |   |-- configs/train_config.yaml   # EfficientNetV2-S, 3 classes (safe/nsfw/illicit)
+|   |   |   |-- scripts/               # dataset.py, train.py, export_onnx.py
+|   |   |   |-- datasets/              # safe/ nsfw/ illicit/ (images)
+|   |   |   |-- checkpoints/           # Meilleur modele .pt
+|   |   |   +-- exports/               # vision_sentinel.onnx
+|   |   +-- text/                       # Modele detection sentiments
+|   |       |-- configs/train_config.yaml   # DistilBERT multilingual, 5 classes
+|   |       |-- scripts/               # dataset.py, train.py, export_onnx.py
+|   |       |-- datasets/              # neutral/ toxic/ (txt/jsonl)
+|   |       |-- checkpoints/           # Meilleur modele
+|   |       +-- exports/               # text_sentinel.onnx + tokenizer.json
+|   +-- shared/                         # Utils partagees
 |
-|-- docker-compose.yml              # Orchestration complete
-|-- dev.sh                          # Script dev local
-|-- .env.example                    # Template variables d'environnement
+|-- docs/                               # Documentation technique
+|   |-- api.md, automod-bot.md, ticket-bot.md, desktop-app.md
+|   +-- communication-bot-api.md, communication-app-api.md, ...
+|
+|-- docker-compose.yml                  # Orchestration complete (15 services)
+|-- dev.sh                              # Script dev local
+|-- .env.example                        # Template variables d'environnement
 +-- README.md
 ```
 
 ---
 
-## Schema base de donnees (PostgreSQL)
+## Schema base de donnees (PostgreSQL — 20 migrations)
 
-### Table `rules` - Regles de moderation par serveur
+### Tables principales
 
-| Colonne | Type | Description |
-|---------|------|-------------|
-| id | UUID PK | Identifiant unique |
-| guild_id | VARCHAR | ID du serveur Discord |
-| flag_type | VARCHAR | Type : Spam, Insult, Link |
-| weight | FLOAT | Poids dans le scoring (defaut: Spam=3, Insult=5, Link=1) |
-| threshold_warn | FLOAT | Seuil warn (defaut: 2.0) |
-| threshold_delete | FLOAT | Seuil delete (defaut: 4.0) |
-| threshold_mute | FLOAT | Seuil mute (defaut: 6.0) |
-| threshold_ban | FLOAT | Seuil ban (defaut: 9.0) |
-| enabled | BOOLEAN | Regle active/inactive |
-| created_at, updated_at | TIMESTAMP | Horodatage |
+| Table | Description | Colonnes cles |
+|-------|------------|---------------|
+| `rules` | Regles de moderation par serveur | guild_id, flag_type (10 types), weight, thresholds (warn/delete/mute/ban), enabled |
+| `infractions` | Violations enregistrees | guild_id, user_id, content, flags (JSONB), score, action, reason |
+| `tickets` | Systeme de tickets | title, status, priority, author_id, assigned_to, category |
+| `ticket_messages` | Messages des tickets | ticket_id (FK), author_name, author_role, content |
+| `security_events` | Evenements de securite | event_type (raid/suspicious), severity, user_ids (JSONB) |
+| `moderation_actions` | Historique moderation manuelle | moderator_id, target_id, action_type, gravity, duration |
+| `user_stats` | Stats utilisateurs | message_count, voice_seconds |
+| `voice_channels` | Salons vocaux dynamiques | owner_id, channel_type, is_locked, user_limit, co-admins |
+| `conduct_points` | Points de conduite | points, penalties, regen |
+| `levels` | Configuration XP/niveaux | xp_per_message, xp_per_voice_minute, level_up_channel |
+| `user_levels` | Niveaux utilisateurs | xp, level |
+| `level_rewards` | Recompenses par niveau | level, role_id |
+| `guilds` | Referentiel serveurs | guild_id, name, icon, member_count |
+| `bot_definitions` | Definitions des bots | bot_name, config_schema (JSON) |
+| `bot_guild_config` | Config per-guild par bot | guild_id, bot_name, config_key, config_value |
+| `logs` | Logs d'activite | level, bot, server, message |
+| `audit_logs` | Logs d'audit | guild_id, action, actor_id, target_id, details (JSONB) |
+| `daily_activity` | Snapshots quotidiens | messages, voice_minutes, active_members, infractions |
+| `hourly_activity` | Activite par heure (heatmaps) | guild_id, day, hour, messages, infractions |
+| `role_panels` | Panels de roles | guild_id, channel_id, message_id, title, roles (JSONB) |
 
-Contrainte unique : `(guild_id, flag_type)` | Index : `guild_id`
+### Flag types supportes (10)
 
-### Table `infractions` - Violations enregistrees
-
-| Colonne | Type | Description |
-|---------|------|-------------|
-| id | UUID PK | Identifiant unique |
-| guild_id, channel_id, user_id | VARCHAR | Contexte Discord |
-| username | VARCHAR | Nom utilisateur |
-| message_id | VARCHAR | ID message original |
-| content | TEXT | Contenu du message |
-| flags | JSONB | Flags detectes (spam, insult, link avec details) |
-| score | FLOAT | Score calcule |
-| action | VARCHAR | Action executee (none/warn/delete/mute/ban) |
-| reason | TEXT | Raison |
-| duration | INTEGER NULL | Duree en secondes (mute) |
-| created_at | TIMESTAMP | Date |
-
-Index : `guild_id`, `(guild_id, user_id)`, `created_at DESC`, `action`
-
-### Table `tickets` + `ticket_messages` - Systeme de tickets
-
-- `tickets` : id, title, status (open/closed), priority, author_id, author_name, assigned_to, server, category, timestamps, messages_count
-- `ticket_messages` : id, ticket_id (FK cascade), author_name, author_role, content, timestamps
-
-Index : `status`, `author_id`, `assigned_to`, `server`, `created_at DESC`
-
-### Table `security_events` - Evenements de securite
-
-| Colonne | Type | Description |
-|---------|------|-------------|
-| id | UUID PK | Identifiant unique |
-| guild_id | VARCHAR | ID du serveur |
-| event_type | VARCHAR | Type (raid_detected, suspicious_account) |
-| severity | VARCHAR | Severite (critical, high, medium, warning) |
-| description | TEXT | Description de l'evenement |
-| user_ids | JSONB | IDs utilisateurs impliques |
-| created_at | TIMESTAMP | Date |
-
-Index : `guild_id`, `event_type`, `created_at DESC`, `severity`
-
-### Table `moderation_actions` - Historique de moderation
-
-| Colonne | Type | Description |
-|---------|------|-------------|
-| id | UUID PK | Identifiant unique |
-| guild_id, channel_id | VARCHAR | Contexte Discord |
-| moderator_id, moderator_name | VARCHAR | Moderateur |
-| target_id, target_name | VARCHAR | Utilisateur cible |
-| action_type | VARCHAR | Type (warn/mute/ban) |
-| reason | TEXT | Raison |
-| gravity | VARCHAR NULL | Gravite (low/medium/high) |
-| duration | INTEGER NULL | Duree en secondes |
-| created_at | TIMESTAMP | Date |
-
-Index : `guild_id`, `(guild_id, target_id)`, `action_type`, `created_at DESC`
-
-### Table `user_stats` - Statistiques utilisateurs
-
-| Colonne | Type | Description |
-|---------|------|-------------|
-| id | UUID PK | Identifiant unique |
-| guild_id | VARCHAR | ID du serveur |
-| user_id | VARCHAR | ID utilisateur |
-| username | VARCHAR | Nom utilisateur |
-| message_count | BIGINT | Nombre de messages |
-| voice_seconds | BIGINT | Temps vocal en secondes |
-| updated_at | TIMESTAMP | Derniere mise a jour |
-
-Contrainte unique : `(guild_id, user_id)` | Index : `guild_id`
+| Type | Source | Poids defaut | Description |
+|------|--------|-------------|-------------|
+| `spam` | Bot automod | 3.0 | Majuscules, repetitions, flood |
+| `insult` | Bot automod | 5.0 | Dictionnaire regex FR/EN |
+| `link` | Bot automod | 1.0 | URLs http/https, discord.gg |
+| `phishing` | Bot automod | 7.0 | Liens suspects |
+| `nsfw` | IA Vision | 8.0 | Images NSFW |
+| `illicit` | IA Vision | 9.0 | Produits illicites |
+| `anger` | IA Text | 3.0 | Colere |
+| `rage` | IA Text | 6.0 | Rage / haine |
+| `threat` | IA Text | 8.0 | Menaces |
+| `harassment` | IA Text | 7.0 | Harcelement |
 
 ---
 
-## Endpoints API
+## Endpoints API (62+)
 
 ### Authentification
 
 Toutes les routes (sauf `/health`) necessitent : `Authorization: Bearer <API_KEY>`
 Si `API_KEY` est vide dans la config, l'auth est desactivee (mode dev).
 
-### WebSocket
+### Analyse (bots)
 
 | Methode | Route | Description |
 |---------|-------|-------------|
-| GET | `/ws?token=<api_key>` | Flux d'evenements temps reel |
+| POST | `/analyze` | Analyse un message (scoring regles + inference IA text) |
+| POST | `/analyze/image` | Analyse une image (inference IA vision ONNX) |
 
-Evenements broadcasts : `infraction_new`, `ticket_new`, `ticket_message`, `ticket_closed`, `ticket_assigned`, `security_event`, `moderation_action`
-
-### Routes Bot - Analyse
-
-| Methode | Route | Description |
-|---------|-------|-------------|
-| POST | `/analyze` | Analyse un message et retourne l'action a executer |
-
-**Body** : `{ guild_id, channel_id, user_id, username, content, flags: { spam, insult, link }, metadata: { message_id, timestamp } }`
-**Reponse** : `{ action: "none"|"warn"|"delete"|"mute"|"ban", reason: "...", duration: null|seconds }`
-
-### Routes Admin - Rules
+### Rules
 
 | Methode | Route | Description |
 |---------|-------|-------------|
@@ -287,142 +271,226 @@ Evenements broadcasts : `infraction_new`, `ticket_new`, `ticket_message`, `ticke
 | POST | `/rules` | Creer/modifier une regle |
 | DELETE | `/rules/{guild_id}/{rule_id}` | Supprimer une regle |
 
-### Routes Admin - Infractions
+### Infractions
 
 | Methode | Route | Description |
 |---------|-------|-------------|
 | GET | `/infractions/{guild_id}` | Liste les infractions (query: user_id, action, limit, offset) |
 
-### Routes Admin - Tickets
+### Tickets
 
 | Methode | Route | Description |
 |---------|-------|-------------|
-| GET | `/api/tickets` | Lister les tickets |
-| POST | `/api/tickets` | Creer un ticket |
-| GET | `/api/tickets/{id}` | Detail d'un ticket avec messages |
-| POST | `/api/tickets/{id}/messages` | Repondre a un ticket |
-| PATCH | `/api/tickets/{id}/close` | Fermer un ticket |
-| PATCH | `/api/tickets/{id}/assign` | Assigner un ticket |
+| GET/POST | `/api/tickets` | Lister / creer |
+| GET | `/api/tickets/{id}` | Detail avec messages |
+| POST | `/api/tickets/{id}/messages` | Repondre |
+| PATCH | `/api/tickets/{id}/close` | Fermer |
+| PATCH | `/api/tickets/{id}/assign` | Assigner |
 
-### Routes Admin - Security
-
-| Methode | Route | Description |
-|---------|-------|-------------|
-| POST | `/api/security/events` | Reporter un evenement de securite |
-| GET | `/api/security/events` | Lister les evenements (query: guild_id) |
-
-### Routes Admin - Moderation
+### Security
 
 | Methode | Route | Description |
 |---------|-------|-------------|
-| POST | `/api/moderation/actions` | Logger une action de moderation |
-| GET | `/api/moderation/history/{guild_id}/{user_id}` | Historique moderation d'un utilisateur |
+| POST | `/api/security/events` | Reporter un evenement |
+| GET | `/api/security/events` | Lister (query: guild_id) |
 
-### Routes Admin - Stats
-
-| Methode | Route | Description |
-|---------|-------|-------------|
-| POST | `/api/stats/messages` | Enregistrer des messages (guild_id, user_id, username, count) |
-| POST | `/api/stats/voice` | Enregistrer du temps vocal (guild_id, user_id, username, seconds) |
-| GET | `/api/stats/{guild_id}/user/{user_id}` | Stats d'un utilisateur |
-| GET | `/api/stats/{guild_id}/overview` | Vue d'ensemble du serveur (cache 60s) |
-| GET | `/api/stats/{guild_id}/leaderboard` | Classement des membres (query: limit, max 50) |
-
-### Route publique
+### Moderation
 
 | Methode | Route | Description |
 |---------|-------|-------------|
-| GET | `/health` | Healthcheck (PostgreSQL, Redis, API status) |
+| POST | `/api/moderation/actions` | Logger une action |
+| GET | `/api/moderation/history/{guild_id}/{user_id}` | Historique |
+
+### Voice Channels (11 endpoints)
+
+Gestion complete des salons vocaux dynamiques : CRUD, transfert, co-admins, whitelist, bans.
+
+### Conduct (points de conduite)
+
+Config, consultation, leaderboard, ajout/deduction points, historique.
+
+### Levels / XP
+
+Config, ajout XP, niveaux utilisateur, leaderboard, recompenses par niveau.
+
+### Role Panels
+
+Panels de roles avec selection, auto-roles a l'arrivee.
+
+### Analytics (6 endpoints)
+
+| Methode | Route | Description |
+|---------|-------|-------------|
+| GET | `/api/analytics` | Toutes les analytics en une requete |
+| GET | `/api/analytics/heatmap` | Activite par heure x jour de la semaine |
+| GET | `/api/analytics/actions` | Distribution warn/delete/mute/ban (avec %) |
+| GET | `/api/analytics/top-infractors` | Classement des plus sanctionnes |
+| GET | `/api/analytics/moderation-trend` | Evolution quotidienne par type |
+| GET | `/api/analytics/peak-hours` | Heures les plus actives (moyennes) |
+
+Query params : `guild_id` (optionnel), `days` (1-90, defaut 30), `limit` (1-50, defaut 10)
+
+### Stats
+
+| Methode | Route | Description |
+|---------|-------|-------------|
+| POST | `/api/stats/messages` | Enregistrer messages |
+| POST | `/api/stats/voice` | Enregistrer temps vocal |
+| GET | `/api/stats/{guild_id}/user/{user_id}` | Stats utilisateur |
+| GET | `/api/stats/{guild_id}/overview` | Vue d'ensemble (cache 60s) |
+| GET | `/api/stats/{guild_id}/leaderboard` | Classement (max 50) |
+
+### Dashboard / Admin
+
+Stats globales, logs, guilds, bot heartbeat, charts activite.
+
+### Healthcheck
+
+| Methode | Route | Description |
+|---------|-------|-------------|
+| GET | `/health` | Status PostgreSQL, Redis, API |
 
 ---
 
-## Bots Discord
+## Bots Discord (9 bots)
 
-### Automod Bot - Auto-moderation
+### Automod Bot — Auto-moderation
 
 Detection locale rapide avant appel API :
-- **Spam** : majuscules excessives (>=8 chars), repetition caracteres (>=6), repetition mots (>=5)
+- **Spam** : majuscules excessives, repetition caracteres/mots, flood (configurable par guild)
 - **Insultes** : dictionnaire regex francais + anglais
 - **Liens** : URLs http/https, invitations discord.gg
+- **Phishing** : detection liens suspects
 
-Si flags detectes -> appel `POST /analyze` -> execution de l'action (warn/delete/mute/ban).
+Si flags detectes -> appel `POST /analyze` -> scoring (regles + IA) -> execution action.
 **Fallback** : si API injoignable, suppression locale du message.
 
-### Moderation Bot - Moderation manuelle
+### Moderation Bot — Moderation manuelle
 
 | Commande | Description |
 |----------|-------------|
-| `/warn <user> <gravity> <reason>` | Avertissement (gravity: low/medium/high) + DM a l'utilisateur |
-| `/mute <user> <reason> [duration_minutes]` | Timeout Discord (max 28 jours) |
-| `/unmute <user>` | Retrait du timeout |
-| `/ban <user> <reason> [duration_hours]` | Bannissement (DM avant ban) |
+| `/warn <user> <gravity> <reason>` | Avertissement + DM |
+| `/mute <user> <reason> [duration]` | Timeout Discord (max 28 jours) |
+| `/unmute <user>` | Retrait timeout |
+| `/ban <user> <reason> [duration]` | Bannissement (DM avant ban) |
 | `/unban <user_id>` | Debannissement |
-| `/history <user>` | Historique de moderation (warns/mutes/bans) |
+| `/history <user>` | Historique moderation |
 
-Toutes les actions sont loguees via `POST /api/moderation/actions`.
+### Security Bot — Securite serveur
 
-### Security Bot - Securite serveur
+- **Anti-raid** : detection joins massifs (configurable), activation verification, alerte
+- **Comptes suspects** : flag comptes < 24h (configurable)
 
-Fonctionne par evenements (pas de commandes), surveille en temps reel :
+### Image Bot — Detection images IA
 
-- **Anti-raid** : detection de joins massifs (defaut: 10 joins en 10s), activation automatique du niveau de verification le plus eleve, alerte dans le premier canal texte
-- **Comptes suspects** : flag les comptes de moins de 24h (configurable)
+- Intercepte tous les attachments images (jpg, png, gif, webp, bmp) + embeds
+- Telecharge, encode base64, envoie a `POST /analyze/image`
+- Detection magic bytes pour le content type
+- **Fallback** : suppression preventive si API down
 
-Tous les evenements sont reportes via `POST /api/security/events`.
-
-### Stats Bot - Statistiques
-
-| Commande | Description |
-|----------|-------------|
-| `/stats user [target]` | Stats d'un utilisateur (messages, temps vocal, infractions) |
-| `/stats server` | Stats globales du serveur |
-| `/stats top [limit]` | Classement des membres les plus actifs (1-25) |
-
-Tracking automatique en arriere-plan :
-- Compte les messages par utilisateur
-- Mesure le temps en vocal (join/leave)
-- Cache local (RwLock + HashMap) + sync backend
-
-### Ticket Bot - Tickets support
+### Stats Bot — Statistiques + XP
 
 | Commande | Description |
 |----------|-------------|
-| `/ticket create <title> <category> [priority]` | Creer un ticket (thread prive) |
-| `/ticket close` | Fermer et archiver le ticket |
-| `/ticket assign <moderator>` | Assigner un moderateur |
+| `/stats user [target]` | Stats utilisateur (messages, vocal, infractions) |
+| `/stats server` | Stats globales |
+| `/stats top [limit]` | Classement (1-25) |
+| `/level [user]` | Niveau et XP |
 
-Categories : report, appeal, permissions, bug, suggestion
-Priorites : urgent, high, medium, low
+Tracking automatique messages + vocal + XP.
+
+### Ticket Bot — Tickets support
+
+| Commande | Description |
+|----------|-------------|
+| `/ticket create <title> <category> [priority]` | Thread prive |
+| `/ticket close` | Fermer et archiver |
+| `/ticket assign <moderator>` | Assigner |
+
+### Voice Bot — Salons vocaux dynamiques
+
+Gestion complete : creation automatique, permissions, co-admins, vote kick, whitelist/ban, file d'attente, anti-flood.
+
+### Audit Bot — Logs d'audit
+
+Tracking des actions Discord (bans, kicks, modifications roles, etc.) et envoi a l'API.
+
+### Roles Bot — Panels de roles
+
+Gestion de panels de roles avec boutons de selection + auto-roles a l'arrivee de nouveaux membres.
 
 ---
 
 ## Systeme de scoring
 
-Le scoring determine l'action a executer sur un message. Chaque type de flag a un poids configurable par serveur.
+Le scoring determine l'action a executer. Combine scoring par regles + inference IA.
 
-**Poids par defaut** : Spam = 3.0, Insult = 5.0, Link = 1.0
+**Scoring regles (bot)** : `score_bot = somme(poids des flags actifs)`
 
-**Calcul** : `score = somme(poids des flags actifs)`
+**Scoring IA text** : `score_ia = somme(poids * confiance)` pour chaque sentiment detecte (seuil: 50%)
+
+**Score combine** : `score_total = score_bot + score_ia`
 
 **Seuils par defaut** :
-- `score >= 2.0` -> warn
-- `score >= 4.0` -> delete
-- `score >= 6.0` -> mute (10 min)
-- `score >= 9.0` -> ban
+- `>= 2.0` -> warn | `>= 4.0` -> delete | `>= 6.0` -> mute (10 min) | `>= 9.0` -> ban
 
-L'action la plus severe dont le seuil est atteint est appliquee. Si aucune regle n'existe pour le serveur, des regles par defaut sont creees automatiquement.
+Tous les seuils et poids sont configurables par serveur via les regles.
+
+---
+
+## Inference IA (ONNX)
+
+### Modele Vision — Detection images
+
+| Propriete | Valeur |
+|-----------|--------|
+| Architecture | EfficientNetV2-S |
+| Classes | safe, nsfw, illicit |
+| Input | Image 224x224 normalisee ImageNet |
+| Format | ONNX (opset 17) |
+| Preprocessing | Resize + normalisation (mean/std ImageNet) |
+
+### Modele Text — Detection sentiments
+
+| Propriete | Valeur |
+|-----------|--------|
+| Architecture | DistilBERT multilingual |
+| Classes | neutral, anger, rage, threat, harassment |
+| Input | Tokens (max 256) + attention mask |
+| Format | ONNX (opset 17) |
+| Tokenizer | HuggingFace tokenizers (Rust) |
+
+Les modeles sont charges au demarrage de l'API. Si absents, l'API fonctionne en mode degrade (scoring regles uniquement).
+
+---
+
+## Gateway WebSocket
+
+Service dedie au temps reel, separe de l'API.
+
+**Architecture** : API publie sur Redis (`PUBLISH sentinel:events`) -> Gateway ecoute (`SUBSCRIBE`) -> broadcast aux clients WebSocket.
+
+| Propriete | Valeur |
+|-----------|--------|
+| Port | 3001 |
+| Auth | `?token=<api_key>` |
+| Max connexions | Configurable (defaut: 1000) |
+| Reconnexion Redis | Automatique (backoff 2s) |
+| Healthcheck | `GET /health` (status + connected_clients) |
+
+**Events broadcasts** : `infraction_new`, `ticket_new`, `ticket_message`, `ticket_closed`, `ticket_assigned`, `security_event`, `moderation_action`
 
 ---
 
 ## Desktop App (Tauri)
 
-### Pages (11 ecrans)
+### Pages (17 ecrans)
 
 | Page | Fonctionnalite |
 |------|---------------|
 | Setup | Configuration initiale (URL API + credentials Discord OAuth) |
 | Login | Connexion Discord OAuth |
-| Dashboard | Stats globales (serveurs, utilisateurs, messages, infractions, bots) |
+| Dashboard | Stats globales + graphiques Chart.js |
 | Logs | Logs d'activite avec filtres (niveau, bot) |
 | Infractions | Table des infractions avec details |
 | Rules | Gestion des regles (toggle, edition seuils/poids) |
@@ -430,31 +498,29 @@ L'action la plus severe dont le seuil est atteint est appliquee. Si aucune regle
 | Moderation | Application d'actions + consultation historique |
 | Security | Monitoring evenements de securite en temps reel |
 | Tickets | Gestion tickets (liste, detail, reponse, fermeture, assignation) |
+| Voice Channels | Monitoring salons vocaux dynamiques |
+| Conduct | Points de conduite + leaderboard |
+| Levels | Systeme XP/niveaux + recompenses |
+| Role Panels | Gestion panels de roles + auto-roles |
+| Watched Users | Surveillance utilisateurs avec dossiers |
+| Audit | Logs d'audit |
 | Settings | Configuration (URL API, cle, auto-refresh, logout) |
-
-### Architecture Rust (src-tauri)
-
-Architecture hexagonale avec 10 services exposes via 26 commandes IPC Tauri :
-
-| Service | Fonctionnalite |
-|---------|---------------|
-| AuthService | OAuth Discord, persistence session (HEED/LMDB), port 19836 callback |
-| DashboardService | Stats globales |
-| LogsService | Logs de moderation |
-| InfractionsService | Consultation infractions |
-| RulesService | CRUD regles par serveur |
-| TicketsService | Cycle de vie complet des tickets |
-| SecurityService | Evenements de securite |
-| ModerationService | Actions de moderation + historique |
-| RealtimeService | WebSocket avec auto-reconnect (backoff exponentiel) |
-| ConfigStore | Stockage LMDB persistent (config Discord, config API) |
+| Bot Config | Configuration par bot et par serveur |
 
 ### Frontend Vue 3
 
-- **Atomic Design** : atoms (Badge, Button, Input, Select, Toggle, StatusDot), molecules (FilterBar, NavItem, StatCard), organisms (DataTable, NotificationPanel, RuleCard, RuleEditModal, SidebarNav)
-- **12 composables** : useAuth, useFetch, useDashboard, useLogs, useInfractions, useRules, useBans, useTickets, useSecurity, useModeration, useRealtime, useNotifications
-- **Notifications natives** : alertes desktop pour evenements critiques via WebSocket
-- **Mock adapter** : mode fallback quand l'API n'est pas configuree
+- **Atomic Design** : 6 atoms, 3 molecules, 6 organisms, 1 template
+- **18 composables** : useAuth, useDashboard, useRules, useInfractions, useModeration, useTickets, useVoiceChannels, useBans, useConduct, useLevels, useRolePanels, useSecurity, useWatchedUsers, useAuditLogs, useLogs, useDashboardCharts, useRealtime, useNotifications
+- **Notifications natives** desktop via WebSocket
+- **Graphiques** Chart.js (trends, distributions)
+
+### Backend Tauri (Rust)
+
+- 19 services applicatifs
+- Architecture hexagonale (domain/ports/adapters)
+- Stockage local LMDB (config persistante)
+- WebSocket temps reel avec auto-reconnect
+- Mock adapter pour mode hors-ligne
 
 ---
 
@@ -462,18 +528,18 @@ Architecture hexagonale avec 10 services exposes via 26 commandes IPC Tauri :
 
 | Middleware | Description |
 |-----------|-------------|
-| Auth | Bearer token, mode dev si API_KEY vide, WebSocket via query param |
+| Auth | Bearer token, mode dev si API_KEY vide |
 | Rate Limiting | Token bucket par IP (defaut: 50 req/s, burst 10x), header Retry-After |
-| CORS | Origins configurables, methodes GET/POST/PATCH/DELETE/OPTIONS |
-| Body Limit | Limite taille requete (defaut: 1 MB) |
-| Tracing | Logs structures (method, URI, request_id, status, latency_ms), format JSON optionnel |
+| CORS | Origins configurables |
+| Body Limit | Defaut: 1 MB |
+| Tracing | Logs structures (method, URI, request_id, status, latency_ms) |
 | Request ID | Propagation x-request-id |
 
 ---
 
 ## Deploiement
 
-### Docker Compose (production)
+### Docker Compose (15 services)
 
 ```bash
 # Demarrer toute la stack
@@ -484,13 +550,12 @@ docker-compose --profile monitoring up -d
 ```
 
 Services :
-- **postgres** (16-alpine) - port 5432, volume `postgres_data`
-- **redis** (7-alpine) - port 6379, volume `redis_data`
-- **api** - port 3000, depend de postgres + redis
-- **automod-bot** - depend de api
-- **moderation-bot** - depend de api
-- **security-bot** - depend de api
-- **ticket-bot** - depend de api
+- **postgres** (16-alpine) — port 5432
+- **redis** (7-alpine) — port 6379
+- **api** — port 3000
+- **gateway** — port 3001
+- **worker** — traitement async
+- **automod-bot, moderation-bot, security-bot, ticket-bot, image-bot, voice-bot, stats-bot, audit-bot, roles-bot**
 
 ### Variables d'environnement (.env)
 
@@ -501,137 +566,56 @@ REDIS_PASSWORD=sentinel_redis
 
 # API
 API_KEY=your_api_key_here
-DATABASE_URL=postgres://sentinel:sentinel_secret@postgres:5432/discord_sentinel
-REDIS_URL=redis://:sentinel_redis@redis:6379
-HOST=0.0.0.0
-PORT=3000
-RUST_LOG=info
 
-# API (optionnel)
-RATE_LIMIT_PER_SEC=50           # Requetes par seconde par IP (defaut: 50)
-MAX_BODY_SIZE=1048576            # Taille max body en bytes (defaut: 1MB)
-SHUTDOWN_TIMEOUT=30              # Timeout arret gracieux en secondes
-ALLOWED_ORIGINS=                 # CORS origins (vide ou * = permissif)
-LOG_FORMAT=                      # "json" pour logs JSON (defaut: human)
+# IA / Inference ONNX (optionnel)
+VISION_MODEL_PATH=./models/vision_sentinel.onnx
+TEXT_MODEL_PATH=./models/text_sentinel.onnx
+TEXT_TOKENIZER_PATH=./models/tokenizer.json
+TEXT_MAX_LENGTH=256
 
 # Bots (un token par bot)
 AUTOMOD_DISCORD_TOKEN=...
 MODERATION_DISCORD_TOKEN=...
 SECURITY_DISCORD_TOKEN=...
 TICKET_DISCORD_TOKEN=...
+IMAGE_DISCORD_TOKEN=...
+VOICE_DISCORD_TOKEN=...
 STATS_DISCORD_TOKEN=...
-
-# Security Bot (optionnel)
-RAID_JOIN_THRESHOLD=10           # Joins pour declencher alerte raid
-RAID_JOIN_WINDOW_SECS=10         # Fenetre de temps en secondes
-MIN_ACCOUNT_AGE_SECS=86400       # Age minimum compte (24h)
-
-# Monitoring (optionnel)
-PGADMIN_EMAIL=admin@sentinel.local
-PGADMIN_PASSWORD=admin
+AUDIT_DISCORD_TOKEN=...
+ROLES_DISCORD_TOKEN=...
 ```
 
 ### Developpement local
 
-**Tout lancer d'un coup** (API + bots + desktop) :
-
 ```bash
-bash dev.sh
-```
-
-Le script `dev.sh` :
-- Charge le `.env` automatiquement
-- Verifie les prerequis (cargo, node)
-- Lance l'API en premier, puis les bots et l'app desktop en parallele
-- Redirige les logs dans `.logs/` (un fichier par service)
-- `Ctrl+C` arrete tout proprement
-
-**Lancer individuellement** :
-
-```bash
-# API
-cd services/api
-cargo run                      # RUST_LOG=debug pour verbose
-
-# Automod bot
-cd bots/automod-bot
-cargo run
-
-# Moderation bot
-cd bots/moderation-bot
-cargo run
-
-# Security bot
-cd bots/security-bot
-cargo run
-
-# Stats bot
-cd bots/stats-bot
-cargo run
-
-# Ticket bot
-cd bots/ticket-bot
-cargo run
-
-# Desktop
-cd apps/desktop
-npm install
-npm run tauri dev              # App complete avec hot reload
-
-# Build production desktop
-npm run tauri build            # Executable natif
+bash dev.sh          # Lance API + bots + desktop en parallele
+# ou individuellement :
+cd services/api && cargo run
+cd services/gateway && cargo run
+cd bots/automod-bot && cargo run
+cd apps/desktop && npm run tauri dev
 ```
 
 ---
 
-## Etat d'avancement
+## Tests
 
-### Implemente
+| Module | Tests | Couverture |
+|--------|-------|------------|
+| API — ScoringService | 21 | Tous les flags, poids, seuils, regles custom |
+| API — InferenceService | 10 | Softmax, mode degrade, classify sans modele |
+| API — TextTokenizer | 4 | Mode degrade, tokenize sans tokenizer |
+| API — AnalyzeImageService | 4 | Preprocessing image, normalisation |
+| API — AnalyzeMessageService | 6 | Thresholds, inference text, construction |
+| API — Value Objects | 12 | Action, FlagType, DetectionFlags (serde, roundtrip) |
+| API — Level | 3 | XP calculs |
+| Gateway — Broadcaster | 6 | Subscribe, unsubscribe, max connections, broadcast |
+| Automod Bot — Detectors | ~20 | Spam, insult, link, phishing |
+| Security Bot — Raid | ~5 | Detection joins massifs |
+| Stats Bot — Tracker | ~5 | Cache local |
+| Voice Bot — State | ~15 | Cooldown, flood, pending, vote |
 
-**API Backend** :
-- Architecture hexagonale complete (domain/ports/adapters)
-- 7 use cases : analyze, rules, infractions, tickets, security, moderation, stats
-- WebSocket temps reel (broadcaster d'evenements)
-- Middleware : auth, rate limiting, CORS, body limit, tracing structure
-- 7 migrations PostgreSQL, cache Redis avec invalidation
-- Healthcheck (PostgreSQL + Redis)
-- Arret gracieux avec drain de connexions
-
-**Bots Discord (5)** :
-- Automod bot : detection locale (spam/insultes/liens) + appel API + fallback
-- Moderation bot : /warn /mute /ban /unmute /unban /history avec DM et logging
-- Security bot : anti-raid (detection joins massifs) + comptes suspects + alertes
-- Stats bot : tracking messages/vocal + /stats user, server, top + leaderboard
-- Ticket bot : /ticket create, close, assign avec threads prives
-
-**Desktop App** :
-- 11 pages d'administration completes
-- OAuth Discord avec callback local
-- WebSocket temps reel avec auto-reconnect
-- Notifications natives desktop
-- Stockage local LMDB (config persistante)
-- Mock adapter pour mode hors-ligne
-- 26 commandes Tauri IPC
-
-**Infrastructure** :
-- Docker Compose (9 services + monitoring optionnel)
-- Script dev.sh pour developpement local
-- Multi-stage Docker builds
-
-### Non implemente
-
-- Worker service (traitement async, queue Redis)
-- Gateway service (WebSocket/realtime dedie)
-- Stats bot non inclus dans docker-compose.yml
-- Infrastructure Kubernetes
-- CI/CD (GitHub Actions)
-- Tests d'integration end-to-end
-
-### Roadmap
-
-- **Phase 1 (MVP)** : en cours - API, 5 bots, DB, desktop app
-- **Phase 2** : queue system Redis, worker async, CI/CD, tests e2e
-- **Phase 3** : IA/ML detection, anti-raid avance, analytics, dashboard complet
+**Total : ~110+ tests unitaires** sur 20 fichiers avec `#[cfg(test)]`
 
 ---
 
@@ -640,9 +624,58 @@ npm run tauri build            # Executable natif
 - **Jamais de logique metier dans les bots** : les bots sont des interfaces legeres
 - **Toujours passer par l'API** : centralisation des decisions
 - **Architecture hexagonale** : separation stricte domain/ports/adapters
-- **Gestion d'erreurs** : `thiserror` pour les erreurs domain, conversion auto vers HTTP status (400, 404, 409, 422, 504, 500)
-- **Cache** : Redis pour les regles (TTL 5min) et stats overview (TTL 60s), invalidation manuelle a la modification
+- **Gateway dedie** : WebSocket temps reel decouple de l'API REST
+- **Inference IA gracieuse** : si modeles absents, fallback sur scoring regles
+- **Gestion d'erreurs** : `thiserror` pour les erreurs domain, conversion auto vers HTTP
+- **Cache** : Redis pour regles (TTL 5min) et stats (TTL 60s), invalidation a la modification
 - **Fallback** : si API injoignable, le bot prend une decision locale de securite
 - **Rate limiting** : token bucket par IP avec burst configurable
 - **Observabilite** : logs structures avec request_id, format JSON optionnel
-- **WebSocket** : broadcast d'evenements pour mise a jour temps reel (desktop app + futurs clients)
+
+---
+
+## Suivi des features
+
+### Termine
+
+- [x] API Backend — Architecture hexagonale, 62+ endpoints, 14 use cases, 20 migrations
+- [x] Automod Bot — Detection spam/insultes/liens/phishing + appel API + fallback
+- [x] Moderation Bot — /warn /mute /ban /unmute /unban /history avec DM et logging
+- [x] Security Bot — Anti-raid + comptes suspects + alertes
+- [x] Stats Bot — Tracking messages/vocal + /stats + XP/levels
+- [x] Ticket Bot — /ticket create, close, assign avec threads prives
+- [x] Image Bot — Detection images NSFW/illicites via API + fallback
+- [x] Voice Bot — Salons dynamiques, vote kick, co-admins, whitelist/ban
+- [x] Audit Bot — Tracking audit logs Discord
+- [x] Roles Bot — Panels de roles + auto-roles
+- [x] Desktop App — 17 pages, OAuth Discord, WebSocket temps reel, notifications natives
+- [x] Gateway WebSocket — Service dedie, Redis pub/sub, auto-reconnect, limite connexions
+- [x] Inference IA ONNX — Vision (NSFW/illicite) + Text (sentiments) integres dans l'API
+- [x] Tokenizer Rust — HuggingFace tokenizers pour inference text
+- [x] Scoring combine — Regles bot + inference IA text avec ponderation par confiance
+- [x] Analytics complet — Heatmap, distribution actions, top infracteurs, trends, peak hours
+- [x] Systeme de conduite — Points, penalties, regeneration, leaderboard
+- [x] Systeme XP/Levels — XP par message/vocal, niveaux, recompenses roles
+- [x] Watched Users — Surveillance avec dossiers complets
+- [x] Bot Config — Configuration per-guild par bot depuis l'app desktop
+- [x] Docker Compose — 15 services orchestres
+- [x] Tests unitaires — 110+ tests (API, gateway, bots)
+- [x] Multi-stage Docker builds — Images Alpine optimisees
+
+### En cours
+
+- [ ] Collecter les datasets IA — Images (safe/nsfw/illicit) et textes (neutral/toxic)
+- [ ] Entrainer les modeles IA — `python train.py` + `python export_onnx.py`
+
+### A faire
+
+- [ ] CI/CD — GitHub Actions (lint, test, build, deploy)
+- [ ] Tests e2e — Integration end-to-end (API + bots + DB)
+- [ ] Worker service — Traitement async via queue Redis (jobs background)
+- [ ] Anti-raid avance — Captcha, slowmode auto, quarantaine
+- [ ] Config seuils IA per-guild — UI desktop pour ajuster confidence threshold
+- [ ] Page analytics desktop — Graphiques heatmap, trends, top infracteurs dans l'app
+- [ ] Rate limiting inference — Limiter appels ONNX pour proteger le CPU
+- [ ] Infrastructure Kubernetes — Helm charts, HPA, monitoring
+- [ ] Monitoring avance — Prometheus, Grafana, alerting
+- [ ] Backup automatique — Snapshots PostgreSQL + export config
