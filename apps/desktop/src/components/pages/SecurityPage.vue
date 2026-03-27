@@ -25,9 +25,9 @@ function eventIcon(type: string): string {
 
 <template>
   <div class="security">
-    <h1>Security Events</h1>
+    <h1>Evenements de securite</h1>
 
-    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="loading" class="loading">Chargement...</div>
 
     <div v-else class="events-list">
       <div v-for="event in events" :key="event.id" class="event-card">
@@ -42,13 +42,13 @@ function eventIcon(type: string): string {
           </div>
           <p class="event-description">{{ event.description }}</p>
           <div v-if="event.user_ids.length > 0" class="event-users">
-            <span class="users-label">Involved users:</span>
+            <span class="users-label">Utilisateurs concernes :</span>
             <span v-for="uid in event.user_ids" :key="uid" class="user-chip">{{ uid }}</span>
           </div>
         </div>
       </div>
 
-      <div v-if="events.length === 0" class="empty">No security events</div>
+      <div v-if="events.length === 0" class="empty">Aucun evenement de securite</div>
     </div>
   </div>
 </template>

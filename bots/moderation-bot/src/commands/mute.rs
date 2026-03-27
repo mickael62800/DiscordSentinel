@@ -4,7 +4,7 @@ use serenity::all::{
 };
 use tracing::{error, info};
 
-use crate::api_client::ModerationAction;
+use crate::api_client::{ApiClient, ModerationAction};
 use crate::handler::ApiClientKey;
 
 pub fn register() -> CreateCommand {
@@ -66,10 +66,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Err(_) => { reply(ctx, command, "Membre introuvable sur le serveur.").await; return; }
     };
 
+    // Charger la config per-guild depuis l'API
+    let guild_config = {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        }
+    };
+    let default_mute_duration_secs = ApiClient::config_u64(&guild_config, "default_mute_duration_secs", 28 * 24 * 3600);
+    let max_mute_duration_secs = ApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
+
     let duration_secs = duration_minutes.map(|m| (m as u64) * 60);
-    // Discord timeout max = 28 jours. Si permanent, on met 28 jours (le backend track le permanent).
-    let timeout_secs = duration_secs.unwrap_or(28 * 24 * 3600);
-    let timeout_secs = timeout_secs.min(28 * 24 * 3600); // cap à 28j
+    // Discord timeout max = 28 jours. Si permanent, on utilise la valeur par defaut de la config.
+    let timeout_secs = duration_secs.unwrap_or(default_mute_duration_secs);
+    let timeout_secs = timeout_secs.min(max_mute_duration_secs).min(28 * 24 * 3600); // cap à 28j Discord max
 
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)

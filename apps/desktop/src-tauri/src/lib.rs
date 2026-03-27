@@ -14,6 +14,10 @@ use application::realtime_service::RealtimeService;
 use application::rules_service::RulesService;
 use application::security_service::SecurityService;
 use application::tickets_service::TicketsService;
+use application::bot_config_service::BotConfigService;
+use application::guild_service::GuildService;
+use application::voice_channels_service::VoiceChannelsService;
+use application::conduct_service::ConductService;
 use domain::ports::AppAdapter;
 use infrastructure::api_adapter::ApiAdapter;
 use infrastructure::config_store::ConfigStore;
@@ -30,8 +34,11 @@ pub fn run() {
             Arc::new(ApiAdapter::new(cfg.api_url.clone(), cfg.api_key.clone()))
         }
         None => {
-            println!("No API config found, using mock adapter");
-            Arc::new(MockAdapter::new())
+            // Fallback : utiliser l'API locale par defaut au lieu du mock
+            let default_url = std::env::var("API_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
+            let default_key = std::env::var("API_KEY").unwrap_or_default();
+            println!("No API config found, using API adapter with default: {}", default_url);
+            Arc::new(ApiAdapter::new(default_url, default_key))
         }
     };
 
@@ -44,6 +51,10 @@ pub fn run() {
     let tickets_svc = Arc::new(TicketsService::new(adapter.clone()));
     let security_svc = Arc::new(SecurityService::new(adapter.clone()));
     let moderation_svc = Arc::new(ModerationService::new(adapter.clone()));
+    let bot_config_svc = Arc::new(BotConfigService::new(adapter.clone()));
+    let guild_svc = Arc::new(GuildService::new(adapter.clone()));
+    let voice_channels_svc = Arc::new(VoiceChannelsService::new(adapter.clone()));
+    let conduct_svc = Arc::new(ConductService::new(adapter.clone()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
@@ -58,6 +69,10 @@ pub fn run() {
         .manage(tickets_svc)
         .manage(security_svc)
         .manage(moderation_svc)
+        .manage(bot_config_svc)
+        .manage(guild_svc)
+        .manage(voice_channels_svc)
+        .manage(conduct_svc)
         .invoke_handler(tauri::generate_handler![
             presentation::commands::discord_login,
             presentation::commands::get_current_user,
@@ -71,6 +86,7 @@ pub fn run() {
             presentation::commands::ws_connect,
             presentation::commands::ws_disconnect,
             presentation::commands::ws_status,
+            presentation::commands::get_guilds,
             presentation::commands::get_dashboard_stats,
             presentation::commands::get_logs,
             presentation::commands::get_infractions,
@@ -85,6 +101,16 @@ pub fn run() {
             presentation::commands::get_security_events,
             presentation::commands::log_moderation_action,
             presentation::commands::get_moderation_history,
+            presentation::commands::get_voice_channels,
+            presentation::commands::get_voice_channel_detail,
+            presentation::commands::get_bot_definitions,
+            presentation::commands::get_bot_guild_config,
+            presentation::commands::set_bot_config,
+            presentation::commands::delete_bot_config,
+            presentation::commands::get_conduct_config,
+            presentation::commands::get_conduct_leaderboard,
+            presentation::commands::get_conduct_points,
+            presentation::commands::get_conduct_log,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -7,17 +7,17 @@ const { stats, loading } = useDashboard();
 
 <template>
   <div class="dashboard">
-    <h1>Dashboard</h1>
+    <h1>Tableau de bord</h1>
 
     <div v-if="!loading && stats" class="stats-grid">
-      <StatCard label="Servers" :value="stats.total_servers" color="var(--accent)" />
-      <StatCard label="Users" :value="stats.total_users.toLocaleString()" color="var(--info)" />
-      <StatCard label="Messages today" :value="stats.messages_today.toLocaleString()" />
-      <StatCard label="Infractions today" :value="stats.infractions_today" color="var(--danger)" />
-      <StatCard label="Bots online" :value="`${stats.bots_online} / ${stats.bots_total}`" color="var(--success)" />
+      <StatCard label="Serveurs" :value="stats.total_servers" color="var(--accent)" />
+      <StatCard label="Utilisateurs" :value="stats.total_users.toLocaleString()" color="var(--info)" />
+      <StatCard label="Messages aujourd'hui" :value="stats.messages_today.toLocaleString()" />
+      <StatCard label="Infractions aujourd'hui" :value="stats.infractions_today" color="var(--danger)" />
+      <StatCard label="Bots en ligne" :value="`${stats.bots_online} / ${stats.bots_total}`" color="var(--success)" />
     </div>
 
-    <div v-else class="loading">Loading...</div>
+    <div v-else class="loading">Chargement...</div>
   </div>
 </template>
 

@@ -1,0 +1,56 @@
+use serde::{Deserialize, Serialize};
+
+use crate::domain::entities::{BotDefinition, BotGuildConfig};
+
+#[derive(Debug, Serialize)]
+pub struct BotDefinitionDto {
+    pub bot_name: String,
+    pub display_name: String,
+    pub description: String,
+    pub config_schema: serde_json::Value,
+}
+
+impl From<BotDefinition> for BotDefinitionDto {
+    fn from(d: BotDefinition) -> Self {
+        Self {
+            bot_name: d.bot_name,
+            display_name: d.display_name,
+            description: d.description,
+            config_schema: d.config_schema,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct BotGuildConfigDto {
+    pub guild_id: String,
+    pub bot_name: String,
+    pub config_key: String,
+    pub config_value: String,
+}
+
+impl From<BotGuildConfig> for BotGuildConfigDto {
+    fn from(c: BotGuildConfig) -> Self {
+        Self {
+            guild_id: c.guild_id,
+            bot_name: c.bot_name,
+            config_key: c.config_key,
+            config_value: c.config_value,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SetConfigDto {
+    pub guild_id: String,
+    pub bot_name: String,
+    pub config_key: String,
+    pub config_value: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct DeleteConfigDto {
+    pub guild_id: String,
+    pub bot_name: String,
+    pub config_key: String,
+}

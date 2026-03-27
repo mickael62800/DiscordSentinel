@@ -25,6 +25,21 @@ impl ManageRulesUseCase for ManageRulesService {
         self.rule_repo.find_by_guild(guild_id).await
     }
 
+    async fn get_all_rules(&self) -> Result<Vec<Rule>, DomainError> {
+        self.rule_repo.find_all().await
+    }
+
+    async fn toggle_rule(&self, rule_id: Uuid, enabled: bool) -> Result<bool, DomainError> {
+        self.rule_repo.toggle(rule_id, enabled).await?;
+
+        // Invalider le cache — on ne connaît pas le guild_id ici, invalider par pattern
+        if let Some(rule) = self.rule_repo.find_by_id(rule_id).await? {
+            self.cache.invalidate_rules(&rule.guild_id).await.ok();
+        }
+
+        Ok(enabled)
+    }
+
     async fn create_or_update_rule(&self, cmd: CreateRuleCommand) -> Result<Rule, DomainError> {
         if cmd.weight < 0.0 {
             return Err(DomainError::InvalidRule("Le poids ne peut pas être négatif".into()));

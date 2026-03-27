@@ -4,7 +4,7 @@ use serenity::all::{
 };
 use tracing::{error, info};
 
-use crate::api_client::ModerationAction;
+use crate::api_client::{ApiClient, ModerationAction};
 use crate::handler::ApiClientKey;
 
 pub fn register() -> CreateCommand {
@@ -68,6 +68,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         format!("{}h", duration_hours.unwrap())
     };
 
+    // Charger la config per-guild depuis l'API
+    let guild_config = {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        }
+    };
+    let ban_delete_message_days = ApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8;
+
     // DM avant le ban (après le ban on ne peut plus DM)
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
         dm.send_message(
@@ -80,8 +91,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ).await.ok();
     }
 
-    // Exécuter le ban Discord (supprime les messages des dernières 24h)
-    if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, 1, reason).await {
+    // Exécuter le ban Discord (supprime les messages des derniers N jours)
+    if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, ban_delete_message_days, reason).await {
         error!(error = %e, "Impossible de bannir");
         reply(ctx, command, &format!("Erreur Discord : {e}")).await;
         return;

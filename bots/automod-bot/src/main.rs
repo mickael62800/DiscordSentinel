@@ -3,12 +3,15 @@ mod config;
 mod detectors;
 mod handler;
 
+use std::sync::Arc;
+
+use dashmap::{DashMap, DashSet};
 use serenity::prelude::*;
 use tracing::info;
 
 use crate::api_client::ApiClient;
 use crate::config::Config;
-use crate::handler::{ApiClientKey, Handler};
+use crate::handler::{ApiClientKey, FloodTrackerKey, Handler, ProcessedMessagesKey};
 
 #[tokio::main]
 async fn main() {
@@ -36,7 +39,20 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(ApiClient::new(&config));
+        data.insert::<ProcessedMessagesKey>(Arc::new(DashSet::new()));
+        data.insert::<FloodTrackerKey>(Arc::new(DashMap::new()));
     }
+
+    // Heartbeat task
+    let api_for_heartbeat = ApiClient::new(&config);
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = api_for_heartbeat.heartbeat("automod-bot").await {
+                tracing::warn!("Heartbeat failed: {}", e);
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+        }
+    });
 
     if let Err(e) = client.start().await {
         eprintln!("Erreur fatale : {e}");

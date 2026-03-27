@@ -1,13 +1,23 @@
+mod bot_config_repository;
+mod conduct_repository;
+mod guild_repository;
 mod infraction_repository;
+mod log_repository;
 mod moderation_repository;
 mod rule_repository;
 mod security_event_repository;
 mod stats_repository;
 mod ticket_repository;
+mod voice_channel_repository;
 
+pub use bot_config_repository::PgBotConfigRepository;
+pub use conduct_repository::PgConductRepository;
+pub use guild_repository::PgGuildRepository;
 pub use infraction_repository::PgInfractionRepository;
+pub use log_repository::PgLogRepository;
 pub use moderation_repository::PgModerationRepository;
 pub use rule_repository::PgRuleRepository;
 pub use security_event_repository::PgSecurityEventRepository;
 pub use stats_repository::PgStatsRepository;
 pub use ticket_repository::PgTicketRepository;
+pub use voice_channel_repository::PgVoiceChannelRepository;

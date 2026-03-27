@@ -1,6 +1,30 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Guild {
+    pub guild_id: String,
+    pub name: String,
+    pub icon: Option<String>,
+    pub member_count: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BotDefinition {
+    pub bot_name: String,
+    pub display_name: String,
+    pub description: String,
+    pub config_schema: serde_json::Value,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BotGuildConfig {
+    pub guild_id: String,
+    pub bot_name: String,
+    pub config_key: String,
+    pub config_value: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct DiscordConfig {
     pub client_id: String,
     pub client_secret: String,
@@ -163,4 +187,88 @@ pub struct UserModerationHistory {
     pub total_mutes: u32,
     pub total_bans: u32,
     pub actions: Vec<ModerationActionResponse>,
+}
+
+// ── Voice Channels ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VoiceChannel {
+    pub id: String,
+    pub guild_id: String,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub channel_id: String,
+    pub text_channel_id: Option<String>,
+    pub members_channel_id: Option<String>,
+    pub queue_channel_id: Option<String>,
+    pub category_id: Option<String>,
+    pub channel_name: String,
+    pub kind: String,
+    pub visibility: String,
+    pub queue_enabled: bool,
+    pub locked: bool,
+    pub member_limit: Option<i32>,
+    pub status: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VoiceChannelCoAdmin {
+    pub id: String,
+    pub user_id: String,
+    pub user_name: String,
+    pub granted_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VoiceChannelBan {
+    pub id: String,
+    pub user_id: String,
+    pub user_name: String,
+    pub banned_by: String,
+    pub reason: Option<String>,
+    pub expires_at: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct VoiceChannelDetail {
+    pub channel: VoiceChannel,
+    pub co_admins: Vec<VoiceChannelCoAdmin>,
+    pub bans: Vec<VoiceChannelBan>,
+}
+
+// ── Conduct ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConductConfig {
+    pub guild_id: String,
+    pub max_points: i32,
+    pub regen_amount: i32,
+    pub regen_interval: String,
+    pub penalty_warn: i32,
+    pub penalty_delete: i32,
+    pub penalty_mute: i32,
+    pub penalty_ban: i32,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct UserConductPoints {
+    pub id: String,
+    pub guild_id: String,
+    pub user_id: String,
+    pub username: String,
+    pub points: i32,
+    pub last_regen_at: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConductPointsLog {
+    pub id: String,
+    pub delta: i32,
+    pub reason: String,
+    pub points_before: i32,
+    pub points_after: i32,
+    pub created_at: String,
 }

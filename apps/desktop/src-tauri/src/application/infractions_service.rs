@@ -12,7 +12,7 @@ impl InfractionsService {
         Self { repo }
     }
 
-    pub async fn get_infractions(&self) -> Result<Vec<Infraction>, String> {
-        self.repo.get_infractions().await
+    pub async fn get_infractions(&self, guild_id: Option<String>) -> Result<Vec<Infraction>, String> {
+        self.repo.get_infractions(guild_id).await
     }
 }

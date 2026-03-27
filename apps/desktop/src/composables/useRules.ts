@@ -1,16 +1,23 @@
-import { ref, onMounted } from "vue";
+import { ref, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { ModerationRule, UpdateRuleParams } from "../types";
+import { useGuildSelector } from "./useGuildSelector";
 
 export function useRules() {
   const rules = ref<ModerationRule[]>([]);
   const loading = ref(true);
   const editing = ref<ModerationRule | null>(null);
+  const { guildIdFilter } = useGuildSelector();
 
   async function fetchRules() {
     loading.value = true;
-    rules.value = await invoke<ModerationRule[]>("get_rules");
-    loading.value = false;
+    try {
+      rules.value = await invoke<ModerationRule[]>("get_rules", { guildId: guildIdFilter.value ?? null });
+    } catch (e) {
+      console.error("Erreur chargement regles:", e);
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function toggleRule(rule: ModerationRule) {
@@ -42,6 +49,7 @@ export function useRules() {
   }
 
   onMounted(fetchRules);
+  watch(guildIdFilter, fetchRules);
 
   return { rules, loading, editing, fetchRules, toggleRule, updateRule, openEdit, closeEdit };
 }

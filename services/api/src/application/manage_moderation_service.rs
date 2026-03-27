@@ -5,7 +5,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::{ModerationAction, UserModerationHistory};
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{LogModerationCommand, ManageModerationUseCase};
+use crate::ports::inbound::{DeductPointsCommand, LogModerationCommand, ManageConductUseCase, ManageModerationUseCase};
 use crate::ports::outbound::{CachePort, ModerationRepository};
 
 const HISTORY_TTL: u64 = 180; // 3 minutes
@@ -13,11 +13,12 @@ const HISTORY_TTL: u64 = 180; // 3 minutes
 pub struct ManageModerationService {
     repo: Arc<dyn ModerationRepository>,
     cache: Arc<dyn CachePort>,
+    conduct_uc: Arc<dyn ManageConductUseCase>,
 }
 
 impl ManageModerationService {
-    pub fn new(repo: Arc<dyn ModerationRepository>, cache: Arc<dyn CachePort>) -> Self {
-        Self { repo, cache }
+    pub fn new(repo: Arc<dyn ModerationRepository>, cache: Arc<dyn CachePort>, conduct_uc: Arc<dyn ManageConductUseCase>) -> Self {
+        Self { repo, cache, conduct_uc }
     }
 }
 
@@ -44,6 +45,14 @@ impl ManageModerationUseCase for ManageModerationService {
         // Invalidate history cache for this user
         let cache_key = format!("modhistory:{}:{}", cmd.guild_id, cmd.target_id);
         self.cache.invalidate(&cache_key).await.ok();
+
+        // Deduire les points de conduite
+        let _ = self.conduct_uc.deduct_points(DeductPointsCommand {
+            guild_id: action.guild_id.clone(),
+            user_id: action.target_id.clone(),
+            username: action.target_name.clone(),
+            action: action.action_type.clone(),
+        }).await;
 
         Ok(action)
     }

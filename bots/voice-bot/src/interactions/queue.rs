@@ -1,0 +1,230 @@
+use serenity::builder::CreateChannel;
+use serenity::model::application::ComponentInteraction;
+use serenity::model::channel::ChannelType;
+use serenity::model::id::{ChannelId, UserId};
+use serenity::model::Permissions;
+use serenity::prelude::*;
+use tracing::{error, info, warn};
+
+use crate::api_client::UpdateVoiceChannelRequest;
+use crate::handler::ApiClientKey;
+
+/// Handle queue interactions: toggle queue, accept/refuse.
+pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
+    let custom_id = component.data.custom_id.as_str();
+
+    match custom_id {
+        "btn_queue" => handle_toggle_queue(ctx, component).await,
+        other if other.starts_with("queue_accept_") => handle_queue_accept(ctx, component).await,
+        other if other.starts_with("queue_refuse_") => handle_queue_refuse(ctx, component).await,
+        _ => {
+            warn!(custom_id = %custom_id, "Queue interaction inconnue");
+        }
+    }
+}
+
+// ── Toggle Queue ──
+
+async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
+    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
+        return;
+    };
+
+    let guild_id = component.guild_id.unwrap_or_default();
+    let queue_enabled = ch.queue_enabled;
+
+    if queue_enabled {
+        // Disable queue: delete the queue voice channel
+        if let Some(ref queue_id_str) = ch.queue_channel_id {
+            if let Ok(queue_id) = queue_id_str.parse::<u64>() {
+                let _ = ChannelId::new(queue_id).delete(&ctx.http).await;
+            }
+        }
+
+        // Update API
+        let update = UpdateVoiceChannelRequest {
+            visibility: None,
+            locked: None,
+            queue_enabled: Some(false),
+            name: None,
+            status: None,
+            member_limit: None,
+            queue_channel_id: Some(None),
+        };
+
+        {
+            let data = ctx.data.read().await;
+            let api = data.get::<ApiClientKey>().expect("ApiClient");
+            if let Err(e) = api
+                .update_channel(&voice_channel_id.get().to_string(), &update)
+                .await
+            {
+                error!(error = %e, "Erreur API disable queue");
+            }
+        }
+
+        super::respond_ephemeral(ctx, component, "La file d'attente a ete **desactivee**.").await;
+        info!(voice = %voice_channel_id, "File d'attente desactivee");
+    } else {
+        // Enable queue: create a queue voice channel in the same category
+        let category_id = ch.category_id.as_ref().and_then(|s| s.parse::<u64>().ok());
+
+        let queue_name = format!("File d'attente - {}", ch.channel_name);
+        let mut queue_builder = CreateChannel::new(&queue_name)
+            .kind(ChannelType::Voice)
+            .user_limit(99);
+
+        if let Some(cat_id) = category_id {
+            queue_builder = queue_builder.category(ChannelId::new(cat_id));
+        }
+
+        let queue_channel = match guild_id.create_channel(&ctx.http, queue_builder).await {
+            Ok(c) => c,
+            Err(e) => {
+                error!(error = %e, "Erreur creation queue channel");
+                super::respond_ephemeral(ctx, component, "Erreur lors de la creation de la file d'attente.").await;
+                return;
+            }
+        };
+
+        let queue_channel_id = queue_channel.id;
+
+        // Permissions on queue: everyone can join but not speak
+        let everyone_role = serenity::model::id::RoleId::new(guild_id.get());
+        let overwrite = serenity::model::channel::PermissionOverwrite {
+            allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT,
+            deny: Permissions::SPEAK,
+            kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
+        };
+        let _ = queue_channel_id.create_permission(&ctx.http, overwrite).await;
+
+        // Update API
+        let update = UpdateVoiceChannelRequest {
+            visibility: None,
+            locked: None,
+            queue_enabled: Some(true),
+            name: None,
+            status: None,
+            member_limit: None,
+            queue_channel_id: Some(Some(queue_channel_id.get().to_string())),
+        };
+
+        {
+            let data = ctx.data.read().await;
+            let api = data.get::<ApiClientKey>().expect("ApiClient");
+            if let Err(e) = api
+                .update_channel(&voice_channel_id.get().to_string(), &update)
+                .await
+            {
+                error!(error = %e, "Erreur API enable queue");
+            }
+        }
+
+        super::respond_ephemeral(ctx, component, "La file d'attente a ete **activee**.").await;
+        info!(voice = %voice_channel_id, queue = %queue_channel_id, "File d'attente activee");
+    }
+}
+
+// ── Accept from Queue ──
+
+async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
+    let custom_id = component.data.custom_id.as_str();
+    let target_id_str = custom_id.strip_prefix("queue_accept_").unwrap_or("");
+    let target_id: u64 = match target_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            super::respond_ephemeral(ctx, component, "ID utilisateur invalide.").await;
+            return;
+        }
+    };
+
+    let target_user_id = UserId::new(target_id);
+    let text_channel_id = component.channel_id;
+
+    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
+        vc
+    } else {
+        super::respond_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        return;
+    };
+
+    let guild_id = component.guild_id.unwrap_or_default();
+
+    // Move the user from the queue channel to the voice channel
+    let edit = serenity::builder::EditMember::new().voice_channel(voice_channel_id);
+    match guild_id.edit_member(&ctx.http, target_user_id, edit).await {
+        Ok(_) => {
+            info!(
+                voice = %voice_channel_id,
+                user = %target_user_id,
+                "Utilisateur accepte depuis la file"
+            );
+        }
+        Err(e) => {
+            warn!(error = %e, "Erreur deplacement depuis la file");
+            super::respond_ephemeral(
+                ctx,
+                component,
+                "Erreur : l'utilisateur n'est peut-etre plus dans la file d'attente.",
+            )
+            .await;
+            return;
+        }
+    }
+
+    // Grant permissions on voice channel
+    let overwrite = serenity::model::channel::PermissionOverwrite {
+        allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
+        deny: Permissions::empty(),
+        kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
+    };
+    let _ = voice_channel_id.create_permission(&ctx.http, overwrite).await;
+
+    super::respond_ephemeral(
+        ctx,
+        component,
+        &format!("<@{target_id}> a ete accepte dans le salon."),
+    )
+    .await;
+}
+
+// ── Refuse from Queue ──
+
+async fn handle_queue_refuse(ctx: &Context, component: &ComponentInteraction) {
+    let custom_id = component.data.custom_id.as_str();
+    let target_id_str = custom_id.strip_prefix("queue_refuse_").unwrap_or("");
+    let target_id: u64 = match target_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            super::respond_ephemeral(ctx, component, "ID utilisateur invalide.").await;
+            return;
+        }
+    };
+
+    let target_user_id = UserId::new(target_id);
+    let guild_id = component.guild_id.unwrap_or_default();
+
+    // Disconnect the user from the queue voice channel
+    match guild_id.disconnect_member(&ctx.http, target_user_id).await {
+        Ok(_) => {
+            info!(user = %target_user_id, "Utilisateur refuse de la file");
+        }
+        Err(e) => {
+            warn!(error = %e, "Erreur disconnect depuis la file");
+            super::respond_ephemeral(
+                ctx,
+                component,
+                "Erreur : l'utilisateur n'est peut-etre plus dans la file d'attente.",
+            )
+            .await;
+            return;
+        }
+    }
+
+    super::respond_ephemeral(
+        ctx,
+        component,
+        &format!("<@{target_id}> a ete refuse."),
+    )
+    .await;
+}

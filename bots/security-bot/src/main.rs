@@ -10,7 +10,7 @@ use tracing::info;
 use crate::account_checker::AccountChecker;
 use crate::api_client::ApiClient;
 use crate::config::Config;
-use crate::handler::{AccountCheckerKey, ApiClientKey, Handler, RaidDetectorKey};
+use crate::handler::{AccountCheckerKey, ApiClientKey, ConfigKey, Handler, RaidDetectorKey};
 use crate::raid_detector::RaidDetector;
 
 #[tokio::main]
@@ -46,7 +46,19 @@ async fn main() {
             config.raid_join_window_secs,
         ));
         data.insert::<AccountCheckerKey>(AccountChecker::new(config.min_account_age_secs));
+        data.insert::<ConfigKey>(config.clone());
     }
+
+    // Heartbeat task
+    let api_for_heartbeat = ApiClient::new(&config);
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = api_for_heartbeat.heartbeat("security-bot").await {
+                tracing::warn!("Heartbeat failed: {}", e);
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+        }
+    });
 
     if let Err(e) = client.start().await {
         eprintln!("Erreur fatale : {e}");

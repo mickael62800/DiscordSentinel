@@ -133,4 +133,28 @@ impl InfractionRepository for PgInfractionRepository {
 
         Ok(rows.into_iter().map(Infraction::from).collect())
     }
+
+    async fn find_all(&self, limit: i64, offset: i64) -> Result<Vec<Infraction>, DomainError> {
+        let rows = sqlx::query_as::<_, InfractionRow>(
+            "SELECT * FROM infractions ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(Infraction::from).collect())
+    }
+
+    async fn count_today(&self) -> Result<u64, DomainError> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM infractions WHERE created_at >= CURRENT_DATE",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.0 as u64)
+    }
 }

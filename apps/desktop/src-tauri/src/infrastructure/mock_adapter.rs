@@ -1,8 +1,8 @@
 use std::pin::Pin;
 use std::future::Future;
 
-use crate::domain::entities::{Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, TicketMessage, UpdateRuleParams, UserModerationHistory};
-use crate::domain::ports::{AppAdapter, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository};
+use crate::domain::entities::{BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, TicketMessage, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel, VoiceChannelDetail};
+use crate::domain::ports::{AppAdapter, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository};
 
 pub struct MockAdapter;
 
@@ -27,8 +27,29 @@ impl StatsRepository for MockAdapter {
     }
 }
 
+impl GuildRepository for MockAdapter {
+    fn get_guilds(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Guild>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+}
+
+impl BotConfigRepository for MockAdapter {
+    fn get_definitions(&self) -> Pin<Box<dyn Future<Output = Result<Vec<BotDefinition>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+    fn get_guild_config(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<BotGuildConfig>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+    fn set_config(&self, _guild_id: String, _bot_name: String, _key: String, _value: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        Box::pin(async { Ok(()) })
+    }
+    fn delete_config(&self, _guild_id: String, _bot_name: String, _key: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        Box::pin(async { Ok(()) })
+    }
+}
+
 impl LogsRepository for MockAdapter {
-    fn get_logs(&self) -> Pin<Box<dyn Future<Output = Result<Vec<LogEntry>, String>> + Send>> {
+    fn get_logs(&self, _guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<LogEntry>, String>> + Send>> {
         Box::pin(async {
             Ok(vec![
                 LogEntry {
@@ -69,7 +90,7 @@ impl LogsRepository for MockAdapter {
 }
 
 impl InfractionsRepository for MockAdapter {
-    fn get_infractions(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Infraction>, String>> + Send>> {
+    fn get_infractions(&self, _guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<Infraction>, String>> + Send>> {
         Box::pin(async {
             Ok(vec![
                 Infraction {
@@ -108,7 +129,7 @@ impl InfractionsRepository for MockAdapter {
 }
 
 impl RulesRepository for MockAdapter {
-    fn get_rules(&self) -> Pin<Box<dyn Future<Output = Result<Vec<ModerationRule>, String>> + Send>> {
+    fn get_rules(&self, _guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<ModerationRule>, String>> + Send>> {
         Box::pin(async {
             Ok(vec![
                 ModerationRule {
@@ -378,6 +399,41 @@ impl ModerationRepository for MockAdapter {
                 ],
             })
         })
+    }
+}
+
+impl VoiceChannelRepository for MockAdapter {
+    fn get_channels(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<VoiceChannel>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+    fn get_channel_detail(&self, _channel_id: String) -> Pin<Box<dyn Future<Output = Result<VoiceChannelDetail, String>> + Send>> {
+        Box::pin(async { Err("Not implemented in mock".into()) })
+    }
+}
+
+impl ConductRepository for MockAdapter {
+    fn get_config(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<ConductConfig, String>> + Send>> {
+        Box::pin(async {
+            Ok(ConductConfig {
+                guild_id: String::new(),
+                max_points: 12,
+                regen_amount: 1,
+                regen_interval: "weekly".into(),
+                penalty_warn: 1,
+                penalty_delete: 2,
+                penalty_mute: 3,
+                penalty_ban: 6,
+            })
+        })
+    }
+    fn get_leaderboard(&self, _guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<UserConductPoints>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
+    }
+    fn get_points(&self, _guild_id: String, _user_id: String) -> Pin<Box<dyn Future<Output = Result<UserConductPoints, String>> + Send>> {
+        Box::pin(async { Err("Not implemented in mock".into()) })
+    }
+    fn get_log(&self, _guild_id: String, _user_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<ConductPointsLog>, String>> + Send>> {
+        Box::pin(async { Ok(vec![]) })
     }
 }
 

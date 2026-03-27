@@ -64,6 +64,46 @@ impl RuleRepository for PgRuleRepository {
         Ok(rows.into_iter().map(Rule::from).collect())
     }
 
+    async fn find_all(&self) -> Result<Vec<Rule>, DomainError> {
+        let rows = sqlx::query_as::<_, RuleRow>(
+            "SELECT * FROM rules ORDER BY guild_id, flag_type",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(Rule::from).collect())
+    }
+
+    async fn find_by_id(&self, id: Uuid) -> Result<Option<Rule>, DomainError> {
+        let row = sqlx::query_as::<_, RuleRow>(
+            "SELECT * FROM rules WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.map(Rule::from))
+    }
+
+    async fn toggle(&self, id: Uuid, enabled: bool) -> Result<(), DomainError> {
+        let result = sqlx::query(
+            "UPDATE rules SET enabled = $1, updated_at = NOW() WHERE id = $2",
+        )
+        .bind(enabled)
+        .bind(id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        if result.rows_affected() == 0 {
+            return Err(DomainError::RuleNotFound(id));
+        }
+
+        Ok(())
+    }
+
     async fn save(&self, rule: &Rule) -> Result<Rule, DomainError> {
         let row = sqlx::query_as::<_, RuleRow>(
             r#"

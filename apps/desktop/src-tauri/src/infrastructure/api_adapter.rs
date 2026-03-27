@@ -3,8 +3,8 @@ use std::pin::Pin;
 
 use reqwest::{Client, RequestBuilder, Response};
 
-use crate::domain::entities::{Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserModerationHistory};
-use crate::domain::ports::{AppAdapter, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository};
+use crate::domain::entities::{BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel, VoiceChannelDetail};
+use crate::domain::ports::{AppAdapter, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository};
 
 pub struct ApiAdapter {
     client: Client,
@@ -31,6 +31,13 @@ impl ApiAdapter {
             req.bearer_auth(&self.api_key)
         }
     }
+
+    fn url_with_guild(&self, path: &str, guild_id: &Option<String>) -> String {
+        match guild_id {
+            Some(gid) => format!("{}/{}?guild_id={}", self.base_url, path, gid),
+            None => format!("{}/{}", self.base_url, path),
+        }
+    }
 }
 
 async fn check_response(resp: Response) -> Result<Response, String> {
@@ -42,6 +49,65 @@ async fn check_response(resp: Response) -> Result<Response, String> {
     } else {
         let body = resp.text().await.unwrap_or_default();
         Err(format!("API error {}: {}", status.as_u16(), body))
+    }
+}
+
+// --- Guilds: GET /api/guilds ---
+
+impl GuildRepository for ApiAdapter {
+    fn get_guilds(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Guild>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/guilds", self.base_url)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<Guild>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+// --- Bot Config ---
+
+impl BotConfigRepository for ApiAdapter {
+    fn get_definitions(&self) -> Pin<Box<dyn Future<Output = Result<Vec<BotDefinition>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/bots/definitions", self.base_url)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<BotDefinition>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_guild_config(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<BotGuildConfig>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/bots/config/{}", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<BotGuildConfig>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn set_config(&self, guild_id: String, bot_name: String, key: String, value: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        #[derive(serde::Serialize)]
+        struct Payload { guild_id: String, bot_name: String, config_key: String, config_value: String }
+        let req = self.auth(self.client.post(format!("{}/api/bots/config", self.base_url)))
+            .json(&Payload { guild_id, bot_name, config_key: key, config_value: value });
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            check_response(resp).await?;
+            Ok(())
+        })
+    }
+
+    fn delete_config(&self, guild_id: String, bot_name: String, key: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        #[derive(serde::Serialize)]
+        struct Payload { guild_id: String, bot_name: String, config_key: String }
+        let req = self.auth(self.client.delete(format!("{}/api/bots/config", self.base_url)))
+            .json(&Payload { guild_id, bot_name, config_key: key });
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            check_response(resp).await?;
+            Ok(())
+        })
     }
 }
 
@@ -58,11 +124,12 @@ impl StatsRepository for ApiAdapter {
     }
 }
 
-// --- Logs: GET /api/logs ---
+// --- Logs: GET /api/logs?guild_id= ---
 
 impl LogsRepository for ApiAdapter {
-    fn get_logs(&self) -> Pin<Box<dyn Future<Output = Result<Vec<LogEntry>, String>> + Send>> {
-        let req = self.auth(self.client.get(format!("{}/api/logs", self.base_url)));
+    fn get_logs(&self, guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<LogEntry>, String>> + Send>> {
+        let url = self.url_with_guild("api/logs", &guild_id);
+        let req = self.auth(self.client.get(url));
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             let resp = check_response(resp).await?;
@@ -71,11 +138,12 @@ impl LogsRepository for ApiAdapter {
     }
 }
 
-// --- Infractions: GET /api/infractions ---
+// --- Infractions: GET /api/infractions?guild_id= ---
 
 impl InfractionsRepository for ApiAdapter {
-    fn get_infractions(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Infraction>, String>> + Send>> {
-        let req = self.auth(self.client.get(format!("{}/api/infractions", self.base_url)));
+    fn get_infractions(&self, guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<Infraction>, String>> + Send>> {
+        let url = self.url_with_guild("api/infractions", &guild_id);
+        let req = self.auth(self.client.get(url));
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             let resp = check_response(resp).await?;
@@ -84,11 +152,12 @@ impl InfractionsRepository for ApiAdapter {
     }
 }
 
-// --- Rules: GET /api/rules, PATCH /api/rules/{id} ---
+// --- Rules: GET /api/rules?guild_id=, PATCH /api/rules/{id} ---
 
 impl RulesRepository for ApiAdapter {
-    fn get_rules(&self) -> Pin<Box<dyn Future<Output = Result<Vec<ModerationRule>, String>> + Send>> {
-        let req = self.auth(self.client.get(format!("{}/api/rules", self.base_url)));
+    fn get_rules(&self, guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<ModerationRule>, String>> + Send>> {
+        let url = self.url_with_guild("api/rules", &guild_id);
+        let req = self.auth(self.client.get(url));
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             let resp = check_response(resp).await?;
@@ -124,8 +193,7 @@ impl RulesRepository for ApiAdapter {
     }
 }
 
-// --- Tickets: GET /api/tickets, GET /api/tickets/{id}, POST /api/tickets/{id}/messages,
-//              PATCH /api/tickets/{id}/close, PATCH /api/tickets/{id}/assign ---
+// --- Tickets ---
 
 impl TicketsRepository for ApiAdapter {
     fn get_tickets(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Ticket>, String>> + Send>> {
@@ -149,11 +217,9 @@ impl TicketsRepository for ApiAdapter {
     fn reply_ticket(&self, ticket_id: String, content: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { content: String }
-
         let req = self.auth(
             self.client.post(format!("{}/api/tickets/{}/messages", self.base_url, ticket_id))
         ).json(&Payload { content });
-
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             check_response(resp).await?;
@@ -173,11 +239,9 @@ impl TicketsRepository for ApiAdapter {
     fn assign_ticket(&self, id: String, assignee: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { assignee: String }
-
         let req = self.auth(
             self.client.patch(format!("{}/api/tickets/{}/assign", self.base_url, id))
         ).json(&Payload { assignee });
-
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             check_response(resp).await?;
@@ -186,7 +250,7 @@ impl TicketsRepository for ApiAdapter {
     }
 }
 
-// --- Security: GET /api/security/events ---
+// --- Security ---
 
 impl SecurityRepository for ApiAdapter {
     fn get_events(&self, guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<SecurityEvent>, String>> + Send>> {
@@ -203,14 +267,13 @@ impl SecurityRepository for ApiAdapter {
     }
 }
 
-// --- Moderation: POST /api/moderation/actions, GET /api/moderation/history/{guild_id}/{user_id} ---
+// --- Moderation ---
 
 impl ModerationRepository for ApiAdapter {
     fn log_action(&self, action: ModerationActionRequest) -> Pin<Box<dyn Future<Output = Result<ModerationActionResponse, String>> + Send>> {
         let req = self.auth(
             self.client.post(format!("{}/api/moderation/actions", self.base_url))
         ).json(&action);
-
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             let resp = check_response(resp).await?;
@@ -222,11 +285,75 @@ impl ModerationRepository for ApiAdapter {
         let req = self.auth(
             self.client.get(format!("{}/api/moderation/history/{}/{}", self.base_url, guild_id, user_id))
         );
-
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
             let resp = check_response(resp).await?;
             resp.json::<UserModerationHistory>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+// --- Voice Channels ---
+
+impl VoiceChannelRepository for ApiAdapter {
+    fn get_channels(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<VoiceChannel>, String>> + Send>> {
+        let url = if guild_id.is_empty() {
+            format!("{}/api/voice-channels/_all", self.base_url)
+        } else {
+            format!("{}/api/voice-channels/{}", self.base_url, guild_id)
+        };
+        let req = self.auth(self.client.get(url));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<VoiceChannel>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_channel_detail(&self, channel_id: String) -> Pin<Box<dyn Future<Output = Result<VoiceChannelDetail, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/voice-channels/by-channel/{}", self.base_url, channel_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<VoiceChannelDetail>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+}
+
+impl ConductRepository for ApiAdapter {
+    fn get_config(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<ConductConfig, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/conduct/config/{}", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<ConductConfig>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_leaderboard(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<UserConductPoints>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/conduct/{}/leaderboard", self.base_url, guild_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<UserConductPoints>>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_points(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<UserConductPoints, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/conduct/{}/{}", self.base_url, guild_id, user_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<UserConductPoints>().await.map_err(|e| format!("Parse error: {}", e))
+        })
+    }
+
+    fn get_log(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<ConductPointsLog>, String>> + Send>> {
+        let req = self.auth(self.client.get(format!("{}/api/conduct/{}/{}/log", self.base_url, guild_id, user_id)));
+        Box::pin(async move {
+            let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
+            let resp = check_response(resp).await?;
+            resp.json::<Vec<ConductPointsLog>>().await.map_err(|e| format!("Parse error: {}", e))
         })
     }
 }

@@ -136,6 +136,24 @@ services:
     depends_on:
       - api
 
+  voice-bot:
+    build:
+      context: ./bots/voice-bot
+      dockerfile: Dockerfile
+    container_name: sentinel-voice-bot
+    restart: unless-stopped
+    environment:
+      DISCORD_TOKEN: ${VOICE_DISCORD_TOKEN}
+      API_BASE_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
+      GUILD_ID: ${VOICE_GUILD_ID}
+      PUBLIC_CREATOR_CHANNEL_ID: ${VOICE_PUBLIC_CREATOR_CHANNEL_ID}
+      PRIVATE_CREATOR_CHANNEL_ID: ${VOICE_PRIVATE_CREATOR_CHANNEL_ID}
+      LOG_CHANNEL_ID: ${VOICE_LOG_CHANNEL_ID:-}
+      RUST_LOG: info
+    depends_on:
+      - api
+
   # ──────────────────────────────────────────────
   # Monitoring
   # ──────────────────────────────────────────────

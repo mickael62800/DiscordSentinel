@@ -23,7 +23,7 @@ const error = ref<string | null>(null);
 
 async function nextStep() {
   if (!apiUrl.value.trim()) {
-    error.value = "API URL is required.";
+    error.value = "L'URL de l'API est requise.";
     return;
   }
 
@@ -44,7 +44,7 @@ async function nextStep() {
 
 async function handleSubmit() {
   if (!clientId.value.trim() || !clientSecret.value.trim()) {
-    error.value = "Both fields are required.";
+    error.value = "Les deux champs sont requis.";
     return;
   }
 
@@ -68,18 +68,18 @@ async function handleSubmit() {
         <span class="logo-icon">S</span>
       </div>
       <h1>DiscordSentinel</h1>
-      <p class="subtitle">Initial Setup</p>
+      <p class="subtitle">Configuration initiale</p>
 
       <div class="steps">
-        <span :class="['step', { active: step === 1, done: step > 1 }]">1. Backend API</span>
+        <span :class="['step', { active: step === 1, done: step > 1 }]">1. API Backend</span>
         <span class="step-sep">&rarr;</span>
-        <span :class="['step', { active: step === 2 }]">2. Discord OAuth</span>
+        <span :class="['step', { active: step === 2 }]">2. OAuth Discord</span>
       </div>
 
       <!-- Step 1: API Config -->
       <form v-if="step === 1" class="setup-form" @submit.prevent="nextStep">
         <div class="setup-instructions">
-          <p>Enter the connection details for your <strong>Sentinel API</strong> backend.</p>
+          <p>Entrez les details de connexion de votre backend <strong>Sentinel API</strong>.</p>
         </div>
 
         <div class="field">
@@ -94,15 +94,15 @@ async function handleSubmit() {
         </div>
 
         <div class="field">
-          <label for="api-key">API Key (Bearer token)</label>
+          <label for="api-key">Cle API (jeton Bearer)</label>
           <input
             id="api-key"
             v-model="apiKey"
             type="password"
-            placeholder="Leave empty if auth is disabled"
+            placeholder="Laisser vide si l'authentification est desactivee"
             autocomplete="off"
           />
-          <span class="field-hint">The API_KEY configured in your backend .env</span>
+          <span class="field-hint">La cle API_KEY configuree dans votre fichier .env backend</span>
         </div>
 
         <p v-if="error" class="error-msg">{{ error }}</p>
@@ -112,15 +112,15 @@ async function handleSubmit() {
           class="save-btn"
           :disabled="saving || !apiUrl.trim()"
         >
-          {{ saving ? "Saving..." : "Next" }}
+          {{ saving ? "Enregistrement..." : "Suivant" }}
         </AppButton>
       </form>
 
       <!-- Step 2: Discord Config -->
       <form v-else class="setup-form" @submit.prevent="handleSubmit">
         <div class="setup-instructions">
-          <p>Create an application on the <strong>Discord Developer Portal</strong> and enter the credentials below.</p>
-          <p class="hint">Redirect URI: <code>http://localhost:19836/callback</code></p>
+          <p>Creez une application sur le <strong>portail developpeur Discord</strong> et entrez les identifiants ci-dessous.</p>
+          <p class="hint">URI de redirection : <code>http://localhost:19836/callback</code></p>
         </div>
 
         <div class="field">
@@ -140,7 +140,7 @@ async function handleSubmit() {
             id="client-secret"
             v-model="clientSecret"
             type="password"
-            placeholder="Your client secret"
+            placeholder="Votre client secret"
             autocomplete="off"
           />
         </div>
@@ -148,13 +148,13 @@ async function handleSubmit() {
         <p v-if="error" class="error-msg">{{ error }}</p>
 
         <div class="btn-row">
-          <button type="button" class="back-link" @click="step = 1">&larr; Back</button>
+          <button type="button" class="back-link" @click="step = 1">&larr; Retour</button>
           <AppButton
             variant="primary"
             class="save-btn"
             :disabled="saving || !clientId.trim() || !clientSecret.trim()"
           >
-            {{ saving ? "Saving..." : "Save & Connect" }}
+            {{ saving ? "Enregistrement..." : "Enregistrer et connecter" }}
           </AppButton>
         </div>
       </form>

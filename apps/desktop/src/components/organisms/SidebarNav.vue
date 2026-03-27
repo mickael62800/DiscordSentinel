@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import NavItem from "../molecules/NavItem.vue";
 import StatusDot from "../atoms/StatusDot.vue";
@@ -6,29 +7,43 @@ import NotificationPanel from "./NotificationPanel.vue";
 import { useAuth } from "../../composables/useAuth";
 import { useNotifications } from "../../composables/useNotifications";
 import { useRealtime } from "../../composables/useRealtime";
+import { useGuildSelector } from "../../composables/useGuildSelector";
 
 const route = useRoute();
 const router = useRouter();
 const { user, logout, avatarUrl } = useAuth();
 const { unreadCount, panelOpen, togglePanel } = useNotifications();
 const { connected: wsConnected } = useRealtime();
+const { guilds, selectedGuildId, fetchGuilds, selectGuild } = useGuildSelector();
 
 const navItems = [
-  { path: "/", label: "Dashboard", icon: "grid" },
-  { path: "/logs", label: "Logs", icon: "list" },
+  { path: "/", label: "Tableau de bord", icon: "grid" },
+  { path: "/logs", label: "Journaux", icon: "list" },
   { path: "/infractions", label: "Infractions", icon: "alert-triangle" },
-  { path: "/rules", label: "Rules", icon: "shield" },
-  { path: "/bans", label: "Bans", icon: "user-x" },
+  { path: "/rules", label: "Regles", icon: "shield" },
+  { path: "/bans", label: "Bannissements", icon: "user-x" },
   { path: "/moderation", label: "Moderation", icon: "gavel" },
-  { path: "/security", label: "Security", icon: "zap" },
+  { path: "/security", label: "Securite", icon: "zap" },
   { path: "/tickets", label: "Tickets", icon: "ticket" },
-  { path: "/settings", label: "Settings", icon: "settings" },
+  { path: "/voice-channels", label: "Vocaux", icon: "mic" },
+  { path: "/conduct", label: "Conduite", icon: "award" },
+  { path: "/bot-config", label: "Config Bots", icon: "cpu" },
+  { path: "/settings", label: "Parametres", icon: "settings" },
 ];
+
+function onGuildChange(event: Event) {
+  const value = (event.target as HTMLSelectElement).value;
+  selectGuild(value === "" ? null : value);
+}
 
 async function handleLogout() {
   await logout();
   router.push("/login");
 }
+
+onMounted(() => {
+  fetchGuilds();
+});
 </script>
 
 <template>
@@ -38,6 +53,25 @@ async function handleLogout() {
         <span class="logo-icon">S</span>
         <span class="logo-text">Sentinel</span>
       </div>
+    </div>
+
+    <!-- Selecteur de serveur -->
+    <div class="guild-selector">
+      <label class="guild-label">Serveur</label>
+      <select
+        class="guild-select"
+        :value="selectedGuildId ?? ''"
+        @change="onGuildChange"
+      >
+        <option value="">Tous les serveurs</option>
+        <option
+          v-for="g in guilds"
+          :key="g.guild_id"
+          :value="g.guild_id"
+        >
+          {{ g.name }}
+        </option>
+      </select>
     </div>
 
     <nav class="sidebar-nav">
@@ -51,14 +85,14 @@ async function handleLogout() {
       />
     </nav>
 
-    <!-- User info -->
+    <!-- Info utilisateur -->
     <div v-if="user" class="sidebar-user">
       <img :src="avatarUrl(user)" :alt="user.username" class="user-avatar" />
       <div class="user-info">
         <span class="user-name">{{ user.global_name ?? user.username }}</span>
         <span class="user-tag">{{ user.username }}</span>
       </div>
-      <button class="logout-btn" title="Logout" @click="handleLogout">
+      <button class="logout-btn" title="Deconnexion" @click="handleLogout">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
           <polyline points="16 17 21 12 16 7" />
@@ -71,10 +105,10 @@ async function handleLogout() {
       <div class="footer-row">
         <div class="status-indicator">
           <StatusDot :status="wsConnected ? 'online' : 'offline'" />
-          <span class="status-text">{{ wsConnected ? "Connected" : "Disconnected" }}</span>
+          <span class="status-text">{{ wsConnected ? "Connecte" : "Deconnecte" }}</span>
         </div>
 
-        <!-- Notification bell -->
+        <!-- Cloche notifications -->
         <button class="bell-btn" title="Notifications" @click="togglePanel">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -85,7 +119,7 @@ async function handleLogout() {
       </div>
     </div>
 
-    <!-- Notification panel -->
+    <!-- Panneau de notifications -->
     <NotificationPanel v-if="panelOpen" />
   </aside>
 </template>
@@ -132,15 +166,58 @@ async function handleLogout() {
   color: var(--text-primary);
 }
 
+/* Selecteur de serveur */
+.guild-selector {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.guild-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.guild-select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 28px;
+}
+
+.guild-select:hover {
+  border-color: var(--accent);
+}
+
+.guild-select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
 .sidebar-nav {
   flex: 1;
   padding: 12px 8px;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-y: auto;
 }
 
-/* User section */
+/* Section utilisateur */
 .sidebar-user {
   display: flex;
   align-items: center;
@@ -222,7 +299,7 @@ async function handleLogout() {
   color: var(--text-secondary);
 }
 
-/* Bell */
+/* Cloche */
 .bell-btn {
   position: relative;
   width: 32px;

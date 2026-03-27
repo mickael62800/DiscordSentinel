@@ -67,51 +67,51 @@ async function resetDiscordConfig() {
 
 <template>
   <div class="settings">
-    <h1>Settings</h1>
+    <h1>Parametres</h1>
 
-    <SettingsSection title="Backend API">
+    <SettingsSection title="API Backend">
       <div class="setting-row">
         <label>API URL</label>
         <AppInput v-model="apiUrl" placeholder="http://localhost:3000" />
       </div>
       <div class="setting-row">
-        <label>API Key (Bearer token)</label>
-        <AppInput v-model="apiKey" type="password" placeholder="Leave empty if disabled" />
+        <label>Cle API (jeton Bearer)</label>
+        <AppInput v-model="apiKey" type="password" placeholder="Laisser vide si desactive" />
       </div>
       <div class="setting-row">
-        <span class="setting-hint">Changes require an app restart to take effect.</span>
+        <span class="setting-hint">Les modifications necessitent un redemarrage de l'application.</span>
         <AppButton variant="primary" :disabled="apiSaving" @click="saveApiConfig">
-          {{ apiSaved ? "Saved!" : apiSaving ? "Saving..." : "Save" }}
+          {{ apiSaved ? "Enregistre !" : apiSaving ? "Enregistrement..." : "Enregistrer" }}
         </AppButton>
       </div>
     </SettingsSection>
 
-    <SettingsSection title="Dashboard">
+    <SettingsSection title="Tableau de bord">
       <div class="setting-row">
-        <label>Auto-refresh</label>
+        <label>Actualisation automatique</label>
         <AppToggle v-model="autoRefresh" />
       </div>
       <div v-if="autoRefresh" class="setting-row">
-        <label>Refresh interval (seconds)</label>
+        <label>Intervalle d'actualisation (secondes)</label>
         <AppInput v-model="refreshInterval" type="number" :min="1" :max="60" />
       </div>
     </SettingsSection>
 
-    <SettingsSection title="Discord Configuration">
+    <SettingsSection title="Configuration Discord">
       <div class="setting-row">
         <div>
-          <label>Reset all credentials</label>
-          <p class="setting-hint">Clears Discord OAuth + API config from LMDB and logs you out.</p>
+          <label>Reinitialiser les identifiants</label>
+          <p class="setting-hint">Supprime la configuration OAuth Discord + API de LMDB et vous deconnecte.</p>
         </div>
         <AppButton variant="secondary" class="danger-btn" @click="resetDiscordConfig">
-          Reset
+          Reinitialiser
         </AppButton>
       </div>
     </SettingsSection>
 
-    <SettingsSection title="About">
+    <SettingsSection title="A propos">
       <p class="about-text">DiscordSentinel v0.1.0</p>
-      <p class="about-text secondary">Distributed moderation platform for Discord</p>
+      <p class="about-text secondary">Plateforme de moderation distribuee pour Discord</p>
     </SettingsSection>
   </div>
 </template>

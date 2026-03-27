@@ -102,7 +102,133 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
             "/api/moderation/history/{guild_id}/{user_id}",
             get(handlers::moderation::get_history),
         )
-        // Stats
+        // Voice channels
+        .route(
+            "/api/voice-channels/_all",
+            get(handlers::voice_channels::list_all_channels),
+        )
+        .route(
+            "/api/voice-channels/{guild_id}",
+            get(handlers::voice_channels::list_channels),
+        )
+        .route(
+            "/api/voice-channels",
+            post(handlers::voice_channels::create_channel),
+        )
+        .route(
+            "/api/voice-channels/by-channel/{channel_id}",
+            get(handlers::voice_channels::get_channel_detail)
+                .patch(handlers::voice_channels::update_channel)
+                .delete(handlers::voice_channels::delete_channel),
+        )
+        .route(
+            "/api/voice-channels/by-channel/{channel_id}/close",
+            patch(handlers::voice_channels::close_channel),
+        )
+        .route(
+            "/api/voice-channels/by-channel/{channel_id}/transfer",
+            patch(handlers::voice_channels::transfer_ownership),
+        )
+        .route(
+            "/api/voice-channels/by-channel/{channel_id}/co-admins",
+            post(handlers::voice_channels::add_co_admin),
+        )
+        .route(
+            "/api/voice-channels/by-channel/{channel_id}/co-admins/{user_id}",
+            delete(handlers::voice_channels::remove_co_admin),
+        )
+        .route(
+            "/api/voice-channels/whitelist/{guild_id}/{owner_id}",
+            get(handlers::voice_channels::get_whitelist),
+        )
+        .route(
+            "/api/voice-channels/whitelist",
+            post(handlers::voice_channels::add_to_whitelist),
+        )
+        .route(
+            "/api/voice-channels/whitelist/{guild_id}/{owner_id}/{target_id}",
+            delete(handlers::voice_channels::remove_from_whitelist),
+        )
+        .route(
+            "/api/voice-channels/by-channel/{channel_id}/bans",
+            post(handlers::voice_channels::ban_from_channel),
+        )
+        .route(
+            "/api/voice-channels/by-channel/{channel_id}/bans/{user_id}",
+            delete(handlers::voice_channels::unban_from_channel)
+                .get(handlers::voice_channels::check_ban),
+        )
+        // Conduct (systeme de points)
+        .route(
+            "/api/conduct/config/{guild_id}",
+            get(handlers::conduct::get_config),
+        )
+        .route(
+            "/api/conduct/config",
+            post(handlers::conduct::save_config),
+        )
+        .route(
+            "/api/conduct/{guild_id}/{user_id}",
+            get(handlers::conduct::get_points),
+        )
+        .route(
+            "/api/conduct/{guild_id}/leaderboard",
+            get(handlers::conduct::get_leaderboard),
+        )
+        .route(
+            "/api/conduct/{guild_id}/{user_id}/log",
+            get(handlers::conduct::get_points_log),
+        )
+        .route(
+            "/api/conduct/{guild_id}/{user_id}/add",
+            post(handlers::conduct::add_points),
+        )
+        // Configuration des bots
+        .route(
+            "/api/bots/definitions",
+            get(handlers::bot_config::get_definitions),
+        )
+        .route(
+            "/api/bots/config/{guild_id}",
+            get(handlers::bot_config::get_guild_config),
+        )
+        .route(
+            "/api/bots/config/{guild_id}/{bot_name}",
+            get(handlers::bot_config::get_bot_config),
+        )
+        .route(
+            "/api/bots/config",
+            post(handlers::bot_config::set_config).delete(handlers::bot_config::delete_config),
+        )
+        // Guilds (référentiel serveurs)
+        .route("/api/guilds", get(handlers::dashboard::list_guilds))
+        .route(
+            "/api/guilds/register",
+            post(handlers::dashboard::register_guild),
+        )
+        // Dashboard (endpoints pour l'app desktop)
+        .route("/api/stats", get(handlers::dashboard::get_dashboard_stats))
+        .route(
+            "/api/logs",
+            get(handlers::dashboard::get_logs).post(handlers::dashboard::create_log),
+        )
+        .route(
+            "/api/infractions",
+            get(handlers::dashboard::get_all_infractions),
+        )
+        .route(
+            "/api/rules",
+            get(handlers::dashboard::get_all_rules),
+        )
+        .route(
+            "/api/rules/{id}",
+            patch(handlers::dashboard::toggle_rule),
+        )
+        .route(
+            "/api/bots/heartbeat",
+            post(handlers::dashboard::bot_heartbeat),
+        )
+        // Stats (endpoints par guild pour les bots)
         .route(
             "/api/stats/messages",
             post(handlers::stats::record_messages),

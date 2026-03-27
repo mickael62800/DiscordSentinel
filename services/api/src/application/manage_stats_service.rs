@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{GuildStatsOverview, UserStats};
+use crate::domain::entities::{DashboardStats, GuildStatsOverview, UserStats};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_stats::{ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand};
 use crate::ports::outbound::{CachePort, InfractionRepository, StatsRepository};
@@ -14,6 +14,7 @@ pub struct ManageStatsService {
     stats_repo: Arc<dyn StatsRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
+    redis_client: redis::Client,
 }
 
 impl ManageStatsService {
@@ -21,8 +22,29 @@ impl ManageStatsService {
         stats_repo: Arc<dyn StatsRepository>,
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
+        redis_client: redis::Client,
     ) -> Self {
-        Self { stats_repo, infraction_repo, cache }
+        Self { stats_repo, infraction_repo, cache, redis_client }
+    }
+
+    async fn count_bots(&self) -> (u32, u32) {
+        if let Ok(mut conn) = self.redis_client.get_multiplexed_async_connection().await {
+            use redis::AsyncCommands;
+            // Tous les bots connus
+            let known: Vec<String> = conn.smembers("bots:known").await.unwrap_or_default();
+            let total = known.len() as u32;
+            // Compter les bots en ligne (clé bot:online:{name} existante)
+            let mut online = 0u32;
+            for name in &known {
+                let exists: bool = conn.exists(format!("bot:online:{}", name)).await.unwrap_or(false);
+                if exists {
+                    online += 1;
+                }
+            }
+            (online, total)
+        } else {
+            (0, 0)
+        }
     }
 }
 
@@ -109,5 +131,22 @@ impl ManageStatsUseCase for ManageStatsService {
 
     async fn get_leaderboard(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError> {
         self.stats_repo.find_by_guild(guild_id, limit).await
+    }
+
+    async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError> {
+        let total_servers = self.stats_repo.count_distinct_guilds().await.unwrap_or(0) as u32;
+        let total_users = self.stats_repo.count_distinct_users().await.unwrap_or(0) as u32;
+        let infractions_today = self.infraction_repo.count_today().await.unwrap_or(0) as u32;
+
+        let (bots_online, bots_total) = self.count_bots().await;
+
+        Ok(DashboardStats {
+            total_servers,
+            total_users,
+            messages_today: 0, // pas de tracking journalier pour l'instant
+            infractions_today,
+            bots_online,
+            bots_total,
+        })
     }
 }

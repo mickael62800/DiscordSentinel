@@ -8,7 +8,7 @@ import AppSelect from "../atoms/AppSelect.vue";
 const { filteredBans, servers, totalBans, loading, searchQuery, filterServer } = useBans();
 
 const serverOptions = computed<SelectOption[]>(() => [
-  { value: "all", label: "All servers" },
+  { value: "all", label: "Tous les serveurs" },
   ...servers.value.map((s) => ({ value: s, label: s })),
 ]);
 </script>
@@ -16,21 +16,21 @@ const serverOptions = computed<SelectOption[]>(() => [
 <template>
   <div class="bans">
     <div class="bans-header">
-      <h1>Banned Accounts</h1>
-      <span class="ban-count">{{ totalBans }} total</span>
+      <h1>Comptes bannis</h1>
+      <span class="ban-count">{{ totalBans }} au total</span>
     </div>
 
     <div class="filters">
       <input
         v-model="searchQuery"
         type="text"
-        placeholder="Search by username, ID or reason..."
+        placeholder="Rechercher par nom, ID ou raison..."
         class="search-input"
       />
       <AppSelect v-model="filterServer" :options="serverOptions" />
     </div>
 
-    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="loading" class="loading">Chargement...</div>
 
     <div v-else class="ban-list">
       <div v-for="ban in filteredBans" :key="ban.id" class="ban-card">
@@ -44,15 +44,15 @@ const serverOptions = computed<SelectOption[]>(() => [
 
         <div class="ban-details">
           <div class="detail-row">
-            <span class="detail-label">Server</span>
+            <span class="detail-label">Serveur</span>
             <span>{{ ban.server }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Reason</span>
+            <span class="detail-label">Raison</span>
             <span class="reason">{{ ban.reason }}</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Banned by</span>
+            <span class="detail-label">Banni par</span>
             <AppBadge :label="ban.moderator" variant="info" />
           </div>
           <div class="detail-row">
@@ -63,7 +63,7 @@ const serverOptions = computed<SelectOption[]>(() => [
       </div>
 
       <div v-if="filteredBans.length === 0" class="empty">
-        No banned accounts{{ searchQuery ? " matching your search" : "" }}
+        Aucun compte banni{{ searchQuery ? " correspondant a votre recherche" : "" }}
       </div>
     </div>
   </div>

@@ -7,11 +7,11 @@ import AppBadge from "../atoms/AppBadge.vue";
 const { infractions, loading } = useInfractions();
 
 const columns: TableColumn[] = [
-  { key: "username", label: "User" },
-  { key: "server", label: "Server" },
+  { key: "username", label: "Utilisateur" },
+  { key: "server", label: "Serveur" },
   { key: "infraction_type", label: "Type" },
-  { key: "reason", label: "Reason" },
-  { key: "moderator", label: "Moderator" },
+  { key: "reason", label: "Raison" },
+  { key: "moderator", label: "Moderateur" },
   { key: "created_at", label: "Date" },
 ];
 
@@ -29,13 +29,13 @@ function typeVariant(type: string): "danger" | "warning" | "info" | "default" {
   <div class="infractions">
     <h1>Infractions</h1>
 
-    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="loading" class="loading">Chargement...</div>
 
     <DataTable
       v-else
       :columns="columns"
       :rows="(infractions as unknown as Record<string, unknown>[])"
-      empty-message="No infractions"
+      empty-message="Aucune infraction"
     >
       <template #cell-username="{ row }">
         <div class="user-cell">

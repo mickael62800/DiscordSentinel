@@ -1,15 +1,25 @@
+mod bot_config_repository;
 mod cache;
+mod conduct_repository;
+mod guild_repository;
 mod infraction_repository;
+mod log_repository;
 mod moderation_repository;
 mod rule_repository;
 mod security_event_repository;
 mod stats_repository;
 mod ticket_repository;
+mod voice_channel_repository;
 
+pub use bot_config_repository::BotConfigRepository;
 pub use cache::CachePort;
+pub use conduct_repository::ConductRepository;
+pub use guild_repository::GuildRepository;
 pub use infraction_repository::InfractionRepository;
+pub use log_repository::LogRepository;
 pub use moderation_repository::ModerationRepository;
 pub use rule_repository::RuleRepository;
 pub use security_event_repository::SecurityEventRepository;
 pub use stats_repository::StatsRepository;
 pub use ticket_repository::TicketRepository;
+pub use voice_channel_repository::VoiceChannelRepository;

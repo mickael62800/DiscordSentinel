@@ -12,7 +12,7 @@ impl LogsService {
         Self { repo }
     }
 
-    pub async fn get_logs(&self) -> Result<Vec<LogEntry>, String> {
-        self.repo.get_logs().await
+    pub async fn get_logs(&self, guild_id: Option<String>) -> Result<Vec<LogEntry>, String> {
+        self.repo.get_logs(guild_id).await
     }
 }

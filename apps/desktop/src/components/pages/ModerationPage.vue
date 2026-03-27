@@ -23,7 +23,7 @@ const lookupUserId = ref("");
 
 async function handleSubmit() {
   if (!guildId.value || !targetId.value || !targetName.value || !reason.value) {
-    error.value = "Guild ID, Target ID, Target Name and Reason are required.";
+    error.value = "L'ID du serveur, l'ID de la cible, le nom de la cible et la raison sont requis.";
     return;
   }
   error.value = null;
@@ -41,7 +41,7 @@ async function handleSubmit() {
       gravity: gravity.value,
       duration: actionType.value === "mute" || actionType.value === "ban" ? duration.value : undefined,
     });
-    success.value = `${result.action_type} applied to ${result.target_name}`;
+    success.value = `${result.action_type} applique a ${result.target_name}`;
     targetId.value = "";
     targetName.value = "";
     reason.value = "";
@@ -73,79 +73,79 @@ function actionVariant(action: string): "danger" | "warning" | "info" | "default
     <div class="mod-grid">
       <!-- Action form -->
       <div class="mod-card">
-        <h2>Apply Action</h2>
+        <h2>Appliquer une action</h2>
         <form class="action-form" @submit.prevent="handleSubmit">
           <div class="form-row">
             <div class="field">
-              <label>Guild ID</label>
-              <input v-model="guildId" type="text" placeholder="Server ID" />
+              <label>ID du serveur</label>
+              <input v-model="guildId" type="text" placeholder="ID du serveur" />
             </div>
           </div>
           <div class="form-row two-col">
             <div class="field">
-              <label>Target User ID</label>
-              <input v-model="targetId" type="text" placeholder="Discord user ID" />
+              <label>ID de l'utilisateur cible</label>
+              <input v-model="targetId" type="text" placeholder="ID utilisateur Discord" />
             </div>
             <div class="field">
-              <label>Target Username</label>
-              <input v-model="targetName" type="text" placeholder="username#1234" />
+              <label>Nom de l'utilisateur cible</label>
+              <input v-model="targetName" type="text" placeholder="nom#1234" />
             </div>
           </div>
           <div class="form-row two-col">
             <div class="field">
               <label>Action</label>
               <select v-model="actionType">
-                <option value="warn">Warn</option>
-                <option value="mute">Mute</option>
-                <option value="ban">Ban</option>
+                <option value="warn">Avertissement</option>
+                <option value="mute">Sourdine</option>
+                <option value="ban">Bannissement</option>
               </select>
             </div>
             <div class="field">
-              <label>Severity</label>
+              <label>Gravite</label>
               <select v-model="gravity">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
+                <option value="low">Faible</option>
+                <option value="medium">Moyen</option>
+                <option value="high">Eleve</option>
+                <option value="critical">Critique</option>
               </select>
             </div>
           </div>
           <div v-if="actionType === 'mute' || actionType === 'ban'" class="form-row">
             <div class="field">
-              <label>Duration (seconds) — leave empty for permanent</label>
+              <label>Duree (secondes) — laisser vide pour permanent</label>
               <input v-model.number="duration" type="number" placeholder="600 = 10min, 3600 = 1h" :min="0" />
             </div>
           </div>
           <div class="field">
-            <label>Reason</label>
-            <textarea v-model="reason" rows="2" placeholder="Why is this action being taken?"></textarea>
+            <label>Raison</label>
+            <textarea v-model="reason" rows="2" placeholder="Pourquoi cette action est-elle prise ?"></textarea>
           </div>
 
           <p v-if="error" class="error-msg">{{ error }}</p>
           <p v-if="success" class="success-msg">{{ success }}</p>
 
           <AppButton variant="primary" class="submit-btn" :disabled="submitting">
-            {{ submitting ? "Applying..." : `Apply ${actionType}` }}
+            {{ submitting ? "Application..." : `Appliquer ${actionType}` }}
           </AppButton>
         </form>
       </div>
 
       <!-- History lookup -->
       <div class="mod-card">
-        <h2>User History</h2>
+        <h2>Historique de l'utilisateur</h2>
         <div class="lookup-form">
           <div class="form-row two-col">
             <div class="field">
-              <label>Guild ID</label>
-              <input v-model="lookupGuildId" type="text" placeholder="Server ID" />
+              <label>ID du serveur</label>
+              <input v-model="lookupGuildId" type="text" placeholder="ID du serveur" />
             </div>
             <div class="field">
-              <label>User ID</label>
-              <input v-model="lookupUserId" type="text" placeholder="Discord user ID" />
+              <label>ID de l'utilisateur</label>
+              <input v-model="lookupUserId" type="text" placeholder="ID utilisateur Discord" />
             </div>
           </div>
           <AppButton variant="primary" :disabled="historyLoading" @click="handleLookup">
-            {{ historyLoading ? "Loading..." : "Lookup" }}
+            {{ historyLoading ? "Chargement..." : "Rechercher" }}
           </AppButton>
         </div>
 
@@ -155,9 +155,9 @@ function actionVariant(action: string): "danger" | "warning" | "info" | "default
             <span class="history-id">{{ history.target_id }}</span>
           </div>
           <div class="history-stats">
-            <div class="stat"><span class="stat-num info">{{ history.total_warns }}</span> warns</div>
-            <div class="stat"><span class="stat-num warning">{{ history.total_mutes }}</span> mutes</div>
-            <div class="stat"><span class="stat-num danger">{{ history.total_bans }}</span> bans</div>
+            <div class="stat"><span class="stat-num info">{{ history.total_warns }}</span> avertissements</div>
+            <div class="stat"><span class="stat-num warning">{{ history.total_mutes }}</span> sourdines</div>
+            <div class="stat"><span class="stat-num danger">{{ history.total_bans }}</span> bannissements</div>
           </div>
           <div v-if="history.actions.length > 0" class="history-actions">
             <div v-for="action in history.actions" :key="action.id" class="history-action">
@@ -165,7 +165,7 @@ function actionVariant(action: string): "danger" | "warning" | "info" | "default
               <span class="action-reason">{{ action.reason }}</span>
             </div>
           </div>
-          <div v-else class="empty-small">No actions recorded</div>
+          <div v-else class="empty-small">Aucune action enregistree</div>
         </div>
       </div>
     </div>

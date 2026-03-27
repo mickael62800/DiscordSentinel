@@ -3,7 +3,7 @@ use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use crate::api_client::ApiClient;
 use crate::commands;
@@ -32,6 +32,26 @@ impl EventHandler for Handler {
             error!(error = %e, "Impossible d'enregistrer les slash commands");
         } else {
             info!("Slash commands enregistrées");
+        }
+
+        // Enregistrer les guilds aupres de l'API
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            for guild_status in &ready.guilds {
+                let guild_id = guild_status.id;
+                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
+                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
+                    if let Err(e) = api.register_guild(
+                        &guild_id.to_string(),
+                        &guild.name,
+                        member_count,
+                    ).await {
+                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
+                    } else {
+                        info!(guild = %guild.name, "Guild enregistree");
+                    }
+                }
+            }
         }
     }
 

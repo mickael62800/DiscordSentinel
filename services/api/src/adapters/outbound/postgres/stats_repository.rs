@@ -140,4 +140,26 @@ impl StatsRepository for PgStatsRepository {
 
         Ok(())
     }
+
+    async fn count_distinct_guilds(&self) -> Result<u64, DomainError> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(DISTINCT guild_id) FROM user_stats",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.0 as u64)
+    }
+
+    async fn count_distinct_users(&self) -> Result<u64, DomainError> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(DISTINCT user_id) FROM user_stats",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.0 as u64)
+    }
 }

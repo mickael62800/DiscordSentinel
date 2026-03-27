@@ -9,10 +9,10 @@ import AppBadge from "../atoms/AppBadge.vue";
 const { filteredLogs, bots, loading, filterLevel, filterBot } = useLogs();
 
 const columns: TableColumn[] = [
-  { key: "timestamp", label: "Time" },
-  { key: "level", label: "Level" },
+  { key: "timestamp", label: "Heure" },
+  { key: "level", label: "Niveau" },
   { key: "bot", label: "Bot" },
-  { key: "server", label: "Server" },
+  { key: "server", label: "Serveur" },
   { key: "message", label: "Message" },
 ];
 
@@ -20,16 +20,16 @@ const filters = computed(() => [
   {
     modelValue: filterLevel.value,
     options: [
-      { value: "all", label: "All levels" },
+      { value: "all", label: "Tous les niveaux" },
       { value: "info", label: "Info" },
-      { value: "warn", label: "Warning" },
-      { value: "error", label: "Error" },
+      { value: "warn", label: "Avertissement" },
+      { value: "error", label: "Erreur" },
     ],
   },
   {
     modelValue: filterBot.value,
     options: [
-      { value: "all", label: "All bots" },
+      { value: "all", label: "Tous les bots" },
       ...bots.value.map((b) => ({ value: b, label: b })),
     ],
   },
@@ -48,17 +48,17 @@ function levelVariant(level: string): "info" | "warn" | "error" | "default" {
 
 <template>
   <div class="logs">
-    <h1>Logs</h1>
+    <h1>Journaux</h1>
 
     <FilterBar :filters="filters" @update:filter="onFilterUpdate" />
 
-    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="loading" class="loading">Chargement...</div>
 
     <DataTable
       v-else
       :columns="columns"
       :rows="(filteredLogs as unknown as Record<string, unknown>[])"
-      empty-message="No logs matching filters"
+      empty-message="Aucun journal correspondant aux filtres"
     >
       <template #cell-timestamp="{ value }">
         <span class="mono">{{ value }}</span>

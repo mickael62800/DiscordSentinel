@@ -26,4 +26,16 @@ impl ManageInfractionsUseCase for ManageInfractionsService {
     ) -> Result<Vec<Infraction>, DomainError> {
         self.infraction_repo.find_by_guild(guild_id, &filters).await
     }
+
+    async fn list_all_infractions(
+        &self,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Infraction>, DomainError> {
+        self.infraction_repo.find_all(limit, offset).await
+    }
+
+    async fn count_today(&self) -> Result<u64, DomainError> {
+        self.infraction_repo.count_today().await
+    }
 }

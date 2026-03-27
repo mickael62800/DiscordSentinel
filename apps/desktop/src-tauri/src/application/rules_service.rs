@@ -12,8 +12,8 @@ impl RulesService {
         Self { repo }
     }
 
-    pub async fn get_rules(&self) -> Result<Vec<ModerationRule>, String> {
-        self.repo.get_rules().await
+    pub async fn get_rules(&self, guild_id: Option<String>) -> Result<Vec<ModerationRule>, String> {
+        self.repo.get_rules(guild_id).await
     }
 
     pub async fn toggle_rule(&self, id: String, enabled: bool) -> Result<bool, String> {

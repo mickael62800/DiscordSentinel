@@ -10,7 +10,11 @@ use crate::application::realtime_service::{RealtimeService, WsStatus};
 use crate::application::rules_service::RulesService;
 use crate::application::security_service::SecurityService;
 use crate::application::tickets_service::TicketsService;
-use crate::domain::entities::{ApiConfig, DiscordConfig, DiscordUser, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserModerationHistory};
+use crate::application::bot_config_service::BotConfigService;
+use crate::application::guild_service::GuildService;
+use crate::application::voice_channels_service::VoiceChannelsService;
+use crate::application::conduct_service::ConductService;
+use crate::domain::entities::{ApiConfig, BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel, VoiceChannelDetail};
 
 #[tauri::command]
 pub async fn get_dashboard_stats(
@@ -20,22 +24,34 @@ pub async fn get_dashboard_stats(
 }
 
 #[tauri::command]
-pub async fn get_logs(service: State<'_, Arc<LogsService>>) -> Result<Vec<LogEntry>, String> {
-    service.get_logs().await
+pub async fn get_guilds(
+    service: State<'_, Arc<GuildService>>,
+) -> Result<Vec<Guild>, String> {
+    service.get_guilds().await
+}
+
+#[tauri::command]
+pub async fn get_logs(
+    service: State<'_, Arc<LogsService>>,
+    guild_id: Option<String>,
+) -> Result<Vec<LogEntry>, String> {
+    service.get_logs(guild_id).await
 }
 
 #[tauri::command]
 pub async fn get_infractions(
     service: State<'_, Arc<InfractionsService>>,
+    guild_id: Option<String>,
 ) -> Result<Vec<Infraction>, String> {
-    service.get_infractions().await
+    service.get_infractions(guild_id).await
 }
 
 #[tauri::command]
 pub async fn get_rules(
     service: State<'_, Arc<RulesService>>,
+    guild_id: Option<String>,
 ) -> Result<Vec<ModerationRule>, String> {
-    service.get_rules().await
+    service.get_rules(guild_id).await
 }
 
 #[tauri::command]
@@ -256,4 +272,96 @@ pub async fn get_moderation_history(
     user_id: String,
 ) -> Result<UserModerationHistory, String> {
     service.get_history(guild_id, user_id).await
+}
+
+// --- Voice Channels commands ---
+
+#[tauri::command]
+pub async fn get_voice_channels(
+    service: State<'_, Arc<VoiceChannelsService>>,
+    guild_id: String,
+) -> Result<Vec<VoiceChannel>, String> {
+    service.get_channels(guild_id).await
+}
+
+#[tauri::command]
+pub async fn get_voice_channel_detail(
+    service: State<'_, Arc<VoiceChannelsService>>,
+    channel_id: String,
+) -> Result<VoiceChannelDetail, String> {
+    service.get_channel_detail(channel_id).await
+}
+
+// --- Bot Config commands ---
+
+#[tauri::command]
+pub async fn get_bot_definitions(
+    service: State<'_, Arc<BotConfigService>>,
+) -> Result<Vec<BotDefinition>, String> {
+    service.get_definitions().await
+}
+
+#[tauri::command]
+pub async fn get_bot_guild_config(
+    service: State<'_, Arc<BotConfigService>>,
+    guild_id: String,
+) -> Result<Vec<BotGuildConfig>, String> {
+    service.get_guild_config(guild_id).await
+}
+
+#[tauri::command]
+pub async fn set_bot_config(
+    service: State<'_, Arc<BotConfigService>>,
+    guild_id: String,
+    bot_name: String,
+    config_key: String,
+    config_value: String,
+) -> Result<(), String> {
+    service.set_config(guild_id, bot_name, config_key, config_value).await
+}
+
+#[tauri::command]
+pub async fn delete_bot_config(
+    service: State<'_, Arc<BotConfigService>>,
+    guild_id: String,
+    bot_name: String,
+    config_key: String,
+) -> Result<(), String> {
+    service.delete_config(guild_id, bot_name, config_key).await
+}
+
+// ── Conduct ──
+
+#[tauri::command]
+pub async fn get_conduct_config(
+    service: State<'_, Arc<ConductService>>,
+    guild_id: String,
+) -> Result<ConductConfig, String> {
+    service.get_config(guild_id).await
+}
+
+#[tauri::command]
+pub async fn get_conduct_leaderboard(
+    service: State<'_, Arc<ConductService>>,
+    guild_id: String,
+) -> Result<Vec<UserConductPoints>, String> {
+    service.get_leaderboard(guild_id).await
+}
+
+#[tauri::command]
+pub async fn get_conduct_points(
+    service: State<'_, Arc<ConductService>>,
+    guild_id: String,
+    user_id: String,
+) -> Result<UserConductPoints, String> {
+    service.get_points(guild_id, user_id).await
+}
+
+#[tauri::command]
+pub async fn get_conduct_log(
+    service: State<'_, Arc<ConductService>>,
+    guild_id: String,
+    user_id: String,
+) -> Result<Vec<ConductPointsLog>, String> {
+    service.get_log(guild_id, user_id).await
 }

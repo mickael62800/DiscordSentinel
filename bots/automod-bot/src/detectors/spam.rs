@@ -1,7 +1,7 @@
-/// Détection basique de spam :
-/// - Messages tout en majuscules (> 8 chars)
-/// - Répétition excessive de caractères (aaaaaaa)
-/// - Répétition de mots
+/// Detection de spam par contenu :
+/// - Repetition excessive de caracteres (aaaaaaa)
+/// - Repetition de mots (buy buy buy buy buy)
+/// Note : le flood (messages rapides) est gere dans le handler, pas ici.
 pub fn detect(content: &str) -> bool {
     let trimmed = content.trim();
 
@@ -9,12 +9,7 @@ pub fn detect(content: &str) -> bool {
         return false;
     }
 
-    // Tout en majuscules (minimum 8 caractères)
-    if trimmed.len() >= 8 && trimmed == trimmed.to_uppercase() && trimmed.chars().any(|c| c.is_alphabetic()) {
-        return true;
-    }
-
-    // Répétition de caractères (ex: "aaaaaaa", "!!!!!!")
+    // Repetition de caracteres (ex: "aaaaaaa", "!!!!!!")
     let chars: Vec<char> = trimmed.chars().collect();
     let mut repeat_count = 1;
     for i in 1..chars.len() {
@@ -28,7 +23,7 @@ pub fn detect(content: &str) -> bool {
         }
     }
 
-    // Répétition de mots (ex: "buy buy buy buy buy")
+    // Repetition de mots (ex: "buy buy buy buy buy")
     let words: Vec<&str> = trimmed.split_whitespace().collect();
     if words.len() >= 5 {
         let first = words[0].to_lowercase();
@@ -40,14 +35,24 @@ pub fn detect(content: &str) -> bool {
     false
 }
 
+/// Detection de message tout en majuscules (>= 8 chars alphabetiques).
+/// Ce n'est pas du spam, juste un avertissement.
+pub fn detect_caps(content: &str) -> bool {
+    let trimmed = content.trim();
+    trimmed.len() >= 8
+        && trimmed == trimmed.to_uppercase()
+        && trimmed.chars().any(|c| c.is_alphabetic())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_caps_spam() {
-        assert!(detect("ACHETE MON PRODUIT MAINTENANT"));
-        assert!(!detect("OK"));
+    fn test_caps_not_spam() {
+        assert!(!detect("ACHETE MON PRODUIT MAINTENANT"));
+        assert!(detect_caps("ACHETE MON PRODUIT MAINTENANT"));
+        assert!(!detect_caps("SALUT"));
     }
 
     #[test]

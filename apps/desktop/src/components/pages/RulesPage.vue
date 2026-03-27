@@ -14,9 +14,9 @@ async function handleSave(params: UpdateRuleParams) {
 
 <template>
   <div class="rules">
-    <h1>Moderation Rules</h1>
+    <h1>Regles de moderation</h1>
 
-    <div v-if="loading" class="loading">Loading...</div>
+    <div v-if="loading" class="loading">Chargement...</div>
 
     <div v-else class="rules-grid">
       <RuleCard

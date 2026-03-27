@@ -6,13 +6,14 @@ use uuid::Uuid;
 use crate::domain::entities::{Infraction, MessageAnalysis};
 use crate::domain::errors::DomainError;
 use crate::domain::services::ScoringService;
-use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase};
+use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, DeductPointsCommand, ManageConductUseCase};
 use crate::ports::outbound::{CachePort, InfractionRepository, RuleRepository};
 
 pub struct AnalyzeMessageService {
     rule_repo: Arc<dyn RuleRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
+    conduct_uc: Arc<dyn ManageConductUseCase>,
 }
 
 impl AnalyzeMessageService {
@@ -20,11 +21,13 @@ impl AnalyzeMessageService {
         rule_repo: Arc<dyn RuleRepository>,
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
+        conduct_uc: Arc<dyn ManageConductUseCase>,
     ) -> Self {
         Self {
             rule_repo,
             infraction_repo,
             cache,
+            conduct_uc,
         }
     }
 }
@@ -63,6 +66,16 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         };
 
         self.infraction_repo.save(&infraction).await?;
+
+        // 3b. Deduire les points de conduite
+        if result.action.as_str() != "none" {
+            let _ = self.conduct_uc.deduct_points(DeductPointsCommand {
+                guild_id: infraction.guild_id.clone(),
+                user_id: infraction.user_id.clone(),
+                username: infraction.username.clone(),
+                action: result.action.as_str().to_string(),
+            }).await;
+        }
 
         // 4. Retourner l'analyse
         Ok(MessageAnalysis {

@@ -40,6 +40,17 @@ async fn main() {
         data.insert::<TrackerKey>(StatsTracker::new());
     }
 
+    // Heartbeat task
+    let api_for_heartbeat = ApiClient::new(&config);
+    tokio::spawn(async move {
+        loop {
+            if let Err(e) = api_for_heartbeat.heartbeat("stats-bot").await {
+                tracing::warn!("Heartbeat failed: {}", e);
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+        }
+    });
+
     if let Err(e) = client.start().await {
         eprintln!("Erreur fatale : {e}");
     }

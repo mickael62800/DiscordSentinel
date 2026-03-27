@@ -10,4 +10,6 @@ pub trait StatsRepository: Send + Sync {
     async fn find_by_guild(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError>;
     async fn increment_messages(&self, guild_id: &str, user_id: &str, username: &str, count: u64) -> Result<(), DomainError>;
     async fn add_voice_seconds(&self, guild_id: &str, user_id: &str, username: &str, seconds: u64) -> Result<(), DomainError>;
+    async fn count_distinct_guilds(&self) -> Result<u64, DomainError>;
+    async fn count_distinct_users(&self) -> Result<u64, DomainError>;
 }

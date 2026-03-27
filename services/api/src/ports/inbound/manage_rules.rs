@@ -19,6 +19,8 @@ pub struct CreateRuleCommand {
 #[async_trait]
 pub trait ManageRulesUseCase: Send + Sync {
     async fn get_rules(&self, guild_id: &str) -> Result<Vec<Rule>, DomainError>;
+    async fn get_all_rules(&self) -> Result<Vec<Rule>, DomainError>;
+    async fn toggle_rule(&self, rule_id: Uuid, enabled: bool) -> Result<bool, DomainError>;
     async fn create_or_update_rule(&self, command: CreateRuleCommand) -> Result<Rule, DomainError>;
     async fn delete_rule(&self, guild_id: &str, rule_id: Uuid) -> Result<(), DomainError>;
 }

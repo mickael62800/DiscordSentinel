@@ -2,26 +2,39 @@ use std::future::Future;
 use std::pin::Pin;
 
 use super::entities::{
-    Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule,
-    SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserModerationHistory,
+    BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry,
+    ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats,
+    Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserModerationHistory, VoiceChannel,
+    VoiceChannelDetail,
 };
 
 type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
+
+pub trait GuildRepository: Send + Sync + 'static {
+    fn get_guilds(&self) -> BoxFut<Vec<Guild>>;
+}
+
+pub trait BotConfigRepository: Send + Sync + 'static {
+    fn get_definitions(&self) -> BoxFut<Vec<BotDefinition>>;
+    fn get_guild_config(&self, guild_id: String) -> BoxFut<Vec<BotGuildConfig>>;
+    fn set_config(&self, guild_id: String, bot_name: String, key: String, value: String) -> BoxFut<()>;
+    fn delete_config(&self, guild_id: String, bot_name: String, key: String) -> BoxFut<()>;
+}
 
 pub trait StatsRepository: Send + Sync + 'static {
     fn get_dashboard_stats(&self) -> BoxFut<ServerStats>;
 }
 
 pub trait LogsRepository: Send + Sync + 'static {
-    fn get_logs(&self) -> BoxFut<Vec<LogEntry>>;
+    fn get_logs(&self, guild_id: Option<String>) -> BoxFut<Vec<LogEntry>>;
 }
 
 pub trait InfractionsRepository: Send + Sync + 'static {
-    fn get_infractions(&self) -> BoxFut<Vec<Infraction>>;
+    fn get_infractions(&self, guild_id: Option<String>) -> BoxFut<Vec<Infraction>>;
 }
 
 pub trait RulesRepository: Send + Sync + 'static {
-    fn get_rules(&self) -> BoxFut<Vec<ModerationRule>>;
+    fn get_rules(&self, guild_id: Option<String>) -> BoxFut<Vec<ModerationRule>>;
     fn toggle_rule(&self, id: String, enabled: bool) -> BoxFut<bool>;
     fn update_rule(&self, params: UpdateRuleParams) -> BoxFut<()>;
 }
@@ -43,13 +56,29 @@ pub trait ModerationRepository: Send + Sync + 'static {
     fn get_history(&self, guild_id: String, user_id: String) -> BoxFut<UserModerationHistory>;
 }
 
+pub trait VoiceChannelRepository: Send + Sync + 'static {
+    fn get_channels(&self, guild_id: String) -> BoxFut<Vec<VoiceChannel>>;
+    fn get_channel_detail(&self, channel_id: String) -> BoxFut<VoiceChannelDetail>;
+}
+
+pub trait ConductRepository: Send + Sync + 'static {
+    fn get_config(&self, guild_id: String) -> BoxFut<ConductConfig>;
+    fn get_leaderboard(&self, guild_id: String) -> BoxFut<Vec<UserConductPoints>>;
+    fn get_points(&self, guild_id: String, user_id: String) -> BoxFut<UserConductPoints>;
+    fn get_log(&self, guild_id: String, user_id: String) -> BoxFut<Vec<ConductPointsLog>>;
+}
+
 pub trait AppAdapter:
-    StatsRepository
+    GuildRepository
+    + BotConfigRepository
+    + StatsRepository
     + LogsRepository
     + InfractionsRepository
     + RulesRepository
     + TicketsRepository
     + SecurityRepository
     + ModerationRepository
+    + VoiceChannelRepository
+    + ConductRepository
 {
 }

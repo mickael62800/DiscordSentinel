@@ -17,4 +17,12 @@ pub trait ManageInfractionsUseCase: Send + Sync {
         guild_id: &str,
         filters: InfractionFilters,
     ) -> Result<Vec<Infraction>, DomainError>;
+
+    async fn list_all_infractions(
+        &self,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<Infraction>, DomainError>;
+
+    async fn count_today(&self) -> Result<u64, DomainError>;
 }

@@ -1,7 +1,11 @@
 pub mod analyze;
+pub mod bot_config;
+pub mod conduct;
+pub mod dashboard;
 pub mod infractions;
 pub mod moderation;
 pub mod rules;
 pub mod security;
 pub mod stats;
 pub mod tickets;
+pub mod voice_channels;

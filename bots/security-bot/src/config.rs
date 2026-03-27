@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct Config {
     pub discord_token: String,
     pub api_base_url: String,

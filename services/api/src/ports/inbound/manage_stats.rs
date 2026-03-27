@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{GuildStatsOverview, UserStats};
+use crate::domain::entities::{DashboardStats, GuildStatsOverview, UserStats};
 use crate::domain::errors::DomainError;
 
 pub struct RecordMessagesCommand {
@@ -24,4 +24,5 @@ pub trait ManageStatsUseCase: Send + Sync {
     async fn get_user_stats(&self, guild_id: &str, user_id: &str) -> Result<Option<UserStats>, DomainError>;
     async fn get_guild_overview(&self, guild_id: &str) -> Result<GuildStatsOverview, DomainError>;
     async fn get_leaderboard(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError>;
+    async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError>;
 }

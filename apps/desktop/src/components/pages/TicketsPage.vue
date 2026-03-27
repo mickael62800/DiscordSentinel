@@ -15,20 +15,20 @@ const filters = computed(() => [
   {
     modelValue: filterStatus.value,
     options: [
-      { value: "all", label: "All statuses" },
-      { value: "open", label: "Open" },
-      { value: "pending", label: "Pending" },
-      { value: "closed", label: "Closed" },
+      { value: "all", label: "Tous les statuts" },
+      { value: "open", label: "Ouvert" },
+      { value: "pending", label: "En attente" },
+      { value: "closed", label: "Ferme" },
     ],
   },
   {
     modelValue: filterPriority.value,
     options: [
-      { value: "all", label: "All priorities" },
+      { value: "all", label: "Toutes les priorites" },
       { value: "urgent", label: "Urgent" },
-      { value: "high", label: "High" },
-      { value: "medium", label: "Medium" },
-      { value: "low", label: "Low" },
+      { value: "high", label: "Elevee" },
+      { value: "medium", label: "Moyenne" },
+      { value: "low", label: "Faible" },
     ],
   },
 ]);
@@ -87,14 +87,14 @@ function priorityVariant(priority: string): "danger" | "warning" | "info" | "def
       <div class="tickets-header">
         <h1>Tickets</h1>
         <div class="tickets-stats">
-          <span class="stat"><strong>{{ openCount }}</strong> open</span>
-          <span class="stat"><strong>{{ pendingCount }}</strong> pending</span>
+          <span class="stat"><strong>{{ openCount }}</strong> ouvert(s)</span>
+          <span class="stat"><strong>{{ pendingCount }}</strong> en attente</span>
         </div>
       </div>
 
       <FilterBar :filters="filters" @update:filter="onFilterUpdate" />
 
-      <div v-if="loading" class="loading">Loading...</div>
+      <div v-if="loading" class="loading">Chargement...</div>
 
       <div v-else class="ticket-list">
         <div
@@ -110,7 +110,7 @@ function priorityVariant(priority: string): "danger" | "warning" | "info" | "def
             </div>
             <div class="ticket-meta">
               <span>{{ ticket.author_name }}</span>
-              <span class="sep">in</span>
+              <span class="sep">dans</span>
               <span>{{ ticket.server }}</span>
               <span class="sep">-</span>
               <span class="category">{{ ticket.category }}</span>
@@ -118,24 +118,24 @@ function priorityVariant(priority: string): "danger" | "warning" | "info" | "def
           </div>
           <div class="ticket-side">
             <AppBadge :label="ticket.status" :variant="statusVariant(ticket.status)" />
-            <span class="ticket-messages">{{ ticket.messages_count }} msg</span>
+            <span class="ticket-messages">{{ ticket.messages_count }} msg.</span>
             <span class="ticket-date">{{ ticket.updated_at }}</span>
           </div>
         </div>
 
         <div v-if="filteredTickets.length === 0" class="empty">
-          No tickets matching filters
+          Aucun ticket correspondant aux filtres
         </div>
       </div>
     </template>
 
     <!-- TICKET DETAIL -->
     <template v-else>
-      <div v-if="detailLoading" class="loading">Loading ticket...</div>
+      <div v-if="detailLoading" class="loading">Chargement du ticket...</div>
 
       <template v-else-if="detail">
         <div class="detail-header">
-          <button class="back-btn" @click="backToList">&larr; Back</button>
+          <button class="back-btn" @click="backToList">&larr; Retour</button>
           <div class="detail-title-row">
             <h1>{{ detail.ticket.title }}</h1>
             <div class="detail-badges">
@@ -145,13 +145,13 @@ function priorityVariant(priority: string): "danger" | "warning" | "info" | "def
             </div>
           </div>
           <div class="detail-info">
-            <span>By <strong>{{ detail.ticket.author_name }}</strong></span>
-            <span class="sep">in</span>
+            <span>Par <strong>{{ detail.ticket.author_name }}</strong></span>
+            <span class="sep">dans</span>
             <span><strong>{{ detail.ticket.server }}</strong></span>
             <span class="sep">|</span>
-            <span>Assigned to: <strong>{{ detail.ticket.assigned_to ?? "Unassigned" }}</strong></span>
+            <span>Assigne a : <strong>{{ detail.ticket.assigned_to ?? "Non assigne" }}</strong></span>
             <span class="sep">|</span>
-            <span>Created {{ detail.ticket.created_at }}</span>
+            <span>Cree le {{ detail.ticket.created_at }}</span>
           </div>
         </div>
 
@@ -179,22 +179,22 @@ function priorityVariant(priority: string): "danger" | "warning" | "info" | "def
         <div v-if="detail.ticket.status !== 'closed'" class="reply-box">
           <textarea
             v-model="replyContent"
-            placeholder="Type your reply..."
+            placeholder="Tapez votre reponse..."
             rows="3"
             @keydown.ctrl.enter="sendReply"
           ></textarea>
           <div class="reply-actions">
             <AppButton variant="primary" :disabled="!replyContent.trim() || replying" @click="sendReply">
-              {{ replying ? "Sending..." : "Reply" }}
+              {{ replying ? "Envoi..." : "Repondre" }}
             </AppButton>
             <AppButton variant="secondary" @click="closeTicket">
-              Close ticket
+              Fermer le ticket
             </AppButton>
           </div>
         </div>
 
         <div v-else class="closed-notice">
-          This ticket is closed.
+          Ce ticket est ferme.
         </div>
       </template>
     </template>

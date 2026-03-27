@@ -1,5 +1,8 @@
 pub mod auth_service;
+pub mod bot_config_service;
+pub mod conduct_service;
 pub mod dashboard_service;
+pub mod guild_service;
 pub mod infractions_service;
 pub mod logs_service;
 pub mod moderation_service;
@@ -7,3 +10,4 @@ pub mod realtime_service;
 pub mod rules_service;
 pub mod security_service;
 pub mod tickets_service;
+pub mod voice_channels_service;

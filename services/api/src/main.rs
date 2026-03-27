@@ -14,15 +14,19 @@ use tracing::{error, info};
 use crate::adapters::inbound::http::{router, state::AppState};
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::postgres::{
-    PgInfractionRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository,
-    PgStatsRepository, PgTicketRepository,
+    PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
+    PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
+    PgTicketRepository, PgVoiceChannelRepository,
 };
 use crate::adapters::outbound::redis_cache::RedisCache;
 use crate::application::{
-    AnalyzeMessageService, ManageInfractionsService, ManageModerationService,
-    ManageRulesService, ManageSecurityService, ManageStatsService, ManageTicketsService,
+    AnalyzeMessageService, ManageConductService, ManageInfractionsService,
+    ManageModerationService, ManageRulesService, ManageSecurityService, ManageStatsService,
+    ManageTicketsService, ManageVoiceChannelsService,
 };
 use crate::config::AppConfig;
+use crate::ports::inbound::ManageConductUseCase;
+use crate::ports::outbound::VoiceChannelRepository;
 
 #[tokio::main]
 async fn main() {
@@ -91,23 +95,58 @@ async fn main() {
     let security_repo = Arc::new(PgSecurityEventRepository::new(pg_pool.clone()));
     let moderation_repo = Arc::new(PgModerationRepository::new(pg_pool.clone()));
     let stats_repo = Arc::new(PgStatsRepository::new(pg_pool.clone()));
+    let voice_channel_repo = Arc::new(PgVoiceChannelRepository::new(pg_pool.clone()));
+    let bot_config_repo = Arc::new(PgBotConfigRepository::new(pg_pool.clone()));
+    let conduct_repo = Arc::new(PgConductRepository::new(pg_pool.clone()));
+    let guild_repo = Arc::new(PgGuildRepository::new(pg_pool.clone()));
+    let log_repo = Arc::new(PgLogRepository::new(pg_pool.clone()));
     let cache = Arc::new(RedisCache::new(redis_client.clone()));
 
     // ── WebSocket broadcaster ──
     let broadcaster = Arc::new(EventBroadcaster::new(256));
 
     // ── Services applicatifs ──
+    let conduct_uc = Arc::new(ManageConductService::new(conduct_repo.clone(), broadcaster.clone()));
+
     let analyze_uc = Arc::new(AnalyzeMessageService::new(
         rule_repo.clone(),
         infraction_repo.clone(),
         cache.clone(),
+        conduct_uc.clone(),
     ));
     let rules_uc = Arc::new(ManageRulesService::new(rule_repo.clone(), cache.clone()));
     let infractions_uc = Arc::new(ManageInfractionsService::new(infraction_repo.clone()));
     let tickets_uc = Arc::new(ManageTicketsService::new(ticket_repo.clone(), cache.clone()));
     let security_uc = Arc::new(ManageSecurityService::new(security_repo.clone(), cache.clone()));
-    let moderation_uc = Arc::new(ManageModerationService::new(moderation_repo.clone(), cache.clone()));
-    let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone()));
+    let moderation_uc = Arc::new(ManageModerationService::new(moderation_repo.clone(), cache.clone(), conduct_uc.clone()));
+    let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone(), redis_client.clone()));
+    let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone()));
+
+    // Regen des points de conduite toutes les heures
+    let conduct_uc_regen = conduct_uc.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;
+            match conduct_uc_regen.run_regen().await {
+                Ok(count) if count > 0 => tracing::info!(count, "Points de conduite regeneres"),
+                Err(e) => tracing::error!(error = %e, "Erreur regen points de conduite"),
+                _ => {}
+            }
+        }
+    });
+
+    // Cleanup expired voice channel bans every 60s
+    let vc_repo_cleanup = voice_channel_repo.clone();
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            if let Ok(count) = vc_repo_cleanup.cleanup_expired_bans().await {
+                if count > 0 {
+                    tracing::debug!(count, "Bans vocaux expirés nettoyés");
+                }
+            }
+        }
+    });
 
     // ── State & Router ──
     let state = AppState {
@@ -118,6 +157,11 @@ async fn main() {
         security_uc,
         moderation_uc,
         stats_uc,
+        voice_channels_uc,
+        conduct_uc,
+        log_repo,
+        guild_repo,
+        bot_config_repo,
         broadcaster,
         api_key: config.api_key.clone(),
         pg_pool: pg_pool.clone(),

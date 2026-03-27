@@ -6,6 +6,7 @@ use tracing::{error, info, warn};
 
 use crate::account_checker::AccountChecker;
 use crate::api_client::{ApiClient, SecurityEvent};
+use crate::config::Config;
 use crate::raid_detector::RaidDetector;
 
 // ── TypeMap keys ──
@@ -25,12 +26,37 @@ impl TypeMapKey for AccountCheckerKey {
     type Value = AccountChecker;
 }
 
+pub struct ConfigKey;
+impl TypeMapKey for ConfigKey {
+    type Value = Config;
+}
+
 pub struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Security bot connecté");
+
+        // Enregistrer les guilds aupres de l'API
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            for guild_status in &ready.guilds {
+                let guild_id = guild_status.id;
+                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
+                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
+                    if let Err(e) = api.register_guild(
+                        &guild_id.to_string(),
+                        &guild.name,
+                        member_count,
+                    ).await {
+                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
+                    } else {
+                        info!(guild = %guild.name, "Guild enregistree");
+                    }
+                }
+            }
+        }
     }
 
     /// Déclenché à chaque nouveau membre qui rejoint un serveur.
@@ -49,8 +75,17 @@ impl EventHandler for Handler {
         let api = data.get::<ApiClientKey>().unwrap();
         let raid_detector = data.get::<RaidDetectorKey>().unwrap();
         let account_checker = data.get::<AccountCheckerKey>().unwrap();
+        let env_config = data.get::<ConfigKey>().unwrap();
+
+        // Charger la config per-guild depuis l'API (fallback sur env vars)
+        let guild_config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+        let _raid_threshold = ApiClient::config_u64(&guild_config, "raid_join_threshold", env_config.raid_join_threshold);
+        let _raid_window = ApiClient::config_u64(&guild_config, "raid_join_window_secs", env_config.raid_join_window_secs);
+        let min_account_age = ApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
 
         // ── 1. Détection anti-raid ──
+        // Note: le RaidDetector utilise les valeurs d'init (env vars).
+        // Pour un support complet per-guild, il faudrait un RaidDetector par guild.
         let is_raid = raid_detector.record_join(guild_id);
 
         if is_raid {
@@ -114,8 +149,15 @@ impl EventHandler for Handler {
         }
 
         // ── 2. Vérification compte suspect ──
-        if account_checker.is_suspicious(user) {
-            let age_h = account_checker.account_age_hours(user);
+        // Utiliser le min_account_age per-guild si disponible
+        let per_guild_checker = AccountChecker::new(min_account_age);
+        let checker = if guild_config.contains_key("min_account_age_secs") {
+            &per_guild_checker
+        } else {
+            account_checker
+        };
+        if checker.is_suspicious(user) {
+            let age_h = checker.account_age_hours(user);
 
             warn!(
                 guild_id = %guild_id,
