@@ -27,7 +27,7 @@ impl AppConfig {
                 .parse()
                 .expect("PORT invalide"),
             rate_limit_per_sec: std::env::var("RATE_LIMIT_PER_SEC")
-                .unwrap_or_else(|_| "50".into())
+                .unwrap_or_else(|_| "200".into())
                 .parse()
                 .unwrap_or(50),
             max_body_size: std::env::var("MAX_BODY_SIZE")

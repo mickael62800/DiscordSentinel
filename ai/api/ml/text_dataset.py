@@ -1,15 +1,6 @@
 """
-Dataset pour la detection de sentiments toxiques
-
-Structure attendue dans datasets/ :
-  toxic/     -> fichiers .txt ou .jsonl contenant les textes toxiques avec labels
-  neutral/   -> fichiers .txt contenant les textes neutres
-
-Format JSONL (toxic/) :
-  {"text": "...", "label": 1}   # 1=anger, 2=rage, 3=threat, 4=harassment
-
-Format TXT (neutral/) :
-  Un texte par ligne (label 0 = neutral)
+Dataset pour la detection de sentiments toxiques.
+Integre directement dans l'API — plus de dependance aux scripts externes.
 """
 
 import json
@@ -54,7 +45,6 @@ class TextSentinelDataset(Dataset):
                             entry = json.loads(line)
                             self.samples.append((entry["text"], entry["label"]))
                 elif file.suffix == ".txt":
-                    # TXT simple = label anger par defaut
                     for line in file.read_text(encoding="utf-8").splitlines():
                         line = line.strip()
                         if line:

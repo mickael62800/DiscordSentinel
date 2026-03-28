@@ -1,13 +1,8 @@
 """
-Dataset pour la detection vision (NSFW / Produits illicites / Safe)
-
-Structure attendue dans datasets/ :
-  safe/       -> images safe (label 0)
-  nsfw/       -> images nsfw (label 1)
-  illicit/    -> images produits illicites (label 2)
+Dataset pour la detection vision (NSFW / Produits illicites / Safe).
+Integre directement dans l'API.
 """
 
-import os
 from pathlib import Path
 from PIL import Image
 from torch.utils.data import Dataset
@@ -31,7 +26,6 @@ class VisionSentinelDataset(Dataset):
         for class_name, label in CLASS_MAP.items():
             class_dir = self.root_dir / class_name
             if not class_dir.exists():
-                print(f"Warning: dossier manquant {class_dir}")
                 continue
 
             for img_path in class_dir.iterdir():

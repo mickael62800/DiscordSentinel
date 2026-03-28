@@ -80,6 +80,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(auth_svc)
         .manage(realtime_svc)
         .manage(dashboard_svc)
@@ -156,6 +157,12 @@ pub fn run() {
             presentation::commands::get_ia_config,
             presentation::commands::save_ia_config,
             presentation::commands::get_full_analytics,
+            presentation::commands::ai_get_datasets,
+            presentation::commands::ai_upload_dataset,
+            presentation::commands::ai_start_training,
+            presentation::commands::ai_training_status,
+            presentation::commands::ai_stop_training,
+            presentation::commands::ai_export_onnx,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

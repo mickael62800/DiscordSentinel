@@ -2,12 +2,39 @@
 import { ref, computed, onMounted } from "vue";
 import { open } from "@tauri-apps/plugin-dialog";
 import { useAiTraining, type ModelType, type TrainingConfig } from "../../composables/useAiTraining";
+import { Line, Doughnut } from "vue-chartjs";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from "chart.js";
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+);
 
 const {
   status,
   datasets,
+  epochHistory,
   loading,
   error,
+  stopping,
   exporting,
   exportResult,
   fetchDatasets,
@@ -40,7 +67,16 @@ const activeDataset = computed(() =>
 
 const progressPercent = computed(() => {
   if (!status.value.total_epochs) return 0;
-  return Math.round((status.value.current_epoch / status.value.total_epochs) * 100);
+  const epochProgress = status.value.total_batches
+    ? status.value.current_batch / status.value.total_batches
+    : 0;
+  const completedEpochs = Math.max(status.value.current_epoch - 1, 0);
+  return Math.round(((completedEpochs + epochProgress) / status.value.total_epochs) * 100);
+});
+
+const batchPercent = computed(() => {
+  if (!status.value.total_batches) return 0;
+  return Math.round((status.value.current_batch / status.value.total_batches) * 100);
 });
 
 const isTrainingThisModel = computed(
@@ -68,6 +104,131 @@ async function handleStartTraining() {
 async function handleExport() {
   await exportOnnx(activeTab.value);
 }
+
+// ── Options graphiques ──
+const lineChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  animation: { duration: 300 },
+  plugins: {
+    legend: { labels: { color: "#9495b0", font: { size: 11 } } },
+  },
+  scales: {
+    x: {
+      ticks: { color: "#9495b0", font: { size: 10 } },
+      grid: { color: "rgba(58, 59, 92, 0.5)" },
+    },
+    y: {
+      ticks: { color: "#9495b0", font: { size: 10 } },
+      grid: { color: "rgba(58, 59, 92, 0.5)" },
+      beginAtZero: true,
+    },
+  },
+};
+
+const accuracyChartOptions = {
+  ...lineChartOptions,
+  scales: {
+    ...lineChartOptions.scales,
+    y: {
+      ...lineChartOptions.scales.y,
+      max: 1,
+      ticks: {
+        ...lineChartOptions.scales.y.ticks,
+        callback: (v: number | string) => `${(Number(v) * 100).toFixed(0)}%`,
+      },
+    },
+  },
+};
+
+const doughnutOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: {
+      position: "bottom" as const,
+      labels: { color: "#9495b0", font: { size: 11 }, padding: 16 },
+    },
+  },
+};
+
+const epochLabels = computed(() =>
+  epochHistory.value.map((e) => `Epoch ${e.epoch}`)
+);
+
+const lossChartData = computed(() => ({
+  labels: epochLabels.value,
+  datasets: [
+    {
+      label: "Loss (train)",
+      data: epochHistory.value.map((e) => e.loss),
+      borderColor: "#ef4444",
+      backgroundColor: "rgba(239, 68, 68, 0.1)",
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+    },
+    {
+      label: "Loss (validation)",
+      data: epochHistory.value.map((e) => e.val_loss),
+      borderColor: "#f97316",
+      backgroundColor: "rgba(249, 115, 22, 0.1)",
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      borderDash: [5, 5],
+    },
+  ],
+}));
+
+const accuracyChartData = computed(() => ({
+  labels: epochLabels.value,
+  datasets: [
+    {
+      label: "Accuracy (train)",
+      data: epochHistory.value.map((e) => e.accuracy),
+      borderColor: "#22c55e",
+      backgroundColor: "rgba(34, 197, 94, 0.1)",
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+    },
+    {
+      label: "Accuracy (validation)",
+      data: epochHistory.value.map((e) => e.val_accuracy),
+      borderColor: "#3b82f6",
+      backgroundColor: "rgba(59, 130, 246, 0.1)",
+      fill: true,
+      tension: 0.3,
+      pointRadius: 3,
+      borderDash: [5, 5],
+    },
+  ],
+}));
+
+const LABEL_COLORS = [
+  "#7c3aed", "#5865f2", "#22c55e", "#f97316", "#ef4444",
+  "#06b6d4", "#ec4899", "#eab308", "#8b5cf6", "#14b8a6",
+];
+
+const datasetChartData = computed(() => {
+  const ds = activeDataset.value;
+  if (!ds) return { labels: [], datasets: [] };
+  const labels = Object.keys(ds.label_distribution);
+  const data = Object.values(ds.label_distribution);
+  return {
+    labels,
+    datasets: [
+      {
+        data,
+        backgroundColor: labels.map((_, i) => LABEL_COLORS[i % LABEL_COLORS.length]),
+        borderWidth: 0,
+      },
+    ],
+  };
+});
+
+const hasEpochData = computed(() => epochHistory.value.length > 0);
 
 function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} o`;
@@ -109,235 +270,297 @@ onMounted(fetchDatasets);
       </button>
     </div>
 
-    <!-- Description du modele -->
-    <section class="model-info">
-      <template v-if="activeTab === 'text-sentiment'">
-        <h2>DistilBERT — Sentiment / Toxicite</h2>
-        <p>
-          Fine-tuning d'un modele DistilBERT pour detecter la colere, les menaces,
-          le harcelement et le spam dans les messages Discord. Utilise par
-          <strong>automod-bot</strong> pour la moderation automatique du texte.
-        </p>
-        <div class="model-tags">
-          <span class="tag">NLP</span>
-          <span class="tag">DistilBERT</span>
-          <span class="tag">Classification multi-label</span>
-          <span class="tag">ONNX</span>
-        </div>
-      </template>
-      <template v-else>
-        <h2>EfficientNetV2 — NSFW / Contenu illicite</h2>
-        <p>
-          Fine-tuning d'un modele EfficientNetV2 pour detecter les images NSFW et
-          les contenus illicites postes sur Discord. Utilise par
-          <strong>image-bot</strong> pour la moderation automatique des images.
-        </p>
-        <div class="model-tags">
-          <span class="tag">Vision</span>
-          <span class="tag">EfficientNetV2</span>
-          <span class="tag">Classification binaire</span>
-          <span class="tag">ONNX</span>
-        </div>
-      </template>
-    </section>
-
-    <!-- Dataset -->
-    <section class="section-card">
-      <div class="section-header">
-        <h3>Dataset</h3>
-        <button class="btn btn-secondary" @click="handleUpload" :disabled="status.running">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-            <polyline points="17 8 12 3 7 8" />
-            <line x1="12" y1="3" x2="12" y2="15" />
-          </svg>
-          Importer un dataset
-        </button>
-      </div>
-
-      <div v-if="loading" class="loading-text">Chargement...</div>
-
-      <div v-else-if="!activeDataset" class="empty-state">
-        <p>Aucun dataset importe pour ce modele.</p>
-        <p class="hint">
+    <!-- Layout 2 colonnes -->
+    <div class="page-layout">
+      <!-- Colonne gauche : controles -->
+      <div class="col-main">
+        <!-- Description du modele -->
+        <section class="model-info">
           <template v-if="activeTab === 'text-sentiment'">
-            Format attendu : CSV ou JSON avec colonnes <code>text</code> et <code>label</code>
-            (anger, threat, harassment, spam, safe)
+            <h2>DistilBERT — Sentiment / Toxicite</h2>
+            <p>
+              Fine-tuning d'un modele DistilBERT pour detecter la colere, les menaces,
+              le harcelement et le spam dans les messages Discord. Utilise par
+              <strong>automod-bot</strong> pour la moderation automatique du texte.
+            </p>
+            <div class="model-tags">
+              <span class="tag">NLP</span>
+              <span class="tag">DistilBERT</span>
+              <span class="tag">Classification multi-label</span>
+              <span class="tag">ONNX</span>
+            </div>
           </template>
           <template v-else>
-            Format attendu : JSON avec chemins d'images et labels
-            (nsfw, illicit, safe)
+            <h2>EfficientNetV2 — NSFW / Contenu illicite</h2>
+            <p>
+              Fine-tuning d'un modele EfficientNetV2 pour detecter les images NSFW et
+              les contenus illicites postes sur Discord. Utilise par
+              <strong>image-bot</strong> pour la moderation automatique des images.
+            </p>
+            <div class="model-tags">
+              <span class="tag">Vision</span>
+              <span class="tag">EfficientNetV2</span>
+              <span class="tag">Classification binaire</span>
+              <span class="tag">ONNX</span>
+            </div>
           </template>
-        </p>
-      </div>
+        </section>
 
-      <div v-else class="dataset-stats">
-        <div class="stat-card">
-          <span class="stat-value">{{ activeDataset.total_samples.toLocaleString() }}</span>
-          <span class="stat-label">Echantillons</span>
-        </div>
-        <div
-          v-for="(count, label) in activeDataset.label_distribution"
-          :key="label"
-          class="stat-card"
-        >
-          <span class="stat-value">{{ count.toLocaleString() }}</span>
-          <span class="stat-label">{{ label }}</span>
-        </div>
-        <div v-if="activeDataset.last_updated" class="stat-card">
-          <span class="stat-value stat-date">{{ activeDataset.last_updated }}</span>
-          <span class="stat-label">Derniere mise a jour</span>
-        </div>
-      </div>
-    </section>
+        <!-- Dataset -->
+        <section class="section-card">
+          <div class="section-header">
+            <h3>Dataset</h3>
+            <button class="btn btn-secondary" @click="handleUpload" :disabled="status.running">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Importer un dataset
+            </button>
+          </div>
 
-    <!-- Parametres d'entrainement -->
-    <section class="section-card">
-      <h3>Parametres d'entrainement</h3>
-      <div class="params-grid">
-        <div class="param">
-          <label>Epochs</label>
-          <input type="number" v-model.number="epochs" min="1" max="100" :disabled="status.running" />
-        </div>
-        <div class="param">
-          <label>Batch size</label>
-          <input type="number" v-model.number="batchSize" min="1" max="256" :disabled="status.running" />
-        </div>
-        <div class="param">
-          <label>Learning rate</label>
-          <input
-            type="number"
-            v-model.number="learningRate"
-            min="0.00001"
-            max="0.1"
-            step="0.0001"
-            :disabled="status.running"
-          />
-        </div>
-        <div class="param">
-          <label>Validation split</label>
-          <input
-            type="number"
-            v-model.number="validationSplit"
-            min="0.05"
-            max="0.5"
-            step="0.05"
-            :disabled="status.running"
-          />
-        </div>
-      </div>
-    </section>
+          <div v-if="loading" class="loading-text">Chargement...</div>
 
-    <!-- Entrainement -->
-    <section class="section-card">
-      <div class="section-header">
-        <h3>Entrainement</h3>
-        <div class="actions">
-          <button
-            v-if="!status.running"
-            class="btn btn-primary"
-            :disabled="!canStartTraining"
-            @click="handleStartTraining"
+          <div v-else-if="!activeDataset" class="empty-state">
+            <p>Aucun dataset importe pour ce modele.</p>
+            <p class="hint">
+              <template v-if="activeTab === 'text-sentiment'">
+                Format attendu : CSV ou JSON avec colonnes <code>text</code> et <code>label</code>
+                (anger, threat, harassment, spam, safe)
+              </template>
+              <template v-else>
+                Format attendu : JSON avec chemins d'images et labels
+                (nsfw, illicit, safe)
+              </template>
+            </p>
+          </div>
+
+          <div v-else class="dataset-stats">
+            <div class="stat-card">
+              <span class="stat-value">{{ activeDataset.total_samples.toLocaleString() }}</span>
+              <span class="stat-label">Echantillons</span>
+            </div>
+            <div
+              v-for="(count, label) in activeDataset.label_distribution"
+              :key="label"
+              class="stat-card"
+            >
+              <span class="stat-value">{{ count.toLocaleString() }}</span>
+              <span class="stat-label">{{ label }}</span>
+            </div>
+            <div v-if="activeDataset.last_updated" class="stat-card">
+              <span class="stat-value stat-date">{{ activeDataset.last_updated }}</span>
+              <span class="stat-label">Derniere mise a jour</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Parametres d'entrainement -->
+        <section class="section-card">
+          <h3>Parametres d'entrainement</h3>
+          <div class="params-grid">
+            <div class="param">
+              <label>Epochs</label>
+              <input type="number" v-model.number="epochs" min="1" max="100" :disabled="status.running" />
+            </div>
+            <div class="param">
+              <label>Batch size</label>
+              <input type="number" v-model.number="batchSize" min="1" max="256" :disabled="status.running" />
+            </div>
+            <div class="param">
+              <label>Learning rate</label>
+              <input
+                type="number"
+                v-model.number="learningRate"
+                min="0.00001"
+                max="0.1"
+                step="0.0001"
+                :disabled="status.running"
+              />
+            </div>
+            <div class="param">
+              <label>Validation split</label>
+              <input
+                type="number"
+                v-model.number="validationSplit"
+                min="0.05"
+                max="0.5"
+                step="0.05"
+                :disabled="status.running"
+              />
+            </div>
+          </div>
+        </section>
+
+        <!-- Entrainement -->
+        <section class="section-card">
+          <div class="section-header">
+            <h3>Entrainement</h3>
+            <div class="actions">
+              <button
+                v-if="!status.running"
+                class="btn btn-primary"
+                :disabled="!canStartTraining || stopping"
+                @click="handleStartTraining"
+              >
+                {{ stopping ? "Arret en cours..." : "Lancer l'entrainement" }}
+              </button>
+              <button
+                v-else
+                class="btn btn-danger"
+                :disabled="stopping"
+                @click="stopTraining"
+              >
+                {{ stopping ? "Arret en cours..." : "Arreter" }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Progression -->
+          <div v-if="isTrainingThisModel" class="training-progress">
+            <!-- Progression globale -->
+            <div class="progress-header">
+              <span class="phase">{{ status.phase }}</span>
+              <span class="epoch-count">
+                Epoch {{ status.current_epoch }} / {{ status.total_epochs }}
+              </span>
+            </div>
+            <div class="progress-bar-container">
+              <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
+            </div>
+
+            <!-- Progression batch intra-epoch -->
+            <div v-if="status.total_batches > 0" class="batch-progress">
+              <div class="batch-header">
+                <span class="batch-label">Batch {{ status.current_batch }} / {{ status.total_batches }}</span>
+                <span class="batch-percent">{{ batchPercent }}%</span>
+              </div>
+              <div class="progress-bar-container progress-bar-sm">
+                <div class="progress-bar progress-bar-batch" :style="{ width: batchPercent + '%' }"></div>
+              </div>
+            </div>
+
+            <!-- Metriques live (batch en cours) -->
+            <div class="metrics-grid">
+              <div class="metric">
+                <span class="metric-label">Loss (live)</span>
+                <span class="metric-value">{{ status.batch_loss.toFixed(4) }}</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Accuracy (live)</span>
+                <span class="metric-value">{{ (status.batch_accuracy * 100).toFixed(1) }}%</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Val Loss</span>
+                <span class="metric-value">{{ status.val_loss.toFixed(4) }}</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Val Accuracy</span>
+                <span class="metric-value">{{ (status.val_accuracy * 100).toFixed(1) }}%</span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            v-else-if="status.phase === 'termine' && status.model_type === activeTab"
+            class="training-complete"
           >
-            Lancer l'entrainement
-          </button>
-          <button v-else class="btn btn-danger" @click="stopTraining">
-            Arreter
-          </button>
-        </div>
-      </div>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="check-icon">
+              <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <div>
+              <strong>Entrainement termine</strong>
+              <p>
+                Accuracy finale : {{ (status.val_accuracy * 100).toFixed(1) }}% —
+                Loss : {{ status.val_loss.toFixed(4) }}
+              </p>
+            </div>
+          </div>
 
-      <!-- Progression -->
-      <div v-if="isTrainingThisModel" class="training-progress">
-        <div class="progress-header">
-          <span class="phase">{{ status.phase }}</span>
-          <span class="epoch-count">
-            Epoch {{ status.current_epoch }} / {{ status.total_epochs }}
-          </span>
-        </div>
-        <div class="progress-bar-container">
-          <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
-        </div>
-        <div class="metrics-grid">
-          <div class="metric">
-            <span class="metric-label">Loss</span>
-            <span class="metric-value">{{ status.loss.toFixed(4) }}</span>
+          <div v-else class="idle-state">
+            <p v-if="!canStartTraining && !activeDataset">
+              Importez un dataset pour commencer l'entrainement.
+            </p>
+            <p v-else-if="status.running">
+              Un entrainement est deja en cours sur un autre modele.
+            </p>
+            <p v-else>Pret a lancer l'entrainement.</p>
           </div>
-          <div class="metric">
-            <span class="metric-label">Accuracy</span>
-            <span class="metric-value">{{ (status.accuracy * 100).toFixed(1) }}%</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Val Loss</span>
-            <span class="metric-value">{{ status.val_loss.toFixed(4) }}</span>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Val Accuracy</span>
-            <span class="metric-value">{{ (status.val_accuracy * 100).toFixed(1) }}%</span>
-          </div>
-        </div>
-      </div>
+        </section>
 
-      <div
-        v-else-if="status.phase === 'completed' && status.model_type === activeTab"
-        class="training-complete"
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="check-icon">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-          <polyline points="22 4 12 14.01 9 11.01" />
-        </svg>
-        <div>
-          <strong>Entrainement termine</strong>
-          <p>
-            Accuracy finale : {{ (status.val_accuracy * 100).toFixed(1) }}% —
-            Loss : {{ status.val_loss.toFixed(4) }}
+        <!-- Export ONNX -->
+        <section class="section-card">
+          <div class="section-header">
+            <h3>Export ONNX</h3>
+            <button
+              class="btn btn-primary"
+              :disabled="exporting || status.running"
+              @click="handleExport"
+            >
+              {{ exporting ? "Export en cours..." : "Exporter en ONNX" }}
+            </button>
+          </div>
+          <p class="description">
+            Convertit le modele entraine au format ONNX pour une inference optimisee en Rust
+            via <code>ort</code> (ONNX Runtime). Le fichier sera place dans le repertoire
+            de modeles de l'API.
           </p>
-        </div>
+
+          <div v-if="exportResult" class="export-result">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="check-icon">
+              <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
+              <polyline points="22 4 12 14.01 9 11.01" />
+            </svg>
+            <div>
+              <strong>Export reussi</strong>
+              <p class="export-details">
+                {{ exportResult.file_path }}
+                <span class="file-size">({{ formatSize(exportResult.file_size_bytes) }})</span>
+              </p>
+            </div>
+          </div>
+        </section>
       </div>
 
-      <div v-else class="idle-state">
-        <p v-if="!canStartTraining && !activeDataset">
-          Importez un dataset pour commencer l'entrainement.
-        </p>
-        <p v-else-if="status.running">
-          Un entrainement est deja en cours sur un autre modele.
-        </p>
-        <p v-else>Pret a lancer l'entrainement.</p>
-      </div>
-    </section>
+      <!-- Colonne droite : graphiques (sticky) -->
+      <div class="col-charts">
+        <!-- Distribution du dataset -->
+        <section v-if="activeDataset && Object.keys(activeDataset.label_distribution).length > 0" class="section-card">
+          <h3>Distribution des labels</h3>
+          <div class="chart-center">
+            <div class="doughnut-wrapper">
+              <Doughnut :data="datasetChartData" :options="doughnutOptions" />
+            </div>
+          </div>
+        </section>
 
-    <!-- Export ONNX -->
-    <section class="section-card">
-      <div class="section-header">
-        <h3>Export ONNX</h3>
-        <button
-          class="btn btn-primary"
-          :disabled="exporting || status.running"
-          @click="handleExport"
-        >
-          {{ exporting ? "Export en cours..." : "Exporter en ONNX" }}
-        </button>
-      </div>
-      <p class="description">
-        Convertit le modele entraine au format ONNX pour une inference optimisee en Rust
-        via <code>ort</code> (ONNX Runtime). Le fichier sera place dans le repertoire
-        de modeles de l'API.
-      </p>
+        <!-- Courbe Loss -->
+        <section v-if="hasEpochData" class="section-card">
+          <h3>Loss</h3>
+          <div class="chart-wrapper">
+            <Line :data="lossChartData" :options="lineChartOptions" />
+          </div>
+        </section>
 
-      <div v-if="exportResult" class="export-result">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="check-icon">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14" />
-          <polyline points="22 4 12 14.01 9 11.01" />
-        </svg>
-        <div>
-          <strong>Export reussi</strong>
-          <p class="export-details">
-            {{ exportResult.file_path }}
-            <span class="file-size">({{ formatSize(exportResult.file_size_bytes) }})</span>
-          </p>
-        </div>
+        <!-- Courbe Accuracy -->
+        <section v-if="hasEpochData" class="section-card">
+          <h3>Accuracy</h3>
+          <div class="chart-wrapper">
+            <Line :data="accuracyChartData" :options="accuracyChartOptions" />
+          </div>
+        </section>
+
+        <!-- Etat vide quand pas de graphiques -->
+        <section v-if="!hasEpochData && !(activeDataset && Object.keys(activeDataset.label_distribution).length > 0)" class="section-card charts-empty">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="empty-icon">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+          </svg>
+          <p>Les graphiques apparaitront ici une fois un dataset charge ou un entrainement lance.</p>
+        </section>
       </div>
-    </section>
+    </div>
 
     <div v-if="error" class="error-banner">{{ error }}</div>
   </div>
@@ -346,7 +569,25 @@ onMounted(fetchDatasets);
 <style scoped>
 .ai-training-page {
   padding: 2rem;
-  max-width: 900px;
+}
+
+.page-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+.col-main {
+  min-width: 0;
+}
+
+.col-charts {
+  position: sticky;
+  top: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .subtitle {
@@ -586,6 +827,37 @@ onMounted(fetchDatasets);
   transition: width 0.3s ease;
 }
 
+.progress-bar-sm {
+  height: 6px;
+}
+
+.progress-bar-batch {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+}
+
+.batch-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.batch-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.batch-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #888);
+}
+
+.batch-percent {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
 .metrics-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -676,6 +948,45 @@ onMounted(fetchDatasets);
 .file-size {
   color: var(--text-secondary, #888);
   margin-left: 4px;
+}
+
+/* Graphiques colonne droite */
+.chart-wrapper {
+  position: relative;
+  height: 200px;
+}
+
+.chart-center {
+  display: flex;
+  justify-content: center;
+}
+
+.doughnut-wrapper {
+  position: relative;
+  width: 100%;
+  height: 260px;
+}
+
+.charts-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  color: var(--text-secondary, #888);
+}
+
+.charts-empty p {
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.empty-icon {
+  width: 40px;
+  height: 40px;
+  opacity: 0.3;
 }
 
 /* Boutons */

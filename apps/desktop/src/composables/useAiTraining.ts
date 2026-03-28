@@ -21,6 +21,11 @@ export interface TrainingStatus {
   val_loss: number;
   val_accuracy: number;
   phase: string;
+  epoch_history: EpochRecord[];
+  current_batch: number;
+  total_batches: number;
+  batch_loss: number;
+  batch_accuracy: number;
 }
 
 export interface DatasetInfo {
@@ -28,6 +33,14 @@ export interface DatasetInfo {
   total_samples: number;
   label_distribution: Record<string, number>;
   last_updated: string | null;
+}
+
+export interface EpochRecord {
+  epoch: number;
+  loss: number;
+  accuracy: number;
+  val_loss: number;
+  val_accuracy: number;
 }
 
 export interface OnnxExportResult {
@@ -47,13 +60,22 @@ export function useAiTraining() {
     val_loss: 0,
     val_accuracy: 0,
     phase: "idle",
+    epoch_history: [],
+    current_batch: 0,
+    total_batches: 0,
+    batch_loss: 0,
+    batch_accuracy: 0,
   });
   const datasets = ref<DatasetInfo[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
+  const epochHistory = ref<EpochRecord[]>([]);
+  const stopping = ref(false);
   const exporting = ref(false);
   const exportResult = ref<OnnxExportResult | null>(null);
   let pollTimer: ReturnType<typeof setInterval> | null = null;
+  let pollCount = 0;
+  let hasSeenRunning = false;
 
   async function fetchDatasets() {
     loading.value = true;
@@ -80,6 +102,7 @@ export function useAiTraining() {
   async function startTraining(config: TrainingConfig) {
     error.value = null;
     exportResult.value = null;
+    epochHistory.value = [];
     try {
       await invoke("ai_start_training", {
         modelType: config.model_type,
@@ -96,9 +119,25 @@ export function useAiTraining() {
 
   async function pollStatus() {
     try {
-      status.value = await invoke<TrainingStatus>("ai_training_status");
-      if (!status.value.running && pollTimer) {
+      pollCount++;
+      const result = await invoke<TrainingStatus>("ai_training_status");
+      status.value = result;
+
+      if (result.epoch_history && result.epoch_history.length > 0) {
+        epochHistory.value = result.epoch_history;
+      }
+
+      if (result.running) {
+        hasSeenRunning = true;
+      }
+
+      // Ne stopper que si le backend a deja signale running=true au moins une fois,
+      // ou apres 10 polls sans reponse positive (timeout 10s)
+      if (!result.running && pollTimer && (hasSeenRunning || pollCount > 10)) {
         stopPolling();
+        if (hasSeenRunning) {
+          status.value.phase = "termine";
+        }
       }
     } catch {
       // silently ignore poll errors
@@ -107,8 +146,11 @@ export function useAiTraining() {
 
   function startPolling() {
     stopPolling();
+    pollCount = 0;
+    hasSeenRunning = false;
     status.value.running = true;
-    pollTimer = setInterval(pollStatus, 1000);
+    status.value.phase = "demarrage";
+    pollTimer = setInterval(pollStatus, 1500);
   }
 
   function stopPolling() {
@@ -119,13 +161,16 @@ export function useAiTraining() {
   }
 
   async function stopTraining() {
+    stopping.value = true;
     try {
       await invoke("ai_stop_training");
       stopPolling();
       status.value.running = false;
-      status.value.phase = "stopped";
+      status.value.phase = "arrete";
     } catch (e) {
       error.value = String(e);
+    } finally {
+      stopping.value = false;
     }
   }
 
@@ -145,8 +190,10 @@ export function useAiTraining() {
   return {
     status,
     datasets,
+    epochHistory,
     loading,
     error,
+    stopping,
     exporting,
     exportResult,
     fetchDatasets,

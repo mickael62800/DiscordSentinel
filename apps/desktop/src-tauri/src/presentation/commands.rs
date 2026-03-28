@@ -545,3 +545,80 @@ pub async fn get_full_analytics(
 ) -> Result<FullAnalytics, String> {
     service.get_full_analytics(guild_id, days).await
 }
+
+// ── AI Training (proxy vers Python API) ──
+
+fn ai_api_url() -> String {
+    std::env::var("AI_API_URL").unwrap_or_else(|_| "http://localhost:8000".into())
+}
+
+#[tauri::command]
+pub async fn ai_get_datasets() -> Result<serde_json::Value, String> {
+    let resp = reqwest::Client::new()
+        .get(format!("{}/api/ai/datasets", ai_api_url()))
+        .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
+}
+
+#[tauri::command]
+pub async fn ai_upload_dataset(model_type: String, file_path: String) -> Result<serde_json::Value, String> {
+    let file_bytes = std::fs::read(&file_path).map_err(|e| format!("Lecture fichier: {e}"))?;
+    let file_name = std::path::Path::new(&file_path)
+        .file_name()
+        .map(|n| n.to_string_lossy().to_string())
+        .unwrap_or_else(|| "dataset".into());
+
+    let part = reqwest::multipart::Part::bytes(file_bytes).file_name(file_name);
+    let form = reqwest::multipart::Form::new().part("file", part);
+
+    let resp = reqwest::Client::new()
+        .post(format!("{}/api/ai/datasets/{}/upload", ai_api_url(), model_type))
+        .multipart(form)
+        .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
+}
+
+#[tauri::command]
+pub async fn ai_start_training(
+    model_type: String,
+    epochs: u32,
+    batch_size: u32,
+    learning_rate: f64,
+    validation_split: f64,
+) -> Result<serde_json::Value, String> {
+    let resp = reqwest::Client::new()
+        .post(format!("{}/api/ai/training/start", ai_api_url()))
+        .json(&serde_json::json!({
+            "model_type": model_type,
+            "epochs": epochs,
+            "batch_size": batch_size,
+            "learning_rate": learning_rate,
+            "validation_split": validation_split,
+        }))
+        .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
+}
+
+#[tauri::command]
+pub async fn ai_training_status() -> Result<serde_json::Value, String> {
+    let resp = reqwest::Client::new()
+        .get(format!("{}/api/ai/training/status", ai_api_url()))
+        .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
+}
+
+#[tauri::command]
+pub async fn ai_stop_training() -> Result<serde_json::Value, String> {
+    let resp = reqwest::Client::new()
+        .post(format!("{}/api/ai/training/stop", ai_api_url()))
+        .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
+}
+
+#[tauri::command]
+pub async fn ai_export_onnx(model_type: String) -> Result<serde_json::Value, String> {
+    let resp = reqwest::Client::new()
+        .post(format!("{}/api/ai/export/{}", ai_api_url(), model_type))
+        .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
+}
