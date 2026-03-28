@@ -63,6 +63,20 @@ impl ApiClient {
         if self.api_key.is_empty() { req } else { req.bearer_auth(&self.api_key) }
     }
 
+    pub fn send_log(&self, level: &str, server: &str, message: &str) {
+        #[derive(Serialize)]
+        struct LogPayload { level: String, bot: String, server: String, message: String, category: String }
+        let req = self.auth(self.client.post(format!("{}/api/logs", self.base_url))
+            .json(&LogPayload {
+                level: level.to_string(),
+                bot: "roles-bot".to_string(),
+                server: server.to_string(),
+                message: message.to_string(),
+                category: "bot".to_string(),
+            }));
+        tokio::spawn(async move { let _ = req.send().await; });
+    }
+
     pub async fn heartbeat(&self, bot_name: &str) {
         #[derive(Serialize)]
         struct P { bot_name: String }

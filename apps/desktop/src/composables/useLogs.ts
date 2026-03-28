@@ -3,42 +3,58 @@ import { invoke } from "@tauri-apps/api/core";
 import type { LogEntry } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
 
-export function useLogs() {
+export function useLogs(categoryFilter?: string) {
   const logs = ref<LogEntry[]>([]);
   const loading = ref(true);
   const filterLevel = ref("all");
   const filterBot = ref("all");
+  const dateFrom = ref("");
+  const dateTo = ref("");
+  const search = ref("");
   const { guildIdFilter } = useGuildSelector();
 
+  // Les logs discord sont filtres par guild, les logs bot/worker/api sont globaux
+  const isGuildScoped = !categoryFilter || categoryFilter === "discord";
+
+  const categoryLogs = computed(() => {
+    if (!categoryFilter) return logs.value;
+    return logs.value.filter((l) => l.category === categoryFilter);
+  });
+
   const filteredLogs = computed(() => {
-    return logs.value.filter((log) => {
+    return categoryLogs.value.filter((log) => {
+      if (search.value) {
+        const q = search.value.toLowerCase();
+        const match = [log.message, log.bot, log.level, log.server, log.timestamp]
+          .some((field) => field?.toLowerCase().includes(q));
+        if (!match) return false;
+      }
       if (filterLevel.value !== "all" && log.level !== filterLevel.value) return false;
       if (filterBot.value !== "all" && log.bot !== filterBot.value) return false;
+      if (dateFrom.value) {
+        const from = new Date(dateFrom.value).getTime();
+        const logDate = new Date(log.timestamp).getTime();
+        if (logDate < from) return false;
+      }
+      if (dateTo.value) {
+        const to = new Date(dateTo.value + "T23:59:59").getTime();
+        const logDate = new Date(log.timestamp).getTime();
+        if (logDate > to) return false;
+      }
       return true;
     });
   });
 
-  // Liste statique de tous les bots + ceux présents dans les logs
-  const knownBots = [
-    "automod-bot",
-    "moderation-bot",
-    "security-bot",
-    "stats-bot",
-    "ticket-bot",
-    "image-bot",
-    "voice-bot",
-    "audit-bot",
-    "roles-bot",
-  ];
-  const bots = computed(() => {
-    const fromLogs = logs.value.map((l) => l.bot);
-    return Array.from(new Set([...knownBots, ...fromLogs])).sort();
+  const sources = computed(() => {
+    const fromLogs = categoryLogs.value.map((l) => l.bot).filter(Boolean);
+    return Array.from(new Set(fromLogs)).sort();
   });
 
   async function fetchLogs() {
     loading.value = true;
     try {
-      logs.value = await invoke<LogEntry[]>("get_logs", { guildId: guildIdFilter.value ?? null });
+      const guildId = isGuildScoped ? (guildIdFilter.value ?? null) : null;
+      logs.value = await invoke<LogEntry[]>("get_logs", { guildId });
     } catch (e) {
       console.error("Erreur chargement journaux:", e);
     } finally {
@@ -47,7 +63,19 @@ export function useLogs() {
   }
 
   onMounted(fetchLogs);
-  watch(guildIdFilter, fetchLogs);
+  if (isGuildScoped) {
+    watch(guildIdFilter, fetchLogs);
+  }
 
-  return { logs, filteredLogs, bots, loading, filterLevel, filterBot, fetchLogs };
+  async function clearLogs() {
+    if (!categoryFilter || categoryFilter === "discord") return;
+    try {
+      await invoke("delete_logs_by_category", { category: categoryFilter });
+      await fetchLogs();
+    } catch (e) {
+      console.error("Erreur suppression logs:", e);
+    }
+  }
+
+  return { logs, categoryLogs, filteredLogs, sources, loading, filterLevel, filterBot, dateFrom, dateTo, search, fetchLogs, clearLogs };
 }

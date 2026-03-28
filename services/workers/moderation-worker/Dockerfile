@@ -15,6 +15,6 @@ FROM alpine:3.21
 
 RUN apk add --no-cache ca-certificates
 
-COPY --from=builder /app/target/release/sentinel-worker /usr/local/bin/sentinel-worker
+COPY --from=builder /app/target/release/sentinel-moderation-worker /usr/local/bin/sentinel-moderation-worker
 
-ENTRYPOINT ["sentinel-worker"]
+ENTRYPOINT ["sentinel-moderation-worker"]

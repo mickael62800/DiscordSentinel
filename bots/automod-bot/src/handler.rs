@@ -167,9 +167,9 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Automod bot connecté");
 
-        // Enregistrer les guilds aupres de l'API
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_bot_log("info", "Automod bot demarre");
             for guild_status in &ready.guilds {
                 let guild_id = guild_status.id;
                 if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
@@ -224,7 +224,7 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
                     Action::Warn => "Avertissement",
                     Action::Delete => "Suppression",
                     Action::Mute => "Mute",
-                    Action::Ban => "Ban",
+                    Action::Ban => "Proposition de ban",
                     Action::None => "",
                 };
                 api_client.send_log(
@@ -314,15 +314,13 @@ async fn execute_action(
             }
         }
         Action::Ban => {
-            if let Some(guild_id) = msg.guild_id {
+            if let Some(_guild_id) = msg.guild_id {
                 let _ = msg.channel_id.say(&ctx.http, format!(
-                    "<@{}> Tu as ete banni. Raison : {reason_text}",
+                    "<@{}> Ton comportement a ete signale pour bannissement. Un moderateur examinera la situation.",
                     msg.author.id
                 )).await;
-                guild_id
-                    .ban_with_reason(&ctx.http, msg.author.id, 1, reason_text)
-                    .await?;
-                info!(user = %msg.author.name, "Utilisateur banni");
+                msg.delete(&ctx.http).await?;
+                info!(user = %msg.author.name, "Proposition de ban enregistree (ban non execute)");
             }
         }
     }

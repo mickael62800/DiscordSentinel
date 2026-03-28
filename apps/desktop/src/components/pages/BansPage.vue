@@ -1,24 +1,45 @@
 <script setup lang="ts">
-import { computed } from "vue";
 import { useBans } from "../../composables/useBans";
-import type { SelectOption } from "../../types";
 import AppBadge from "../atoms/AppBadge.vue";
-import AppSelect from "../atoms/AppSelect.vue";
+import type { Infraction, ConfirmedBan } from "../../types";
+import { useFormatDate } from "../../composables/useFormatDate";
 
-const { filteredBans, servers, totalBans, loading, searchQuery, filterServer } = useBans();
+const { formatShortDateTime: fmt } = useFormatDate();
 
-const serverOptions = computed<SelectOption[]>(() => [
-  { value: "all", label: "Tous les serveurs" },
-  ...servers.value.map((s) => ({ value: s, label: s })),
-]);
+const {
+  filteredProposals,
+  filteredConfirmed,
+  totalProposals,
+  totalConfirmed,
+  loading,
+  banning,
+  searchQuery,
+  executeBan,
+  executeUnban,
+} = useBans();
+
+async function handleBan(proposal: Infraction) {
+  if (!confirm(`Bannir ${proposal.username} (${proposal.user_id}) ?\nRaison : ${proposal.reason}`)) return;
+  try {
+    await executeBan(proposal.server, proposal.user_id, proposal.reason);
+  } catch (e) {
+    alert(`Erreur : ${e}`);
+  }
+}
+
+async function handleUnban(ban: ConfirmedBan) {
+  if (!confirm(`Debannir ${ban.target_name} (${ban.target_id}) ?`)) return;
+  try {
+    await executeUnban(ban.guild_id, ban.target_id);
+  } catch (e) {
+    alert(`Erreur : ${e}`);
+  }
+}
 </script>
 
 <template>
   <div class="bans">
-    <div class="bans-header">
-      <h1>Comptes bannis</h1>
-      <span class="ban-count">{{ totalBans }} au total</span>
-    </div>
+    <h1>Comptes bannis</h1>
 
     <div class="filters">
       <input
@@ -27,77 +48,127 @@ const serverOptions = computed<SelectOption[]>(() => [
         placeholder="Rechercher par nom, ID ou raison..."
         class="search-input"
       />
-      <AppSelect v-model="filterServer" :options="serverOptions" />
     </div>
 
     <div v-if="loading" class="loading">Chargement...</div>
 
-    <div v-else class="ban-list">
-      <div v-for="ban in filteredBans" :key="ban.id" class="ban-card">
-        <div class="ban-user">
-          <div class="user-avatar-placeholder">{{ ban.username.charAt(0).toUpperCase() }}</div>
-          <div class="user-info">
-            <span class="username">{{ ban.username }}</span>
-            <span class="user-id">{{ ban.user_id }}</span>
-          </div>
+    <div v-else class="bans-columns">
+      <!-- Colonne gauche : Bannis effectifs -->
+      <div class="bans-column">
+        <div class="column-header">
+          <h2>Bannis</h2>
+          <span class="count-badge">{{ totalConfirmed }}</span>
         </div>
 
-        <div class="ban-details">
-          <div class="detail-row">
-            <span class="detail-label">Serveur</span>
-            <span>{{ ban.server }}</span>
+        <div class="ban-list">
+          <div v-for="ban in filteredConfirmed" :key="ban.id" class="ban-card confirmed">
+            <div class="ban-user">
+              <div class="user-avatar-placeholder confirmed-avatar">{{ ban.target_name.charAt(0).toUpperCase() }}</div>
+              <div class="user-info">
+                <span class="username">{{ ban.target_name }}</span>
+                <span class="user-id">{{ ban.target_id }}</span>
+              </div>
+            </div>
+            <div class="ban-details">
+              <div class="detail-row">
+                <span class="detail-label">Raison</span>
+                <span class="reason">{{ ban.reason }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Banni par</span>
+                <AppBadge :label="ban.moderator_name" variant="info" />
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Type</span>
+                <AppBadge
+                  :label="ban.action_type === 'ban_permanent' ? 'Permanent' : 'Temporaire'"
+                  :variant="ban.action_type === 'ban_permanent' ? 'danger' : 'warning'"
+                />
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Date</span>
+                <span class="mono">{{ fmt(ban.created_at) }}</span>
+              </div>
+            </div>
+            <div class="ban-actions">
+              <button
+                class="unban-btn"
+                :disabled="banning"
+                @click="handleUnban(ban)"
+              >
+                {{ banning ? 'Debannissement...' : 'Debannir' }}
+              </button>
+            </div>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">Raison</span>
-            <span class="reason">{{ ban.reason }}</span>
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Banni par</span>
-            <AppBadge :label="ban.moderator" variant="info" />
-          </div>
-          <div class="detail-row">
-            <span class="detail-label">Date</span>
-            <span class="mono">{{ ban.created_at }}</span>
+
+          <div v-if="filteredConfirmed.length === 0" class="empty">
+            Aucun compte banni{{ searchQuery ? " correspondant" : "" }}
           </div>
         </div>
       </div>
 
-      <div v-if="filteredBans.length === 0" class="empty">
-        Aucun compte banni{{ searchQuery ? " correspondant a votre recherche" : "" }}
+      <!-- Colonne droite : Propositions de ban -->
+      <div class="bans-column">
+        <div class="column-header">
+          <h2>A bannir</h2>
+          <span class="count-badge proposal">{{ totalProposals }}</span>
+        </div>
+
+        <div class="ban-list">
+          <div v-for="proposal in filteredProposals" :key="proposal.id" class="ban-card proposal">
+            <div class="ban-user">
+              <div class="user-avatar-placeholder proposal-avatar">{{ proposal.username.charAt(0).toUpperCase() }}</div>
+              <div class="user-info">
+                <span class="username">{{ proposal.username }}</span>
+                <span class="user-id">{{ proposal.user_id }}</span>
+              </div>
+            </div>
+            <div class="ban-details">
+              <div class="detail-row">
+                <span class="detail-label">Raison</span>
+                <span class="reason">{{ proposal.reason }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Detecte par</span>
+                <AppBadge label="Automod" variant="warning" />
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Date</span>
+                <span class="mono">{{ fmt(proposal.created_at) }}</span>
+              </div>
+            </div>
+            <div class="ban-actions">
+              <button
+                class="ban-btn"
+                :disabled="banning"
+                @click="handleBan(proposal)"
+              >
+                {{ banning ? 'Bannissement...' : 'Bannir' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="filteredProposals.length === 0" class="empty">
+            Aucune proposition{{ searchQuery ? " correspondante" : "" }}
+          </div>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.bans-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.bans h1 {
   margin-bottom: 24px;
 }
 
-.bans-header h1 {
-  margin: 0;
-}
-
-.ban-count {
-  font-size: 13px;
-  color: var(--text-secondary);
-  background-color: var(--bg-card);
-  padding: 4px 10px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-}
-
 .filters {
-  display: flex;
-  gap: 12px;
   margin-bottom: 16px;
 }
 
 .search-input {
-  flex: 1;
+  width: 100%;
+  max-width: 400px;
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -117,6 +188,39 @@ const serverOptions = computed<SelectOption[]>(() => [
   opacity: 0.6;
 }
 
+.bans-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.column-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.column-header h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.count-badge {
+  font-size: 12px;
+  font-weight: 600;
+  background-color: var(--danger);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.count-badge.proposal {
+  background-color: var(--warning, #f59e0b);
+}
+
 .ban-list {
   display: flex;
   flex-direction: column;
@@ -126,33 +230,44 @@ const serverOptions = computed<SelectOption[]>(() => [
 .ban-card {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--danger);
   border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
+  padding: 16px;
+}
+
+.ban-card.confirmed {
+  border-left: 3px solid var(--danger);
+}
+
+.ban-card.proposal {
+  border-left: 3px solid var(--warning, #f59e0b);
 }
 
 .ban-user {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-width: 200px;
+  margin-bottom: 12px;
 }
 
 .user-avatar-placeholder {
-  width: 40px;
-  height: 40px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--danger), #ff6b6b);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
-  font-size: 16px;
+  font-size: 14px;
   color: white;
   flex-shrink: 0;
+}
+
+.confirmed-avatar {
+  background: linear-gradient(135deg, var(--danger), #ff6b6b);
+}
+
+.proposal-avatar {
+  background: linear-gradient(135deg, var(--warning, #f59e0b), #fbbf24);
 }
 
 .user-info {
@@ -177,7 +292,6 @@ const serverOptions = computed<SelectOption[]>(() => [
 }
 
 .ban-details {
-  flex: 1;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -198,6 +312,51 @@ const serverOptions = computed<SelectOption[]>(() => [
 
 .reason {
   color: var(--text-primary);
+}
+
+.ban-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ban-btn {
+  background-color: var(--danger);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.ban-btn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.ban-btn:disabled,
+.unban-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.unban-btn {
+  background-color: transparent;
+  color: var(--accent, #22c55e);
+  border: 1px solid var(--accent, #22c55e);
+  border-radius: 6px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.unban-btn:hover:not(:disabled) {
+  background-color: var(--accent, #22c55e);
+  color: white;
 }
 
 .empty {

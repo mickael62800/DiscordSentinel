@@ -25,6 +25,12 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, guilds = ready.guilds.len(), "Roles bot connecte");
+        {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                api.send_log("info", "", "Roles bot demarre");
+            }
+        }
 
         // Enregistrer les commandes
         for guild_status in &ready.guilds {

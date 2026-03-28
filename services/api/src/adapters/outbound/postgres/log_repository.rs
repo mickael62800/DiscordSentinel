@@ -24,6 +24,8 @@ struct LogRow {
     bot: String,
     server: String,
     message: String,
+    category: String,
+    details: serde_json::Value,
 }
 
 impl From<LogRow> for LogEntry {
@@ -35,6 +37,8 @@ impl From<LogRow> for LogEntry {
             bot: row.bot,
             server: row.server,
             message: row.message,
+            category: row.category,
+            details: row.details,
         }
     }
 }
@@ -44,8 +48,8 @@ impl LogRepository for PgLogRepository {
     async fn save(&self, entry: &LogEntry) -> Result<(), DomainError> {
         sqlx::query(
             r#"
-            INSERT INTO logs (id, timestamp, level, bot, server, message)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO logs (id, timestamp, level, bot, server, message, category, details)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             "#,
         )
         .bind(entry.id)
@@ -54,6 +58,8 @@ impl LogRepository for PgLogRepository {
         .bind(&entry.bot)
         .bind(&entry.server)
         .bind(&entry.message)
+        .bind(&entry.category)
+        .bind(&entry.details)
         .execute(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
@@ -63,7 +69,7 @@ impl LogRepository for PgLogRepository {
 
     async fn find_all(&self, limit: i64) -> Result<Vec<LogEntry>, DomainError> {
         let rows = sqlx::query_as::<_, LogRow>(
-            "SELECT id, timestamp, level, bot, server, message FROM logs ORDER BY timestamp DESC LIMIT $1",
+            "SELECT id, timestamp, level, bot, server, message, category, details FROM logs ORDER BY timestamp DESC LIMIT $1",
         )
         .bind(limit)
         .fetch_all(&self.pool)
@@ -71,5 +77,14 @@ impl LogRepository for PgLogRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         Ok(rows.into_iter().map(LogEntry::from).collect())
+    }
+
+    async fn delete_by_category(&self, category: &str) -> Result<u64, DomainError> {
+        let result = sqlx::query("DELETE FROM logs WHERE category = $1")
+            .bind(category)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(result.rows_affected())
     }
 }

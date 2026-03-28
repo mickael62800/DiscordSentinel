@@ -3,6 +3,9 @@ import { computed } from "vue";
 import { useWatchedUsers } from "../../composables/useWatchedUsers";
 import AppBadge from "../atoms/AppBadge.vue";
 import DataTable from "../organisms/DataTable.vue";
+import { useFormatDate } from "../../composables/useFormatDate";
+
+const { formatShortDateTime: fmt } = useFormatDate();
 import type { TableColumn, WatchedUser } from "../../types";
 import { actionVariant, severityVariant } from "../../utils/variants";
 
@@ -21,10 +24,9 @@ const filteredUsers = computed(() => {
   let list = users.value;
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
-    list = list.filter(
-      (u) =>
-        u.username.toLowerCase().includes(q) ||
-        u.user_id.includes(q),
+    list = list.filter((u) =>
+      [u.username, u.user_id, u.reason, u.risk_level, u.guild_id]
+        .some((field) => field?.toLowerCase().includes(q)),
     );
   }
   if (riskFilter.value) {
@@ -203,7 +205,7 @@ const dossierConductColumns: TableColumn[] = [
                 <AppBadge :label="String(value)" :variant="actionVariant(String(value))" />
               </template>
               <template #cell-created_at="{ value }">
-                <span class="mono">{{ value }}</span>
+                <span class="mono">{{ fmt(String(value)) }}</span>
               </template>
             </DataTable>
           </section>
@@ -230,7 +232,7 @@ const dossierConductColumns: TableColumn[] = [
                 <AppBadge :label="evt.severity" :variant="severityVariant(evt.severity)" />
                 <span class="event-type">{{ evt.event_type.replace("_", " ") }}</span>
                 <span class="event-desc">{{ evt.description }}</span>
-                <span class="mono event-date">{{ evt.created_at }}</span>
+                <span class="mono event-date">{{ fmt(evt.created_at) }}</span>
               </div>
             </div>
           </section>
@@ -249,7 +251,7 @@ const dossierConductColumns: TableColumn[] = [
                 </span>
               </template>
               <template #cell-created_at="{ value }">
-                <span class="mono">{{ value }}</span>
+                <span class="mono">{{ fmt(String(value)) }}</span>
               </template>
             </DataTable>
           </section>

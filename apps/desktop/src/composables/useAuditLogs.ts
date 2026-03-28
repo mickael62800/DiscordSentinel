@@ -19,12 +19,9 @@ export function useAuditLogs() {
     }
     if (searchQuery.value) {
       const q = searchQuery.value.toLowerCase();
-      list = list.filter(
-        (l) =>
-          (l.actor_name?.toLowerCase().includes(q) ?? false) ||
-          (l.target_name?.toLowerCase().includes(q) ?? false) ||
-          (l.channel_name?.toLowerCase().includes(q) ?? false) ||
-          l.event_type.toLowerCase().includes(q),
+      list = list.filter((l) =>
+        [l.actor_name, l.actor_id, l.target_name, l.target_id, l.channel_name, l.channel_id, l.event_type, l.created_at, JSON.stringify(l.details)]
+          .some((field) => field?.toLowerCase().includes(q)),
       );
     }
     return list;

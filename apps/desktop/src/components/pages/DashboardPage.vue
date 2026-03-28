@@ -31,8 +31,8 @@ ChartJS.register(
   Filler,
 );
 
-const { stats, loading: statsLoading } = useDashboard();
-const { activity, loading: chartsLoading, days } = useDashboardCharts();
+const { stats, loading: statsLoading, error: statsError } = useDashboard();
+const { activity, topUsers, loading: chartsLoading, error: chartsError, days } = useDashboardCharts();
 
 const chartOptions = {
   responsive: true,
@@ -76,19 +76,33 @@ const messagesChartData = computed(() => ({
   ],
 }));
 
-const voiceChartData = computed(() => ({
-  labels: labels.value,
-  datasets: [
-    {
-      label: "Minutes vocales",
-      data: activity.value.map((a) => a.voice_minutes),
-      borderColor: "#57f287",
-      backgroundColor: "rgba(87, 242, 135, 0.15)",
-      fill: true,
-      tension: 0.3,
-    },
-  ],
-}));
+const voiceChartData = computed(() => {
+  let cumul = 0;
+  const cumulData = activity.value.map((a) => {
+    cumul += Math.round(a.voice_minutes / 60 * 10) / 10;
+    return cumul;
+  });
+  return {
+    labels: labels.value,
+    datasets: [
+      {
+        label: "Heures vocales (cumule)",
+        data: cumulData,
+        borderColor: "#57f287",
+        backgroundColor: "rgba(87, 242, 135, 0.15)",
+        fill: true,
+        tension: 0.3,
+      },
+      {
+        label: "Heures / jour",
+        data: activity.value.map((a) => Math.round(a.voice_minutes / 60 * 10) / 10),
+        borderColor: "#2ecc71",
+        backgroundColor: "rgba(46, 204, 113, 0.4)",
+        type: "bar" as const,
+      },
+    ],
+  };
+});
 
 const infractionsChartData = computed(() => ({
   labels: labels.value,
@@ -140,6 +154,126 @@ const doughnutOptions = {
   },
 };
 
+const memberGrowthData = computed(() => ({
+  labels: labels.value,
+  datasets: [
+    {
+      label: "Arrivees",
+      data: activity.value.map((a) => a.new_members),
+      borderColor: "#57f287",
+      backgroundColor: "rgba(87, 242, 135, 0.15)",
+      fill: true,
+      tension: 0.3,
+    },
+    {
+      label: "Departs",
+      data: activity.value.map((a) => a.leaves),
+      borderColor: "#ed4245",
+      backgroundColor: "rgba(237, 66, 69, 0.15)",
+      fill: true,
+      tension: 0.3,
+    },
+  ],
+}));
+
+const netGrowthData = computed(() => {
+  let cumul = 0;
+  const data = activity.value.map((a) => {
+    cumul += a.new_members - a.leaves;
+    return cumul;
+  });
+  return {
+    labels: labels.value,
+    datasets: [
+      {
+        label: "Croissance nette (cumul)",
+        data,
+        borderColor: "#5865f2",
+        backgroundColor: (ctx: { raw: number }) =>
+          ctx.raw >= 0 ? "rgba(87, 242, 135, 0.3)" : "rgba(237, 66, 69, 0.3)",
+        fill: true,
+        tension: 0.3,
+      },
+    ],
+  };
+});
+
+const engagementData = computed(() => ({
+  labels: labels.value,
+  datasets: [
+    {
+      label: "Messages / membre actif",
+      data: activity.value.map((a) =>
+        a.active_members > 0 ? Math.round((a.messages / a.active_members) * 10) / 10 : 0,
+      ),
+      borderColor: "#e67e22",
+      backgroundColor: "rgba(230, 126, 34, 0.15)",
+      fill: true,
+      tension: 0.3,
+    },
+  ],
+}));
+
+const serverHealthData = computed(() => ({
+  labels: labels.value,
+  datasets: [
+    {
+      label: "Infractions pour 100 messages",
+      data: activity.value.map((a) =>
+        a.messages > 0 ? Math.round((a.infractions / a.messages) * 10000) / 100 : 0,
+      ),
+      borderColor: "#e74c3c",
+      backgroundColor: "rgba(231, 76, 60, 0.15)",
+      fill: true,
+      tension: 0.3,
+    },
+  ],
+}));
+
+const topMessagesData = computed(() => ({
+  labels: topUsers.value.map((u) => u.username || u.user_id),
+  datasets: [
+    {
+      label: "Messages",
+      data: topUsers.value.map((u) => u.message_count),
+      backgroundColor: "#5865f2",
+      borderRadius: 6,
+    },
+  ],
+}));
+
+const topVoiceData = computed(() => ({
+  labels: topUsers.value.map((u) => u.username || u.user_id),
+  datasets: [
+    {
+      label: "Heures vocales",
+      data: topUsers.value.map((u) => Math.round(u.voice_hours * 10) / 10),
+      backgroundColor: "#57f287",
+      borderRadius: 6,
+    },
+  ],
+}));
+
+const horizontalBarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: "y" as const,
+  plugins: {
+    legend: { display: false },
+  },
+  scales: {
+    x: {
+      ticks: { color: "#9495b0", font: { size: 10 } },
+      grid: { color: "rgba(58, 59, 92, 0.5)" },
+      beginAtZero: true,
+    },
+    y: {
+      ticks: { color: "#9495b0", font: { size: 11 } },
+      grid: { display: false },
+    },
+  },
+};
+
 const membersChartData = computed(() => ({
   labels: labels.value,
   datasets: [
@@ -174,11 +308,16 @@ const membersChartData = computed(() => ({
       <StatCard label="Messages aujourd'hui" :value="stats.messages_today.toLocaleString()" />
       <StatCard label="Infractions aujourd'hui" :value="stats.infractions_today" color="var(--danger)" />
       <StatCard label="Bots en ligne" :value="`${stats.bots_online} / ${stats.bots_total}`" color="var(--success)" />
+      <StatCard label="Workers en ligne" :value="`${stats.workers_online} / ${stats.workers_total}`" color="var(--accent)" />
+      <StatCard label="PostgreSQL" :value="stats.postgres_online ? 'En ligne' : 'Hors ligne'" :color="stats.postgres_online ? 'var(--success)' : 'var(--danger)'" />
+      <StatCard label="Redis" :value="stats.redis_online ? 'En ligne' : 'Hors ligne'" :color="stats.redis_online ? 'var(--success)' : 'var(--danger)'" />
     </div>
     <div v-else-if="statsLoading" class="loading">Chargement des stats...</div>
+    <div v-else-if="statsError" class="error-msg">Erreur chargement stats : {{ statsError }}</div>
 
     <!-- Charts -->
-    <div v-if="!chartsLoading && activity.length > 0" class="charts-grid">
+    <div v-if="chartsError" class="error-msg">Erreur chargement graphiques : {{ chartsError }}</div>
+    <div v-else-if="!chartsLoading && activity.length > 0" class="charts-grid">
       <div class="chart-card">
         <h3>Messages</h3>
         <div class="chart-container">
@@ -204,6 +343,48 @@ const membersChartData = computed(() => ({
         <h3>Repartition des infractions</h3>
         <div class="chart-container chart-container--small">
           <Doughnut :data="doughnutData" :options="doughnutOptions" />
+        </div>
+      </div>
+
+      <div class="chart-card chart-card--wide">
+        <h3>Croissance membres</h3>
+        <div class="chart-container">
+          <Line :data="memberGrowthData" :options="chartOptions" />
+        </div>
+      </div>
+
+      <div class="chart-card chart-card--wide">
+        <h3>Croissance nette du serveur</h3>
+        <div class="chart-container">
+          <Line :data="netGrowthData" :options="chartOptions" />
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Engagement (messages / membre)</h3>
+        <div class="chart-container">
+          <Line :data="engagementData" :options="chartOptions" />
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <h3>Sante du serveur</h3>
+        <div class="chart-container">
+          <Line :data="serverHealthData" :options="chartOptions" />
+        </div>
+      </div>
+
+      <div v-if="topUsers.length > 0" class="chart-card">
+        <h3>Top membres (messages)</h3>
+        <div class="chart-container chart-container--tall">
+          <Bar :data="topMessagesData" :options="horizontalBarOptions" />
+        </div>
+      </div>
+
+      <div v-if="topUsers.length > 0" class="chart-card">
+        <h3>Top membres (vocal)</h3>
+        <div class="chart-container chart-container--tall">
+          <Bar :data="topVoiceData" :options="horizontalBarOptions" />
         </div>
       </div>
 
@@ -300,10 +481,24 @@ const membersChartData = computed(() => ({
   position: relative;
 }
 
+.chart-container--tall {
+  height: 300px;
+}
+
 .chart-container--small {
   height: 200px;
   max-width: 300px;
   margin: 0 auto;
+}
+
+.error-msg {
+  color: var(--danger);
+  background-color: rgba(237, 66, 69, 0.1);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 13px;
+  margin-bottom: 16px;
 }
 
 .loading, .empty {

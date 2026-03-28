@@ -12,6 +12,10 @@ pub struct DashboardStatsDto {
     pub infractions_today: u32,
     pub bots_online: u32,
     pub bots_total: u32,
+    pub workers_online: u32,
+    pub workers_total: u32,
+    pub postgres_online: bool,
+    pub redis_online: bool,
 }
 
 impl From<DashboardStats> for DashboardStatsDto {
@@ -23,6 +27,10 @@ impl From<DashboardStats> for DashboardStatsDto {
             infractions_today: s.infractions_today,
             bots_online: s.bots_online,
             bots_total: s.bots_total,
+            workers_online: s.workers_online,
+            workers_total: s.workers_total,
+            postgres_online: s.postgres_online,
+            redis_online: s.redis_online,
         }
     }
 }
@@ -37,6 +45,8 @@ pub struct LogEntryDto {
     pub bot: String,
     pub server: String,
     pub message: String,
+    pub category: String,
+    pub details: serde_json::Value,
 }
 
 impl From<LogEntry> for LogEntryDto {
@@ -48,6 +58,8 @@ impl From<LogEntry> for LogEntryDto {
             bot: e.bot,
             server: e.server,
             message: e.message,
+            category: e.category,
+            details: e.details,
         }
     }
 }
@@ -58,6 +70,8 @@ pub struct CreateLogDto {
     pub bot: Option<String>,
     pub server: Option<String>,
     pub message: String,
+    pub category: Option<String>,
+    pub details: Option<serde_json::Value>,
 }
 
 // ── Infraction DTO (format desktop) ──

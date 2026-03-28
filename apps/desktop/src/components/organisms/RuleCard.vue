@@ -68,7 +68,7 @@ function ruleName(rule: ModerationRule): string {
       </div>
       <AppToggle :model-value="rule.enabled" @update:model-value="emit('toggle', rule)" />
     </div>
-    <p class="rule-description">{{ rule.description }}</p>
+    <p class="rule-description">{{ rule.description.replace(/\s*pour le serveur \d+/i, '') }}</p>
     <div class="rule-footer">
       <AppBadge :label="typeLabel(rule.rule_type)" variant="default" />
       <button class="edit-btn" @click="emit('edit', rule)">

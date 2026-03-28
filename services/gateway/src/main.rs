@@ -1,6 +1,7 @@
 mod broadcaster;
 mod config;
 mod handler;
+mod logger;
 mod health;
 mod redis_subscriber;
 
@@ -18,6 +19,7 @@ use tracing::{info, Span};
 use crate::broadcaster::EventBroadcaster;
 use crate::config::Config;
 use crate::handler::{ws_handler, GatewayState};
+use crate::logger::GatewayLogger;
 
 #[tokio::main]
 async fn main() {
@@ -40,6 +42,9 @@ async fn main() {
         "Demarrage de Sentinel Gateway"
     );
 
+    // Logger
+    let gw_logger = GatewayLogger::new(config.api_url.clone());
+
     // Broadcaster local
     let broadcaster = Arc::new(EventBroadcaster::new(512, config.max_connections));
 
@@ -47,8 +52,9 @@ async fn main() {
     let redis_broadcaster = broadcaster.clone();
     let redis_url = config.redis_url.clone();
     let redis_channel = config.redis_channel.clone();
+    let redis_logger = gw_logger.clone();
     tokio::spawn(async move {
-        redis_subscriber::run_redis_subscriber(&redis_url, &redis_channel, redis_broadcaster).await;
+        redis_subscriber::run_redis_subscriber(&redis_url, &redis_channel, redis_broadcaster, redis_logger).await;
     });
 
     // CORS
@@ -58,6 +64,7 @@ async fn main() {
     let ws_state = GatewayState {
         broadcaster: broadcaster.clone(),
         api_key: config.api_key.clone(),
+        logger: gw_logger.clone(),
     };
 
     let trace_layer = TraceLayer::new_for_http()
@@ -98,6 +105,12 @@ async fn main() {
         .await
         .expect("Impossible de bind le port");
 
+    gw_logger.info("Gateway WebSocket demarree", serde_json::json!({
+        "event": "startup",
+        "bind": config.bind_addr(),
+        "max_connections": config.max_connections,
+    }));
+
     info!("Sentinel Gateway pret (WebSocket sur /ws)");
 
     axum::serve(
@@ -107,6 +120,8 @@ async fn main() {
     .with_graceful_shutdown(shutdown_signal())
     .await
     .expect("Erreur serveur");
+
+    gw_logger.warn("Gateway WebSocket arretee", serde_json::json!({"event": "shutdown"}));
 
     info!("Sentinel Gateway arrete proprement");
 }

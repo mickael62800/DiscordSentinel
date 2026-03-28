@@ -9,6 +9,7 @@ use tower_http::trace::TraceLayer;
 use tracing::Span;
 
 use super::handlers;
+use super::middleware::api_logger::api_logger_middleware;
 use super::middleware::auth::auth_middleware;
 use super::middleware::rate_limit::{rate_limit_middleware, RateLimiter};
 use super::state::AppState;
@@ -97,6 +98,18 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route(
             "/api/moderation/actions",
             post(handlers::moderation::log_action),
+        )
+        .route(
+            "/api/moderation/bans",
+            get(handlers::moderation::list_bans),
+        )
+        .route(
+            "/api/moderation/execute-ban",
+            post(handlers::moderation::execute_ban),
+        )
+        .route(
+            "/api/moderation/execute-unban",
+            post(handlers::moderation::execute_unban),
         )
         .route(
             "/api/moderation/history/{guild_id}/{user_id}",
@@ -328,6 +341,10 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
             get(handlers::dashboard::get_logs).post(handlers::dashboard::create_log),
         )
         .route(
+            "/api/logs/{category}",
+            delete(handlers::dashboard::delete_logs_by_category),
+        )
+        .route(
             "/api/infractions",
             get(handlers::dashboard::get_all_infractions),
         )
@@ -398,9 +415,12 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         );
     });
 
+    let log_repo = state.log_repo.clone();
+
     Router::new()
         .merge(protected)
         .merge(public)
+        .layer(middleware::from_fn_with_state(log_repo, api_logger_middleware))
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(RequestBodyLimitLayer::new(max_body_size))
         .layer(trace_layer)

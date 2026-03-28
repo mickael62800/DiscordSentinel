@@ -27,23 +27,32 @@ impl ManageStatsService {
         Self { stats_repo, infraction_repo, cache, redis_client }
     }
 
-    async fn count_bots(&self) -> (u32, u32) {
+    async fn count_services(&self) -> (u32, u32, u32, u32) {
         if let Ok(mut conn) = self.redis_client.get_multiplexed_async_connection().await {
             use redis::AsyncCommands;
-            // Tous les bots connus
             let known: Vec<String> = conn.smembers("bots:known").await.unwrap_or_default();
-            let total = known.len() as u32;
-            // Compter les bots en ligne (clé bot:online:{name} existante)
-            let mut online = 0u32;
+
+            let mut bots_online = 0u32;
+            let mut bots_total = 0u32;
+            let mut workers_online = 0u32;
+            let mut workers_total = 0u32;
+
             for name in &known {
+                let is_worker = name.contains("worker");
                 let exists: bool = conn.exists(format!("bot:online:{}", name)).await.unwrap_or(false);
-                if exists {
-                    online += 1;
+
+                if is_worker {
+                    workers_total += 1;
+                    if exists { workers_online += 1; }
+                } else {
+                    bots_total += 1;
+                    if exists { bots_online += 1; }
                 }
             }
-            (online, total)
+
+            (bots_online, bots_total, workers_online, workers_total)
         } else {
-            (0, 0)
+            (0, 0, 0, 0)
         }
     }
 }
@@ -138,15 +147,34 @@ impl ManageStatsUseCase for ManageStatsService {
         let total_users = self.stats_repo.count_distinct_users().await.unwrap_or(0) as u32;
         let infractions_today = self.infraction_repo.count_today().await.unwrap_or(0) as u32;
 
-        let (bots_online, bots_total) = self.count_bots().await;
+        let (bots_online, bots_total, workers_online, workers_total) = self.count_services().await;
+
+        // Check PostgreSQL
+        let postgres_online = self.stats_repo.count_distinct_guilds().await.is_ok();
+
+        // Check Redis
+        let redis_online = self.redis_client
+            .get_multiplexed_async_connection()
+            .await
+            .map(|mut conn| {
+                tokio::spawn(async move {
+                    let _: Result<String, _> = redis::AsyncCommands::get(&mut conn, "ping_test").await;
+                });
+                true
+            })
+            .unwrap_or(false);
 
         Ok(DashboardStats {
             total_servers,
             total_users,
-            messages_today: 0, // pas de tracking journalier pour l'instant
+            messages_today: 0,
             infractions_today,
             bots_online,
             bots_total,
+            workers_online,
+            workers_total,
+            postgres_online,
+            redis_online,
         })
     }
 }

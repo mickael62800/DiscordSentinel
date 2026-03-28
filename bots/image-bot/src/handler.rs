@@ -111,9 +111,9 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Image bot connecte");
 
-        // Enregistrer les guilds aupres de l'API
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log("info", "", "Image bot demarre");
             for guild_status in &ready.guilds {
                 let guild_id = guild_status.id;
                 if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
@@ -212,14 +212,28 @@ async fn process_image_attachment(
                 "Reponse analyse image"
             );
 
+            if response.action != Action::None {
+                api_client.send_log("warn", &guild_id.to_string(), &format!(
+                    "Image detectee — {} par {} : {:?} ({})",
+                    response.action.as_str(), msg.author.name,
+                    response.classifications, response.reason.as_deref().unwrap_or("Automod")
+                ));
+            }
+
             if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref())
                 .await
             {
                 error!(error = %e, "Erreur execution action image");
+                api_client.send_log("error", &guild_id.to_string(), &format!(
+                    "Erreur action image : {}", e
+                ));
             }
         }
         Err(e) => {
             warn!(error = %e, "Backend injoignable — suppression preventive de l'image");
+            api_client.send_log("error", &guild_id.to_string(), &format!(
+                "Backend injoignable pour analyse image : {}", e
+            ));
             // Fallback : en cas de doute sur une image et API down, on supprime
             let _ = msg.delete(&ctx.http).await;
             let _ = msg

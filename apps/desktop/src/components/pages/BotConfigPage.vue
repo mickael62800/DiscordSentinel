@@ -6,7 +6,12 @@ import { useGuildSelector } from "../../composables/useGuildSelector";
 
 const { selectedGuildId, selectedGuild, guilds } = useGuildSelector();
 
-const definitions = ref<BotDefinition[]>([]);
+const workerNames = ["moderation-worker", "analytics-worker"];
+
+const allDefinitions = ref<BotDefinition[]>([]);
+const definitions = computed(() =>
+  allDefinitions.value.filter((d) => !workerNames.includes(d.bot_name)),
+);
 const configs = ref<BotGuildConfig[]>([]);
 const selectedBot = ref<string | null>(null);
 const loading = ref(false);
@@ -26,7 +31,7 @@ const configFields = computed<ConfigField[]>(() => {
 
 async function fetchDefinitions() {
   try {
-    definitions.value = await invoke<BotDefinition[]>("get_bot_definitions");
+    allDefinitions.value = await invoke<BotDefinition[]>("get_bot_definitions");
   } catch (e) {
     console.error("Erreur chargement definitions bots:", e);
   }

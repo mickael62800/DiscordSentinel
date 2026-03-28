@@ -3,6 +3,9 @@ import { ref, computed } from "vue";
 import { useTickets, useTicketDetail } from "../../composables/useTickets";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppButton from "../atoms/AppButton.vue";
+import { useFormatDate } from "../../composables/useFormatDate";
+
+const { formatShortDateTime: fmt } = useFormatDate();
 import FilterBar from "../molecules/FilterBar.vue";
 import { statusVariant, priorityVariant } from "../../utils/variants";
 
@@ -134,7 +137,7 @@ function backToList() {
             <span class="sep">|</span>
             <span>Assigne a : <strong>{{ detail.ticket.assigned_to ?? "Non assigne" }}</strong></span>
             <span class="sep">|</span>
-            <span>Cree le {{ detail.ticket.created_at }}</span>
+            <span>Cree le {{ fmt(detail.ticket.created_at) }}</span>
           </div>
         </div>
 
@@ -152,7 +155,7 @@ function backToList() {
                 :label="msg.author_role"
                 variant="info"
               />
-              <span class="message-time">{{ msg.created_at }}</span>
+              <span class="message-time">{{ fmt(msg.created_at) }}</span>
             </div>
             <p class="message-content">{{ msg.content }}</p>
           </div>

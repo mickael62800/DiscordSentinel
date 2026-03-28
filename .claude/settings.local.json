@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:3000/api/infractions)",
+      "Bash(curl -s \"http://localhost:3000/infractions/1486472782303985866?limit=5\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''{len\\(d\\)} infractions''''\\)\")",
+      "Bash(curl -s \"http://localhost:3000/api/infractions?guild_id=1486472782303985866\")",
+      "Bash(curl -sv \"http://localhost:3000/api/infractions?guild_id=1486472782303985866\")",
+      "Bash(cargo check:*)",
+      "Bash(taskkill //F //IM sentinel-api.exe)",
+      "Bash(curl -s \"http://localhost:3000/api/rules\")",
+      "Bash(curl -s \"http://localhost:3000/api/rules?guild_id=1486472782303985866\")",
+      "Bash(curl -s \"http://localhost:3000/rules/1486472782303985866\")"
+    ]
+  }
+}

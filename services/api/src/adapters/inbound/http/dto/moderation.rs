@@ -63,6 +63,33 @@ impl From<ModerationAction> for ModerationActionResponseDto {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct BanEntryDto {
+    pub id: String,
+    pub guild_id: String,
+    pub target_id: String,
+    pub target_name: String,
+    pub moderator_name: String,
+    pub action_type: String,
+    pub reason: String,
+    pub created_at: String,
+}
+
+impl From<ModerationAction> for BanEntryDto {
+    fn from(a: ModerationAction) -> Self {
+        Self {
+            id: a.id.to_string(),
+            guild_id: a.guild_id,
+            target_id: a.target_id,
+            target_name: a.target_name,
+            moderator_name: a.moderator_name,
+            action_type: a.action_type,
+            reason: a.reason,
+            created_at: a.created_at.to_rfc3339(),
+        }
+    }
+}
+
 impl From<UserModerationHistory> for UserHistoryDto {
     fn from(h: UserModerationHistory) -> Self {
         Self {

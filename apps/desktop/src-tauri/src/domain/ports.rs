@@ -2,11 +2,11 @@ use std::future::Future;
 use std::pin::Pin;
 
 use super::entities::{
-    BotDefinition, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry,
+    BotDefinition, BotGuildConfig, ConfirmedBan, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry,
     ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats,
     AuditLog, AutoRoleConfig, DailyActivity, LevelConfig, LevelReward, RolePanel, RolePanelDetail,
     Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier,
-    UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser,
+    TopUser, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser,
 };
 
 type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
@@ -28,6 +28,7 @@ pub trait StatsRepository: Send + Sync + 'static {
 
 pub trait LogsRepository: Send + Sync + 'static {
     fn get_logs(&self, guild_id: Option<String>) -> BoxFut<Vec<LogEntry>>;
+    fn delete_logs_by_category(&self, category: String) -> BoxFut<()>;
 }
 
 pub trait InfractionsRepository: Send + Sync + 'static {
@@ -55,6 +56,9 @@ pub trait SecurityRepository: Send + Sync + 'static {
 pub trait ModerationRepository: Send + Sync + 'static {
     fn log_action(&self, action: ModerationActionRequest) -> BoxFut<ModerationActionResponse>;
     fn get_history(&self, guild_id: String, user_id: String) -> BoxFut<UserModerationHistory>;
+    fn get_confirmed_bans(&self, guild_id: Option<String>) -> BoxFut<Vec<ConfirmedBan>>;
+    fn execute_ban(&self, guild_id: String, user_id: String, reason: String) -> BoxFut<()>;
+    fn execute_unban(&self, guild_id: String, user_id: String) -> BoxFut<()>;
 }
 
 pub trait VoiceChannelRepository: Send + Sync + 'static {
@@ -77,6 +81,7 @@ pub trait RolePanelsRepository: Send + Sync + 'static {
 
 pub trait DashboardChartsRepository: Send + Sync + 'static {
     fn get_activity_trend(&self, guild_id: Option<String>, days: Option<i32>) -> BoxFut<Vec<DailyActivity>>;
+    fn get_top_users(&self, guild_id: String, limit: Option<u32>) -> BoxFut<Vec<TopUser>>;
 }
 
 pub trait LevelRepository: Send + Sync + 'static {

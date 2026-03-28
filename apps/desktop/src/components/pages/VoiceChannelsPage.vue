@@ -2,6 +2,9 @@
 import { ref } from "vue";
 import { useVoiceChannels, useVoiceChannelDetail } from "../../composables/useVoiceChannels";
 import AppBadge from "../atoms/AppBadge.vue";
+import { useFormatDate } from "../../composables/useFormatDate";
+
+const { formatShortDateTime: fmt } = useFormatDate();
 
 const { filteredChannels, loading, filterKind, publicCount, privateCount, totalCount } = useVoiceChannels();
 const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
@@ -65,7 +68,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           <div><strong>File d'attente :</strong> {{ detail.channel.queue_enabled ? 'Active' : 'Desactive' }}</div>
           <div v-if="detail.channel.member_limit"><strong>Limite :</strong> {{ detail.channel.member_limit }}</div>
           <div v-if="detail.channel.status"><strong>Statut :</strong> {{ detail.channel.status }}</div>
-          <div><strong>Cree le :</strong> {{ new Date(detail.channel.created_at).toLocaleString() }}</div>
+          <div><strong>Cree le :</strong> {{ fmt(detail.channel.created_at) }}</div>
         </div>
 
         <h3 v-if="detail.co_admins.length">Co-admins ({{ detail.co_admins.length }})</h3>
@@ -118,7 +121,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
             <td>{{ ch.visibility }}</td>
             <td>{{ ch.locked ? 'Oui' : 'Non' }}</td>
             <td>{{ ch.queue_enabled ? 'Oui' : 'Non' }}</td>
-            <td>{{ new Date(ch.created_at).toLocaleString() }}</td>
+            <td>{{ fmt(ch.created_at) }}</td>
           </tr>
         </tbody>
       </table>

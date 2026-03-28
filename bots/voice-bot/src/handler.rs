@@ -71,9 +71,9 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Voice bot connecte");
 
-        // Enregistrer les guilds aupres de l'API
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log("info", "", "Voice bot demarre");
             for guild_status in &ready.guilds {
                 let guild_id = guild_status.id;
                 if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {

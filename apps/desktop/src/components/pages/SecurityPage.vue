@@ -1,9 +1,22 @@
 <script setup lang="ts">
+import { ref, computed } from "vue";
 import { useSecurity } from "../../composables/useSecurity";
 import AppBadge from "../atoms/AppBadge.vue";
 import { severityVariant } from "../../utils/variants";
+import { useFormatDate } from "../../composables/useFormatDate";
 
+const { formatShortDateTime: fmt } = useFormatDate();
 const { events, loading } = useSecurity();
+const search = ref("");
+
+const filteredEvents = computed(() => {
+  if (!search.value) return events.value;
+  const q = search.value.toLowerCase();
+  return events.value.filter((e) =>
+    [e.event_type, e.severity, e.description, e.created_at, ...(e.user_ids || [])]
+      .some((field) => field?.toLowerCase().includes(q)),
+  );
+});
 
 function eventIcon(type: string): string {
   switch (type) {
@@ -19,10 +32,12 @@ function eventIcon(type: string): string {
   <div class="security">
     <h1>Evenements de securite</h1>
 
+    <input v-model="search" type="text" placeholder="Rechercher dans tous les champs..." class="search-global" />
+
     <div v-if="loading" class="loading">Chargement...</div>
 
     <div v-else class="events-list">
-      <div v-for="event in events" :key="event.id" class="event-card">
+      <div v-for="event in filteredEvents" :key="event.id" class="event-card">
         <div :class="['event-icon', `icon--${event.severity}`]">
           {{ eventIcon(event.event_type) }}
         </div>
@@ -30,7 +45,7 @@ function eventIcon(type: string): string {
           <div class="event-header">
             <span class="event-type">{{ event.event_type.replace("_", " ") }}</span>
             <AppBadge :label="event.severity" :variant="severityVariant(event.severity)" />
-            <span class="event-time">{{ event.created_at }}</span>
+            <span class="event-time">{{ fmt(event.created_at) }}</span>
           </div>
           <p class="event-description">{{ event.description }}</p>
           <div v-if="event.user_ids.length > 0" class="event-users">
@@ -49,6 +64,10 @@ function eventIcon(type: string): string {
 .security h1 {
   margin-bottom: 24px;
 }
+
+.search-global { width: 100%; padding: 10px 14px; margin-bottom: 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-card); color: var(--text-primary); font-size: 14px; outline: none; }
+.search-global:focus { border-color: var(--accent); }
+.search-global::placeholder { color: var(--text-secondary); opacity: 0.6; }
 
 .events-list {
   display: flex;

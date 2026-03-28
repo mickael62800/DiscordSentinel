@@ -8,4 +8,8 @@ pub struct DashboardStats {
     pub infractions_today: u32,
     pub bots_online: u32,
     pub bots_total: u32,
+    pub workers_online: u32,
+    pub workers_total: u32,
+    pub postgres_online: bool,
+    pub redis_online: bool,
 }

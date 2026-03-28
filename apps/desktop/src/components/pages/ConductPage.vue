@@ -3,6 +3,9 @@ import { ref } from "vue";
 import { useConduct, useConductDetail } from "../../composables/useConduct";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
+import { useFormatDate } from "../../composables/useFormatDate";
+
+const { formatShortDateTime: fmt } = useFormatDate();
 
 const { selectedGuildId } = useGuildSelector();
 const { config, leaderboard, loading, fetchLeaderboard } = useConduct();
@@ -88,7 +91,7 @@ function backToList() {
           </thead>
           <tbody>
             <tr v-for="entry in detailLog" :key="entry.id">
-              <td>{{ new Date(entry.created_at).toLocaleString() }}</td>
+              <td>{{ fmt(entry.created_at) }}</td>
               <td :class="entry.delta < 0 ? 'text-danger' : 'text-success'">
                 {{ entry.delta > 0 ? '+' : '' }}{{ entry.delta }}
               </td>

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::domain::entities::{ModerationActionRequest, ModerationActionResponse, UserModerationHistory};
+use crate::domain::entities::{ConfirmedBan, ModerationActionRequest, ModerationActionResponse, UserModerationHistory};
 use crate::domain::ports::ModerationRepository;
 
 pub struct ModerationService {
@@ -18,5 +18,17 @@ impl ModerationService {
 
     pub async fn get_history(&self, guild_id: String, user_id: String) -> Result<UserModerationHistory, String> {
         self.repo.get_history(guild_id, user_id).await
+    }
+
+    pub async fn get_confirmed_bans(&self, guild_id: Option<String>) -> Result<Vec<ConfirmedBan>, String> {
+        self.repo.get_confirmed_bans(guild_id).await
+    }
+
+    pub async fn execute_ban(&self, guild_id: String, user_id: String, reason: String) -> Result<(), String> {
+        self.repo.execute_ban(guild_id, user_id, reason).await
+    }
+
+    pub async fn execute_unban(&self, guild_id: String, user_id: String) -> Result<(), String> {
+        self.repo.execute_unban(guild_id, user_id).await
     }
 }

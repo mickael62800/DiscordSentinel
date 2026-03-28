@@ -15,4 +15,8 @@ impl LogsService {
     pub async fn get_logs(&self, guild_id: Option<String>) -> Result<Vec<LogEntry>, String> {
         self.repo.get_logs(guild_id).await
     }
+
+    pub async fn delete_logs_by_category(&self, category: String) -> Result<(), String> {
+        self.repo.delete_logs_by_category(category).await
+    }
 }

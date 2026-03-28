@@ -16,22 +16,48 @@ const { unreadCount, panelOpen, togglePanel } = useNotifications();
 const { connected: wsConnected } = useRealtime();
 const { guilds, selectedGuildId, fetchGuilds, selectGuild } = useGuildSelector();
 
-const navItems = [
+const generalItems = [
   { path: "/", label: "Tableau de bord", icon: "grid" },
-  { path: "/logs", label: "Journaux", icon: "list" },
+  { path: "/analytics", label: "Analytiques", icon: "trending-up" },
+];
+
+const moderationItems = [
   { path: "/infractions", label: "Infractions", icon: "alert-triangle" },
   { path: "/rules", label: "Regles", icon: "shield" },
   { path: "/bans", label: "Bannissements", icon: "user-x" },
   { path: "/moderation", label: "Moderation", icon: "gavel" },
-  { path: "/security", label: "Securite", icon: "zap" },
+  { path: "/conduct", label: "Conduite", icon: "award" },
+  { path: "/watched-users", label: "Surveillance", icon: "eye" },
+];
+
+const communityItems = [
   { path: "/tickets", label: "Tickets", icon: "ticket" },
   { path: "/voice-channels", label: "Vocaux", icon: "mic" },
-  { path: "/conduct", label: "Conduite", icon: "award" },
-  { path: "/bot-config", label: "Config Bots", icon: "cpu" },
   { path: "/role-panels", label: "Roles", icon: "users" },
   { path: "/levels", label: "Niveaux", icon: "trending-up" },
-  { path: "/watched-users", label: "Surveillance", icon: "eye" },
+];
+
+const securityItems = [
+  { path: "/security", label: "Securite", icon: "zap" },
   { path: "/audit", label: "Audit", icon: "clipboard" },
+];
+
+const logItems = [
+  { path: "/logs", label: "Journaux Discord", icon: "list" },
+  { path: "/logs/bots", label: "Journaux Bots", icon: "cpu" },
+  { path: "/logs/workers", label: "Journaux Workers", icon: "activity" },
+  { path: "/logs/api", label: "Journaux API", icon: "server" },
+  { path: "/logs/websocket", label: "Journaux WebSocket", icon: "wifi" },
+];
+
+const aiItems = [
+  { path: "/ai-training", label: "Entrainement", icon: "layers" },
+  { path: "/ia-config", label: "Config IA", icon: "brain" },
+];
+
+const configItems = [
+  { path: "/bot-config", label: "Config Bots", icon: "cpu" },
+  { path: "/worker-config", label: "Config Workers", icon: "activity" },
   { path: "/settings", label: "Parametres", icon: "settings" },
 ];
 
@@ -80,7 +106,67 @@ onMounted(() => {
 
     <nav class="sidebar-nav">
       <NavItem
-        v-for="item in navItems"
+        v-for="item in generalItems"
+        :key="item.path"
+        :path="item.path"
+        :label="item.label"
+        :icon="item.icon"
+        :active="route.path === item.path"
+      />
+
+      <div class="nav-separator"><span>Moderation</span></div>
+      <NavItem
+        v-for="item in moderationItems"
+        :key="item.path"
+        :path="item.path"
+        :label="item.label"
+        :icon="item.icon"
+        :active="route.path === item.path"
+      />
+
+      <div class="nav-separator"><span>Communaute</span></div>
+      <NavItem
+        v-for="item in communityItems"
+        :key="item.path"
+        :path="item.path"
+        :label="item.label"
+        :icon="item.icon"
+        :active="route.path === item.path"
+      />
+
+      <div class="nav-separator"><span>Securite</span></div>
+      <NavItem
+        v-for="item in securityItems"
+        :key="item.path"
+        :path="item.path"
+        :label="item.label"
+        :icon="item.icon"
+        :active="route.path === item.path"
+      />
+
+      <div class="nav-separator"><span>Logs</span></div>
+      <NavItem
+        v-for="item in logItems"
+        :key="item.path"
+        :path="item.path"
+        :label="item.label"
+        :icon="item.icon"
+        :active="route.path === item.path"
+      />
+
+      <div class="nav-separator"><span>Intelligence Artificielle</span></div>
+      <NavItem
+        v-for="item in aiItems"
+        :key="item.path"
+        :path="item.path"
+        :label="item.label"
+        :icon="item.icon"
+        :active="route.path === item.path"
+      />
+
+      <div class="nav-separator"><span>Configuration</span></div>
+      <NavItem
+        v-for="item in configItems"
         :key="item.path"
         :path="item.path"
         :label="item.label"
@@ -219,6 +305,26 @@ onMounted(() => {
   flex-direction: column;
   gap: 2px;
   overflow-y: auto;
+}
+
+.nav-separator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 14px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.nav-separator::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--border);
 }
 
 /* Section utilisateur */

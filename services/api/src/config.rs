@@ -9,6 +9,8 @@ pub struct AppConfig {
     pub shutdown_timeout_secs: u64,
     /// Comma-separated list of allowed origins. Empty or "*" = permissive (dev mode).
     pub allowed_origins: String,
+    /// Discord bot token pour executer des bans (optionnel).
+    pub discord_bot_token: String,
 }
 
 impl AppConfig {
@@ -37,6 +39,9 @@ impl AppConfig {
                 .parse()
                 .unwrap_or(30),
             allowed_origins: std::env::var("ALLOWED_ORIGINS").unwrap_or_default(),
+            discord_bot_token: std::env::var("AUTOMOD_DISCORD_TOKEN")
+                .or_else(|_| std::env::var("MODERATION_DISCORD_TOKEN"))
+                .unwrap_or_default(),
         }
     }
 

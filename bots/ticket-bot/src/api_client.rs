@@ -89,12 +89,21 @@ impl ApiClient {
     }
 
     pub fn send_log(&self, level: &str, server: &str, message: &str) {
+        self.send_log_with_category(level, server, message, "discord");
+    }
+
+    pub fn send_bot_log(&self, level: &str, message: &str) {
+        self.send_log_with_category(level, "", message, "bot");
+    }
+
+    fn send_log_with_category(&self, level: &str, server: &str, message: &str, category: &str) {
         #[derive(serde::Serialize)]
         struct LogPayload {
             level: String,
             bot: String,
             server: String,
             message: String,
+            category: String,
         }
 
         let req = self.auth(
@@ -105,6 +114,7 @@ impl ApiClient {
                     bot: Self::BOT_NAME.to_string(),
                     server: server.to_string(),
                     message: message.to_string(),
+                    category: category.to_string(),
                 }),
         );
 

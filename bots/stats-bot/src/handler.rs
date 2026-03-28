@@ -30,6 +30,12 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Stats bot connecté");
+        {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                api.send_log("info", "", "Stats bot demarre");
+            }
+        }
 
         if let Err(e) = serenity::model::application::Command::set_global_commands(
             &ctx.http,

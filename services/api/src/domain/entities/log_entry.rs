@@ -10,4 +10,6 @@ pub struct LogEntry {
     pub bot: String,
     pub server: String,
     pub message: String,
+    pub category: String,
+    pub details: serde_json::Value,
 }

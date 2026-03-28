@@ -35,18 +35,40 @@ pub async fn get_logs(
     Ok(Json(filtered))
 }
 
+/// DELETE /api/logs/{category} — supprimer tous les logs d'une categorie
+pub async fn delete_logs_by_category(
+    State(state): State<AppState>,
+    Path(category): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    if category == "discord" {
+        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
+            "Impossible de supprimer les journaux Discord".into(),
+        )));
+    }
+    let count = state.log_repo.delete_by_category(&category).await?;
+    Ok(Json(serde_json::json!({ "deleted": count })))
+}
+
 /// POST /api/logs — écrire un log (utilisé par les bots)
 pub async fn create_log(
     State(state): State<AppState>,
     Json(dto): Json<CreateLogDto>,
 ) -> Result<StatusCode, ApiError> {
+    let bot_name = dto.bot.unwrap_or_default();
+    let category = dto.category.unwrap_or_else(|| {
+        if bot_name.contains("worker") { "worker".to_string() }
+        else if bot_name.contains("-bot") { "bot".to_string() }
+        else { "discord".to_string() }
+    });
     let entry = LogEntry {
         id: Uuid::new_v4(),
         timestamp: chrono::Utc::now(),
         level: dto.level.unwrap_or_else(|| "info".to_string()),
-        bot: dto.bot.unwrap_or_default(),
+        bot: bot_name,
         server: dto.server.unwrap_or_default(),
         message: dto.message,
+        category,
+        details: dto.details.unwrap_or(serde_json::json!({})),
     };
     state.log_repo.save(&entry).await?;
     Ok(StatusCode::CREATED)

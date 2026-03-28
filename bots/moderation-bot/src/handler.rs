@@ -18,6 +18,12 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Moderation bot connecté");
+        {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                api.send_log("info", "", "Moderation bot demarre");
+            }
+        }
 
         if let Err(e) = serenity::model::application::Command::set_global_commands(
             &ctx.http,
@@ -53,7 +59,11 @@ impl EventHandler for Handler {
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Command(command) = interaction {
-            match command.data.name.as_str() {
+            let cmd_name = command.data.name.clone();
+            let moderator = command.user.name.clone();
+            let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
+
+            match cmd_name.as_str() {
                 "warn" => commands::warn::handle(&ctx, &command).await,
                 "mute" => commands::mute::handle(&ctx, &command).await,
                 "unmute" => commands::mute::handle_unmute(&ctx, &command).await,
@@ -61,6 +71,11 @@ impl EventHandler for Handler {
                 "unban" => commands::ban::handle_unban(&ctx, &command).await,
                 "history" => commands::history::handle(&ctx, &command).await,
                 _ => {}
+            }
+
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                api.send_log("info", &guild_id, &format!("Commande /{} executee par {}", cmd_name, moderator));
             }
         }
     }

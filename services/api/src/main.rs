@@ -150,7 +150,7 @@ async fn main() {
     );
 
     // ── Services applicatifs ──
-    let conduct_uc = Arc::new(ManageConductService::new(conduct_repo.clone(), broadcaster.clone()));
+    let conduct_uc = Arc::new(ManageConductService::new(conduct_repo.clone(), infraction_repo.clone(), broadcaster.clone(), config.discord_bot_token.clone()));
 
     let analyze_uc = Arc::new(
         AnalyzeMessageService::new(
@@ -226,15 +226,32 @@ async fn main() {
         broadcaster,
         job_client,
         api_key: config.api_key.clone(),
+        discord_bot_token: config.discord_bot_token.clone(),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
     };
 
+    let api_log_repo = state.log_repo.clone();
     let app = router::build(state, config.max_body_size, config.rate_limit_per_sec, &config.allowed_origins);
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr())
         .await
         .expect("Impossible de bind le port");
+
+    // Log demarrage en BDD
+    {
+        let entry = crate::domain::entities::LogEntry {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            level: "info".into(),
+            bot: "sentinel-api".into(),
+            server: String::new(),
+            message: format!("API demarree sur {}", config.bind_addr()),
+            category: "api".into(),
+            details: serde_json::json!({"event": "startup", "bind": config.bind_addr()}),
+        };
+        let _ = api_log_repo.save(&entry).await;
+    }
 
     info!("Sentinel API prêt (WebSocket sur /ws)");
 
@@ -253,7 +270,21 @@ async fn main() {
     info!(timeout_secs = config.shutdown_timeout_secs, "Arrêt en cours, attente des requêtes en vol...");
     tokio::time::sleep(shutdown_timeout).await;
 
-    // Fermer le pool PostgreSQL proprement
+    // Log arret en BDD
+    {
+        let entry = crate::domain::entities::LogEntry {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            level: "warn".into(),
+            bot: "sentinel-api".into(),
+            server: String::new(),
+            message: "API en cours d'arret".into(),
+            category: "api".into(),
+            details: serde_json::json!({"event": "shutdown"}),
+        };
+        let _ = api_log_repo.save(&entry).await;
+    }
+
     pg_pool.close().await;
     info!("Sentinel API arrêté proprement");
 }

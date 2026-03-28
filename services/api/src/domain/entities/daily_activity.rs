@@ -11,6 +11,7 @@ pub struct DailyActivity {
     pub voice_minutes: i64,
     pub active_members: i32,
     pub new_members: i32,
+    pub leaves: i32,
     pub infractions: i32,
     pub warns: i32,
     pub mutes: i32,

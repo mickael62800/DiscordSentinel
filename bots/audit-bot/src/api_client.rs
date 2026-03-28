@@ -56,6 +56,39 @@ impl ApiClient {
         Ok(())
     }
 
+    pub fn send_log(&self, level: &str, server: &str, message: &str) {
+        self.send_log_with_category(level, server, message, "discord");
+    }
+
+    pub fn send_bot_log(&self, level: &str, message: &str) {
+        self.send_log_with_category(level, "", message, "bot");
+    }
+
+    fn send_log_with_category(&self, level: &str, server: &str, message: &str, category: &str) {
+        #[derive(Serialize)]
+        struct LogPayload {
+            level: String,
+            bot: String,
+            server: String,
+            message: String,
+            category: String,
+        }
+
+        let req = self
+            .client
+            .post(format!("{}/api/logs", self.base_url))
+            .json(&LogPayload {
+                level: level.to_string(),
+                bot: "audit-bot".to_string(),
+                server: server.to_string(),
+                message: message.to_string(),
+                category: category.to_string(),
+            });
+
+        let req = self.auth(req);
+        tokio::spawn(async move { let _ = req.send().await; });
+    }
+
     pub async fn heartbeat(&self, bot_name: &str) {
         #[derive(Serialize)]
         struct Payload {

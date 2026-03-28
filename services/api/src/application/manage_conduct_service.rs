@@ -5,21 +5,58 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::domain::entities::{ConductConfig, ConductPointsLog, UserConductPoints};
+use crate::domain::entities::{ConductConfig, ConductPointsLog, Infraction, UserConductPoints};
 use crate::domain::errors::DomainError;
+use crate::domain::value_objects::{Action, DetectionFlags};
 use crate::ports::inbound::{
     AddPointsCommand, DeductPointsCommand, ManageConductUseCase, SaveConductConfigCommand,
 };
-use crate::ports::outbound::ConductRepository;
+use crate::ports::outbound::{ConductRepository, InfractionRepository};
 
 pub struct ManageConductService {
     repo: Arc<dyn ConductRepository>,
+    infraction_repo: Arc<dyn InfractionRepository>,
     broadcaster: Arc<EventBroadcaster>,
+    discord_bot_token: String,
+    http_client: reqwest::Client,
 }
 
 impl ManageConductService {
-    pub fn new(repo: Arc<dyn ConductRepository>, broadcaster: Arc<EventBroadcaster>) -> Self {
-        Self { repo, broadcaster }
+    pub fn new(repo: Arc<dyn ConductRepository>, infraction_repo: Arc<dyn InfractionRepository>, broadcaster: Arc<EventBroadcaster>, discord_bot_token: String) -> Self {
+        Self { repo, infraction_repo, broadcaster, discord_bot_token, http_client: reqwest::Client::new() }
+    }
+
+    /// Mute un utilisateur via l'API Discord (timeout 10 minutes)
+    async fn mute_user(&self, guild_id: &str, user_id: &str) {
+        if self.discord_bot_token.is_empty() {
+            tracing::warn!("MODERATION_DISCORD_TOKEN non configure, mute impossible");
+            return;
+        }
+
+        let timeout_until = Utc::now() + chrono::Duration::minutes(10);
+        let url = format!("https://discord.com/api/v10/guilds/{}/members/{}", guild_id, user_id);
+
+        match self.http_client
+            .patch(&url)
+            .header("Authorization", format!("Bot {}", self.discord_bot_token))
+            .json(&serde_json::json!({
+                "communication_disabled_until": timeout_until.to_rfc3339(),
+            }))
+            .send()
+            .await
+        {
+            Ok(resp) if resp.status().is_success() => {
+                tracing::info!(guild_id, user_id, "Utilisateur mute (0 points)");
+            }
+            Ok(resp) => {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                tracing::error!(guild_id, user_id, %status, %body, "Echec mute Discord");
+            }
+            Err(e) => {
+                tracing::error!(guild_id, user_id, error = %e, "Erreur connexion Discord pour mute");
+            }
+        }
     }
 
     async fn get_or_create_points(
@@ -131,8 +168,26 @@ impl ManageConductUseCase for ManageConductService {
 
         user_points.points = points_after;
 
-        // Notification si 0 points
+        // Mute + proposition de ban si 0 points
         if points_after == 0 {
+            self.mute_user(&cmd.guild_id, &cmd.user_id).await;
+            let infraction = Infraction {
+                id: Uuid::new_v4(),
+                guild_id: cmd.guild_id.clone(),
+                channel_id: String::new(),
+                user_id: cmd.user_id.clone(),
+                username: cmd.username.clone(),
+                message_id: String::new(),
+                content: String::new(),
+                flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
+                score: 0.0,
+                action: Action::Ban,
+                reason: format!("Points de conduite tombes a 0 (derniere infraction: {})", cmd.action),
+                duration: None,
+                created_at: Utc::now(),
+            };
+            let _ = self.infraction_repo.save(&infraction).await;
+
             self.broadcaster.broadcast(
                 "user_zero_points",
                 serde_json::json!({

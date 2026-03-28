@@ -34,6 +34,7 @@ pub struct AppState {
     pub broadcaster: Arc<EventBroadcaster>,
     pub job_client: JobClient,
     pub api_key: String,
+    pub discord_bot_token: String,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
 }

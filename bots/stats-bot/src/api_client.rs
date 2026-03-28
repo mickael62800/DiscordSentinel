@@ -105,6 +105,20 @@ impl ApiClient {
         }
     }
 
+    pub fn send_log(&self, level: &str, server: &str, message: &str) {
+        #[derive(Serialize)]
+        struct LogPayload { level: String, bot: String, server: String, message: String, category: String }
+        let req = self.auth(self.client.post(format!("{}/api/logs", self.base_url))
+            .json(&LogPayload {
+                level: level.to_string(),
+                bot: Self::BOT_NAME.to_string(),
+                server: server.to_string(),
+                message: message.to_string(),
+                category: "bot".to_string(),
+            }));
+        tokio::spawn(async move { let _ = req.send().await; });
+    }
+
     pub async fn heartbeat(&self, name: &str) -> Result<(), String> {
         #[derive(serde::Serialize)]
         struct Payload { name: String }

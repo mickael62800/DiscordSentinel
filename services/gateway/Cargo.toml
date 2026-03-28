@@ -13,6 +13,9 @@ tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "prop
 # Redis pub/sub
 redis = { version = "0.27", features = ["tokio-comp"] }
 
+# HTTP Client
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
 # Serialization
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

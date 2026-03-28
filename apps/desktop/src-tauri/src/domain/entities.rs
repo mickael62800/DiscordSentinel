@@ -68,6 +68,10 @@ pub struct ServerStats {
     pub infractions_today: u32,
     pub bots_online: u32,
     pub bots_total: u32,
+    pub workers_online: u32,
+    pub workers_total: u32,
+    pub postgres_online: bool,
+    pub redis_online: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -78,6 +82,10 @@ pub struct LogEntry {
     pub bot: String,
     pub server: String,
     pub message: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub details: serde_json::Value,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -90,6 +98,18 @@ pub struct Infraction {
     pub reason: String,
     pub created_at: String,
     pub moderator: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ConfirmedBan {
+    pub id: String,
+    pub guild_id: String,
+    pub target_id: String,
+    pub target_name: String,
+    pub moderator_name: String,
+    pub action_type: String,
+    pub reason: String,
+    pub created_at: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -281,6 +301,17 @@ pub struct AutoRoleConfig {
     pub enabled: bool,
 }
 
+// ── Top Users ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct TopUser {
+    pub user_id: String,
+    pub username: String,
+    pub message_count: u64,
+    pub voice_seconds: u64,
+    pub voice_hours: f64,
+}
+
 // ── Dashboard Charts ──
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -290,6 +321,7 @@ pub struct DailyActivity {
     pub voice_minutes: i64,
     pub active_members: i32,
     pub new_members: i32,
+    pub leaves: i32,
     pub infractions: i32,
     pub warns: i32,
     pub mutes: i32,

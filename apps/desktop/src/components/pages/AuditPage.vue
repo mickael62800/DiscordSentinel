@@ -2,7 +2,9 @@
 import { useAuditLogs } from "../../composables/useAuditLogs";
 import AppBadge from "../atoms/AppBadge.vue";
 import type { BadgeVariant } from "../../utils/variants";
+import { useFormatDate } from "../../composables/useFormatDate";
 
+const { formatShortDateTime: fmt } = useFormatDate();
 const { filteredLogs, eventTypes, loading, filterEventType, searchQuery } = useAuditLogs();
 
 function eventVariant(type: string): BadgeVariant {
@@ -102,7 +104,7 @@ function eventIcon(type: string): string {
             <span v-if="log.channel_name" class="channel">
               dans <strong>{{ log.channel_name }}</strong>
             </span>
-            <span class="timestamp">{{ log.created_at }}</span>
+            <span class="timestamp">{{ fmt(log.created_at) }}</span>
           </div>
           <div v-if="hasDetails(log.details)" class="entry-details">
             <template v-if="log.details.new_content">

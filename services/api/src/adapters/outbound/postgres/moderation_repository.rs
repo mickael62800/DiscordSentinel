@@ -91,4 +91,39 @@ impl ModerationRepository for PgModerationRepository {
 
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
+
+    async fn find_bans(&self, guild_id: Option<&str>) -> Result<Vec<ModerationAction>, DomainError> {
+        let rows = match guild_id {
+            Some(gid) => {
+                sqlx::query_as::<_, ActionRow>(
+                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' AND guild_id = $1 ORDER BY created_at DESC LIMIT 200",
+                )
+                .bind(gid)
+                .fetch_all(&self.pool)
+                .await
+            }
+            None => {
+                sqlx::query_as::<_, ActionRow>(
+                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' ORDER BY created_at DESC LIMIT 200",
+                )
+                .fetch_all(&self.pool)
+                .await
+            }
+        }
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(ModerationAction::from).collect())
+    }
+
+    async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {
+        sqlx::query(
+            "DELETE FROM moderation_actions WHERE guild_id = $1 AND target_id = $2 AND action_type LIKE 'ban%'",
+        )
+        .bind(guild_id)
+        .bind(target_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(())
+    }
 }

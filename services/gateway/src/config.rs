@@ -7,6 +7,7 @@ pub struct Config {
     pub redis_channel: String,
     pub allowed_origins: String,
     pub max_connections: usize,
+    pub api_url: String,
 }
 
 impl Config {
@@ -27,6 +28,8 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(1000),
+            api_url: std::env::var("API_URL")
+                .unwrap_or_else(|_| "http://localhost:3000".to_string()),
         }
     }
 

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useNotifications } from "../../composables/useNotifications";
 import AppBadge from "../atoms/AppBadge.vue";
+import { useFormatDate } from "../../composables/useFormatDate";
 
+const { formatShortDateTime: fmt } = useFormatDate();
 const { notifications, unreadCount, markAsRead, markAllAsRead, closePanel } = useNotifications();
 
 function severityVariant(severity: string): "danger" | "warning" | "info" | "default" {
@@ -53,7 +55,7 @@ function typeIcon(type: string): string {
             <AppBadge :label="notif.severity" :variant="severityVariant(notif.severity)" />
           </div>
           <p class="notif-message">{{ notif.message }}</p>
-          <span class="notif-time">{{ notif.created_at }}</span>
+          <span class="notif-time">{{ fmt(notif.created_at) }}</span>
         </div>
         <span v-if="!notif.read" class="unread-dot"></span>
       </div>

@@ -21,7 +21,7 @@ use crate::application::role_panels_service::RolePanelsService;
 use crate::application::watched_users_service::WatchedUsersService;
 use crate::application::ia_config_service::{IaConfigService, IaConfig};
 use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
-use crate::domain::entities::{ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, DailyActivity, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::entities::{ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
 
 #[tauri::command]
 pub async fn get_dashboard_stats(
@@ -43,6 +43,14 @@ pub async fn get_logs(
     guild_id: Option<String>,
 ) -> Result<Vec<LogEntry>, String> {
     service.get_logs(guild_id).await
+}
+
+#[tauri::command]
+pub async fn delete_logs_by_category(
+    service: State<'_, Arc<LogsService>>,
+    category: String,
+) -> Result<(), String> {
+    service.delete_logs_by_category(category).await
 }
 
 #[tauri::command]
@@ -232,6 +240,33 @@ pub async fn ws_status(
     Ok(service.get_status().await)
 }
 
+#[tauri::command]
+pub async fn execute_ban(
+    service: State<'_, Arc<ModerationService>>,
+    guild_id: String,
+    user_id: String,
+    reason: String,
+) -> Result<(), String> {
+    service.execute_ban(guild_id, user_id, reason).await
+}
+
+#[tauri::command]
+pub async fn execute_unban(
+    service: State<'_, Arc<ModerationService>>,
+    guild_id: String,
+    user_id: String,
+) -> Result<(), String> {
+    service.execute_unban(guild_id, user_id).await
+}
+
+#[tauri::command]
+pub async fn get_confirmed_bans(
+    service: State<'_, Arc<ModerationService>>,
+    guild_id: Option<String>,
+) -> Result<Vec<ConfirmedBan>, String> {
+    service.get_confirmed_bans(guild_id).await
+}
+
 // --- Security commands ---
 
 #[tauri::command]
@@ -372,6 +407,15 @@ pub async fn get_activity_trend(
     days: Option<i32>,
 ) -> Result<Vec<DailyActivity>, String> {
     service.get_activity_trend(guild_id, days).await
+}
+
+#[tauri::command]
+pub async fn get_top_users(
+    service: State<'_, Arc<DashboardChartsService>>,
+    guild_id: String,
+    limit: Option<u32>,
+) -> Result<Vec<TopUser>, String> {
+    service.get_top_users(guild_id, limit).await
 }
 
 // ── Levels / XP ──

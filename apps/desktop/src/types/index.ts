@@ -51,6 +51,10 @@ export interface ServerStats {
   infractions_today: number;
   bots_online: number;
   bots_total: number;
+  workers_online: number;
+  workers_total: number;
+  postgres_online: boolean;
+  redis_online: boolean;
 }
 
 export interface LogEntry {
@@ -60,6 +64,8 @@ export interface LogEntry {
   bot: string;
   server: string;
   message: string;
+  category: string;
+  details: Record<string, unknown>;
 }
 
 export interface Infraction {
@@ -71,6 +77,17 @@ export interface Infraction {
   reason: string;
   created_at: string;
   moderator: string;
+}
+
+export interface ConfirmedBan {
+  id: string;
+  guild_id: string;
+  target_id: string;
+  target_name: string;
+  moderator_name: string;
+  action_type: string;
+  reason: string;
+  created_at: string;
 }
 
 export interface ModerationRule {
@@ -305,10 +322,19 @@ export interface DailyActivity {
   voice_minutes: number;
   active_members: number;
   new_members: number;
+  leaves: number;
   infractions: number;
   warns: number;
   mutes: number;
   bans: number;
+}
+
+export interface TopUser {
+  user_id: string;
+  username: string;
+  message_count: number;
+  voice_seconds: number;
+  voice_hours: number;
 }
 
 // ── Levels / XP ──
