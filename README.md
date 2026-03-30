@@ -59,27 +59,27 @@ Discord Messages / Events / Images
 
 | Composant            | Technologie                              | Details                                                    |
 | -------------------- | ---------------------------------------- | ---------------------------------------------------------- |
-| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 62+ endpoints, 21 handlers, 14 use cases |
+| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 62+ endpoints, 22 handlers, 14 use cases, helpers.rs |
 | Gateway WebSocket    | Rust, Axum 0.8, Redis pub/sub            | Service dedie temps reel, auto-reconnect                   |
-| Workers (3)          | Rust, Tokio, Redis, sqlx                 | 3 workers specialises : moderation, analytics, monitoring  |
-| Base de donnees      | PostgreSQL 16                            | 28 migrations, 20+ tables                                  |
+| Workers (3 + common) | Rust, Tokio, Redis, sqlx                 | 3 workers specialises + crate partagee sentinel-worker-common |
+| Base de donnees      | PostgreSQL 16                            | 29 migrations, 20+ tables                                  |
 | Cache                | Redis 7                                  | Cache regles TTL 5min, stats TTL 60s, pub/sub events       |
 | Inference IA         | ONNX Runtime 2.0, ndarray, tokenizers    | Vision (NSFW/illicite) + Text (sentiments)                 |
 | Automod Bot          | Rust, Serenity 0.12                      | Detection spam/insultes/liens/phishing + appel API         |
 | Moderation Bot       | Rust, Serenity 0.12                      | /warn /mute /ban /unmute /unban /history                   |
 | Security Bot         | Rust, Serenity 0.12, DashMap             | Anti-raid, quarantaine, captcha DM, slowmode auto          |
-| Stats Bot            | Rust, Serenity 0.12                      | /stats user, server, top + tracking temps reel + XP/levels |
+| Stats Bot (→ Progression Bot) | Rust, Serenity 0.12               | /stats user, server, top + tracking temps reel + XP/levels |
 | Ticket Bot           | Rust, Serenity 0.12                      | /ticket create, close, assign                              |
 | Image Bot            | Rust, Serenity 0.12                      | Detection images NSFW/illicites via API                    |
 | Voice Bot            | Rust, Serenity 0.12                      | Salons dynamiques, vote kick, co-admins, whitelist/ban     |
 | Audit Bot            | Rust, Serenity 0.12                      | Tracking audit logs Discord                                |
-| Roles Bot            | Rust, Serenity 0.12                      | Role panels + auto-roles                                   |
-| Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia, Chart.js | 25 pages, 19 composants UI, 25 composables                 |
+| Roles Bot (→ Community Bot) | Rust, Serenity 0.12                 | Role panels + auto-roles + sync Discord roles              |
+| Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia, Chart.js | 27 pages, 24 composants UI, 29 composables                 |
 | Desktop App Backend  | Tauri 2.x, Rust                          | Architecture hexagonale, HEED/LMDB local, WebSocket        |
 | Entrainement IA      | Python, PyTorch, Transformers, ONNX      | 2 modeles : vision + text sentiment                        |
 | Containerisation     | Docker (Alpine), Docker Compose          | Multi-stage builds, 15 services                            |
 
-**Dependances Rust cles** : serde, reqwest 0.12, sqlx 0.8, chrono, uuid, thiserror, tracing, async-trait, regex, tower-http (CORS, rate limiting, tracing), dashmap, futures-util, ort (ONNX Runtime), tokenizers, image, base64, ndarray
+**Dependances Rust cles** : serde, reqwest 0.12, sqlx 0.8, chrono, uuid, thiserror, tracing, async-trait, regex, tower-http (CORS, rate limiting, tracing), dashmap, futures-util, ort (ONNX Runtime), tokenizers, image, base64, ndarray, sentinel-worker-common (crate partagee workers), sentinel-shared (crate partagee bots)
 
 ---
 
@@ -120,10 +120,10 @@ DiscordSentinel/
 |   |   |   |-- application/            # 14 implementations use cases
 |   |   |   +-- adapters/
 |   |   |       |-- inbound/
-|   |   |       |   |-- http/           # 21 handlers, 19 DTOs, middleware (auth, rate_limit), router
+|   |   |       |   |-- http/           # 22 handlers, helpers.rs, 19 DTOs, middleware (auth, rate_limit), router
 |   |   |       |   +-- ws/             # EventBroadcaster (Redis pub/sub)
 |   |   |       +-- outbound/           # 18 PostgreSQL repos, Redis cache
-|   |   |-- migrations/                 # 28 SQL migrations
+|   |   |-- migrations/                 # 29 SQL migrations
 |   |   |-- Dockerfile
 |   |   +-- Cargo.toml
 |   |
@@ -141,11 +141,13 @@ DiscordSentinel/
 |   +-- worker/                         # Worker async legacy (queue Redis)
 |       +-- Cargo.toml
 |
-|-- services/workers/                    # 3 workers specialises
+|-- services/workers/                    # 3 workers specialises + crate partagee
+|   |-- worker-common/                 # Crate partagee (shutdown, heartbeat, scheduler, pg_pool)
+|   |   +-- src/lib.rs
 |   |-- moderation-worker/              # Conduite, bans, sync ban proposals
-|   |   +-- src/ (main, config, heartbeat, scheduler, jobs/)
+|   |   +-- src/ (main, config, scheduler, jobs/)
 |   |-- analytics-worker/              # Snapshots quotidiens + horaires
-|   |   +-- src/ (main, config, heartbeat, scheduler, jobs/)
+|   |   +-- src/ (main, config, scheduler, jobs/)
 |   +-- monitoring-worker/             # Monitoring systeme
 |       +-- src/ (main, config, monitor)
 |
@@ -214,7 +216,7 @@ DiscordSentinel/
 
 ---
 
-## Schema base de donnees (PostgreSQL — 28 migrations)
+## Schema base de donnees (PostgreSQL — 29 migrations)
 
 ### Tables principales
 
@@ -240,6 +242,7 @@ DiscordSentinel/
 | `daily_activity`     | Snapshots quotidiens             | messages, voice_minutes, active_members, infractions                               |
 | `hourly_activity`    | Activite par heure (heatmaps)    | guild_id, day, hour, messages, infractions                                         |
 | `role_panels`        | Panels de roles                  | guild_id, channel_id, message_id, title, roles (JSONB)                             |
+| `discord_roles`      | Roles Discord synchronises       | guild_id, id, name, color, position, permissions, managed, member_count             |
 
 ### Flag types supportes (10)
 
@@ -325,6 +328,13 @@ Config, ajout XP, niveaux utilisateur, leaderboard, recompenses par niveau.
 ### Role Panels
 
 Panels de roles avec selection, auto-roles a l'arrivee.
+
+### Discord Roles
+
+| Methode | Route                                | Description                                        |
+| ------- | ------------------------------------ | -------------------------------------------------- |
+| GET     | `/api/discord-roles/{guild_id}`      | Liste les roles Discord du serveur (synchronises)  |
+| POST    | `/api/discord-roles/{guild_id}/sync` | Synchroniser les roles (appele par le community-bot) |
 
 ### Analytics (6 endpoints)
 
@@ -513,7 +523,7 @@ Service dedie au temps reel, separe de l'API.
 
 ## Desktop App (Tauri)
 
-### Pages (25 ecrans)
+### Pages (27 ecrans)
 
 | Page           | Fonctionnalite                                                   |
 | -------------- | ---------------------------------------------------------------- |
@@ -543,11 +553,12 @@ Service dedie au temps reel, separe de l'API.
 | Analytics      | Heatmap, trends moderation, top infracteurs, peak hours, distribution |
 | IA Config      | Seuils de confiance IA par serveur (sliders text + vision)       |
 | AI Training    | Interface d'entrainement IA (datasets, progression, graphiques)  |
+| Discord Roles  | Visualisation des roles Discord du serveur (sync par le bot)     |
 
 ### Frontend Vue 3
 
-- **Atomic Design** : 6 atoms, 4 molecules, 8 organisms, 1 template, 25 pages
-- **25 composables** : useAuth, useDashboard, useRules, useInfractions, useModeration, useTickets, useVoiceChannels, useBans, useConduct, useLevels, useRolePanels, useSecurity, useWatchedUsers, useAuditLogs, useLogs, useDashboardCharts, useRealtime, useNotifications, useAiTraining, useAnalytics, useFetch, useFormatDate, useGuildSelector, useIaConfig, usePagination
+- **Atomic Design** : 9 atoms, 5 molecules, 10 organisms, 1 template, 27 pages
+- **29 composables** : useAuth, useDashboard, useRules, useInfractions, useModeration, useTickets, useVoiceChannels, useBans, useConduct, useLevels, useRolePanels, useSecurity, useWatchedUsers, useAuditLogs, useLogs, useDashboardCharts, useRealtime, useNotifications, useAiTraining, useAnalytics, useFetch, useFormatDate, useGuildSelector, useIaConfig, usePagination, useGuildFetch, useSearch, useConfirm, useDiscordRoles
 - **Notifications natives** desktop via WebSocket
 - **Graphiques** Chart.js (trends, distributions)
 
@@ -732,7 +743,7 @@ cd apps/desktop && npm run tauri dev
 
 ### Termine
 
-- [x] API Backend — Architecture hexagonale, 62+ endpoints, 21 handlers, 14 use cases, 28 migrations
+- [x] API Backend — Architecture hexagonale, 62+ endpoints, 22 handlers, helpers.rs, 14 use cases, 29 migrations
 - [x] Automod Bot — Detection spam/insultes/liens/phishing + appel API + fallback
 - [x] Moderation Bot — /warn /mute /ban /unmute /unban /history avec DM et logging
 - [x] Security Bot — Anti-raid + comptes suspects + alertes
@@ -742,7 +753,7 @@ cd apps/desktop && npm run tauri dev
 - [x] Voice Bot — Salons dynamiques, vote kick, co-admins, whitelist/ban
 - [x] Audit Bot — Tracking audit logs Discord
 - [x] Roles Bot — Panels de roles + auto-roles
-- [x] Desktop App — 25 pages, OAuth Discord, WebSocket temps reel, notifications natives
+- [x] Desktop App — 27 pages, OAuth Discord, WebSocket temps reel, notifications natives
 - [x] Gateway WebSocket — Service dedie, Redis pub/sub, auto-reconnect, limite connexions
 - [x] Inference IA ONNX — Vision (NSFW/illicite) + Text (sentiments) integres dans l'API
 - [x] Tokenizer Rust — HuggingFace tokenizers pour inference text
@@ -764,6 +775,14 @@ cd apps/desktop && npm run tauri dev
 - [x] AI Training UI — Interface desktop pour entrainement IA (datasets, progression, graphiques)
 - [x] Worker Config UI — Page de configuration et monitoring des workers
 - [x] Guild Selector — Selection de serveur globale dans l'app desktop
+- [x] Refactoring DRY desktop — useGuildFetch, useSearch, useConfirm, LogsTemplate, FormField, LoadingState, EmptyState, ConfirmDialog, CSS variables
+- [x] Refactoring API — helpers.rs (map_to_dtos, normalize_limit, ok_response), DiscordApiService, route nesting
+- [x] Refactoring Gateway — Race condition fixee, exponential backoff Redis, graceful shutdown timeout, config env
+- [x] Refactoring Workers — Crate sentinel-worker-common, 3 workers refactores, fix bug analytics interval
+- [x] Ameliorations ML — max_length 128, early stopping vision, test split, augmentation enrichie, class weights, AMP, LR finder, shared metrics
+- [x] Embeds Discord uniformes — bots/shared/src/embeds.rs, 8 bots migres vers embeds riches
+- [x] Centralisation variants — actionLabel, typeLabel, eventVariant, eventLabel, eventIcon dans variants.ts
+- [x] Discord Roles — Sync bot→API→desktop, page DiscordRolesPage, migration 029
 
 ### En cours
 
@@ -779,3 +798,4 @@ cd apps/desktop && npm run tauri dev
 - [ ] Backup automatique — Snapshots PostgreSQL + export config
 
 > Roadmap detaillee des features futures : [docs/ROADMAPV2.md](docs/ROADMAPV2.md)
+> Regles metier des bots + 87 features planifiees + modifications API/desktop : [docs/bots-business-logic.md](docs/bots-business-logic.md)
