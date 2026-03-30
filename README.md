@@ -59,10 +59,10 @@ Discord Messages / Events / Images
 
 | Composant            | Technologie                              | Details                                                    |
 | -------------------- | ---------------------------------------- | ---------------------------------------------------------- |
-| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 62+ endpoints, 14 use cases       |
+| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 62+ endpoints, 21 handlers, 14 use cases |
 | Gateway WebSocket    | Rust, Axum 0.8, Redis pub/sub            | Service dedie temps reel, auto-reconnect                   |
-| Worker               | Rust, Tokio, Redis, sqlx                 | Queue Redis (BRPOP), taches periodiques, jobs background   |
-| Base de donnees      | PostgreSQL 16                            | 20 migrations, 20+ tables                                  |
+| Workers (3)          | Rust, Tokio, Redis, sqlx                 | 3 workers specialises : moderation, analytics, monitoring  |
+| Base de donnees      | PostgreSQL 16                            | 28 migrations, 20+ tables                                  |
 | Cache                | Redis 7                                  | Cache regles TTL 5min, stats TTL 60s, pub/sub events       |
 | Inference IA         | ONNX Runtime 2.0, ndarray, tokenizers    | Vision (NSFW/illicite) + Text (sentiments)                 |
 | Automod Bot          | Rust, Serenity 0.12                      | Detection spam/insultes/liens/phishing + appel API         |
@@ -74,7 +74,7 @@ Discord Messages / Events / Images
 | Voice Bot            | Rust, Serenity 0.12                      | Salons dynamiques, vote kick, co-admins, whitelist/ban     |
 | Audit Bot            | Rust, Serenity 0.12                      | Tracking audit logs Discord                                |
 | Roles Bot            | Rust, Serenity 0.12                      | Role panels + auto-roles                                   |
-| Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia, Chart.js | 17 pages, 15 composants UI, 18 composables                 |
+| Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia, Chart.js | 25 pages, 19 composants UI, 25 composables                 |
 | Desktop App Backend  | Tauri 2.x, Rust                          | Architecture hexagonale, HEED/LMDB local, WebSocket        |
 | Entrainement IA      | Python, PyTorch, Transformers, ONNX      | 2 modeles : vision + text sentiment                        |
 | Containerisation     | Docker (Alpine), Docker Compose          | Multi-stage builds, 15 services                            |
@@ -91,9 +91,9 @@ DiscordSentinel/
 |-- apps/
 |   +-- desktop/                        # App admin Tauri + Vue 3
 |       |-- src/                        # Frontend Vue 3 + TypeScript
-|       |   |-- components/             # Atomic design (6 atoms, 3 molecules, 6 organisms, 1 template)
-|       |   |-- router/                 # Vue Router (17 routes)
-|       |   |-- composables/            # 18 composables Vue
+|       |   |-- components/             # Atomic design (6 atoms, 4 molecules, 8 organisms, 1 template, 25 pages)
+|       |   |-- router/                 # Vue Router (25 routes)
+|       |   |-- composables/            # 25 composables Vue
 |       |   |-- types/                  # TypeScript interfaces
 |       |   +-- styles/                 # CSS global
 |       |-- src-tauri/                  # Backend Tauri (Rust)
@@ -120,10 +120,10 @@ DiscordSentinel/
 |   |   |   |-- application/            # 14 implementations use cases
 |   |   |   +-- adapters/
 |   |   |       |-- inbound/
-|   |   |       |   |-- http/           # 20 handlers, 19 DTOs, middleware (auth, rate_limit), router
+|   |   |       |   |-- http/           # 21 handlers, 19 DTOs, middleware (auth, rate_limit), router
 |   |   |       |   +-- ws/             # EventBroadcaster (Redis pub/sub)
 |   |   |       +-- outbound/           # 18 PostgreSQL repos, Redis cache
-|   |   |-- migrations/                 # 20 SQL migrations
+|   |   |-- migrations/                 # 28 SQL migrations
 |   |   |-- Dockerfile
 |   |   +-- Cargo.toml
 |   |
@@ -138,19 +138,16 @@ DiscordSentinel/
 |   |   |-- Dockerfile
 |   |   +-- Cargo.toml
 |   |
-|   +-- worker/                         # Worker async (traitement background)
-|       |-- src/
-|       |   |-- main.rs               # Bootstrap, connexions PG+Redis, graceful shutdown
-|       |   |-- config.rs             # DATABASE_URL, REDIS_URL, intervalles
-|       |   |-- queue.rs              # Redis job queue (LPUSH/BRPOP)
-|       |   |-- scheduler.rs          # Planificateur taches periodiques
-|       |   +-- jobs/
-|       |       |-- mod.rs            # Dispatch job par type
-|       |       |-- conduct_regen.rs  # Regen points de conduite
-|       |       |-- cleanup_bans.rs   # Nettoyage bans vocaux expires
-|       |       +-- daily_snapshot.rs # Snapshots activite quotidienne
-|       |-- Dockerfile
+|   +-- worker/                         # Worker async legacy (queue Redis)
 |       +-- Cargo.toml
+|
+|-- services/workers/                    # 3 workers specialises
+|   |-- moderation-worker/              # Conduite, bans, sync ban proposals
+|   |   +-- src/ (main, config, heartbeat, scheduler, jobs/)
+|   |-- analytics-worker/              # Snapshots quotidiens + horaires
+|   |   +-- src/ (main, config, heartbeat, scheduler, jobs/)
+|   +-- monitoring-worker/             # Monitoring systeme
+|       +-- src/ (main, config, monitor)
 |
 |-- bots/
 |   |-- automod-bot/                    # Bot auto-moderation
@@ -217,7 +214,7 @@ DiscordSentinel/
 
 ---
 
-## Schema base de donnees (PostgreSQL — 20 migrations)
+## Schema base de donnees (PostgreSQL — 28 migrations)
 
 ### Tables principales
 
@@ -516,7 +513,7 @@ Service dedie au temps reel, separe de l'API.
 
 ## Desktop App (Tauri)
 
-### Pages (20 ecrans)
+### Pages (25 ecrans)
 
 | Page           | Fonctionnalite                                                   |
 | -------------- | ---------------------------------------------------------------- |
@@ -524,6 +521,10 @@ Service dedie au temps reel, separe de l'API.
 | Login          | Connexion Discord OAuth                                          |
 | Dashboard      | Stats globales + graphiques Chart.js                             |
 | Logs           | Logs d'activite avec filtres (niveau, bot)                       |
+| Logs API       | Logs specifiques a l'API                                         |
+| Logs Bots      | Logs specifiques aux bots Discord                                |
+| Logs WebSocket | Logs specifiques au gateway WebSocket                            |
+| Logs Workers   | Logs specifiques aux workers                                     |
 | Infractions    | Table des infractions avec details                               |
 | Rules          | Gestion des regles (toggle, edition seuils/poids)                |
 | Bans           | Liste des bans avec recherche et filtres                         |
@@ -538,13 +539,15 @@ Service dedie au temps reel, separe de l'API.
 | Audit          | Logs d'audit                                                     |
 | Settings       | Configuration (URL API, cle, auto-refresh, logout)               |
 | Bot Config     | Configuration par bot et par serveur                             |
+| Worker Config  | Configuration et monitoring des workers                          |
 | Analytics      | Heatmap, trends moderation, top infracteurs, peak hours, distribution |
 | IA Config      | Seuils de confiance IA par serveur (sliders text + vision)       |
+| AI Training    | Interface d'entrainement IA (datasets, progression, graphiques)  |
 
 ### Frontend Vue 3
 
-- **Atomic Design** : 6 atoms, 3 molecules, 6 organisms, 1 template
-- **18 composables** : useAuth, useDashboard, useRules, useInfractions, useModeration, useTickets, useVoiceChannels, useBans, useConduct, useLevels, useRolePanels, useSecurity, useWatchedUsers, useAuditLogs, useLogs, useDashboardCharts, useRealtime, useNotifications
+- **Atomic Design** : 6 atoms, 4 molecules, 8 organisms, 1 template, 25 pages
+- **25 composables** : useAuth, useDashboard, useRules, useInfractions, useModeration, useTickets, useVoiceChannels, useBans, useConduct, useLevels, useRolePanels, useSecurity, useWatchedUsers, useAuditLogs, useLogs, useDashboardCharts, useRealtime, useNotifications, useAiTraining, useAnalytics, useFetch, useFormatDate, useGuildSelector, useIaConfig, usePagination
 - **Notifications natives** desktop via WebSocket
 - **Graphiques** Chart.js (trends, distributions)
 
@@ -558,44 +561,43 @@ Service dedie au temps reel, separe de l'API.
 
 ---
 
-## Worker Service
+## Workers (3 services specialises)
 
-Service de traitement asynchrone, separe de l'API. Combine une queue Redis et des taches periodiques.
+Architecture distribuee avec 3 workers dedies, chacun avec son propre scheduler et heartbeat.
 
-**Architecture** : API enqueue des jobs via `LPUSH sentinel:jobs` -> Worker consomme via `BRPOP` -> execution + mise a jour BDD.
+### Moderation Worker
 
-### Queue Redis
+Gere les taches liees a la moderation et aux sanctions.
 
-| Propriete  | Valeur                                                |
-| ---------- | ----------------------------------------------------- |
-| Queue key  | `sentinel:jobs` (configurable via `REDIS_QUEUE_KEY`)  |
-| Format job | JSON `{"type": "...", "payload": {...}, "created_at"}` |
-| Consommation | `BRPOP` bloquant avec timeout 2s                    |
-| Production | `LPUSH` via `JobClient` dans l'API                    |
+| Tache                | Intervalle | Description                                    |
+| -------------------- | ---------- | ---------------------------------------------- |
+| `conduct_regen`      | 1h         | Regeneration points de conduite (weekly/monthly)|
+| `cleanup_bans`       | 60s        | Nettoyage bans vocaux expires                  |
+| `sync_ban_proposals` | periodique | Synchronisation propositions de ban             |
 
-### Taches periodiques
+### Analytics Worker
 
-| Tache            | Intervalle | Description                                    |
-| ---------------- | ---------- | ---------------------------------------------- |
-| `conduct_regen`  | 1h         | Regeneration points de conduite (weekly/monthly)|
-| `cleanup_bans`   | 60s        | Nettoyage bans vocaux expires                  |
-| `daily_snapshot` | 5min       | Snapshots activite quotidienne par guild        |
+Gere les snapshots et statistiques d'activite.
 
-### Types de jobs supportes
+| Tache             | Intervalle | Description                                    |
+| ----------------- | ---------- | ---------------------------------------------- |
+| `daily_snapshot`  | 5min       | Snapshots activite quotidienne par guild        |
+| `hourly_snapshot` | periodique | Snapshots activite par heure (heatmaps)        |
 
-| Type              | Description                               |
-| ----------------- | ----------------------------------------- |
-| `conduct_regen`   | Regeneration manuelle des points          |
-| `cleanup_bans`    | Nettoyage bans a la demande               |
-| `daily_snapshot`  | Snapshot activite a la demande            |
+### Monitoring Worker
 
-### Configuration
+Surveillance systeme et sante des services.
+
+| Composant | Description                       |
+| --------- | --------------------------------- |
+| `monitor` | Monitoring sante et metriques     |
+
+### Configuration workers
 
 | Variable                  | Defaut          | Description                    |
 | ------------------------- | --------------- | ------------------------------ |
 | `DATABASE_URL`            | requis          | URL PostgreSQL                 |
 | `REDIS_URL`               | requis          | URL Redis                      |
-| `REDIS_QUEUE_KEY`         | `sentinel:jobs` | Cle de la queue Redis          |
 | `CONDUCT_REGEN_INTERVAL`  | `3600`          | Intervalle regen conduite (s)  |
 | `BAN_CLEANUP_INTERVAL`    | `60`            | Intervalle cleanup bans (s)    |
 | `DAILY_SNAPSHOT_INTERVAL` | `300`           | Intervalle snapshots (s)       |
@@ -644,7 +646,9 @@ Services :
 - **redis** (7-alpine) — port 6379
 - **api** — port 3000
 - **gateway** — port 3001
-- **worker** — traitement async
+- **moderation-worker** — conduite, bans, sync ban proposals
+- **analytics-worker** — snapshots quotidiens + horaires
+- **monitoring-worker** — surveillance systeme
 - **automod-bot, moderation-bot, security-bot, ticket-bot, image-bot, voice-bot, stats-bot, audit-bot, roles-bot**
 
 ### Variables d'environnement (.env)
@@ -728,7 +732,7 @@ cd apps/desktop && npm run tauri dev
 
 ### Termine
 
-- [x] API Backend — Architecture hexagonale, 62+ endpoints, 14 use cases, 20 migrations
+- [x] API Backend — Architecture hexagonale, 62+ endpoints, 21 handlers, 14 use cases, 28 migrations
 - [x] Automod Bot — Detection spam/insultes/liens/phishing + appel API + fallback
 - [x] Moderation Bot — /warn /mute /ban /unmute /unban /history avec DM et logging
 - [x] Security Bot — Anti-raid + comptes suspects + alertes
@@ -738,7 +742,7 @@ cd apps/desktop && npm run tauri dev
 - [x] Voice Bot — Salons dynamiques, vote kick, co-admins, whitelist/ban
 - [x] Audit Bot — Tracking audit logs Discord
 - [x] Roles Bot — Panels de roles + auto-roles
-- [x] Desktop App — 17 pages, OAuth Discord, WebSocket temps reel, notifications natives
+- [x] Desktop App — 25 pages, OAuth Discord, WebSocket temps reel, notifications natives
 - [x] Gateway WebSocket — Service dedie, Redis pub/sub, auto-reconnect, limite connexions
 - [x] Inference IA ONNX — Vision (NSFW/illicite) + Text (sentiments) integres dans l'API
 - [x] Tokenizer Rust — HuggingFace tokenizers pour inference text
@@ -751,11 +755,15 @@ cd apps/desktop && npm run tauri dev
 - [x] Docker Compose — 15 services orchestres
 - [x] Tests unitaires — 110+ tests (API, gateway, bots)
 - [x] Multi-stage Docker builds — Images Alpine optimisees
-- [x] Worker service — Queue Redis (LPUSH/BRPOP), taches periodiques, JobClient API
+- [x] Workers specialises — 3 workers dedies (moderation, analytics, monitoring) avec heartbeat
 - [x] Anti-raid avance — Quarantaine (role restrictif), captcha DM (bouton), slowmode auto, kick timeout
 - [x] Config seuils IA per-guild — Table ia_config, endpoints API, page desktop avec sliders, seuils dynamiques
 - [x] Rate limiting inference — Semaphore (4 concurrent) + token bucket (20/s), HTTP 429, configurable
 - [x] Page analytics desktop — Heatmap, trends moderation, top infracteurs, peak hours, distribution actions
+- [x] Logs segmentes — Pages dediees par source (API, Bots, WebSocket, Workers)
+- [x] AI Training UI — Interface desktop pour entrainement IA (datasets, progression, graphiques)
+- [x] Worker Config UI — Page de configuration et monitoring des workers
+- [x] Guild Selector — Selection de serveur globale dans l'app desktop
 
 ### En cours
 

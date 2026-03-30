@@ -15,6 +15,8 @@ use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 use crate::api_client::{Action, AnalyzeRequest, ApiClient, MessageMetadata};
 use crate::detectors;
 
+use sentinel_shared::embeds::{warn_embed, moderate_embed, danger_embed, critical_embed};
+
 /// Deduplication des messages deja traites
 pub struct ProcessedMessagesKey;
 
@@ -127,10 +129,11 @@ impl EventHandler for Handler {
             drop(data);
 
             // Avertir + traiter comme spam
-            let _ = msg.reply(&ctx.http, format!(
-                "<@{}> Merci de ne pas envoyer autant de messages aussi rapidement.",
-                msg.author.id
-            )).await;
+            let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                .field("📝 Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
+                .thumbnail(msg.author.face());
+            let builder = serenity::builder::CreateMessage::new().embed(embed);
+            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
 
             info!(user = %msg.author.name, "Flood detecte");
 
@@ -143,10 +146,11 @@ impl EventHandler for Handler {
 
         // 2. Detection caps (avertissement seulement, pas d'infraction)
         if detectors::spam::detect_caps(content) {
-            let _ = msg.reply(&ctx.http, format!(
-                "<@{}> Merci d'ecrire normalement sans tout mettre en majuscules.",
-                msg.author.id
-            )).await;
+            let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                .field("📝 Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
+                .thumbnail(msg.author.face());
+            let builder = serenity::builder::CreateMessage::new().embed(embed);
+            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
             info!(user = %msg.author.name, "Caps detecte, avertissement envoye");
             // Pas d'appel backend, juste un avertissement
         }
@@ -250,16 +254,18 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
         Err(e) => {
             warn!(error = %e, "Backend injoignable — action locale par defaut");
             if request.flags.phishing {
-                let _ = msg.reply(&ctx.http, format!(
-                    "<@{}> Ton message a ete supprime (lien suspect detecte).",
-                    msg.author.id
-                )).await;
+                let embed = moderate_embed("🗑\u{fe0f} Message supprime")
+                    .field("📝 Raison", "Lien suspect detecte.", false)
+                    .thumbnail(msg.author.face());
+                let builder = serenity::builder::CreateMessage::new().embed(embed);
+                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
                 let _ = msg.delete(&ctx.http).await;
             } else if request.flags.insult {
-                let _ = msg.reply(&ctx.http, format!(
-                    "<@{}> Ton message a ete supprime pour langage inapproprie.",
-                    msg.author.id
-                )).await;
+                let embed = moderate_embed("🗑\u{fe0f} Message supprime")
+                    .field("📝 Raison", "Langage inapproprie.", false)
+                    .thumbnail(msg.author.face());
+                let builder = serenity::builder::CreateMessage::new().embed(embed);
+                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
                 let _ = msg.delete(&ctx.http).await;
             }
         }
@@ -279,27 +285,37 @@ async fn execute_action(
     match action {
         Action::None => {}
         Action::Warn => {
-            msg.reply(&ctx.http, format!(
-                "<@{}> Avertissement : {reason_text}",
-                msg.author.id
-            )).await?;
+            let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                .field("📝 Raison", reason_text, false)
+                .thumbnail(msg.author.face());
+            let builder = serenity::builder::CreateMessage::new().embed(embed);
+            msg.channel_id.send_message(&ctx.http, builder).await?;
             info!(user = %msg.author.name, "Avertissement envoye");
         }
         Action::Delete => {
             // Avertir AVANT de supprimer
-            let _ = msg.channel_id.say(&ctx.http, format!(
-                "<@{}> Ton message a ete supprime. Raison : {reason_text}",
-                msg.author.id
-            )).await;
+            let content_preview = if msg.content.len() > 200 {
+                format!("{}...", &msg.content[..200])
+            } else {
+                msg.content.clone()
+            };
+            let embed = moderate_embed("🗑\u{fe0f} Message supprime")
+                .field("📝 Raison", reason_text, false)
+                .field("📄 Contenu original", format!("```{}```", content_preview), false)
+                .thumbnail(msg.author.face());
+            let builder = serenity::builder::CreateMessage::new().embed(embed);
+            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
             msg.delete(&ctx.http).await?;
             info!(message_id = %msg.id, "Message supprime");
         }
         Action::Mute => {
             let mute_minutes = mute_duration_secs / 60;
-            let _ = msg.channel_id.say(&ctx.http, format!(
-                "<@{}> Tu as ete mute {mute_minutes} minutes. Raison : {reason_text}",
-                msg.author.id
-            )).await;
+            let embed = danger_embed("🔇 Mute automatique")
+                .field("📝 Raison", reason_text, false)
+                .field("⏱ Duree", format!("{} minutes", mute_minutes), false)
+                .thumbnail(msg.author.face());
+            let builder = serenity::builder::CreateMessage::new().embed(embed);
+            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
             msg.delete(&ctx.http).await?;
             if let (Some(guild_id), Ok(member)) = (msg.guild_id, msg.member(&ctx.http).await) {
                 let mut member = guild_id.member(&ctx.http, member.user.id).await?;
@@ -319,10 +335,11 @@ async fn execute_action(
         }
         Action::Ban => {
             if let Some(_guild_id) = msg.guild_id {
-                let _ = msg.channel_id.say(&ctx.http, format!(
-                    "<@{}> Ton comportement a ete signale pour bannissement. Un moderateur examinera la situation.",
-                    msg.author.id
-                )).await;
+                let embed = critical_embed("🔨 Signalement pour bannissement")
+                    .field("📝 Raison", reason_text, false)
+                    .thumbnail(msg.author.face());
+                let builder = serenity::builder::CreateMessage::new().embed(embed);
+                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
                 msg.delete(&ctx.http).await?;
                 info!(user = %msg.author.name, "Proposition de ban enregistree (ban non execute)");
             }

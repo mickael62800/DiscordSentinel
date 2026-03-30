@@ -8,6 +8,7 @@ use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::embeds::{danger_embed, info_embed, success_embed, warn_embed};
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::api_client::{ApiClient, SecurityEvent};
@@ -192,25 +193,25 @@ impl EventHandler for Handler {
                     .values()
                     .find(|c| c.kind == serenity::model::channel::ChannelType::Text)
                 {
-                    let mut alert = format!(
-                        "**\u{1f6a8} ALERTE SECURITE** — Raid detecte ({} joins rapides).\n\
-                         Niveau de verification augmente automatiquement.",
-                        join_count
-                    );
+                    let mut actions = String::from("Niveau de verification augmente automatiquement.");
                     if slowmode_secs > 0 {
-                        alert.push_str(&format!(
-                            "\n\u{23f1}\u{fe0f} Slowmode active ({}s) sur tous les salons.",
+                        actions.push_str(&format!(
+                            "\nSlowmode active ({}s) sur tous les salons.",
                             slowmode_secs
                         ));
                     }
                     if quarantine_enabled {
-                        alert.push_str("\n\u{1f512} Nouveaux membres mis en quarantaine.");
+                        actions.push_str("\nNouveaux membres mis en quarantaine.");
                     }
+
+                    let embed = danger_embed("\u{1f6a8} ALERTE RAID DETECTE")
+                        .field("\u{1f465} Joins rapides", join_count.to_string(), true)
+                        .field("\u{26a1} Actions", actions, false);
 
                     channel
                         .send_message(
                             &ctx.http,
-                            serenity::builder::CreateMessage::new().content(alert),
+                            serenity::builder::CreateMessage::new().embed(embed),
                         )
                         .await
                         .ok();
@@ -439,15 +440,17 @@ impl EventHandler for Handler {
                 }
             }
 
-            let content = if released {
-                "\u{2705} **Verification reussie !** Vous avez maintenant acces au serveur."
+            let embed = if released {
+                success_embed("\u{2705} Verification reussie")
+                    .description("Vous avez maintenant acces au serveur.")
             } else {
-                "\u{26a0}\u{fe0f} Vous n'etes pas en quarantaine ou la verification a deja ete effectuee."
+                warn_embed("\u{26a0}\u{fe0f} Deja verifie")
+                    .description("Vous n'etes pas en quarantaine ou la verification a deja ete effectuee.")
             };
 
             let response = serenity::builder::CreateInteractionResponse::Message(
                 serenity::builder::CreateInteractionResponseMessage::new()
-                    .content(content)
+                    .embed(embed)
                     .ephemeral(true),
             );
 

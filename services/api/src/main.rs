@@ -16,7 +16,7 @@ use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
     PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgIaConfigRepository, PgLevelRepository, PgRolePanelRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
+    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgRolePanelRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
 };
 use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::redis_cache::RedisCache;
@@ -25,7 +25,7 @@ use crate::application::{
     ManageModerationService, ManageRulesService, ManageSecurityService, ManageStatsService,
     ManageAuditLogsService, ManageLevelsService, ManageRolePanelsService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
 };
-use crate::domain::services::{InferenceService, TextTokenizer};
+use crate::domain::services::{DiscordApiService, InferenceService, TextTokenizer};
 use crate::config::AppConfig;
 
 #[tokio::main]
@@ -188,6 +188,7 @@ async fn main() {
     let level_repo = Arc::new(PgLevelRepository::new(pg_pool.clone()));
     let levels_uc = Arc::new(ManageLevelsService::new(level_repo));
     let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
+    let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),
@@ -195,6 +196,9 @@ async fn main() {
         security_uc.clone(),
         conduct_uc.clone(),
     ));
+
+    // ── Discord API service ──
+    let discord_api = Arc::new(DiscordApiService::new(config.discord_bot_token.clone()));
 
     // ── Job client (queue Redis → worker) ──
     let queue_key = std::env::var("REDIS_QUEUE_KEY")
@@ -223,8 +227,10 @@ async fn main() {
         guild_repo,
         bot_config_repo,
         ia_config_repo,
+        discord_role_repo,
         broadcaster,
         job_client,
+        discord_api,
         api_key: config.api_key.clone(),
         discord_bot_token: config.discord_bot_token.clone(),
         pg_pool: pg_pool.clone(),

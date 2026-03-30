@@ -1,69 +1,13 @@
 <script setup lang="ts">
 import { useAuditLogs } from "../../composables/useAuditLogs";
 import AppBadge from "../atoms/AppBadge.vue";
-import type { BadgeVariant } from "../../utils/variants";
+import LoadingState from "../atoms/LoadingState.vue";
+import EmptyState from "../atoms/EmptyState.vue";
+import { eventVariant, eventLabel, eventIcon } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { filteredLogs, eventTypes, loading, filterEventType, searchQuery } = useAuditLogs();
-
-function eventVariant(type: string): BadgeVariant {
-  switch (type) {
-    case "member_ban":
-    case "channel_delete":
-      return "danger";
-    case "member_leave":
-    case "message_delete":
-    case "member_roles_update":
-      return "warning";
-    case "member_join":
-    case "member_unban":
-    case "channel_create":
-      return "success";
-    case "voice_join":
-    case "voice_leave":
-    case "voice_move":
-      return "info";
-    default:
-      return "default";
-  }
-}
-
-function eventLabel(type: string): string {
-  const labels: Record<string, string> = {
-    message_delete: "Message supprime",
-    message_edit: "Message edite",
-    member_join: "Membre rejoint",
-    member_leave: "Membre parti",
-    member_ban: "Membre banni",
-    member_unban: "Membre debanni",
-    member_roles_update: "Roles modifies",
-    voice_join: "Rejoint vocal",
-    voice_leave: "Quitte vocal",
-    voice_move: "Change de vocal",
-    channel_create: "Salon cree",
-    channel_delete: "Salon supprime",
-  };
-  return labels[type] ?? type;
-}
-
-function eventIcon(type: string): string {
-  const icons: Record<string, string> = {
-    message_delete: "X",
-    message_edit: "E",
-    member_join: "+",
-    member_leave: "-",
-    member_ban: "B",
-    member_unban: "U",
-    member_roles_update: "R",
-    voice_join: "V",
-    voice_leave: "V",
-    voice_move: "M",
-    channel_create: "#",
-    channel_delete: "#",
-  };
-  return icons[type] ?? "?";
-}
 </script>
 
 <template>
@@ -85,7 +29,7 @@ function eventIcon(type: string): string {
       </select>
     </div>
 
-    <div v-if="loading" class="loading">Chargement...</div>
+    <LoadingState v-if="loading" />
 
     <div v-else class="audit-list">
       <div v-for="log in filteredLogs" :key="log.id" class="audit-entry">
@@ -123,9 +67,7 @@ function eventIcon(type: string): string {
         </div>
       </div>
 
-      <div v-if="filteredLogs.length === 0" class="empty">
-        Aucun evenement d'audit
-      </div>
+      <EmptyState v-if="filteredLogs.length === 0" message="Aucun evenement d'audit" />
     </div>
   </div>
 </template>

@@ -3,6 +3,7 @@ use axum::Json;
 
 use crate::adapters::inbound::http::dto::analytics::*;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::state::AppState;
 
 /// GET /api/analytics — Retourne toutes les analytics en une seule requete.
@@ -40,7 +41,7 @@ pub async fn get_heatmap(
         .analytics_repo
         .get_heatmap(params.guild_id.as_deref(), params.days())
         .await?;
-    Ok(Json(data.into_iter().map(Into::into).collect()))
+    Ok(map_to_dtos(data))
 }
 
 /// GET /api/analytics/actions
@@ -52,7 +53,7 @@ pub async fn get_action_distribution(
         .analytics_repo
         .get_action_distribution(params.guild_id.as_deref(), params.days())
         .await?;
-    Ok(Json(data.into_iter().map(Into::into).collect()))
+    Ok(map_to_dtos(data))
 }
 
 /// GET /api/analytics/top-infractors
@@ -64,7 +65,7 @@ pub async fn get_top_infractors(
         .analytics_repo
         .get_top_infractors(params.guild_id.as_deref(), params.days(), params.limit())
         .await?;
-    Ok(Json(data.into_iter().map(Into::into).collect()))
+    Ok(map_to_dtos(data))
 }
 
 /// GET /api/analytics/moderation-trend
@@ -76,7 +77,7 @@ pub async fn get_moderation_trend(
         .analytics_repo
         .get_moderation_trend(params.guild_id.as_deref(), params.days())
         .await?;
-    Ok(Json(data.into_iter().map(Into::into).collect()))
+    Ok(map_to_dtos(data))
 }
 
 /// GET /api/analytics/peak-hours
@@ -88,5 +89,5 @@ pub async fn get_peak_hours(
         .analytics_repo
         .get_peak_hours(params.guild_id.as_deref(), params.days())
         .await?;
-    Ok(Json(data.into_iter().map(Into::into).collect()))
+    Ok(map_to_dtos(data))
 }

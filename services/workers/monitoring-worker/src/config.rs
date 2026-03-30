@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct MonitorConfig {
     pub redis_url: String,
     pub api_url: String,

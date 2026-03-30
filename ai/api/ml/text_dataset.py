@@ -18,7 +18,7 @@ CLASS_MAP = {
 
 
 class TextSentinelDataset(Dataset):
-    def __init__(self, root_dir: str, tokenizer, max_length: int = 256):
+    def __init__(self, root_dir: str, tokenizer, max_length: int = 128):
         self.root_dir = Path(root_dir)
         self.tokenizer = tokenizer
         self.max_length = max_length

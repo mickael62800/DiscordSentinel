@@ -6,6 +6,7 @@ use crate::adapters::inbound::http::dto::levels::{
     SaveLevelConfigDto, SetRewardDto, UserLevelDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::manage_levels::AddXpCommand;
 
@@ -14,7 +15,7 @@ pub async fn get_config(
     Path(guild_id): Path<String>,
 ) -> Result<Json<LevelConfigDto>, ApiError> {
     let config = state.levels_uc.get_config(&guild_id).await?;
-    Ok(Json(LevelConfigDto::from(config)))
+    Ok(single_dto(config))
 }
 
 pub async fn save_config(
@@ -22,7 +23,7 @@ pub async fn save_config(
     Json(dto): Json<SaveLevelConfigDto>,
 ) -> Result<Json<LevelConfigDto>, ApiError> {
     let config = state.levels_uc.save_config(dto.into()).await?;
-    Ok(Json(LevelConfigDto::from(config)))
+    Ok(single_dto(config))
 }
 
 pub async fn add_xp(
@@ -38,7 +39,7 @@ pub async fn add_xp(
             amount: dto.amount,
         })
         .await?;
-    Ok(Json(AddXpResponseDto::from(result)))
+    Ok(single_dto(result))
 }
 
 pub async fn get_user_level(
@@ -46,7 +47,7 @@ pub async fn get_user_level(
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<UserLevelDto>, ApiError> {
     let level = state.levels_uc.get_user_level(&guild_id, &user_id).await?;
-    Ok(Json(UserLevelDto::from(level)))
+    Ok(single_dto(level))
 }
 
 pub async fn get_leaderboard(
@@ -54,10 +55,9 @@ pub async fn get_leaderboard(
     Path(guild_id): Path<String>,
     Query(params): Query<LevelLeaderboardParams>,
 ) -> Result<Json<Vec<UserLevelDto>>, ApiError> {
-    let limit = params.limit.unwrap_or(25).min(100);
+    let limit = normalize_limit(params.limit, 25, 100);
     let levels = state.levels_uc.get_leaderboard(&guild_id, limit).await?;
-    let dtos: Vec<UserLevelDto> = levels.into_iter().map(UserLevelDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(levels))
 }
 
 pub async fn get_rewards(
@@ -65,8 +65,7 @@ pub async fn get_rewards(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<LevelRewardDto>>, ApiError> {
     let rewards = state.levels_uc.get_rewards(&guild_id).await?;
-    let dtos: Vec<LevelRewardDto> = rewards.into_iter().map(LevelRewardDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(rewards))
 }
 
 pub async fn set_reward(
@@ -77,7 +76,7 @@ pub async fn set_reward(
         .levels_uc
         .set_reward(&dto.guild_id, dto.level, &dto.role_id)
         .await?;
-    Ok(Json(LevelRewardDto::from(reward)))
+    Ok(single_dto(reward))
 }
 
 pub async fn delete_reward(

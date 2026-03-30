@@ -20,6 +20,7 @@ import WorkerConfigPage from "../components/pages/WorkerConfigPage.vue";
 import WatchedUsersPage from "../components/pages/WatchedUsersPage.vue";
 import LevelsPage from "../components/pages/LevelsPage.vue";
 import RolePanelsPage from "../components/pages/RolePanelsPage.vue";
+import DiscordRolesPage from "../components/pages/DiscordRolesPage.vue";
 import AuditPage from "../components/pages/AuditPage.vue";
 import AnalyticsPage from "../components/pages/AnalyticsPage.vue";
 import AiTrainingPage from "../components/pages/AiTrainingPage.vue";
@@ -48,6 +49,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/watched-users", name: "watched-users", component: WatchedUsersPage },
   { path: "/levels", name: "levels", component: LevelsPage },
   { path: "/role-panels", name: "role-panels", component: RolePanelsPage },
+  { path: "/discord-roles", name: "discord-roles", component: DiscordRolesPage },
   { path: "/audit", name: "audit", component: AuditPage },
   { path: "/analytics", name: "analytics", component: AnalyticsPage },
   { path: "/ai-training", name: "ai-training", component: AiTrainingPage },

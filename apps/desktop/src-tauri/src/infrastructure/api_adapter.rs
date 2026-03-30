@@ -3,8 +3,8 @@ use std::pin::Pin;
 
 use reqwest::{Client, RequestBuilder, Response};
 
-use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
-use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, LevelRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
+use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, DiscordRole, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
 
 pub struct ApiAdapter {
     client: Client,
@@ -341,6 +341,12 @@ impl RolePanelsRepository for ApiAdapter {
 
     fn get_auto_roles(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<AutoRoleConfig>, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/auto-roles/{}", self.base_url, guild_id)))
+    }
+}
+
+impl DiscordRolesRepository for ApiAdapter {
+    fn get_discord_roles(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<DiscordRole>, String>> + Send>> {
+        self.get_json(self.client.get(format!("{}/api/discord-roles/{}", self.base_url, guild_id)))
     }
 }
 

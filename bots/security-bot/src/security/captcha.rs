@@ -4,6 +4,8 @@ use serenity::model::id::UserId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use sentinel_shared::embeds::info_embed;
+
 /// Identifiant du bouton de vérification captcha.
 pub const CAPTCHA_BUTTON_ID: &str = "sentinel_captcha_verify";
 
@@ -48,14 +50,17 @@ pub async fn send_challenge(ctx: &Context, user_id: UserId, guild_name: &str) ->
 
     let row = CreateActionRow::Buttons(vec![button]);
 
-    let message = CreateMessage::new()
-        .content(format!(
-            "**Vérification de sécurité — {}**\n\n\
-             Votre compte a été détecté comme potentiellement suspect.\n\
-             Cliquez sur le bouton ci-dessous pour confirmer que vous êtes humain.\n\n\
-             ⏱️ Vous avez **5 minutes** pour vous vérifier, sinon vous serez expulsé.",
+    let embed = info_embed("\u{1f6e1}\u{fe0f} Verification requise")
+        .description(format!(
+            "**Verification de securite — {}**\n\n\
+             Votre compte a ete detecte comme potentiellement suspect.\n\
+             Cliquez sur le bouton ci-dessous pour confirmer que vous etes humain.",
             guild_name
         ))
+        .field("\u{23f1}\u{fe0f}", "Vous avez **5 minutes** pour vous verifier, sinon vous serez expulse.", false);
+
+    let message = CreateMessage::new()
+        .embed(embed)
         .components(vec![row]);
 
     match dm_channel.send_message(&ctx.http, message).await {

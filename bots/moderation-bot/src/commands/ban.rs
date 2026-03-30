@@ -1,10 +1,12 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateMessage,
 };
 use tracing::{error, info};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::embeds::{critical_embed, success_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use crate::api_client::ModerationAction;
@@ -55,12 +57,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
     let is_permanent = duration_hours.is_none();
@@ -82,22 +84,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
     let ban_delete_message_days = BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8;
 
+    let guild_name = guild_id.to_partial_guild(&ctx.http).await
+        .map(|g| g.name).unwrap_or_else(|_| "le serveur".into());
+
     // DM avant le ban (apres le ban on ne peut plus DM)
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
+        let dm_embed = critical_embed(format!("🔨 Ban ({duration_label}) sur **{guild_name}**"))
+            .field("Raison", reason, false);
+
         dm.send_message(
             &ctx.http,
-            serenity::builder::CreateMessage::new().content(format!(
-                "🔨 **Ban ({duration_label})** sur **{}**\nRaison : {reason}",
-                guild_id.to_partial_guild(&ctx.http).await
-                    .map(|g| g.name).unwrap_or_else(|_| "le serveur".into()),
-            )),
+            CreateMessage::new().embed(dm_embed),
         ).await.ok();
     }
 
     // Executer le ban Discord (supprime les messages des derniers N jours)
     if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, ban_delete_message_days, reason).await {
         error!(error = %e, "Impossible de bannir");
-        reply(ctx, command, &format!("Erreur Discord : {e}")).await;
+        reply_text(ctx, command, &format!("Erreur Discord : {e}")).await;
         return;
     }
 
@@ -124,10 +128,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     info!(target = %target.name, duration = %duration_label, "Ban applique");
 
-    reply(ctx, command, &format!(
-        "🔨 **Ban ({duration_label})** applique a **{}**.\nRaison : {reason}",
-        target.name
-    )).await;
+    let channel_embed = critical_embed(format!("🔨 Ban ({duration_label})"))
+        .field("Cible", format!("<@{}>", target.id), true)
+        .field("Moderateur", format!("<@{}>", command.user.id), true)
+        .field("Duree", &duration_label, true)
+        .field("Raison", reason, false);
+
+    command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().embed(channel_embed),
+        ),
+    ).await.ok();
 }
 
 pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
@@ -137,19 +149,19 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
 
     let user_id: u64 = match user_id_str.parse() {
         Ok(id) => id,
-        Err(_) => { reply(ctx, command, "ID utilisateur invalide.").await; return; }
+        Err(_) => { reply_text(ctx, command, "ID utilisateur invalide.").await; return; }
     };
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target_uid = serenity::model::id::UserId::new(user_id);
 
     if let Err(e) = guild_id.unban(&ctx.http, target_uid).await {
         error!(error = %e, "Impossible de debannir");
-        reply(ctx, command, &format!("Erreur : {e}")).await;
+        reply_text(ctx, command, &format!("Erreur : {e}")).await;
         return;
     }
 
@@ -174,10 +186,18 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
 
     info!(target_id = user_id_str, "Unban applique");
 
-    reply(ctx, command, &format!("Utilisateur `{user_id_str}` debanni.")).await;
+    let unban_embed = success_embed("✅ Unban")
+        .field("Utilisateur", format!("`{user_id_str}`"), false);
+
+    command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().embed(unban_embed),
+        ),
+    ).await.ok();
 }
 
-async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
+async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
     command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(

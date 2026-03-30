@@ -373,7 +373,7 @@ function backToList() {
 }
 
 .message--staff {
-  background-color: rgba(88, 101, 242, 0.1);
+  background-color: var(--accent-bg);
   border: 1px solid rgba(88, 101, 242, 0.25);
   align-self: flex-end;
 }

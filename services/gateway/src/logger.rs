@@ -26,7 +26,11 @@ impl GatewayLogger {
             "details": details,
         });
         let req = self.client.post(url).json(&body);
-        tokio::spawn(async move { let _ = req.send().await; });
+        tokio::spawn(async move {
+            if let Err(e) = req.send().await {
+                tracing::debug!(error = %e, "Failed to send gateway log to API");
+            }
+        });
     }
 
     pub fn info(&self, message: &str, details: serde_json::Value) {

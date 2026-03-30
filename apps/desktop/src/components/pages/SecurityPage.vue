@@ -1,22 +1,19 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
 import { useSecurity } from "../../composables/useSecurity";
+import { useSearch } from "../../composables/useSearch";
+import type { SecurityEvent } from "../../types";
 import AppBadge from "../atoms/AppBadge.vue";
+import LoadingState from "../atoms/LoadingState.vue";
+import EmptyState from "../atoms/EmptyState.vue";
 import { severityVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { events, loading } = useSecurity();
-const search = ref("");
-
-const filteredEvents = computed(() => {
-  if (!search.value) return events.value;
-  const q = search.value.toLowerCase();
-  return events.value.filter((e) =>
-    [e.event_type, e.severity, e.description, e.created_at, ...(e.user_ids || [])]
-      .some((field) => field?.toLowerCase().includes(q)),
-  );
-});
+const { search, filtered: filteredEvents } = useSearch<SecurityEvent>(
+  events,
+  ["event_type", "severity", "description", "created_at", (e) => e.user_ids?.join(" ")],
+);
 
 function eventIcon(type: string): string {
   switch (type) {
@@ -34,7 +31,7 @@ function eventIcon(type: string): string {
 
     <input v-model="search" type="text" placeholder="Rechercher dans tous les champs..." class="search-global" />
 
-    <div v-if="loading" class="loading">Chargement...</div>
+    <LoadingState v-if="loading" />
 
     <div v-else class="events-list">
       <div v-for="event in filteredEvents" :key="event.id" class="event-card">
@@ -55,7 +52,7 @@ function eventIcon(type: string): string {
         </div>
       </div>
 
-      <div v-if="events.length === 0" class="empty">Aucun evenement de securite</div>
+      <EmptyState v-if="events.length === 0" message="Aucun evenement de securite" />
     </div>
   </div>
 </template>

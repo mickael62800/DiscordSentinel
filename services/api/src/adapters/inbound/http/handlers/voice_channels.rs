@@ -7,6 +7,7 @@ use crate::adapters::inbound::http::dto::voice_channels::{
     WhitelistEntryResponseDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::{
     BanFromChannelCommand, ManageCoAdminCommand, ManageWhitelistCommand,
@@ -19,8 +20,7 @@ pub async fn list_all_channels(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let channels = state.voice_channels_uc.list_all_channels().await?;
-    let dtos: Vec<VoiceChannelResponseDto> = channels.into_iter().map(VoiceChannelResponseDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(channels))
 }
 
 pub async fn list_channels(
@@ -28,8 +28,7 @@ pub async fn list_channels(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let channels = state.voice_channels_uc.list_channels(&guild_id).await?;
-    let dtos: Vec<VoiceChannelResponseDto> = channels.into_iter().map(VoiceChannelResponseDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(channels))
 }
 
 pub async fn get_channel_detail(
@@ -37,7 +36,7 @@ pub async fn get_channel_detail(
     Path(channel_id): Path<String>,
 ) -> Result<Json<VoiceChannelDetailDto>, ApiError> {
     let detail = state.voice_channels_uc.get_channel_detail(&channel_id).await?;
-    Ok(Json(VoiceChannelDetailDto::from(detail)))
+    Ok(single_dto(detail))
 }
 
 pub async fn create_channel(
@@ -57,7 +56,7 @@ pub async fn create_channel(
         }),
     );
 
-    Ok(Json(VoiceChannelResponseDto::from(channel)))
+    Ok(single_dto(channel))
 }
 
 pub async fn close_channel(
@@ -71,7 +70,7 @@ pub async fn close_channel(
         serde_json::json!({ "channel_id": &channel_id }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn delete_channel(
@@ -86,7 +85,7 @@ pub async fn delete_channel(
         serde_json::json!({ "channel_id": &channel_id }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn update_channel(
@@ -113,7 +112,7 @@ pub async fn update_channel(
         serde_json::json!({ "channel_id": &channel_id }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn transfer_ownership(
@@ -141,7 +140,7 @@ pub async fn transfer_ownership(
         }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 // ── Co-admins ──
@@ -160,7 +159,7 @@ pub async fn add_co_admin(
         })
         .await?;
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn remove_co_admin(
@@ -172,7 +171,7 @@ pub async fn remove_co_admin(
         .remove_co_admin(&channel_id, &user_id)
         .await?;
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 // ── Whitelist ──
@@ -182,8 +181,7 @@ pub async fn get_whitelist(
     Path((guild_id, owner_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<WhitelistEntryResponseDto>>, ApiError> {
     let entries = state.voice_channels_uc.get_whitelist(&guild_id, &owner_id).await?;
-    let dtos: Vec<WhitelistEntryResponseDto> = entries.into_iter().map(WhitelistEntryResponseDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(entries))
 }
 
 pub async fn add_to_whitelist(
@@ -200,7 +198,7 @@ pub async fn add_to_whitelist(
         })
         .await?;
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn remove_from_whitelist(
@@ -212,7 +210,7 @@ pub async fn remove_from_whitelist(
         .remove_from_whitelist(&guild_id, &owner_id, &target_id)
         .await?;
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 // ── Bans ──
@@ -234,7 +232,7 @@ pub async fn ban_from_channel(
         })
         .await?;
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn unban_from_channel(
@@ -246,7 +244,7 @@ pub async fn unban_from_channel(
         .unban_from_channel(&channel_id, &user_id)
         .await?;
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn check_ban(

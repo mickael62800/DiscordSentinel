@@ -8,6 +8,11 @@ pub struct Config {
     pub allowed_origins: String,
     pub max_connections: usize,
     pub api_url: String,
+    pub broadcast_capacity: usize,
+    pub redis_reconnect_delay_secs: u64,
+    pub redis_reconnect_max_delay_secs: u64,
+    pub cors_max_age_secs: u64,
+    pub shutdown_timeout_secs: u64,
 }
 
 impl Config {
@@ -30,6 +35,26 @@ impl Config {
                 .unwrap_or(1000),
             api_url: std::env::var("API_URL")
                 .unwrap_or_else(|_| "http://localhost:3000".to_string()),
+            broadcast_capacity: std::env::var("BROADCAST_CHANNEL_CAPACITY")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(512),
+            redis_reconnect_delay_secs: std::env::var("REDIS_RECONNECT_DELAY_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(2),
+            redis_reconnect_max_delay_secs: std::env::var("REDIS_RECONNECT_MAX_DELAY_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(30),
+            cors_max_age_secs: std::env::var("CORS_MAX_AGE_SECS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(3600),
+            shutdown_timeout_secs: std::env::var("SHUTDOWN_TIMEOUT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(30),
         }
     }
 

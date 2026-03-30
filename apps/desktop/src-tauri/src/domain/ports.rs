@@ -99,6 +99,10 @@ pub trait WatchedUsersRepository: Send + Sync + 'static {
     fn get_user_dossier(&self, guild_id: String, user_id: String) -> BoxFut<UserDossier>;
 }
 
+pub trait DiscordRolesRepository: Send + Sync + 'static {
+    fn get_discord_roles(&self, guild_id: String) -> BoxFut<Vec<DiscordRole>>;
+}
+
 pub trait AppAdapter:
     GuildRepository
     + BotConfigRepository
@@ -116,5 +120,6 @@ pub trait AppAdapter:
     + LevelRepository
     + DashboardChartsRepository
     + RolePanelsRepository
+    + DiscordRolesRepository
 {
 }

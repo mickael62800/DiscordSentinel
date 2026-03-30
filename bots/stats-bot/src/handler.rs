@@ -6,6 +6,10 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use serenity::builder::CreateMessage;
+
+use sentinel_shared::embeds::success_embed;
+
 use sentinel_shared::heartbeat::register_guilds;
 
 use crate::api_client::ApiClient;
@@ -92,12 +96,15 @@ impl EventHandler for Handler {
             {
                 Ok(result) => {
                     if result.leveled_up {
-                        let _ = msg.channel_id.say(
-                            &ctx.http,
-                            format!(
-                                "GG <@{}>, tu es maintenant niveau **{}** !",
+                        let embed = success_embed("\u{1f389} LEVEL UP !")
+                            .description(format!(
+                                "<@{}> est maintenant **niveau {}** !",
                                 msg.author.id, result.user.level
-                            ),
+                            ))
+                            .thumbnail(msg.author.face());
+                        let _ = msg.channel_id.send_message(
+                            &ctx.http,
+                            CreateMessage::new().embed(embed),
                         ).await;
 
                         // Attribuer le role recompense si configure

@@ -3,6 +3,7 @@ use axum::Json;
 
 use crate::adapters::inbound::http::dto::role_panels::*;
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 
 pub async fn create_panel(
@@ -10,7 +11,7 @@ pub async fn create_panel(
     Json(dto): Json<CreateRolePanelDto>,
 ) -> Result<Json<RolePanelDetailDto>, ApiError> {
     let detail = state.role_panels_uc.create_panel(dto.into()).await?;
-    Ok(Json(RolePanelDetailDto::from(detail)))
+    Ok(single_dto(detail))
 }
 
 pub async fn get_panel(
@@ -18,7 +19,7 @@ pub async fn get_panel(
     Path(panel_id): Path<String>,
 ) -> Result<Json<RolePanelDetailDto>, ApiError> {
     let detail = state.role_panels_uc.get_panel(&panel_id).await?;
-    Ok(Json(RolePanelDetailDto::from(detail)))
+    Ok(single_dto(detail))
 }
 
 pub async fn get_panel_by_message(
@@ -34,7 +35,7 @@ pub async fn list_panels(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<RolePanelDto>>, ApiError> {
     let panels = state.role_panels_uc.list_panels(&guild_id).await?;
-    Ok(Json(panels.into_iter().map(RolePanelDto::from).collect()))
+    Ok(map_to_dtos(panels))
 }
 
 pub async fn set_message_id(
@@ -58,7 +59,7 @@ pub async fn list_auto_roles(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<AutoRoleDto>>, ApiError> {
     let roles = state.role_panels_uc.list_auto_roles(&guild_id).await?;
-    Ok(Json(roles.into_iter().map(AutoRoleDto::from).collect()))
+    Ok(map_to_dtos(roles))
 }
 
 pub async fn add_auto_role(
@@ -66,7 +67,7 @@ pub async fn add_auto_role(
     Json(dto): Json<CreateAutoRoleDto>,
 ) -> Result<Json<AutoRoleDto>, ApiError> {
     let role = state.role_panels_uc.add_auto_role(dto.into()).await?;
-    Ok(Json(AutoRoleDto::from(role)))
+    Ok(single_dto(role))
 }
 
 pub async fn delete_auto_role(

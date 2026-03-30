@@ -17,6 +17,7 @@ mod image_analysis;
 mod level;
 mod daily_activity;
 mod role_panel;
+mod discord_role;
 mod ia_config;
 pub mod analytics;
 
@@ -43,3 +44,4 @@ pub use voice_channel::{
     VoiceChannelWhitelistEntry,
 };
 pub use watched_user::WatchedUser;
+pub use discord_role::DiscordRole;

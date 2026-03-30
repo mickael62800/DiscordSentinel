@@ -21,24 +21,24 @@ defineProps<{
 }
 
 .badge--info {
-  background-color: rgba(91, 192, 235, 0.15);
+  background-color: var(--info-bg);
   color: var(--info);
 }
 
 .badge--warn,
 .badge--warning {
-  background-color: rgba(254, 231, 92, 0.15);
+  background-color: var(--warning-bg);
   color: var(--warning);
 }
 
 .badge--error,
 .badge--danger {
-  background-color: rgba(237, 66, 69, 0.15);
+  background-color: var(--danger-bg);
   color: var(--danger);
 }
 
 .badge--success {
-  background-color: rgba(87, 242, 135, 0.15);
+  background-color: var(--success-bg);
   color: var(--success);
 }
 

@@ -1,10 +1,12 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateMessage,
 };
 use tracing::{error, info};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::embeds::{moderate_embed, success_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use crate::api_client::ModerationAction;
@@ -55,18 +57,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
     // Appliquer le timeout Discord
     let mut member = match guild_id.member(&ctx.http, target.id).await {
         Ok(m) => m,
-        Err(_) => { reply(ctx, command, "Membre introuvable sur le serveur.").await; return; }
+        Err(_) => { reply_text(ctx, command, "Membre introuvable sur le serveur.").await; return; }
     };
 
     // Charger la config per-guild depuis l'API
@@ -97,7 +99,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     if let Err(e) = member.disable_communication_until_datetime(&ctx.http, timeout).await {
         error!(error = %e, "Impossible de mute l'utilisateur");
-        reply(ctx, command, &format!("Erreur Discord : {e}")).await;
+        reply_text(ctx, command, &format!("Erreur Discord : {e}")).await;
         return;
     }
 
@@ -131,22 +133,33 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     info!(target = %target.name, duration = %duration_label, "Mute applique");
 
+    let guild_name = guild_id.to_partial_guild(&ctx.http).await
+        .map(|g| g.name).unwrap_or_else(|_| "le serveur".into());
+
     // DM
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
+        let dm_embed = moderate_embed(format!("🔇 Mute ({duration_label}) sur **{guild_name}**"))
+            .field("Duree", &duration_label, true)
+            .field("Raison", reason, false);
+
         dm.send_message(
             &ctx.http,
-            serenity::builder::CreateMessage::new().content(format!(
-                "🔇 **Mute ({duration_label})** sur **{}**\nRaison : {reason}",
-                guild_id.to_partial_guild(&ctx.http).await
-                    .map(|g| g.name).unwrap_or_else(|_| "le serveur".into()),
-            )),
+            CreateMessage::new().embed(dm_embed),
         ).await.ok();
     }
 
-    reply(ctx, command, &format!(
-        "🔇 **Mute ({duration_label})** applique a <@{}>.\nRaison : {reason}",
-        target.id
-    )).await;
+    let channel_embed = moderate_embed(format!("🔇 Mute ({duration_label})"))
+        .field("Cible", format!("<@{}>", target.id), true)
+        .field("Moderateur", format!("<@{}>", command.user.id), true)
+        .field("Duree", &duration_label, true)
+        .field("Raison", reason, false);
+
+    command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().embed(channel_embed),
+        ),
+    ).await.ok();
 }
 
 pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
@@ -156,17 +169,17 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let mut member = match guild_id.member(&ctx.http, target_id).await {
         Ok(m) => m,
-        Err(_) => { reply(ctx, command, "Membre introuvable.").await; return; }
+        Err(_) => { reply_text(ctx, command, "Membre introuvable.").await; return; }
     };
 
     if let Err(e) = member.enable_communication(&ctx.http).await {
         error!(error = %e, "Impossible de unmute");
-        reply(ctx, command, &format!("Erreur : {e}")).await;
+        reply_text(ctx, command, &format!("Erreur : {e}")).await;
         return;
     }
 
@@ -193,10 +206,18 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
 
     info!(target = %target_name, "Unmute applique");
 
-    reply(ctx, command, &format!("🔊 <@{target_id}> a ete unmute.")).await;
+    let unmute_embed = success_embed("🔊 Unmute")
+        .field("Cible", format!("<@{target_id}>"), false);
+
+    command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new().embed(unmute_embed),
+        ),
+    ).await.ok();
 }
 
-async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
+async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
     command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(

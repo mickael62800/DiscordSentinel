@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
 import MainLayout from "./components/templates/MainLayout.vue";
+import ConfirmDialog from "./components/molecules/ConfirmDialog.vue";
 
 const route = useRoute();
 </script>
@@ -13,4 +14,6 @@ const route = useRoute();
   <MainLayout v-else>
     <router-view />
   </MainLayout>
+
+  <ConfirmDialog />
 </template>

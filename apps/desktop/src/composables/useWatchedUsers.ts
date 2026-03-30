@@ -1,13 +1,13 @@
-import { ref, onMounted, watch } from "vue";
+import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { WatchedUser, UserDossier } from "../types";
-import { useGuildSelector } from "./useGuildSelector";
+import { useGuildFetch } from "./useGuildFetch";
 
 export function useWatchedUsers() {
-  const users = ref<WatchedUser[]>([]);
-  const loading = ref(true);
-  const error = ref<string | null>(null);
-  const { guildIdFilter } = useGuildSelector();
+  const { data: users, loading, error, refresh: fetchUsers } = useGuildFetch<WatchedUser[]>(
+    "get_watched_users",
+    [],
+  );
 
   const selectedUser = ref<WatchedUser | null>(null);
   const dossier = ref<UserDossier | null>(null);
@@ -15,21 +15,6 @@ export function useWatchedUsers() {
 
   const searchQuery = ref("");
   const riskFilter = ref("");
-
-  async function fetchUsers() {
-    loading.value = true;
-    error.value = null;
-    try {
-      users.value = await invoke<WatchedUser[]>("get_watched_users", {
-        guildId: guildIdFilter.value ?? null,
-      });
-    } catch (e) {
-      error.value = String(e);
-      console.error("Erreur chargement utilisateurs surveilles:", e);
-    } finally {
-      loading.value = false;
-    }
-  }
 
   async function fetchDossier(guildId: string, userId: string) {
     dossierLoading.value = true;
@@ -53,9 +38,6 @@ export function useWatchedUsers() {
       dossier.value = null;
     }
   }
-
-  onMounted(fetchUsers);
-  watch(guildIdFilter, fetchUsers);
 
   return {
     users,

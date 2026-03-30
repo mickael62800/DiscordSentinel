@@ -18,6 +18,7 @@ use crate::application::audit_logs_service::AuditLogsService;
 use crate::application::dashboard_charts_service::DashboardChartsService;
 use crate::application::levels_service::LevelsService;
 use crate::application::role_panels_service::RolePanelsService;
+use crate::application::discord_roles_service::DiscordRolesService;
 use crate::application::watched_users_service::WatchedUsersService;
 use crate::application::ia_config_service::{IaConfigService, IaConfig};
 use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
@@ -28,7 +29,7 @@ use crate::domain::entities::{
     ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent,
     ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
     UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail,
-    WatchedUser,
+    WatchedUser, DiscordRole,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -82,6 +83,9 @@ tauri_passthrough!(delete_bot_config, BotConfigService, delete_config -> (), gui
 tauri_passthrough!(get_role_panels, RolePanelsService, get_panels -> Vec<RolePanel>, guild_id: String);
 tauri_passthrough!(get_role_panel_detail, RolePanelsService, get_panel -> RolePanelDetail, panel_id: String);
 tauri_passthrough!(get_auto_roles, RolePanelsService, get_auto_roles -> Vec<AutoRoleConfig>, guild_id: String);
+
+// Discord Roles
+tauri_passthrough!(get_discord_roles, DiscordRolesService, get_discord_roles -> Vec<DiscordRole>, guild_id: String);
 
 // Dashboard Charts
 tauri_passthrough!(get_activity_trend, DashboardChartsService, get_activity_trend -> Vec<DailyActivity>, guild_id: Option<String>, days: Option<i32>);

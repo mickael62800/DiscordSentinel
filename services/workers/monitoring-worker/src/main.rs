@@ -1,21 +1,16 @@
 mod config;
 mod monitor;
 
-use tokio::signal;
 use tracing::info;
 
 use crate::config::MonitorConfig;
+use sentinel_worker_common as common;
+
+const WORKER_NAME: &str = "monitoring-worker";
 
 #[tokio::main]
 async fn main() {
-    dotenvy::dotenv().ok();
-
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "sentinel_monitoring_worker=info".into()),
-        )
-        .init();
+    common::init_tracing("sentinel_monitoring_worker=info");
 
     let config = MonitorConfig::from_env();
 
@@ -32,70 +27,16 @@ async fn main() {
         }
     }
 
-    // Heartbeat pour se signaler en ligne
-    let api_url = config.api_url.clone();
-    tokio::spawn(async move {
-        let client = reqwest::Client::new();
-        let url = format!("{}/api/bots/heartbeat", api_url);
-        loop {
-            let _ = client
-                .post(&url)
-                .json(&serde_json::json!({ "name": "monitoring-worker" }))
-                .send()
-                .await;
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        }
-    });
+    common::start_heartbeat(config.api_url.clone(), WORKER_NAME);
+    monitor::start(redis_client, config.clone());
 
-    // Lancer le monitoring
-    let api_url2 = config.api_url.clone();
-    monitor::start(redis_client, config);
-
-    send_lifecycle_log(&api_url2, "info", "Monitoring Worker demarre").await;
+    common::send_lifecycle_log(&config.api_url, WORKER_NAME, "info", "Monitoring Worker demarre").await;
 
     info!("Sentinel Monitoring Worker pret");
 
-    shutdown_signal().await;
+    common::shutdown_signal().await;
 
-    send_lifecycle_log(&api_url2, "warn", "Monitoring Worker en cours d'arret").await;
+    common::send_lifecycle_log(&config.api_url, WORKER_NAME, "warn", "Monitoring Worker en cours d'arret").await;
 
     info!("Sentinel Monitoring Worker arrete");
-}
-
-async fn send_lifecycle_log(api_url: &str, level: &str, message: &str) {
-    let _ = reqwest::Client::new()
-        .post(format!("{}/api/logs", api_url))
-        .json(&serde_json::json!({
-            "level": level,
-            "bot": "monitoring-worker",
-            "server": "",
-            "message": message,
-            "category": "worker",
-        }))
-        .send()
-        .await;
-}
-
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("Impossible d'ecouter Ctrl+C");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("Impossible d'ecouter SIGTERM")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => info!("Signal Ctrl+C recu"),
-        _ = terminate => info!("Signal SIGTERM recu"),
-    }
 }

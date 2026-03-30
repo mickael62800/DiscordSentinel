@@ -3,6 +3,7 @@ use axum::Json;
 
 use crate::adapters::inbound::http::dto::infractions::{InfractionQueryParams, InfractionResponseDto};
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::InfractionFilters;
 
@@ -14,14 +15,10 @@ pub async fn list_infractions(
     let filters = InfractionFilters {
         user_id: params.user_id,
         action: params.action,
-        limit: params.limit.unwrap_or(50).min(200),
+        limit: normalize_limit(params.limit, 50, 200),
         offset: params.offset.unwrap_or(0),
     };
 
     let infractions = state.infractions_uc.list_infractions(&guild_id, filters).await?;
-    let dtos: Vec<InfractionResponseDto> = infractions
-        .into_iter()
-        .map(InfractionResponseDto::from)
-        .collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(infractions))
 }

@@ -6,6 +6,7 @@ use crate::adapters::inbound::http::dto::watched_users::{
     UserDossierResponseDto, WatchedUserResponseDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -21,11 +22,7 @@ pub async fn list_watched_users(
         .watched_users_uc
         .list_watched_users(params.guild_id.as_deref())
         .await?;
-    let dtos: Vec<WatchedUserResponseDto> = users
-        .into_iter()
-        .map(WatchedUserResponseDto::from)
-        .collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(users))
 }
 
 pub async fn get_user_dossier(
@@ -36,5 +33,5 @@ pub async fn get_user_dossier(
         .watched_users_uc
         .get_user_dossier(&guild_id, &user_id)
         .await?;
-    Ok(Json(UserDossierResponseDto::from(dossier)))
+    Ok(single_dto(dossier))
 }

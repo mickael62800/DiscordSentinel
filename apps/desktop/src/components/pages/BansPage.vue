@@ -1,10 +1,16 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useBans } from "../../composables/useBans";
+import { useConfirm } from "../../composables/useConfirm";
 import AppBadge from "../atoms/AppBadge.vue";
+import LoadingState from "../atoms/LoadingState.vue";
+import EmptyState from "../atoms/EmptyState.vue";
 import type { Infraction, ConfirmedBan } from "../../types";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
+const { confirm } = useConfirm();
+const banError = ref<string | null>(null);
 
 const {
   filteredProposals,
@@ -19,20 +25,24 @@ const {
 } = useBans();
 
 async function handleBan(proposal: Infraction) {
-  if (!confirm(`Bannir ${proposal.username} (${proposal.user_id}) ?\nRaison : ${proposal.reason}`)) return;
+  banError.value = null;
+  const ok = await confirm({ message: `Bannir ${proposal.username} (${proposal.user_id}) ?\nRaison : ${proposal.reason}` });
+  if (!ok) return;
   try {
     await executeBan(proposal.server, proposal.user_id, proposal.reason);
   } catch (e) {
-    alert(`Erreur : ${e}`);
+    banError.value = String(e);
   }
 }
 
 async function handleUnban(ban: ConfirmedBan) {
-  if (!confirm(`Debannir ${ban.target_name} (${ban.target_id}) ?`)) return;
+  banError.value = null;
+  const ok = await confirm({ message: `Debannir ${ban.target_name} (${ban.target_id}) ?` });
+  if (!ok) return;
   try {
     await executeUnban(ban.guild_id, ban.target_id);
   } catch (e) {
-    alert(`Erreur : ${e}`);
+    banError.value = String(e);
   }
 }
 </script>
@@ -50,7 +60,9 @@ async function handleUnban(ban: ConfirmedBan) {
       />
     </div>
 
-    <div v-if="loading" class="loading">Chargement...</div>
+    <p v-if="banError" class="ban-error">{{ banError }}</p>
+
+    <LoadingState v-if="loading" />
 
     <div v-else class="bans-columns">
       <!-- Colonne gauche : Bannis effectifs -->
@@ -101,9 +113,7 @@ async function handleUnban(ban: ConfirmedBan) {
             </div>
           </div>
 
-          <div v-if="filteredConfirmed.length === 0" class="empty">
-            Aucun compte banni{{ searchQuery ? " correspondant" : "" }}
-          </div>
+          <EmptyState v-if="filteredConfirmed.length === 0" :message="searchQuery ? 'Aucun compte banni correspondant' : 'Aucun compte banni'" />
         </div>
       </div>
 
@@ -148,9 +158,7 @@ async function handleUnban(ban: ConfirmedBan) {
             </div>
           </div>
 
-          <div v-if="filteredProposals.length === 0" class="empty">
-            Aucune proposition{{ searchQuery ? " correspondante" : "" }}
-          </div>
+          <EmptyState v-if="filteredProposals.length === 0" :message="searchQuery ? 'Aucune proposition correspondante' : 'Aucune proposition'" />
         </div>
       </div>
     </div>
@@ -359,12 +367,9 @@ async function handleUnban(ban: ConfirmedBan) {
   color: white;
 }
 
-.empty {
-  text-align: center;
-  color: var(--text-secondary);
-  padding: 40px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+.ban-error {
+  color: var(--danger);
+  font-size: 13px;
+  margin-bottom: 12px;
 }
 </style>

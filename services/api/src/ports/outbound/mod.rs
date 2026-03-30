@@ -16,6 +16,7 @@ mod level_repository;
 mod daily_activity_repository;
 mod role_panel_repository;
 mod analytics_repository;
+mod discord_role_repository;
 mod ia_config_repository;
 
 pub use analytics_repository::AnalyticsRepository;
@@ -37,3 +38,4 @@ pub use stats_repository::StatsRepository;
 pub use ticket_repository::TicketRepository;
 pub use voice_channel_repository::VoiceChannelRepository;
 pub use watched_user_repository::WatchedUserRepository;
+pub use discord_role_repository::DiscordRoleRepository;

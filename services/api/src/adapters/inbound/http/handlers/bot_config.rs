@@ -6,6 +6,7 @@ use crate::adapters::inbound::http::dto::bot_config::{
     BotDefinitionDto, BotGuildConfigDto, DeleteConfigDto, SetConfigDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::state::AppState;
 
 /// GET /api/bots/definitions — liste des bots et leurs parametres disponibles
@@ -13,7 +14,7 @@ pub async fn get_definitions(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<BotDefinitionDto>>, ApiError> {
     let defs = state.bot_config_repo.get_definitions().await?;
-    Ok(Json(defs.into_iter().map(BotDefinitionDto::from).collect()))
+    Ok(map_to_dtos(defs))
 }
 
 /// GET /api/bots/config/{guild_id} — config de tous les bots pour un serveur
@@ -22,7 +23,7 @@ pub async fn get_guild_config(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<BotGuildConfigDto>>, ApiError> {
     let configs = state.bot_config_repo.get_all_config(&guild_id).await?;
-    Ok(Json(configs.into_iter().map(BotGuildConfigDto::from).collect()))
+    Ok(map_to_dtos(configs))
 }
 
 /// GET /api/bots/config/{guild_id}/{bot_name} — config d'un bot specifique pour un serveur
@@ -31,7 +32,7 @@ pub async fn get_bot_config(
     Path((guild_id, bot_name)): Path<(String, String)>,
 ) -> Result<Json<Vec<BotGuildConfigDto>>, ApiError> {
     let configs = state.bot_config_repo.get_config(&guild_id, &bot_name).await?;
-    Ok(Json(configs.into_iter().map(BotGuildConfigDto::from).collect()))
+    Ok(map_to_dtos(configs))
 }
 
 /// POST /api/bots/config — sauvegarder un parametre

@@ -11,9 +11,10 @@ use serenity::model::id::RoleId;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
+use sentinel_shared::embeds::{neutral_embed, success_embed};
 use sentinel_shared::heartbeat::register_guilds;
 
-use crate::api_client::ApiClient;
+use crate::api_client::{ApiClient, SyncRole};
 use crate::commands;
 
 /// Cle TypeMap pour le client API specifique au roles-bot.
@@ -40,6 +41,18 @@ impl EventHandler for Handler {
                 warn!(error = %e, guild = %guild_id, "Erreur enregistrement commandes");
             }
         }
+
+        // Sync initiale des roles Discord vers l'API
+        sync_all_guild_roles(&ctx).await;
+
+        // Sync periodique toutes les 5 minutes
+        let ctx_clone = ctx.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+                sync_all_guild_roles(&ctx_clone).await;
+            }
+        });
     }
 
     // -- Auto-role quand un membre rejoint --
@@ -130,20 +143,22 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
     let role = RoleId::new(role_id);
     let has_role = member.roles.contains(&role);
 
-    let message = if has_role {
+    let embed = if has_role {
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             let _ = m.remove_role(&ctx.http, role).await;
         }
-        format!("Role <@&{}> retire !", role_id)
+        neutral_embed("\u{21a9}\u{fe0f} Role retire")
+            .description(format!("Le role <@&{}> vous a ete retire.", role_id))
     } else {
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             let _ = m.add_role(&ctx.http, role).await;
         }
-        format!("Role <@&{}> attribue !", role_id)
+        success_embed("\u{2705} Role attribue")
+            .description(format!("Le role <@&{}> vous a ete attribue.", role_id))
     };
 
     let msg = CreateInteractionResponseMessage::new()
-        .content(message)
+        .embed(embed)
         .ephemeral(true);
     let response = CreateInteractionResponse::Message(msg);
     let _ = component.create_response(&ctx.http, response).await;
@@ -205,4 +220,46 @@ pub async fn send_role_panel(
     }
 
     channel_id.send_message(&ctx.http, message).await
+}
+
+/// Synchronise les roles Discord de toutes les guilds vers l'API backend.
+async fn sync_all_guild_roles(ctx: &Context) {
+    let data = ctx.data.read().await;
+    let api = match data.get::<RolesApiKey>() {
+        Some(a) => a,
+        None => return,
+    };
+
+    let guilds = ctx.cache.guilds();
+    for guild_id in guilds {
+        let roles = match guild_id.roles(&ctx.http).await {
+            Ok(r) => r,
+            Err(e) => {
+                warn!(error = %e, guild = %guild_id, "Erreur recuperation roles Discord");
+                continue;
+            }
+        };
+
+        let sync_roles: Vec<SyncRole> = roles
+            .values()
+            .map(|r| SyncRole {
+                id: r.id.to_string(),
+                name: r.name.clone(),
+                color: r.colour.0 as i32,
+                position: r.position as i32,
+                permissions: r.permissions.bits().to_string(),
+                mentionable: r.mentionable,
+                managed: r.managed,
+                icon: r.icon.as_ref().map(|i| i.to_string()),
+                member_count: 0, // Discord ne fournit pas ce chiffre via l'API roles
+            })
+            .collect();
+
+        let count = sync_roles.len();
+        if let Err(e) = api.sync_discord_roles(&guild_id.to_string(), sync_roles).await {
+            warn!(error = %e, guild = %guild_id, "Erreur sync roles vers API");
+        } else {
+            info!(guild = %guild_id, roles = count, "Roles Discord synchronises");
+        }
+    }
 }

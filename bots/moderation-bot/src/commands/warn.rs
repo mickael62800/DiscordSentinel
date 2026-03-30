@@ -1,8 +1,11 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateMessage,
 };
 use tracing::{error, info};
+
+use sentinel_shared::embeds::{sentinel_embed, gravity_color, gravity_emoji};
 
 use crate::api_client::ModerationAction;
 use crate::handler::ModerationApiKey;
@@ -44,24 +47,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
     // Log dans le backend
     let data = ctx.data.read().await;
     let api = data.get::<ModerationApiKey>().unwrap();
-
-    let gravity_emoji = match gravity {
-        "low" => "🟡",
-        "medium" => "🟠",
-        "high" => "🔴",
-        _ => "⚪",
-    };
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
@@ -85,31 +81,48 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 "Warn enregistre"
             );
 
+            let guild_name = guild_id.to_partial_guild(&ctx.http).await
+                .map(|g| g.name).unwrap_or_else(|_| "le serveur".into());
+
             // DM a l'utilisateur
             if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
+                let dm_embed = sentinel_embed(
+                    format!("{} Avertissement sur **{guild_name}**", gravity_emoji(gravity)),
+                    gravity_color(gravity),
+                )
+                .field("Gravite", gravity, true)
+                .field("Raison", reason, false);
+
                 dm.send_message(
                     &ctx.http,
-                    serenity::builder::CreateMessage::new().content(format!(
-                        "{gravity_emoji} **Avertissement ({gravity})** sur **{}**\nRaison : {reason}",
-                        guild_id.to_partial_guild(&ctx.http).await
-                            .map(|g| g.name).unwrap_or_else(|_| "le serveur".into()),
-                    )),
+                    CreateMessage::new().embed(dm_embed),
                 ).await.ok();
             }
 
-            reply(ctx, command, &format!(
-                "{gravity_emoji} **Warn ({gravity})** applique a <@{}>.\nRaison : {reason}",
-                target.id
-            )).await;
+            let channel_embed = sentinel_embed(
+                format!("{} Warn ({gravity})", gravity_emoji(gravity)),
+                gravity_color(gravity),
+            )
+            .field("Cible", format!("<@{}>", target.id), true)
+            .field("Moderateur", format!("<@{}>", command.user.id), true)
+            .field("Gravite", gravity, true)
+            .field("Raison", reason, false);
+
+            command.create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().embed(channel_embed),
+                ),
+            ).await.ok();
         }
         Err(e) => {
             error!(error = %e, "Erreur log warn");
-            reply(ctx, command, &format!("Erreur : {e}")).await;
+            reply_text(ctx, command, &format!("Erreur : {e}")).await;
         }
     }
 }
 
-async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
+async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
     command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(

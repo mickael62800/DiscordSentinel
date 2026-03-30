@@ -446,3 +446,20 @@ pub struct ConductPointsLog {
     pub points_after: i32,
     pub created_at: String,
 }
+
+// ── Discord Roles ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct DiscordRole {
+    pub id: String,
+    pub guild_id: String,
+    pub name: String,
+    pub color: i32,
+    pub position: i32,
+    pub permissions: String,
+    pub mentionable: bool,
+    pub managed: bool,
+    pub icon: Option<String>,
+    pub member_count: i32,
+    pub synced_at: String,
+}

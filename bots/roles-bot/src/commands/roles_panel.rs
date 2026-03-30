@@ -1,8 +1,10 @@
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateCommandOption, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 use tracing::{error, info};
+
+use sentinel_shared::embeds::{info_embed, neutral_embed, success_embed};
 
 use crate::handler::{send_role_panel, RolesApiKey};
 
@@ -90,7 +92,13 @@ async fn handle_deploy(ctx: &Context, command: &CommandInteraction, _guild_id: &
             // Sauvegarder le message_id dans l'API
             let _ = api.set_message_id(&panel_id, &msg.id.to_string()).await;
             info!(panel_id = %panel_id, message_id = %msg.id, "Panel de roles deploye");
-            respond(ctx, command, &format!("Panel **{}** deploye !", panel.panel.title)).await;
+            respond_embed(
+                ctx,
+                command,
+                success_embed("\u{2705} Panel deploye")
+                    .description(format!("Le panel **{}** a ete deploye dans ce salon.", panel.panel.title)),
+            )
+            .await;
         }
         Err(e) => {
             error!(error = %e, "Erreur envoi panel");
@@ -113,13 +121,18 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction, guild_id: &str
                 return;
             }
 
-            let mut desc = String::from("**Panels de roles :**\n");
+            let mut desc = String::new();
             for p in &panels {
                 let status = if p.message_id.is_some() { "deploye" } else { "non deploye" };
                 desc.push_str(&format!("- **{}** (`{}`) — {}\n", p.title, p.id, status));
             }
 
-            respond(ctx, command, &desc).await;
+            respond_embed(
+                ctx,
+                command,
+                info_embed("\u{1f4cb} Panels de roles").description(desc),
+            )
+            .await;
         }
         Err(e) => {
             error!(error = %e, "Erreur API list_panels");
@@ -131,6 +144,14 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction, guild_id: &str
 async fn respond(ctx: &Context, command: &CommandInteraction, content: &str) {
     let msg = CreateInteractionResponseMessage::new()
         .content(content)
+        .ephemeral(true);
+    let response = CreateInteractionResponse::Message(msg);
+    let _ = command.create_response(&ctx.http, response).await;
+}
+
+async fn respond_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
+    let msg = CreateInteractionResponseMessage::new()
+        .embed(embed)
         .ephemeral(true);
     let response = CreateInteractionResponse::Message(msg);
     let _ = command.create_response(&ctx.http, response).await;

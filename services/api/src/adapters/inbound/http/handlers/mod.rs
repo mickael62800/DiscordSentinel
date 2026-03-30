@@ -17,4 +17,5 @@ pub mod levels;
 pub mod dashboard_charts;
 pub mod role_panels;
 pub mod analytics;
+pub mod discord_roles;
 pub mod ia_config;

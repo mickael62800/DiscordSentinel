@@ -44,6 +44,19 @@ pub struct AutoRole {
     pub enabled: bool,
 }
 
+#[derive(Debug, Serialize)]
+pub struct SyncRole {
+    pub id: String,
+    pub name: String,
+    pub color: i32,
+    pub position: i32,
+    pub permissions: String,
+    pub mentionable: bool,
+    pub managed: bool,
+    pub icon: Option<String>,
+    pub member_count: i32,
+}
+
 pub struct ApiClient {
     pub base: Arc<BaseApiClient>,
 }
@@ -89,6 +102,20 @@ impl ApiClient {
             .send().await.map_err(|e| format!("{e}"))?;
         if !resp.status().is_success() { return Ok(vec![]); }
         resp.json::<Vec<RolePanel>>().await.map_err(|e| format!("{e}"))
+    }
+
+    /// Synchronise les roles Discord d'un serveur vers l'API backend.
+    pub async fn sync_discord_roles(&self, guild_id: &str, roles: Vec<SyncRole>) -> Result<(), String> {
+        #[derive(Serialize)]
+        struct Body { roles: Vec<SyncRole> }
+        let req = self.base.client()
+            .post(format!("{}/api/discord-roles/{}/sync", self.base.base_url(), guild_id))
+            .json(&Body { roles });
+        let resp = self.base.auth(req).send().await.map_err(|e| format!("{e}"))?;
+        if !resp.status().is_success() {
+            return Err(format!("Sync roles error: {}", resp.status()));
+        }
+        Ok(())
     }
 
     pub async fn get_panel(&self, panel_id: &str) -> Result<Option<RolePanelDetail>, String> {

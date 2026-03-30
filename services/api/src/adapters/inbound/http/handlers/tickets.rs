@@ -6,6 +6,7 @@ use crate::adapters::inbound::http::dto::tickets::{
     UpdateStatusDto, UpdateTicketChannelDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::{AssignTicketCommand, ReplyTicketCommand, UpdateTicketChannelCommand};
@@ -15,8 +16,7 @@ pub async fn list_tickets(
     Query(params): Query<ListTicketsQuery>,
 ) -> Result<Json<Vec<TicketResponseDto>>, ApiError> {
     let tickets = state.tickets_uc.list_tickets(params.status, params.priority, params.search, params.author_id).await?;
-    let dtos: Vec<TicketResponseDto> = tickets.into_iter().map(TicketResponseDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(tickets))
 }
 
 pub async fn get_ticket_detail(
@@ -24,7 +24,7 @@ pub async fn get_ticket_detail(
     Path(id): Path<String>,
 ) -> Result<Json<TicketDetailDto>, ApiError> {
     let detail = state.tickets_uc.get_ticket_detail(&id).await?;
-    Ok(Json(TicketDetailDto::from(detail)))
+    Ok(single_dto(detail))
 }
 
 pub async fn create_ticket(
@@ -44,7 +44,7 @@ pub async fn create_ticket(
         }),
     );
 
-    Ok(Json(TicketResponseDto::from(ticket)))
+    Ok(single_dto(ticket))
 }
 
 pub async fn reply_ticket(
@@ -72,7 +72,7 @@ pub async fn reply_ticket(
         }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn close_ticket(
@@ -86,7 +86,7 @@ pub async fn close_ticket(
         serde_json::json!({ "ticket_id": &id }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn assign_ticket(
@@ -111,7 +111,7 @@ pub async fn assign_ticket(
         }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn update_status(
@@ -138,7 +138,7 @@ pub async fn update_status(
         serde_json::json!({ "ticket_id": &id, "status": &dto.status }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }
 
 pub async fn update_ticket_channel(
@@ -160,5 +160,5 @@ pub async fn update_ticket_channel(
         serde_json::json!({ "ticket_id": &id }),
     );
 
-    Ok(Json(serde_json::json!({ "ok": true })))
+    Ok(ok_response())
 }

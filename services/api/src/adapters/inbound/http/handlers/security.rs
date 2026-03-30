@@ -5,6 +5,7 @@ use crate::adapters::inbound::http::dto::security::{
     ReportEventDto, SecurityEventResponseDto, SecurityQueryParams,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
@@ -31,7 +32,7 @@ pub async fn report_event(
         }),
     );
 
-    Ok(Json(SecurityEventResponseDto::from(event)))
+    Ok(single_dto(event))
 }
 
 /// GET /api/security/events — lister les événements de sécurité
@@ -44,10 +45,5 @@ pub async fn list_events(
         .list_events(params.guild_id.as_deref())
         .await?;
 
-    let dtos: Vec<SecurityEventResponseDto> = events
-        .into_iter()
-        .map(SecurityEventResponseDto::from)
-        .collect();
-
-    Ok(Json(dtos))
+    Ok(map_to_dtos(events))
 }

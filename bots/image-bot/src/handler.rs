@@ -6,11 +6,13 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::MessageId;
 use serenity::prelude::*;
+use serenity::all::CreateMessage;
 use tracing::{error, info, warn};
 
+use sentinel_shared::embeds::{warn_embed, moderate_embed, danger_embed, critical_embed};
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
-use crate::api_client::{Action, AnalyzeImageRequest, ApiClient};
+use crate::api_client::{Action, AnalyzeImageRequest, ApiClient, Classification};
 
 // ── TypeMap keys ──
 
@@ -210,7 +212,14 @@ async fn process_image_attachment(
                 ));
             }
 
-            if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref())
+            if let Err(e) = execute_action(
+                ctx,
+                msg,
+                &response.action,
+                response.reason.as_deref(),
+                &response.classifications,
+                response.duration,
+            )
                 .await
             {
                 error!(error = %e, "Erreur execution action image");
@@ -226,15 +235,13 @@ async fn process_image_attachment(
             ));
             // Fallback : en cas de doute sur une image et API down, on supprime
             let _ = msg.delete(&ctx.http).await;
+            let embed = moderate_embed("⚠\u{fe0f} Image supprimee preventivement")
+                .description(format!("<@{}>", msg.author.id))
+                .field("📋 Raison", "API de verification indisponible — l'image a ete supprimee par precaution.", false)
+                .thumbnail(msg.author.face());
             let _ = msg
                 .channel_id
-                .say(
-                    &ctx.http,
-                    format!(
-                        "<@{}> Ton image a ete supprimee (verification impossible).",
-                        msg.author.id
-                    ),
-                )
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
                 .await;
         }
     }
@@ -274,54 +281,67 @@ fn detect_content_type(filename: &str, bytes: &[u8]) -> String {
     .to_string()
 }
 
+/// Formate les classifications en une chaine lisible.
+fn format_classifications(classifications: &[Classification]) -> String {
+    if classifications.is_empty() {
+        return "Aucune".to_string();
+    }
+    classifications
+        .iter()
+        .map(|c| format!("{} ({:.0}%)", c.label, c.confidence * 100.0))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 /// Execute l'action decidee par le backend.
 async fn execute_action(
     ctx: &Context,
     msg: &Message,
     action: &Action,
     reason: Option<&str>,
+    classifications: &[Classification],
+    duration: Option<u64>,
 ) -> Result<(), serenity::Error> {
     let reason_text = reason.unwrap_or("Contenu d'image interdit");
+    let detection_text = format_classifications(classifications);
 
     match action {
         Action::None => {}
         Action::Warn => {
-            msg.reply(
-                &ctx.http,
-                format!(
-                    "<@{}> Avertissement : {reason_text}",
-                    msg.author.id
-                ),
-            )
-            .await?;
+            let embed = warn_embed("⚠\u{fe0f} Avertissement — Image")
+                .description(format!("<@{}>", msg.author.id))
+                .field("📝 Raison", reason_text, false)
+                .field("🏷\u{fe0f} Detection", &detection_text, false)
+                .thumbnail(msg.author.face());
+            msg.channel_id
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
+                .await?;
             info!(user = %msg.author.name, "Avertissement image envoye");
         }
         Action::Delete => {
+            let embed = moderate_embed("🗑\u{fe0f} Image supprimee")
+                .description(format!("<@{}>", msg.author.id))
+                .field("📝 Raison", reason_text, false)
+                .field("🏷\u{fe0f} Detection", &detection_text, false)
+                .thumbnail(msg.author.face());
             let _ = msg
                 .channel_id
-                .say(
-                    &ctx.http,
-                    format!(
-                        "<@{}> Ton image a ete supprimee. Raison : {reason_text}",
-                        msg.author.id
-                    ),
-                )
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
                 .await;
             msg.delete(&ctx.http).await?;
             info!(message_id = %msg.id, "Message avec image supprime");
         }
         Action::Mute => {
-            let mute_duration_secs: u64 = 600; // 10 min par defaut
+            let mute_duration_secs: u64 = duration.unwrap_or(600); // 10 min par defaut
             let mute_minutes = mute_duration_secs / 60;
+            let embed = danger_embed("🔇 Mute — Image interdite")
+                .description(format!("<@{}>", msg.author.id))
+                .field("📝 Raison", reason_text, false)
+                .field("⏱\u{fe0f} Duree", format!("{mute_minutes} minutes"), false)
+                .thumbnail(msg.author.face());
             let _ = msg
                 .channel_id
-                .say(
-                    &ctx.http,
-                    format!(
-                        "<@{}> Tu as ete mute {mute_minutes} minutes pour image interdite. Raison : {reason_text}",
-                        msg.author.id
-                    ),
-                )
+                .send_message(&ctx.http, CreateMessage::new().embed(embed))
                 .await;
             msg.delete(&ctx.http).await?;
 
@@ -343,15 +363,13 @@ async fn execute_action(
         }
         Action::Ban => {
             if let Some(guild_id) = msg.guild_id {
+                let embed = critical_embed("🔨 Ban — Image interdite")
+                    .description(format!("<@{}>", msg.author.id))
+                    .field("📝 Raison", reason_text, false)
+                    .thumbnail(msg.author.face());
                 let _ = msg
                     .channel_id
-                    .say(
-                        &ctx.http,
-                        format!(
-                            "<@{}> Tu as ete banni pour image interdite. Raison : {reason_text}",
-                            msg.author.id
-                        ),
-                    )
+                    .send_message(&ctx.http, CreateMessage::new().embed(embed))
                     .await;
                 guild_id
                     .ban_with_reason(&ctx.http, msg.author.id, 1, reason_text)

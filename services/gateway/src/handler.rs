@@ -9,6 +9,9 @@ use tracing::{info, warn};
 use crate::broadcaster::EventBroadcaster;
 use crate::logger::GatewayLogger;
 
+/// WebSocket close code: "Try Again Later" (server at capacity)
+const WS_CLOSE_TRY_AGAIN_LATER: u16 = 1013;
+
 #[derive(Debug, serde::Deserialize)]
 pub struct WsQuery {
     pub token: Option<String>,
@@ -33,11 +36,7 @@ pub async fn ws_handler(
         match query.token {
             Some(ref t) if t == &state.api_key => {}
             _ => {
-                warn!("WebSocket rejected: invalid token");
-                state.logger.warn("Connexion WebSocket refusee : token invalide", serde_json::json!({
-                    "event": "auth_rejected",
-                    "client_ip": addr.to_string(),
-                }));
+                warn!(client_ip = %addr, "WebSocket rejected: invalid token");
                 return StatusCode::UNAUTHORIZED.into_response();
             }
         }
@@ -48,29 +47,32 @@ pub async fn ws_handler(
     ws.on_upgrade(move |socket| handle_socket(socket, state.broadcaster, logger, client_ip))
 }
 
-async fn handle_socket(mut socket: WebSocket, broadcaster: Arc<EventBroadcaster>, logger: Arc<GatewayLogger>, client_ip: String) {
+async fn handle_socket(
+    mut socket: WebSocket,
+    broadcaster: Arc<EventBroadcaster>,
+    logger: Arc<GatewayLogger>,
+    client_ip: String,
+) {
     // Verifier la limite de connexions
     let mut rx = match broadcaster.subscribe() {
         Some(rx) => rx,
         None => {
-            warn!("WebSocket rejected: max connections reached");
-            logger.error("Connexion WebSocket refusee : limite atteinte", serde_json::json!({
-                "event": "max_connections",
-                "client_ip": &client_ip,
-                "connected": broadcaster.connected_count(),
-            }));
-            let _ = socket
+            warn!(client_ip = %client_ip, connected = broadcaster.connected_count(), "WebSocket rejected: max connections reached");
+            if let Err(e) = socket
                 .send(Message::Close(Some(axum::extract::ws::CloseFrame {
-                    code: 1013,
+                    code: WS_CLOSE_TRY_AGAIN_LATER,
                     reason: "Too many connections".into(),
                 })))
-                .await;
+                .await
+            {
+                warn!(error = %e, "Failed to send close frame");
+            }
             return;
         }
     };
 
     let clients = broadcaster.connected_count();
-    info!(clients, "WebSocket client connected");
+    info!(clients, client_ip = %client_ip, "WebSocket client connected");
     logger.info("Client WebSocket connecte", serde_json::json!({
         "event": "client_connected",
         "client_ip": &client_ip,
@@ -78,6 +80,7 @@ async fn handle_socket(mut socket: WebSocket, broadcaster: Arc<EventBroadcaster>
     }));
 
     let mut events_relayed: u64 = 0;
+    let mut events_skipped: u64 = 0;
 
     loop {
         tokio::select! {
@@ -92,17 +95,13 @@ async fn handle_socket(mut socket: WebSocket, broadcaster: Arc<EventBroadcaster>
                                 events_relayed += 1;
                             }
                             Err(e) => {
-                                warn!(error = %e, "Failed to serialize event");
+                                warn!(error = %e, event_type = %ws_event.event, "Failed to serialize event");
                             }
                         }
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        warn!(skipped = n, "Client lagged");
-                        logger.warn("Client WebSocket en retard", serde_json::json!({
-                            "event": "client_lagged",
-                            "client_ip": &client_ip,
-                            "skipped_events": n,
-                        }));
+                        warn!(skipped = n, client_ip = %client_ip, "Client lagged");
+                        events_skipped += n;
                     }
                     Err(_) => break,
                 }
@@ -123,11 +122,12 @@ async fn handle_socket(mut socket: WebSocket, broadcaster: Arc<EventBroadcaster>
 
     broadcaster.unsubscribe();
     let clients = broadcaster.connected_count();
-    info!(clients, "WebSocket client disconnected");
+    info!(clients, client_ip = %client_ip, events_relayed, events_skipped, "WebSocket client disconnected");
     logger.info("Client WebSocket deconnecte", serde_json::json!({
         "event": "client_disconnected",
         "client_ip": &client_ip,
         "total_clients": clients,
         "events_relayed": events_relayed,
+        "skipped_events": events_skipped,
     }));
 }

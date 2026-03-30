@@ -15,6 +15,7 @@ mod level_repository;
 mod daily_activity_repository;
 mod role_panel_repository;
 mod analytics_repository;
+mod discord_role_repository;
 mod ia_config_repository;
 
 pub use analytics_repository::PgAnalyticsRepository;
@@ -35,3 +36,4 @@ pub use stats_repository::PgStatsRepository;
 pub use ticket_repository::PgTicketRepository;
 pub use voice_channel_repository::PgVoiceChannelRepository;
 pub use watched_user_repository::PgWatchedUserRepository;
+pub use discord_role_repository::PgDiscordRoleRepository;

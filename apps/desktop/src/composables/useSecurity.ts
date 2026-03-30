@@ -1,11 +1,10 @@
-import { useFetch } from "./useFetch";
 import type { SecurityEvent } from "../types";
+import { useGuildFetch } from "./useGuildFetch";
 
 export function useSecurity() {
-  const { data: events, loading, error, refresh: fetchEvents } = useFetch<SecurityEvent[]>(
+  const { data: events, loading, error, refresh: fetchEvents } = useGuildFetch<SecurityEvent[]>(
     "get_security_events",
     [],
-    { guildId: null },
   );
 
   return { events, loading, error, fetchEvents };

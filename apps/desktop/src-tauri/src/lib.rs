@@ -22,6 +22,7 @@ use application::audit_logs_service::AuditLogsService;
 use application::dashboard_charts_service::DashboardChartsService;
 use application::levels_service::LevelsService;
 use application::role_panels_service::RolePanelsService;
+use application::discord_roles_service::DiscordRolesService;
 use application::watched_users_service::WatchedUsersService;
 use domain::ports::AppAdapter;
 use infrastructure::api_adapter::ApiAdapter;
@@ -63,6 +64,7 @@ pub fn run() {
     let dashboard_charts_svc = Arc::new(DashboardChartsService::new(adapter.clone()));
     let levels_svc = Arc::new(LevelsService::new(adapter.clone()));
     let role_panels_svc = Arc::new(RolePanelsService::new(adapter.clone()));
+    let discord_roles_svc = Arc::new(DiscordRolesService::new(adapter.clone()));
     let watched_users_svc = Arc::new(WatchedUsersService::new(adapter.clone()));
 
     // IA config uses direct HTTP (no repository trait needed)
@@ -98,6 +100,7 @@ pub fn run() {
         .manage(dashboard_charts_svc)
         .manage(levels_svc)
         .manage(role_panels_svc)
+        .manage(discord_roles_svc)
         .manage(watched_users_svc)
         .manage(ia_config_svc)
         .manage(analytics_svc)
@@ -149,6 +152,7 @@ pub fn run() {
             presentation::commands::get_role_panels,
             presentation::commands::get_role_panel_detail,
             presentation::commands::get_auto_roles,
+            presentation::commands::get_discord_roles,
             presentation::commands::get_activity_trend,
             presentation::commands::get_top_users,
             presentation::commands::get_audit_logs,

@@ -14,7 +14,7 @@ use tokio::signal;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
-use tracing::{info, Span};
+use tracing::{info, warn, Span};
 
 use crate::broadcaster::EventBroadcaster;
 use crate::config::Config;
@@ -39,26 +39,41 @@ async fn main() {
         redis = %config.redis_url,
         channel = %config.redis_channel,
         max_connections = config.max_connections,
+        broadcast_capacity = config.broadcast_capacity,
         "Demarrage de Sentinel Gateway"
     );
+
+    // Warning securite si API_KEY vide
+    if config.api_key.is_empty() {
+        warn!("API_KEY non definie — authentification WebSocket desactivee (mode dev)");
+    }
 
     // Logger
     let gw_logger = GatewayLogger::new(config.api_url.clone());
 
-    // Broadcaster local
-    let broadcaster = Arc::new(EventBroadcaster::new(512, config.max_connections));
+    // Broadcaster local (capacite configurable)
+    let broadcaster = Arc::new(EventBroadcaster::new(config.broadcast_capacity, config.max_connections));
 
-    // Lancer le subscriber Redis en background
+    // Lancer le subscriber Redis en background avec exponential backoff
     let redis_broadcaster = broadcaster.clone();
     let redis_url = config.redis_url.clone();
     let redis_channel = config.redis_channel.clone();
     let redis_logger = gw_logger.clone();
+    let redis_base_delay = config.redis_reconnect_delay_secs;
+    let redis_max_delay = config.redis_reconnect_max_delay_secs;
     tokio::spawn(async move {
-        redis_subscriber::run_redis_subscriber(&redis_url, &redis_channel, redis_broadcaster, redis_logger).await;
+        redis_subscriber::run_redis_subscriber(
+            &redis_url,
+            &redis_channel,
+            redis_broadcaster,
+            redis_logger,
+            redis_base_delay,
+            redis_max_delay,
+        ).await;
     });
 
     // CORS
-    let cors = build_cors(&config.allowed_origins);
+    let cors = build_cors(&config.allowed_origins, config.cors_max_age_secs);
 
     // Routes
     let ws_state = GatewayState {
@@ -121,18 +136,29 @@ async fn main() {
     .await
     .expect("Erreur serveur");
 
+    // Graceful shutdown avec timeout
+    let timeout = std::time::Duration::from_secs(config.shutdown_timeout_secs);
+    info!(timeout_secs = config.shutdown_timeout_secs, "Arret en cours, attente des connexions...");
+    tokio::time::sleep(timeout).await;
+
     gw_logger.warn("Gateway WebSocket arretee", serde_json::json!({"event": "shutdown"}));
 
     info!("Sentinel Gateway arrete proprement");
 }
 
-fn build_cors(allowed_origins: &str) -> CorsLayer {
+fn build_cors(allowed_origins: &str, max_age_secs: u64) -> CorsLayer {
     let allow_origin = if allowed_origins.is_empty() || allowed_origins == "*" {
         AllowOrigin::any()
     } else {
         let origins: Vec<HeaderValue> = allowed_origins
             .split(',')
-            .filter_map(|o| o.trim().parse().ok())
+            .filter_map(|o| {
+                let trimmed = o.trim();
+                trimmed.parse().map_err(|e| {
+                    warn!(origin = %trimmed, error = %e, "CORS origin invalide, ignore");
+                    e
+                }).ok()
+            })
             .collect();
         AllowOrigin::list(origins)
     };
@@ -145,7 +171,7 @@ fn build_cors(allowed_origins: &str) -> CorsLayer {
             header::AUTHORIZATION,
             header::HeaderName::from_static("x-request-id"),
         ])
-        .max_age(std::time::Duration::from_secs(3600))
+        .max_age(std::time::Duration::from_secs(max_age_secs))
 }
 
 async fn shutdown_signal() {

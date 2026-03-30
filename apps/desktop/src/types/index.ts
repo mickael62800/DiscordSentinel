@@ -483,3 +483,18 @@ export interface FullAnalytics {
   moderation_trend: ModerationTrend[];
   peak_hours: PeakHour[];
 }
+
+// Discord Roles (synchronises par le community-bot)
+export interface DiscordRole {
+  id: string;
+  guild_id: string;
+  name: string;
+  color: number;
+  position: number;
+  permissions: string;
+  mentionable: boolean;
+  managed: boolean;
+  icon: string | null;
+  member_count: number;
+  synced_at: string;
+}

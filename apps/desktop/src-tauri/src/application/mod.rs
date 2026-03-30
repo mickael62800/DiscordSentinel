@@ -18,3 +18,4 @@ pub mod role_panels_service;
 pub mod watched_users_service;
 pub mod ia_config_service;
 pub mod analytics_service;
+pub mod discord_roles_service;

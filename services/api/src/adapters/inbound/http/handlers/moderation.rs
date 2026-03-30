@@ -6,8 +6,8 @@ use crate::adapters::inbound::http::dto::moderation::{
     BanEntryDto, LogActionDto, ModerationActionResponseDto, UserHistoryDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -27,7 +27,6 @@ pub async fn log_action(
     let command = dto.into();
     let action = state.moderation_uc.log_action(command).await?;
 
-    // Broadcast WebSocket
     state.broadcaster.broadcast(
         "moderation_action",
         serde_json::json!({
@@ -38,7 +37,7 @@ pub async fn log_action(
         }),
     );
 
-    Ok(Json(ModerationActionResponseDto::from(action)))
+    Ok(single_dto(action))
 }
 
 #[derive(Debug, Deserialize)]
@@ -53,35 +52,12 @@ pub async fn execute_ban(
     State(state): State<AppState>,
     Json(dto): Json<ExecuteBanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    if state.discord_bot_token.is_empty() {
-        return Err(ApiError(DomainError::Internal("MODERATION_DISCORD_TOKEN non configure".into())));
-    }
-
-    // Appeler l'API Discord pour bannir
-    let client = reqwest::Client::new();
-    let url = format!(
-        "https://discord.com/api/v10/guilds/{}/bans/{}",
-        dto.guild_id, dto.user_id
-    );
-
-    let resp = client
-        .put(&url)
-        .header("Authorization", format!("Bot {}", state.discord_bot_token))
-        .json(&serde_json::json!({
-            "delete_message_seconds": 86400,
-            "reason": dto.reason,
-        }))
-        .send()
+    state
+        .discord_api
+        .ban_user(&dto.guild_id, &dto.user_id, &dto.reason)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("Discord API error: {e}"))))?;
+        .map_err(ApiError)?;
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        return Err(ApiError(DomainError::Internal(format!("Discord ban failed ({status}): {body}"))));
-    }
-
-    // Log l'action de moderation
     let command = crate::ports::inbound::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new(),
@@ -96,7 +72,7 @@ pub async fn execute_ban(
     };
     state.moderation_uc.log_action(command).await?;
 
-    Ok(Json(serde_json::json!({ "success": true })))
+    Ok(ok_response())
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,30 +86,12 @@ pub async fn execute_unban(
     State(state): State<AppState>,
     Json(dto): Json<ExecuteUnbanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    if state.discord_bot_token.is_empty() {
-        return Err(ApiError(DomainError::Internal("MODERATION_DISCORD_TOKEN non configure".into())));
-    }
-
-    let client = reqwest::Client::new();
-    let url = format!(
-        "https://discord.com/api/v10/guilds/{}/bans/{}",
-        dto.guild_id, dto.user_id
-    );
-
-    let resp = client
-        .delete(&url)
-        .header("Authorization", format!("Bot {}", state.discord_bot_token))
-        .send()
+    state
+        .discord_api
+        .unban_user(&dto.guild_id, &dto.user_id)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("Discord API error: {e}"))))?;
+        .map_err(ApiError)?;
 
-    let status = resp.status();
-    if !status.is_success() && status.as_u16() != 404 {
-        let body = resp.text().await.unwrap_or_default();
-        return Err(ApiError(DomainError::Internal(format!("Discord unban failed ({status}): {body}"))));
-    }
-
-    // Log l'action
     let command = crate::ports::inbound::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new(),
@@ -146,13 +104,13 @@ pub async fn execute_unban(
         gravity: None,
         duration: None,
     };
-    // Supprimer les entrees ban de moderation_actions
-    state.moderation_uc.delete_bans_for_user(&dto.guild_id, &command.target_id).await?;
-
-    // Log le unban
+    state
+        .moderation_uc
+        .delete_bans_for_user(&dto.guild_id, &command.target_id)
+        .await?;
     state.moderation_uc.log_action(command).await?;
 
-    Ok(Json(serde_json::json!({ "success": true })))
+    Ok(ok_response())
 }
 
 /// GET /api/moderation/bans
@@ -160,8 +118,11 @@ pub async fn list_bans(
     State(state): State<AppState>,
     Query(params): Query<BansQuery>,
 ) -> Result<Json<Vec<BanEntryDto>>, ApiError> {
-    let bans = state.moderation_uc.list_bans(params.guild_id.as_deref()).await?;
-    Ok(Json(bans.into_iter().map(BanEntryDto::from).collect()))
+    let bans = state
+        .moderation_uc
+        .list_bans(params.guild_id.as_deref())
+        .await?;
+    Ok(map_to_dtos(bans))
 }
 
 /// GET /api/moderation/history/{guild_id}/{user_id}
@@ -169,6 +130,9 @@ pub async fn get_history(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<UserHistoryDto>, ApiError> {
-    let history = state.moderation_uc.get_history(&guild_id, &user_id).await?;
-    Ok(Json(UserHistoryDto::from(history)))
+    let history = state
+        .moderation_uc
+        .get_history(&guild_id, &user_id)
+        .await?;
+    Ok(single_dto(history))
 }

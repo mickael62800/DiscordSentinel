@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
+use tracing::debug;
 
 /// Evenement WebSocket transmis aux clients.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,25 +28,38 @@ impl EventBroadcaster {
         }
     }
 
+    /// Tente de s'abonner au broadcast. Retourne None si la limite est atteinte.
+    /// Fix: utilise compare_exchange en boucle pour eviter la race condition.
     pub fn subscribe(&self) -> Option<broadcast::Receiver<WsEvent>> {
-        let current = self.connected_clients.load(Ordering::Relaxed);
-        if current >= self.max_connections {
-            return None;
+        loop {
+            let current = self.connected_clients.load(Ordering::Acquire);
+            if current >= self.max_connections {
+                return None;
+            }
+            // Atomiquement: incrementer seulement si la valeur n'a pas change
+            if self
+                .connected_clients
+                .compare_exchange(current, current + 1, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+            {
+                return Some(self.tx.subscribe());
+            }
+            // Sinon, une autre thread a modifie le compteur, on re-essaie
         }
-        self.connected_clients.fetch_add(1, Ordering::Relaxed);
-        Some(self.tx.subscribe())
     }
 
     pub fn unsubscribe(&self) {
-        self.connected_clients.fetch_sub(1, Ordering::Relaxed);
+        self.connected_clients.fetch_sub(1, Ordering::AcqRel);
     }
 
     pub fn broadcast(&self, event: WsEvent) {
-        let _ = self.tx.send(event);
+        if let Err(e) = self.tx.send(event) {
+            debug!(error = %e, "Broadcast failed (no active receivers)");
+        }
     }
 
     pub fn connected_count(&self) -> usize {
-        self.connected_clients.load(Ordering::Relaxed)
+        self.connected_clients.load(Ordering::Acquire)
     }
 }
 
@@ -83,7 +97,6 @@ mod tests {
         let _rx2 = broadcaster.subscribe();
         assert_eq!(broadcaster.connected_count(), 2);
 
-        // 3eme connexion refusee
         let rx3 = broadcaster.subscribe();
         assert!(rx3.is_none());
         assert_eq!(broadcaster.connected_count(), 2);
@@ -108,7 +121,6 @@ mod tests {
     #[test]
     fn test_broadcast_no_subscriber_no_panic() {
         let broadcaster = EventBroadcaster::new(16, 100);
-        // Pas de subscriber, ne doit pas paniquer
         broadcaster.broadcast(WsEvent {
             event: "orphan".to_string(),
             data: serde_json::json!(null),

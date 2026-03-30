@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::adapters::inbound::http::dto::rules::{CreateRuleDto, RuleResponseDto};
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 
 pub async fn get_rules(
@@ -11,8 +12,7 @@ pub async fn get_rules(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<RuleResponseDto>>, ApiError> {
     let rules = state.rules_uc.get_rules(&guild_id).await?;
-    let dtos: Vec<RuleResponseDto> = rules.into_iter().map(RuleResponseDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(rules))
 }
 
 pub async fn create_rule(
@@ -21,7 +21,7 @@ pub async fn create_rule(
 ) -> Result<Json<RuleResponseDto>, ApiError> {
     let command = dto.into();
     let rule = state.rules_uc.create_or_update_rule(command).await?;
-    Ok(Json(RuleResponseDto::from(rule)))
+    Ok(single_dto(rule))
 }
 
 pub async fn delete_rule(

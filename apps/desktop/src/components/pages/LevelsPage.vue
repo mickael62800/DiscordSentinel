@@ -203,7 +203,7 @@ function rewardForLevel(level: number): string | null {
   font-size: 12px;
   font-weight: 600;
   color: var(--accent);
-  background-color: rgba(88, 101, 242, 0.15);
+  background-color: var(--accent-bg);
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -212,7 +212,7 @@ function rewardForLevel(level: number): string | null {
   font-size: 10px;
   font-weight: 600;
   color: var(--warning);
-  background-color: rgba(254, 231, 92, 0.15);
+  background-color: var(--warning-bg);
   padding: 2px 6px;
   border-radius: 4px;
 }

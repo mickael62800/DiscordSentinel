@@ -62,10 +62,10 @@ const trendData = computed(() => {
       return `${date.getDate()}/${date.getMonth() + 1}`;
     }),
     datasets: [
-      { label: "Avertissements", data: t.map((d) => d.warns), borderColor: "#5bc0eb", backgroundColor: "rgba(91,192,235,0.1)", fill: true, tension: 0.3 },
+      { label: "Avertissements", data: t.map((d) => d.warns), borderColor: "#5bc0eb", backgroundColor: "var(--info-bg)", fill: true, tension: 0.3 },
       { label: "Suppressions", data: t.map((d) => d.deletes), borderColor: "#ffa500", backgroundColor: "rgba(255,165,0,0.1)", fill: true, tension: 0.3 },
-      { label: "Sourdines", data: t.map((d) => d.mutes), borderColor: "#fee75c", backgroundColor: "rgba(254,231,92,0.1)", fill: true, tension: 0.3 },
-      { label: "Bannissements", data: t.map((d) => d.bans), borderColor: "#ed4245", backgroundColor: "rgba(237,66,69,0.1)", fill: true, tension: 0.3 },
+      { label: "Sourdines", data: t.map((d) => d.mutes), borderColor: "#fee75c", backgroundColor: "var(--warning-bg)", fill: true, tension: 0.3 },
+      { label: "Bannissements", data: t.map((d) => d.bans), borderColor: "#ed4245", backgroundColor: "var(--danger-bg)", fill: true, tension: 0.3 },
     ],
   };
 });

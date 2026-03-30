@@ -70,7 +70,7 @@ const messagesChartData = computed(() => ({
       label: "Messages",
       data: activity.value.map((a) => a.messages),
       borderColor: "#5865f2",
-      backgroundColor: "rgba(88, 101, 242, 0.15)",
+      backgroundColor: "var(--accent-bg)",
       fill: true,
       tension: 0.3,
     },
@@ -90,7 +90,7 @@ const voiceChartData = computed(() => {
         label: "Heures vocales (cumule)",
         data: cumulData,
         borderColor: "#57f287",
-        backgroundColor: "rgba(87, 242, 135, 0.15)",
+        backgroundColor: "var(--success-bg)",
         fill: true,
         tension: 0.3,
       },
@@ -162,7 +162,7 @@ const memberGrowthData = computed(() => ({
       label: "Arrivees",
       data: activity.value.map((a) => a.new_members),
       borderColor: "#57f287",
-      backgroundColor: "rgba(87, 242, 135, 0.15)",
+      backgroundColor: "var(--success-bg)",
       fill: true,
       tension: 0.3,
     },
@@ -170,7 +170,7 @@ const memberGrowthData = computed(() => ({
       label: "Departs",
       data: activity.value.map((a) => a.leaves),
       borderColor: "#ed4245",
-      backgroundColor: "rgba(237, 66, 69, 0.15)",
+      backgroundColor: "var(--danger-bg)",
       fill: true,
       tension: 0.3,
     },
@@ -282,7 +282,7 @@ const membersChartData = computed(() => ({
       label: "Membres actifs",
       data: activity.value.map((a) => a.active_members),
       borderColor: "#fee75c",
-      backgroundColor: "rgba(254, 231, 92, 0.15)",
+      backgroundColor: "var(--warning-bg)",
       fill: true,
       tension: 0.3,
     },
@@ -494,7 +494,7 @@ const membersChartData = computed(() => ({
 
 .error-msg {
   color: var(--danger);
-  background-color: rgba(237, 66, 69, 0.1);
+  background-color: var(--danger-bg);
   border: 1px solid var(--danger);
   border-radius: 8px;
   padding: 12px 16px;

@@ -1,25 +1,20 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
 import { useInfractions } from "../../composables/useInfractions";
-import type { TableColumn } from "../../types";
+import { useSearch } from "../../composables/useSearch";
+import type { TableColumn, Infraction } from "../../types";
 import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppInput from "../atoms/AppInput.vue";
+import LoadingState from "../atoms/LoadingState.vue";
 import { infractionTypeVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { infractions, loading } = useInfractions();
-const search = ref("");
-
-const filteredInfractions = computed(() => {
-  const term = String(search.value).trim().toLowerCase();
-  if (!term) return infractions.value;
-  return infractions.value.filter((i) =>
-    [i.username, i.user_id, i.reason, i.infraction_type, i.moderator, i.server, i.created_at]
-      .some((field) => field?.toLowerCase().includes(term)),
-  );
-});
+const { search, filtered: filteredInfractions } = useSearch<Infraction>(
+  infractions,
+  ["username", "user_id", "reason", "infraction_type", "moderator", "server", "created_at"],
+);
 
 const columns: TableColumn[] = [
   { key: "username", label: "Utilisateur" },
@@ -41,7 +36,7 @@ const columns: TableColumn[] = [
       />
     </div>
 
-    <div v-if="loading" class="loading">Chargement...</div>
+    <LoadingState v-if="loading" />
 
     <DataTable
       v-else

@@ -5,6 +5,7 @@ use crate::adapters::inbound::http::dto::audit_logs::{
     AuditLogQueryParams, AuditLogResponseDto, CreateAuditLogDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
 
@@ -13,7 +14,7 @@ pub async fn create_audit_log(
     Json(dto): Json<CreateAuditLogDto>,
 ) -> Result<Json<AuditLogResponseDto>, ApiError> {
     let log = state.audit_logs_uc.create(dto.into()).await?;
-    Ok(Json(AuditLogResponseDto::from(log)))
+    Ok(single_dto(log))
 }
 
 pub async fn list_audit_logs(
@@ -24,7 +25,7 @@ pub async fn list_audit_logs(
         event_type: params.event_type,
         actor_id: params.actor_id,
         target_id: params.target_id,
-        limit: params.limit.unwrap_or(100).min(500),
+        limit: normalize_limit(params.limit, 100, 500),
         offset: params.offset.unwrap_or(0),
     };
 
@@ -32,6 +33,5 @@ pub async fn list_audit_logs(
         .audit_logs_uc
         .list(params.guild_id.as_deref(), filters)
         .await?;
-    let dtos: Vec<AuditLogResponseDto> = logs.into_iter().map(AuditLogResponseDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(logs))
 }

@@ -1,13 +1,16 @@
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { VoiceChannel, VoiceChannelDetail } from "../types";
-import { useGuildSelector } from "./useGuildSelector";
+import { useGuildFetch } from "./useGuildFetch";
 
 export function useVoiceChannels() {
-  const channels = ref<VoiceChannel[]>([]);
-  const loading = ref(true);
+  const { data: channels, loading, refresh: fetchChannels } = useGuildFetch<VoiceChannel[]>(
+    "get_voice_channels",
+    [],
+    { extraParams: {} },
+  );
+
   const filterKind = ref("all");
-  const { guildIdFilter } = useGuildSelector();
 
   const filteredChannels = computed(() => {
     return channels.value.filter((c) => {
@@ -19,20 +22,6 @@ export function useVoiceChannels() {
   const publicCount = computed(() => channels.value.filter((c) => c.kind === "public").length);
   const privateCount = computed(() => channels.value.filter((c) => c.kind === "private").length);
   const totalCount = computed(() => channels.value.length);
-
-  async function fetchChannels() {
-    loading.value = true;
-    try {
-      channels.value = await invoke<VoiceChannel[]>("get_voice_channels", { guildId: guildIdFilter.value ?? "" });
-    } catch (e) {
-      console.error("Erreur chargement salons vocaux:", e);
-    } finally {
-      loading.value = false;
-    }
-  }
-
-  onMounted(fetchChannels);
-  watch(guildIdFilter, fetchChannels);
 
   return { channels, filteredChannels, loading, filterKind, publicCount, privateCount, totalCount, fetchChannels };
 }

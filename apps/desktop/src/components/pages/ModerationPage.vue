@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useModeration } from "../../composables/useModeration";
 import AppButton from "../atoms/AppButton.vue";
 import AppBadge from "../atoms/AppBadge.vue";
+import FormField from "../atoms/FormField.vue";
 import { actionVariant } from "../../utils/variants";
 
 const { submitting, history, historyLoading, logAction, fetchHistory } = useModeration();
@@ -69,50 +70,43 @@ async function handleLookup() {
         <h2>Appliquer une action</h2>
         <form class="action-form" @submit.prevent="handleSubmit">
           <div class="form-row">
-            <div class="field">
-              <label>ID du serveur</label>
+            <FormField label="ID du serveur">
               <input v-model="guildId" type="text" placeholder="ID du serveur" />
-            </div>
+            </FormField>
           </div>
           <div class="form-row two-col">
-            <div class="field">
-              <label>ID de l'utilisateur cible</label>
+            <FormField label="ID de l'utilisateur cible">
               <input v-model="targetId" type="text" placeholder="ID utilisateur Discord" />
-            </div>
-            <div class="field">
-              <label>Nom de l'utilisateur cible</label>
+            </FormField>
+            <FormField label="Nom de l'utilisateur cible">
               <input v-model="targetName" type="text" placeholder="nom#1234" />
-            </div>
+            </FormField>
           </div>
           <div class="form-row two-col">
-            <div class="field">
-              <label>Action</label>
+            <FormField label="Action">
               <select v-model="actionType">
                 <option value="warn">Avertissement</option>
                 <option value="mute">Sourdine</option>
                 <option value="ban">Bannissement</option>
               </select>
-            </div>
-            <div class="field">
-              <label>Gravite</label>
+            </FormField>
+            <FormField label="Gravite">
               <select v-model="gravity">
                 <option value="low">Faible</option>
                 <option value="medium">Moyen</option>
                 <option value="high">Eleve</option>
                 <option value="critical">Critique</option>
               </select>
-            </div>
+            </FormField>
           </div>
           <div v-if="actionType === 'mute' || actionType === 'ban'" class="form-row">
-            <div class="field">
-              <label>Duree (secondes) — laisser vide pour permanent</label>
+            <FormField label="Duree (secondes) — laisser vide pour permanent">
               <input v-model.number="duration" type="number" placeholder="600 = 10min, 3600 = 1h" :min="0" />
-            </div>
+            </FormField>
           </div>
-          <div class="field">
-            <label>Raison</label>
+          <FormField label="Raison">
             <textarea v-model="reason" rows="2" placeholder="Pourquoi cette action est-elle prise ?"></textarea>
-          </div>
+          </FormField>
 
           <p v-if="error" class="error-msg">{{ error }}</p>
           <p v-if="success" class="success-msg">{{ success }}</p>
@@ -128,14 +122,12 @@ async function handleLookup() {
         <h2>Historique de l'utilisateur</h2>
         <div class="lookup-form">
           <div class="form-row two-col">
-            <div class="field">
-              <label>ID du serveur</label>
+            <FormField label="ID du serveur">
               <input v-model="lookupGuildId" type="text" placeholder="ID du serveur" />
-            </div>
-            <div class="field">
-              <label>ID de l'utilisateur</label>
+            </FormField>
+            <FormField label="ID de l'utilisateur">
               <input v-model="lookupUserId" type="text" placeholder="ID utilisateur Discord" />
-            </div>
+            </FormField>
           </div>
           <AppButton variant="primary" :disabled="historyLoading" @click="handleLookup">
             {{ historyLoading ? "Chargement..." : "Rechercher" }}
@@ -198,21 +190,9 @@ async function handleLookup() {
 }
 
 .form-row { display: flex; gap: 12px; }
-.form-row.two-col > .field { flex: 1; }
+.form-row.two-col > :deep(.form-field) { flex: 1; }
 
-.field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.field label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-secondary);
-}
-
-.field input, .field select, .field textarea {
+:deep(.form-field) input, :deep(.form-field) select, :deep(.form-field) textarea {
   width: 100%;
   background-color: var(--bg-primary);
   border: 1px solid var(--border);
@@ -224,11 +204,11 @@ async function handleLookup() {
   outline: none;
 }
 
-.field input:focus, .field select:focus, .field textarea:focus {
+:deep(.form-field) input:focus, :deep(.form-field) select:focus, :deep(.form-field) textarea:focus {
   border-color: var(--accent);
 }
 
-.field textarea { resize: vertical; }
+:deep(.form-field) textarea { resize: vertical; }
 
 .error-msg { color: var(--danger); font-size: 13px; }
 .success-msg { color: var(--success); font-size: 13px; }

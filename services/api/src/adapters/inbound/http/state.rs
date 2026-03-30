@@ -2,12 +2,13 @@ use std::sync::Arc;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::job_client::JobClient;
+use crate::domain::services::DiscordApiService;
 use crate::ports::inbound::{
     AnalyzeImageUseCase, AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
     ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageTicketsUseCase,
     ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
-use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, GuildRepository, IaConfigRepository, LogRepository};
+use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, IaConfigRepository, LogRepository};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -31,10 +32,13 @@ pub struct AppState {
     pub guild_repo: Arc<dyn GuildRepository>,
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
     pub ia_config_repo: Arc<dyn IaConfigRepository>,
+    pub discord_role_repo: Arc<dyn DiscordRoleRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,
+    pub discord_api: Arc<DiscordApiService>,
     pub api_key: String,
+    #[allow(dead_code)]
     pub discord_bot_token: String,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,

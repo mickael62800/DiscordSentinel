@@ -2,6 +2,7 @@
 import type { ModerationRule } from "../../types";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppToggle from "../atoms/AppToggle.vue";
+import { actionVariant, actionLabel, typeLabel } from "../../utils/variants";
 
 defineProps<{
   rule: ModerationRule;
@@ -11,48 +12,6 @@ const emit = defineEmits<{
   toggle: [rule: ModerationRule];
   edit: [rule: ModerationRule];
 }>();
-
-function actionVariant(action: string): "danger" | "warning" | "info" | "default" {
-  switch (action) {
-    case "ban":
-    case "lockdown":
-      return "danger";
-    case "mute":
-    case "delete":
-      return "warning";
-    case "warn":
-      return "info";
-    default:
-      return "default";
-  }
-}
-
-function actionLabel(action: string): string {
-  const labels: Record<string, string> = {
-    ban: "Bannissement",
-    mute: "Sourdine",
-    delete: "Suppression",
-    warn: "Avertissement",
-    lockdown: "Verrouillage",
-  };
-  return labels[action] ?? action;
-}
-
-function typeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    spam: "Spam",
-    insult: "Insulte",
-    link: "Lien",
-    phishing: "Hameconnage",
-    nsfw: "NSFW",
-    illicit: "Illicite",
-    anger: "Colere",
-    rage: "Rage",
-    threat: "Menace",
-    harassment: "Harcelement",
-  };
-  return labels[type] ?? type;
-}
 
 function ruleName(rule: ModerationRule): string {
   return typeLabel(rule.rule_type);

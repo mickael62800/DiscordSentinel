@@ -7,6 +7,7 @@ use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use sentinel_shared::embeds::neutral_embed;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::api_client::ApiClient;
@@ -260,12 +261,14 @@ async fn close_inactive_tickets(ctx: &Context) {
                 let channel_id = ChannelId::new(ch_id);
 
                 // Envoyer un message avant suppression
-                let _ = channel_id.say(
-                    &ctx.http,
-                    format!(
-                        "Ce ticket a ete automatiquement ferme apres {} jours d'inactivite.",
+                let embed = neutral_embed("\u{1f550} Ticket ferme automatiquement")
+                    .description(format!(
+                        "Ce ticket a ete ferme apres {} jours d'inactivite.",
                         timeout_days
-                    ),
+                    ));
+                let _ = channel_id.send_message(
+                    &ctx.http,
+                    serenity::builder::CreateMessage::new().embed(embed),
                 ).await;
 
                 tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;

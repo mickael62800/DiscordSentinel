@@ -7,6 +7,7 @@ use crate::adapters::inbound::http::dto::conduct::{
     UserConductPointsDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::AddPointsCommand;
 
@@ -25,7 +26,7 @@ pub async fn get_config(
     Path(guild_id): Path<String>,
 ) -> Result<Json<ConductConfigDto>, ApiError> {
     let config = state.conduct_uc.get_config(&guild_id).await?;
-    Ok(Json(ConductConfigDto::from(config)))
+    Ok(single_dto(config))
 }
 
 pub async fn save_config(
@@ -33,7 +34,7 @@ pub async fn save_config(
     Json(dto): Json<SaveConductConfigDto>,
 ) -> Result<Json<ConductConfigDto>, ApiError> {
     let config = state.conduct_uc.save_config(dto.into()).await?;
-    Ok(Json(ConductConfigDto::from(config)))
+    Ok(single_dto(config))
 }
 
 pub async fn get_points(
@@ -41,7 +42,7 @@ pub async fn get_points(
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<UserConductPointsDto>, ApiError> {
     let points = state.conduct_uc.get_points(&guild_id, &user_id).await?;
-    Ok(Json(UserConductPointsDto::from(points)))
+    Ok(single_dto(points))
 }
 
 pub async fn get_leaderboard(
@@ -49,13 +50,9 @@ pub async fn get_leaderboard(
     Path(guild_id): Path<String>,
     Query(query): Query<LeaderboardQuery>,
 ) -> Result<Json<Vec<UserConductPointsDto>>, ApiError> {
-    let limit = query.limit.unwrap_or(20).min(50);
+    let limit = normalize_limit(query.limit, 20, 50);
     let leaderboard = state.conduct_uc.get_leaderboard(&guild_id, limit).await?;
-    let dtos: Vec<UserConductPointsDto> = leaderboard
-        .into_iter()
-        .map(UserConductPointsDto::from)
-        .collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(leaderboard))
 }
 
 pub async fn get_points_log(
@@ -63,13 +60,12 @@ pub async fn get_points_log(
     Path((guild_id, user_id)): Path<(String, String)>,
     Query(query): Query<LogQuery>,
 ) -> Result<Json<Vec<ConductPointsLogDto>>, ApiError> {
-    let limit = query.limit.unwrap_or(50).min(100);
+    let limit = normalize_limit(query.limit, 50, 100);
     let log = state
         .conduct_uc
         .get_points_log(&guild_id, &user_id, limit)
         .await?;
-    let dtos: Vec<ConductPointsLogDto> = log.into_iter().map(ConductPointsLogDto::from).collect();
-    Ok(Json(dtos))
+    Ok(map_to_dtos(log))
 }
 
 pub async fn add_points(
@@ -86,5 +82,5 @@ pub async fn add_points(
             reason: dto.reason,
         })
         .await?;
-    Ok(Json(UserConductPointsDto::from(points)))
+    Ok(single_dto(points))
 }
