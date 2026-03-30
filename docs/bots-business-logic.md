@@ -723,6 +723,7 @@ Reponse ephemere
 | **Replay d'evenements** | Interface dans le dashboard pour rejouer les evenements d'une periode donnee. Utile pour comprendre ce qui s'est passe pendant un incident | LOW |
 | **Rapport hebdomadaire automatique** | Chaque lundi matin, generer un embed recap dans un canal admin configurable : messages de la semaine, nouveaux membres, departs, infractions (warns/mutes/bans), top 5 actifs, tendances vs semaine precedente (hausse/baisse avec fleches). Zero effort pour les admins. Genere par le analytics-worker et envoye via Redis pub/sub → audit-bot qui poste l'embed | MEDIUM |
 | **Auto-archivage des canaux inactifs** | Detecter les canaux texte sans aucun message depuis X jours (configurable, defaut 30j). Les deplacer automatiquement vers une categorie "Archives" en read-only. Notification dans le canal admin avant archivage (48h de delai). Commande `/unarchive <canal>` pour restaurer. Nettoie le serveur automatiquement | MEDIUM |
+| **Synthese mensuelle IA** | Chaque 1er du mois, collecter TOUTES les donnees du serveur sur le mois passe (messages, vocal, infractions, membres, tickets, securite, XP, roles, vocal) et envoyer a une IA (Claude API) pour generer une synthese intelligente en langage naturel. L'IA produit : resume executif, points positifs, points d'attention, recommandations concretes, comparaison avec le mois precedent. Le rapport est poste en embed dans le canal admin + archive en BDD + visible dans l'app desktop. Configurable per-guild (activer/desactiver, canal de destination, langue) | HIGH |
 
 ### Community Bot (ex Roles Bot)
 
@@ -1200,6 +1201,193 @@ CREATE INDEX idx_anomaly_guild ON anomaly_events(guild_id, created_at DESC);
 
 ---
 
+#### 12. Synthese mensuelle IA (Audit Bot + Analytics Worker + Claude API)
+
+**Nouvelles tables :**
+
+```sql
+CREATE TABLE monthly_reports (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    guild_id        TEXT NOT NULL,
+    month           DATE NOT NULL,                      -- 1er du mois (ex: 2026-03-01)
+    raw_data        JSONB NOT NULL,                     -- donnees brutes collectees
+    ai_summary      TEXT NOT NULL,                      -- synthese generee par l'IA
+    ai_highlights   JSONB NOT NULL DEFAULT '[]',        -- points cles extraits
+    ai_recommendations JSONB NOT NULL DEFAULT '[]',     -- recommandations
+    comparison      JSONB,                              -- comparaison mois precedent
+    tokens_used     INT NOT NULL DEFAULT 0,             -- tokens IA consommes
+    generated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    posted_at       TIMESTAMPTZ,                        -- quand le rapport a ete poste sur Discord
+    UNIQUE(guild_id, month)
+);
+CREATE INDEX idx_monthly_reports_guild ON monthly_reports(guild_id, month DESC);
+
+CREATE TABLE monthly_report_config (
+    guild_id        TEXT PRIMARY KEY,
+    enabled         BOOLEAN NOT NULL DEFAULT FALSE,
+    channel_id      TEXT,                               -- canal admin ou poster
+    language        TEXT NOT NULL DEFAULT 'fr',          -- langue de la synthese
+    ai_provider     TEXT NOT NULL DEFAULT 'claude',      -- claude, openai
+    include_recommendations BOOLEAN NOT NULL DEFAULT TRUE,
+    include_comparison BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+**Nouveaux endpoints :**
+
+| Methode | Route | Description |
+|---------|-------|-------------|
+| GET | `/api/monthly-reports/{guild_id}` | Lister les rapports mensuels |
+| GET | `/api/monthly-reports/{guild_id}/{month}` | Detail d'un rapport |
+| POST | `/api/monthly-reports/{guild_id}/generate` | Generer manuellement un rapport |
+| GET | `/api/monthly-reports/config/{guild_id}` | Config du rapport mensuel |
+| PUT | `/api/monthly-reports/config/{guild_id}` | Modifier la config |
+
+**Pipeline de generation :**
+
+```
+1er du mois a 8h00 (job analytics-worker)
+  |
+  v
+1. COLLECTE DES DONNEES (requetes SQL agregees)
+   |
+   +-- Messages : total, par canal, par jour, pics d'activite
+   +-- Vocal : heures totales, duree moyenne session, pics
+   +-- Membres : arrivees, departs, taux retention, comptes suspects
+   +-- Infractions : total par type (warn/delete/mute/ban), recidivistes, evolution
+   +-- Tickets : ouverts, fermes, temps moyen reponse, satisfaction moyenne
+   +-- Securite : raids detectes, comptes suspects, quarantaines
+   +-- XP/Niveaux : nouveaux niveaux atteints, top progressions
+   +-- Moderation : actions par moderateur, tendances
+   +-- Roles : changements, panels les plus utilises
+   |
+2. COMPARAISON AVEC LE MOIS PRECEDENT
+   |
+   +-- Delta pour chaque metrique (hausse/baisse en %)
+   +-- Tendances sur 3 mois si disponible
+   |
+3. CONSTRUCTION DU PROMPT IA
+   |
+   +-- Contexte : "Tu es un analyste de communaute Discord."
+   +-- Donnees : JSON structure avec toutes les metriques
+   +-- Instructions : generer resume, points positifs, alertes, recommandations
+   +-- Langue : configurable (fr/en)
+   |
+4. APPEL CLAUDE API (ou OpenAI selon config)
+   |
+   +-- Model : claude-sonnet-4-6 (bon rapport qualite/prix pour les syntheses)
+   +-- Max tokens : 2000
+   +-- Temperature : 0.3 (factuel, pas creatif)
+   |
+5. PARSING DE LA REPONSE
+   |
+   +-- Extraction : resume, highlights[], recommendations[]
+   +-- Stockage en BDD (monthly_reports)
+   |
+6. PUBLICATION
+   |
+   +-- POST vers Redis pub/sub → Audit Bot poste l'embed dans le canal admin
+   +-- Notification WebSocket → Desktop App affiche le nouveau rapport
+```
+
+**Exemple de prompt envoye a l'IA :**
+
+```
+Tu es un analyste de communaute Discord. Voici les donnees du serveur "MonServeur"
+pour le mois de mars 2026. Genere une synthese en francais.
+
+Donnees :
+- Messages : 45,230 (fevrier : 38,100, +18.7%)
+- Temps vocal : 1,234 heures (fevrier : 980h, +25.9%)
+- Nouveaux membres : 156 (fevrier : 132)
+- Departs : 42 (fevrier : 38)
+- Infractions : 89 warns, 12 mutes, 3 bans (fevrier : 95 warns, 15 mutes, 5 bans)
+- Tickets : 23 ouverts, 21 fermes, temps moyen reponse 45min
+- Raids : 1 detecte (12 comptes, neutralise en 30s)
+- Top canal : #general (12,340 msgs), #gaming (8,210 msgs)
+- Pic d'activite : samedi 21h (moyenne 89 msgs/h)
+
+Reponds en JSON :
+{
+  "summary": "Resume executif en 3-5 phrases",
+  "highlights": ["point positif 1", "point positif 2"],
+  "concerns": ["point d'attention 1"],
+  "recommendations": ["recommandation 1", "recommandation 2"],
+  "health_score": 85
+}
+```
+
+**Exemple de reponse IA :**
+
+```json
+{
+  "summary": "Mars a ete un mois dynamique pour MonServeur avec une hausse significative de l'activite (+18.7% messages, +25.9% vocal). La communaute grandit avec 156 nouveaux membres et un taux de retention de 73%. Les infractions sont en baisse (-6.3% warns, -20% mutes, -40% bans), signe d'une communaute qui se stabilise.",
+  "highlights": [
+    "Croissance soutenue : +18.7% de messages et +25.9% de temps vocal",
+    "Infractions en nette baisse : -40% de bans par rapport a fevrier",
+    "Raid neutralise en 30 secondes, systeme de securite efficace",
+    "Temps de reponse tickets excellent (45 min en moyenne)"
+  ],
+  "concerns": [
+    "42 departs ce mois (taux de depart 27%) — surveiller les raisons",
+    "Pic d'activite concentre le samedi soir — risque de sous-moderation"
+  ],
+  "recommendations": [
+    "Renforcer la moderation le samedi soir 20h-23h (pic d'activite + infractions)",
+    "Analyser les raisons des 42 departs — sondage optionnel aux membres partants",
+    "Feliciter les 5 membres les plus actifs pour encourager l'engagement"
+  ],
+  "health_score": 85
+}
+```
+
+**Card embed postee par l'Audit Bot :**
+
+```
+┌─ BLURPLE (0x5865F2) ────────────────────────────────────┐
+│ 📊 Synthese mensuelle — Mars 2026              🏥 85/100│
+│                                                         │
+│ Mars a ete un mois dynamique pour MonServeur avec une   │
+│ hausse significative de l'activite (+18.7% messages,    │
+│ +25.9% vocal). La communaute grandit avec 156 nouveaux  │
+│ membres et un taux de retention de 73%.                 │
+│                                                         │
+│ ✅ Points positifs                                       │
+│ • Croissance soutenue : +18.7% messages, +25.9% vocal  │
+│ • Infractions en nette baisse : -40% de bans            │
+│ • Raid neutralise en 30s                                │
+│ • Temps reponse tickets : 45 min                        │
+│                                                         │
+│ ⚠️ Points d'attention                                    │
+│ • 42 departs (taux 27%) — surveiller                    │
+│ • Pic samedi soir — risque sous-moderation              │
+│                                                         │
+│ 💡 Recommandations                                       │
+│ • Renforcer moderation samedi 20h-23h                   │
+│ • Analyser les raisons des departs                      │
+│ • Feliciter les top 5 membres actifs                    │
+│                                                         │
+│ 📈 vs Fevrier : msgs +18.7% · vocal +25.9% · bans -40% │
+│                                                         │
+│ ─────────────────────────────────────────────────────── │
+│ Sentinel Analytics • Genere le 01/04/2026 a 08h00       │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Configuration requise (env) :**
+
+```env
+# IA Provider pour les syntheses mensuelles
+ANTHROPIC_API_KEY=sk-ant-...          # Pour Claude API
+# ou
+OPENAI_API_KEY=sk-...                  # Pour OpenAI (alternative)
+```
+
+**Nouveau job worker :** `generate_monthly_report` dans le analytics-worker (cron : 1er du mois a 8h00).
+
+---
+
 ### Phase 3 — Moyenne priorite
 
 #### 12. Roles exclusifs et conditionnels (Roles Bot)
@@ -1626,6 +1814,16 @@ pub trait CallsRepository {
 - Actions : retirer un role temporaire
 - Filtre par role, utilisateur, date d'expiration
 
+**`MonthlyReportsPage.vue`** — Syntheses mensuelles IA
+
+- Liste des rapports mensuels generes avec date, health score, statut
+- Detail d'un rapport : resume IA complet, highlights, concerns, recommandations
+- Graphique health score sur 12 mois (evolution sante du serveur)
+- Config per-guild : activer/desactiver, canal, langue, provider IA
+- Bouton "Generer maintenant" pour forcer un rapport hors planning
+- Comparaison cote a cote de 2 mois
+- Export PDF du rapport
+
 #### Pages existantes a enrichir
 
 **`TicketsPage.vue`** — Ajouter SLA + Satisfaction
@@ -1650,6 +1848,7 @@ pub trait CallsRepository {
 | `useSLA` | Config SLA + metriques + breaches |
 | `useTicketSatisfaction` | Stats satisfaction + avis par ticket |
 | `useXpStreaks` | Streaks XP, classement, multiplicateurs |
+| `useMonthlyReports` | Rapports mensuels IA, config, generation manuelle |
 
 #### Nouveaux types TypeScript
 
@@ -1724,9 +1923,40 @@ interface UserStreak {
   last_activity_date: string;
   xp_multiplier: number;
 }
+
+// Synthese mensuelle IA
+interface MonthlyReport {
+  id: string;
+  guild_id: string;
+  month: string;                           // "2026-03-01"
+  ai_summary: string;                     // Resume en langage naturel
+  ai_highlights: string[];                // Points positifs
+  ai_concerns: string[];                  // Points d'attention
+  ai_recommendations: string[];           // Recommandations
+  health_score: number;                   // 0-100
+  comparison?: {                          // vs mois precedent
+    messages_delta: number;               // % change
+    vocal_delta: number;
+    members_delta: number;
+    infractions_delta: number;
+  };
+  tokens_used: number;
+  generated_at: string;
+  posted_at?: string;
+}
+
+interface MonthlyReportConfig {
+  guild_id: string;
+  enabled: boolean;
+  channel_id?: string;
+  language: "fr" | "en";
+  ai_provider: "claude" | "openai";
+  include_recommendations: boolean;
+  include_comparison: boolean;
+}
 ```
 
-#### Nouvelles commandes Tauri (15)
+#### Nouvelles commandes Tauri (19)
 
 ```
 get_anomaly_rules(guild_id) → Vec<AnomalyRule>
@@ -1744,6 +1974,11 @@ get_ticket_satisfaction(ticket_id) → Option<TicketSatisfaction>
 get_user_streak(guild_id, user_id) → UserStreak
 get_top_streaks(guild_id, limit) → Vec<UserStreak>
 get_streak_leaderboard(guild_id) → Vec<UserStreak>
+get_monthly_reports(guild_id) → Vec<MonthlyReport>
+get_monthly_report(guild_id, month) → MonthlyReport
+generate_monthly_report(guild_id) → MonthlyReport
+get_monthly_report_config(guild_id) → MonthlyReportConfig
+set_monthly_report_config(guild_id, config) → MonthlyReportConfig
 ```
 
 ---
@@ -1931,6 +2166,7 @@ Section Moderation:
   + Appels (/appeals) — icone: message-circle
   + Actions programmees (/scheduled-actions) — icone: clock
   + Convocations (/calls) — icone: phone
+  + Rapports mensuels IA (/monthly-reports) — icone: bar-chart
 
 Section Securite:
   + Anomalies (/anomalies) — icone: activity
@@ -1951,6 +2187,7 @@ Section Communaute:
 | `temporary_role_expired` | Worker | Notification info |
 | `call_opened` | API (via moderation bot) | Notification + refresh page calls |
 | `call_closed` | API (via moderation bot) | Notification info |
+| `monthly_report_generated` | Worker (analytics) | Notification + affichage du nouveau rapport |
 
 ---
 
