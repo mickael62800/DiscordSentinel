@@ -42,8 +42,11 @@ class TextSentinelDataset(Dataset):
                     for line in file.read_text(encoding="utf-8").splitlines():
                         line = line.strip()
                         if line:
-                            entry = json.loads(line)
-                            self.samples.append((entry["text"], entry["label"]))
+                            try:
+                                entry = json.loads(line)
+                                self.samples.append((entry["text"], entry["label"]))
+                            except (json.JSONDecodeError, KeyError):
+                                continue
                 elif file.suffix == ".txt":
                     for line in file.read_text(encoding="utf-8").splitlines():
                         line = line.strip()

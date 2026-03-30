@@ -3,12 +3,18 @@ mod commands;
 mod config;
 mod handler;
 
+use std::sync::Arc;
+
 use serenity::prelude::*;
 use tracing::info;
 
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::config::BotConfig;
+use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+
 use crate::api_client::ApiClient;
 use crate::config::Config;
-use crate::handler::{ApiClientKey, Handler};
+use crate::handler::{Handler, RolesApiKey};
 
 #[tokio::main]
 async fn main() {
@@ -22,33 +28,25 @@ async fn main() {
         .init();
 
     let config = Config::from_env();
-    let api_client = ApiClient::new(&config);
+    let base_api = Arc::new(BaseApiClient::new(&config, "roles-bot"));
+    let roles_api = ApiClient::new(base_api.clone());
 
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS
         | GatewayIntents::GUILD_MESSAGE_REACTIONS;
 
-    let mut client = Client::builder(&config.discord_token, intents)
+    let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .await
         .expect("Erreur creation client Discord");
 
     {
         let mut data = client.data.write().await;
-        data.insert::<ApiClientKey>(api_client);
+        data.insert::<ApiClientKey>(base_api.clone());
+        data.insert::<RolesApiKey>(roles_api);
     }
 
-    // Heartbeat
-    let data = client.data.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-            let data = data.read().await;
-            if let Some(api) = data.get::<ApiClientKey>() {
-                api.heartbeat("roles-bot").await;
-            }
-        }
-    });
+    spawn_heartbeat(base_api);
 
     info!("Demarrage roles-bot...");
 

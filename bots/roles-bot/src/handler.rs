@@ -9,13 +9,16 @@ use serenity::model::gateway::Ready;
 use serenity::model::guild::Member;
 use serenity::model::id::RoleId;
 use serenity::prelude::*;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
+
+use sentinel_shared::heartbeat::register_guilds;
 
 use crate::api_client::ApiClient;
 use crate::commands;
 
-pub struct ApiClientKey;
-impl TypeMapKey for ApiClientKey {
+/// Cle TypeMap pour le client API specifique au roles-bot.
+pub struct RolesApiKey;
+impl TypeMapKey for RolesApiKey {
     type Value = ApiClient;
 }
 
@@ -25,12 +28,7 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, guilds = ready.guilds.len(), "Roles bot connecte");
-        {
-            let data = ctx.data.read().await;
-            if let Some(api) = data.get::<ApiClientKey>() {
-                api.send_log("info", "", "Roles bot demarre");
-            }
-        }
+        register_guilds(&ctx, &ready).await;
 
         // Enregistrer les commandes
         for guild_status in &ready.guilds {
@@ -42,29 +40,14 @@ impl EventHandler for Handler {
                 warn!(error = %e, guild = %guild_id, "Erreur enregistrement commandes");
             }
         }
-
-        // Enregistrer les guilds
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            for guild_status in &ready.guilds {
-                let guild_id = guild_status.id;
-                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
-                    let _ = api.register_guild(
-                        &guild_id.to_string(),
-                        &guild.name,
-                        guild.approximate_member_count.unwrap_or(0) as i32,
-                    ).await;
-                }
-            }
-        }
     }
 
-    // ── Auto-role quand un membre rejoint ──
+    // -- Auto-role quand un membre rejoint --
 
     async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
         let guild_id = new_member.guild_id;
         let data = ctx.data.read().await;
-        let api = match data.get::<ApiClientKey>() {
+        let api = match data.get::<RolesApiKey>() {
             Some(a) => a,
             None => return,
         };
@@ -92,13 +75,13 @@ impl EventHandler for Handler {
 
                 tokio::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-                    if let Ok(mut member) = guild.member(&ctx_clone.http, user).await {
+                    if let Ok(member) = guild.member(&ctx_clone.http, user).await {
                         let _ = member.add_role(&ctx_clone.http, RoleId::new(role_id)).await;
                     }
                 });
             } else {
                 if let Ok(role_id) = ar.role_id.parse::<u64>() {
-                    if let Ok(mut member) = guild_id.member(&ctx.http, new_member.user.id).await {
+                    if let Ok(member) = guild_id.member(&ctx.http, new_member.user.id).await {
                         let _ = member.add_role(&ctx.http, RoleId::new(role_id)).await;
                     }
                 }
@@ -106,7 +89,7 @@ impl EventHandler for Handler {
         }
     }
 
-    // ── Clic sur un bouton de panel de roles ──
+    // -- Clic sur un bouton de panel de roles --
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction {
@@ -148,12 +131,12 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
     let has_role = member.roles.contains(&role);
 
     let message = if has_role {
-        if let Ok(mut m) = guild_id.member(&ctx.http, component.user.id).await {
+        if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             let _ = m.remove_role(&ctx.http, role).await;
         }
         format!("Role <@&{}> retire !", role_id)
     } else {
-        if let Ok(mut m) = guild_id.member(&ctx.http, component.user.id).await {
+        if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             let _ = m.add_role(&ctx.http, role).await;
         }
         format!("Role <@&{}> attribue !", role_id)

@@ -6,8 +6,9 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use crate::api_client::UpdateVoiceChannelRequest;
-use crate::handler::ApiClientKey;
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::{ApiClient, UpdateVoiceChannelRequest};
 
 /// Handle queue interactions: toggle queue, accept/refuse.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -54,7 +55,8 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
 
         {
             let data = ctx.data.read().await;
-            let api = data.get::<ApiClientKey>().expect("ApiClient");
+            let base = data.get::<ApiClientKey>().expect("ApiClient");
+            let api = ApiClient::new(base.clone());
             if let Err(e) = api
                 .update_channel(&voice_channel_id.get().to_string(), &update)
                 .await
@@ -111,7 +113,8 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
 
         {
             let data = ctx.data.read().await;
-            let api = data.get::<ApiClientKey>().expect("ApiClient");
+            let base = data.get::<ApiClientKey>().expect("ApiClient");
+            let api = ApiClient::new(base.clone());
             if let Err(e) = api
                 .update_channel(&voice_channel_id.get().to_string(), &update)
                 .await

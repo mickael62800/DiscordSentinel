@@ -204,7 +204,7 @@ impl ConductRepository for PgConductRepository {
 
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserConductPoints>, DomainError> {
         let rows = sqlx::query_as::<_, PointsRow>(
-            "SELECT * FROM user_conduct_points WHERE guild_id = $1 ORDER BY points ASC, updated_at DESC LIMIT $2",
+            "SELECT * FROM user_conduct_points WHERE guild_id = $1 ORDER BY points DESC, updated_at DESC LIMIT $2",
         )
         .bind(guild_id)
         .bind(limit)

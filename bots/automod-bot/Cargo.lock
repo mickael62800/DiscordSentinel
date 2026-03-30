@@ -51,6 +51,7 @@ dependencies = [
  "dotenvy",
  "regex",
  "reqwest",
+ "sentinel-shared",
  "serde",
  "serde_json",
  "serenity",
@@ -1096,6 +1097,18 @@ checksum = "9bd1c54ea06cfd2f6b63219704de0b9b4f72dcc2b8fdef820be6cd799780e91e"
 dependencies = [
  "serde",
  "zeroize",
+]
+
+[[package]]
+name = "sentinel-shared"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serenity",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

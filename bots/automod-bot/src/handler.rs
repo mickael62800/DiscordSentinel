@@ -9,15 +9,11 @@ use serenity::model::id::{ChannelId, MessageId, UserId};
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
+
 use crate::api_client::{Action, AnalyzeRequest, ApiClient, MessageMetadata};
 use crate::detectors;
-
-/// Cle pour acceder a l'ApiClient dans le TypeMap de Serenity.
-pub struct ApiClientKey;
-
-impl TypeMapKey for ApiClientKey {
-    type Value = ApiClient;
-}
 
 /// Deduplication des messages deja traites
 pub struct ProcessedMessagesKey;
@@ -75,12 +71,22 @@ impl EventHandler for Handler {
             }
         };
 
-        let flood_max_messages = ApiClient::config_u64(&config, "flood_max_messages", DEFAULT_FLOOD_MAX_MESSAGES) as usize;
-        let flood_window_secs = ApiClient::config_u64(&config, "flood_window_secs", DEFAULT_FLOOD_WINDOW_SECS);
-        let mute_duration_secs = ApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+        let flood_max_messages = BaseApiClient::config_u64(&config, "flood_max_messages", DEFAULT_FLOOD_MAX_MESSAGES) as usize;
+        let flood_window_secs = BaseApiClient::config_u64(&config, "flood_window_secs", DEFAULT_FLOOD_WINDOW_SECS);
+        let mute_duration_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+
+        // Verifier les salons exclus
+        let ignored_channels_str = BaseApiClient::config_or(&config, "ignored_channels", "");
+        if !ignored_channels_str.is_empty() {
+            let channel_id_str = msg.channel_id.get().to_string();
+            let ignored: Vec<&str> = ignored_channels_str.split(',').map(|s| s.trim()).collect();
+            if ignored.iter().any(|id| *id == channel_id_str) {
+                return;
+            }
+        }
 
         // Verifier les roles ignores
-        let ignored_roles_str = ApiClient::config_or(&config, "ignored_roles", "");
+        let ignored_roles_str = BaseApiClient::config_or(&config, "ignored_roles", "");
         if !ignored_roles_str.is_empty() {
             if let Some(member) = &msg.member {
                 let ignored: Vec<&str> = ignored_roles_str.split(',').map(|s| s.trim()).collect();
@@ -130,7 +136,8 @@ impl EventHandler for Handler {
 
             // Envoyer au backend comme spam
             let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
-            send_to_backend(&ctx, &msg, flags, mute_duration_secs).await;
+            let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
+            send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id).await;
             return;
         }
 
@@ -161,36 +168,18 @@ impl EventHandler for Handler {
             "Message flagge"
         );
 
-        send_to_backend(&ctx, &msg, flags, mute_duration_secs).await;
+        let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
+        send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id).await;
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
-        info!(bot = %ready.user.name, "Automod bot connecté");
-
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_bot_log("info", "Automod bot demarre");
-            for guild_status in &ready.guilds {
-                let guild_id = guild_status.id;
-                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
-                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
-                    if let Err(e) = api.register_guild(
-                        &guild_id.to_string(),
-                        &guild.name,
-                        member_count,
-                    ).await {
-                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
-                    } else {
-                        info!(guild = %guild.name, "Guild enregistree");
-                    }
-                }
-            }
-        }
+        info!(bot = %ready.user.name, "Automod bot connecte");
+        register_guilds(&ctx, &ready).await;
     }
 }
 
 /// Envoie le message au backend pour analyse et execute l'action.
-async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::DetectionFlags, mute_duration_secs: u64) {
+async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::DetectionFlags, mute_duration_secs: u64, log_channel_id: u64) {
     let request = AnalyzeRequest {
         guild_id: msg.guild_id.map(|id| id.to_string()).unwrap_or_default(),
         channel_id: msg.channel_id.to_string(),
@@ -205,13 +194,16 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
     };
 
     let data = ctx.data.read().await;
-    let api_client = match data.get::<ApiClientKey>() {
-        Some(client) => client,
+    let base = match data.get::<ApiClientKey>() {
+        Some(client) => Arc::clone(client),
         None => {
-            error!("ApiClient introuvable dans le contexte");
+            error!("BaseApiClient introuvable dans le contexte");
             return;
         }
     };
+    drop(data);
+
+    let api_client = ApiClient::new(Arc::clone(&base));
 
     match api_client.analyze(&request).await {
         Ok(response) => {
@@ -227,16 +219,28 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
                     Action::Ban => "Proposition de ban",
                     Action::None => "",
                 };
-                api_client.send_log(
+                let log_message = format!(
+                    "{} — {} : {}",
+                    action_label,
+                    msg.author.name,
+                    response.reason.as_deref().unwrap_or("Automod"),
+                );
+
+                // Log vers l'API backend (base de donnees)
+                base.send_log(
                     if matches!(response.action, Action::Ban) { "error" } else { "warn" },
                     &guild_id,
-                    &format!(
-                        "{} — {} : {}",
-                        action_label,
-                        msg.author.name,
-                        response.reason.as_deref().unwrap_or("Automod"),
-                    ),
+                    &log_message,
                 );
+
+                // Log vers le salon Discord si configure
+                if log_channel_id != 0 {
+                    send_discord_log(
+                        ctx, msg, &response.action, action_label,
+                        response.reason.as_deref().unwrap_or("Automod"),
+                        &request.flags, log_channel_id,
+                    ).await;
+                }
             }
 
             if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs).await {
@@ -326,4 +330,92 @@ async fn execute_action(
     }
 
     Ok(())
+}
+
+/// Envoie un log soigne dans le salon Discord de logs (embed riche).
+async fn send_discord_log(
+    ctx: &Context,
+    msg: &Message,
+    action: &Action,
+    action_label: &str,
+    reason: &str,
+    flags: &detectors::DetectionFlags,
+    log_channel_id: u64,
+) {
+    let channel = serenity::model::id::ChannelId::new(log_channel_id);
+
+    // Icone et couleur selon la severite
+    let (icon, color) = match action {
+        Action::Warn    => ("\u{26a0}\u{fe0f}", 0xf59e0b),  // Warning jaune
+        Action::Delete  => ("\u{1f5d1}\u{fe0f}", 0xf97316), // Corbeille orange
+        Action::Mute    => ("\u{1f507}", 0xef4444),          // Mute rouge
+        Action::Ban     => ("\u{1f6ab}", 0xdc2626),          // Interdit rouge fonce
+        Action::None    => ("\u{2705}", 0x22c55e),           // Check vert
+    };
+
+    // Construire la liste des detections
+    let mut detections = Vec::new();
+    if flags.spam     { detections.push("\u{1f4e8} Spam"); }
+    if flags.insult   { detections.push("\u{1f92c} Insulte"); }
+    if flags.link     { detections.push("\u{1f517} Lien"); }
+    if flags.phishing { detections.push("\u{1f3a3} Phishing"); }
+    let detections_text = if detections.is_empty() {
+        "Aucune".to_string()
+    } else {
+        detections.join(" | ")
+    };
+
+    // Tronquer le message si trop long
+    let content_preview = if msg.content.len() > 300 {
+        format!("{}...", &msg.content[..300])
+    } else {
+        msg.content.clone()
+    };
+
+    let embed = serenity::builder::CreateEmbed::new()
+        .author(serenity::builder::CreateEmbedAuthor::new(
+            format!("{} {}", icon, action_label),
+        ))
+        .title("AutoMod - Detection automatique")
+        .color(color)
+        .field(
+            "\u{1f464} Utilisateur",
+            format!("<@{}> (`{}`)", msg.author.id, msg.author.name),
+            true,
+        )
+        .field(
+            "\u{1f4ac} Salon",
+            format!("<#{}>", msg.channel_id),
+            true,
+        )
+        .field(
+            "\u{2699}\u{fe0f} Action",
+            action_label,
+            true,
+        )
+        .field(
+            "\u{1f50d} Detections",
+            detections_text,
+            false,
+        )
+        .field(
+            "\u{1f4dd} Raison",
+            reason,
+            false,
+        )
+        .field(
+            "\u{1f4e9} Message original",
+            format!("```{}```", content_preview),
+            false,
+        )
+        .thumbnail(msg.author.face())
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            format!("ID: {} | Auteur: {}", msg.id, msg.author.id),
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+
+    let builder = serenity::builder::CreateMessage::new().embed(embed);
+    if let Err(e) = channel.send_message(&ctx.http, builder).await {
+        tracing::warn!(error = %e, "Impossible d'envoyer le log Discord");
+    }
 }

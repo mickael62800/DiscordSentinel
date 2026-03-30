@@ -14,7 +14,7 @@ mod manage_role_panels_service;
 mod manage_levels_service;
 
 pub use analyze_image_service::AnalyzeImageService;
-pub use analyze_message_service::AnalyzeMessageService;
+pub use analyze_message_service::{AnalyzeMessageService, score_classifications};
 pub use manage_conduct_service::ManageConductService;
 pub use manage_infractions_service::ManageInfractionsService;
 pub use manage_moderation_service::ManageModerationService;

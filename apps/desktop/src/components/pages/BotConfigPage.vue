@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 
-const { selectedGuildId, selectedGuild, guilds } = useGuildSelector();
+const { selectedGuildId, selectedGuild } = useGuildSelector();
 
 const workerNames = ["moderation-worker", "analytics-worker"];
 
@@ -17,6 +17,7 @@ const selectedBot = ref<string | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 const formValues = ref<Record<string, string>>({});
+const savedValues = ref<Record<string, string>>({});
 const successMessage = ref("");
 
 const selectedDefinition = computed(() =>
@@ -28,6 +29,38 @@ const configFields = computed<ConfigField[]>(() => {
   const schema = selectedDefinition.value.config_schema;
   return Array.isArray(schema) ? schema : [];
 });
+
+// Detecte si un champ a ete modifie par rapport a la valeur en base
+function isFieldModified(key: string): boolean {
+  return (formValues.value[key] ?? "") !== (savedValues.value[key] ?? "");
+}
+
+// Detecte si au moins un champ a change
+const hasChanges = computed(() =>
+  configFields.value.some((f) => isFieldModified(f.key))
+);
+
+// Nombre de champs modifies
+const changesCount = computed(() =>
+  configFields.value.filter((f) => isFieldModified(f.key)).length
+);
+
+// Valeur affichee sous le label : valeur en base ou defaut
+function fieldStatus(field: ConfigField): { text: string; source: "db" | "default" | "none" } {
+  const dbValue = savedValues.value[field.key];
+  const typeLabel = field.type === "channel" ? "ID du salon"
+    : field.type === "role" ? "ID du role"
+    : field.type === "number" ? "nombre"
+    : field.type === "boolean" ? "true/false"
+    : "texte";
+  if (dbValue !== undefined && dbValue !== "") {
+    return { text: `Configure : ${dbValue}`, source: "db" };
+  }
+  if (field.default !== undefined && field.default !== "") {
+    return { text: `Par defaut : ${field.default} (${typeLabel})`, source: "default" };
+  }
+  return { text: `Non configure (${typeLabel})`, source: "none" };
+}
 
 async function fetchDefinitions() {
   try {
@@ -59,7 +92,12 @@ function loadFormValues() {
       values[cfg.config_key] = cfg.config_value;
     }
   }
-  formValues.value = values;
+  savedValues.value = { ...values };
+  formValues.value = { ...values };
+}
+
+function cancelChanges() {
+  formValues.value = { ...savedValues.value };
 }
 
 async function saveConfig() {
@@ -68,13 +106,14 @@ async function saveConfig() {
   successMessage.value = "";
   try {
     for (const field of configFields.value) {
+      if (!isFieldModified(field.key)) continue;
       const value = formValues.value[field.key] ?? "";
       if (value) {
         await invoke("set_bot_config", {
           guildId: selectedGuildId.value,
           botName: selectedBot.value,
           configKey: field.key,
-          configValue: value,
+          configValue: String(value),
         });
       } else {
         await invoke("delete_bot_config", {
@@ -84,7 +123,7 @@ async function saveConfig() {
         });
       }
     }
-    successMessage.value = "Configuration enregistree";
+    successMessage.value = `${changesCount.value} parametre(s) enregistre(s)`;
     await fetchConfig();
     setTimeout(() => (successMessage.value = ""), 3000);
   } catch (e) {
@@ -118,7 +157,6 @@ watch(selectedBot, loadFormValues);
       <p class="page-subtitle">Parametrer chaque bot pour le serveur selectionne</p>
     </header>
 
-    <!-- Pas de serveur selectionne -->
     <div v-if="!selectedGuildId" class="empty-state">
       <p>Selectionnez un serveur dans la barre laterale pour configurer les bots.</p>
     </div>
@@ -155,24 +193,54 @@ watch(selectedBot, loadFormValues);
         </div>
 
         <template v-else>
-          <div v-for="field in configFields" :key="field.key" class="form-group">
+          <div
+            v-for="field in configFields"
+            :key="field.key"
+            class="form-group"
+            :class="{ modified: isFieldModified(field.key) }"
+          >
             <label :for="field.key" class="form-label">
               {{ field.label }}
               <span v-if="field.required" class="required">*</span>
+              <span v-if="isFieldModified(field.key)" class="modified-badge">modifie</span>
             </label>
             <input
               :id="field.key"
               v-model="formValues[field.key]"
               class="form-input"
-              :placeholder="'ID du ' + field.type"
-              type="text"
+              :placeholder="field.type === 'channel' ? 'Entrez l\'ID du salon Discord'
+                : field.type === 'role' ? 'Entrez l\'ID du role Discord'
+                : field.type === 'boolean' ? 'true ou false'
+                : field.default !== undefined ? String(field.default)
+                : ''"
+              :type="field.type === 'number' ? 'number' : 'text'"
             />
-            <span class="form-hint">Type : {{ field.type }} — Cle : {{ field.key }}</span>
+            <span
+              class="form-hint"
+              :class="{
+                'hint-db': fieldStatus(field).source === 'db',
+                'hint-default': fieldStatus(field).source === 'default',
+                'hint-none': fieldStatus(field).source === 'none',
+              }"
+            >
+              {{ fieldStatus(field).text }}
+            </span>
           </div>
 
           <div class="form-actions">
-            <button class="btn-save" :disabled="saving" @click="saveConfig">
-              {{ saving ? "Enregistrement..." : "Enregistrer" }}
+            <button
+              class="btn-save"
+              :disabled="saving || !hasChanges"
+              @click="saveConfig"
+            >
+              {{ saving ? "Enregistrement..." : hasChanges ? `Enregistrer (${changesCount})` : "Aucune modification" }}
+            </button>
+            <button
+              v-if="hasChanges"
+              class="btn-cancel"
+              @click="cancelChanges"
+            >
+              Annuler
             </button>
             <span v-if="successMessage" class="success-msg">{{ successMessage }}</span>
           </div>
@@ -294,10 +362,21 @@ watch(selectedBot, loadFormValues);
 
 .form-group {
   margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.form-group.modified {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.04);
 }
 
 .form-label {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
@@ -306,6 +385,16 @@ watch(selectedBot, loadFormValues);
 
 .required {
   color: var(--danger);
+}
+
+.modified-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
 }
 
 .form-input {
@@ -325,11 +414,30 @@ watch(selectedBot, loadFormValues);
   box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
 
+.form-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.5;
+  font-style: italic;
+}
+
 .form-hint {
   display: block;
   font-size: 11px;
-  color: var(--text-secondary);
   margin-top: 4px;
+}
+
+.hint-db {
+  color: #22c55e;
+}
+
+.hint-default {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.hint-none {
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .form-actions {
@@ -355,8 +463,23 @@ watch(selectedBot, loadFormValues);
 }
 
 .btn-save:disabled {
-  opacity: 0.5;
+  opacity: 0.4;
   cursor: not-allowed;
+}
+
+.btn-cancel {
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  border-color: var(--danger);
+  color: var(--danger);
 }
 
 .success-msg {

@@ -9,9 +9,12 @@ use dashmap::{DashMap, DashSet};
 use serenity::prelude::*;
 use tracing::info;
 
-use crate::api_client::ApiClient;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::config::BotConfig;
+use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+
 use crate::config::Config;
-use crate::handler::{ApiClientKey, FloodTrackerKey, Handler, ProcessedMessagesKey};
+use crate::handler::{FloodTrackerKey, Handler, ProcessedMessagesKey};
 
 #[tokio::main]
 async fn main() {
@@ -25,34 +28,28 @@ async fn main() {
 
     let config = Config::from_env();
 
-    info!(api_url = %config.api_base_url, "Démarrage de l'automod bot");
+    info!(api_url = %config.base().api_base_url, "Demarrage de l'automod bot");
 
-    // Intents nécessaires : lire les messages dans les guilds
+    // Intents necessaires : lire les messages dans les guilds
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client = Client::builder(&config.discord_token, intents)
+    let base_api = Arc::new(BaseApiClient::new(&config, "automod-bot"));
+
+    let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
         .await
-        .expect("Erreur création du client Discord");
+        .expect("Erreur creation du client Discord");
 
-    // Stocker l'ApiClient dans le contexte partagé
+    // Stocker le BaseApiClient et les structures partagees dans le contexte
     {
         let mut data = client.data.write().await;
-        data.insert::<ApiClientKey>(ApiClient::new(&config));
+        data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<ProcessedMessagesKey>(Arc::new(DashSet::new()));
         data.insert::<FloodTrackerKey>(Arc::new(DashMap::new()));
     }
 
     // Heartbeat task
-    let api_for_heartbeat = ApiClient::new(&config);
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) = api_for_heartbeat.heartbeat("automod-bot").await {
-                tracing::warn!("Heartbeat failed: {}", e);
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        }
-    });
+    spawn_heartbeat(Arc::clone(&base_api));
 
     if let Err(e) = client.start().await {
         eprintln!("Erreur fatale : {e}");

@@ -5,7 +5,7 @@ use serenity::all::{
 };
 use tracing::error;
 
-use crate::handler::ApiClientKey;
+use crate::handler::StatsApiKey;
 
 /// Enregistre la commande /stats avec ses sous-commandes.
 pub fn register() -> CreateCommand {
@@ -90,7 +90,7 @@ async fn handle_user(
     let target_user = target_id.to_user(&ctx.http).await.unwrap_or(command.user.clone());
 
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
+    let api = match data.get::<StatsApiKey>() {
         Some(api) => api,
         None => return reply_text(ctx, command, "Erreur interne : API non configurée.").await,
     };
@@ -156,7 +156,7 @@ async fn handle_server(
     };
 
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
+    let api = match data.get::<StatsApiKey>() {
         Some(api) => api,
         None => return reply_text(ctx, command, "Erreur interne : API non configurée.").await,
     };
@@ -220,7 +220,7 @@ async fn handle_top(
         .unwrap_or(10);
 
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
+    let api = match data.get::<StatsApiKey>() {
         Some(api) => api,
         None => return reply_text(ctx, command, "Erreur interne : API non configurée.").await,
     };

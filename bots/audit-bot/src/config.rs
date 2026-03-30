@@ -1,18 +1,20 @@
+use sentinel_shared::config::{BaseConfig, BotConfig};
+
 #[derive(Clone)]
 pub struct Config {
-    pub discord_token: String,
-    pub api_base_url: String,
-    pub api_key: String,
+    base: BaseConfig,
 }
 
 impl Config {
     pub fn from_env() -> Self {
         Self {
-            discord_token: std::env::var("AUDIT_DISCORD_TOKEN")
-                .expect("AUDIT_DISCORD_TOKEN requis"),
-            api_base_url: std::env::var("API_BASE_URL")
-                .unwrap_or_else(|_| "http://localhost:3000".to_string()),
-            api_key: std::env::var("API_KEY").unwrap_or_default(),
+            base: BaseConfig::from_env("AUDIT_DISCORD_TOKEN"),
         }
+    }
+}
+
+impl BotConfig for Config {
+    fn base(&self) -> &BaseConfig {
+        &self.base
     }
 }

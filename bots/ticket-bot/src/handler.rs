@@ -1,20 +1,18 @@
+use futures_util::StreamExt;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
+
+use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::api_client::ApiClient;
 use crate::commands;
 use crate::commands::ticket;
-
-/// Clé pour accéder à l'ApiClient dans le TypeMap.
-pub struct ApiClientKey;
-
-impl TypeMapKey for ApiClientKey {
-    type Value = ApiClient;
-}
+use crate::config::ConfigKey;
 
 pub struct Handler;
 
@@ -35,28 +33,28 @@ impl EventHandler for Handler {
             info!("Slash commands enregistrees");
         }
 
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_bot_log("info", "Ticket bot demarre");
-            for guild_status in &ready.guilds {
-                let guild_id = guild_status.id;
-                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
-                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
-                    if let Err(e) = api.register_guild(
-                        &guild_id.to_string(),
-                        &guild.name,
-                        member_count,
-                    ).await {
-                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
-                    } else {
-                        info!(guild = %guild.name, "Guild enregistree");
-                    }
-                }
+        register_guilds(&ctx, &ready).await;
+
+        // Deployer automatiquement le panel dans le salon configure
+        deploy_panel_if_needed(&ctx).await;
+
+        // Lancer la fermeture automatique des tickets inactifs (toutes les 30 min)
+        let ctx_clone2 = ctx.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(1800)).await;
+                close_inactive_tickets(&ctx_clone2).await;
             }
-        }
+        });
+
+        // Lancer le listener Redis pour la communication bidirectionnelle
+        let ctx_clone3 = ctx.clone();
+        tokio::spawn(async move {
+            listen_redis_events(ctx_clone3).await;
+        });
     }
 
-    /// Gestion des slash commands ET des interactions composants (boutons, menus).
+    /// Gestion des slash commands ET des interactions composants (boutons, menus, modals).
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         match interaction {
             Interaction::Command(command) => {
@@ -71,8 +69,18 @@ impl EventHandler for Handler {
                     ticket::TYPE_SELECT_ID => ticket::handle_type_select(&ctx, &component).await,
                     ticket::CLOSE_BUTTON_ID => ticket::handle_close_button(&ctx, &component).await,
                     ticket::INVITE_BUTTON_ID => ticket::handle_invite_button(&ctx, &component).await,
+                    ticket::INVITE_SELECT_ID => ticket::handle_invite_select(&ctx, &component).await,
                     ticket::VOCAL_BUTTON_ID => ticket::handle_vocal_button(&ctx, &component).await,
+                    ticket::VOCAL_USER_ACCEPT_ID => ticket::handle_vocal_user_accept(&ctx, &component).await,
+                    ticket::VOCAL_USER_DECLINE_ID => ticket::handle_vocal_user_decline(&ctx, &component).await,
+                    ticket::CLOSE_CONFIRM_ID => ticket::handle_close_confirm(&ctx, &component).await,
+                    ticket::CLOSE_CANCEL_ID => ticket::handle_close_cancel(&ctx, &component).await,
                     _ => {}
+                }
+            }
+            Interaction::Modal(modal) => {
+                if ticket::is_ticket_modal(&modal.data.custom_id) {
+                    ticket::handle_modal_submit(&ctx, &modal).await;
                 }
             }
             _ => {}
@@ -80,7 +88,6 @@ impl EventHandler for Handler {
     }
 
     /// Sync des messages dans les salons ticket vers le backend.
-    /// Gere aussi les invitations par mention.
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.author.bot {
             return;
@@ -99,45 +106,27 @@ impl EventHandler for Handler {
             return;
         }
 
-        // Gestion invitation par mention
-        if !msg.mentions.is_empty() {
-            for mentioned in &msg.mentions {
-                if mentioned.bot {
-                    continue;
-                }
-                // Ajouter la permission VIEW_CHANNEL pour l'utilisateur mentionne
-                let overwrite = serenity::all::PermissionOverwrite {
-                    allow: serenity::model::Permissions::VIEW_CHANNEL
-                        | serenity::model::Permissions::SEND_MESSAGES
-                        | serenity::model::Permissions::READ_MESSAGE_HISTORY,
-                    deny: serenity::model::Permissions::empty(),
-                    kind: serenity::all::PermissionOverwriteType::Member(mentioned.id),
-                };
-                if let Err(e) = msg.channel_id.create_permission(&ctx.http, overwrite).await {
-                    warn!(error = %e, user = %mentioned.name, "Impossible d'inviter l'utilisateur");
-                } else {
-                    let _ = msg.channel_id.say(
-                        &ctx.http,
-                        format!("<@{}> a ete invite dans ce ticket.", mentioned.id),
-                    ).await;
-                    info!(user = %mentioned.name, channel = %channel_name, "Utilisateur invite dans le ticket");
-                }
+        // Sync message vers le backend — recuperer l'UUID depuis le topic du salon
+        let ticket_id = match ticket::get_ticket_id_from_channel(&ctx, msg.channel_id).await {
+            Some(id) => id,
+            None => {
+                warn!(channel = %channel_name, "Impossible de trouver l'UUID du ticket pour la sync des messages");
+                return;
             }
-        }
-
-        // Sync message vers le backend
-        let ticket_id = channel_name.trim_start_matches("ticket-");
+        };
 
         let data = ctx.data.read().await;
-        let api = match data.get::<ApiClientKey>() {
+        let base = match data.get::<ApiClientKey>() {
             Some(client) => client,
             None => return,
         };
+        let api = ApiClient::new(base.clone());
 
         let author_role = match msg.guild_id {
             Some(guild_id) => {
                 if let Ok(member) = guild_id.member(&ctx.http, msg.author.id).await {
-                    if let Ok(permissions) = member.permissions(&ctx.cache) {
+                    if let Some(guild) = guild_id.to_guild_cached(&ctx.cache) {
+                        let permissions = guild.member_permissions(&member);
                         if permissions.manage_messages() {
                             "moderator"
                         } else {
@@ -154,10 +143,264 @@ impl EventHandler for Handler {
         };
 
         if let Err(e) = api
-            .reply_ticket(ticket_id, &msg.content, &msg.author.name, author_role)
+            .reply_ticket(&ticket_id, &msg.content, &msg.author.name, author_role)
             .await
         {
             error!(error = %e, ticket_id = %ticket_id, "Erreur sync message vers backend");
+        }
+
+    }
+}
+
+/// Deploie le panel de creation de ticket dans le salon configure,
+/// sauf s'il y en a deja un (pour eviter les doublons a chaque redemarrage).
+async fn deploy_panel_if_needed(ctx: &Context) {
+    let data = ctx.data.read().await;
+
+    // Chercher le channel_id depuis la config env
+    let channel_id = {
+        let config = data.get::<ConfigKey>();
+        config.and_then(|c| c.ticket_channel_id)
+    };
+
+    // Si pas de config env, chercher dans la guild config de chaque guild (cle: assistance_channel_id)
+    let channel_ids: Vec<u64> = if let Some(id) = channel_id {
+        vec![id]
+    } else if let Some(base) = data.get::<ApiClientKey>() {
+        let mut ids = Vec::new();
+        for guild in ctx.cache.guilds() {
+            let guild_config = base.get_guild_config(&guild.to_string()).await.unwrap_or_default();
+            if let Some(ch_id_str) = guild_config.get("assistance_channel_id") {
+                if let Ok(ch_id) = ch_id_str.parse::<u64>() {
+                    ids.push(ch_id);
+                }
+            }
+        }
+        ids
+    } else {
+        vec![]
+    };
+
+    if channel_ids.is_empty() {
+        warn!("Aucun salon de ticket configure (TICKET_CHANNEL_ID ou guild config 'assistance_channel_id'). Le panel ne sera pas deploye automatiquement.");
+        return;
+    }
+
+    let bot_id = ctx.cache.current_user().id;
+
+    for ch_id in channel_ids {
+        let channel_id = ChannelId::new(ch_id);
+
+        // Supprimer les anciens panels du bot pour eviter les doublons
+        // et garantir que le contenu est toujours a jour
+        if let Ok(messages) = channel_id.messages(&ctx.http, serenity::all::GetMessages::new().limit(20)).await {
+            for msg in &messages {
+                if msg.author.id == bot_id
+                    && !msg.components.is_empty()
+                    && msg.content.contains("Assistance & Support")
+                {
+                    if let Err(e) = msg.delete(&ctx.http).await {
+                        warn!(error = %e, "Impossible de supprimer l'ancien panel");
+                    }
+                }
+            }
+        }
+
+        // Deployer le panel a jour
+        match channel_id.send_message(&ctx.http, ticket::build_panel_message()).await {
+            Ok(_) => info!(channel_id = %ch_id, "Panel de tickets deploye"),
+            Err(e) => error!(error = %e, channel_id = %ch_id, "Impossible de deployer le panel de tickets"),
+        }
+    }
+}
+
+/// Ferme automatiquement les tickets inactifs depuis plus de 7 jours.
+/// Supprime le salon Discord et ferme le ticket via l'API.
+async fn close_inactive_tickets(ctx: &Context) {
+    let data = ctx.data.read().await;
+    let base = match data.get::<ApiClientKey>() {
+        Some(b) => b,
+        None => return,
+    };
+    let api = ApiClient::new(base.clone());
+
+    let tickets = match api.list_tickets().await {
+        Ok(t) => t,
+        Err(_) => return,
+    };
+
+    let now = chrono::Utc::now();
+    let timeout_days = 7i64;
+
+    for ticket in &tickets {
+        if ticket.status == "closed" {
+            continue;
+        }
+
+        // Parser updated_at pour verifier l'inactivite
+        let updated_at = match chrono::DateTime::parse_from_rfc3339(&ticket.updated_at) {
+            Ok(dt) => dt.with_timezone(&chrono::Utc),
+            Err(_) => continue,
+        };
+
+        let inactive_days = (now - updated_at).num_days();
+        if inactive_days < timeout_days {
+            continue;
+        }
+
+        // Fermer le ticket via l'API
+        if let Err(e) = api.close_ticket(&ticket.id).await {
+            warn!(error = %e, ticket_id = %ticket.id, "Erreur fermeture ticket inactif");
+            continue;
+        }
+
+        // Supprimer le salon Discord s'il existe
+        if let Some(ref channel_id_str) = ticket.channel_id {
+            if let Ok(ch_id) = channel_id_str.parse::<u64>() {
+                let channel_id = ChannelId::new(ch_id);
+
+                // Envoyer un message avant suppression
+                let _ = channel_id.say(
+                    &ctx.http,
+                    format!(
+                        "Ce ticket a ete automatiquement ferme apres {} jours d'inactivite.",
+                        timeout_days
+                    ),
+                ).await;
+
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                let _ = channel_id.delete(&ctx.http).await;
+            }
+        }
+
+        info!(ticket_id = %ticket.id, inactive_days = %inactive_days, "Ticket inactif ferme automatiquement");
+    }
+}
+
+/// Ecoute les events Redis (sentinel:events) pour la communication bidirectionnelle.
+/// Quand un moderateur repond a un ticket depuis l'app desktop, le message est affiche dans Discord.
+async fn listen_redis_events(ctx: Context) {
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
+    let channel_name = std::env::var("REDIS_CHANNEL").unwrap_or_else(|_| "sentinel:events".to_string());
+
+    loop {
+        match redis::Client::open(redis_url.as_str()) {
+            Ok(client) => {
+                match client.get_async_pubsub().await {
+                    Ok(mut pubsub) => {
+                        if let Err(e) = pubsub.subscribe(&channel_name).await {
+                            error!(error = %e, "Erreur abonnement Redis");
+                            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                            continue;
+                        }
+
+                        info!(channel = %channel_name, "Ecoute Redis pour communication bidirectionnelle");
+
+                        loop {
+                            let msg = pubsub.on_message().next().await;
+                            if let Some(msg) = msg {
+                                let payload: String = match msg.get_payload() {
+                                    Ok(p) => p,
+                                    Err(_) => continue,
+                                };
+
+                                handle_redis_event(&ctx, &payload).await;
+                            } else {
+                                warn!("Connexion Redis perdue, reconnexion...");
+                                break;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        error!(error = %e, "Erreur connexion async Redis");
+                    }
+                }
+            }
+            Err(e) => {
+                error!(error = %e, "Erreur creation client Redis");
+            }
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    }
+}
+
+/// Traite un event recu depuis Redis.
+/// Si c'est un ticket_message avec author_role=moderator, poste le message dans le salon Discord.
+async fn handle_redis_event(ctx: &Context, payload: &str) {
+    let event: serde_json::Value = match serde_json::from_str(payload) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let event_type = event.get("event").and_then(|e| e.as_str()).unwrap_or("");
+    let data = match event.get("data") {
+        Some(d) => d,
+        None => return,
+    };
+
+    if event_type != "ticket_message" {
+        return;
+    }
+
+    // Extraire les infos du message
+    let ticket_id = match data.get("ticket_id").and_then(|v| v.as_str()) {
+        Some(id) => id,
+        None => return,
+    };
+    let author_name = data.get("author_name").and_then(|v| v.as_str()).unwrap_or("Staff");
+
+    // Chercher le salon Discord correspondant a ce ticket
+    // On parcourt les guilds pour trouver un salon avec [ticket:ID] dans le topic
+    let bot_id = ctx.cache.current_user().id;
+    for guild_id in ctx.cache.guilds() {
+        let channels = match guild_id.channels(&ctx.http).await {
+            Ok(c) => c,
+            Err(_) => continue,
+        };
+
+        for (_ch_id, channel) in &channels {
+            if !channel.name.starts_with("ticket-") {
+                continue;
+            }
+
+            let topic = channel.topic.as_deref().unwrap_or("");
+            if let Some(id) = ticket::extract_ticket_id_from_topic(topic) {
+                if id == ticket_id {
+                    // Recuperer le dernier message du ticket depuis l'API
+                    let data_lock = ctx.data.read().await;
+                    if let Some(base) = data_lock.get::<ApiClientKey>() {
+                        let api = ApiClient::new(base.clone());
+                        if let Ok(detail) = api.get_ticket(ticket_id).await {
+                            if let Some(last_msg) = detail.messages.last() {
+                                if last_msg.author_role == "moderator" {
+                                    // Verifier que ce message n'existe pas deja dans le salon Discord
+                                    // (ecrit par un humain ou deja reposte par le bot)
+                                    let already_in_channel = channel.id
+                                        .messages(&ctx.http, serenity::all::GetMessages::new().limit(5))
+                                        .await
+                                        .ok()
+                                        .map(|msgs| msgs.iter().any(|m| {
+                                            // Message deja ecrit par un humain dans Discord
+                                            (!m.author.bot && m.content == last_msg.content)
+                                            // Ou deja reposte par le bot
+                                            || (m.author.id == bot_id && m.content.contains(&last_msg.content))
+                                        }))
+                                        .unwrap_or(false);
+
+                                    if !already_in_channel {
+                                        let _ = channel.id.say(
+                                            &ctx.http,
+                                            format!("**[staff]** {} :\n> {}", author_name, last_msg.content),
+                                        ).await;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return;
+                }
+            }
         }
     }
 }

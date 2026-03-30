@@ -11,6 +11,8 @@ import torch
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+_state_lock = threading.Lock()
+
 router = APIRouter()
 
 AI_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -29,6 +31,8 @@ class TrainingState:
         self.phase = "idle"
         self.epoch_history: list[dict] = []
         self._stop_flag = False
+        self.early_stopped = False
+        self.best_epoch = 0
         # Progression intra-epoch
         self.current_batch = 0
         self.total_batches = 0
@@ -46,11 +50,13 @@ class TrainingState:
             "val_loss": round(self.val_loss, 4),
             "val_accuracy": round(self.val_accuracy, 4),
             "phase": self.phase,
-            "epoch_history": self.epoch_history,
+            "epoch_history": list(self.epoch_history),
             "current_batch": self.current_batch,
             "total_batches": self.total_batches,
             "batch_loss": round(self.batch_loss, 4),
             "batch_accuracy": round(self.batch_accuracy, 4),
+            "early_stopped": self.early_stopped,
+            "best_epoch": self.best_epoch,
         }
 
     def record_epoch(self):
@@ -78,6 +84,8 @@ class TrainingState:
         self.phase = "idle"
         self.epoch_history = []
         self._stop_flag = False
+        self.early_stopped = False
+        self.best_epoch = 0
         self.current_batch = 0
         self.total_batches = 0
         self.batch_loss = 0.0
@@ -94,6 +102,8 @@ class TrainingRequest(BaseModel):
     batch_size: int = 32
     learning_rate: float = 0.001
     validation_split: float = 0.2
+    early_stopping_patience: int = 3
+    use_class_weights: bool = True
 
 
 @router.get("/training/status")
@@ -106,13 +116,14 @@ async def start_training(req: TrainingRequest):
     global _training_thread
 
     # Si un thread tourne encore apres un stop, attendre qu'il finisse
-    if state.running or (_training_thread is not None and _training_thread.is_alive()):
+    if _training_thread is not None and _training_thread.is_alive():
         state._stop_flag = True
-        if _training_thread is not None and _training_thread.is_alive():
-            state.phase = "arret en cours"
-            _training_thread.join(timeout=15)
-            if _training_thread.is_alive():
-                raise HTTPException(409, "L'entrainement precedent ne s'est pas arrete a temps")
+        state.phase = "arret en cours"
+        _training_thread.join(timeout=10)
+        if _training_thread.is_alive():
+            raise HTTPException(409, "L'entrainement precedent ne s'est pas arrete a temps")
+    # Reset le thread mort
+    _training_thread = None
 
     if req.model_type == "text-sentiment":
         thread = threading.Thread(target=_train_text, args=(req,), daemon=True)
@@ -146,7 +157,9 @@ async def stop_training():
 
 def _train_text(req: TrainingRequest):
     try:
-        from torch.utils.data import DataLoader, random_split
+        import torch.nn as nn
+        from collections import Counter
+        from torch.utils.data import DataLoader, Subset
         from transformers import AutoTokenizer, AutoModelForSequenceClassification, get_linear_schedule_with_warmup
         from ml.text_dataset import TextSentinelDataset
 
@@ -159,6 +172,8 @@ def _train_text(req: TrainingRequest):
 
         backbone = config["model"]["backbone"]
         max_length = config["model"]["max_length"]
+        num_classes = config["model"]["num_classes"]
+        label_smoothing = config.get("training", {}).get("label_smoothing", 0.0)
         tokenizer = AutoTokenizer.from_pretrained(backbone)
 
         dataset_dir = AI_ROOT / "training" / "text" / "datasets"
@@ -169,22 +184,60 @@ def _train_text(req: TrainingRequest):
             state.running = False
             return
 
+        # ── Split stratifie (meme distribution de classes dans train et val) ──
         state.phase = "preparation donnees"
-        train_size = int(len(dataset) * (1 - req.validation_split))
-        val_size = len(dataset) - train_size
-        train_set, val_set = random_split(dataset, [train_size, val_size])
+        import random
+        random.seed(42)
+        indices_by_label: dict[int, list[int]] = {}
+        for i in range(len(dataset)):
+            label = dataset[i]["labels"]
+            indices_by_label.setdefault(label, []).append(i)
+
+        train_indices, val_indices = [], []
+        for label, indices in indices_by_label.items():
+            random.shuffle(indices)
+            split = int(len(indices) * (1 - req.validation_split))
+            train_indices.extend(indices[:split])
+            val_indices.extend(indices[split:])
+
+        random.shuffle(train_indices)
+        random.shuffle(val_indices)
+
+        train_set = Subset(dataset, train_indices)
+        val_set = Subset(dataset, val_indices)
 
         train_loader = DataLoader(train_set, batch_size=req.batch_size, shuffle=True)
         val_loader = DataLoader(val_set, batch_size=req.batch_size, shuffle=False)
 
+        # ── Class weights (compense le desequilibre des classes) ──
+        loss_fn = None
+        if req.use_class_weights:
+            state.phase = "calcul class weights"
+            label_counts = Counter()
+            for idx in train_indices:
+                label_counts[dataset[idx]["labels"]] += 1
+            total_samples = sum(label_counts.values())
+            weights = []
+            for c in range(num_classes):
+                count = label_counts.get(c, 1)
+                weights.append(total_samples / (num_classes * count))
+            class_weights = torch.tensor(weights, dtype=torch.float32).to(device)
+            loss_fn = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
+        elif label_smoothing > 0:
+            loss_fn = nn.CrossEntropyLoss(label_smoothing=label_smoothing)
+
         model = AutoModelForSequenceClassification.from_pretrained(
-            backbone, num_labels=config["model"]["num_classes"]
+            backbone, num_labels=num_classes
         ).to(device)
 
         optimizer = torch.optim.AdamW(model.parameters(), lr=req.learning_rate, weight_decay=0.01)
         total_steps = len(train_loader) * req.epochs
         scheduler = get_linear_schedule_with_warmup(optimizer, int(total_steps * 0.1), total_steps)
 
+        # ── Early stopping ──
+        best_val_loss = float("inf")
+        patience_counter = 0
+        patience = req.early_stopping_patience
         best_val_acc = 0.0
         num_train_batches = len(train_loader)
 
@@ -207,11 +260,21 @@ def _train_text(req: TrainingRequest):
 
                 optimizer.zero_grad()
                 outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-                outputs.loss.backward()
+
+                # Utiliser les class weights si actives
+                if loss_fn is not None:
+                    loss = loss_fn(outputs.logits, labels)
+                else:
+                    loss = outputs.loss
+                loss.backward()
+
+                # Gradient clipping (evite les explosions de gradient)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
                 optimizer.step()
                 scheduler.step()
 
-                total_loss += outputs.loss.item()
+                total_loss += loss.item()
                 preds = outputs.logits.argmax(dim=-1)
                 correct += (preds == labels).sum().item()
                 total += labels.size(0)
@@ -221,6 +284,7 @@ def _train_text(req: TrainingRequest):
             state.loss = total_loss / max(num_train_batches, 1)
             state.accuracy = correct / max(total, 1)
 
+            # ── Validation ──
             state.phase = f"validation epoch {epoch + 1}/{req.epochs}"
             model.eval()
             val_loss, val_correct, val_total = 0.0, 0, 0
@@ -230,7 +294,11 @@ def _train_text(req: TrainingRequest):
                     attention_mask = batch["attention_mask"].to(device)
                     labels = batch["labels"].to(device)
                     outputs = model(input_ids=input_ids, attention_mask=attention_mask, labels=labels)
-                    val_loss += outputs.loss.item()
+                    if loss_fn is not None:
+                        v_loss = loss_fn(outputs.logits, labels)
+                    else:
+                        v_loss = outputs.loss
+                    val_loss += v_loss.item()
                     preds = outputs.logits.argmax(dim=-1)
                     val_correct += (preds == labels).sum().item()
                     val_total += labels.size(0)
@@ -239,19 +307,36 @@ def _train_text(req: TrainingRequest):
             state.val_accuracy = val_correct / max(val_total, 1)
             state.record_epoch()
 
-            if state.val_accuracy > best_val_acc:
+            # ── Sauvegarde du meilleur modele ──
+            if state.val_loss < best_val_loss:
+                best_val_loss = state.val_loss
                 best_val_acc = state.val_accuracy
+                patience_counter = 0
+                state.best_epoch = epoch + 1
                 checkpoint_dir = AI_ROOT / "training" / "text" / "checkpoints" / "best_model"
                 checkpoint_dir.mkdir(parents=True, exist_ok=True)
                 model.save_pretrained(str(checkpoint_dir))
                 tokenizer.save_pretrained(str(checkpoint_dir))
+            else:
+                patience_counter += 1
 
-        state.phase = "termine" if not state._stop_flag else "arrete"
+            # ── Early stopping : arret si val_loss ne s'ameliore plus ──
+            if patience > 0 and patience_counter >= patience:
+                state.early_stopped = True
+                state.phase = f"early stop epoch {epoch + 1} (patience {patience}, best epoch {state.best_epoch})"
+                break
+
+        if not state._stop_flag and not state.early_stopped:
+            state.phase = "termine"
+        elif state._stop_flag:
+            state.phase = "arrete"
 
     except Exception as e:
         state.phase = f"erreur: {e}"
     finally:
         state.running = False
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
 
 # ── Vision Training ──
@@ -371,3 +456,5 @@ def _train_vision(req: TrainingRequest):
         state.phase = f"erreur: {e}"
     finally:
         state.running = False
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()

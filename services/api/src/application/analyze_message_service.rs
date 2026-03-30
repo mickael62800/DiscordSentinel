@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tracing::info;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 use crate::domain::entities::{Infraction, MessageAnalysis};
@@ -9,7 +9,6 @@ use crate::domain::errors::DomainError;
 use crate::domain::services::{InferenceRateLimiter, InferenceService, ScoringService, TextTokenizer};
 use crate::domain::value_objects::{Action, FlagType};
 use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::domain::entities::IaConfig;
 use crate::ports::outbound::{CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
 
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
@@ -81,11 +80,25 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         let text_enabled = ia_config.as_ref().map(|c| c.text_enabled).unwrap_or(true);
         let text_threshold = ia_config.as_ref().map(|c| c.text_threshold as f32).unwrap_or(DEFAULT_TEXT_THRESHOLD);
 
+        debug!(
+            has_inference = self.inference.is_some(),
+            has_tokenizer = self.tokenizer.is_some(),
+            text_enabled,
+            "Etat inference IA"
+        );
+
         if let (Some(inference), Some(tokenizer)) = (&self.inference, &self.tokenizer) {
+            debug!(
+                text_available = inference.text_available(),
+                tokenizer_available = tokenizer.available(),
+                content_empty = cmd.content.is_empty(),
+                "Check inference conditions"
+            );
             if text_enabled && inference.text_available() && tokenizer.available() && !cmd.content.is_empty() {
                 // Rate limit inference
                 let _permit = self.inference_limiter.acquire().await?;
 
+                debug!("Lancement inference text...");
                 match self.run_text_inference(inference, tokenizer, &cmd.content, &rules, text_threshold) {
                     Ok(Some((ia_score, _ia_flags, ia_reason))) => {
                         // Combiner : prendre le score le plus eleve
@@ -192,53 +205,64 @@ impl AnalyzeMessageService {
         // Inference
         let classifications = inference.classify_text(input_ids, attention_mask)?;
 
-        // Filtrer les sentiments au-dessus du seuil per-guild
-        let mut detected: Vec<(FlagType, f32)> = Vec::new();
-
+        // Log les classifications brutes
         for c in &classifications {
-            let flag = match c.label.as_str() {
-                "anger" if c.confidence >= threshold => Some(FlagType::Anger),
-                "rage" if c.confidence >= threshold => Some(FlagType::Rage),
-                "threat" if c.confidence >= threshold => Some(FlagType::Threat),
-                "harassment" if c.confidence >= threshold => Some(FlagType::Harassment),
-                _ => None,
-            };
-
-            if let Some(flag_type) = flag {
-                detected.push((flag_type, c.confidence));
-            }
+            debug!(label = %c.label, confidence = c.confidence, threshold, "Classification IA brute");
         }
 
-        if detected.is_empty() {
-            return Ok(None);
-        }
-
-        // Calculer le score IA
-        let mut ia_score = 0.0;
-        let mut triggered: Vec<String> = Vec::new();
-
-        for (flag_type, confidence) in &detected {
-            let rule = rules.iter().find(|r| r.flag_type == *flag_type && r.enabled);
-            let base_weight = match rule {
-                Some(r) => r.weight,
-                None => match flag_type {
-                    FlagType::Anger => 3.0,
-                    FlagType::Rage => 6.0,
-                    FlagType::Threat => 8.0,
-                    FlagType::Harassment => 7.0,
-                    _ => 5.0,
-                },
-            };
-            // Ponderer par la confiance du modele
-            let weighted = base_weight * (*confidence as f64);
-            ia_score += weighted;
-            triggered.push(format!("{}({:.0}%)", flag_type.as_str(), confidence * 100.0));
-        }
-
-        let reason = format!("IA sentiment : {}", triggered.join(", "));
-
-        Ok(Some((ia_score, detected.into_iter().map(|(f, _)| f).collect(), reason)))
+        Ok(score_classifications(&classifications, rules, threshold))
     }
+}
+
+/// Fonction pure : transforme les classifications IA en score, flags et raison.
+/// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.
+pub fn score_classifications(
+    classifications: &[crate::domain::services::InferenceClassification],
+    rules: &[crate::domain::entities::Rule],
+    threshold: f32,
+) -> Option<(f64, Vec<FlagType>, String)> {
+    let mut detected: Vec<(FlagType, f32)> = Vec::new();
+
+    for c in classifications {
+        let flag = match c.label.as_str() {
+            "anger" if c.confidence >= threshold => Some(FlagType::Anger),
+            "rage" if c.confidence >= threshold => Some(FlagType::Rage),
+            "threat" if c.confidence >= threshold => Some(FlagType::Threat),
+            "harassment" if c.confidence >= threshold => Some(FlagType::Harassment),
+            _ => None,
+        };
+
+        if let Some(flag_type) = flag {
+            detected.push((flag_type, c.confidence));
+        }
+    }
+
+    if detected.is_empty() {
+        return None;
+    }
+
+    let mut ia_score = 0.0;
+    let mut triggered: Vec<String> = Vec::new();
+
+    for (flag_type, confidence) in &detected {
+        let rule = rules.iter().find(|r| r.flag_type == *flag_type && r.enabled);
+        let base_weight = match rule {
+            Some(r) => r.weight,
+            None => match flag_type {
+                FlagType::Anger => 3.0,
+                FlagType::Rage => 6.0,
+                FlagType::Threat => 8.0,
+                FlagType::Harassment => 7.0,
+                _ => 5.0,
+            },
+        };
+        let weighted = base_weight * (*confidence as f64);
+        ia_score += weighted;
+        triggered.push(format!("{}({:.0}%)", flag_type.as_str(), confidence * 100.0));
+    }
+
+    let reason = format!("IA sentiment : {}", triggered.join(", "));
+    Some((ia_score, detected.into_iter().map(|(f, _)| f).collect(), reason))
 }
 
 /// Seuils par defaut (replique du ScoringService pour le scoring combine).
@@ -273,6 +297,7 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
     use crate::domain::entities::Rule;
+    use crate::domain::services::InferenceClassification;
 
     fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
         let now = Utc::now();
@@ -290,6 +315,12 @@ mod tests {
             updated_at: now,
         }
     }
+
+    fn cls(label: &str, confidence: f32) -> InferenceClassification {
+        InferenceClassification { label: label.to_string(), confidence }
+    }
+
+    // ── resolve_thresholds ──
 
     #[test]
     fn test_resolve_thresholds_defaults() {
@@ -316,7 +347,7 @@ mod tests {
         rule.threshold_warn = 0.5;
         rule.enabled = false;
         let (w, _, _, _) = resolve_thresholds(&[rule]);
-        assert_eq!(w, 2.0); // Disabled => defaults
+        assert_eq!(w, 2.0);
     }
 
     #[test]
@@ -342,25 +373,428 @@ mod tests {
     #[test]
     fn test_with_text_inference_sets_fields() {
         use std::sync::Arc;
-        use crate::domain::services::{InferenceService, TextTokenizer};
+        use crate::domain::services::{InferenceRateLimiter, InferenceService, TextTokenizer};
 
-        // Creer des instances vides (pas de modele charge)
         let inference = Arc::new(InferenceService::new(None, None));
         let tokenizer = Arc::new(TextTokenizer::new(None, 256));
 
-        // Verifier que without inference, les champs sont None
-        // On ne peut pas tester directement les champs prives, mais on peut
-        // verifier que la construction ne panique pas
         let _service = AnalyzeMessageService::new(
             Arc::new(MockRuleRepo),
             Arc::new(MockInfractionRepo),
             Arc::new(MockCache),
             Arc::new(MockConduct),
+            Arc::new(MockIaConfigRepo),
+            Arc::new(InferenceRateLimiter::new(4, 0)),
         ).with_text_inference(inference, tokenizer);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Tests score_classifications — fonction pure, pas de mock
+    // ══════════════════════════════════════════════════════════
+
+    // ── Messages neutres ──
+
+    #[test]
+    fn neutral_message_returns_none() {
+        let classifications = vec![
+            cls("neutral", 0.95),
+            cls("anger", 0.02),
+            cls("rage", 0.01),
+            cls("threat", 0.01),
+            cls("harassment", 0.01),
+        ];
+        assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    }
+
+    #[test]
+    fn all_below_threshold_returns_none() {
+        let classifications = vec![
+            cls("neutral", 0.30),
+            cls("anger", 0.45),
+            cls("rage", 0.10),
+            cls("threat", 0.10),
+            cls("harassment", 0.05),
+        ];
+        assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    }
+
+    #[test]
+    fn empty_classifications_returns_none() {
+        assert!(score_classifications(&[], &[], 0.5).is_none());
+    }
+
+    // ── Détection anger ──
+
+    #[test]
+    fn anger_above_threshold_detected() {
+        let classifications = vec![
+            cls("neutral", 0.20),
+            cls("anger", 0.70),
+            cls("rage", 0.05),
+            cls("threat", 0.03),
+            cls("harassment", 0.02),
+        ];
+        let result = score_classifications(&classifications, &[], 0.5);
+        assert!(result.is_some());
+
+        let (score, flags, reason) = result.unwrap();
+        assert_eq!(flags, vec![FlagType::Anger]);
+        // anger weight=3.0, confidence=0.7 → 3.0 * 0.7 = 2.1
+        assert!((score - 2.1).abs() < 0.01);
+        assert!(reason.contains("anger"));
+        assert!(reason.contains("70%"));
+    }
+
+    // ── Détection rage ──
+
+    #[test]
+    fn rage_above_threshold_detected() {
+        let classifications = vec![
+            cls("neutral", 0.05),
+            cls("anger", 0.10),
+            cls("rage", 0.80),
+            cls("threat", 0.03),
+            cls("harassment", 0.02),
+        ];
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags, vec![FlagType::Rage]);
+        // rage weight=6.0, confidence=0.8 → 4.8
+        assert!((score - 4.8).abs() < 0.01);
+    }
+
+    // ── Détection threat ──
+
+    #[test]
+    fn threat_above_threshold_detected() {
+        let classifications = vec![
+            cls("neutral", 0.02),
+            cls("anger", 0.03),
+            cls("rage", 0.05),
+            cls("threat", 0.85),
+            cls("harassment", 0.05),
+        ];
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags, vec![FlagType::Threat]);
+        // threat weight=8.0, confidence=0.85 → 6.8
+        assert!((score - 6.8).abs() < 0.01);
+    }
+
+    // ── Détection harassment ──
+
+    #[test]
+    fn harassment_above_threshold_detected() {
+        let classifications = vec![
+            cls("neutral", 0.05),
+            cls("anger", 0.05),
+            cls("rage", 0.05),
+            cls("threat", 0.05),
+            cls("harassment", 0.80),
+        ];
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags, vec![FlagType::Harassment]);
+        // harassment weight=7.0, confidence=0.8 → 5.6
+        assert!((score - 5.6).abs() < 0.01);
+    }
+
+    // ── Combinaisons ──
+
+    #[test]
+    fn anger_plus_rage_combined_score() {
+        let classifications = vec![
+            cls("neutral", 0.05),
+            cls("anger", 0.60),
+            cls("rage", 0.70),
+            cls("threat", 0.03),
+            cls("harassment", 0.02),
+        ];
+        let (score, flags, reason) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags.len(), 2);
+        assert!(flags.contains(&FlagType::Anger));
+        assert!(flags.contains(&FlagType::Rage));
+        // anger: 3.0*0.6=1.8 + rage: 6.0*0.7=4.2 → 6.0
+        assert!((score - 6.0).abs() < 0.01);
+        assert!(reason.contains("anger"));
+        assert!(reason.contains("rage"));
+    }
+
+    #[test]
+    fn all_toxic_flags_combined() {
+        let classifications = vec![
+            cls("neutral", 0.01),
+            cls("anger", 0.60),
+            cls("rage", 0.70),
+            cls("threat", 0.80),
+            cls("harassment", 0.90),
+        ];
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags.len(), 4);
+        // anger:3*0.6=1.8 + rage:6*0.7=4.2 + threat:8*0.8=6.4 + harassment:7*0.9=6.3 = 18.7
+        assert!((score - 18.7).abs() < 0.01);
+    }
+
+    // ── Seuils personnalisés ──
+
+    #[test]
+    fn strict_threshold_filters_out_low_confidence() {
+        let classifications = vec![
+            cls("anger", 0.70),
+            cls("rage", 0.85),
+        ];
+        // Seuil strict = 0.8 → anger(0.7) rejeté, rage(0.85) accepté
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.8).unwrap();
+        assert_eq!(flags, vec![FlagType::Rage]);
+        // rage: 6.0 * 0.85 = 5.1
+        assert!((score - 5.1).abs() < 0.01);
+    }
+
+    #[test]
+    fn very_strict_threshold_rejects_all() {
+        let classifications = vec![
+            cls("anger", 0.70),
+            cls("rage", 0.80),
+            cls("threat", 0.85),
+        ];
+        // Seuil = 0.95 → tout rejeté
+        assert!(score_classifications(&classifications, &[], 0.95).is_none());
+    }
+
+    #[test]
+    fn zero_threshold_accepts_everything() {
+        let classifications = vec![
+            cls("anger", 0.01),
+            cls("rage", 0.01),
+        ];
+        let result = score_classifications(&classifications, &[], 0.0);
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().1.len(), 2);
+    }
+
+    #[test]
+    fn exact_threshold_boundary_accepted() {
+        let classifications = vec![cls("anger", 0.50)];
+        // confidence == threshold → accepté (>=)
+        let result = score_classifications(&classifications, &[], 0.5);
+        assert!(result.is_some());
+    }
+
+    #[test]
+    fn just_below_threshold_rejected() {
+        let classifications = vec![cls("anger", 0.499)];
+        assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    }
+
+    // ── Règles custom ──
+
+    #[test]
+    fn custom_rule_overrides_default_weight() {
+        let classifications = vec![cls("anger", 0.80)];
+        let rules = vec![make_rule(FlagType::Anger, 10.0)];
+        let (score, _, _) = score_classifications(&classifications, &rules, 0.5).unwrap();
+        // custom weight=10.0, confidence=0.8 → 8.0 (vs 2.4 par défaut)
+        assert!((score - 8.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn disabled_rule_uses_default_weight() {
+        let classifications = vec![cls("anger", 0.80)];
+        let mut rule = make_rule(FlagType::Anger, 10.0);
+        rule.enabled = false;
+        let (score, _, _) = score_classifications(&classifications, &[rule], 0.5).unwrap();
+        // rule disabled → default weight=3.0, confidence=0.8 → 2.4
+        assert!((score - 2.4).abs() < 0.01);
+    }
+
+    #[test]
+    fn custom_rule_for_different_flag_no_effect() {
+        let classifications = vec![cls("anger", 0.80)];
+        let rules = vec![make_rule(FlagType::Rage, 15.0)];
+        let (score, _, _) = score_classifications(&classifications, &rules, 0.5).unwrap();
+        // rule est pour Rage, pas Anger → default anger weight=3.0
+        assert!((score - 2.4).abs() < 0.01);
+    }
+
+    #[test]
+    fn multiple_custom_rules_applied() {
+        let classifications = vec![
+            cls("anger", 0.60),
+            cls("threat", 0.70),
+        ];
+        let rules = vec![
+            make_rule(FlagType::Anger, 5.0),
+            make_rule(FlagType::Threat, 12.0),
+        ];
+        let (score, _, _) = score_classifications(&classifications, &rules, 0.5).unwrap();
+        // anger: 5.0*0.6=3.0 + threat: 12.0*0.7=8.4 → 11.4
+        assert!((score - 11.4).abs() < 0.01);
+    }
+
+    // ── Labels non reconnus ignorés ──
+
+    #[test]
+    fn unknown_labels_ignored() {
+        let classifications = vec![
+            cls("neutral", 0.90),
+            cls("joy", 0.80),
+            cls("sadness", 0.70),
+        ];
+        assert!(score_classifications(&classifications, &[], 0.5).is_none());
+    }
+
+    // ── Format de la raison ──
+
+    #[test]
+    fn reason_format_single_flag() {
+        let classifications = vec![cls("threat", 0.90)];
+        let (_, _, reason) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(reason, "IA sentiment : threat(90%)");
+    }
+
+    #[test]
+    fn reason_format_multiple_flags() {
+        let classifications = vec![
+            cls("anger", 0.70),
+            cls("harassment", 0.80),
+        ];
+        let (_, _, reason) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(reason, "IA sentiment : anger(70%), harassment(80%)");
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Tests de scoring combiné → action
+    // ══════════════════════════════════════════════════════════
+
+    #[test]
+    fn anger_only_triggers_warn() {
+        // anger: weight=3.0, confidence=0.8 → score=2.4 >= warn(2.0) mais < delete(4.0)
+        let classifications = vec![cls("anger", 0.80)];
+        let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        let (t_warn, t_delete, _, _) = resolve_thresholds(&[]);
+        assert!(score >= t_warn);
+        assert!(score < t_delete);
+    }
+
+    #[test]
+    fn rage_triggers_delete_or_mute() {
+        // rage: weight=6.0, confidence=0.85 → score=5.1 >= delete(4.0) mais < mute(6.0)
+        let classifications = vec![cls("rage", 0.85)];
+        let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        let (_, t_delete, t_mute, _) = resolve_thresholds(&[]);
+        assert!(score >= t_delete);
+        assert!(score < t_mute);
+    }
+
+    #[test]
+    fn threat_high_confidence_triggers_mute() {
+        // threat: weight=8.0, confidence=0.90 → score=7.2 >= mute(6.0) mais < ban(9.0)
+        let classifications = vec![cls("threat", 0.90)];
+        let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        let (_, _, t_mute, t_ban) = resolve_thresholds(&[]);
+        assert!(score >= t_mute);
+        assert!(score < t_ban);
+    }
+
+    #[test]
+    fn rage_plus_threat_triggers_ban() {
+        // rage:6.0*0.8=4.8 + threat:8.0*0.8=6.4 → 11.2 >= ban(9.0)
+        let classifications = vec![
+            cls("rage", 0.80),
+            cls("threat", 0.80),
+        ];
+        let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        let (_, _, _, t_ban) = resolve_thresholds(&[]);
+        assert!(score >= t_ban);
+    }
+
+    #[test]
+    fn anger_low_confidence_below_warn() {
+        // anger: weight=3.0, confidence=0.55 → score=1.65 < warn(2.0)
+        let classifications = vec![cls("anger", 0.55)];
+        let (score, _, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        let (t_warn, _, _, _) = resolve_thresholds(&[]);
+        assert!(score < t_warn);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Tests avec confidences réalistes (somme ~1.0 via softmax)
+    // ══════════════════════════════════════════════════════════
+
+    #[test]
+    fn realistic_softmax_angry_message() {
+        // Softmax distribution typique d'un message colérique
+        let classifications = vec![
+            cls("neutral", 0.15),
+            cls("anger", 0.55),
+            cls("rage", 0.15),
+            cls("threat", 0.10),
+            cls("harassment", 0.05),
+        ];
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags, vec![FlagType::Anger]);
+        // anger: 3.0 * 0.55 = 1.65
+        assert!((score - 1.65).abs() < 0.01);
+    }
+
+    #[test]
+    fn realistic_softmax_threat_message() {
+        // Message de menace directe
+        let classifications = vec![
+            cls("neutral", 0.02),
+            cls("anger", 0.08),
+            cls("rage", 0.10),
+            cls("threat", 0.75),
+            cls("harassment", 0.05),
+        ];
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags, vec![FlagType::Threat]);
+        // threat: 8.0 * 0.75 = 6.0
+        assert!((score - 6.0).abs() < 0.01);
+    }
+
+    #[test]
+    fn realistic_softmax_harassment_escalation() {
+        // Harcèlement avec rage sous-jacente
+        let classifications = vec![
+            cls("neutral", 0.03),
+            cls("anger", 0.07),
+            cls("rage", 0.55),
+            cls("threat", 0.05),
+            cls("harassment", 0.30),
+        ];
+        // threshold 0.5 → rage(0.55) detecté, harassment(0.30) rejeté
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.5).unwrap();
+        assert_eq!(flags, vec![FlagType::Rage]);
+        // rage: 6.0 * 0.55 = 3.3
+        assert!((score - 3.3).abs() < 0.01);
+    }
+
+    #[test]
+    fn realistic_softmax_harassment_escalation_lower_threshold() {
+        let classifications = vec![
+            cls("neutral", 0.03),
+            cls("anger", 0.07),
+            cls("rage", 0.55),
+            cls("threat", 0.05),
+            cls("harassment", 0.30),
+        ];
+        // Seuil plus bas (0.25) → rage ET harassment détectés
+        let (score, flags, _) = score_classifications(&classifications, &[], 0.25).unwrap();
+        assert_eq!(flags.len(), 2);
+        // rage: 6.0*0.55=3.3 + harassment: 7.0*0.30=2.1 → 5.4
+        assert!((score - 5.4).abs() < 0.01);
     }
 }
 
 // ── Mocks minimaux pour les tests ──
+
+#[cfg(test)]
+struct MockIaConfigRepo;
+
+#[cfg(test)]
+#[async_trait]
+impl IaConfigRepository for MockIaConfigRepo {
+    async fn get(&self, _: &str) -> Result<Option<crate::domain::entities::IaConfig>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn save(&self, config: &crate::domain::entities::IaConfig) -> Result<crate::domain::entities::IaConfig, crate::domain::errors::DomainError> { Ok(config.clone()) }
+}
 
 #[cfg(test)]
 struct MockRuleRepo;

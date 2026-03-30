@@ -21,127 +21,100 @@ use crate::application::role_panels_service::RolePanelsService;
 use crate::application::watched_users_service::WatchedUsersService;
 use crate::application::ia_config_service::{IaConfigService, IaConfig};
 use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
-use crate::domain::entities::{ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::entities::{
+    ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity,
+    LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog,
+    DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest,
+    ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent,
+    ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
+    UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail,
+    WatchedUser,
+};
 
-#[tauri::command]
-pub async fn get_dashboard_stats(
-    service: State<'_, Arc<DashboardService>>,
-) -> Result<ServerStats, String> {
-    service.get_stats().await
-}
+// ─────────────────────────────────────────────────────────────
+// Pass-through commands (generated via macro)
+// ─────────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub async fn get_guilds(
-    service: State<'_, Arc<GuildService>>,
-) -> Result<Vec<Guild>, String> {
-    service.get_guilds().await
-}
+// Dashboard
+tauri_passthrough!(get_dashboard_stats, DashboardService, get_stats -> ServerStats);
 
-#[tauri::command]
-pub async fn get_logs(
-    service: State<'_, Arc<LogsService>>,
-    guild_id: Option<String>,
-) -> Result<Vec<LogEntry>, String> {
-    service.get_logs(guild_id).await
-}
+// Guilds
+tauri_passthrough!(get_guilds, GuildService, get_guilds -> Vec<Guild>);
 
-#[tauri::command]
-pub async fn delete_logs_by_category(
-    service: State<'_, Arc<LogsService>>,
-    category: String,
-) -> Result<(), String> {
-    service.delete_logs_by_category(category).await
-}
+// Logs
+tauri_passthrough!(get_logs, LogsService, get_logs -> Vec<LogEntry>, guild_id: Option<String>);
+tauri_passthrough!(delete_logs_by_category, LogsService, delete_logs_by_category -> (), category: String);
 
-#[tauri::command]
-pub async fn get_infractions(
-    service: State<'_, Arc<InfractionsService>>,
-    guild_id: Option<String>,
-) -> Result<Vec<Infraction>, String> {
-    service.get_infractions(guild_id).await
-}
+// Infractions
+tauri_passthrough!(get_infractions, InfractionsService, get_infractions -> Vec<Infraction>, guild_id: Option<String>);
 
-#[tauri::command]
-pub async fn get_rules(
-    service: State<'_, Arc<RulesService>>,
-    guild_id: Option<String>,
-) -> Result<Vec<ModerationRule>, String> {
-    service.get_rules(guild_id).await
-}
+// Rules
+tauri_passthrough!(get_rules, RulesService, get_rules -> Vec<ModerationRule>, guild_id: Option<String>);
+tauri_passthrough!(toggle_rule, RulesService, toggle_rule -> bool, id: String, enabled: bool);
 
-#[tauri::command]
-pub async fn toggle_rule(
-    service: State<'_, Arc<RulesService>>,
-    id: String,
-    enabled: bool,
-) -> Result<bool, String> {
-    service.toggle_rule(id, enabled).await
-}
+// Tickets
+tauri_passthrough!(get_tickets, TicketsService, get_tickets -> Vec<Ticket>);
+tauri_passthrough!(get_ticket_detail, TicketsService, get_ticket_detail -> TicketDetail, id: String);
+tauri_passthrough!(reply_ticket, TicketsService, reply_ticket -> (), ticket_id: String, content: String);
+tauri_passthrough!(close_ticket, TicketsService, close_ticket -> (), id: String);
+tauri_passthrough!(assign_ticket, TicketsService, assign_ticket -> (), id: String, assignee: String);
 
-#[tauri::command]
-pub async fn update_rule(
-    service: State<'_, Arc<RulesService>>,
-    guild_id: String,
-    flag_type: String,
-    weight: f64,
-    threshold_warn: f64,
-    threshold_delete: f64,
-    threshold_mute: f64,
-    threshold_ban: f64,
-    enabled: bool,
-) -> Result<(), String> {
-    service.update_rule(UpdateRuleParams {
-        guild_id,
-        flag_type,
-        weight,
-        threshold_warn,
-        threshold_delete,
-        threshold_mute,
-        threshold_ban,
-        enabled,
-    }).await
-}
+// Moderation
+tauri_passthrough!(execute_ban, ModerationService, execute_ban -> (), guild_id: String, user_id: String, reason: String);
+tauri_passthrough!(execute_unban, ModerationService, execute_unban -> (), guild_id: String, user_id: String);
+tauri_passthrough!(get_confirmed_bans, ModerationService, get_confirmed_bans -> Vec<ConfirmedBan>, guild_id: Option<String>);
+tauri_passthrough!(get_moderation_history, ModerationService, get_history -> UserModerationHistory, guild_id: String, user_id: String);
 
-#[tauri::command]
-pub async fn get_tickets(
-    service: State<'_, Arc<TicketsService>>,
-) -> Result<Vec<Ticket>, String> {
-    service.get_tickets().await
-}
+// Security
+tauri_passthrough!(get_security_events, SecurityService, get_events -> Vec<SecurityEvent>, guild_id: Option<String>);
 
-#[tauri::command]
-pub async fn get_ticket_detail(
-    service: State<'_, Arc<TicketsService>>,
-    id: String,
-) -> Result<TicketDetail, String> {
-    service.get_ticket_detail(id).await
-}
+// Voice Channels
+tauri_passthrough!(get_voice_channels, VoiceChannelsService, get_channels -> Vec<VoiceChannel>, guild_id: String);
+tauri_passthrough!(get_voice_channel_detail, VoiceChannelsService, get_channel_detail -> VoiceChannelDetail, channel_id: String);
 
-#[tauri::command]
-pub async fn reply_ticket(
-    service: State<'_, Arc<TicketsService>>,
-    ticket_id: String,
-    content: String,
-) -> Result<(), String> {
-    service.reply_ticket(ticket_id, content).await
-}
+// Bot Config
+tauri_passthrough!(get_bot_definitions, BotConfigService, get_definitions -> Vec<BotDefinition>);
+tauri_passthrough!(get_bot_guild_config, BotConfigService, get_guild_config -> Vec<BotGuildConfig>, guild_id: String);
+tauri_passthrough!(set_bot_config, BotConfigService, set_config -> (), guild_id: String, bot_name: String, config_key: String, config_value: String);
+tauri_passthrough!(delete_bot_config, BotConfigService, delete_config -> (), guild_id: String, bot_name: String, config_key: String);
 
-#[tauri::command]
-pub async fn close_ticket(
-    service: State<'_, Arc<TicketsService>>,
-    id: String,
-) -> Result<(), String> {
-    service.close_ticket(id).await
-}
+// Role Panels
+tauri_passthrough!(get_role_panels, RolePanelsService, get_panels -> Vec<RolePanel>, guild_id: String);
+tauri_passthrough!(get_role_panel_detail, RolePanelsService, get_panel -> RolePanelDetail, panel_id: String);
+tauri_passthrough!(get_auto_roles, RolePanelsService, get_auto_roles -> Vec<AutoRoleConfig>, guild_id: String);
 
-#[tauri::command]
-pub async fn assign_ticket(
-    service: State<'_, Arc<TicketsService>>,
-    id: String,
-    assignee: String,
-) -> Result<(), String> {
-    service.assign_ticket(id, assignee).await
-}
+// Dashboard Charts
+tauri_passthrough!(get_activity_trend, DashboardChartsService, get_activity_trend -> Vec<DailyActivity>, guild_id: Option<String>, days: Option<i32>);
+tauri_passthrough!(get_top_users, DashboardChartsService, get_top_users -> Vec<TopUser>, guild_id: String, limit: Option<u32>);
+
+// Levels / XP
+tauri_passthrough!(get_level_config, LevelsService, get_config -> LevelConfig, guild_id: String);
+tauri_passthrough!(get_level_leaderboard, LevelsService, get_leaderboard -> Vec<UserLevel>, guild_id: String);
+tauri_passthrough!(get_level_rewards, LevelsService, get_rewards -> Vec<LevelReward>, guild_id: String);
+
+// Audit Logs
+tauri_passthrough!(get_audit_logs, AuditLogsService, get_audit_logs -> Vec<AuditLog>, guild_id: Option<String>, event_type: Option<String>, limit: Option<i64>);
+
+// Watched Users
+tauri_passthrough!(get_watched_users, WatchedUsersService, get_watched_users -> Vec<WatchedUser>, guild_id: Option<String>);
+tauri_passthrough!(get_user_dossier, WatchedUsersService, get_user_dossier -> UserDossier, guild_id: String, user_id: String);
+
+// Conduct
+tauri_passthrough!(get_conduct_config, ConductService, get_config -> ConductConfig, guild_id: String);
+tauri_passthrough!(get_conduct_leaderboard, ConductService, get_leaderboard -> Vec<UserConductPoints>, guild_id: String);
+tauri_passthrough!(get_conduct_points, ConductService, get_points -> UserConductPoints, guild_id: String, user_id: String);
+tauri_passthrough!(get_conduct_log, ConductService, get_log -> Vec<ConductPointsLog>, guild_id: String, user_id: String);
+
+// IA Config
+tauri_passthrough!(get_ia_config, IaConfigService, get_config -> IaConfig, guild_id: String);
+tauri_passthrough!(save_ia_config, IaConfigService, save_config -> IaConfig, guild_id: String, text_enabled: bool, text_threshold: f64, vision_enabled: bool, vision_threshold: f64);
+
+// Analytics
+tauri_passthrough!(get_full_analytics, AnalyticsService, get_full_analytics -> FullAnalytics, guild_id: Option<String>, days: Option<i32>);
+
+// ─────────────────────────────────────────────────────────────
+// Commands with custom logic (kept manual)
+// ─────────────────────────────────────────────────────────────
 
 // --- Auth commands ---
 
@@ -212,72 +185,33 @@ pub fn save_api_config(
     service.save_api_config(ApiConfig { api_url, api_key })
 }
 
-// --- WebSocket commands ---
+// --- Rules (complex) ---
 
 #[tauri::command]
-pub async fn ws_connect(
-    app: AppHandle,
-    service: State<'_, Arc<RealtimeService>>,
-    auth_service: State<'_, Arc<AuthService>>,
-) -> Result<(), String> {
-    let api_config = auth_service.get_api_config()?
-        .ok_or("API not configured")?;
-    service.connect(app, api_config.api_url, api_config.api_key).await
-}
-
-#[tauri::command]
-pub async fn ws_disconnect(
-    service: State<'_, Arc<RealtimeService>>,
-) -> Result<(), String> {
-    service.disconnect().await;
-    Ok(())
-}
-
-#[tauri::command]
-pub async fn ws_status(
-    service: State<'_, Arc<RealtimeService>>,
-) -> Result<WsStatus, String> {
-    Ok(service.get_status().await)
-}
-
-#[tauri::command]
-pub async fn execute_ban(
-    service: State<'_, Arc<ModerationService>>,
+pub async fn update_rule(
+    service: State<'_, Arc<RulesService>>,
     guild_id: String,
-    user_id: String,
-    reason: String,
+    flag_type: String,
+    weight: f64,
+    threshold_warn: f64,
+    threshold_delete: f64,
+    threshold_mute: f64,
+    threshold_ban: f64,
+    enabled: bool,
 ) -> Result<(), String> {
-    service.execute_ban(guild_id, user_id, reason).await
+    service.update_rule(UpdateRuleParams {
+        guild_id,
+        flag_type,
+        weight,
+        threshold_warn,
+        threshold_delete,
+        threshold_mute,
+        threshold_ban,
+        enabled,
+    }).await
 }
 
-#[tauri::command]
-pub async fn execute_unban(
-    service: State<'_, Arc<ModerationService>>,
-    guild_id: String,
-    user_id: String,
-) -> Result<(), String> {
-    service.execute_unban(guild_id, user_id).await
-}
-
-#[tauri::command]
-pub async fn get_confirmed_bans(
-    service: State<'_, Arc<ModerationService>>,
-    guild_id: Option<String>,
-) -> Result<Vec<ConfirmedBan>, String> {
-    service.get_confirmed_bans(guild_id).await
-}
-
-// --- Security commands ---
-
-#[tauri::command]
-pub async fn get_security_events(
-    service: State<'_, Arc<SecurityService>>,
-    guild_id: Option<String>,
-) -> Result<Vec<SecurityEvent>, String> {
-    service.get_events(guild_id).await
-}
-
-// --- Moderation commands ---
+// --- Moderation (complex) ---
 
 #[tauri::command]
 pub async fn log_moderation_action(
@@ -307,246 +241,37 @@ pub async fn log_moderation_action(
     }).await
 }
 
-#[tauri::command]
-pub async fn get_moderation_history(
-    service: State<'_, Arc<ModerationService>>,
-    guild_id: String,
-    user_id: String,
-) -> Result<UserModerationHistory, String> {
-    service.get_history(guild_id, user_id).await
-}
-
-// --- Voice Channels commands ---
+// --- WebSocket commands ---
 
 #[tauri::command]
-pub async fn get_voice_channels(
-    service: State<'_, Arc<VoiceChannelsService>>,
-    guild_id: String,
-) -> Result<Vec<VoiceChannel>, String> {
-    service.get_channels(guild_id).await
-}
-
-#[tauri::command]
-pub async fn get_voice_channel_detail(
-    service: State<'_, Arc<VoiceChannelsService>>,
-    channel_id: String,
-) -> Result<VoiceChannelDetail, String> {
-    service.get_channel_detail(channel_id).await
-}
-
-// --- Bot Config commands ---
-
-#[tauri::command]
-pub async fn get_bot_definitions(
-    service: State<'_, Arc<BotConfigService>>,
-) -> Result<Vec<BotDefinition>, String> {
-    service.get_definitions().await
-}
-
-#[tauri::command]
-pub async fn get_bot_guild_config(
-    service: State<'_, Arc<BotConfigService>>,
-    guild_id: String,
-) -> Result<Vec<BotGuildConfig>, String> {
-    service.get_guild_config(guild_id).await
-}
-
-#[tauri::command]
-pub async fn set_bot_config(
-    service: State<'_, Arc<BotConfigService>>,
-    guild_id: String,
-    bot_name: String,
-    config_key: String,
-    config_value: String,
+pub async fn ws_connect(
+    app: AppHandle,
+    service: State<'_, Arc<RealtimeService>>,
+    auth_service: State<'_, Arc<AuthService>>,
 ) -> Result<(), String> {
-    service.set_config(guild_id, bot_name, config_key, config_value).await
+    let api_config = auth_service.get_api_config()?
+        .ok_or("API not configured")?;
+    service.connect(app, api_config.api_url, api_config.api_key).await
 }
 
 #[tauri::command]
-pub async fn delete_bot_config(
-    service: State<'_, Arc<BotConfigService>>,
-    guild_id: String,
-    bot_name: String,
-    config_key: String,
+pub async fn ws_disconnect(
+    service: State<'_, Arc<RealtimeService>>,
 ) -> Result<(), String> {
-    service.delete_config(guild_id, bot_name, config_key).await
-}
-
-// ── Role Panels ──
-
-#[tauri::command]
-pub async fn get_role_panels(
-    service: State<'_, Arc<RolePanelsService>>,
-    guild_id: String,
-) -> Result<Vec<RolePanel>, String> {
-    service.get_panels(guild_id).await
+    service.disconnect().await;
+    Ok(())
 }
 
 #[tauri::command]
-pub async fn get_role_panel_detail(
-    service: State<'_, Arc<RolePanelsService>>,
-    panel_id: String,
-) -> Result<RolePanelDetail, String> {
-    service.get_panel(panel_id).await
+pub async fn ws_status(
+    service: State<'_, Arc<RealtimeService>>,
+) -> Result<WsStatus, String> {
+    Ok(service.get_status().await)
 }
 
-#[tauri::command]
-pub async fn get_auto_roles(
-    service: State<'_, Arc<RolePanelsService>>,
-    guild_id: String,
-) -> Result<Vec<AutoRoleConfig>, String> {
-    service.get_auto_roles(guild_id).await
-}
-
-// ── Dashboard Charts ──
-
-#[tauri::command]
-pub async fn get_activity_trend(
-    service: State<'_, Arc<DashboardChartsService>>,
-    guild_id: Option<String>,
-    days: Option<i32>,
-) -> Result<Vec<DailyActivity>, String> {
-    service.get_activity_trend(guild_id, days).await
-}
-
-#[tauri::command]
-pub async fn get_top_users(
-    service: State<'_, Arc<DashboardChartsService>>,
-    guild_id: String,
-    limit: Option<u32>,
-) -> Result<Vec<TopUser>, String> {
-    service.get_top_users(guild_id, limit).await
-}
-
-// ── Levels / XP ──
-
-#[tauri::command]
-pub async fn get_level_config(
-    service: State<'_, Arc<LevelsService>>,
-    guild_id: String,
-) -> Result<LevelConfig, String> {
-    service.get_config(guild_id).await
-}
-
-#[tauri::command]
-pub async fn get_level_leaderboard(
-    service: State<'_, Arc<LevelsService>>,
-    guild_id: String,
-) -> Result<Vec<UserLevel>, String> {
-    service.get_leaderboard(guild_id).await
-}
-
-#[tauri::command]
-pub async fn get_level_rewards(
-    service: State<'_, Arc<LevelsService>>,
-    guild_id: String,
-) -> Result<Vec<LevelReward>, String> {
-    service.get_rewards(guild_id).await
-}
-
-// ── Audit Logs ──
-
-#[tauri::command]
-pub async fn get_audit_logs(
-    service: State<'_, Arc<AuditLogsService>>,
-    guild_id: Option<String>,
-    event_type: Option<String>,
-    limit: Option<i64>,
-) -> Result<Vec<AuditLog>, String> {
-    service.get_audit_logs(guild_id, event_type, limit).await
-}
-
-// ── Watched Users (Surveillance) ──
-
-#[tauri::command]
-pub async fn get_watched_users(
-    service: State<'_, Arc<WatchedUsersService>>,
-    guild_id: Option<String>,
-) -> Result<Vec<WatchedUser>, String> {
-    service.get_watched_users(guild_id).await
-}
-
-#[tauri::command]
-pub async fn get_user_dossier(
-    service: State<'_, Arc<WatchedUsersService>>,
-    guild_id: String,
-    user_id: String,
-) -> Result<UserDossier, String> {
-    service.get_user_dossier(guild_id, user_id).await
-}
-
-// ── Conduct ──
-
-#[tauri::command]
-pub async fn get_conduct_config(
-    service: State<'_, Arc<ConductService>>,
-    guild_id: String,
-) -> Result<ConductConfig, String> {
-    service.get_config(guild_id).await
-}
-
-#[tauri::command]
-pub async fn get_conduct_leaderboard(
-    service: State<'_, Arc<ConductService>>,
-    guild_id: String,
-) -> Result<Vec<UserConductPoints>, String> {
-    service.get_leaderboard(guild_id).await
-}
-
-#[tauri::command]
-pub async fn get_conduct_points(
-    service: State<'_, Arc<ConductService>>,
-    guild_id: String,
-    user_id: String,
-) -> Result<UserConductPoints, String> {
-    service.get_points(guild_id, user_id).await
-}
-
-#[tauri::command]
-pub async fn get_conduct_log(
-    service: State<'_, Arc<ConductService>>,
-    guild_id: String,
-    user_id: String,
-) -> Result<Vec<ConductPointsLog>, String> {
-    service.get_log(guild_id, user_id).await
-}
-
-// ── IA Config ──
-
-#[tauri::command]
-pub async fn get_ia_config(
-    service: State<'_, Arc<IaConfigService>>,
-    guild_id: String,
-) -> Result<IaConfig, String> {
-    service.get_config(guild_id).await
-}
-
-#[tauri::command]
-pub async fn save_ia_config(
-    service: State<'_, Arc<IaConfigService>>,
-    guild_id: String,
-    text_enabled: bool,
-    text_threshold: f64,
-    vision_enabled: bool,
-    vision_threshold: f64,
-) -> Result<IaConfig, String> {
-    service
-        .save_config(guild_id, text_enabled, text_threshold, vision_enabled, vision_threshold)
-        .await
-}
-
-// ── Analytics ──
-
-#[tauri::command]
-pub async fn get_full_analytics(
-    service: State<'_, Arc<AnalyticsService>>,
-    guild_id: Option<String>,
-    days: Option<i32>,
-) -> Result<FullAnalytics, String> {
-    service.get_full_analytics(guild_id, days).await
-}
-
-// ── AI Training (proxy vers Python API) ──
+// ─────────────────────────────────────────────────────────────
+// AI Training (proxy to Python API)
+// ─────────────────────────────────────────────────────────────
 
 fn ai_api_url() -> String {
     std::env::var("AI_API_URL").unwrap_or_else(|_| "http://localhost:8000".into())

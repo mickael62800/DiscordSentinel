@@ -1031,12 +1031,25 @@ dependencies = [
  "dotenvy",
  "rand 0.8.5",
  "reqwest",
+ "sentinel-shared",
  "serde",
  "serde_json",
  "serenity",
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "sentinel-shared"
+version = "0.1.0"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_json",
+ "serenity",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

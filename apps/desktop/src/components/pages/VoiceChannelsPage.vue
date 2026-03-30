@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useVoiceChannels, useVoiceChannelDetail } from "../../composables/useVoiceChannels";
+import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
+import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 
 const { filteredChannels, loading, filterKind, publicCount, privateCount, totalCount } = useVoiceChannels();
+const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
 const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
 
 const selectedId = ref<string | null>(null);
@@ -62,7 +65,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
         <h2>{{ detail.channel.channel_name }}</h2>
         <div class="detail-grid">
           <div><strong>Proprietaire :</strong> {{ detail.channel.owner_name }}</div>
-          <div><strong>Type :</strong> <AppBadge :variant="kindVariant(detail.channel.kind)">{{ detail.channel.kind }}</AppBadge></div>
+          <div><strong>Type :</strong> <AppBadge :label="detail.channel.kind" :variant="kindVariant(detail.channel.kind)" /></div>
           <div><strong>Visibilite :</strong> {{ detail.channel.visibility }}</div>
           <div><strong>Verrouille :</strong> {{ detail.channel.locked ? 'Oui' : 'Non' }}</div>
           <div><strong>File d'attente :</strong> {{ detail.channel.queue_enabled ? 'Active' : 'Desactive' }}</div>
@@ -83,7 +86,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
             <span>par {{ ban.banned_by }}</span>
             <span v-if="ban.reason">{{ ban.reason }}</span>
             <span v-if="ban.expires_at">Expire : {{ new Date(ban.expires_at).toLocaleString() }}</span>
-            <AppBadge v-else variant="danger">Permanent</AppBadge>
+            <AppBadge v-else label="Permanent" variant="danger" />
           </div>
         </div>
       </div>
@@ -114,10 +117,10 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="ch in filteredChannels" :key="ch.id" class="clickable" @click="selectChannel(ch.channel_id)">
+          <tr v-for="ch in paginatedChannels" :key="ch.id" class="clickable" @click="selectChannel(ch.channel_id)">
             <td>{{ ch.channel_name }}</td>
             <td>{{ ch.owner_name }}</td>
-            <td><AppBadge :variant="kindVariant(ch.kind)">{{ ch.kind }}</AppBadge></td>
+            <td><AppBadge :label="ch.kind" :variant="kindVariant(ch.kind)" /></td>
             <td>{{ ch.visibility }}</td>
             <td>{{ ch.locked ? 'Oui' : 'Non' }}</td>
             <td>{{ ch.queue_enabled ? 'Oui' : 'Non' }}</td>
@@ -125,6 +128,15 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           </tr>
         </tbody>
       </table>
+
+      <PaginationBar
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="totalItems"
+        :per-page="perPage"
+        @update:current-page="currentPage = $event"
+        @update:per-page="perPage = $event"
+      />
     </div>
   </div>
 </template>

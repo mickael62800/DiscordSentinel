@@ -1,13 +1,20 @@
 mod api_client;
+mod audit_event;
 mod config;
 mod handler;
+mod handlers;
+
+use std::sync::Arc;
 
 use serenity::prelude::*;
 use tracing::info;
 
-use crate::api_client::ApiClient;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::config::BotConfig;
+use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+
 use crate::config::Config;
-use crate::handler::{ApiClientKey, Handler};
+use crate::handler::Handler;
 
 #[tokio::main]
 async fn main() {
@@ -21,36 +28,26 @@ async fn main() {
         .init();
 
     let config = Config::from_env();
-    let api_client = ApiClient::new(&config);
+    let api = Arc::new(BaseApiClient::new(&config, "audit-bot"));
 
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS
-        | GatewayIntents::GUILD_BANS
+        | GatewayIntents::GUILD_MODERATION
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client = Client::builder(&config.discord_token, intents)
+    let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .await
         .expect("Erreur creation client Discord");
 
     {
         let mut data = client.data.write().await;
-        data.insert::<ApiClientKey>(api_client);
+        data.insert::<ApiClientKey>(api.clone());
     }
 
-    // Heartbeat toutes les 30 secondes
-    let data = client.data.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-            let data = data.read().await;
-            if let Some(api) = data.get::<ApiClientKey>() {
-                api.heartbeat("audit-bot").await;
-            }
-        }
-    });
+    spawn_heartbeat(api);
 
     info!("Demarrage audit-bot...");
 

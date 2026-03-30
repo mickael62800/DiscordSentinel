@@ -1,4 +1,9 @@
-# Datasets (trop volumineux pour git)
+# Datasets sources (trop volumineux pour git)
+Datasets/ToxiFrench/
+Datasets/mlma/
+Datasets/nsfw_urls/
+
+# Datasets generes
 training/vision/datasets/nsfw/
 training/vision/datasets/illicit/
 training/vision/datasets/safe/

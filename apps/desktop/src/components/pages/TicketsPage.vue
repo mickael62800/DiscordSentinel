@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useTickets, useTicketDetail } from "../../composables/useTickets";
+import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppButton from "../atoms/AppButton.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 import FilterBar from "../molecules/FilterBar.vue";
+import PaginationBar from "../molecules/PaginationBar.vue";
 import { statusVariant, priorityVariant } from "../../utils/variants";
 
 const { filteredTickets, loading, filterStatus, filterPriority, openCount, pendingCount } = useTickets();
+const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedTickets } = usePagination(filteredTickets);
 const { detail, loading: detailLoading, replying, fetchDetail, reply, close } = useTicketDetail();
 
 const selectedId = ref<string | null>(null);
@@ -84,7 +87,7 @@ function backToList() {
 
       <div v-else class="ticket-list">
         <div
-          v-for="ticket in filteredTickets"
+          v-for="ticket in paginatedTickets"
           :key="ticket.id"
           class="ticket-row"
           @click="selectTicket(ticket.id)"
@@ -113,6 +116,15 @@ function backToList() {
           Aucun ticket correspondant aux filtres
         </div>
       </div>
+
+      <PaginationBar
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="totalItems"
+        :per-page="perPage"
+        @update:current-page="currentPage = $event"
+        @update:per-page="perPage = $event"
+      />
     </template>
 
     <!-- TICKET DETAIL -->

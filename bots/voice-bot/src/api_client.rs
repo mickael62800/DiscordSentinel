@@ -1,7 +1,7 @@
-use reqwest::Client;
-use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-use crate::config::Config;
+use serde::{Deserialize, Serialize};
+use sentinel_shared::api_client::BaseApiClient;
 
 // ── Request DTOs ──
 
@@ -116,85 +116,12 @@ pub struct VoiceChannelDetailResponse {
 // ── Client ──
 
 pub struct ApiClient {
-    client: Client,
-    base_url: String,
-    api_key: String,
+    pub base: Arc<BaseApiClient>,
 }
 
 impl ApiClient {
-    const BOT_NAME: &'static str = "voice-bot";
-
-    pub fn new(config: &Config) -> Self {
-        Self {
-            client: Client::new(),
-            base_url: config.api_base_url.clone(),
-            api_key: config.api_key.clone(),
-        }
-    }
-
-    fn auth(&self, req: reqwest::RequestBuilder) -> reqwest::RequestBuilder {
-        if self.api_key.is_empty() {
-            req
-        } else {
-            req.bearer_auth(&self.api_key)
-        }
-    }
-
-    pub fn send_log(&self, level: &str, server: &str, message: &str) {
-        #[derive(Serialize)]
-        struct LogPayload { level: String, bot: String, server: String, message: String, category: String }
-        let req = self.auth(self.client.post(format!("{}/api/logs", self.base_url))
-            .json(&LogPayload {
-                level: level.to_string(),
-                bot: Self::BOT_NAME.to_string(),
-                server: server.to_string(),
-                message: message.to_string(),
-                category: "bot".to_string(),
-            }));
-        tokio::spawn(async move { let _ = req.send().await; });
-    }
-
-    pub async fn heartbeat(&self, name: &str) -> Result<(), String> {
-        #[derive(serde::Serialize)]
-        struct Payload { name: String }
-
-        let mut req = self.client
-            .post(format!("{}/api/bots/heartbeat", self.base_url))
-            .json(&Payload { name: name.to_string() });
-
-        if !self.api_key.is_empty() {
-            req = req.bearer_auth(&self.api_key);
-        }
-
-        req.send().await.map_err(|e| format!("Heartbeat failed: {e}"))?;
-        Ok(())
-    }
-
-    pub async fn get_guild_config(&self, guild_id: &str) -> Result<std::collections::HashMap<String, String>, String> {
-        let url = format!("{}/api/bots/config/{}/{}", self.base_url, guild_id, Self::BOT_NAME);
-        let mut req = self.client.get(&url);
-        if !self.api_key.is_empty() {
-            req = req.bearer_auth(&self.api_key);
-        }
-
-        #[derive(serde::Deserialize)]
-        struct ConfigEntry {
-            config_key: String,
-            config_value: String,
-        }
-
-        let resp = req.send().await.map_err(|e| format!("Config fetch failed: {e}"))?;
-        let entries: Vec<ConfigEntry> = resp.json().await.map_err(|e| format!("Config parse failed: {e}"))?;
-        Ok(entries.into_iter().map(|e| (e.config_key, e.config_value)).collect())
-    }
-
-    /// Helper pour lire une valeur de config avec fallback
-    pub fn config_or(config: &std::collections::HashMap<String, String>, key: &str, default: &str) -> String {
-        config.get(key).cloned().unwrap_or_else(|| default.to_string())
-    }
-
-    pub fn config_u64(config: &std::collections::HashMap<String, String>, key: &str, default: u64) -> u64 {
-        config.get(key).and_then(|v| v.parse().ok()).unwrap_or(default)
+    pub fn new(base: Arc<BaseApiClient>) -> Self {
+        Self { base }
     }
 
     // ── Channels ──
@@ -204,10 +131,12 @@ impl ApiClient {
         guild_id: &str,
     ) -> Result<Vec<VoiceChannelResponse>, String> {
         let req = self
-            .client
-            .get(format!("{}/api/voice-channels/{guild_id}", self.base_url));
+            .base
+            .client()
+            .get(format!("{}/api/voice-channels/{guild_id}", self.base.base_url()));
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?
@@ -221,11 +150,13 @@ impl ApiClient {
         request: &CreateVoiceChannelRequest,
     ) -> Result<VoiceChannelResponse, String> {
         let req = self
-            .client
-            .post(format!("{}/api/voice-channels", self.base_url))
+            .base
+            .client()
+            .post(format!("{}/api/voice-channels", self.base.base_url()))
             .json(request);
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?
@@ -235,12 +166,13 @@ impl ApiClient {
     }
 
     pub async fn delete_channel(&self, channel_id: &str) -> Result<(), String> {
-        let req = self.client.delete(format!(
+        let req = self.base.client().delete(format!(
             "{}/api/voice-channels/by-channel/{channel_id}",
-            self.base_url
+            self.base.base_url()
         ));
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
@@ -254,14 +186,16 @@ impl ApiClient {
         request: &UpdateVoiceChannelRequest,
     ) -> Result<(), String> {
         let req = self
-            .client
+            .base
+            .client()
             .patch(format!(
                 "{}/api/voice-channels/by-channel/{channel_id}",
-                self.base_url
+                self.base.base_url()
             ))
             .json(request);
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
@@ -273,12 +207,13 @@ impl ApiClient {
         &self,
         channel_id: &str,
     ) -> Result<Option<VoiceChannelResponse>, String> {
-        let req = self.client.get(format!(
+        let req = self.base.client().get(format!(
             "{}/api/voice-channels/by-channel/{channel_id}",
-            self.base_url
+            self.base.base_url()
         ));
 
         let response = self
+            .base
             .auth(req)
             .send()
             .await
@@ -304,14 +239,16 @@ impl ApiClient {
         request: &TransferOwnershipRequest,
     ) -> Result<(), String> {
         let req = self
-            .client
+            .base
+            .client()
             .patch(format!(
                 "{}/api/voice-channels/by-channel/{channel_id}/transfer",
-                self.base_url
+                self.base.base_url()
             ))
             .json(request);
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
@@ -327,14 +264,16 @@ impl ApiClient {
         request: &AddCoAdminRequest,
     ) -> Result<(), String> {
         let req = self
-            .client
+            .base
+            .client()
             .post(format!(
                 "{}/api/voice-channels/by-channel/{channel_id}/co-admins",
-                self.base_url
+                self.base.base_url()
             ))
             .json(request);
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
@@ -346,14 +285,16 @@ impl ApiClient {
 
     pub async fn add_to_whitelist(&self, request: &AddWhitelistRequest) -> Result<(), String> {
         let req = self
-            .client
+            .base
+            .client()
             .post(format!(
                 "{}/api/voice-channels/whitelist",
-                self.base_url
+                self.base.base_url()
             ))
             .json(request);
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
@@ -369,44 +310,20 @@ impl ApiClient {
         request: &BanFromChannelRequest,
     ) -> Result<(), String> {
         let req = self
-            .client
+            .base
+            .client()
             .post(format!(
                 "{}/api/voice-channels/by-channel/{channel_id}/bans",
-                self.base_url
+                self.base.base_url()
             ))
             .json(request);
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
 
-        Ok(())
-    }
-
-    // ── Guild registration ──
-
-    pub async fn register_guild(&self, guild_id: &str, name: &str, member_count: i32) -> Result<(), String> {
-        #[derive(serde::Serialize)]
-        struct Payload {
-            guild_id: String,
-            name: String,
-            member_count: Option<i32>,
-        }
-
-        let mut req = self.client
-            .post(format!("{}/api/guilds/register", self.base_url))
-            .json(&Payload {
-                guild_id: guild_id.to_string(),
-                name: name.to_string(),
-                member_count: Some(member_count),
-            });
-
-        if !self.api_key.is_empty() {
-            req = req.bearer_auth(&self.api_key);
-        }
-
-        req.send().await.map_err(|e| format!("Guild register failed: {e}"))?;
         Ok(())
     }
 
@@ -417,11 +334,13 @@ impl ApiClient {
         request: &LogModerationActionRequest,
     ) -> Result<(), String> {
         let req = self
-            .client
-            .post(format!("{}/api/moderation/actions", self.base_url))
+            .base
+            .client()
+            .post(format!("{}/api/moderation/actions", self.base.base_url()))
             .json(request);
 
-        self.auth(req)
+        self.base
+            .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;

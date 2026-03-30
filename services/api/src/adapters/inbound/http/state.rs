@@ -32,6 +32,7 @@ pub struct AppState {
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
     pub ia_config_repo: Arc<dyn IaConfigRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
+    #[allow(dead_code)]
     pub job_client: JobClient,
     pub api_key: String,
     pub discord_bot_token: String,

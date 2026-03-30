@@ -12,8 +12,10 @@ use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use crate::api_client::VoiceChannelResponse;
-use crate::handler::{ApiClientKey, TextToVoiceMapKey, MembersToVoiceMapKey};
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::{ApiClient, VoiceChannelResponse};
+use crate::handler::{TextToVoiceMapKey, MembersToVoiceMapKey};
 
 // ── Helpers ──
 
@@ -54,7 +56,8 @@ pub async fn require_admin(
     // Fetch channel info from API
     let channel_resp = {
         let data = ctx.data.read().await;
-        let api = data.get::<ApiClientKey>().expect("ApiClient");
+        let base = data.get::<ApiClientKey>().expect("ApiClient");
+        let api = ApiClient::new(base.clone());
         api.get_channel(&voice_channel_id.get().to_string()).await
     };
 

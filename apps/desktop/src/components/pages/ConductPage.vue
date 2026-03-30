@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useConduct, useConductDetail } from "../../composables/useConduct";
+import { usePagination } from "../../composables/usePagination";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
+import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 
 const { selectedGuildId } = useGuildSelector();
-const { config, leaderboard, loading, fetchLeaderboard } = useConduct();
+const { config, leaderboard, loading } = useConduct();
+const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLeaderboard } = usePagination(leaderboard);
 const { points: detailPoints, log: detailLog, loading: detailLoading, fetchDetail } = useConductDetail();
 
 const selectedUser = ref<string | null>(null);
-const editing = ref(false);
 
 function pointsVariant(points: number, max: number): "success" | "warning" | "danger" | "default" {
   const ratio = points / max;
@@ -120,7 +122,7 @@ function backToList() {
         </thead>
         <tbody>
           <tr
-            v-for="user in leaderboard"
+            v-for="user in paginatedLeaderboard"
             :key="user.id"
             class="clickable"
             @click="selectUser(user.guild_id, user.user_id)"
@@ -134,14 +136,21 @@ function backToList() {
               / {{ config?.max_points ?? 12 }}
             </td>
             <td>
-              <AppBadge :variant="pointsVariant(user.points, config?.max_points ?? 12)">
-                {{ user.points === 0 ? 'ALERTE' : user.points <= 4 ? 'Critique' : user.points <= 8 ? 'Attention' : 'OK' }}
-              </AppBadge>
+              <AppBadge :label="user.points === 0 ? 'ALERTE' : user.points <= 4 ? 'Critique' : user.points <= 8 ? 'Attention' : 'OK'" :variant="pointsVariant(user.points, config?.max_points ?? 12)" />
             </td>
             <td>{{ new Date(user.last_regen_at).toLocaleDateString() }}</td>
           </tr>
         </tbody>
       </table>
+
+      <PaginationBar
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="totalItems"
+        :per-page="perPage"
+        @update:current-page="currentPage = $event"
+        @update:per-page="perPage = $event"
+      />
     </div>
   </div>
 </template>

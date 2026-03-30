@@ -37,5 +37,6 @@ pub trait ManageConductUseCase: Send + Sync {
     async fn add_points(&self, cmd: AddPointsCommand) -> Result<UserConductPoints, DomainError>;
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserConductPoints>, DomainError>;
     async fn get_points_log(&self, guild_id: &str, user_id: &str, limit: i64) -> Result<Vec<ConductPointsLog>, DomainError>;
+    #[allow(dead_code)]
     async fn run_regen(&self) -> Result<u64, DomainError>;
 }

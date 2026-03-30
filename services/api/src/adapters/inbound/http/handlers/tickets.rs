@@ -1,17 +1,20 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
 
 use crate::adapters::inbound::http::dto::tickets::{
-    AssignDto, CreateTicketDto, ReplyDto, TicketDetailDto, TicketResponseDto,
+    AssignDto, CreateTicketDto, ListTicketsQuery, ReplyDto, TicketDetailDto, TicketResponseDto,
+    UpdateStatusDto, UpdateTicketChannelDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::{AssignTicketCommand, ReplyTicketCommand};
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::{AssignTicketCommand, ReplyTicketCommand, UpdateTicketChannelCommand};
 
 pub async fn list_tickets(
     State(state): State<AppState>,
+    Query(params): Query<ListTicketsQuery>,
 ) -> Result<Json<Vec<TicketResponseDto>>, ApiError> {
-    let tickets = state.tickets_uc.list_tickets().await?;
+    let tickets = state.tickets_uc.list_tickets(params.status, params.priority, params.search, params.author_id).await?;
     let dtos: Vec<TicketResponseDto> = tickets.into_iter().map(TicketResponseDto::from).collect();
     Ok(Json(dtos))
 }
@@ -106,6 +109,55 @@ pub async fn assign_ticket(
             "ticket_id": &id,
             "assignee": &assignee,
         }),
+    );
+
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+pub async fn update_status(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(dto): Json<UpdateStatusDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let valid_statuses = ["open", "pending", "closed"];
+    if !valid_statuses.contains(&dto.status.as_str()) {
+        return Err(DomainError::InvalidRule(format!(
+            "Statut invalide : {}. Valeurs acceptees : open, pending, closed",
+            dto.status
+        )).into());
+    }
+
+    if dto.status == "closed" {
+        state.tickets_uc.close_ticket(&id).await?;
+    } else {
+        state.tickets_uc.update_status(&id, &dto.status).await?;
+    }
+
+    state.broadcaster.broadcast(
+        "ticket_status_updated",
+        serde_json::json!({ "ticket_id": &id, "status": &dto.status }),
+    );
+
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+pub async fn update_ticket_channel(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(dto): Json<UpdateTicketChannelDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state
+        .tickets_uc
+        .update_ticket_channel(UpdateTicketChannelCommand {
+            ticket_id: id.clone(),
+            voice_channel_id: dto.voice_channel_id,
+            invited_user_id: dto.invited_user_id,
+        })
+        .await?;
+
+    state.broadcaster.broadcast(
+        "ticket_channel_updated",
+        serde_json::json!({ "ticket_id": &id }),
     );
 
     Ok(Json(serde_json::json!({ "ok": true })))

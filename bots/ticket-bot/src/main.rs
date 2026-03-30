@@ -3,12 +3,17 @@ mod commands;
 mod config;
 mod handler;
 
+use std::sync::Arc;
+
 use serenity::prelude::*;
 use tracing::info;
 
-use crate::api_client::ApiClient;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::config::BotConfig;
+use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+
 use crate::config::Config;
-use crate::handler::{ApiClientKey, Handler};
+use crate::handler::Handler;
 
 #[tokio::main]
 async fn main() {
@@ -20,32 +25,26 @@ async fn main() {
 
     let config = Config::from_env();
 
-    info!(api_url = %config.api_base_url, "Démarrage du ticket bot");
+    info!(api_url = %config.api_base_url(), "Demarrage du ticket bot");
+
+    let api = Arc::new(BaseApiClient::new(&config, "ticket-bot"));
 
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
         | GatewayIntents::GUILDS;
 
-    let mut client = Client::builder(&config.discord_token, intents)
+    let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .await
-        .expect("Erreur création du client Discord");
+        .expect("Erreur creation du client Discord");
 
     {
         let mut data = client.data.write().await;
-        data.insert::<ApiClientKey>(ApiClient::new(&config));
+        data.insert::<ApiClientKey>(api.clone());
+        data.insert::<config::ConfigKey>(config.clone());
     }
 
-    // Heartbeat task
-    let api_for_heartbeat = ApiClient::new(&config);
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) = api_for_heartbeat.heartbeat("ticket-bot").await {
-                tracing::warn!("Heartbeat failed: {}", e);
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        }
-    });
+    spawn_heartbeat(api);
 
     if let Err(e) = client.start().await {
         eprintln!("Erreur fatale : {e}");

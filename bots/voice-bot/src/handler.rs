@@ -8,18 +8,14 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::ChannelId;
 use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
-use tracing::{info, warn};
+use tracing::info;
 
-use crate::api_client::ApiClient;
+use sentinel_shared::heartbeat::register_guilds;
+
 use crate::config::Config;
 use crate::state::{CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
 
-// ── TypeMap keys ──
-
-pub struct ApiClientKey;
-impl TypeMapKey for ApiClientKey {
-    type Value = ApiClient;
-}
+// ── TypeMap keys (bot-specific) ──
 
 pub struct ConfigKey;
 impl TypeMapKey for ConfigKey {
@@ -70,26 +66,7 @@ pub struct Handler;
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Voice bot connecte");
-
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log("info", "", "Voice bot demarre");
-            for guild_status in &ready.guilds {
-                let guild_id = guild_status.id;
-                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
-                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
-                    if let Err(e) = api.register_guild(
-                        &guild_id.to_string(),
-                        &guild.name,
-                        member_count,
-                    ).await {
-                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
-                    } else {
-                        info!(guild = %guild.name, "Guild enregistree");
-                    }
-                }
-            }
-        }
+        register_guilds(&ctx, &ready).await;
     }
 
     async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {

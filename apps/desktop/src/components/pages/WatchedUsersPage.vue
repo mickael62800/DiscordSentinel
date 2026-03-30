@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useWatchedUsers } from "../../composables/useWatchedUsers";
+import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
 import DataTable from "../organisms/DataTable.vue";
+import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
@@ -25,7 +27,7 @@ const filteredUsers = computed(() => {
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
     list = list.filter((u) =>
-      [u.username, u.user_id, u.reason, u.risk_level, u.guild_id]
+      [u.username, u.user_id, u.risk_level, u.guild_id, u.guild_name]
         .some((field) => field?.toLowerCase().includes(q)),
     );
   }
@@ -34,6 +36,8 @@ const filteredUsers = computed(() => {
   }
   return list;
 });
+
+const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedUsers } = usePagination(filteredUsers);
 
 function riskLabel(level: string): string {
   switch (level) {
@@ -102,7 +106,7 @@ const dossierConductColumns: TableColumn[] = [
       <!-- Liste des utilisateurs -->
       <div class="users-list">
         <div
-          v-for="user in filteredUsers"
+          v-for="user in paginatedUsers"
           :key="`${user.guild_id}-${user.user_id}`"
           :class="['user-card', { selected: selectedUser?.user_id === user.user_id && selectedUser?.guild_id === user.guild_id }]"
           @click="selectUser(user)"
@@ -154,6 +158,15 @@ const dossierConductColumns: TableColumn[] = [
           Aucun utilisateur surveille
         </div>
       </div>
+
+      <PaginationBar
+        :current-page="currentPage"
+        :total-pages="totalPages"
+        :total-items="totalItems"
+        :per-page="perPage"
+        @update:current-page="currentPage = $event"
+        @update:per-page="perPage = $event"
+      />
 
       <!-- Panneau dossier -->
       <div v-if="selectedUser" class="dossier-panel">

@@ -14,8 +14,11 @@ pub trait ConductRepository: Send + Sync {
     async fn save_points(&self, points: &UserConductPoints) -> Result<(), DomainError>;
     async fn update_points(&self, guild_id: &str, user_id: &str, new_points: i32) -> Result<(), DomainError>;
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserConductPoints>, DomainError>;
+    #[allow(dead_code)]
     async fn find_users_needing_regen(&self, interval: &str) -> Result<Vec<UserConductPoints>, DomainError>;
+    #[allow(dead_code)]
     async fn update_regen_timestamp(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+    #[allow(dead_code)]
     async fn delete_points(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 
     // Log

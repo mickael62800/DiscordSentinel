@@ -84,8 +84,8 @@ impl From<MessageRow> for TicketMessage {
 
 #[async_trait]
 impl TicketRepository for PgTicketRepository {
-    async fn find_all(&self) -> Result<Vec<Ticket>, DomainError> {
-        let rows = sqlx::query_as::<_, TicketRow>(
+    async fn find_all(&self, status: Option<&str>, priority: Option<&str>, search: Option<&str>, author_id: Option<&str>) -> Result<Vec<Ticket>, DomainError> {
+        let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
             r#"
             SELECT t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
                    t.assigned_to, t.server, t.category, t.ticket_type,
@@ -94,16 +94,42 @@ impl TicketRepository for PgTicketRepository {
                    COUNT(tm.id) AS messages_count
             FROM tickets t
             LEFT JOIN ticket_messages tm ON tm.ticket_id = t.id
+            WHERE 1=1
+            "#,
+        );
+
+        if let Some(s) = status {
+            qb.push(" AND t.status = ");
+            qb.push_bind(s.to_string());
+        }
+        if let Some(p) = priority {
+            qb.push(" AND t.priority = ");
+            qb.push_bind(p.to_string());
+        }
+        if let Some(s) = search {
+            qb.push(" AND LOWER(t.title) LIKE LOWER(");
+            qb.push_bind(format!("%{s}%"));
+            qb.push(")");
+        }
+        if let Some(a) = author_id {
+            qb.push(" AND t.author_id = ");
+            qb.push_bind(a.to_string());
+        }
+
+        qb.push(
+            r#"
             GROUP BY t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
                      t.assigned_to, t.server, t.category, t.ticket_type,
                      t.channel_id, t.voice_channel_id, t.invited_user_id,
                      t.created_at, t.updated_at
             ORDER BY t.updated_at DESC
             "#,
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        );
+
+        let rows = qb.build_query_as::<TicketRow>()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         Ok(rows.into_iter().map(Ticket::from).collect())
     }

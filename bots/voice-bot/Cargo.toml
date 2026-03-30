@@ -5,6 +5,7 @@ edition = "2021"
 description = "Bot de gestion de salons vocaux temporaires — public, prive, whitelist, co-admin, vote kick"
 
 [dependencies]
+sentinel-shared = { path = "../shared" }
 serenity = { version = "0.12", default-features = false, features = ["client", "gateway", "model", "cache", "rustls_backend"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "time"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

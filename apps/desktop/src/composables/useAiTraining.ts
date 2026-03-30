@@ -26,6 +26,8 @@ export interface TrainingStatus {
   total_batches: number;
   batch_loss: number;
   batch_accuracy: number;
+  early_stopped: boolean;
+  best_epoch: number;
 }
 
 export interface DatasetInfo {
@@ -49,144 +51,190 @@ export interface OnnxExportResult {
   file_size_bytes: number;
 }
 
-export function useAiTraining() {
-  const status = ref<TrainingStatus>({
-    running: false,
-    model_type: null,
+// ── State global (singleton) — persiste entre les navigations de page ──
+
+const status = ref<TrainingStatus>({
+  running: false,
+  model_type: null,
+  current_epoch: 0,
+  total_epochs: 0,
+  loss: 0,
+  accuracy: 0,
+  val_loss: 0,
+  val_accuracy: 0,
+  phase: "idle",
+  epoch_history: [],
+  current_batch: 0,
+  total_batches: 0,
+  batch_loss: 0,
+  batch_accuracy: 0,
+  early_stopped: false,
+  best_epoch: 0,
+});
+const datasets = ref<DatasetInfo[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
+const epochHistory = ref<EpochRecord[]>([]);
+const stopping = ref(false);
+const exporting = ref(false);
+const exportResult = ref<OnnxExportResult | null>(null);
+let pollTimer: ReturnType<typeof setInterval> | null = null;
+let pollCount = 0;
+let hasSeenRunning = false;
+
+// ── Fonctions ──
+
+async function fetchDatasets() {
+  loading.value = true;
+  error.value = null;
+  try {
+    datasets.value = await invoke<DatasetInfo[]>("ai_get_datasets");
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    loading.value = false;
+  }
+}
+
+async function uploadDataset(modelType: ModelType, filePath: string) {
+  error.value = null;
+  try {
+    await invoke("ai_upload_dataset", { modelType, filePath });
+    await fetchDatasets();
+  } catch (e) {
+    error.value = String(e);
+  }
+}
+
+async function startTraining(config: TrainingConfig) {
+  error.value = null;
+  exportResult.value = null;
+  epochHistory.value = [];
+  status.value = {
+    running: true,
+    model_type: config.model_type,
     current_epoch: 0,
-    total_epochs: 0,
+    total_epochs: config.epochs,
     loss: 0,
     accuracy: 0,
     val_loss: 0,
     val_accuracy: 0,
-    phase: "idle",
+    phase: "demarrage",
     epoch_history: [],
     current_batch: 0,
     total_batches: 0,
     batch_loss: 0,
     batch_accuracy: 0,
-  });
-  const datasets = ref<DatasetInfo[]>([]);
-  const loading = ref(false);
-  const error = ref<string | null>(null);
-  const epochHistory = ref<EpochRecord[]>([]);
-  const stopping = ref(false);
-  const exporting = ref(false);
-  const exportResult = ref<OnnxExportResult | null>(null);
-  let pollTimer: ReturnType<typeof setInterval> | null = null;
-  let pollCount = 0;
-  let hasSeenRunning = false;
+    early_stopped: false,
+    best_epoch: 0,
+  };
+  try {
+    await invoke("ai_start_training", {
+      modelType: config.model_type,
+      epochs: config.epochs,
+      batchSize: config.batch_size,
+      learningRate: config.learning_rate,
+      validationSplit: config.validation_split,
+    });
+    startPolling();
+  } catch (e) {
+    error.value = String(e);
+    status.value.running = false;
+    status.value.phase = "idle";
+  }
+}
 
-  async function fetchDatasets() {
-    loading.value = true;
-    error.value = null;
-    try {
-      datasets.value = await invoke<DatasetInfo[]>("ai_get_datasets");
-    } catch (e) {
-      error.value = String(e);
-    } finally {
-      loading.value = false;
+async function pollStatus() {
+  try {
+    pollCount++;
+    const result = await invoke<TrainingStatus>("ai_training_status");
+
+    if (!result.running && !hasSeenRunning && pollCount <= 3) {
+      return;
     }
-  }
 
-  async function uploadDataset(modelType: ModelType, filePath: string) {
-    error.value = null;
-    try {
-      await invoke("ai_upload_dataset", { modelType, filePath });
-      await fetchDatasets();
-    } catch (e) {
-      error.value = String(e);
+    status.value = result;
+
+    if (result.epoch_history && result.epoch_history.length > 0) {
+      epochHistory.value = result.epoch_history;
     }
-  }
 
-  async function startTraining(config: TrainingConfig) {
-    error.value = null;
-    exportResult.value = null;
-    epochHistory.value = [];
-    try {
-      await invoke("ai_start_training", {
-        modelType: config.model_type,
-        epochs: config.epochs,
-        batchSize: config.batch_size,
-        learningRate: config.learning_rate,
-        validationSplit: config.validation_split,
-      });
-      startPolling();
-    } catch (e) {
-      error.value = String(e);
+    if (result.running) {
+      hasSeenRunning = true;
     }
-  }
 
-  async function pollStatus() {
-    try {
-      pollCount++;
-      const result = await invoke<TrainingStatus>("ai_training_status");
-      status.value = result;
-
-      if (result.epoch_history && result.epoch_history.length > 0) {
-        epochHistory.value = result.epoch_history;
-      }
-
-      if (result.running) {
-        hasSeenRunning = true;
-      }
-
-      // Ne stopper que si le backend a deja signale running=true au moins une fois,
-      // ou apres 10 polls sans reponse positive (timeout 10s)
-      if (!result.running && pollTimer && (hasSeenRunning || pollCount > 10)) {
-        stopPolling();
-        if (hasSeenRunning) {
-          status.value.phase = "termine";
-        }
-      }
-    } catch {
-      // silently ignore poll errors
-    }
-  }
-
-  function startPolling() {
-    stopPolling();
-    pollCount = 0;
-    hasSeenRunning = false;
-    status.value.running = true;
-    status.value.phase = "demarrage";
-    pollTimer = setInterval(pollStatus, 1500);
-  }
-
-  function stopPolling() {
-    if (pollTimer) {
-      clearInterval(pollTimer);
-      pollTimer = null;
-    }
-  }
-
-  async function stopTraining() {
-    stopping.value = true;
-    try {
-      await invoke("ai_stop_training");
+    if (!result.running && pollTimer && (hasSeenRunning || pollCount > 20)) {
       stopPolling();
-      status.value.running = false;
-      status.value.phase = "arrete";
-    } catch (e) {
-      error.value = String(e);
-    } finally {
       stopping.value = false;
     }
+  } catch {
+    // silently ignore poll errors
   }
+}
 
-  async function exportOnnx(modelType: ModelType) {
-    exporting.value = true;
-    error.value = null;
-    exportResult.value = null;
-    try {
-      exportResult.value = await invoke<OnnxExportResult>("ai_export_onnx", { modelType });
-    } catch (e) {
-      error.value = String(e);
-    } finally {
-      exporting.value = false;
+function startPolling() {
+  stopPolling();
+  pollCount = 0;
+  hasSeenRunning = false;
+  pollTimer = setInterval(pollStatus, 1500);
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+async function stopTraining() {
+  stopping.value = true;
+  try {
+    await invoke("ai_stop_training");
+    status.value.phase = "arret en cours...";
+    if (!pollTimer) {
+      startPolling();
     }
+  } catch (e) {
+    error.value = String(e);
+    stopping.value = false;
   }
+}
 
+async function exportOnnx(modelType: ModelType) {
+  exporting.value = true;
+  error.value = null;
+  exportResult.value = null;
+  try {
+    exportResult.value = await invoke<OnnxExportResult>("ai_export_onnx", { modelType });
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    exporting.value = false;
+  }
+}
+
+/// Synchronise le state avec le backend.
+/// Appele quand on arrive sur la page pour recuperer l'etat reel.
+async function syncWithBackend() {
+  try {
+    const result = await invoke<TrainingStatus>("ai_training_status");
+    status.value = result;
+    if (result.epoch_history && result.epoch_history.length > 0) {
+      epochHistory.value = result.epoch_history;
+    }
+    // Si un training est en cours cote backend, relancer le polling
+    if (result.running && !pollTimer) {
+      hasSeenRunning = true;
+      startPolling();
+    }
+  } catch {
+    // API ML pas disponible
+  }
+}
+
+// ── Export singleton ──
+
+export function useAiTraining() {
   return {
     status,
     datasets,
@@ -200,7 +248,9 @@ export function useAiTraining() {
     uploadDataset,
     startTraining,
     stopTraining,
+    stopPolling,
     exportOnnx,
     pollStatus,
+    syncWithBackend,
   };
 }

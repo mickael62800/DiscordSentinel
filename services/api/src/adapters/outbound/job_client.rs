@@ -4,12 +4,14 @@ use tracing::{debug, error};
 
 /// Client pour enqueue des jobs dans la queue Redis du worker
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct JobClient {
     redis: redis::Client,
     queue_key: String,
 }
 
 #[derive(Serialize)]
+#[allow(dead_code)]
 struct Job<'a> {
     #[serde(rename = "type")]
     job_type: &'a str,
@@ -17,6 +19,7 @@ struct Job<'a> {
     created_at: chrono::DateTime<chrono::Utc>,
 }
 
+#[allow(dead_code)]
 impl JobClient {
     pub fn new(redis: redis::Client, queue_key: String) -> Self {
         Self { redis, queue_key }

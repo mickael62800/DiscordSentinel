@@ -7,18 +7,21 @@ use serenity::model::id::{GuildId, RoleId};
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use crate::account_checker::AccountChecker;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
+
 use crate::api_client::{ApiClient, SecurityEvent};
-use crate::captcha;
 use crate::config::Config;
-use crate::quarantine::QuarantineManager;
-use crate::raid_detector::RaidDetector;
-use crate::slowmode::SlowmodeManager;
+use crate::security::account_checker::AccountChecker;
+use crate::security::captcha;
+use crate::security::quarantine::QuarantineManager;
+use crate::security::raid_detector::RaidDetector;
+use crate::security::slowmode::SlowmodeManager;
 
 // ── TypeMap keys ──
 
-pub struct ApiClientKey;
-impl TypeMapKey for ApiClientKey {
+pub struct SecurityApiKey;
+impl TypeMapKey for SecurityApiKey {
     type Value = ApiClient;
 }
 
@@ -52,30 +55,11 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        info!(bot = %ready.user.name, "Security bot connecté");
-
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_bot_log("info", "Security bot demarre");
-            for guild_status in &ready.guilds {
-                let guild_id = guild_status.id;
-                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
-                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
-                    if let Err(e) = api.register_guild(
-                        &guild_id.to_string(),
-                        &guild.name,
-                        member_count,
-                    ).await {
-                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
-                    } else {
-                        info!(guild = %guild.name, "Guild enregistree");
-                    }
-                }
-            }
-        }
+        info!(bot = %ready.user.name, "Security bot connecte");
+        register_guilds(&ctx, &ready).await;
     }
 
-    /// Déclenché à chaque nouveau membre qui rejoint un serveur.
+    /// Declenche a chaque nouveau membre qui rejoint un serveur.
     async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
         let guild_id = new_member.guild_id;
         let user = &new_member.user;
@@ -89,24 +73,34 @@ impl EventHandler for Handler {
 
         let data = ctx.data.read().await;
 
-        // Log l'arrivée dans le journal
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log(
+        // Log l'arrivee dans le journal
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.send_log(
                 "info",
                 &guild_id.to_string(),
                 &format!("Nouveau membre : {} ({})", user.name, user.id),
             );
         }
-        let api = data.get::<ApiClientKey>().unwrap();
-        let raid_detector = data.get::<RaidDetectorKey>().unwrap();
-        let account_checker = data.get::<AccountCheckerKey>().unwrap();
-        let env_config = data.get::<ConfigKey>().unwrap();
-        let quarantine = data.get::<QuarantineKey>().unwrap();
-        let slowmode = data.get::<SlowmodeKey>().unwrap();
+        let (base, sec_api, raid_detector, account_checker, env_config, quarantine, slowmode) =
+            match (
+                data.get::<ApiClientKey>(),
+                data.get::<SecurityApiKey>(),
+                data.get::<RaidDetectorKey>(),
+                data.get::<AccountCheckerKey>(),
+                data.get::<ConfigKey>(),
+                data.get::<QuarantineKey>(),
+                data.get::<SlowmodeKey>(),
+            ) {
+                (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f), Some(g)) => (a, b, c, d, e, f, g),
+                _ => {
+                    error!(guild_id = %guild_id, "TypeMap incomplete — composants manquants");
+                    return;
+                }
+            };
 
         // Charger la config per-guild depuis l'API (fallback sur env vars)
-        let guild_config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
-        let min_account_age = ApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
+        let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+        let min_account_age = BaseApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
 
         // Config quarantaine per-guild
         let quarantine_enabled = guild_config
@@ -126,7 +120,7 @@ impl EventHandler for Handler {
             .and_then(|v| v.parse().ok())
             .unwrap_or(env_config.slowmode_seconds);
 
-        // ── 1. Détection anti-raid ──
+        // ── 1. Detection anti-raid ──
         let is_raid = raid_detector.record_join(guild_id);
 
         if is_raid {
@@ -135,7 +129,7 @@ impl EventHandler for Handler {
             warn!(
                 guild_id = %guild_id,
                 joins = join_count,
-                "RAID DÉTECTÉ — activation lockdown"
+                "RAID DETECTE — activation lockdown"
             );
 
             // Signaler au backend
@@ -144,7 +138,7 @@ impl EventHandler for Handler {
                 event_type: "raid_detected".to_string(),
                 severity: "critical".to_string(),
                 description: format!(
-                    "Raid détecté : {} joins en quelques secondes. Actions: lockdown{}{}",
+                    "Raid detecte : {} joins en quelques secondes. Actions: lockdown{}{}",
                     join_count,
                     if slowmode_secs > 0 { ", slowmode auto" } else { "" },
                     if quarantine_enabled { ", quarantaine" } else { "" },
@@ -152,11 +146,11 @@ impl EventHandler for Handler {
                 user_ids: vec![user.id.to_string()],
             };
 
-            if let Err(e) = api.report_event(&event).await {
-                error!(error = %e, "Erreur envoi événement raid au backend");
+            if let Err(e) = sec_api.report_event(&event).await {
+                error!(error = %e, "Erreur envoi evenement raid au backend");
             }
 
-            // Activer le mode vérification du serveur (highest)
+            // Activer le mode verification du serveur (highest)
             if let Ok(mut guild) = guild_id.to_partial_guild(&ctx.http).await {
                 let edit = serenity::builder::EditGuild::new()
                     .verification_level(serenity::model::guild::VerificationLevel::Higher);
@@ -164,7 +158,7 @@ impl EventHandler for Handler {
                 if let Err(e) = guild.edit(&ctx.http, edit).await {
                     error!(error = %e, "Impossible d'activer le lockdown");
                 } else {
-                    info!(guild_id = %guild_id, "Lockdown activé (verification: Highest)");
+                    info!(guild_id = %guild_id, "Lockdown active (verification: Highest)");
                 }
             }
 
@@ -173,7 +167,7 @@ impl EventHandler for Handler {
                 slowmode.activate(&ctx, guild_id, slowmode_secs).await;
             }
 
-            // ── Quarantaine sur le membre qui a déclenché ──
+            // ── Quarantaine sur le membre qui a declenche ──
             if quarantine_enabled {
                 if let Some(role_id) = quarantine_role_id {
                     quarantine
@@ -192,25 +186,25 @@ impl EventHandler for Handler {
                 }
             }
 
-            // Envoyer une alerte dans le premier salon texte trouvé
+            // Envoyer une alerte dans le premier salon texte trouve
             if let Ok(channels) = guild_id.channels(&ctx.http).await {
                 if let Some(channel) = channels
                     .values()
                     .find(|c| c.kind == serenity::model::channel::ChannelType::Text)
                 {
                     let mut alert = format!(
-                        "**🚨 ALERTE SÉCURITÉ** — Raid détecté ({} joins rapides).\n\
-                         Niveau de vérification augmenté automatiquement.",
+                        "**\u{1f6a8} ALERTE SECURITE** — Raid detecte ({} joins rapides).\n\
+                         Niveau de verification augmente automatiquement.",
                         join_count
                     );
                     if slowmode_secs > 0 {
                         alert.push_str(&format!(
-                            "\n⏱️ Slowmode activé ({}s) sur tous les salons.",
+                            "\n\u{23f1}\u{fe0f} Slowmode active ({}s) sur tous les salons.",
                             slowmode_secs
                         ));
                     }
                     if quarantine_enabled {
-                        alert.push_str("\n🔒 Nouveaux membres mis en quarantaine.");
+                        alert.push_str("\n\u{1f512} Nouveaux membres mis en quarantaine.");
                     }
 
                     channel
@@ -226,7 +220,7 @@ impl EventHandler for Handler {
             raid_detector.reset(guild_id);
         }
 
-        // ── 2. Vérification compte suspect ──
+        // ── 2. Verification compte suspect ──
         let per_guild_checker = AccountChecker::new(min_account_age);
         let checker = if guild_config.contains_key("min_account_age_secs") {
             &per_guild_checker
@@ -241,11 +235,11 @@ impl EventHandler for Handler {
                 guild_id = %guild_id,
                 user = %user.name,
                 account_age_hours = age_h,
-                "Compte suspect détecté (trop récent)"
+                "Compte suspect detecte (trop recent)"
             );
 
             let mut description = format!(
-                "Compte suspect : {} (créé il y a {}h)",
+                "Compte suspect : {} (cree il y a {}h)",
                 user.name, age_h
             );
 
@@ -280,13 +274,13 @@ impl EventHandler for Handler {
                 user_ids: vec![user.id.to_string()],
             };
 
-            if let Err(e) = api.report_event(&event).await {
-                error!(error = %e, "Erreur envoi événement compte suspect");
+            if let Err(e) = sec_api.report_event(&event).await {
+                error!(error = %e, "Erreur envoi evenement compte suspect");
             }
         }
     }
 
-    /// Déclenché quand un membre quitte le serveur.
+    /// Declenche quand un membre quitte le serveur.
     async fn guild_member_removal(
         &self,
         ctx: Context,
@@ -297,8 +291,8 @@ impl EventHandler for Handler {
         info!(guild_id = %guild_id, user = %user.name, "Membre parti");
 
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log(
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.send_log(
                 "info",
                 &guild_id.to_string(),
                 &format!("Membre parti : {} ({})", user.name, user.id),
@@ -306,7 +300,7 @@ impl EventHandler for Handler {
         }
     }
 
-    /// Déclenché quand un salon est créé.
+    /// Declenche quand un salon est cree.
     async fn channel_create(&self, ctx: Context, channel: GuildChannel) {
         let guild_id = channel.guild_id;
         let kind = match channel.kind {
@@ -318,19 +312,19 @@ impl EventHandler for Handler {
             _ => "autre",
         };
 
-        info!(guild_id = %guild_id, channel = %channel.name, kind, "Salon créé");
+        info!(guild_id = %guild_id, channel = %channel.name, kind, "Salon cree");
 
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log(
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.send_log(
                 "info",
                 &guild_id.to_string(),
-                &format!("Salon {} créé : {} ({})", kind, channel.name, channel.id),
+                &format!("Salon {} cree : {} ({})", kind, channel.name, channel.id),
             );
         }
     }
 
-    /// Déclenché quand un salon est supprimé.
+    /// Declenche quand un salon est supprime.
     async fn channel_delete(&self, ctx: Context, channel: GuildChannel, _messages: Option<Vec<serenity::model::channel::Message>>) {
         let guild_id = channel.guild_id;
         let kind = match channel.kind {
@@ -340,25 +334,25 @@ impl EventHandler for Handler {
             _ => "autre",
         };
 
-        info!(guild_id = %guild_id, channel = %channel.name, kind, "Salon supprimé");
+        info!(guild_id = %guild_id, channel = %channel.name, kind, "Salon supprime");
 
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log(
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.send_log(
                 "warn",
                 &guild_id.to_string(),
-                &format!("Salon {} supprimé : {}", kind, channel.name),
+                &format!("Salon {} supprime : {}", kind, channel.name),
             );
         }
     }
 
-    /// Déclenché quand un membre est banni.
+    /// Declenche quand un membre est banni.
     async fn guild_ban_addition(&self, ctx: Context, guild_id: GuildId, banned_user: serenity::model::user::User) {
         info!(guild_id = %guild_id, user = %banned_user.name, "Membre banni");
 
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log(
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.send_log(
                 "warn",
                 &guild_id.to_string(),
                 &format!("Membre banni : {} ({})", banned_user.name, banned_user.id),
@@ -366,21 +360,21 @@ impl EventHandler for Handler {
         }
     }
 
-    /// Déclenché quand un membre est débanni.
+    /// Declenche quand un membre est debanni.
     async fn guild_ban_removal(&self, ctx: Context, guild_id: GuildId, unbanned_user: serenity::model::user::User) {
-        info!(guild_id = %guild_id, user = %unbanned_user.name, "Membre débanni");
+        info!(guild_id = %guild_id, user = %unbanned_user.name, "Membre debanni");
 
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log(
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.send_log(
                 "info",
                 &guild_id.to_string(),
-                &format!("Membre débanni : {} ({})", unbanned_user.name, unbanned_user.id),
+                &format!("Membre debanni : {} ({})", unbanned_user.name, unbanned_user.id),
             );
         }
     }
 
-    /// Gère les interactions (bouton captcha).
+    /// Gere les interactions (bouton captcha).
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
         if let Interaction::Component(component) = interaction {
             if component.data.custom_id != captcha::CAPTCHA_BUTTON_ID {
@@ -390,9 +384,19 @@ impl EventHandler for Handler {
             let user_id = component.user.id;
 
             let data = ctx.data.read().await;
-            let quarantine = data.get::<QuarantineKey>().unwrap();
-            let env_config = data.get::<ConfigKey>().unwrap();
-            let api = data.get::<ApiClientKey>().unwrap();
+            let (quarantine, env_config, base, sec_api) =
+                match (
+                    data.get::<QuarantineKey>(),
+                    data.get::<ConfigKey>(),
+                    data.get::<ApiClientKey>(),
+                    data.get::<SecurityApiKey>(),
+                ) {
+                    (Some(q), Some(c), Some(a), Some(s)) => (q, c, a, s),
+                    _ => {
+                        error!("TypeMap incomplete pour interaction captcha");
+                        return;
+                    }
+                };
 
             // Trouver dans quelle guild l'utilisateur est en quarantaine
             let mut released = false;
@@ -404,7 +408,7 @@ impl EventHandler for Handler {
                         continue;
                     }
 
-                    let guild_config = api
+                    let guild_config = base
                         .get_guild_config(&guild_id.to_string())
                         .await
                         .unwrap_or_default();
@@ -423,12 +427,12 @@ impl EventHandler for Handler {
                             event_type: "captcha_verified".to_string(),
                             severity: "info".to_string(),
                             description: format!(
-                                "Utilisateur {} a passé le captcha",
+                                "Utilisateur {} a passe le captcha",
                                 component.user.name
                             ),
                             user_ids: vec![user_id.to_string()],
                         };
-                        api.report_event(&event).await.ok();
+                        sec_api.report_event(&event).await.ok();
 
                         released = true;
                     }
@@ -436,9 +440,9 @@ impl EventHandler for Handler {
             }
 
             let content = if released {
-                "✅ **Vérification réussie !** Vous avez maintenant accès au serveur."
+                "\u{2705} **Verification reussie !** Vous avez maintenant acces au serveur."
             } else {
-                "⚠️ Vous n'êtes pas en quarantaine ou la vérification a déjà été effectuée."
+                "\u{26a0}\u{fe0f} Vous n'etes pas en quarantaine ou la verification a deja ete effectuee."
             };
 
             let response = serenity::builder::CreateInteractionResponse::Message(

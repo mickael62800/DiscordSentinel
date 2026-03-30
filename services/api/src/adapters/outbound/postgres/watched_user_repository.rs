@@ -86,11 +86,12 @@ impl WatchedUserRepository for PgWatchedUserRepository {
             user_security AS (
                 SELECT
                     se.guild_id,
-                    unnest(se.user_ids) AS user_id,
+                    u.user_id,
                     COUNT(*) AS security_events_count
-                FROM security_events se
+                FROM security_events se,
+                     jsonb_array_elements_text(se.user_ids) AS u(user_id)
                 WHERE ($1::text IS NULL OR se.guild_id = $1)
-                GROUP BY se.guild_id, unnest(se.user_ids)
+                GROUP BY se.guild_id, u.user_id
             )
             SELECT
                 ui.user_id,

@@ -18,6 +18,7 @@ const autoRefresh = ref(true);
 const refreshInterval = ref(5);
 const apiSaving = ref(false);
 const apiSaved = ref(false);
+const apiError = ref<string | null>(null);
 let savedTimer: ReturnType<typeof setTimeout> | null = null;
 
 onMounted(async () => {
@@ -39,6 +40,7 @@ onUnmounted(() => {
 async function saveApiConfig() {
   apiSaving.value = true;
   apiSaved.value = false;
+  apiError.value = null;
   try {
     await invoke("save_api_config", {
       apiUrl: apiUrl.value.trim(),
@@ -48,6 +50,7 @@ async function saveApiConfig() {
     if (savedTimer) clearTimeout(savedTimer);
     savedTimer = setTimeout(() => { apiSaved.value = false; }, 2000);
   } catch (e) {
+    apiError.value = String(e);
     console.error("Failed to save API config:", e);
   } finally {
     apiSaving.value = false;
@@ -79,7 +82,10 @@ async function resetDiscordConfig() {
         <AppInput v-model="apiKey" type="password" placeholder="Laisser vide si desactive" />
       </div>
       <div class="setting-row">
-        <span class="setting-hint">Les modifications necessitent un redemarrage de l'application.</span>
+        <div>
+          <span class="setting-hint">Les modifications necessitent un redemarrage de l'application.</span>
+          <p v-if="apiError" class="setting-hint" style="color: var(--danger); opacity: 1;">Erreur : {{ apiError }}</p>
+        </div>
         <AppButton variant="primary" :disabled="apiSaving" @click="saveApiConfig">
           {{ apiSaved ? "Enregistre !" : apiSaving ? "Enregistrement..." : "Enregistrer" }}
         </AppButton>

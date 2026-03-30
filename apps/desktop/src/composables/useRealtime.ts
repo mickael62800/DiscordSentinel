@@ -41,6 +41,12 @@ export function useRealtime() {
     if (initialized) return;
     initialized = true;
 
+    // Nettoyer les listeners existants pour eviter les doublons
+    for (const unlisten of unlisteners) {
+      unlisten();
+    }
+    unlisteners.length = 0;
+
     const u1 = await listen("ws:connected", (event) => {
       const payload = event.payload as { connected: boolean; url: string };
       connected.value = payload.connected;

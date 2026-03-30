@@ -6,18 +6,20 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use sentinel_shared::heartbeat::register_guilds;
+
 use crate::api_client::ApiClient;
 use crate::commands;
 use crate::tracker::StatsTracker;
 
-/// Clé pour accéder à l'ApiClient dans le TypeMap.
-pub struct ApiClientKey;
+/// Cle TypeMap pour le client API specifique au stats-bot.
+pub struct StatsApiKey;
 
-impl TypeMapKey for ApiClientKey {
+impl TypeMapKey for StatsApiKey {
     type Value = ApiClient;
 }
 
-/// Clé pour accéder au StatsTracker dans le TypeMap.
+/// Cle pour acceder au StatsTracker dans le TypeMap.
 pub struct TrackerKey;
 
 impl TypeMapKey for TrackerKey {
@@ -29,13 +31,10 @@ pub struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
-        info!(bot = %ready.user.name, "Stats bot connecté");
-        {
-            let data = ctx.data.read().await;
-            if let Some(api) = data.get::<ApiClientKey>() {
-                api.send_log("info", "", "Stats bot demarre");
-            }
-        }
+        info!(bot = %ready.user.name, "Stats bot connecte");
+
+        // Enregistrer les guilds via le shared helper
+        register_guilds(&ctx, &ready).await;
 
         if let Err(e) = serenity::model::application::Command::set_global_commands(
             &ctx.http,
@@ -45,27 +44,7 @@ impl EventHandler for Handler {
         {
             error!(error = %e, "Impossible d'enregistrer les slash commands");
         } else {
-            info!("Slash commands enregistrées");
-        }
-
-        // Enregistrer les guilds aupres de l'API
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            for guild_status in &ready.guilds {
-                let guild_id = guild_status.id;
-                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
-                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
-                    if let Err(e) = api.register_guild(
-                        &guild_id.to_string(),
-                        &guild.name,
-                        member_count,
-                    ).await {
-                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
-                    } else {
-                        info!(guild = %guild.name, "Guild enregistree");
-                    }
-                }
-            }
+            info!("Slash commands enregistrees");
         }
     }
 
@@ -88,7 +67,7 @@ impl EventHandler for Handler {
         }
 
         // Envoyer au backend
-        if let Some(api) = data.get::<ApiClientKey>() {
+        if let Some(api) = data.get::<StatsApiKey>() {
             if let Err(e) = api
                 .record_messages(
                     &guild_id.to_string(),
@@ -124,7 +103,7 @@ impl EventHandler for Handler {
                         // Attribuer le role recompense si configure
                         if let Some(role_id_str) = &result.reward_role_id {
                             if let Ok(role_id) = role_id_str.parse::<u64>() {
-                                if let Ok(mut member) = guild_id.member(&ctx.http, msg.author.id).await {
+                                if let Ok(member) = guild_id.member(&ctx.http, msg.author.id).await {
                                     let _ = member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await;
                                 }
                             }
@@ -152,7 +131,7 @@ impl EventHandler for Handler {
         let is_in_voice = new.channel_id.is_some();
 
         let tracker = data.get::<TrackerKey>();
-        let api = data.get::<ApiClientKey>();
+        let api = data.get::<StatsApiKey>();
 
         match (was_in_voice, is_in_voice) {
             (false, true) => {
@@ -162,12 +141,12 @@ impl EventHandler for Handler {
                 }
             }
             (true, false) => {
-                // Quitté le salon vocal — calculer la durée et envoyer au backend
+                // Quitte le salon vocal — calculer la duree et envoyer au backend
                 if let Some(tracker) = tracker {
                     let seconds = tracker.voice_leave(guild_id.get(), user_id.get()).await;
 
                     if seconds > 0 {
-                        // Récupérer le nom d'utilisateur
+                        // Recuperer le nom d'utilisateur
                         let username = user_id
                             .to_user(&ctx.http)
                             .await

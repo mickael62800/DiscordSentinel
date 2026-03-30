@@ -2,8 +2,10 @@ use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-use crate::api_client::LogModerationActionRequest;
-use crate::handler::{ApiClientKey, FloodTrackerKey, MembersToVoiceMapKey};
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::{ApiClient, LogModerationActionRequest};
+use crate::handler::{FloodTrackerKey, MembersToVoiceMapKey};
 
 pub async fn handle_message(ctx: &Context, msg: &Message) {
     if msg.author.bot {
@@ -68,7 +70,8 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
 
     // Logger l'action via l'API
     let data = ctx.data.read().await;
-    if let Some(api) = data.get::<ApiClientKey>() {
+    if let Some(base) = data.get::<ApiClientKey>() {
+        let api = ApiClient::new(base.clone());
         let request = LogModerationActionRequest {
             guild_id: guild_id.get().to_string(),
             channel_id: channel_id.get().to_string(),

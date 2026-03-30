@@ -49,12 +49,17 @@ async def upload_dataset(model_type: str, file: UploadFile = File(...)):
         raise HTTPException(400, f"Type de modele inconnu: {model_type}")
 
     target_dir.mkdir(parents=True, exist_ok=True)
-    target_path = target_dir / file.filename
+    safe_name = Path(file.filename).name
+    if not safe_name or safe_name.startswith("."):
+        raise HTTPException(400, "Nom de fichier invalide")
+    target_path = target_dir / safe_name
+    if target_path.resolve().parent != target_dir.resolve():
+        raise HTTPException(400, "Nom de fichier invalide")
 
     with open(target_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
 
-    return {"uploaded": file.filename, "size": target_path.stat().st_size}
+    return {"uploaded": safe_name, "size": target_path.stat().st_size}
 
 
 @router.delete("/datasets/{model_type}")
@@ -96,7 +101,10 @@ def _scan_text_datasets() -> DatasetInfo:
             if f.suffix == ".jsonl":
                 for line in f.read_text(encoding="utf-8").splitlines():
                     if line.strip():
-                        entry = json.loads(line)
+                        try:
+                            entry = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
                         label_id = entry.get("label", 1)
                         labels[label_names.get(label_id, str(label_id))] += 1
                 mod = f.stat().st_mtime

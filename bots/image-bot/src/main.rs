@@ -8,9 +8,12 @@ use dashmap::DashSet;
 use serenity::prelude::*;
 use tracing::info;
 
-use crate::api_client::ApiClient;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::config::BotConfig;
+use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+
 use crate::config::Config;
-use crate::handler::{ApiClientKey, Handler, ProcessedMessagesKey};
+use crate::handler::{Handler, MaxImageSizeKey, ProcessedMessagesKey};
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +28,7 @@ async fn main() {
     let config = Config::from_env();
 
     info!(
-        api_url = %config.api_base_url,
+        api_url = %config.base().api_base_url,
         max_image_size = config.max_image_size,
         "Demarrage de l'image bot"
     );
@@ -33,7 +36,9 @@ async fn main() {
     // Intents : lire les messages pour detecter les pieces jointes
     let intents = GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
 
-    let mut client = Client::builder(&config.discord_token, intents)
+    let base_api = Arc::new(BaseApiClient::new(&config, "image-bot"));
+
+    let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
         .await
         .expect("Erreur creation du client Discord");
@@ -41,20 +46,13 @@ async fn main() {
     // Stocker les donnees partagees
     {
         let mut data = client.data.write().await;
-        data.insert::<ApiClientKey>(ApiClient::new(&config));
+        data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<ProcessedMessagesKey>(Arc::new(DashSet::new()));
+        data.insert::<MaxImageSizeKey>(config.max_image_size);
     }
 
     // Heartbeat task
-    let api_for_heartbeat = ApiClient::new(&config);
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) = api_for_heartbeat.heartbeat("image-bot").await {
-                tracing::warn!("Heartbeat failed: {}", e);
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        }
-    });
+    spawn_heartbeat(Arc::clone(&base_api));
 
     if let Err(e) = client.start().await {
         eprintln!("Erreur fatale : {e}");

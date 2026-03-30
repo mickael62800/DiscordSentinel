@@ -23,7 +23,7 @@ export function useNotifications() {
         notifications.value.unshift(notif);
         // Cap at 200 notifications to prevent unbounded growth
         if (notifications.value.length > 200) {
-          notifications.value.length = 200;
+          notifications.value.splice(200);
         }
         if (notif.severity === "critical" || notif.severity === "high") {
           sendNativeNotification(notif);

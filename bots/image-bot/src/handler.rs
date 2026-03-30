@@ -8,18 +8,20 @@ use serenity::model::id::MessageId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
+
 use crate::api_client::{Action, AnalyzeImageRequest, ApiClient};
 
 // ── TypeMap keys ──
 
-pub struct ApiClientKey;
-impl TypeMapKey for ApiClientKey {
-    type Value = ApiClient;
-}
-
 pub struct ProcessedMessagesKey;
 impl TypeMapKey for ProcessedMessagesKey {
     type Value = Arc<DashSet<MessageId>>;
+}
+
+pub struct MaxImageSizeKey;
+impl TypeMapKey for MaxImageSizeKey {
+    type Value = u64;
 }
 
 /// Extensions d'images supportees.
@@ -110,25 +112,7 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Image bot connecte");
-
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            api.send_log("info", "", "Image bot demarre");
-            for guild_status in &ready.guilds {
-                let guild_id = guild_status.id;
-                if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
-                    let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
-                    if let Err(e) = api
-                        .register_guild(&guild_id.to_string(), &guild.name, member_count)
-                        .await
-                    {
-                        warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
-                    } else {
-                        info!(guild = %guild.name, "Guild enregistree");
-                    }
-                }
-            }
-        }
+        register_guilds(&ctx, &ready).await;
     }
 }
 
@@ -156,14 +140,20 @@ async fn process_image_attachment(
     filename: &str,
     guild_id: &str,
 ) {
-    let data = ctx.data.read().await;
-    let api_client = match data.get::<ApiClientKey>() {
-        Some(client) => client,
-        None => {
-            error!("ApiClient introuvable dans le contexte");
-            return;
-        }
+    let (base, max_image_size) = {
+        let data = ctx.data.read().await;
+        let base = match data.get::<ApiClientKey>() {
+            Some(client) => Arc::clone(client),
+            None => {
+                error!("BaseApiClient introuvable dans le contexte");
+                return;
+            }
+        };
+        let max_size = data.get::<MaxImageSizeKey>().copied().unwrap_or(10 * 1024 * 1024);
+        (base, max_size)
     };
+
+    let api_client = ApiClient::new(Arc::clone(&base), max_image_size);
 
     // Telecharger l'image
     let image_bytes = match api_client.download_image(image_url).await {
@@ -213,7 +203,7 @@ async fn process_image_attachment(
             );
 
             if response.action != Action::None {
-                api_client.send_log("warn", &guild_id.to_string(), &format!(
+                base.send_log("warn", guild_id, &format!(
                     "Image detectee — {} par {} : {:?} ({})",
                     response.action.as_str(), msg.author.name,
                     response.classifications, response.reason.as_deref().unwrap_or("Automod")
@@ -224,14 +214,14 @@ async fn process_image_attachment(
                 .await
             {
                 error!(error = %e, "Erreur execution action image");
-                api_client.send_log("error", &guild_id.to_string(), &format!(
+                base.send_log("error", guild_id, &format!(
                     "Erreur action image : {}", e
                 ));
             }
         }
         Err(e) => {
             warn!(error = %e, "Backend injoignable — suppression preventive de l'image");
-            api_client.send_log("error", &guild_id.to_string(), &format!(
+            base.send_log("error", guild_id, &format!(
                 "Backend injoignable pour analyse image : {}", e
             ));
             // Fallback : en cas de doute sur une image et API down, on supprime

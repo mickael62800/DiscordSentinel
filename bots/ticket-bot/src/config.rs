@@ -1,21 +1,36 @@
+use serenity::prelude::TypeMapKey;
+use sentinel_shared::config::{BaseConfig, BotConfig};
+
+#[derive(Clone)]
+#[allow(dead_code)]
 pub struct Config {
-    pub discord_token: String,
-    pub api_base_url: String,
-    pub api_key: String,
+    base: BaseConfig,
     pub ticket_category_id: Option<u64>,
+    pub ticket_channel_id: Option<u64>,
 }
 
 impl Config {
     pub fn from_env() -> Self {
         Self {
-            discord_token: std::env::var("DISCORD_TOKEN")
-                .expect("DISCORD_TOKEN manquant dans .env"),
-            api_base_url: std::env::var("API_BASE_URL")
-                .unwrap_or_else(|_| "http://localhost:3000".to_string()),
-            api_key: std::env::var("API_KEY").unwrap_or_default(),
+            base: BaseConfig::from_env("TICKET_DISCORD_TOKEN"),
             ticket_category_id: std::env::var("TICKET_CATEGORY_ID")
+                .ok()
+                .and_then(|v| v.parse().ok()),
+            ticket_channel_id: std::env::var("TICKET_CHANNEL_ID")
                 .ok()
                 .and_then(|v| v.parse().ok()),
         }
     }
+}
+
+impl BotConfig for Config {
+    fn base(&self) -> &BaseConfig {
+        &self.base
+    }
+}
+
+pub struct ConfigKey;
+
+impl TypeMapKey for ConfigKey {
+    type Value = Config;
 }

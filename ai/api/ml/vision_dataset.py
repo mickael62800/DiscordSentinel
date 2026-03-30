@@ -42,7 +42,8 @@ class VisionSentinelDataset(Dataset):
 
     def __getitem__(self, idx):
         img_path, label = self.samples[idx]
-        image = Image.open(img_path).convert("RGB")
+        with Image.open(img_path) as img:
+            image = img.convert("RGB")
 
         if self.transform:
             image = self.transform(image)

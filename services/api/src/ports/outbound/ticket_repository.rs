@@ -6,7 +6,7 @@ use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait TicketRepository: Send + Sync {
-    async fn find_all(&self) -> Result<Vec<Ticket>, DomainError>;
+    async fn find_all(&self, status: Option<&str>, priority: Option<&str>, search: Option<&str>, author_id: Option<&str>) -> Result<Vec<Ticket>, DomainError>;
     async fn find_by_id(&self, id: Uuid) -> Result<Option<Ticket>, DomainError>;
     async fn save(&self, ticket: &Ticket) -> Result<(), DomainError>;
     async fn update_status(&self, id: Uuid, status: &str) -> Result<(), DomainError>;

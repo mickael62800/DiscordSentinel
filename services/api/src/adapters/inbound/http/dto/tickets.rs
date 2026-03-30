@@ -3,6 +3,14 @@ use serde::{Deserialize, Serialize};
 use crate::domain::entities::{Ticket, TicketDetail, TicketMessage};
 use crate::ports::inbound::CreateTicketCommand;
 
+#[derive(Debug, Deserialize, Default)]
+pub struct ListTicketsQuery {
+    pub status: Option<String>,
+    pub priority: Option<String>,
+    pub search: Option<String>,
+    pub author_id: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateTicketDto {
     pub title: String,
@@ -46,6 +54,11 @@ fn default_author_role() -> String {
 #[derive(Debug, Deserialize)]
 pub struct AssignDto {
     pub assignee: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateStatusDto {
+    pub status: String,
 }
 
 #[derive(Debug, Deserialize)]

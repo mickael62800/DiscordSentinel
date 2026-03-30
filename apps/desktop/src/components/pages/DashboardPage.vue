@@ -4,6 +4,7 @@ import { useDashboard } from "../../composables/useDashboard";
 import { useDashboardCharts } from "../../composables/useDashboardCharts";
 import StatCard from "../molecules/StatCard.vue";
 import { Line, Bar, Doughnut } from "vue-chartjs";
+import type { ScriptableContext } from "chart.js";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -101,7 +102,7 @@ const voiceChartData = computed(() => {
         type: "bar" as const,
       },
     ],
-  };
+  } as any;
 });
 
 const infractionsChartData = computed(() => ({
@@ -189,8 +190,8 @@ const netGrowthData = computed(() => {
         label: "Croissance nette (cumul)",
         data,
         borderColor: "#5865f2",
-        backgroundColor: (ctx: { raw: number }) =>
-          ctx.raw >= 0 ? "rgba(87, 242, 135, 0.3)" : "rgba(237, 66, 69, 0.3)",
+        backgroundColor: (ctx: ScriptableContext<"line">) =>
+          (ctx.raw as number) >= 0 ? "rgba(87, 242, 135, 0.3)" : "rgba(237, 66, 69, 0.3)",
         fill: true,
         tension: 0.3,
       },

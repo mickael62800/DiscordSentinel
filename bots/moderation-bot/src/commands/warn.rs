@@ -5,17 +5,17 @@ use serenity::all::{
 use tracing::{error, info};
 
 use crate::api_client::ModerationAction;
-use crate::handler::ApiClientKey;
+use crate::handler::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("warn")
         .description("Avertir un utilisateur")
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur à avertir")
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a avertir")
                 .required(true),
         )
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "gravity", "Gravité de l'avertissement")
+            CreateCommandOption::new(CommandOptionType::String, "gravity", "Gravite de l'avertissement")
                 .required(true)
                 .add_string_choice("Faible", "low")
                 .add_string_choice("Moyenne", "medium")
@@ -54,7 +54,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Log dans le backend
     let data = ctx.data.read().await;
-    let api = data.get::<ApiClientKey>().unwrap();
+    let api = data.get::<ModerationApiKey>().unwrap();
 
     let gravity_emoji = match gravity {
         "low" => "🟡",
@@ -82,10 +82,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 action_id = %resp.id,
                 target = %target.name,
                 gravity = gravity,
-                "Warn enregistré"
+                "Warn enregistre"
             );
 
-            // DM à l'utilisateur
+            // DM a l'utilisateur
             if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
                 dm.send_message(
                     &ctx.http,
@@ -98,7 +98,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
 
             reply(ctx, command, &format!(
-                "{gravity_emoji} **Warn ({gravity})** appliqué à <@{}>.\nRaison : {reason}",
+                "{gravity_emoji} **Warn ({gravity})** applique a <@{}>.\nRaison : {reason}",
                 target.id
             )).await;
         }

@@ -5,7 +5,7 @@ use serenity::all::{
 };
 use tracing::error;
 
-use crate::handler::ApiClientKey;
+use crate::handler::StatsApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("level")
@@ -76,7 +76,7 @@ async fn handle_user(ctx: &Context, command: &CommandInteraction, guild_id: &str
         .unwrap_or_else(|| command.user.id.to_string());
 
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
+    let api = match data.get::<StatsApiKey>() {
         Some(a) => a,
         None => return,
     };
@@ -127,7 +127,7 @@ async fn handle_top(ctx: &Context, command: &CommandInteraction, guild_id: &str)
         .unwrap_or(10);
 
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
+    let api = match data.get::<StatsApiKey>() {
         Some(a) => a,
         None => return,
     };

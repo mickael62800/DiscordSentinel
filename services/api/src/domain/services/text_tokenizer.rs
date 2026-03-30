@@ -21,11 +21,17 @@ impl TextTokenizer {
             }
             match Tokenizer::from_file(p) {
                 Ok(mut tok) => {
-                    // Configurer le padding et la troncature
+                    // Detecter le pad token du modele (CamemBERT=<pad>/1, BERT=[PAD]/0)
+                    let (pad_id, pad_token) = tok.get_vocab(true)
+                        .iter()
+                        .find(|(token, _)| *token == "<pad>" || *token == "[PAD]")
+                        .map(|(token, &id)| (id, token.clone()))
+                        .unwrap_or((0, "[PAD]".to_string()));
+
                     let padding = tokenizers::PaddingParams {
                         strategy: tokenizers::PaddingStrategy::Fixed(max_length),
-                        pad_id: 0,
-                        pad_token: "[PAD]".to_string(),
+                        pad_id,
+                        pad_token,
                         ..Default::default()
                     };
                     tok.with_padding(Some(padding));
@@ -105,7 +111,71 @@ mod tests {
     #[test]
     fn test_max_length_stored() {
         let tok = TextTokenizer::new(None, 128);
-        // max_length est correctement stocke meme sans tokenizer
         assert_eq!(tok.max_length, 128);
+    }
+
+    // ── Tests avec le vrai tokenizer ──
+
+    const TOKENIZER_PATH: &str = "../../ai/training/text/exports/tokenizer.json";
+
+    fn load_real_tokenizer() -> Option<TextTokenizer> {
+        let tok = TextTokenizer::new(Some(TOKENIZER_PATH), 256);
+        if tok.available() { Some(tok) } else { None }
+    }
+
+    #[test]
+    fn real_tokenizer_loads_successfully() {
+        let tok = load_real_tokenizer();
+        assert!(tok.is_some(), "Tokenizer introuvable a {TOKENIZER_PATH}");
+    }
+
+    #[test]
+    fn real_tokenizer_simple_text() {
+        let Some(tok) = load_real_tokenizer() else { return };
+        let (ids, mask) = tok.tokenize("Bonjour tout le monde").unwrap();
+        assert_eq!(ids.shape(), &[1, 256]);
+        assert_eq!(mask.shape(), &[1, 256]);
+        // Les premiers tokens doivent etre non-zero (vrais tokens)
+        assert_ne!(ids[[0, 0]], 0);
+        // Le mask doit avoir des 1 au debut et des 0 a la fin (padding)
+        assert_eq!(mask[[0, 0]], 1);
+        assert_eq!(mask[[0, 255]], 0);
+    }
+
+    #[test]
+    fn real_tokenizer_empty_text() {
+        let Some(tok) = load_real_tokenizer() else { return };
+        let (ids, mask) = tok.tokenize("").unwrap();
+        assert_eq!(ids.shape(), &[1, 256]);
+        // Meme un texte vide produit au moins les tokens speciaux (CLS, SEP)
+        assert_eq!(mask[[0, 0]], 1);
+    }
+
+    #[test]
+    fn real_tokenizer_long_text_truncated() {
+        let Some(tok) = load_real_tokenizer() else { return };
+        let long_text = "mot ".repeat(1000);
+        let (ids, mask) = tok.tokenize(&long_text).unwrap();
+        assert_eq!(ids.shape(), &[1, 256]);
+        // Tous les slots doivent etre remplis (pas de padding)
+        assert_eq!(mask[[0, 255]], 1);
+    }
+
+    #[test]
+    fn real_tokenizer_special_chars() {
+        let Some(tok) = load_real_tokenizer() else { return };
+        let result = tok.tokenize("😡🤬💀 je vais te 💩 espèce de $#@!");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn real_tokenizer_french_insults() {
+        let Some(tok) = load_real_tokenizer() else { return };
+        let result = tok.tokenize("t'es qu'un connard, ferme ta gueule");
+        assert!(result.is_ok());
+        let (ids, _) = result.unwrap();
+        // Les tokens doivent etre significatifs (pas tous padding)
+        let non_zero = ids.iter().filter(|&&v| v != 0).count();
+        assert!(non_zero > 3);
     }
 }

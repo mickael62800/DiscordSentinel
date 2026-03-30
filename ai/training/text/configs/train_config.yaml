@@ -1,22 +1,22 @@
 model:
   name: "text-sentinel"
-  backbone: "distilbert-base-multilingual-cased"  # Multilingue FR/EN, leger
+  backbone: "camembert-base"  # Modele francais specialise (138Go de texte FR)
   num_classes: 5
-  max_length: 256
+  max_length: 128  # 99% des messages Discord < 50 mots
 
 training:
   epochs: 20
   batch_size: 64
-  learning_rate: 0.00002
+  learning_rate: 0.00003  # 3e-5, optimal pour fine-tuning transformers
   weight_decay: 0.01
   scheduler: "linear_warmup"
   warmup_ratio: 0.1
-  early_stopping_patience: 5
+  early_stopping_patience: 3
+  label_smoothing: 0.1  # Regularisation contre le bruit dans les labels
 
 data:
-  train_split: 0.8
-  val_split: 0.1
-  test_split: 0.1
+  train_split: 0.85
+  val_split: 0.15
   num_workers: 4
 
 classes:

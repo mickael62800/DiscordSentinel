@@ -17,6 +17,8 @@ export interface ConfigField {
   label: string;
   type: string;
   required: boolean;
+  default?: string;
+  [k: string]: unknown;
 }
 
 export interface BotGuildConfig {
@@ -179,6 +181,10 @@ export interface Ticket {
   assigned_to: string | null;
   server: string;
   category: string;
+  ticket_type: string | null;
+  channel_id: string | null;
+  voice_channel_id: string | null;
+  invited_user_id: string | null;
   created_at: string;
   updated_at: string;
   messages_count: number;

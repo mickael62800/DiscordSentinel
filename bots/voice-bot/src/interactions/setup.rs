@@ -9,8 +9,10 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use crate::api_client::CreateVoiceChannelRequest;
-use crate::handler::{ApiClientKey, PendingChannelsKey, TextToVoiceMapKey, MembersToVoiceMapKey};
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::{ApiClient, CreateVoiceChannelRequest};
+use crate::handler::{PendingChannelsKey, TextToVoiceMapKey, MembersToVoiceMapKey};
 
 /// Handle setup interactions: toggle hidden, open, cancel.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -281,7 +283,8 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let api = data.get::<ApiClientKey>().expect("ApiClient");
+        let base = data.get::<ApiClientKey>().expect("ApiClient");
+        let api = ApiClient::new(base.clone());
         if let Err(e) = api.create_channel(&request).await {
             error!(error = %e, "Erreur enregistrement API du salon");
         }
@@ -311,7 +314,7 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     );
 
     // Log
-    crate::utils::embeds::log_channel_created(
+    crate::embeds::log_channel_created(
         ctx,
         user_id.get(),
         "Prive",

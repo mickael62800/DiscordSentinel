@@ -1,6 +1,6 @@
 use axum::http::{header, HeaderValue, Method};
 use axum::middleware;
-use axum::routing::{delete, get, patch, post, put};
+use axum::routing::{delete, get, patch, post};
 use axum::Router;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
@@ -88,6 +88,14 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route(
             "/api/tickets/{id}/assign",
             patch(handlers::tickets::assign_ticket),
+        )
+        .route(
+            "/api/tickets/{id}/status",
+            patch(handlers::tickets::update_status),
+        )
+        .route(
+            "/api/tickets/{id}/channels",
+            patch(handlers::tickets::update_ticket_channel),
         )
         // Security events
         .route(

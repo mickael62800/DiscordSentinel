@@ -1,8 +1,7 @@
 #!/bin/bash
 # ============================================
 # DiscordSentinel - Dev Launcher
-# Lance l'API, les bots et l'app desktop
-# en parallele pour le developpement local
+# Lance TOUT : API, API ML, 9 bots, desktop
 # ============================================
 
 set -e
@@ -17,6 +16,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
 NC='\033[0m'
 
 # PIDs des processus lances
@@ -62,6 +62,10 @@ check_prereqs() {
         missing=1
     fi
 
+    if ! command -v python3 &>/dev/null && ! command -v python &>/dev/null; then
+        echo -e "${YELLOW}python3 non trouve — l'API ML ne sera pas lancee${NC}"
+    fi
+
     if [ "$missing" -eq 1 ]; then
         exit 1
     fi
@@ -94,34 +98,103 @@ start_service() {
 
 echo ""
 echo -e "${CYAN}================================================${NC}"
-echo -e "${CYAN}   DiscordSentinel - Dev Mode${NC}"
+echo -e "${CYAN}   DiscordSentinel - Dev Mode (full stack)${NC}"
 echo -e "${CYAN}================================================${NC}"
 echo ""
 
 check_prereqs
 
-# API Backend
+# ── 1. API Backend (Rust) ──
 start_service "api" \
     "$ROOT_DIR/services/api" \
     "cargo run" \
     "$GREEN"
 
-# Attendre un peu que l'API demarre avant les bots
-sleep 2
+# ── 2. API ML (Python FastAPI) ──
+PYTHON_CMD="python3"
+if ! command -v python3 &>/dev/null; then
+    PYTHON_CMD="python"
+fi
 
-# Automod Bot
+if [ -d "$ROOT_DIR/ai/api" ]; then
+    start_service "ml-api" \
+        "$ROOT_DIR/ai/api" \
+        "$PYTHON_CMD -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload" \
+        "$MAGENTA"
+fi
+
+# ── 3. Gateway WebSocket ──
+start_service "gateway" \
+    "$ROOT_DIR/services/gateway" \
+    "cargo run" \
+    "$GREEN"
+
+# Attendre que les APIs + gateway demarrent avant les bots et workers
+sleep 3
+
+# ── 4. Workers ──
+start_service "analytics-worker" \
+    "$ROOT_DIR/services/workers/analytics-worker" \
+    "cargo run" \
+    "$YELLOW"
+
+start_service "moderation-worker" \
+    "$ROOT_DIR/services/workers/moderation-worker" \
+    "cargo run" \
+    "$YELLOW"
+
+start_service "monitoring-worker" \
+    "$ROOT_DIR/services/workers/monitoring-worker" \
+    "cargo run" \
+    "$YELLOW"
+
+# ── 5. Tous les bots Discord ──
+start_service "audit-bot" \
+    "$ROOT_DIR/bots/audit-bot" \
+    "cargo run" \
+    "$BLUE"
+
 start_service "automod-bot" \
     "$ROOT_DIR/bots/automod-bot" \
     "cargo run" \
     "$BLUE"
 
-# Ticket Bot
+start_service "image-bot" \
+    "$ROOT_DIR/bots/image-bot" \
+    "cargo run" \
+    "$BLUE"
+
+start_service "moderation-bot" \
+    "$ROOT_DIR/bots/moderation-bot" \
+    "cargo run" \
+    "$BLUE"
+
+start_service "roles-bot" \
+    "$ROOT_DIR/bots/roles-bot" \
+    "cargo run" \
+    "$BLUE"
+
+start_service "security-bot" \
+    "$ROOT_DIR/bots/security-bot" \
+    "cargo run" \
+    "$BLUE"
+
+start_service "stats-bot" \
+    "$ROOT_DIR/bots/stats-bot" \
+    "cargo run" \
+    "$BLUE"
+
 start_service "ticket-bot" \
     "$ROOT_DIR/bots/ticket-bot" \
     "cargo run" \
     "$BLUE"
 
-# Desktop App
+start_service "voice-bot" \
+    "$ROOT_DIR/bots/voice-bot" \
+    "cargo run" \
+    "$BLUE"
+
+# ── 6. Desktop App (Tauri + Vue) ──
 if [ -d "$ROOT_DIR/apps/desktop" ]; then
     if [ ! -d "$ROOT_DIR/apps/desktop/node_modules" ]; then
         echo -e "${YELLOW}[INSTALL] Desktop - npm install...${NC}"
@@ -138,8 +211,19 @@ echo -e "${GREEN}================================================${NC}"
 echo -e "${GREEN}   Tous les services sont lances !${NC}"
 echo -e "${GREEN}================================================${NC}"
 echo ""
-echo -e "  API         : ${GREEN}http://localhost:3000${NC}"
+echo -e "  API Backend : ${GREEN}http://localhost:3000${NC}"
+echo -e "  API ML      : ${MAGENTA}http://localhost:8000${NC}"
+echo -e "  Gateway WS  : ${GREEN}ws://localhost:3001${NC}"
 echo -e "  Desktop     : ${CYAN}Tauri app (fenetre native)${NC}"
+echo ""
+echo -e "  Workers (3) :"
+echo -e "    ${YELLOW}analytics-worker  moderation-worker  monitoring-worker${NC}"
+echo ""
+echo -e "  Bots Discord (9) :"
+echo -e "    ${BLUE}audit-bot  automod-bot  image-bot${NC}"
+echo -e "    ${BLUE}moderation-bot  roles-bot  security-bot${NC}"
+echo -e "    ${BLUE}stats-bot  ticket-bot  voice-bot${NC}"
+echo ""
 echo -e "  Logs        : ${YELLOW}.logs/*.log${NC}"
 echo ""
 echo -e "${YELLOW}Ctrl+C pour tout arreter${NC}"

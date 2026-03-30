@@ -14,6 +14,7 @@ const selectedWorker = ref<string | null>(null);
 const loading = ref(false);
 const saving = ref(false);
 const formValues = ref<Record<string, string>>({});
+const savedValues = ref<Record<string, string>>({});
 const successMessage = ref("");
 
 const workerDefinitions = computed(() =>
@@ -29,6 +30,31 @@ const configFields = computed<ConfigField[]>(() => {
   const schema = selectedDefinition.value.config_schema;
   return Array.isArray(schema) ? schema : [];
 });
+
+function isFieldModified(key: string): boolean {
+  return (formValues.value[key] ?? "") !== (savedValues.value[key] ?? "");
+}
+
+const hasChanges = computed(() =>
+  configFields.value.some((f) => isFieldModified(f.key))
+);
+
+const changesCount = computed(() =>
+  configFields.value.filter((f) => isFieldModified(f.key)).length
+);
+
+function fieldStatus(field: ConfigField): { text: string; source: "db" | "default" | "none" } {
+  const dbValue = savedValues.value[field.key];
+  if (dbValue !== undefined && dbValue !== "") {
+    const unit = field.label.includes("heure") ? "heure(s)" : "minute(s)";
+    return { text: `Valeur actuelle : ${dbValue} ${unit}`, source: "db" };
+  }
+  if (field.default !== undefined && field.default !== "") {
+    const unit = field.label.includes("heure") ? "heure(s)" : "minute(s)";
+    return { text: `Valeur par defaut : ${field.default} ${unit}`, source: "default" };
+  }
+  return { text: "Non configure", source: "none" };
+}
 
 async function fetchDefinitions() {
   try {
@@ -59,13 +85,13 @@ function loadFormValues() {
     for (const cfg of configs.value.filter((c) => c.bot_name === selectedWorker.value)) {
       values[cfg.config_key] = cfg.config_value;
     }
-    for (const field of configFields.value) {
-      if (!(field.key in values) && (field as Record<string, unknown>).default) {
-        values[field.key] = String((field as Record<string, unknown>).default);
-      }
-    }
   }
-  formValues.value = values;
+  savedValues.value = { ...values };
+  formValues.value = { ...values };
+}
+
+function cancelChanges() {
+  formValues.value = { ...savedValues.value };
 }
 
 async function saveConfig() {
@@ -74,13 +100,14 @@ async function saveConfig() {
   successMessage.value = "";
   try {
     for (const field of configFields.value) {
+      if (!isFieldModified(field.key)) continue;
       const value = formValues.value[field.key] ?? "";
       if (value) {
         await invoke("set_bot_config", {
           guildId: selectedGuildId.value,
           botName: selectedWorker.value,
           configKey: field.key,
-          configValue: value,
+          configValue: String(value),
         });
       } else {
         await invoke("delete_bot_config", {
@@ -90,7 +117,7 @@ async function saveConfig() {
         });
       }
     }
-    successMessage.value = "Configuration enregistree";
+    successMessage.value = `${changesCount.value} parametre(s) enregistre(s)`;
     await fetchConfig();
     setTimeout(() => (successMessage.value = ""), 3000);
   } catch (e) {
@@ -158,9 +185,15 @@ watch(selectedWorker, loadFormValues);
         </div>
 
         <template v-else>
-          <div v-for="field in configFields" :key="field.key" class="form-group">
+          <div
+            v-for="field in configFields"
+            :key="field.key"
+            class="form-group"
+            :class="{ modified: isFieldModified(field.key) }"
+          >
             <label :for="field.key" class="form-label">
               {{ field.label }}
+              <span v-if="isFieldModified(field.key)" class="modified-badge">modifie</span>
             </label>
             <div class="input-row">
               <input
@@ -169,15 +202,36 @@ watch(selectedWorker, loadFormValues);
                 class="form-input"
                 type="number"
                 min="1"
+                :placeholder="field.default !== undefined ? String(field.default) : ''"
               />
               <span class="input-unit">{{ field.label.includes('heure') ? 'h' : 'min' }}</span>
             </div>
-            <span class="form-hint">Par defaut : {{ (field as Record<string, unknown>).default ?? '?' }} {{ field.label.includes('heure') ? 'heure(s)' : 'minute(s)' }}</span>
+            <span
+              class="form-hint"
+              :class="{
+                'hint-db': fieldStatus(field).source === 'db',
+                'hint-default': fieldStatus(field).source === 'default',
+                'hint-none': fieldStatus(field).source === 'none',
+              }"
+            >
+              {{ fieldStatus(field).text }}
+            </span>
           </div>
 
           <div class="form-actions">
-            <button class="btn-save" :disabled="saving" @click="saveConfig">
-              {{ saving ? "Enregistrement..." : "Enregistrer" }}
+            <button
+              class="btn-save"
+              :disabled="saving || !hasChanges"
+              @click="saveConfig"
+            >
+              {{ saving ? "Enregistrement..." : hasChanges ? `Enregistrer (${changesCount})` : "Aucune modification" }}
+            </button>
+            <button
+              v-if="hasChanges"
+              class="btn-cancel"
+              @click="cancelChanges"
+            >
+              Annuler
             </button>
             <span v-if="successMessage" class="success-msg">{{ successMessage }}</span>
           </div>
@@ -206,16 +260,66 @@ watch(selectedWorker, loadFormValues);
 .config-form { background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
 .config-form h2 { font-size: 18px; margin-bottom: 20px; color: var(--text-primary); }
 .no-params { color: var(--text-secondary); font-size: 14px; padding: 20px 0; }
-.form-group { margin-bottom: 16px; }
-.form-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px; }
+
+.form-group {
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.form-group.modified {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.form-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 6px;
+}
+
+.modified-badge {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
 .input-row { display: flex; align-items: center; gap: 8px; }
 .input-unit { font-size: 14px; font-weight: 600; color: var(--text-secondary); min-width: 30px; }
 .form-input { flex: 1; max-width: 200px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px; font-family: monospace; }
 .form-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); }
-.form-hint { display: block; font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+.form-input::placeholder { color: var(--text-secondary); opacity: 0.5; font-style: italic; }
+
+.form-hint { display: block; font-size: 11px; margin-top: 4px; }
+.hint-db { color: #22c55e; }
+.hint-default { color: var(--text-secondary); font-style: italic; }
+.hint-none { color: var(--text-secondary); opacity: 0.6; }
+
 .form-actions { display: flex; align-items: center; gap: 12px; margin-top: 20px; }
 .btn-save { padding: 10px 24px; background: var(--accent); color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
 .btn-save:hover:not(:disabled) { opacity: 0.9; }
-.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.btn-cancel {
+  padding: 10px 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.btn-cancel:hover { border-color: var(--danger); color: var(--danger); }
+
 .success-msg { color: var(--success); font-size: 13px; font-weight: 500; }
 </style>

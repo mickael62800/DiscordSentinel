@@ -4,7 +4,7 @@ use serenity::all::{
 };
 use tracing::{error, info};
 
-use crate::handler::{send_role_panel, ApiClientKey};
+use crate::handler::{send_role_panel, RolesApiKey};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("roles-panel")
@@ -51,7 +51,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 }
 
-async fn handle_deploy(ctx: &Context, command: &CommandInteraction, guild_id: &str) {
+async fn handle_deploy(ctx: &Context, command: &CommandInteraction, _guild_id: &str) {
     let sub_options = match &command.data.options[0].value {
         CommandDataOptionValue::SubCommand(opts) => opts,
         _ => return,
@@ -66,7 +66,7 @@ async fn handle_deploy(ctx: &Context, command: &CommandInteraction, guild_id: &s
     };
 
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
+    let api = match data.get::<RolesApiKey>() {
         Some(a) => a,
         None => return,
     };
@@ -101,7 +101,7 @@ async fn handle_deploy(ctx: &Context, command: &CommandInteraction, guild_id: &s
 
 async fn handle_list(ctx: &Context, command: &CommandInteraction, guild_id: &str) {
     let data = ctx.data.read().await;
-    let api = match data.get::<ApiClientKey>() {
+    let api = match data.get::<RolesApiKey>() {
         Some(a) => a,
         None => return,
     };

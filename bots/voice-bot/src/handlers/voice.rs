@@ -10,12 +10,14 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use crate::api_client::CreateVoiceChannelRequest;
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::{ApiClient, CreateVoiceChannelRequest};
 use crate::handler::{
-    ApiClientKey, ConfigKey, CooldownTrackerKey, MembersToVoiceMapKey,
+    ConfigKey, CooldownTrackerKey, MembersToVoiceMapKey,
     TextToVoiceMapKey, VoiceOwnerMapKey,
 };
-use crate::utils::embeds;
+use crate::embeds;
 
 pub async fn handle_voice_state_update(
     ctx: &Context,
@@ -37,8 +39,8 @@ pub async fn handle_voice_state_update(
         };
 
         // Tenter de charger depuis l'API
-        if let Some(api) = data.get::<ApiClientKey>() {
-            match api.get_guild_config(&guild_id.to_string()).await {
+        if let Some(base) = data.get::<ApiClientKey>() {
+            match base.get_guild_config(&guild_id.to_string()).await {
                 Ok(config) => {
                     let public_id = config.get("public_creator_channel_id")
                         .and_then(|v| v.parse::<u64>().ok())
@@ -277,7 +279,8 @@ async fn create_temp_channel(
     // Enregistrer via l'API
     {
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let api = ApiClient::new(base.clone());
             let request = CreateVoiceChannelRequest {
                 guild_id: guild_id.get().to_string(),
                 owner_id: user_id.get().to_string(),
@@ -548,7 +551,8 @@ async fn check_and_delete_empty(
     // Recuperer les infos du channel via l'API (pour le queue_channel_id)
     let queue_channel_id = {
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let api = ApiClient::new(base.clone());
             api.get_channel(&voice_channel_id.get().to_string())
                 .await
                 .ok()
@@ -564,7 +568,8 @@ async fn check_and_delete_empty(
     // Supprimer via l'API
     {
         let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let api = ApiClient::new(base.clone());
             if let Err(e) = api
                 .delete_channel(&voice_channel_id.get().to_string())
                 .await
@@ -678,8 +683,8 @@ async fn check_queue_join(
     user_id: serenity::model::id::UserId,
 ) {
     let data = ctx.data.read().await;
-    let _api = match data.get::<ApiClientKey>() {
-        Some(api) => api,
+    let _base = match data.get::<ApiClientKey>() {
+        Some(b) => b,
         None => return,
     };
 

@@ -1,27 +1,27 @@
-mod account_checker;
 mod api_client;
-mod captcha;
 mod config;
 mod handler;
-mod quarantine;
-mod raid_detector;
-mod slowmode;
+mod security;
 
 use std::sync::Arc;
 
 use serenity::prelude::*;
 use tracing::info;
 
-use crate::account_checker::AccountChecker;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::config::BotConfig;
+use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+
 use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::{
-    AccountCheckerKey, ApiClientKey, ConfigKey, Handler, QuarantineKey, RaidDetectorKey,
-    SlowmodeKey,
+    AccountCheckerKey, ConfigKey, Handler, QuarantineKey, RaidDetectorKey,
+    SecurityApiKey, SlowmodeKey,
 };
-use crate::quarantine::QuarantineManager;
-use crate::raid_detector::RaidDetector;
-use crate::slowmode::SlowmodeManager;
+use crate::security::account_checker::AccountChecker;
+use crate::security::quarantine::QuarantineManager;
+use crate::security::raid_detector::RaidDetector;
+use crate::security::slowmode::SlowmodeManager;
 
 #[tokio::main]
 async fn main() {
@@ -34,26 +34,29 @@ async fn main() {
     let config = Config::from_env();
 
     info!(
-        api_url = %config.api_base_url,
+        api_url = %config.base().api_base_url,
         raid_threshold = config.raid_join_threshold,
         raid_window = config.raid_join_window_secs,
         min_account_age = config.min_account_age_secs,
         quarantine = config.quarantine_enabled,
         captcha = config.captcha_enabled,
         slowmode = config.slowmode_seconds,
-        "Démarrage du security bot"
+        "Demarrage du security bot"
     );
 
     let intents = GatewayIntents::GUILDS | GatewayIntents::GUILD_MEMBERS;
 
-    let mut client = Client::builder(&config.discord_token, intents)
+    let base_api = Arc::new(BaseApiClient::new(&config, "security-bot"));
+
+    let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
         .await
-        .expect("Erreur création du client Discord");
+        .expect("Erreur creation du client Discord");
 
     {
         let mut data = client.data.write().await;
-        data.insert::<ApiClientKey>(ApiClient::new(&config));
+        data.insert::<ApiClientKey>(Arc::clone(&base_api));
+        data.insert::<SecurityApiKey>(ApiClient::new(Arc::clone(&base_api)));
         data.insert::<RaidDetectorKey>(RaidDetector::new(
             config.raid_join_threshold,
             config.raid_join_window_secs,
@@ -65,17 +68,9 @@ async fn main() {
     }
 
     // Heartbeat task
-    let api_for_heartbeat = ApiClient::new(&config);
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) = api_for_heartbeat.heartbeat("security-bot").await {
-                tracing::warn!("Heartbeat failed: {}", e);
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        }
-    });
+    spawn_heartbeat(Arc::clone(&base_api));
 
-    // Background task: kick des utilisateurs en quarantaine qui n'ont pas passé le captcha
+    // Background task: kick des utilisateurs en quarantaine qui n'ont pas passe le captcha
     let data_for_timeout = Arc::clone(&client.data);
     let http_for_timeout = Arc::clone(&client.http);
     let captcha_timeout = config.captcha_timeout_secs;
@@ -91,13 +86,13 @@ async fn main() {
 
             let expired = quarantine.expired_users(captcha_timeout);
             for (guild_id, user_id) in expired {
-                // Kick l'utilisateur qui n'a pas vérifié
+                // Kick l'utilisateur qui n'a pas verifie
                 if let Err(e) = guild_id.kick(&*http_for_timeout, user_id).await {
                     tracing::warn!(
                         error = %e,
                         guild_id = %guild_id,
                         user_id = %user_id,
-                        "Impossible de kick l'utilisateur en quarantaine expirée"
+                        "Impossible de kick l'utilisateur en quarantaine expiree"
                     );
                 } else {
                     info!(
@@ -111,7 +106,7 @@ async fn main() {
         }
     });
 
-    // Background task: revert slowmode après expiration
+    // Background task: revert slowmode apres expiration
     let data_for_slowmode = Arc::clone(&client.data);
     let http_for_slowmode = Arc::clone(&client.http);
     let slowmode_duration = config.slowmode_duration_secs;

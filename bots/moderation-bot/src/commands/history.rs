@@ -4,13 +4,13 @@ use serenity::all::{
 };
 use tracing::error;
 
-use crate::handler::ApiClientKey;
+use crate::handler::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("history")
         .description("Voir l'historique des sanctions d'un utilisateur")
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur à vérifier")
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a verifier")
                 .required(true),
         )
 }
@@ -26,7 +26,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let data = ctx.data.read().await;
-    let api = data.get::<ApiClientKey>().unwrap();
+    let api = data.get::<ModerationApiKey>().unwrap();
 
     match api.get_history(&guild_id.to_string(), &target_id.to_string()).await {
         Ok(history) => {
@@ -36,7 +36,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             );
 
             if history.actions.is_empty() {
-                msg.push_str("Aucune sanction enregistrée.");
+                msg.push_str("Aucune sanction enregistree.");
             } else {
                 for (i, action) in history.actions.iter().take(10).enumerate() {
                     let emoji = match action.action_type.as_str() {
@@ -60,7 +60,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             reply(ctx, command, &msg).await;
         }
         Err(e) => {
-            error!(error = %e, "Erreur récupération historique");
+            error!(error = %e, "Erreur recuperation historique");
             reply(ctx, command, &format!("Erreur : {e}")).await;
         }
     }

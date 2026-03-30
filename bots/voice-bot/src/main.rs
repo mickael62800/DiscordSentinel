@@ -1,10 +1,10 @@
 mod api_client;
 mod config;
+mod embeds;
 mod handler;
 mod handlers;
 mod interactions;
 mod state;
-mod utils;
 
 use std::sync::Arc;
 
@@ -12,10 +12,14 @@ use dashmap::DashMap;
 use serenity::prelude::*;
 use tracing::info;
 
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::config::BotConfig;
+use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
+
 use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::{
-    ApiClientKey, ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
+    ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
     PendingChannelsKey, TextToVoiceMapKey, VoiceOwnerMapKey, VoteTrackerKey,
 };
 use crate::state::{CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
@@ -30,7 +34,10 @@ async fn main() {
 
     let config = Config::from_env();
 
-    info!(api_url = %config.api_base_url, "Demarrage du voice bot");
+    info!(api_url = %config.api_base_url(), "Demarrage du voice bot");
+
+    let api = Arc::new(BaseApiClient::new(&config, "voice-bot"));
+    let voice_api = ApiClient::new(api.clone());
 
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_VOICE_STATES
@@ -38,15 +45,13 @@ async fn main() {
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let api_client = ApiClient::new(&config);
-
     // Charger les salons existants depuis l'API au demarrage
     let text_to_voice: Arc<DashMap<serenity::model::id::ChannelId, serenity::model::id::ChannelId>> = Arc::new(DashMap::new());
     let members_to_voice: Arc<DashMap<serenity::model::id::ChannelId, serenity::model::id::ChannelId>> = Arc::new(DashMap::new());
     let voice_owner: Arc<DashMap<serenity::model::id::ChannelId, serenity::model::id::UserId>> = Arc::new(DashMap::new());
 
     let guild_id_str = config.guild_id.to_string();
-    match api_client.list_channels(&guild_id_str).await {
+    match voice_api.list_channels(&guild_id_str).await {
         Ok(channels) => {
             for ch in &channels {
                 let voice_id = serenity::model::id::ChannelId::new(
@@ -76,17 +81,14 @@ async fn main() {
         }
     }
 
-    let mut client = Client::builder(&config.discord_token, intents)
+    let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .await
         .expect("Erreur creation du client Discord");
 
-    // Heartbeat task
-    let api_for_heartbeat = ApiClient::new(&config);
-
     {
         let mut data = client.data.write().await;
-        data.insert::<ApiClientKey>(api_client);
+        data.insert::<ApiClientKey>(api.clone());
         data.insert::<ConfigKey>(config);
         data.insert::<FloodTrackerKey>(Arc::new(FloodTracker::new()));
         data.insert::<VoteTrackerKey>(Arc::new(VoteTracker::new()));
@@ -97,14 +99,7 @@ async fn main() {
         data.insert::<VoiceOwnerMapKey>(voice_owner);
     }
 
-    tokio::spawn(async move {
-        loop {
-            if let Err(e) = api_for_heartbeat.heartbeat("voice-bot").await {
-                tracing::warn!("Heartbeat failed: {}", e);
-            }
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-        }
-    });
+    spawn_heartbeat(api);
 
     if let Err(e) = client.start().await {
         eprintln!("Erreur fatale : {e}");

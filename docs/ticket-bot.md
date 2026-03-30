@@ -1,8 +1,8 @@
 # Ticket Bot
 
-Bot de gestion de tickets pour Discord. Il permet aux utilisateurs de créer des tickets de support, signaler des problèmes, faire appel de sanctions, et aux modérateurs de gérer ces tickets.
+Bot de gestion de tickets pour Discord. Il permet aux utilisateurs de creer des tickets de support, signaler des problemes, faire appel de sanctions, et aux moderateurs de gerer ces tickets.
 
-Conformément à la philosophie du projet, le bot est une **interface légère** : il crée les threads Discord et transmet tout au backend API qui persiste et gère les données.
+Conformement a la philosophie du projet, le bot est une **interface legere** : il cree les salons Discord et transmet tout au backend API qui persiste et gere les donnees.
 
 ---
 
@@ -14,9 +14,10 @@ Conformément à la philosophie du projet, le bot est une **interface légère**
 | Framework Discord | Serenity 0.12 |
 | Runtime async | Tokio |
 | Client HTTP | Reqwest 0.12 (rustls) |
-| Sérialisation | Serde / serde_json |
+| Serialisation | Serde / serde_json |
 | Configuration | dotenvy (.env) |
 | Logging | tracing + tracing-subscriber |
+| Crate partage | sentinel-shared (api_client, config, heartbeat) |
 
 ---
 
@@ -29,106 +30,184 @@ bots/ticket-bot/
 ├── .dockerignore
 ├── .env.example
 └── src/
-    ├── main.rs              # Point d'entrée, init client Discord
-    ├── config.rs            # Chargement config depuis .env
-    ├── api_client.rs        # Client HTTP vers le backend (CRUD tickets)
-    ├── handler.rs           # EventHandler : slash commands + sync messages
+    ├── main.rs              # Point d'entree, init client Discord
+    ├── config.rs            # Chargement config depuis .env (extends BaseConfig)
+    ├── api_client.rs        # Client HTTP specifique tickets (wraps BaseApiClient)
+    ├── handler.rs           # EventHandler : panel interactif + sync messages
     └── commands/
         ├── mod.rs           # Enregistrement des slash commands
-        └── ticket.rs        # /ticket create | close | assign
+        └── ticket.rs        # Panel interactif, creation, fermeture, assignation
 ```
 
 ---
 
-## Slash commands
+## Fonctionnement actuel
 
-### `/ticket create <title> <category> [priority]`
+### Panel interactif (methode principale)
 
-Crée un nouveau ticket.
+Le bot deploie un **panel interactif** dans un salon avec un bouton "Creer un ticket". Quand un utilisateur clique :
 
-| Paramètre | Obligatoire | Type | Description |
-|-----------|-------------|------|-------------|
-| `title` | Oui | string | Titre du ticket |
-| `category` | Oui | choix | `report`, `appeal`, `permissions`, `bug`, `suggestion` |
-| `priority` | Non | choix | `urgent`, `high`, `medium` (défaut), `low` |
+1. Un **menu deroulant** apparait avec 6 types de ticket :
+   - Probleme serveur
+   - Signalement utilisateur
+   - Appel de sanction
+   - Question / aide
+   - Suggestion
+   - Autre
 
-**Ce qui se passe :**
-1. Le bot envoie `POST /api/tickets` au backend avec les infos
-2. Le backend crée le ticket en base et retourne l'ID
-3. Le bot crée un **thread privé** nommé `ticket-{id}` dans le salon actuel
-4. Le bot envoie un message d'ouverture dans le thread avec les détails
-5. L'utilisateur reçoit une réponse éphémère avec le lien vers le thread
+2. L'utilisateur selectionne un type
+3. Le bot cree un **salon textuel prive** (pas un thread) avec permissions :
+   - `@everyone` : DENY (lecture/ecriture)
+   - Auteur du ticket : ALLOW (lecture/ecriture)
+   - Staff/moderateurs : ALLOW (lecture/ecriture)
+4. Le bot envoie `POST /api/tickets` au backend
+5. Un message de bienvenue est affiche dans le salon avec les boutons :
+   - "Passer en vocal" (cree un salon vocal lie)
+   - "Inviter quelqu'un" (ajoute un utilisateur au ticket)
+   - "Fermer le ticket"
 
-### `/ticket close`
+### Slash commands
 
-Ferme le ticket du salon actuel (doit être utilisé dans un thread `ticket-*`).
+#### `/ticket setup`
 
-**Ce qui se passe :**
+Deploie le panel interactif dans le salon actuel (admin uniquement).
+
+#### `/ticket close`
+
+Ferme le ticket du salon actuel (doit etre utilise dans un salon `ticket-*`).
+
 1. Le bot envoie `PATCH /api/tickets/{id}/close` au backend
-2. Le backend passe le statut à `closed`
-3. Le bot archive et verrouille le thread Discord
+2. Le backend passe le statut a `closed`
+3. Le salon Discord est supprime apres 5 secondes
 
-### `/ticket assign <moderator>`
+### Sync automatique des messages
 
-Assigne un modérateur au ticket.
+Tout message envoye dans un salon `ticket-*` est automatiquement transmis au backend via `POST /api/tickets/{id}/messages`. Le bot determine le role de l'auteur (moderateur ou utilisateur) via les permissions Discord.
 
-| Paramètre | Obligatoire | Type | Description |
-|-----------|-------------|------|-------------|
-| `moderator` | Oui | @utilisateur | Le modérateur à assigner |
-
-**Ce qui se passe :**
-1. Le bot envoie `PATCH /api/tickets/{id}/assign` au backend
-2. Le backend enregistre l'assignation
-3. Le bot ajoute le modérateur au thread Discord
+Les messages de bots sont ignores pour eviter les boucles.
 
 ---
 
-## Sync automatique des messages
+## Ce qui fonctionne (etat actuel)
 
-Tout message envoyé par un utilisateur dans un thread `ticket-*` est automatiquement transmis au backend via `POST /api/tickets/{id}/messages`. Cela permet à l'app desktop de voir la conversation complète.
+- [x] Panel interactif avec bouton + menu deroulant (6 types)
+- [x] Creation de salon prive avec permissions
+- [x] Envoi au backend (`POST /api/tickets`)
+- [x] Message de bienvenue avec boutons d'action
+- [x] Sync des messages vers le backend
+- [x] Fermeture via bouton ou slash command
+- [x] Suppression du salon Discord a la fermeture
+- [x] Heartbeat vers le backend (via sentinel-shared)
+- [x] Enregistrement des guilds au demarrage
+- [x] Logging des actions
 
-Le bot ignore les messages de bots pour éviter les boucles.
+---
+
+## Ce qui ne fonctionne PAS / bugs connus
+
+### BUG CRITIQUE : Fermeture utilise le nom du salon au lieu de l'UUID
+
+**Fichier :** `commands/ticket.rs` ligne ~334
+
+Le bot extrait l'ID du ticket depuis le nom du salon (`ticket-username-1234`) et l'envoie a l'API. Mais l'API attend un **UUID valide**. Le `close_ticket()` echoue silencieusement car `"username-1234"` n'est pas un UUID.
+
+**Correction :** Stocker l'UUID du ticket (retourne par le backend a la creation) dans le message de bienvenue ou dans les metadata du salon, et l'utiliser pour la fermeture.
+
+### BUG CRITIQUE : voice_channel_id et invited_user_id jamais transmis
+
+**Fichiers :** `api_client.rs` structs Ticket
+
+Les boutons "Passer en vocal" et "Inviter quelqu'un" creent bien les salons/permissions dans Discord, mais les IDs ne sont jamais envoyes au backend (`voice_channel_id`, `invited_user_id`). Ces champs existent en base de donnees mais restent toujours NULL.
+
+**Correction :** Apres creation du salon vocal ou invitation, appeler `PATCH /api/tickets/{id}/channels` (endpoint a creer cote API).
+
+### BUG CRITIQUE : Reponses du staff desktop jamais affichees dans Discord
+
+Quand un moderateur repond a un ticket depuis l'application bureau, le message est sauvegarde en base mais **jamais affiche dans le salon Discord**. La communication est a sens unique (Discord -> backend, mais pas backend -> Discord).
+
+**Correction :** Implementer un listener WebSocket dans le bot qui ecoute les events `ticket_message` et affiche les nouveaux messages dans le salon Discord correspondant.
+
+### BUG : Endpoint update_ticket_channel n'existe pas
+
+La fonction `update_ticket_channel()` est definie dans le service backend et les ports, mais **aucune route HTTP** n'est enregistree dans le router. L'endpoint est mort.
+
+**Correction :** Ajouter la route `PATCH /api/tickets/{id}/channels` dans le router de l'API.
+
+### BUG MINEUR : ticket_type manquant dans les structs bot et desktop
+
+Le champ `ticket_type` (probleme_serveur, signalement, appel, etc.) est envoye a la creation mais n'est pas present dans les structs de deserialisation du bot ni dans les types TypeScript du desktop.
+
+---
+
+## Limitations connues
+
+### Pas de validation des statuts et priorites
+
+Les statuts (`open`, `pending`, `closed`) et priorites (`urgent`, `high`, `medium`, `low`) sont des strings libres. L'API accepte n'importe quelle valeur sans validation. Devrait etre des enums.
+
+### Pas de rate limiting
+
+Un utilisateur peut creer un nombre illimite de tickets. Il faudrait limiter a ~5 tickets par jour par utilisateur.
+
+### Pas de recherche par texte
+
+Ni le bot ni le desktop ne permettent de chercher un ticket par son contenu ou son titre. Le filtrage se fait uniquement par statut/priorite.
+
+### Pas d'historique des assignations
+
+Quand un ticket est reassigne, l'ancien assignataire est ecrase. Aucune trace de qui a assigne a qui et quand.
+
+### Pas de notification lors de nouvelles reponses
+
+Quand un message est ajoute a un ticket (cote Discord ou cote desktop), les autres participants ne recoivent pas de notification push.
 
 ---
 
 ## Communication avec le backend
 
-| Action | Méthode | Endpoint | Description |
-|--------|---------|----------|-------------|
-| Créer un ticket | `POST` | `/api/tickets` | Crée le ticket en base |
-| Voir un ticket | `GET` | `/api/tickets/{id}` | Détail + messages |
-| Répondre | `POST` | `/api/tickets/{id}/messages` | Ajoute un message |
-| Fermer | `PATCH` | `/api/tickets/{id}/close` | Passe en statut `closed` |
-| Assigner | `PATCH` | `/api/tickets/{id}/assign` | Assigne un modérateur |
+| Action | Methode | Endpoint | Etat |
+|--------|---------|----------|------|
+| Creer un ticket | `POST` | `/api/tickets` | Fonctionne |
+| Voir un ticket | `GET` | `/api/tickets/{id}` | Fonctionne |
+| Repondre | `POST` | `/api/tickets/{id}/messages` | Fonctionne |
+| Fermer | `PATCH` | `/api/tickets/{id}/close` | Bug (UUID vs nom salon) |
+| Assigner | `PATCH` | `/api/tickets/{id}/assign` | Fonctionne |
+| Mettre a jour channels | `PATCH` | `/api/tickets/{id}/channels` | Route manquante |
 
 L'authentification se fait via le header `Authorization: Bearer <API_KEY>`.
 
-### Requête de création
+### Requete de creation
 
 ```json
 {
-  "title": "Utilisateur signalé pour harcèlement",
-  "priority": "high",
+  "title": "Probleme serveur",
+  "priority": "medium",
   "author_id": "111222333",
   "author_name": "pseudo",
   "server": "Mon Serveur",
-  "category": "report"
+  "category": "report",
+  "ticket_type": "probleme_serveur",
+  "channel_id": "999888777"
 }
 ```
 
-### Réponse de création
+### Reponse de creation
 
 ```json
 {
   "id": "550e8400-e29b-41d4-a716-446655440000",
-  "title": "Utilisateur signalé pour harcèlement",
+  "title": "Probleme serveur",
   "status": "open",
-  "priority": "high",
+  "priority": "medium",
   "author_id": "111222333",
   "author_name": "pseudo",
   "assigned_to": null,
   "server": "Mon Serveur",
   "category": "report",
+  "ticket_type": "probleme_serveur",
+  "channel_id": "999888777",
+  "voice_channel_id": null,
+  "invited_user_id": null,
   "created_at": "2026-03-26T09:00:00+00:00",
   "updated_at": "2026-03-26T09:00:00+00:00",
   "messages_count": 0
@@ -140,43 +219,52 @@ L'authentification se fait via le header `Authorization: Bearer <API_KEY>`.
 ## Flux complet
 
 ```
-Utilisateur tape /ticket create "Harcèlement" report high
-       │
-       ▼
-┌──────────────────────────────────────┐
-│           TICKET BOT                 │
-│                                      │
-│  1. Récupère les infos de la commande│
-│  2. POST /api/tickets → Backend      │
-└──────────────┬───────────────────────┘
-               │
-               ▼
-┌──────────────────────────────────────┐
-│           API BACKEND                │
-│                                      │
-│  1. Crée le ticket en base (PG)     │
-│  2. Retourne le ticket avec son ID  │
-└──────────────┬───────────────────────┘
-               │
-               ▼
-┌──────────────────────────────────────┐
-│           TICKET BOT                 │
-│                                      │
-│  3. Crée un thread privé sur Discord │
-│  4. Envoie le message d'ouverture   │
-│  5. Réponse éphémère à l'utilisateur│
-└──────────────────────────────────────┘
-               │
-               ▼
-  L'utilisateur et les modos discutent dans le thread
-  → Chaque message est sync vers POST /api/tickets/{id}/messages
-               │
-               ▼
-  Un modo tape /ticket close
-       │
-       ▼
-  Bot → PATCH /api/tickets/{id}/close → Backend
-  Bot → Archive et verrouille le thread Discord
+Utilisateur clique "Creer un ticket" sur le panel
+       |
+       v
+Menu deroulant : choisit "Signalement utilisateur"
+       |
+       v
++--------------------------------------+
+|           TICKET BOT                 |
+|                                      |
+|  1. Cree salon prive #ticket-xxx    |
+|  2. POST /api/tickets -> Backend     |
++--------------------------------------+
+       |
+       v
++--------------------------------------+
+|           API BACKEND                |
+|                                      |
+|  1. Cree le ticket en base (PG)     |
+|  2. Broadcast event ticket_new (WS) |
+|  3. Retourne le ticket avec son ID  |
++--------------------------------------+
+       |
+       v
++--------------------------------------+
+|           TICKET BOT                 |
+|                                      |
+|  3. Affiche message bienvenue       |
+|     + boutons (vocal, inviter,      |
+|       fermer)                        |
+|  4. Reponse ephemere a l'utilisateur|
++--------------------------------------+
+       |
+       v
+  L'utilisateur et les modos discutent dans le salon
+  -> Chaque message est sync vers POST /api/tickets/{id}/messages
+       |
+       v
+  [ Application bureau : le staff voit le ticket et peut repondre ]
+  -> PROBLEME : les reponses du staff ne remontent PAS vers Discord
+       |
+       v
+  Un modo clique "Fermer le ticket"
+       |
+       v
+  Bot -> PATCH /api/tickets/{id}/close -> Backend
+  Bot -> Supprime le salon Discord apres 5s
 ```
 
 ---
@@ -185,73 +273,49 @@ Utilisateur tape /ticket create "Harcèlement" report high
 
 ### Variables d'environnement
 
-Copier `.env.example` en `.env` :
-
-| Variable | Obligatoire | Description | Défaut |
+| Variable | Obligatoire | Description | Defaut |
 |----------|-------------|-------------|--------|
-| `DISCORD_TOKEN` | Oui | Token du bot Discord | - |
+| `TICKET_DISCORD_TOKEN` | Oui | Token du bot Discord | - |
 | `API_BASE_URL` | Non | URL du backend | `http://localhost:3000` |
-| `API_KEY` | Non | Clé API pour l'authentification | _(vide)_ |
-| `TICKET_CATEGORY_ID` | Non | ID de catégorie Discord pour les threads | _(vide)_ |
+| `API_KEY` | Non | Cle API pour l'authentification | _(vide)_ |
+| `TICKET_CATEGORY_ID` | Non | ID de categorie Discord pour les salons | _(vide)_ |
 
 ### Intents Discord requis
 
-- **GUILD_MESSAGES** : recevoir les messages dans les threads
+- **GUILD_MESSAGES** : recevoir les messages dans les salons
 - **MESSAGE_CONTENT** : lire le contenu des messages pour la sync
-- **GUILDS** : accéder aux infos des serveurs
+- **GUILDS** : acceder aux infos des serveurs
 
 ### Permissions Discord requises
 
 | Permission | Raison |
 |------------|--------|
-| Send Messages | Envoyer des messages dans les threads |
-| Create Private Threads | Créer les threads de tickets |
-| Manage Threads | Archiver/verrouiller les threads fermés |
-| Send Messages in Threads | Écrire dans les threads |
+| Send Messages | Envoyer des messages dans les salons |
+| Manage Channels | Creer/supprimer les salons de tickets |
+| Manage Roles | Gerer les permissions des salons prives |
+| Send Messages in Threads | Ecrire dans les threads |
 | Use Slash Commands | Enregistrer et utiliser les commandes |
+| Connect | Creer des salons vocaux lies aux tickets |
 
 ---
 
-## Installation et lancement
+## Plan de corrections (priorite)
 
-### Prérequis
+### Phase 1 : Bugs critiques
 
-- Rust >= 1.75
-- Un token de bot Discord avec les intents activés
-- Le backend Sentinel API lancé
+1. **Fixer close_ticket()** : stocker l'UUID du backend dans les metadata du salon et l'utiliser au lieu du nom
+2. **Ajouter route PATCH /api/tickets/{id}/channels** dans le router API
+3. **Transmettre voice_channel_id et invited_user_id** au backend apres creation
+4. **Ajouter ticket_type** dans les structs de deserialisation (bot + desktop)
 
-### Commandes
+### Phase 2 : Communication bidirectionnelle
 
-```bash
-cd bots/ticket-bot
+5. **Afficher les reponses staff dans Discord** : le bot ecoute les events WebSocket `ticket_message` et poste dans le salon
+6. **Notifications** : notifier les participants quand un message est ajoute
 
-cp .env.example .env
-# Renseigner DISCORD_TOKEN et API_BASE_URL
+### Phase 3 : Ameliorations
 
-cargo run
-```
-
-### Docker
-
-```bash
-docker compose up -d ticket-bot
-```
-
----
-
-## Logs
-
-| Niveau | Événement |
-|--------|-----------|
-| `INFO` | Démarrage, ticket créé/fermé/assigné, slash commands enregistrées |
-| `ERROR` | Erreur API, erreur Discord |
-
-Exemple :
-
-```
-2026-03-26T10:00:00  INFO ticket_bot: Démarrage du ticket bot api_url=http://localhost:3000
-2026-03-26T10:00:01  INFO ticket_bot::handler: Ticket bot connecté bot=TicketBot
-2026-03-26T10:00:01  INFO ticket_bot::handler: Slash commands enregistrées
-2026-03-26T10:05:00  INFO ticket_bot::commands::ticket: Ticket créé ticket_id=550e8400 author=pseudo guild=MonServeur
-2026-03-26T10:30:00  INFO ticket_bot::commands::ticket: Ticket fermé ticket_id=550e8400
-```
+7. **Enums** pour statuts et priorites (validation compile-time)
+8. **Rate limiting** : max 5 tickets/jour/utilisateur
+9. **Recherche** : endpoint de recherche par titre/contenu
+10. **Historique assignations** : table `ticket_assignments`

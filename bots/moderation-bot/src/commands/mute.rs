@@ -4,14 +4,17 @@ use serenity::all::{
 };
 use tracing::{error, info};
 
-use crate::api_client::{ApiClient, ModerationAction};
-use crate::handler::ApiClientKey;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::ModerationAction;
+use crate::handler::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("mute")
         .description("Mute un utilisateur (permanent ou temporaire)")
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur à mute")
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a mute")
                 .required(true),
         )
         .add_option(
@@ -22,7 +25,7 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::Integer,
                 "duration",
-                "Durée en minutes (vide = permanent, max 40320 = 28 jours)",
+                "Duree en minutes (vide = permanent, max 40320 = 28 jours)",
             ),
         )
 }
@@ -31,7 +34,7 @@ pub fn register_unmute() -> CreateCommand {
     CreateCommand::new("unmute")
         .description("Retirer le mute d'un utilisateur")
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur à unmute")
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a unmute")
                 .required(true),
         )
 }
@@ -75,13 +78,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             std::collections::HashMap::new()
         }
     };
-    let default_mute_duration_secs = ApiClient::config_u64(&guild_config, "default_mute_duration_secs", 28 * 24 * 3600);
-    let max_mute_duration_secs = ApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
+    let default_mute_duration_secs = BaseApiClient::config_u64(&guild_config, "default_mute_duration_secs", 28 * 24 * 3600);
+    let max_mute_duration_secs = BaseApiClient::config_u64(&guild_config, "max_mute_duration_secs", 28 * 24 * 3600);
 
     let duration_secs = duration_minutes.map(|m| (m as u64) * 60);
     // Discord timeout max = 28 jours. Si permanent, on utilise la valeur par defaut de la config.
     let timeout_secs = duration_secs.unwrap_or(default_mute_duration_secs);
-    let timeout_secs = timeout_secs.min(max_mute_duration_secs).min(28 * 24 * 3600); // cap à 28j Discord max
+    let timeout_secs = timeout_secs.min(max_mute_duration_secs).min(28 * 24 * 3600); // cap a 28j Discord max
 
     let ts = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -107,7 +110,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Log dans le backend
     let data = ctx.data.read().await;
-    let api = data.get::<ApiClientKey>().unwrap();
+    let api = data.get::<ModerationApiKey>().unwrap();
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
@@ -126,7 +129,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         error!(error = %e, "Erreur log mute");
     }
 
-    info!(target = %target.name, duration = %duration_label, "Mute appliqué");
+    info!(target = %target.name, duration = %duration_label, "Mute applique");
 
     // DM
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
@@ -141,7 +144,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     reply(ctx, command, &format!(
-        "🔇 **Mute ({duration_label})** appliqué à <@{}>.\nRaison : {reason}",
+        "🔇 **Mute ({duration_label})** applique a <@{}>.\nRaison : {reason}",
         target.id
     )).await;
 }
@@ -169,7 +172,7 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
 
     // Log unmute
     let data = ctx.data.read().await;
-    let api = data.get::<ApiClientKey>().unwrap();
+    let api = data.get::<ModerationApiKey>().unwrap();
     let target = target_id.to_user(&ctx.http).await.ok();
     let target_name = target.as_ref().map(|u| u.name.as_str()).unwrap_or("inconnu");
 
@@ -188,9 +191,9 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
 
     api.log_action(&action).await.ok();
 
-    info!(target = %target_name, "Unmute appliqué");
+    info!(target = %target_name, "Unmute applique");
 
-    reply(ctx, command, &format!("🔊 <@{target_id}> a été unmute.")).await;
+    reply(ctx, command, &format!("🔊 <@{target_id}> a ete unmute.")).await;
 }
 
 async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {

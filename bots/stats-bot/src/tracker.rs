@@ -72,6 +72,7 @@ impl StatsTracker {
     }
 
     /// Récupère les stats d'un utilisateur (inclut le temps vocal en cours).
+    #[allow(dead_code)]
     pub async fn get_user_stats(&self, guild_id: u64, user_id: u64) -> UserStats {
         let stats = self.stats.read().await;
         let mut result = stats
@@ -90,6 +91,7 @@ impl StatsTracker {
     }
 
     /// Récupère les stats de tous les utilisateurs d'un serveur.
+    #[allow(dead_code)]
     pub async fn get_guild_stats(&self, guild_id: u64) -> Vec<(u64, UserStats)> {
         let stats = self.stats.read().await;
         let sessions = self.voice_sessions.read().await;

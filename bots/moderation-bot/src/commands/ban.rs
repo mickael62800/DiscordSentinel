@@ -4,14 +4,17 @@ use serenity::all::{
 };
 use tracing::{error, info};
 
-use crate::api_client::{ApiClient, ModerationAction};
-use crate::handler::ApiClientKey;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::ModerationAction;
+use crate::handler::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("ban")
         .description("Bannir un utilisateur (permanent ou temporaire)")
         .add_option(
-            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur à bannir")
+            CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a bannir")
                 .required(true),
         )
         .add_option(
@@ -22,16 +25,16 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::Integer,
                 "duration",
-                "Durée en heures (vide = permanent)",
+                "Duree en heures (vide = permanent)",
             ),
         )
 }
 
 pub fn register_unban() -> CreateCommand {
     CreateCommand::new("unban")
-        .description("Débannir un utilisateur")
+        .description("Debannir un utilisateur")
         .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur à débannir")
+            CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur a debannir")
                 .required(true),
         )
 }
@@ -77,9 +80,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             std::collections::HashMap::new()
         }
     };
-    let ban_delete_message_days = ApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8;
+    let ban_delete_message_days = BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8;
 
-    // DM avant le ban (après le ban on ne peut plus DM)
+    // DM avant le ban (apres le ban on ne peut plus DM)
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
         dm.send_message(
             &ctx.http,
@@ -91,7 +94,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ).await.ok();
     }
 
-    // Exécuter le ban Discord (supprime les messages des derniers N jours)
+    // Executer le ban Discord (supprime les messages des derniers N jours)
     if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, ban_delete_message_days, reason).await {
         error!(error = %e, "Impossible de bannir");
         reply(ctx, command, &format!("Erreur Discord : {e}")).await;
@@ -100,7 +103,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Log dans le backend
     let data = ctx.data.read().await;
-    let api = data.get::<ApiClientKey>().unwrap();
+    let api = data.get::<ModerationApiKey>().unwrap();
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
@@ -119,10 +122,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         error!(error = %e, "Erreur log ban");
     }
 
-    info!(target = %target.name, duration = %duration_label, "Ban appliqué");
+    info!(target = %target.name, duration = %duration_label, "Ban applique");
 
     reply(ctx, command, &format!(
-        "🔨 **Ban ({duration_label})** appliqué à **{}**.\nRaison : {reason}",
+        "🔨 **Ban ({duration_label})** applique a **{}**.\nRaison : {reason}",
         target.name
     )).await;
 }
@@ -145,14 +148,14 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
     let target_uid = serenity::model::id::UserId::new(user_id);
 
     if let Err(e) = guild_id.unban(&ctx.http, target_uid).await {
-        error!(error = %e, "Impossible de débannir");
+        error!(error = %e, "Impossible de debannir");
         reply(ctx, command, &format!("Erreur : {e}")).await;
         return;
     }
 
     // Log
     let data = ctx.data.read().await;
-    let api = data.get::<ApiClientKey>().unwrap();
+    let api = data.get::<ModerationApiKey>().unwrap();
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
@@ -169,9 +172,9 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
 
     api.log_action(&action).await.ok();
 
-    info!(target_id = user_id_str, "Unban appliqué");
+    info!(target_id = user_id_str, "Unban applique");
 
-    reply(ctx, command, &format!("Utilisateur `{user_id_str}` débanni.")).await;
+    reply(ctx, command, &format!("Utilisateur `{user_id_str}` debanni.")).await;
 }
 
 async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {

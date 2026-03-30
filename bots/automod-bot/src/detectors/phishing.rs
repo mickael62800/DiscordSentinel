@@ -84,49 +84,106 @@ pub fn detect(content: &str) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_discord_phishing_links() {
-        assert!(detect("Va voir https://dlscord.gift/nitro-free"));
-        assert!(detect("https://disc0rd-app.com/verify"));
-        assert!(detect("https://discordnitro-gift.xyz/claim"));
-        assert!(detect("Regarde https://discord-gift.ru/free"));
-    }
+    // ── Typosquatting Discord ──
 
     #[test]
-    fn test_steam_phishing() {
-        assert!(detect("https://steamcommunlty.com/trade"));
-        assert!(detect("https://steampowored.com/login"));
-    }
+    fn discord_typo_dlscord() { assert!(detect("https://dlscord.gift/nitro")); }
+    #[test]
+    fn discord_typo_disc0rd() { assert!(detect("https://disc0rd-app.com/verify")); }
+    #[test]
+    fn discord_typo_d1scord() { assert!(detect("https://d1scord.com/free")); }
+    #[test]
+    fn discord_nitro_fake() { assert!(detect("https://discordnitro-gift.xyz/claim")); }
+    #[test]
+    fn discord_dash_variant() { assert!(detect("https://discord-gift.ru/free")); }
+    #[test]
+    fn discord_fake_app() { assert!(detect("https://disc0rdapp.com/login")); }
+
+    // ── Typosquatting Steam ──
 
     #[test]
-    fn test_ip_grabbers() {
-        assert!(detect("https://grabify.link/abc123"));
-        assert!(detect("https://iplogger.org/test"));
-    }
+    fn steam_typo_communlty() { assert!(detect("https://steamcommunlty.com/trade")); }
+    #[test]
+    fn steam_typo_powored() { assert!(detect("https://steampowored.com/login")); }
+    #[test]
+    fn steam_typo_st3am() { assert!(detect("https://st3amcommunity.com/profile")); }
+
+    // ── IP grabbers ──
 
     #[test]
-    fn test_scam_messages() {
-        assert!(detect("Free Discord Nitro! Claim now"));
-        assert!(detect("Recois ton cadeau nitro gratuit"));
-        assert!(detect("Free steam gift card for everyone"));
-        assert!(detect("Earn $500 in crypto today"));
-        assert!(detect("Send 0.1 BTC and get 1 BTC back"));
-        assert!(detect("Your account has been disabled, verify within 24 hours"));
-    }
+    fn grabify() { assert!(detect("https://grabify.link/abc123")); }
+    #[test]
+    fn iplogger() { assert!(detect("https://iplogger.org/test")); }
+    #[test]
+    fn blasze() { assert!(detect("https://blasze.tk/track")); }
+
+    // ── Scam messages texte (sans lien) ──
 
     #[test]
-    fn test_legitimate_messages() {
-        assert!(!detect("Salut, tu veux jouer a un jeu ?"));
-        assert!(!detect("J'ai achete Nitro hier c'est cool"));
-        assert!(!detect("https://discord.com/channels/123/456"));
-        assert!(!detect("https://store.steampowered.com/app/730"));
-        assert!(!detect("Mon compte Steam est ancien"));
-        assert!(!detect("J'ai de la crypto sur Binance"));
-    }
+    fn scam_free_nitro_en() { assert!(detect("Free Discord Nitro! Claim now")); }
+    #[test]
+    fn scam_free_nitro_fr() { assert!(detect("Recois ton cadeau nitro gratuit")); }
+    #[test]
+    fn scam_nitro_for_free() { assert!(detect("Discord Nitro for free here")); }
+    #[test]
+    fn scam_free_steam() { assert!(detect("Free steam gift card for everyone")); }
+    #[test]
+    fn scam_steam_wallet_free() { assert!(detect("Steam wallet for free click here")); }
+    #[test]
+    fn scam_crypto_earn() { assert!(detect("Earn $500 in crypto today")); }
+    #[test]
+    fn scam_bitcoin_giveaway() { assert!(detect("Bitcoin giveaway live now")); }
+    #[test]
+    fn scam_send_btc() { assert!(detect("Send 0.1 BTC and get 1 BTC back")); }
+    #[test]
+    fn scam_account_disabled() { assert!(detect("Your account has been disabled, verify now")); }
+    #[test]
+    fn scam_verify_24h() { assert!(detect("Verify your account within 24 hours")); }
+    #[test]
+    fn scam_qr_code() { assert!(detect("Scan this QR code to get Nitro")); }
+    #[test]
+    fn scam_fr_gagner_crypto() { assert!(detect("Gagnez 1000 en crypto facilement")); }
+    #[test]
+    fn scam_eth_airdrop() { assert!(detect("Ethereum airdrop happening now")); }
+
+    // ── Domaines de phishing generiques ──
 
     #[test]
-    fn test_real_discord_links_not_flagged() {
-        assert!(!detect("https://discord.com/invite/abc123"));
-        assert!(!detect("https://discord.gg/serveur"));
-    }
+    fn generic_login_verify() { assert!(detect("https://discord-login-verify.com/auth")); }
+    #[test]
+    fn generic_verify_account() { assert!(detect("https://verify-account-now.xyz/step1")); }
+    #[test]
+    fn free_nitro_domain() { assert!(detect("https://free-nitro-generator.com/claim")); }
+
+    // ── Whitelist — vrais domaines NE DOIVENT PAS trigger ──
+
+    #[test]
+    fn legit_discord_com() { assert!(!detect("https://discord.com/channels/123/456")); }
+    #[test]
+    fn legit_discord_invite() { assert!(!detect("https://discord.com/invite/abc123")); }
+    #[test]
+    fn legit_discord_gg() { assert!(!detect("https://discord.gg/serveur")); }
+    #[test]
+    fn legit_steam_store() { assert!(!detect("https://store.steampowered.com/app/730")); }
+    #[test]
+    fn legit_steamcommunity() { assert!(!detect("https://steamcommunity.com/id/user")); }
+    #[test]
+    fn legit_cdn_discord() { assert!(!detect("https://cdn.discordapp.com/attachments/123/456/image.png")); }
+
+    // ── Messages normaux — NE DOIVENT PAS trigger ──
+
+    #[test]
+    fn normal_gaming() { assert!(!detect("On joue a quoi ce soir ?")); }
+    #[test]
+    fn normal_nitro_mention() { assert!(!detect("J'ai achete Nitro hier c'est cool")); }
+    #[test]
+    fn normal_steam_mention() { assert!(!detect("Mon compte Steam est ancien")); }
+    #[test]
+    fn normal_crypto_mention() { assert!(!detect("J'ai de la crypto sur Binance")); }
+    #[test]
+    fn normal_account_mention() { assert!(!detect("Mon account Discord date de 2020")); }
+    #[test]
+    fn normal_empty() { assert!(!detect("")); }
+    #[test]
+    fn normal_french_chat() { assert!(!detect("Salut les gars, quelqu'un pour ranked ?")); }
 }

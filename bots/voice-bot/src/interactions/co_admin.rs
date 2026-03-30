@@ -8,8 +8,9 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use crate::api_client::AddCoAdminRequest;
-use crate::handler::ApiClientKey;
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use crate::api_client::{ApiClient, AddCoAdminRequest};
 
 /// Handle co-admin interactions: promote/demote.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -77,7 +78,8 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
     // Verify ownership
     let ch = {
         let data = ctx.data.read().await;
-        let api = data.get::<ApiClientKey>().expect("ApiClient");
+        let base = data.get::<ApiClientKey>().expect("ApiClient");
+        let api = ApiClient::new(base.clone());
         match api.get_channel(&voice_channel_id.get().to_string()).await {
             Ok(Some(ch)) => ch,
             _ => {
@@ -161,7 +163,8 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
 
     {
         let data = ctx.data.read().await;
-        let api = data.get::<ApiClientKey>().expect("ApiClient");
+        let base = data.get::<ApiClientKey>().expect("ApiClient");
+        let api = ApiClient::new(base.clone());
         if let Err(e) = api
             .add_co_admin(&voice_channel_id.get().to_string(), &request)
             .await

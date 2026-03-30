@@ -1,9 +1,9 @@
 use serenity::model::id::ChannelId;
+use sentinel_shared::config::{BaseConfig, BotConfig};
 
+#[derive(Clone)]
 pub struct Config {
-    pub discord_token: String,
-    pub api_base_url: String,
-    pub api_key: String,
+    base: BaseConfig,
     pub guild_id: u64,
     pub public_creator_channel_id: ChannelId,
     pub private_creator_channel_id: ChannelId,
@@ -12,11 +12,7 @@ pub struct Config {
 
 impl Config {
     pub fn from_env() -> Self {
-        let discord_token =
-            std::env::var("DISCORD_TOKEN").expect("DISCORD_TOKEN manquant dans .env");
-        let api_base_url = std::env::var("API_BASE_URL")
-            .unwrap_or_else(|_| "http://localhost:3000".to_string());
-        let api_key = std::env::var("API_KEY").unwrap_or_default();
+        let base = BaseConfig::from_env("VOICE_DISCORD_TOKEN");
 
         let guild_id: u64 = std::env::var("GUILD_ID")
             .expect("GUILD_ID manquant dans .env")
@@ -38,13 +34,17 @@ impl Config {
             .and_then(|v| v.parse().ok());
 
         Self {
-            discord_token,
-            api_base_url,
-            api_key,
+            base,
             guild_id,
             public_creator_channel_id: ChannelId::new(public_creator),
             private_creator_channel_id: ChannelId::new(private_creator),
             log_channel_id: log_channel_id.map(ChannelId::new),
         }
+    }
+}
+
+impl BotConfig for Config {
+    fn base(&self) -> &BaseConfig {
+        &self.base
     }
 }
