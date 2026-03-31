@@ -18,6 +18,7 @@ pub struct VoiceChannel {
     pub visibility: String,
     pub queue_enabled: bool,
     pub locked: bool,
+    pub stage_enabled: bool,
     pub member_limit: Option<i32>,
     pub status: Option<String>,
     pub channel_status: String,
@@ -57,8 +58,44 @@ pub struct VoiceChannelBan {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceChannelInviteLink {
+    pub id: Uuid,
+    pub voice_channel_id: Uuid,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub created_by: String,
+    pub created_by_name: String,
+    pub code: String,
+    pub max_uses: Option<i32>,
+    pub current_uses: i32,
+    pub expires_at: DateTime<Utc>,
+    pub revoked: bool,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceChannelTheme {
+    pub id: Uuid,
+    pub guild_id: String,
+    pub name: String,
+    pub emoji: Option<String>,
+    pub channel_name_template: String,
+    pub member_limit: Option<i32>,
+    pub visibility: String,
+    pub locked: bool,
+    pub queue_enabled: bool,
+    pub bitrate: Option<i32>,
+    pub slowmode_secs: Option<i32>,
+    pub stage_enabled: bool,
+    pub is_default: bool,
+    pub sort_order: i32,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannelDetail {
     pub channel: VoiceChannel,
     pub co_admins: Vec<VoiceChannelCoAdmin>,
     pub bans: Vec<VoiceChannelBan>,
+    pub invite_links: Vec<VoiceChannelInviteLink>,
 }

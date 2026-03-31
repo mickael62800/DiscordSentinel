@@ -4,54 +4,15 @@ Ce document decrit la logique metier exacte de chaque bot, telle qu'implementee 
 
 ---
 
-## Renommages prevus
+## Renommages
 
-Deux bots vont etre renommes pour refleter leur perimetre reel apres les extensions planifiees :
+### ✅ `stats-bot` → `progression-bot` (FAIT — migration 038)
 
-| Ancien nom | Nouveau nom | Raison |
-|-----------|------------|--------|
-| `stats-bot` | **`progression-bot`** | Ne fait plus seulement des "stats" : gere l'XP, les niveaux, les streaks, les badges, les cooldowns, les multiplicateurs. "Progression" reflete le parcours du membre dans le serveur. |
-| `roles-bot` | **`community-bot`** | Ne fait plus seulement des "roles" : gere les auto-roles, les panels, l'onboarding des nouveaux membres, le parcours guide, le tracking de retention. "Community" reflete la mission d'accueil et d'integration. |
+Ne fait plus seulement des "stats" : gere l'XP, les niveaux, les streaks, les badges, les cooldowns, les multiplicateurs. "Progression" reflete le parcours du membre dans le serveur.
 
-### Impact du renommage
+### ✅ `roles-bot` → `community-bot` (FAIT — migration 039)
 
-Pour chaque bot renomme, les fichiers/references suivants doivent etre mis a jour :
-
-**`stats-bot` → `progression-bot` :**
-
-| Element | Ancien | Nouveau |
-|---------|--------|---------|
-| Dossier | `bots/stats-bot/` | `bots/progression-bot/` |
-| Cargo.toml name | `sentinel-stats-bot` | `sentinel-progression-bot` |
-| Variable env token | `STATS_DISCORD_TOKEN` | `PROGRESSION_DISCORD_TOKEN` |
-| Heartbeat name | `"stats-bot"` | `"progression-bot"` |
-| Docker service | `stats-bot` | `progression-bot` |
-| bot_definitions (BDD) | `stats-bot` | `progression-bot` |
-| Dockerfile binary | `sentinel-stats-bot` | `sentinel-progression-bot` |
-| Tracing filter | `sentinel_stats_bot` | `sentinel_progression_bot` |
-| Logs (category bot) | `"stats-bot"` | `"progression-bot"` |
-
-**`roles-bot` → `community-bot` :**
-
-| Element | Ancien | Nouveau |
-|---------|--------|---------|
-| Dossier | `bots/roles-bot/` | `bots/community-bot/` |
-| Cargo.toml name | `sentinel-roles-bot` | `sentinel-community-bot` |
-| Variable env token | `ROLES_DISCORD_TOKEN` | `COMMUNITY_DISCORD_TOKEN` |
-| Heartbeat name | `"roles-bot"` | `"community-bot"` |
-| Docker service | `roles-bot` | `community-bot` |
-| bot_definitions (BDD) | `roles-bot` | `community-bot` |
-| Dockerfile binary | `sentinel-roles-bot` | `sentinel-community-bot` |
-| Tracing filter | `sentinel_roles_bot` | `sentinel_community_bot` |
-| Logs (category bot) | `"roles-bot"` | `"community-bot"` |
-
-**Fichiers concernes en dehors des bots :**
-- `docker-compose.yml` — renommer les services
-- `.env.example` — renommer les variables
-- `README.md` — mettre a jour les references
-- `services/api/migrations/` — migration pour mettre a jour `bot_definitions` et `bot_guild_config`
-- `apps/desktop/src-tauri/src/` — si des references hardcodees existent
-- `docs/bots-business-logic.md` — ce document (sections 4 et 9)
+Ne fait plus seulement des "roles" : gere les auto-roles, les panels, l'onboarding des nouveaux membres, le parcours guide, le tracking de retention. "Community" reflete la mission d'accueil et d'integration.
 
 ---
 
@@ -463,6 +424,181 @@ Message avec piece jointe ou embed image
 - CooldownTracker : empeche le spam de creation de salons
 - FloodTracker : empeche les interactions en rafale
 
+#### AFK auto-move
+
+Detecte et deplace automatiquement les utilisateurs inactifs (mute + sourd) vers un canal AFK.
+
+```
+Voice state update
+  |
+  v
+1. Detection : self_mute == true ET self_deaf == true
+   → AfkTracker.mark_afk(user_id) avec timestamp
+   Si unmute ou undeaf → AfkTracker.clear(user_id)
+  |
+2. Tache de fond (toutes les 60 secondes)
+   Pour chaque guild :
+     |
+     +-- Verifier afk_enabled (config per-guild)
+     +-- Verifier afk_channel_id > 0
+     +-- Pour chaque utilisateur AFK :
+           |
+           +-- Si timeout non atteint → skip
+           +-- Si pas dans un salon vocal → clear
+           +-- Si pas dans un salon temporaire (pas dans VoiceOwnerMap) → clear
+           +-- Si owner du salon ET afk_move_owner == false → skip
+           +-- Si deja dans le canal AFK → clear
+           |
+           +-- Deplacer vers le canal AFK
+           +-- Log embed (💤 Membre deplace - AFK)
+           +-- Clear le tracking
+```
+
+**Configuration per-guild :**
+
+| Parametre | Defaut | Description |
+|-----------|--------|-------------|
+| `afk_enabled` | false | Active/desactive l'AFK auto-move |
+| `afk_channel_id` | 0 | ID du canal AFK de destination |
+| `afk_timeout_minutes` | 10 | Minutes d'inactivite avant deplacement |
+| `afk_move_owner` | false | Deplacer aussi le proprietaire du salon |
+
+**Securite :**
+- Ne deplace que depuis les salons temporaires (verifie via VoiceOwnerMap)
+- Respecte l'immunite du proprietaire sauf si `afk_move_owner` est active
+- Pas de boucle : ignore les utilisateurs deja dans le canal AFK
+- Clear le tracking en cas d'erreur pour eviter les retries infinis
+
+**Tests :** 7 tests unitaires dans `afk_tracker.rs` (mark, clear, timestamps, independance, bulk).
+
+#### Liens d'invitation par code
+
+Permet au proprietaire de generer un code d'invitation court (8 caracteres alphanumeriques) valide pour une duree configurable. N'importe quel membre peut utiliser le code pour rejoindre le salon.
+
+```
+Proprietaire clique "Lien" dans le panneau
+  |
+  v
+1. Boutons de selection duree : 15 min / 30 min / 1 heure / 24 heures
+  |
+2. POST /api/voice-channels/by-channel/{id}/invites
+   → API genere un code unique (8 chars), stocke en BDD avec expiration
+   → Reponse : code + expiration
+  |
+3. Reponse ephemere au proprietaire avec le code
+   → "Code : **ABCD1234** — valide 30 minutes"
+  |
+4. Un membre tape `!join ABCD1234` dans n'importe quel canal
+  |
+  v
+5. POST /api/voice-channels/invites/{code}/use
+   → Validation : non expire, non revoque, uses < max_uses
+   → Increment atomique des uses (protection race condition)
+   → Whitelist automatique de l'utilisateur
+  |
+6. Bot applique les permissions Discord :
+   - Voice : VIEW_CHANNEL + CONNECT + SPEAK
+   - Text channels : VIEW_CHANNEL + SEND_MESSAGES + READ_MESSAGE_HISTORY
+  |
+7. Si le membre est dans un vocal → deplacement automatique vers le salon
+  |
+8. Log embed dans le canal de log
+```
+
+**Endpoints API :**
+
+| Methode | Route | Description |
+|---------|-------|-------------|
+| GET | `/api/voice-channels/by-channel/{id}/invites` | Lister les liens actifs |
+| POST | `/api/voice-channels/by-channel/{id}/invites` | Creer un lien |
+| DELETE | `/api/voice-channels/by-channel/{id}/invites/{link_id}` | Revoquer |
+| POST | `/api/voice-channels/invites/{code}/use` | Utiliser un code |
+
+**Table SQL :** `voice_channel_invite_links` (migration 035)
+
+**Desktop :** Section "Liens d'invitation" dans la vue detail des salons vocaux. Boutons de creation (4 durees), tableau des liens actifs (code, createur, uses, expiration), revocation, copie au clic.
+
+#### Themes de salon
+
+Templates pre-configures par serveur. Chaque theme definit les parametres appliques automatiquement a la creation d'un salon temporaire.
+
+```
+Utilisateur rejoint le hub createur
+  |
+  v
+1. Fetch des themes via GET /api/voice-channels/themes/{guild_id}
+  |
+2. Si aucun theme → creation avec valeurs par defaut (backward compatible)
+   Si un seul theme → creation directe avec ce theme
+   Si plusieurs themes → menu de selection envoye en DM
+  |
+3. L'utilisateur choisit un theme (StringSelect)
+  |
+4. Creation du salon avec les parametres du theme :
+   - Nom categorie : channel_name_template.replace("{user}", display_name)
+   - Nom vocal : nom du theme (ex: "Gaming")
+   - Limite membres, visibilite, verrouille, queue : depuis le theme
+   - Bitrate : applique sur le salon vocal
+   - Slowmode : applique sur les salons texte
+```
+
+**Parametres d'un theme :**
+
+| Parametre | Type | Defaut | Description |
+|-----------|------|--------|-------------|
+| `name` | TEXT | requis | Nom du theme (Gaming, Musique, Travail...) |
+| `emoji` | TEXT | null | Emoji affiche dans le menu |
+| `channel_name_template` | TEXT | `{user}` | Template pour le nom de la categorie |
+| `member_limit` | INT | null | Limite de membres (null = aucune) |
+| `visibility` | TEXT | `visible` | Visibilite par defaut (visible/hidden) |
+| `locked` | BOOL | false | Verrouille par defaut |
+| `queue_enabled` | BOOL | false | File d'attente activee par defaut |
+| `bitrate` | INT | null | Bitrate audio en bps (null = defaut Discord) |
+| `slowmode_secs` | INT | null | Slowmode sur les salons texte (null = aucun) |
+| `is_default` | BOOL | false | Theme par defaut (utilise si DMs fermes ou timeout) |
+| `sort_order` | INT | 0 | Ordre d'affichage dans le menu |
+
+**Table SQL :** `voice_channel_themes` (migration 036)
+
+**Endpoints API :**
+
+| Methode | Route | Description |
+|---------|-------|-------------|
+| GET | `/api/voice-channels/themes/{guild_id}` | Lister les themes |
+| POST | `/api/voice-channels/themes/{guild_id}` | Creer un theme |
+| PATCH | `/api/voice-channels/themes/{guild_id}/{id}` | Modifier |
+| DELETE | `/api/voice-channels/themes/{guild_id}/{id}` | Supprimer |
+
+**Desktop :** Section "Themes de salon" avec formulaire de creation (tous les champs), liste des themes avec emoji/nom/parametres, suppression. Badge "Defaut" sur le theme par defaut.
+
+#### Mode stage (presentation)
+
+Mode ou seul le proprietaire et les speakers designes peuvent parler. Les autres membres ecoutent.
+
+**Implementation** : simulation par permissions Discord (meme pattern que hide/lock) :
+- **Activer stage** : deny `SPEAK` a `@everyone` sur le salon vocal
+- **Desactiver stage** : allow `SPEAK` a `@everyone`
+- **Donner la parole** : grant `SPEAK | CONNECT | VIEW_CHANNEL` a un membre specifique via permission overwrite
+
+```
+Proprietaire clique "Stage" dans le panneau de controle
+  |
+  v
+Toggle stage_enabled dans l'API (PATCH /api/voice-channels/by-channel/{id})
+  |
+  v
+Discord : deny/allow SPEAK sur @everyone
+  |
+  v
+Bouton "Donner parole" → user select → grant SPEAK au membre choisi
+```
+
+**Panneau de controle** : bouton "Stage" dans row2 (label dynamique "Stage" / "Stage actif", style vert si actif). Ligne "Mode stage : Actif/Inactif" dans l'embed de statut.
+
+**Integration themes** : champ `stage_enabled` dans `voice_channel_themes` (migration 037). Si un theme a `stage_enabled = true`, le deny SPEAK est applique des la creation du salon.
+
+**Desktop** : badge "Stage Actif" dans la vue detail. Checkbox "Mode stage" dans le formulaire de theme.
+
 ### Etat persistant
 
 | Map | Cle → Valeur |
@@ -606,7 +742,7 @@ Reponse ephemere
 | **Progression** (ex Stats) | Cache local StatsTracker utilise |
 | **Ticket** | Operations Discord fonctionnent, sync backend ignore |
 | **Image** | **Suppression preventive** de l'image (fail-safe) |
-| **Voice** | Evenements vocaux traites localement |
+| **Voice** | Evenements vocaux traites localement, AFK tracking local |
 | **Community** (ex Roles) | Attribution de roles fonctionne localement |
 | **Audit** | Evenements logues localement, envoyes quand l'API revient |
 
@@ -702,12 +838,12 @@ Reponse ephemere
 
 | Feature | Description | Priorite |
 |---------|-------------|----------|
-| **Statistiques vocales par salon** | Tracker le nombre de participants, la duree moyenne, les pics d'utilisation. Affichable dans le dashboard | MEDIUM |
-| **Salons a theme** | Templates de salon pre-configures (Gaming, Musique, Travail). Chaque theme a des permissions, une limite d'utilisateurs et un nom automatique differents | MEDIUM |
-| **Invitation par lien** | Generer un lien d'invitation temporaire pour le salon vocal (valide X minutes). L'utilisateur invite est automatiquement autorise meme sans etre dans la whitelist | MEDIUM |
-| **Salon "stage"** | Mode presentation : seul le speaker peut parler, les autres sont en ecoute. Le speaker peut donner la parole ponctuellement. Utile pour les events | LOW |
+| ~~**Statistiques vocales par salon**~~ | ~~Tracker le nombre de participants, la duree moyenne, les pics d'utilisation. Affichable dans le dashboard~~ | ✅ FAIT |
+| ~~**Salons a theme**~~ | ~~Templates de salon pre-configures (Gaming, Musique, Travail). Chaque theme a des permissions, une limite d'utilisateurs et un nom automatique differents~~ | ✅ FAIT |
+| ~~**Invitation par lien**~~ | ~~Generer un lien d'invitation temporaire pour le salon vocal (valide X minutes). L'utilisateur invite est automatiquement autorise meme sans etre dans la whitelist~~ | ✅ FAIT |
+| ~~**Salon "stage"**~~ | ~~Mode presentation : seul le speaker peut parler, les autres sont en ecoute. Le speaker peut donner la parole ponctuellement. Utile pour les events~~ | ✅ FAIT |
 | **Enregistrement vocal** | Option pour enregistrer les conversations vocales (avec consentement de tous les participants). Stockage et telechargement depuis le dashboard | LOW |
-| **AFK auto-move** | Deplacer automatiquement les utilisateurs AFK (muet + sourd > X min) vers un canal AFK dedié. Libere les places | LOW |
+| ~~**AFK auto-move**~~ | ~~Deplacer automatiquement les utilisateurs AFK (muet + sourd > X min) vers un canal AFK dedie. Libere les places~~ | ✅ FAIT |
 
 ### Audit Bot
 
@@ -837,7 +973,7 @@ CREATE INDEX idx_appeals_status ON appeals(status);
 
 ---
 
-#### 3. Roles temporaires avec expiration (Roles Bot)
+#### 3. Roles temporaires avec expiration (Community Bot)
 
 **Nouvelle table :**
 
@@ -1389,7 +1525,7 @@ OPENAI_API_KEY=sk-...                  # Pour OpenAI (alternative)
 
 ### Phase 3 — Moyenne priorite
 
-#### 12. Roles exclusifs et conditionnels (Roles Bot)
+#### 12. Roles exclusifs et conditionnels (Community Bot)
 
 **Modifications table `role_panels` :**
 
@@ -1400,7 +1536,7 @@ ALTER TABLE role_panels ADD COLUMN min_server_days INT;               -- jours m
 ALTER TABLE role_panels ADD COLUMN min_level INT;                     -- niveau minimum requis
 ```
 
-**Modification use case :** Ajouter une verification dans le handler du roles-bot :
+**Modification use case :** Ajouter une verification dans le handler du community-bot :
 1. Verifier les prerequis (`required_roles`, `min_server_days`, `min_level`)
 2. Si `exclusive_group` est defini, retirer les autres roles du meme groupe avant d'ajouter
 
@@ -1463,31 +1599,19 @@ CREATE INDEX idx_name_history_user ON username_history(guild_id, user_id, create
 
 ---
 
-#### 15. Statistiques vocales par salon (Voice Bot)
+#### 15. Statistiques vocales par salon — ✅ FAIT
 
-**Nouvelle table :**
+**Implementation reelle** (differente du plan initial) : pas de nouvelle table. Agregation SQL directe sur la table `voice_sessions` existante (migration 034) avec `LEFT JOIN voice_channels` pour distinguer temporaire/permanent.
 
-```sql
-CREATE TABLE voice_channel_stats (
-    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    guild_id        TEXT NOT NULL,
-    channel_id      TEXT NOT NULL,
-    owner_id        TEXT NOT NULL,
-    peak_members    INT NOT NULL DEFAULT 0,
-    total_duration  BIGINT NOT NULL DEFAULT 0,       -- duree totale en secondes
-    total_joins     INT NOT NULL DEFAULT 0,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    closed_at       TIMESTAMPTZ
-);
-CREATE INDEX idx_voice_stats_guild ON voice_channel_stats(guild_id, created_at DESC);
-```
-
-**Nouveau endpoint :**
+**Endpoint :**
 
 | Methode | Route | Description |
 |---------|-------|-------------|
-| GET | `/api/voice-stats/{guild_id}` | Stats vocales agregees (salons crees, duree moyenne, pic) |
-| POST | `/api/voice-stats` | Enregistrer les stats a la fermeture d'un salon |
+| GET | `/api/stats/{guild_id}/voice-stats` | Stats vocales agregees par salon (query: days, limit) |
+
+**Architecture anti-doublon** : progression-bot = seul collecteur, API = agregation en lecture seule, aucune modification des bots.
+
+**Desktop** : section "Statistiques vocales (30 derniers jours)" avec cards + tableau des top salons avec badges Temporaire/Permanent.
 
 ---
 
@@ -1550,7 +1674,7 @@ CREATE INDEX idx_badges_user ON user_badges(guild_id, user_id);
 
 ---
 
-#### 18. Reaction roles (Roles Bot)
+#### 18. Reaction roles (Community Bot)
 
 **Nouvelle table :**
 

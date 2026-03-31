@@ -17,3 +17,6 @@ pub mod dashboard_charts;
 pub mod role_panels;
 pub mod analytics;
 pub mod ia_config;
+pub mod notes;
+pub mod reminders;
+pub mod strikes;

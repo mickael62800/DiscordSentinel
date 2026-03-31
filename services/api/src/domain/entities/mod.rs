@@ -19,6 +19,9 @@ mod daily_activity;
 mod role_panel;
 mod discord_role;
 mod ia_config;
+mod strikes;
+mod sanction_reminder;
+mod user_note;
 pub mod analytics;
 
 pub use ia_config::IaConfig;
@@ -38,10 +41,13 @@ pub use moderation_action::{ModerationAction, UserModerationHistory};
 pub use rule::Rule;
 pub use security_event::SecurityEvent;
 pub use ticket::{Ticket, TicketDetail, TicketMessage};
-pub use user_stats::{GuildStatsOverview, UserStats};
+pub use user_stats::{GuildStatsOverview, GuildVoiceStats, UserStats, VoiceSessionStats};
 pub use voice_channel::{
     VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelDetail,
-    VoiceChannelWhitelistEntry,
+    VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry,
 };
 pub use watched_user::WatchedUser;
 pub use discord_role::DiscordRole;
+pub use strikes::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
+pub use sanction_reminder::SanctionReminder;
+pub use user_note::UserNote;

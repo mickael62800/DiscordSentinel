@@ -3,6 +3,8 @@ use serde::Serialize;
 #[derive(Debug, Clone, Serialize)]
 pub struct WsEvent {
     pub event: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub guild_id: Option<String>,
     pub data: serde_json::Value,
 }
 
@@ -28,9 +30,13 @@ impl EventBroadcaster {
     }
 
     /// Publie un evenement sur Redis pour le gateway.
+    /// Le `guild_id` est extrait automatiquement du payload JSON pour le filtrage server-side.
     pub fn broadcast(&self, event: &str, data: serde_json::Value) {
+        let guild_id = data.get("guild_id").and_then(|v| v.as_str()).map(String::from);
+
         let ws_event = WsEvent {
             event: event.to_string(),
+            guild_id,
             data,
         };
 

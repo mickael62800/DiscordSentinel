@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use crate::domain::entities::{GuildStatsOverview, UserStats};
+use crate::domain::entities::{GuildStatsOverview, GuildVoiceStats, UserStats, VoiceSessionStats};
 use crate::ports::inbound::manage_stats::{RecordMessagesCommand, RecordVoiceCommand};
 
 // ── Request DTOs ──
@@ -55,6 +55,72 @@ pub struct GuildOverviewDto {
     pub total_mutes: u64,
     pub total_bans: u64,
     pub top_members: Vec<UserStatsDto>,
+}
+
+// ── Voice Stats ──
+
+#[derive(Debug, Deserialize)]
+pub struct VoiceStatsQuery {
+    pub days: Option<u32>,
+    pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VoiceSessionStatsDto {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub is_temporary: bool,
+    pub total_sessions: i64,
+    pub total_duration_secs: i64,
+    pub total_duration_hours: f64,
+    pub unique_users: i64,
+    pub avg_duration_secs: i64,
+    pub last_activity: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GuildVoiceStatsDto {
+    pub total_channels: i64,
+    pub total_sessions: i64,
+    pub total_duration_secs: i64,
+    pub total_duration_hours: f64,
+    pub unique_users: i64,
+    pub avg_session_secs: i64,
+    pub temp_channels: i64,
+    pub perm_channels: i64,
+    pub channels: Vec<VoiceSessionStatsDto>,
+}
+
+impl From<VoiceSessionStats> for VoiceSessionStatsDto {
+    fn from(s: VoiceSessionStats) -> Self {
+        Self {
+            channel_id: s.channel_id,
+            channel_name: s.channel_name,
+            is_temporary: s.is_temporary,
+            total_sessions: s.total_sessions,
+            total_duration_secs: s.total_duration_secs,
+            total_duration_hours: s.total_duration_secs as f64 / 3600.0,
+            unique_users: s.unique_users,
+            avg_duration_secs: s.avg_duration_secs,
+            last_activity: s.last_activity.map(|t| t.to_rfc3339()),
+        }
+    }
+}
+
+impl From<GuildVoiceStats> for GuildVoiceStatsDto {
+    fn from(g: GuildVoiceStats) -> Self {
+        Self {
+            total_channels: g.total_channels,
+            total_sessions: g.total_sessions,
+            total_duration_secs: g.total_duration_secs,
+            total_duration_hours: g.total_duration_secs as f64 / 3600.0,
+            unique_users: g.unique_users,
+            avg_session_secs: g.avg_session_secs,
+            temp_channels: g.temp_channels,
+            perm_channels: g.perm_channels,
+            channels: g.channels.into_iter().map(VoiceSessionStatsDto::from).collect(),
+        }
+    }
 }
 
 // ── Conversions ──

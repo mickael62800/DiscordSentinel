@@ -33,7 +33,7 @@ impl EventHandler for Handler {
         {
             error!(error = %e, "Impossible d'enregistrer les slash commands");
         } else {
-            info!("Slash commands enregistrees : warn, mute, unmute, ban, unban, history");
+            info!("Slash commands enregistrees : warn, mute, unmute, ban, unban, history, note");
         }
     }
 
@@ -50,6 +50,7 @@ impl EventHandler for Handler {
                 "ban" => commands::ban::handle(&ctx, &command).await,
                 "unban" => commands::ban::handle_unban(&ctx, &command).await,
                 "history" => commands::history::handle(&ctx, &command).await,
+                "note" => commands::notes::handle(&ctx, &command).await,
                 _ => {}
             }
 

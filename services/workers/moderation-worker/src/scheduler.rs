@@ -31,10 +31,20 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
     spawn_periodic(
         "sync_ban_proposals",
         config.sync_ban_proposals_interval_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "moderation-worker",
+        |pool| Box::pin(async move { jobs::sync_ban_proposals::run(&pool).await }),
+    );
+
+    spawn_periodic(
+        "send_reminders",
+        config.send_reminders_interval_secs,
         pool,
         shutdown,
         api_url,
         "moderation-worker",
-        |pool| Box::pin(async move { jobs::sync_ban_proposals::run(&pool).await }),
+        |pool| Box::pin(async move { jobs::send_reminders::run(&pool).await }),
     );
 }

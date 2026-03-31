@@ -221,14 +221,14 @@ services:
     depends_on:
       - api
 
-  stats-bot:
+  progression-bot:
     build:
-      context: ./bots/stats-bot
+      context: ./bots/progression-bot
       dockerfile: Dockerfile
-    container_name: sentinel-stats-bot
+    container_name: sentinel-progression-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${STATS_DISCORD_TOKEN}
+      DISCORD_TOKEN: ${PROGRESSION_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
@@ -249,14 +249,14 @@ services:
     depends_on:
       - api
 
-  roles-bot:
+  community-bot:
     build:
-      context: ./bots/roles-bot
+      context: ./bots/community-bot
       dockerfile: Dockerfile
-    container_name: sentinel-roles-bot
+    container_name: sentinel-community-bot
     restart: unless-stopped
     environment:
-      ROLES_DISCORD_TOKEN: ${ROLES_DISCORD_TOKEN}
+      COMMUNITY_DISCORD_TOKEN: ${COMMUNITY_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info

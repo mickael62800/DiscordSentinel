@@ -5,7 +5,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::domain::services::DiscordApiService;
 use crate::ports::inbound::{
     AnalyzeImageUseCase, AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
-    ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageTicketsUseCase,
+    ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
     ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
 use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, IaConfigRepository, LogRepository};
@@ -26,6 +26,9 @@ pub struct AppState {
     pub audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>,
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,
     pub role_panels_uc: Arc<dyn ManageRolePanelsUseCase>,
+    pub notes_uc: Arc<dyn ManageNotesUseCase>,
+    pub reminders_uc: Arc<dyn ManageRemindersUseCase>,
+    pub strikes_uc: Arc<dyn ManageStrikesUseCase>,
     pub analytics_repo: Arc<dyn AnalyticsRepository>,
     pub daily_activity_repo: Arc<dyn DailyActivityRepository>,
     pub log_repo: Arc<dyn LogRepository>,

@@ -19,3 +19,6 @@ pub mod role_panels;
 pub mod analytics;
 pub mod discord_roles;
 pub mod ia_config;
+pub mod notes;
+pub mod reminders;
+pub mod strikes;

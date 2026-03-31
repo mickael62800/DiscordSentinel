@@ -8,6 +8,7 @@ use crate::adapters::inbound::http::dto::moderation::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::state::AppState;
+use crate::ports::inbound::{AddStrikeCommand, CreateReminderCommand};
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -24,8 +25,34 @@ pub async fn log_action(
     let moderator_name = dto.moderator_name.clone();
     let reason = dto.reason.clone();
 
+    let guild_id = dto.guild_id.clone();
+    let target_id = dto.target_id.clone();
+    let strike_reason = dto.reason.clone();
+    let moderator_id = dto.moderator_id.clone();
+    let duration = dto.duration;
+
     let command = dto.into();
     let action = state.moderation_uc.log_action(command).await?;
+
+    // Add a strike and check for escalation
+    let strike_result = state
+        .strikes_uc
+        .add_strike(AddStrikeCommand {
+            guild_id: guild_id.clone(),
+            user_id: target_id.clone(),
+            reason: strike_reason,
+            source: "moderator".into(),
+            infraction_id: None,
+        })
+        .await
+        .ok();
+
+    let mut dto = ModerationActionResponseDto::from(action);
+    if let Some(ref sr) = strike_result {
+        dto.strikes_count = Some(sr.active_count);
+        dto.escalation_action = sr.escalation_action.clone();
+        dto.escalation_duration = sr.escalation_duration;
+    }
 
     state.broadcaster.broadcast(
         "moderation_action",
@@ -37,7 +64,42 @@ pub async fn log_action(
         }),
     );
 
-    Ok(single_dto(action))
+    if let Some(ref sr) = strike_result {
+        if sr.escalation_action.is_some() {
+            state.broadcaster.broadcast(
+                "strike_added",
+                serde_json::json!({
+                    "guild_id": guild_id,
+                    "user_id": target_id,
+                    "active_count": sr.active_count,
+                    "escalation_action": sr.escalation_action,
+                    "escalation_duration": sr.escalation_duration,
+                }),
+            );
+        }
+    }
+
+    // Auto-create reminder for temporary sanctions (mute_temp, ban_temp)
+    // Auto-create reminder for temporary sanctions
+    if action_type == "mute_temp" || action_type == "ban_temp" {
+        if let Some(dur) = duration {
+            let action_uuid = dto.id.parse().unwrap_or_default();
+            let _ = state.reminders_uc.create_reminder(CreateReminderCommand {
+                guild_id: guild_id.clone(),
+                moderator_id,
+                moderator_name: moderator_name.clone(),
+                target_id: target_id.clone(),
+                target_name: target_name.clone(),
+                action_type: action_type.clone(),
+                reason: reason.clone(),
+                action_id: action_uuid,
+                duration_secs: dur,
+                remind_before_secs: 3600,
+            }).await;
+        }
+    }
+
+    Ok(Json(dto))
 }
 
 #[derive(Debug, Deserialize)]

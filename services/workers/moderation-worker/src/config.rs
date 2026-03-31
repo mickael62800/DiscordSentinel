@@ -4,6 +4,7 @@ pub struct WorkerConfig {
     pub conduct_regen_interval_secs: u64,
     pub ban_cleanup_interval_secs: u64,
     pub sync_ban_proposals_interval_secs: u64,
+    pub send_reminders_interval_secs: u64,
 }
 
 impl WorkerConfig {
@@ -20,6 +21,10 @@ impl WorkerConfig {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(2);
+        let reminders_secs: u64 = std::env::var("SEND_REMINDERS_INTERVAL")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(30);
 
         Self {
             database_url: std::env::var("DATABASE_URL")
@@ -29,6 +34,7 @@ impl WorkerConfig {
             conduct_regen_interval_secs: regen_hours * 3600,
             ban_cleanup_interval_secs: cleanup_minutes * 60,
             sync_ban_proposals_interval_secs: sync_minutes * 60,
+            send_reminders_interval_secs: reminders_secs,
         }
     }
 }

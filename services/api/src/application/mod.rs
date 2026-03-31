@@ -12,6 +12,9 @@ mod manage_watched_users_service;
 mod manage_audit_logs_service;
 mod manage_role_panels_service;
 mod manage_levels_service;
+mod manage_notes_service;
+mod manage_reminders_service;
+mod manage_strikes_service;
 
 pub use analyze_image_service::AnalyzeImageService;
 pub use analyze_message_service::{AnalyzeMessageService, score_classifications};
@@ -26,4 +29,7 @@ pub use manage_voice_channels_service::ManageVoiceChannelsService;
 pub use manage_audit_logs_service::ManageAuditLogsService;
 pub use manage_role_panels_service::ManageRolePanelsService;
 pub use manage_levels_service::ManageLevelsService;
+pub use manage_notes_service::ManageNotesService;
+pub use manage_reminders_service::ManageRemindersService;
+pub use manage_strikes_service::ManageStrikesService;
 pub use manage_watched_users_service::ManageWatchedUsersService;

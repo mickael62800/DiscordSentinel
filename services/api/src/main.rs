@@ -1,9 +1,3 @@
-mod adapters;
-mod application;
-mod config;
-mod domain;
-mod ports;
-
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -11,22 +5,22 @@ use sqlx::postgres::PgPoolOptions;
 use tokio::signal;
 use tracing::{error, info};
 
-use crate::adapters::inbound::http::{router, state::AppState};
-use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::adapters::outbound::postgres::{
+use sentinel_api::adapters::inbound::http::{router, state::AppState};
+use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use sentinel_api::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
     PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgRolePanelRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
+    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
 };
-use crate::adapters::outbound::job_client::JobClient;
-use crate::adapters::outbound::redis_cache::RedisCache;
-use crate::application::{
+use sentinel_api::adapters::outbound::job_client::JobClient;
+use sentinel_api::adapters::outbound::redis_cache::RedisCache;
+use sentinel_api::application::{
     AnalyzeImageService, AnalyzeMessageService, ManageConductService, ManageInfractionsService,
     ManageModerationService, ManageRulesService, ManageSecurityService, ManageStatsService,
-    ManageAuditLogsService, ManageLevelsService, ManageRolePanelsService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
+    ManageAuditLogsService, ManageLevelsService, ManageNotesService, ManageRemindersService, ManageRolePanelsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
 };
-use crate::domain::services::{DiscordApiService, InferenceService, TextTokenizer};
-use crate::config::AppConfig;
+use sentinel_api::domain::services::{DiscordApiService, InferenceService, TextTokenizer};
+use sentinel_api::config::AppConfig;
 
 #[tokio::main]
 async fn main() {
@@ -101,6 +95,9 @@ async fn main() {
     let guild_repo = Arc::new(PgGuildRepository::new(pg_pool.clone()));
     let log_repo = Arc::new(PgLogRepository::new(pg_pool.clone()));
     let ia_config_repo = Arc::new(PgIaConfigRepository::new(pg_pool.clone()));
+    let notes_repo = Arc::new(PgNotesRepository::new(pg_pool.clone()));
+    let reminder_repo = Arc::new(PgReminderRepository::new(pg_pool.clone()));
+    let strike_repo = Arc::new(PgStrikeRepository::new(pg_pool.clone()));
     let cache = Arc::new(RedisCache::new(redis_client.clone()));
 
     // ── Event broadcaster (Redis pub/sub → gateway WebSocket) ──
@@ -140,7 +137,7 @@ async fn main() {
         .unwrap_or(20);
 
     let inference_limiter = Arc::new(
-        crate::domain::services::InferenceRateLimiter::new(inference_max_concurrent, inference_max_per_sec)
+        sentinel_api::domain::services::InferenceRateLimiter::new(inference_max_concurrent, inference_max_per_sec)
     );
 
     info!(
@@ -188,6 +185,9 @@ async fn main() {
     let level_repo = Arc::new(PgLevelRepository::new(pg_pool.clone()));
     let levels_uc = Arc::new(ManageLevelsService::new(level_repo));
     let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
+    let notes_uc = Arc::new(ManageNotesService::new(notes_repo));
+    let reminders_uc = Arc::new(ManageRemindersService::new(reminder_repo));
+    let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo));
     let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
@@ -195,6 +195,7 @@ async fn main() {
         moderation_uc.clone(),
         security_uc.clone(),
         conduct_uc.clone(),
+        notes_uc.clone(),
     ));
 
     // ── Discord API service ──
@@ -221,6 +222,9 @@ async fn main() {
         audit_logs_uc,
         levels_uc,
         role_panels_uc,
+        notes_uc,
+        reminders_uc,
+        strikes_uc,
         analytics_repo,
         daily_activity_repo,
         log_repo,
@@ -246,7 +250,7 @@ async fn main() {
 
     // Log demarrage en BDD
     {
-        let entry = crate::domain::entities::LogEntry {
+        let entry = sentinel_api::domain::entities::LogEntry {
             id: uuid::Uuid::new_v4(),
             timestamp: chrono::Utc::now(),
             level: "info".into(),
@@ -278,7 +282,7 @@ async fn main() {
 
     // Log arret en BDD
     {
-        let entry = crate::domain::entities::LogEntry {
+        let entry = sentinel_api::domain::entities::LogEntry {
             id: uuid::Uuid::new_v4(),
             timestamp: chrono::Utc::now(),
             level: "warn".into(),

@@ -4,6 +4,7 @@ use crate::adapters::inbound::http::dto::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::dto::moderation::ModerationActionResponseDto;
 use crate::adapters::inbound::http::dto::security::SecurityEventResponseDto;
 use crate::adapters::inbound::http::dto::conduct::ConductPointsLogDto;
+use crate::adapters::inbound::http::dto::notes::UserNoteDto;
 use crate::domain::entities::WatchedUser;
 use crate::ports::inbound::manage_watched_users::UserDossier;
 
@@ -51,6 +52,7 @@ pub struct UserDossierResponseDto {
     pub moderation_actions: Vec<ModerationActionResponseDto>,
     pub security_events: Vec<SecurityEventResponseDto>,
     pub conduct_log: Vec<ConductPointsLogDto>,
+    pub notes: Vec<UserNoteDto>,
 }
 
 impl From<UserDossier> for UserDossierResponseDto {
@@ -61,6 +63,7 @@ impl From<UserDossier> for UserDossierResponseDto {
             moderation_actions: d.moderation_actions.into_iter().map(ModerationActionResponseDto::from).collect(),
             security_events: d.security_events.into_iter().map(SecurityEventResponseDto::from).collect(),
             conduct_log: d.conduct_log.into_iter().map(ConductPointsLogDto::from).collect(),
+            notes: d.notes.into_iter().map(UserNoteDto::from).collect(),
         }
     }
 }

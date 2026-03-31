@@ -12,6 +12,9 @@ pub mod manage_watched_users;
 pub mod manage_audit_logs;
 pub mod manage_levels;
 pub mod manage_role_panels;
+pub mod manage_notes;
+pub mod manage_reminders;
+pub mod manage_strikes;
 
 pub use analyze_image::{AnalyzeImageCommand, AnalyzeImageUseCase};
 pub use analyze_message::{AnalyzeMessageCommand, AnalyzeMessageUseCase};
@@ -31,8 +34,11 @@ pub use manage_audit_logs::ManageAuditLogsUseCase;
 pub use manage_role_panels::ManageRolePanelsUseCase;
 pub use manage_levels::ManageLevelsUseCase;
 pub use manage_watched_users::ManageWatchedUsersUseCase;
+pub use manage_notes::{AddNoteCommand, ManageNotesUseCase};
+pub use manage_reminders::{CreateReminderCommand, ManageRemindersUseCase};
+pub use manage_strikes::{AddStrikeCommand, ManageStrikesUseCase, SaveStrikeConfigCommand};
 pub use manage_voice_channels::{
-    BanFromChannelCommand, CreateVoiceChannelCommand, ManageCoAdminCommand,
-    ManageVoiceChannelsUseCase, ManageWhitelistCommand, TransferOwnershipCommand,
-    UpdateVoiceChannelCommand,
+    BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
+    ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
+    TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
 };

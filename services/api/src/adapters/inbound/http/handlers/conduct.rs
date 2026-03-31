@@ -73,14 +73,28 @@ pub async fn add_points(
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<AddPointsDto>,
 ) -> Result<Json<UserConductPointsDto>, ApiError> {
+    let amount = dto.amount;
+    let reason = dto.reason.clone();
+
     let points = state
         .conduct_uc
         .add_points(AddPointsCommand {
-            guild_id,
-            user_id,
-            amount: dto.amount,
-            reason: dto.reason,
+            guild_id: guild_id.clone(),
+            user_id: user_id.clone(),
+            amount,
+            reason,
         })
         .await?;
+
+    state.broadcaster.broadcast(
+        "conduct_points_changed",
+        serde_json::json!({
+            "guild_id": &guild_id,
+            "user_id": &user_id,
+            "amount": amount,
+            "reason": &dto.reason,
+        }),
+    );
+
     Ok(single_dto(points))
 }

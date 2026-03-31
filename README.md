@@ -39,13 +39,13 @@ Discord Messages / Events / Images
         |                              |                              |
         v                              v                              v
 +----------------+  +----------------+  +---------------------+
-|  Ticket Bot    |  |  Stats Bot     |  |   Desktop App       |
+|  Ticket Bot    |  | Progression Bot|  |   Desktop App       |
 |  /ticket       |  |  /stats        |  |   Tauri + Vue 3     |
 |  create/close  |  |  user/server   |  |   Admin complete    |
 +----------------+  +----------------+  +---------------------+
                               |
 +----------------+  +----------------+  +----------------+
-|  Voice Bot     |  |  Audit Bot     |  |  Roles Bot     |
+|  Voice Bot     |  |  Audit Bot     |  | Community Bot  |
 |  Salons dyn.   |  |  Logs audit    |  |  Role panels   |
 |  Vote kick     |  |  Tracking      |  |  Auto-roles    |
 +----------------+  +----------------+  +----------------+
@@ -59,21 +59,21 @@ Discord Messages / Events / Images
 
 | Composant            | Technologie                              | Details                                                    |
 | -------------------- | ---------------------------------------- | ---------------------------------------------------------- |
-| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 62+ endpoints, 22 handlers, 14 use cases, helpers.rs |
+| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 84+ endpoints, 25 handlers, 17 use cases, helpers.rs, 42 migrations |
 | Gateway WebSocket    | Rust, Axum 0.8, Redis pub/sub            | Service dedie temps reel, auto-reconnect                   |
 | Workers (3 + common) | Rust, Tokio, Redis, sqlx                 | 3 workers specialises + crate partagee sentinel-worker-common |
-| Base de donnees      | PostgreSQL 16                            | 29 migrations, 20+ tables                                  |
+| Base de donnees      | PostgreSQL 16                            | 37 migrations, 22+ tables                                  |
 | Cache                | Redis 7                                  | Cache regles TTL 5min, stats TTL 60s, pub/sub events       |
 | Inference IA         | ONNX Runtime 2.0, ndarray, tokenizers    | Vision (NSFW/illicite) + Text (sentiments)                 |
 | Automod Bot          | Rust, Serenity 0.12                      | Detection spam/insultes/liens/phishing + appel API         |
 | Moderation Bot       | Rust, Serenity 0.12                      | /warn /mute /ban /unmute /unban /history                   |
 | Security Bot         | Rust, Serenity 0.12, DashMap             | Anti-raid, quarantaine, captcha DM, slowmode auto          |
-| Stats Bot (→ Progression Bot) | Rust, Serenity 0.12               | /stats user, server, top + tracking temps reel + XP/levels |
+| Progression Bot        | Rust, Serenity 0.12                      | /stats user, server, top + tracking temps reel + XP/levels |
 | Ticket Bot           | Rust, Serenity 0.12                      | /ticket create, close, assign                              |
 | Image Bot            | Rust, Serenity 0.12                      | Detection images NSFW/illicites via API                    |
-| Voice Bot            | Rust, Serenity 0.12                      | Salons dynamiques, vote kick, co-admins, whitelist/ban     |
+| Voice Bot            | Rust, Serenity 0.12                      | Salons dynamiques, vote kick, co-admins, whitelist/ban, invite links, AFK auto-move, themes, stage mode |
 | Audit Bot            | Rust, Serenity 0.12                      | Tracking audit logs Discord                                |
-| Roles Bot (→ Community Bot) | Rust, Serenity 0.12                 | Role panels + auto-roles + sync Discord roles              |
+| Community Bot          | Rust, Serenity 0.12                      | Role panels + auto-roles + sync Discord roles              |
 | Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia, Chart.js | 27 pages, 24 composants UI, 29 composables                 |
 | Desktop App Backend  | Tauri 2.x, Rust                          | Architecture hexagonale, HEED/LMDB local, WebSocket        |
 | Entrainement IA      | Python, PyTorch, Transformers, ONNX      | 2 modeles : vision + text sentiment                        |
@@ -163,7 +163,7 @@ DiscordSentinel/
 |   |   +-- src/
 |   |       |-- raid_detector.rs        # Anti-raid (DashMap, thread-safe, avec tests)
 |   |       +-- account_checker.rs      # Verification age compte
-|   |-- stats-bot/                      # Bot statistiques + XP
+|   |-- progression-bot/                 # Bot progression (stats, XP, niveaux)
 |   |   +-- src/
 |   |       |-- tracker.rs              # Cache local (RwLock + HashMap, avec tests)
 |   |       +-- commands/               # stats.rs, level.rs
@@ -177,12 +177,13 @@ DiscordSentinel/
 |   |   +-- src/
 |   |       |-- handlers/               # message.rs, voice.rs
 |   |       |-- interactions/           # access_control, channel_management, co_admin, queue, setup, transfer, vote_kick
-|   |       |-- state/                  # cooldown_tracker, flood_tracker, pending_channels, vote_tracker (tous avec tests)
-|   |       +-- utils/                  # embeds.rs
+|   |       |-- state/                  # cooldown_tracker, flood_tracker, pending_channels, vote_tracker, afk_tracker (tous avec tests)
+|   |       |-- tasks/                  # afk_sweep.rs (tache de fond AFK auto-move)
+|   |       +-- embeds.rs              # Logging embed Discord
 |   |-- audit-bot/                      # Bot audit logs
 |   |   +-- src/
 |   |       +-- main.rs, handler.rs, api_client.rs, config.rs
-|   +-- roles-bot/                      # Bot role panels + auto-roles
+|   +-- community-bot/                   # Bot communaute (roles, onboarding)
 |       +-- src/
 |           +-- commands/               # roles_panel.rs
 |
@@ -216,7 +217,7 @@ DiscordSentinel/
 
 ---
 
-## Schema base de donnees (PostgreSQL — 29 migrations)
+## Schema base de donnees (PostgreSQL — 42 migrations)
 
 ### Tables principales
 
@@ -243,6 +244,12 @@ DiscordSentinel/
 | `hourly_activity`    | Activite par heure (heatmaps)    | guild_id, day, hour, messages, infractions                                         |
 | `role_panels`        | Panels de roles                  | guild_id, channel_id, message_id, title, roles (JSONB)                             |
 | `discord_roles`      | Roles Discord synchronises       | guild_id, id, name, color, position, permissions, managed, member_count             |
+| `voice_channel_invite_links` | Liens d'invitation vocaux | voice_channel_id (FK), code (UNIQUE), max_uses, current_uses, expires_at, revoked   |
+| `voice_channel_themes`       | Themes de salons vocaux  | guild_id, name, emoji, channel_name_template, member_limit, visibility, bitrate     |
+| `strike_config`    | Config escalade par serveur        | guild_id, window_secs, thresholds (JSONB), enabled                                 |
+| `user_strikes`     | Strikes individuels                | guild_id, user_id, reason, source, infraction_id, expires_at                       |
+| `user_notes`       | Notes moderateur sur utilisateurs  | guild_id, user_id, author_id, author_name, content, category                       |
+| `sanction_reminders` | Rappels sanctions temporaires    | guild_id, moderator_id, target_id, action_type, remind_at, expires_at, status      |
 
 ### Flag types supportes (10)
 
@@ -261,7 +268,7 @@ DiscordSentinel/
 
 ---
 
-## Endpoints API (62+)
+## Endpoints API (84+)
 
 ### Authentification
 
@@ -313,9 +320,20 @@ Si `API_KEY` est vide dans la config, l'auth est desactivee (mode dev).
 | POST    | `/api/moderation/actions`                      | Logger une action |
 | GET     | `/api/moderation/history/{guild_id}/{user_id}` | Historique        |
 
-### Voice Channels (11 endpoints)
+### Voice Channels (19 endpoints)
 
-Gestion complete des salons vocaux dynamiques : CRUD, transfert, co-admins, whitelist, bans.
+Gestion complete des salons vocaux dynamiques : CRUD, transfert, co-admins, whitelist, bans, liens d'invitation, themes.
+
+| Methode | Route                                            | Description                          |
+| ------- | ------------------------------------------------ | ------------------------------------ |
+| GET     | `/api/voice-channels/by-channel/{id}/invites`    | Lister les liens d'invitation actifs |
+| POST    | `/api/voice-channels/by-channel/{id}/invites`    | Creer un lien d'invitation           |
+| DELETE  | `/api/voice-channels/by-channel/{id}/invites/{link_id}` | Revoquer un lien             |
+| POST    | `/api/voice-channels/invites/{code}/use`         | Utiliser un code d'invitation        |
+| GET     | `/api/voice-channels/themes/{guild_id}`          | Lister les themes du serveur         |
+| POST    | `/api/voice-channels/themes/{guild_id}`          | Creer un theme                       |
+| PATCH   | `/api/voice-channels/themes/{guild_id}/{id}`     | Modifier un theme                    |
+| DELETE  | `/api/voice-channels/themes/{guild_id}/{id}`     | Supprimer un theme                   |
 
 ### Conduct (points de conduite)
 
@@ -358,6 +376,33 @@ Query params : `guild_id` (optionnel), `days` (1-90, defaut 30), `limit` (1-50, 
 | GET     | `/api/stats/{guild_id}/user/{user_id}` | Stats utilisateur          |
 | GET     | `/api/stats/{guild_id}/overview`       | Vue d'ensemble (cache 60s) |
 | GET     | `/api/stats/{guild_id}/leaderboard`    | Classement (max 50)        |
+| GET     | `/api/stats/{guild_id}/voice-stats`    | Stats vocales par salon (temp/perm, 30j, top 20) |
+
+### Strikes (escalade progressive)
+
+| Methode | Route                              | Description                                              |
+| ------- | ---------------------------------- | -------------------------------------------------------- |
+| GET     | `/api/strikes/config/{guild_id}`   | Config escalade du serveur                               |
+| PUT     | `/api/strikes/config/{guild_id}`   | Modifier la config escalade                              |
+| GET     | `/api/strikes/{guild_id}/{user_id}`| Strikes actifs d'un utilisateur                          |
+| POST    | `/api/strikes`                     | Ajouter un strike (retourne escalation si seuil atteint) |
+| DELETE  | `/api/strikes/{guild_id}/{user_id}`| Reset les strikes d'un utilisateur                       |
+
+### Notes utilisateur
+
+| Methode | Route                              | Description               |
+| ------- | ---------------------------------- | ------------------------- |
+| POST    | `/api/notes`                       | Ajouter une note          |
+| GET     | `/api/notes/{guild_id}/{user_id}`  | Notes d'un utilisateur    |
+| DELETE  | `/api/notes/{id}`                  | Supprimer une note        |
+
+### Rappels sanctions temporaires
+
+| Methode | Route                     | Description                |
+| ------- | ------------------------- | -------------------------- |
+| POST    | `/api/reminders`          | Creer un rappel            |
+| GET     | `/api/reminders/pending`  | Rappels en attente d'envoi |
+| GET     | `/api/reminders/{guild_id}` | Rappels d'un serveur     |
 
 ### Dashboard / Admin
 
@@ -411,7 +456,7 @@ Si flags detectes -> appel `POST /analyze` -> scoring (regles + IA) -> execution
 - Detection magic bytes pour le content type
 - **Fallback** : suppression preventive si API down
 
-### Stats Bot — Statistiques + XP
+### Progression Bot — Statistiques + XP
 
 | Commande               | Description                                      |
 | ---------------------- | ------------------------------------------------ |
@@ -432,13 +477,18 @@ Tracking automatique messages + vocal + XP.
 
 ### Voice Bot — Salons vocaux dynamiques
 
-Gestion complete : creation automatique, permissions, co-admins, vote kick, whitelist/ban, file d'attente, anti-flood.
+Gestion complete : creation automatique, permissions, co-admins, vote kick, whitelist/ban, file d'attente, anti-flood, AFK auto-move, liens d'invitation par code, themes de salon.
+
+- **Mode stage** : mode presentation ou seul le proprietaire (et les speakers designes) peut parler. Les autres membres ecoutent. Le proprietaire peut donner/retirer la parole via un bouton "Donner parole" (user select). Simulation par permissions Discord (deny SPEAK a @everyone). Activable par bouton dans le panneau de controle ou par defaut via un theme.
+- **Themes de salon** : templates pre-configures par serveur (Gaming, Musique, Travail, etc.). Chaque theme definit : nom (template {user}), emoji, limite membres, visibilite, verrouille, queue, bitrate, slowmode, stage. A la creation, si plusieurs themes existent, un menu de selection est envoye en DM. Configuration CRUD depuis l'app desktop.
+- **Liens d'invitation** : le proprietaire genere un code 8 caracteres (bouton "Lien" dans le panneau) avec duree configurable (15min/30min/1h/24h). N'importe qui utilise le code via `!join <code>` pour etre automatiquement whiteliste et autorise a rejoindre, meme si le salon est cache/verrouille. Gestion depuis l'app desktop (creation, liste, revocation, copie).
+- **AFK auto-move** : detecte les utilisateurs mute+sourd dans les salons temporaires et les deplace vers un canal AFK apres un timeout configurable. Tache de fond toutes les 60s. Respecte l'immunite du proprietaire (configurable). Config per-guild : `afk_enabled`, `afk_channel_id`, `afk_timeout_minutes`, `afk_move_owner`.
 
 ### Audit Bot — Logs d'audit
 
 Tracking des actions Discord (bans, kicks, modifications roles, etc.) et envoi a l'API.
 
-### Roles Bot — Panels de roles
+### Community Bot — Panels de roles
 
 Gestion de panels de roles avec boutons de selection + auto-roles a l'arrivee de nouveaux membres.
 
@@ -660,7 +710,7 @@ Services :
 - **moderation-worker** — conduite, bans, sync ban proposals
 - **analytics-worker** — snapshots quotidiens + horaires
 - **monitoring-worker** — surveillance systeme
-- **automod-bot, moderation-bot, security-bot, ticket-bot, image-bot, voice-bot, stats-bot, audit-bot, roles-bot**
+- **automod-bot, moderation-bot, security-bot, ticket-bot, image-bot, voice-bot, progression-bot, audit-bot, community-bot**
 
 ### Variables d'environnement (.env)
 
@@ -685,9 +735,9 @@ SECURITY_DISCORD_TOKEN=...
 TICKET_DISCORD_TOKEN=...
 IMAGE_DISCORD_TOKEN=...
 VOICE_DISCORD_TOKEN=...
-STATS_DISCORD_TOKEN=...
+PROGRESSION_DISCORD_TOKEN=...
 AUDIT_DISCORD_TOKEN=...
-ROLES_DISCORD_TOKEN=...
+COMMUNITY_DISCORD_TOKEN=...
 ```
 
 ### Developpement local
@@ -717,10 +767,20 @@ cd apps/desktop && npm run tauri dev
 | Gateway — Broadcaster       | 6     | Subscribe, unsubscribe, max connections, broadcast  |
 | Automod Bot — Detectors     | ~20   | Spam, insult, link, phishing                        |
 | Security Bot — Raid         | ~5    | Detection joins massifs                             |
-| Stats Bot — Tracker         | ~5    | Cache local                                         |
-| Voice Bot — State           | ~15   | Cooldown, flood, pending, vote                      |
+| Progression Bot — Tracker   | ~5    | Cache local                                         |
+| Voice Bot — State           | ~22   | Cooldown, flood, pending, vote, AFK tracker         |
+| API — Moderation HTTP       | 15    | Endpoints log_action, history, bans (integration)   |
+| API — Moderation Service    | 17    | log_action, get_history, list_bans, delete_bans     |
+| API — Strikes Service       | 8     | add_strike, escalation, reset, config               |
+| API — Strikes HTTP          | 8     | Endpoints config, strikes, add, reset (integration) |
+| API — Notes Service         | 10    | add_note, categories, get, delete                   |
+| API — Notes HTTP            | 7     | Endpoints add, get, delete (integration)            |
+| API — Reminders Service     | 6     | create, mark_sent, cancel, list                     |
+| API — Reminders HTTP        | 6     | Endpoints create, pending, list (integration)       |
+| API — Tickets HTTP          | 17    | CRUD tickets, status, channels (integration)        |
+| API — Voice Channels HTTP   | 23    | CRUD channels, invite links, themes (integration)   |
 
-**Total : ~110+ tests unitaires** sur 20 fichiers avec `#[cfg(test)]`
+**Total : ~230+ tests** sur 30+ fichiers avec `#[cfg(test)]` et tests d'integration
 
 ---
 
@@ -743,16 +803,16 @@ cd apps/desktop && npm run tauri dev
 
 ### Termine
 
-- [x] API Backend — Architecture hexagonale, 62+ endpoints, 22 handlers, helpers.rs, 14 use cases, 29 migrations
+- [x] API Backend — Architecture hexagonale, 84+ endpoints, 25 handlers, helpers.rs, 17 use cases, 42 migrations
 - [x] Automod Bot — Detection spam/insultes/liens/phishing + appel API + fallback
-- [x] Moderation Bot — /warn /mute /ban /unmute /unban /history avec DM et logging
+- [x] Moderation Bot — /warn /mute /ban /unmute /unban /history /note avec DM, logging, strikes et rappels
 - [x] Security Bot — Anti-raid + comptes suspects + alertes
-- [x] Stats Bot — Tracking messages/vocal + /stats + XP/levels
+- [x] Progression Bot — Tracking messages/vocal + /stats + XP/levels
 - [x] Ticket Bot — /ticket create, close, assign avec threads prives
 - [x] Image Bot — Detection images NSFW/illicites via API + fallback
-- [x] Voice Bot — Salons dynamiques, vote kick, co-admins, whitelist/ban
+- [x] Voice Bot — Salons dynamiques, vote kick, co-admins, whitelist/ban, AFK auto-move, invite links, themes, stage mode
 - [x] Audit Bot — Tracking audit logs Discord
-- [x] Roles Bot — Panels de roles + auto-roles
+- [x] Community Bot — Panels de roles + auto-roles
 - [x] Desktop App — 27 pages, OAuth Discord, WebSocket temps reel, notifications natives
 - [x] Gateway WebSocket — Service dedie, Redis pub/sub, auto-reconnect, limite connexions
 - [x] Inference IA ONNX — Vision (NSFW/illicite) + Text (sentiments) integres dans l'API
@@ -764,7 +824,7 @@ cd apps/desktop && npm run tauri dev
 - [x] Watched Users — Surveillance avec dossiers complets
 - [x] Bot Config — Configuration per-guild par bot depuis l'app desktop
 - [x] Docker Compose — 15 services orchestres
-- [x] Tests unitaires — 110+ tests (API, gateway, bots)
+- [x] Tests unitaires — 117+ tests (API, gateway, bots)
 - [x] Multi-stage Docker builds — Images Alpine optimisees
 - [x] Workers specialises — 3 workers dedies (moderation, analytics, monitoring) avec heartbeat
 - [x] Anti-raid avance — Quarantaine (role restrictif), captcha DM (bouton), slowmode auto, kick timeout
@@ -783,6 +843,15 @@ cd apps/desktop && npm run tauri dev
 - [x] Embeds Discord uniformes — bots/shared/src/embeds.rs, 8 bots migres vers embeds riches
 - [x] Centralisation variants — actionLabel, typeLabel, eventVariant, eventLabel, eventIcon dans variants.ts
 - [x] Discord Roles — Sync bot→API→desktop, page DiscordRolesPage, migration 029
+- [x] Voice Invite Links — Liens d'invitation par code (8 chars, expiration configurable), bot + API + desktop
+- [x] Voice Stats par salon — Statistiques vocales aggregees (temp/permanent), endpoint API + section desktop
+- [x] Voice Themes — Templates de salon pre-configures (nom, emoji, limite, visibilite, bitrate, etc.), menu selection en DM, CRUD API + desktop
+- [x] Voice Stage Mode — Mode presentation (deny SPEAK @everyone, grant speakers), bouton toggle + donner parole, integre aux themes
+- [x] Systeme de strikes — Escalade progressive (3 strikes = mute, 5 = ban), config per-guild, fenetre glissante, 5 endpoints API, integration moderation handler
+- [x] Notes utilisateur — /note <user> <text> avec categories (general/warning/positive/context), integration UserDossier, 3 endpoints API
+- [x] Rappels sanctions temporaires — Auto-creation de rappel 1h avant expiration mute/ban temp, job worker send_reminders (30s), 3 endpoints API
+- [x] Renommage stats-bot → progression-bot — Migration 038, tous les fichiers mis a jour
+- [x] Renommage roles-bot → community-bot — Migration 039, tous les fichiers mis a jour
 
 ### En cours
 

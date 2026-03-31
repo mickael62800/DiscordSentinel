@@ -139,6 +139,12 @@ pub async fn bot_heartbeat(
         // Enregistrer aussi dans l'ensemble des bots connus
         let _: () = conn.sadd("bots:known", &payload.name).await.unwrap_or(());
     }
+
+    state.broadcaster.broadcast(
+        "bot_heartbeat",
+        serde_json::json!({ "name": &payload.name }),
+    );
+
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 

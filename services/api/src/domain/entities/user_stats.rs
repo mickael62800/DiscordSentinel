@@ -25,3 +25,27 @@ pub struct GuildStatsOverview {
     pub total_bans: u64,
     pub top_members: Vec<UserStats>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VoiceSessionStats {
+    pub channel_id: String,
+    pub channel_name: String,
+    pub is_temporary: bool,
+    pub total_sessions: i64,
+    pub total_duration_secs: i64,
+    pub unique_users: i64,
+    pub avg_duration_secs: i64,
+    pub last_activity: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GuildVoiceStats {
+    pub total_channels: i64,
+    pub total_sessions: i64,
+    pub total_duration_secs: i64,
+    pub unique_users: i64,
+    pub avg_session_secs: i64,
+    pub temp_channels: i64,
+    pub perm_channels: i64,
+    pub channels: Vec<VoiceSessionStats>,
+}

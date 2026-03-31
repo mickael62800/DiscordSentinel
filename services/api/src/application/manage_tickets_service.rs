@@ -175,7 +175,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
         Ok(())
     }
 
-    async fn update_ticket_channel(&self, cmd: crate::ports::inbound::UpdateTicketChannelCommand) -> Result<(), DomainError> {
+    async fn update_ticket_channel(&self, cmd: UpdateTicketChannelCommand) -> Result<(), DomainError> {
         let uuid = cmd
             .ticket_id
             .parse::<Uuid>()

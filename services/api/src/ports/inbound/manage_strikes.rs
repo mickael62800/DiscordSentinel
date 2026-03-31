@@ -1,0 +1,29 @@
+use async_trait::async_trait;
+use uuid::Uuid;
+
+use crate::domain::entities::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
+use crate::domain::errors::DomainError;
+
+pub struct AddStrikeCommand {
+    pub guild_id: String,
+    pub user_id: String,
+    pub reason: String,
+    pub source: String,
+    pub infraction_id: Option<Uuid>,
+}
+
+pub struct SaveStrikeConfigCommand {
+    pub guild_id: String,
+    pub window_secs: i64,
+    pub thresholds: Vec<StrikeThreshold>,
+    pub enabled: bool,
+}
+
+#[async_trait]
+pub trait ManageStrikesUseCase: Send + Sync {
+    async fn add_strike(&self, cmd: AddStrikeCommand) -> Result<StrikeResult, DomainError>;
+    async fn get_active_strikes(&self, guild_id: &str, user_id: &str) -> Result<Vec<UserStrike>, DomainError>;
+    async fn reset_strikes(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn get_config(&self, guild_id: &str) -> Result<StrikeConfig, DomainError>;
+    async fn save_config(&self, cmd: SaveStrikeConfigCommand) -> Result<StrikeConfig, DomainError>;
+}

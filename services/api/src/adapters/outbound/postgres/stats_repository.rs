@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::UserStats;
+use crate::domain::entities::{UserStats, VoiceSessionStats};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::StatsRepository;
 
@@ -194,5 +194,73 @@ impl StatsRepository for PgStatsRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         Ok(())
+    }
+
+    async fn get_guild_voice_stats(&self, guild_id: &str, days: u32, limit: u32) -> Result<Vec<VoiceSessionStats>, DomainError> {
+        let since = chrono::Utc::now() - chrono::Duration::days(days as i64);
+
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            channel_id: String,
+            channel_name: String,
+            is_temporary: bool,
+            total_sessions: i64,
+            total_duration_secs: i64,
+            unique_users: i64,
+            avg_duration_secs: i64,
+            last_activity: Option<chrono::DateTime<chrono::Utc>>,
+        }
+
+        let rows = sqlx::query_as::<_, Row>(
+            r#"
+            SELECT
+                vs.channel_id,
+                (array_agg(vs.channel_name ORDER BY vs.ended_at DESC))[1] as channel_name,
+                BOOL_OR(vc.id IS NOT NULL AND vc.channel_status = 'open') as is_temporary,
+                COUNT(*)::BIGINT as total_sessions,
+                COALESCE(SUM(vs.duration_secs), 0)::BIGINT as total_duration_secs,
+                COUNT(DISTINCT vs.user_id)::BIGINT as unique_users,
+                COALESCE(AVG(vs.duration_secs), 0)::BIGINT as avg_duration_secs,
+                MAX(vs.ended_at) as last_activity
+            FROM voice_sessions vs
+            LEFT JOIN voice_channels vc ON vs.channel_id = vc.channel_id AND vc.channel_status = 'open'
+            WHERE vs.guild_id = $1 AND vs.started_at > $2
+            GROUP BY vs.channel_id
+            ORDER BY total_duration_secs DESC
+            LIMIT $3
+            "#,
+        )
+        .bind(guild_id)
+        .bind(since)
+        .bind(limit as i64)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(|r| VoiceSessionStats {
+            channel_id: r.channel_id,
+            channel_name: r.channel_name,
+            is_temporary: r.is_temporary,
+            total_sessions: r.total_sessions,
+            total_duration_secs: r.total_duration_secs,
+            unique_users: r.unique_users,
+            avg_duration_secs: r.avg_duration_secs,
+            last_activity: r.last_activity,
+        }).collect())
+    }
+
+    async fn count_unique_voice_users(&self, guild_id: &str, days: u32) -> Result<i64, DomainError> {
+        let since = chrono::Utc::now() - chrono::Duration::days(days as i64);
+
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(DISTINCT user_id)::BIGINT FROM voice_sessions WHERE guild_id = $1 AND started_at > $2",
+        )
+        .bind(guild_id)
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.0)
     }
 }

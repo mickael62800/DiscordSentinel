@@ -30,6 +30,10 @@ pub async fn add_xp(
     State(state): State<AppState>,
     Json(dto): Json<AddXpDto>,
 ) -> Result<Json<AddXpResponseDto>, ApiError> {
+    let guild_id = dto.guild_id.clone();
+    let user_id = dto.user_id.clone();
+    let amount = dto.amount;
+
     let result = state
         .levels_uc
         .add_xp(AddXpCommand {
@@ -39,6 +43,16 @@ pub async fn add_xp(
             amount: dto.amount,
         })
         .await?;
+
+    state.broadcaster.broadcast(
+        "xp_gained",
+        serde_json::json!({
+            "guild_id": &guild_id,
+            "user_id": &user_id,
+            "amount": amount,
+        }),
+    );
+
     Ok(single_dto(result))
 }
 

@@ -17,6 +17,9 @@ mod role_panel_repository;
 mod analytics_repository;
 mod discord_role_repository;
 mod ia_config_repository;
+mod notes_repository;
+mod reminder_repository;
+mod strike_repository;
 
 pub use analytics_repository::PgAnalyticsRepository;
 pub use ia_config_repository::PgIaConfigRepository;
@@ -37,3 +40,6 @@ pub use ticket_repository::PgTicketRepository;
 pub use voice_channel_repository::PgVoiceChannelRepository;
 pub use watched_user_repository::PgWatchedUserRepository;
 pub use discord_role_repository::PgDiscordRoleRepository;
+pub use notes_repository::PgNotesRepository;
+pub use reminder_repository::PgReminderRepository;
+pub use strike_repository::PgStrikeRepository;

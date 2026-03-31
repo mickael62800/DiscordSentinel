@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::domain::entities::WatchedUser;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_watched_users::{ManageWatchedUsersUseCase, UserDossier};
-use crate::ports::inbound::{InfractionFilters, ManageInfractionsUseCase, ManageModerationUseCase, ManageSecurityUseCase, ManageConductUseCase};
+use crate::ports::inbound::{InfractionFilters, ManageInfractionsUseCase, ManageModerationUseCase, ManageNotesUseCase, ManageSecurityUseCase, ManageConductUseCase};
 use crate::ports::outbound::WatchedUserRepository;
 
 pub struct ManageWatchedUsersService {
@@ -14,6 +14,7 @@ pub struct ManageWatchedUsersService {
     moderation_uc: Arc<dyn ManageModerationUseCase>,
     security_uc: Arc<dyn ManageSecurityUseCase>,
     conduct_uc: Arc<dyn ManageConductUseCase>,
+    notes_uc: Arc<dyn ManageNotesUseCase>,
 }
 
 impl ManageWatchedUsersService {
@@ -23,6 +24,7 @@ impl ManageWatchedUsersService {
         moderation_uc: Arc<dyn ManageModerationUseCase>,
         security_uc: Arc<dyn ManageSecurityUseCase>,
         conduct_uc: Arc<dyn ManageConductUseCase>,
+        notes_uc: Arc<dyn ManageNotesUseCase>,
     ) -> Self {
         Self {
             watched_repo,
@@ -30,6 +32,7 @@ impl ManageWatchedUsersService {
             moderation_uc,
             security_uc,
             conduct_uc,
+            notes_uc,
         }
     }
 }
@@ -76,12 +79,15 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
             .await
             .unwrap_or_default();
 
+        let notes = self.notes_uc.get_notes(guild_id, user_id).await.unwrap_or_default();
+
         Ok(UserDossier {
             user,
             infractions,
             moderation_actions: history.actions,
             security_events,
             conduct_log,
+            notes,
         })
     }
 }

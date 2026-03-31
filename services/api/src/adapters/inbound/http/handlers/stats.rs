@@ -3,7 +3,8 @@ use axum::http::StatusCode;
 use axum::Json;
 
 use crate::adapters::inbound::http::dto::stats::{
-    GuildOverviewDto, LeaderboardQuery, RecordMessagesDto, RecordVoiceDto, UserStatsDto,
+    GuildOverviewDto, GuildVoiceStatsDto, LeaderboardQuery, RecordMessagesDto, RecordVoiceDto,
+    UserStatsDto, VoiceStatsQuery,
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
@@ -13,7 +14,17 @@ pub async fn record_messages(
     State(state): State<AppState>,
     Json(dto): Json<RecordMessagesDto>,
 ) -> Result<StatusCode, ApiError> {
+    let guild_id = dto.guild_id.clone();
+    let user_id = dto.user_id.clone();
+    let count = dto.count;
+
     state.stats_uc.record_messages(dto.into()).await?;
+
+    state.broadcaster.broadcast(
+        "stats_messages_recorded",
+        serde_json::json!({ "guild_id": &guild_id, "user_id": &user_id, "count": count }),
+    );
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -22,7 +33,17 @@ pub async fn record_voice(
     State(state): State<AppState>,
     Json(dto): Json<RecordVoiceDto>,
 ) -> Result<StatusCode, ApiError> {
+    let guild_id = dto.guild_id.clone();
+    let user_id = dto.user_id.clone();
+    let seconds = dto.seconds;
+
     state.stats_uc.record_voice(dto.into()).await?;
+
+    state.broadcaster.broadcast(
+        "stats_voice_recorded",
+        serde_json::json!({ "guild_id": &guild_id, "user_id": &user_id, "seconds": seconds }),
+    );
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -53,4 +74,16 @@ pub async fn get_leaderboard(
     let limit = params.limit.unwrap_or(10).min(50);
     let members = state.stats_uc.get_leaderboard(&guild_id, limit).await?;
     Ok(Json(members.into_iter().map(UserStatsDto::from).collect()))
+}
+
+/// GET /api/stats/{guild_id}/voice-stats — stats vocales par salon
+pub async fn get_guild_voice_stats(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Query(params): Query<VoiceStatsQuery>,
+) -> Result<Json<GuildVoiceStatsDto>, ApiError> {
+    let days = params.days.unwrap_or(30).min(90);
+    let limit = params.limit.unwrap_or(20).min(50);
+    let stats = state.stats_uc.get_guild_voice_stats(&guild_id, days, limit).await?;
+    Ok(Json(GuildVoiceStatsDto::from(stats)))
 }

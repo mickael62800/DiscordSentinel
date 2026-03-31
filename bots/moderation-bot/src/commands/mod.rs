@@ -1,6 +1,7 @@
 pub mod ban;
 pub mod history;
 pub mod mute;
+pub mod notes;
 pub mod warn;
 
 use serenity::builder::CreateCommand;
@@ -13,5 +14,6 @@ pub fn all() -> Vec<CreateCommand> {
         ban::register(),
         ban::register_unban(),
         history::register(),
+        notes::register(),
     ]
 }

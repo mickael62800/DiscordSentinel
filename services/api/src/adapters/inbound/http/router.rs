@@ -70,6 +70,27 @@ fn security_routes() -> Router<AppState> {
         .route("/events", post(handlers::security::report_event).get(handlers::security::list_events))
 }
 
+fn reminders_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::reminders::create_reminder))
+        .route("/pending", get(handlers::reminders::get_pending))
+        .route("/{guild_id}", get(handlers::reminders::list_by_guild))
+}
+
+fn notes_routes() -> Router<AppState> {
+    Router::new()
+        .route("/", post(handlers::notes::add_note))
+        .route("/{guild_id}/{user_id}", get(handlers::notes::get_notes))
+        .route("/{id}", delete(handlers::notes::delete_note))
+}
+
+fn strikes_routes() -> Router<AppState> {
+    Router::new()
+        .route("/config/{guild_id}", get(handlers::strikes::get_config).put(handlers::strikes::save_config))
+        .route("/{guild_id}/{user_id}", get(handlers::strikes::get_active_strikes).delete(handlers::strikes::reset_strikes))
+        .route("/", post(handlers::strikes::add_strike))
+}
+
 fn moderation_routes() -> Router<AppState> {
     Router::new()
         .route("/actions", post(handlers::moderation::log_action))
@@ -103,6 +124,17 @@ fn voice_channel_routes() -> Router<AppState> {
             delete(handlers::voice_channels::unban_from_channel)
                 .get(handlers::voice_channels::check_ban),
         )
+        // Invite Links
+        .route(
+            "/by-channel/{channel_id}/invites",
+            get(handlers::voice_channels::list_invite_links)
+                .post(handlers::voice_channels::create_invite_link),
+        )
+        .route("/by-channel/{channel_id}/invites/{link_id}", delete(handlers::voice_channels::revoke_invite_link))
+        .route("/invites/{code}/use", post(handlers::voice_channels::use_invite_link))
+        // Themes
+        .route("/themes/{guild_id}", get(handlers::voice_channels::list_themes).post(handlers::voice_channels::create_theme))
+        .route("/themes/{guild_id}/{theme_id}", patch(handlers::voice_channels::update_theme).delete(handlers::voice_channels::delete_theme))
 }
 
 fn conduct_routes() -> Router<AppState> {
@@ -160,6 +192,7 @@ fn stats_routes() -> Router<AppState> {
         .route("/{guild_id}/user/{user_id}", get(handlers::stats::get_user_stats))
         .route("/{guild_id}/overview", get(handlers::stats::get_guild_overview))
         .route("/{guild_id}/leaderboard", get(handlers::stats::get_leaderboard))
+        .route("/{guild_id}/voice-stats", get(handlers::stats::get_guild_voice_stats))
 }
 
 fn dashboard_routes() -> Router<AppState> {
@@ -177,6 +210,44 @@ fn dashboard_routes() -> Router<AppState> {
         .route("/bots/config/{guild_id}/{bot_name}", get(handlers::bot_config::get_bot_config))
         .route("/bots/config", post(handlers::bot_config::set_config).delete(handlers::bot_config::delete_config))
         .route("/ia-config/{guild_id}", get(handlers::ia_config::get_ia_config).put(handlers::ia_config::save_ia_config))
+}
+
+/// Construit le router sans rate limiter ni ConnectInfo — pour les tests d'integration.
+pub fn build_for_test(state: AppState) -> Router {
+    let protected = Router::new()
+        .merge(bot_routes())
+        .nest("/api/tickets", ticket_routes())
+        .nest("/api/security", security_routes())
+        .nest("/api/moderation", moderation_routes())
+        .nest("/api/strikes", strikes_routes())
+        .nest("/api/notes", notes_routes())
+        .nest("/api/reminders", reminders_routes())
+        .nest("/api/voice-channels", voice_channel_routes())
+        .nest("/api/conduct", conduct_routes())
+        .nest("/api/levels", level_routes())
+        .nest("/api/role-panels", role_panel_routes())
+        .nest("/api/auto-roles", auto_role_routes())
+        .nest("/api/analytics", analytics_routes())
+        .nest("/api/stats", stats_routes())
+        .route("/api/stats", get(handlers::dashboard::get_dashboard_stats))
+        .nest("/api", dashboard_routes())
+        .route("/api/charts/activity", get(handlers::dashboard_charts::get_activity_trend))
+        .route("/api/audit-logs", get(handlers::audit_logs::list_audit_logs).post(handlers::audit_logs::create_audit_log))
+        .route("/api/watched-users", get(handlers::watched_users::list_watched_users))
+        .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier))
+        .route("/api/discord-roles/{guild_id}", get(handlers::discord_roles::list_roles))
+        .route("/api/discord-roles/{guild_id}/sync", post(handlers::discord_roles::sync_roles))
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            auth_middleware,
+        ));
+
+    let public = Router::new().route("/health", get(handlers::health::health));
+
+    Router::new()
+        .merge(protected)
+        .merge(public)
+        .with_state(state)
 }
 
 pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, allowed_origins: &str) -> Router {
@@ -199,6 +270,9 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .nest("/api/tickets", ticket_routes())
         .nest("/api/security", security_routes())
         .nest("/api/moderation", moderation_routes())
+        .nest("/api/strikes", strikes_routes())
+        .nest("/api/notes", notes_routes())
+        .nest("/api/reminders", reminders_routes())
         .nest("/api/voice-channels", voice_channel_routes())
         .nest("/api/conduct", conduct_routes())
         .nest("/api/levels", level_routes())

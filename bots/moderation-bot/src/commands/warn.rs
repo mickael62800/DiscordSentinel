@@ -3,9 +3,9 @@ use serenity::all::{
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     CreateMessage,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
-use sentinel_shared::embeds::{sentinel_embed, gravity_color, gravity_emoji};
+use sentinel_shared::embeds::{sentinel_embed, gravity_color, gravity_emoji, danger_embed, moderate_embed};
 
 use crate::api_client::ModerationAction;
 use crate::handler::ModerationApiKey;
@@ -78,6 +78,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 action_id = %resp.id,
                 target = %target.name,
                 gravity = gravity,
+                strikes = ?resp.strikes_count,
+                escalation = ?resp.escalation_action,
                 "Warn enregistre"
             );
 
@@ -99,8 +101,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 ).await.ok();
             }
 
+            let strikes_label = resp.strikes_count.map(|c| format!(" — Strike {c}")).unwrap_or_default();
             let channel_embed = sentinel_embed(
-                format!("{} Warn ({gravity})", gravity_emoji(gravity)),
+                format!("{} Warn ({gravity}){strikes_label}", gravity_emoji(gravity)),
                 gravity_color(gravity),
             )
             .field("Cible", format!("<@{}>", target.id), true)
@@ -114,6 +117,42 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     CreateInteractionResponseMessage::new().embed(channel_embed),
                 ),
             ).await.ok();
+
+            // Appliquer l'escalation si le seuil de strikes est atteint
+            if let Some(ref esc_action) = resp.escalation_action {
+                let mut member = match guild_id.member(&ctx.http, target.id).await {
+                    Ok(m) => m,
+                    Err(_) => return,
+                };
+                match esc_action.as_str() {
+                    "mute" => {
+                        let secs = resp.escalation_duration.unwrap_or(600);
+                        let ts = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs() as i64 + secs as i64;
+                        let datetime = time::OffsetDateTime::from_unix_timestamp(ts).expect("timestamp");
+                        let timeout = serenity::model::Timestamp::from(datetime);
+                        if let Err(e) = member.disable_communication_until_datetime(&ctx.http, timeout).await {
+                            warn!(error = %e, "Escalation mute echouee");
+                        } else {
+                            let esc_embed = moderate_embed(format!("🔇 Mute auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
+                                .field("Cible", format!("<@{}>", target.id), true)
+                                .field("Duree", format!("{}min", secs / 60), true);
+                            let _ = command.channel_id.send_message(&ctx.http, CreateMessage::new().embed(esc_embed)).await;
+                        }
+                    }
+                    "ban" => {
+                        let esc_embed = danger_embed(format!("🔨 Ban auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
+                            .field("Cible", format!("<@{}>", target.id), true);
+                        let _ = command.channel_id.send_message(&ctx.http, CreateMessage::new().embed(esc_embed)).await;
+                        if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, 1, reason).await {
+                            warn!(error = %e, "Escalation ban echouee");
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
         Err(e) => {
             error!(error = %e, "Erreur log warn");

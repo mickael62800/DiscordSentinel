@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{VoiceChannel, VoiceChannelDetail, VoiceChannelWhitelistEntry};
+use crate::domain::entities::{VoiceChannel, VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry};
 use crate::domain::errors::DomainError;
 
 pub struct CreateVoiceChannelCommand {
@@ -16,6 +16,7 @@ pub struct CreateVoiceChannelCommand {
     pub kind: String,
     pub visibility: String,
     pub queue_enabled: bool,
+    pub stage_enabled: bool,
 }
 
 pub struct UpdateVoiceChannelCommand {
@@ -27,6 +28,7 @@ pub struct UpdateVoiceChannelCommand {
     pub status: Option<String>,
     pub member_limit: Option<Option<i32>>,
     pub queue_channel_id: Option<Option<String>>,
+    pub stage_enabled: Option<bool>,
 }
 
 pub struct TransferOwnershipCommand {
@@ -57,6 +59,36 @@ pub struct BanFromChannelCommand {
     pub duration_secs: Option<i64>,
 }
 
+pub struct CreateInviteLinkCommand {
+    pub channel_id: String,
+    pub created_by: String,
+    pub created_by_name: String,
+    pub duration_secs: Option<i64>,
+    pub max_uses: Option<i32>,
+}
+
+pub struct UseInviteLinkCommand {
+    pub code: String,
+    pub user_id: String,
+    pub user_name: String,
+}
+
+pub struct CreateThemeCommand {
+    pub guild_id: String,
+    pub name: String,
+    pub emoji: Option<String>,
+    pub channel_name_template: String,
+    pub member_limit: Option<i32>,
+    pub visibility: String,
+    pub locked: bool,
+    pub queue_enabled: bool,
+    pub bitrate: Option<i32>,
+    pub slowmode_secs: Option<i32>,
+    pub stage_enabled: bool,
+    pub is_default: bool,
+    pub sort_order: i32,
+}
+
 #[async_trait]
 pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError>;
@@ -81,4 +113,16 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn ban_from_channel(&self, cmd: BanFromChannelCommand) -> Result<(), DomainError>;
     async fn unban_from_channel(&self, channel_id: &str, user_id: &str) -> Result<(), DomainError>;
     async fn is_banned(&self, channel_id: &str, user_id: &str) -> Result<bool, DomainError>;
+
+    // Invite Links
+    async fn create_invite_link(&self, cmd: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError>;
+    async fn list_invite_links(&self, channel_id: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError>;
+    async fn use_invite_link(&self, cmd: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError>;
+    async fn revoke_invite_link(&self, channel_id: &str, link_id: &str) -> Result<(), DomainError>;
+
+    // Themes
+    async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError>;
+    async fn create_theme(&self, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError>;
+    async fn update_theme(&self, theme_id: &str, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError>;
+    async fn delete_theme(&self, guild_id: &str, theme_id: &str) -> Result<(), DomainError>;
 }

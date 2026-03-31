@@ -18,6 +18,9 @@ mod role_panel_repository;
 mod analytics_repository;
 mod discord_role_repository;
 mod ia_config_repository;
+mod notes_repository;
+mod reminder_repository;
+mod strike_repository;
 
 pub use analytics_repository::AnalyticsRepository;
 pub use ia_config_repository::IaConfigRepository;
@@ -39,3 +42,6 @@ pub use ticket_repository::TicketRepository;
 pub use voice_channel_repository::VoiceChannelRepository;
 pub use watched_user_repository::WatchedUserRepository;
 pub use discord_role_repository::DiscordRoleRepository;
+pub use notes_repository::NotesRepository;
+pub use reminder_repository::ReminderRepository;
+pub use strike_repository::StrikeRepository;

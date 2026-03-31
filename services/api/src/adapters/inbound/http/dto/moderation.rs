@@ -23,6 +23,12 @@ pub struct ModerationActionResponseDto {
     pub action_type: String,
     pub target_name: String,
     pub reason: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escalation_action: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub escalation_duration: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub strikes_count: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -59,6 +65,9 @@ impl From<ModerationAction> for ModerationActionResponseDto {
             action_type: a.action_type,
             target_name: a.target_name,
             reason: a.reason,
+            escalation_action: None,
+            escalation_duration: None,
+            strikes_count: None,
         }
     }
 }

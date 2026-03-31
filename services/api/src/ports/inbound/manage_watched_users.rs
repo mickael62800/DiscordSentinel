@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::{
-    ConductPointsLog, Infraction, ModerationAction, SecurityEvent, WatchedUser,
+    ConductPointsLog, Infraction, ModerationAction, SecurityEvent, UserNote, WatchedUser,
 };
 use crate::domain::errors::DomainError;
 
@@ -12,6 +12,7 @@ pub struct UserDossier {
     pub moderation_actions: Vec<ModerationAction>,
     pub security_events: Vec<SecurityEvent>,
     pub conduct_log: Vec<ConductPointsLog>,
+    pub notes: Vec<UserNote>,
 }
 
 #[async_trait]

@@ -28,6 +28,9 @@ pub struct ModerationActionResponse {
     pub action_type: String,
     pub target_name: String,
     pub reason: String,
+    pub escalation_action: Option<String>,
+    pub escalation_duration: Option<u64>,
+    pub strikes_count: Option<u32>,
 }
 
 /// Historique des sanctions d'un utilisateur.
@@ -88,6 +91,39 @@ impl ApiClient {
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?
             .json::<UserHistory>()
+            .await
+            .map_err(|e| format!("Erreur parsing: {e}"))
+    }
+
+    /// Ajoute une note sur un utilisateur.
+    pub async fn add_note(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        author_id: &str,
+        author_name: &str,
+        content: &str,
+        category: &str,
+    ) -> Result<serde_json::Value, String> {
+        let req = self
+            .base
+            .client()
+            .post(format!("{}/api/notes", self.base.base_url()))
+            .json(&serde_json::json!({
+                "guild_id": guild_id,
+                "user_id": user_id,
+                "author_id": author_id,
+                "author_name": author_name,
+                "content": content,
+                "category": category,
+            }));
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau: {e}"))?
+            .json::<serde_json::Value>()
             .await
             .map_err(|e| format!("Erreur parsing: {e}"))
     }

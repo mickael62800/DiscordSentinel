@@ -169,8 +169,8 @@ start_service "moderation-bot" \
     "cargo run" \
     "$BLUE"
 
-start_service "roles-bot" \
-    "$ROOT_DIR/bots/roles-bot" \
+start_service "community-bot" \
+    "$ROOT_DIR/bots/community-bot" \
     "cargo run" \
     "$BLUE"
 
@@ -179,8 +179,8 @@ start_service "security-bot" \
     "cargo run" \
     "$BLUE"
 
-start_service "stats-bot" \
-    "$ROOT_DIR/bots/stats-bot" \
+start_service "progression-bot" \
+    "$ROOT_DIR/bots/progression-bot" \
     "cargo run" \
     "$BLUE"
 
@@ -221,8 +221,8 @@ echo -e "    ${YELLOW}analytics-worker  moderation-worker  monitoring-worker${NC
 echo ""
 echo -e "  Bots Discord (9) :"
 echo -e "    ${BLUE}audit-bot  automod-bot  image-bot${NC}"
-echo -e "    ${BLUE}moderation-bot  roles-bot  security-bot${NC}"
-echo -e "    ${BLUE}stats-bot  ticket-bot  voice-bot${NC}"
+echo -e "    ${BLUE}community-bot  moderation-bot  security-bot${NC}"
+echo -e "    ${BLUE}progression-bot  ticket-bot  voice-bot${NC}"
 echo ""
 echo -e "  Logs        : ${YELLOW}.logs/*.log${NC}"
 echo ""

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{DashboardStats, GuildStatsOverview, UserStats};
+use crate::domain::entities::{DashboardStats, GuildStatsOverview, GuildVoiceStats, UserStats};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_stats::{ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand};
 use crate::ports::outbound::{CachePort, InfractionRepository, StatsRepository};
@@ -93,6 +93,11 @@ impl ManageStatsUseCase for ManageStatsService {
 
         let overview_key = format!("stats:overview:{}", cmd.guild_id);
         self.cache.invalidate(&overview_key).await.ok();
+
+        // Invalider les caches voice_stats pour les periodes courantes
+        for days in [7, 30, 90] {
+            self.cache.invalidate(&format!("voice_stats:{}:{days}:20", cmd.guild_id)).await.ok();
+        }
 
         Ok(())
     }
@@ -191,5 +196,42 @@ impl ManageStatsUseCase for ManageStatsService {
             postgres_online,
             redis_online,
         })
+    }
+
+    async fn get_guild_voice_stats(&self, guild_id: &str, days: u32, limit: u32) -> Result<GuildVoiceStats, DomainError> {
+        let cache_key = format!("voice_stats:{guild_id}:{days}:{limit}");
+
+        if let Some(json) = self.cache.get_json(&cache_key).await? {
+            if let Ok(stats) = serde_json::from_str::<GuildVoiceStats>(&json) {
+                return Ok(stats);
+            }
+        }
+
+        let channels = self.stats_repo.get_guild_voice_stats(guild_id, days, limit).await?;
+        let unique_users = self.stats_repo.count_unique_voice_users(guild_id, days).await?;
+
+        let total_channels = channels.len() as i64;
+        let total_sessions: i64 = channels.iter().map(|c| c.total_sessions).sum();
+        let total_duration_secs: i64 = channels.iter().map(|c| c.total_duration_secs).sum();
+        let avg_session_secs = if total_sessions > 0 { total_duration_secs / total_sessions } else { 0 };
+        let temp_channels = channels.iter().filter(|c| c.is_temporary).count() as i64;
+        let perm_channels = channels.iter().filter(|c| !c.is_temporary).count() as i64;
+
+        let stats = GuildVoiceStats {
+            total_channels,
+            total_sessions,
+            total_duration_secs,
+            unique_users,
+            avg_session_secs,
+            temp_channels,
+            perm_channels,
+            channels,
+        };
+
+        if let Ok(json) = serde_json::to_string(&stats) {
+            self.cache.set_json(&cache_key, &json, OVERVIEW_TTL).await.ok();
+        }
+
+        Ok(stats)
     }
 }
