@@ -13,4 +13,5 @@ pub trait StatsRepository: Send + Sync {
     async fn add_voice_seconds(&self, guild_id: &str, user_id: &str, username: &str, seconds: u64) -> Result<(), DomainError>;
     async fn count_distinct_guilds(&self) -> Result<u64, DomainError>;
     async fn count_distinct_users(&self) -> Result<u64, DomainError>;
+    async fn save_voice_session(&self, guild_id: &str, user_id: &str, username: &str, channel_id: &str, channel_name: &str, duration_secs: u64) -> Result<(), DomainError>;
 }

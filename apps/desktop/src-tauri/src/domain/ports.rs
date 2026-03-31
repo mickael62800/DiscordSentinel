@@ -6,7 +6,7 @@ use super::entities::{
     ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats,
     AuditLog, AutoRoleConfig, DailyActivity, LevelConfig, LevelReward, RolePanel, RolePanelDetail,
     Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier,
-    TopUser, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser,
+    TopUser, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser, DiscordRole,
 };
 
 type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;

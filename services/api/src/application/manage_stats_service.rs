@@ -76,6 +76,21 @@ impl ManageStatsUseCase for ManageStatsService {
             .add_voice_seconds(&cmd.guild_id, &cmd.user_id, &cmd.username, cmd.seconds)
             .await?;
 
+        // Enregistrer la session vocale detaillee (par salon)
+        if !cmd.channel_id.is_empty() {
+            self.stats_repo
+                .save_voice_session(
+                    &cmd.guild_id,
+                    &cmd.user_id,
+                    &cmd.username,
+                    &cmd.channel_id,
+                    &cmd.channel_name,
+                    cmd.seconds,
+                )
+                .await
+                .ok();
+        }
+
         let overview_key = format!("stats:overview:{}", cmd.guild_id);
         self.cache.invalidate(&overview_key).await.ok();
 

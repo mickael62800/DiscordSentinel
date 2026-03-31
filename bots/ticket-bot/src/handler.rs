@@ -231,7 +231,18 @@ async fn close_inactive_tickets(ctx: &Context) {
     };
 
     let now = chrono::Utc::now();
-    let timeout_days = 7i64;
+
+    // Lire le timeout depuis la config de chaque guild (ou defaut 7 jours)
+    let mut timeout_days = 7i64;
+    for guild in ctx.cache.guilds() {
+        let guild_config = base.get_guild_config(&guild.to_string()).await.unwrap_or_default();
+        let configured = sentinel_shared::api_client::BaseApiClient::config_u64(&guild_config, "inactive_close_days", 7);
+        if configured == 0 {
+            return; // 0 = desactive
+        }
+        timeout_days = configured as i64;
+        break;
+    }
 
     for ticket in &tickets {
         if ticket.status == "closed" {

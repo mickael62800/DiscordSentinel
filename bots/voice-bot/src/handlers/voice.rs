@@ -14,7 +14,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use crate::api_client::{ApiClient, CreateVoiceChannelRequest};
 use crate::handler::{
-    ConfigKey, CooldownTrackerKey, MembersToVoiceMapKey,
+    AfkTrackerKey, ConfigKey, CooldownTrackerKey, MembersToVoiceMapKey,
     TextToVoiceMapKey, VoiceOwnerMapKey,
 };
 use crate::embeds;
@@ -98,6 +98,18 @@ pub async fn handle_voice_state_update(
             if old_channel_id != public_creator_id && old_channel_id != private_creator_id {
                 revoke_members_panel_access(ctx, old_channel_id, user_id).await;
                 check_and_delete_empty(ctx, old_channel_id, guild_id).await;
+            }
+        }
+    }
+
+    // Tracking AFK : marquer ou retirer selon l'etat mute+sourd
+    {
+        let data = ctx.data.read().await;
+        if let Some(afk_tracker) = data.get::<AfkTrackerKey>() {
+            if new.channel_id.is_some() && new.self_mute && new.self_deaf {
+                afk_tracker.mark_afk(user_id);
+            } else {
+                afk_tracker.clear(user_id);
             }
         }
     }

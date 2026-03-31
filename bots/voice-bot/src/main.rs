@@ -5,6 +5,7 @@ mod handler;
 mod handlers;
 mod interactions;
 mod state;
+mod tasks;
 
 use std::sync::Arc;
 
@@ -19,10 +20,10 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::{
-    ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
+    AfkTrackerKey, ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
     PendingChannelsKey, TextToVoiceMapKey, VoiceOwnerMapKey, VoteTrackerKey,
 };
-use crate::state::{CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
+use crate::state::{AfkTracker, CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
 
 #[tokio::main]
 async fn main() {
@@ -97,6 +98,7 @@ async fn main() {
         data.insert::<TextToVoiceMapKey>(text_to_voice);
         data.insert::<MembersToVoiceMapKey>(members_to_voice);
         data.insert::<VoiceOwnerMapKey>(voice_owner);
+        data.insert::<AfkTrackerKey>(Arc::new(AfkTracker::new()));
     }
 
     spawn_heartbeat(api);

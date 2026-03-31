@@ -81,6 +81,8 @@ struct RecordVoicePayload {
     user_id: String,
     username: String,
     seconds: u64,
+    channel_id: String,
+    channel_name: String,
 }
 
 // ── Client ──
@@ -130,6 +132,8 @@ impl ApiClient {
         user_id: &str,
         username: &str,
         seconds: u64,
+        channel_id: &str,
+        channel_name: &str,
     ) -> Result<(), String> {
         let req = self
             .base
@@ -140,6 +144,8 @@ impl ApiClient {
                 user_id: user_id.to_string(),
                 username: username.to_string(),
                 seconds,
+                channel_id: channel_id.to_string(),
+                channel_name: channel_name.to_string(),
             });
 
         self.base

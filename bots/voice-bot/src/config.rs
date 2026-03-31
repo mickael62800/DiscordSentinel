@@ -14,22 +14,22 @@ impl Config {
     pub fn from_env() -> Self {
         let base = BaseConfig::from_env("VOICE_DISCORD_TOKEN");
 
-        let guild_id: u64 = std::env::var("GUILD_ID")
-            .expect("GUILD_ID manquant dans .env")
+        let guild_id: u64 = std::env::var("VOICE_GUILD_ID")
+            .expect("VOICE_GUILD_ID manquant dans .env")
             .parse()
-            .expect("GUILD_ID doit etre un nombre");
+            .expect("VOICE_GUILD_ID doit etre un nombre");
 
-        let public_creator: u64 = std::env::var("PUBLIC_CREATOR_CHANNEL_ID")
-            .expect("PUBLIC_CREATOR_CHANNEL_ID manquant dans .env")
+        let public_creator: u64 = std::env::var("VOICE_PUBLIC_CREATOR_CHANNEL_ID")
+            .expect("VOICE_PUBLIC_CREATOR_CHANNEL_ID manquant dans .env")
             .parse()
-            .expect("PUBLIC_CREATOR_CHANNEL_ID doit etre un nombre");
+            .expect("VOICE_PUBLIC_CREATOR_CHANNEL_ID doit etre un nombre");
 
-        let private_creator: u64 = std::env::var("PRIVATE_CREATOR_CHANNEL_ID")
-            .expect("PRIVATE_CREATOR_CHANNEL_ID manquant dans .env")
+        let private_creator: u64 = std::env::var("VOICE_PRIVATE_CREATOR_CHANNEL_ID")
+            .expect("VOICE_PRIVATE_CREATOR_CHANNEL_ID manquant dans .env")
             .parse()
-            .expect("PRIVATE_CREATOR_CHANNEL_ID doit etre un nombre");
+            .expect("VOICE_PRIVATE_CREATOR_CHANNEL_ID doit etre un nombre");
 
-        let log_channel_id: Option<u64> = std::env::var("LOG_CHANNEL_ID")
+        let log_channel_id: Option<u64> = std::env::var("VOICE_LOG_CHANNEL_ID")
             .ok()
             .and_then(|v| v.parse().ok());
 

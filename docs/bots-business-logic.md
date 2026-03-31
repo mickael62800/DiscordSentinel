@@ -702,7 +702,6 @@ Reponse ephemere
 
 | Feature | Description | Priorite |
 |---------|-------------|----------|
-| **Limite de temps** | Duree maximale d'un salon temporaire (configurable). Avertissement 5 min avant, puis fermeture automatique. Evite les salons "zombies" | HIGH |
 | **Statistiques vocales par salon** | Tracker le nombre de participants, la duree moyenne, les pics d'utilisation. Affichable dans le dashboard | MEDIUM |
 | **Salons a theme** | Templates de salon pre-configures (Gaming, Musique, Travail). Chaque theme a des permissions, une limite d'utilisateurs et un nom automatique differents | MEDIUM |
 | **Invitation par lien** | Generer un lien d'invitation temporaire pour le salon vocal (valide X minutes). L'utilisateur invite est automatiquement autorise meme sans etre dans la whitelist | MEDIUM |

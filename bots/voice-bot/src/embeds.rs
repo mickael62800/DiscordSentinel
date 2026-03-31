@@ -1,4 +1,4 @@
-use serenity::builder::{CreateEmbed, CreateMessage};
+use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 
@@ -26,28 +26,31 @@ pub async fn log_channel_created(
     channel_name: &str,
     options: &str,
 ) {
+    let type_emoji = if channel_type == "private" { "🔒" } else { "🔊" };
+    let type_label = if channel_type == "private" { "Prive" } else { "Public" };
+
     let embed = CreateEmbed::new()
-        .title("Salon cree")
-        .description(format!(
-            "**Createur :** <@{creator_id}>\n\
-            **Type :** {channel_type}\n\
-            **Nom :** {channel_name}\n\
-            **Options :** {options}"
-        ))
+        .title(format!("{} Salon vocal cree", type_emoji))
         .color(0x2ecc71)
+        .field("Createur", format!("<@{creator_id}>"), true)
+        .field("Type", type_label, true)
+        .field("Nom", channel_name, true)
+        .field("Options", if options.is_empty() { "Aucune" } else { options }, false)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
         .timestamp(serenity::model::Timestamp::now());
 
     send_log(ctx, embed).await;
 }
 
 pub async fn log_channel_deleted(ctx: &Context, channel_name: &str, channel_type: &str) {
+    let type_emoji = if channel_type == "private" { "🔒" } else { "🔊" };
+
     let embed = CreateEmbed::new()
-        .title("Salon supprime")
-        .description(format!(
-            "**Nom :** {channel_name}\n\
-            **Type :** {channel_type}"
-        ))
+        .title(format!("🗑️ Salon vocal supprime"))
         .color(0xe74c3c)
+        .field("Nom", channel_name, true)
+        .field("Type", format!("{} {}", type_emoji, channel_type), true)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
         .timestamp(serenity::model::Timestamp::now());
 
     send_log(ctx, embed).await;
@@ -55,12 +58,11 @@ pub async fn log_channel_deleted(ctx: &Context, channel_name: &str, channel_type
 
 pub async fn log_member_joined(ctx: &Context, user_id: u64, channel_name: &str) {
     let embed = CreateEmbed::new()
-        .title("Membre rejoint")
-        .description(format!(
-            "**Membre :** <@{user_id}>\n\
-            **Salon :** {channel_name}"
-        ))
+        .title("➡️ Membre rejoint")
         .color(0x3498db)
+        .field("Membre", format!("<@{user_id}>"), true)
+        .field("Salon", channel_name, true)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
         .timestamp(serenity::model::Timestamp::now());
 
     send_log(ctx, embed).await;
@@ -68,12 +70,83 @@ pub async fn log_member_joined(ctx: &Context, user_id: u64, channel_name: &str) 
 
 pub async fn log_member_left(ctx: &Context, user_id: u64, channel_name: &str) {
     let embed = CreateEmbed::new()
-        .title("Membre parti")
-        .description(format!(
-            "**Membre :** <@{user_id}>\n\
-            **Salon :** {channel_name}"
-        ))
+        .title("⬅️ Membre parti")
         .color(0x95a5a6)
+        .field("Membre", format!("<@{user_id}>"), true)
+        .field("Salon", channel_name, true)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
+        .timestamp(serenity::model::Timestamp::now());
+
+    send_log(ctx, embed).await;
+}
+
+pub async fn log_vote_kick(ctx: &Context, target_id: u64, channel_name: &str, result: &str) {
+    let (emoji, color) = if result == "expulse" {
+        ("👢", 0xe74c3c)
+    } else {
+        ("✅", 0x2ecc71)
+    };
+
+    let embed = CreateEmbed::new()
+        .title(format!("{} Vote kick — {}", emoji, result))
+        .color(color)
+        .field("Cible", format!("<@{target_id}>"), true)
+        .field("Salon", channel_name, true)
+        .field("Resultat", result, true)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
+        .timestamp(serenity::model::Timestamp::now());
+
+    send_log(ctx, embed).await;
+}
+
+pub async fn log_transfer(ctx: &Context, from_id: u64, to_id: u64, channel_name: &str) {
+    let embed = CreateEmbed::new()
+        .title("🔄 Transfert de propriete")
+        .color(0xf39c12)
+        .field("Ancien proprietaire", format!("<@{from_id}>"), true)
+        .field("Nouveau proprietaire", format!("<@{to_id}>"), true)
+        .field("Salon", channel_name, false)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
+        .timestamp(serenity::model::Timestamp::now());
+
+    send_log(ctx, embed).await;
+}
+
+pub async fn log_ban(ctx: &Context, user_id: u64, channel_name: &str, duration: &str) {
+    let embed = CreateEmbed::new()
+        .title("🚫 Membre banni du salon")
+        .color(0xe74c3c)
+        .field("Membre", format!("<@{user_id}>"), true)
+        .field("Salon", channel_name, true)
+        .field("Duree", duration, true)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
+        .timestamp(serenity::model::Timestamp::now());
+
+    send_log(ctx, embed).await;
+}
+
+pub async fn log_flood_mute(ctx: &Context, user_id: u64, channel_name: &str, duration_secs: u64) {
+    let embed = CreateEmbed::new()
+        .title("🔇 Mute anti-flood")
+        .color(0xef4444)
+        .field("Membre", format!("<@{user_id}>"), true)
+        .field("Salon", channel_name, true)
+        .field("Duree", format!("{} secondes", duration_secs), true)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
+        .timestamp(serenity::model::Timestamp::now());
+
+    send_log(ctx, embed).await;
+}
+
+pub async fn log_afk_move(ctx: &Context, user_id: u64, from_channel: &str, to_channel: &str, afk_minutes: u64) {
+    let embed = CreateEmbed::new()
+        .title("💤 Membre deplace (AFK)")
+        .color(0xf39c12)
+        .field("Membre", format!("<@{user_id}>"), true)
+        .field("Depuis", from_channel, true)
+        .field("Vers", to_channel, true)
+        .field("Duree AFK", format!("{} minutes", afk_minutes), false)
+        .footer(CreateEmbedFooter::new("Voice Bot"))
         .timestamp(serenity::model::Timestamp::now());
 
     send_log(ctx, embed).await;

@@ -6,7 +6,7 @@ use serenity::all::{
     ComponentInteraction, PermissionOverwrite, PermissionOverwriteType, EditChannel,
     CreateModal, CreateInputText, InputTextStyle, ModalInteraction,
 };
-use serenity::builder::{CreateChannel, CreateMessage};
+use serenity::builder::{CreateChannel, CreateEmbed, CreateMessage};
 use serenity::model::channel::ChannelType;
 use serenity::model::Permissions;
 use tracing::{error, info, warn};
@@ -452,45 +452,72 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     };
 
     let welcome_content = format!(
-        "**Ticket #{ticket_short}** — {type_label}\n\
-         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n\
-         **Auteur :** <@{author_id}>\n\
+        "**Auteur :** <@{author_id}>\n\
          **Type :** {type_label}\n\
          **Priorite :** {priority}\n\
          **Sujet :** {subject}\n\n\
          **Description :**\n\
          > {description}\n\n\
-         ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\
          {staff_line}",
-        ticket_short = &ticket_id[..8.min(ticket_id.len())],
         author_id = author.id,
         subject = title,
         description = description.replace('\n', "\n> "),
     );
 
-    // Message de bienvenue (sans boutons)
-    let welcome = CreateMessage::new().content(welcome_content);
+    // Lire les couleurs depuis la config (ou valeurs par defaut)
+    let parse_color = |config: &std::collections::HashMap<String, String>, key: &str, default: u32| -> u32 {
+        config.get(key)
+            .and_then(|v| u32::from_str_radix(v.trim_start_matches('#'), 16).ok())
+            .unwrap_or(default)
+    };
+
+    let color_normal = parse_color(&guild_config, "color_normal", 0x2ecc71);
+    let color_urgent = parse_color(&guild_config, "color_urgent", 0xff6600);
+    let color_confidential = parse_color(&guild_config, "color_confidential", 0xe74c3c);
+    let color_staff = parse_color(&guild_config, "color_staff", 0xe67e22);
+    let color_user = parse_color(&guild_config, "color_user", 0x3498db);
+
+    let embed_color: u32 = if is_admin_only {
+        color_confidential
+    } else if URGENT_TYPES.contains(&ticket_type.as_str()) {
+        color_urgent
+    } else {
+        color_normal
+    };
+
+    // Message d'accueil personnalise ou par defaut
+    let custom_welcome = guild_config.get("welcome_message")
+        .filter(|v| !v.is_empty())
+        .cloned();
+
+    let welcome_text = if let Some(ref custom) = custom_welcome {
+        format!(
+            "**Auteur :** <@{author_id}>\n\
+             **Type :** {type_label}\n\
+             **Priorite :** {priority}\n\
+             **Sujet :** {subject}\n\n\
+             **Description :**\n\
+             > {description}\n\n\
+             {custom}",
+            author_id = author.id,
+            subject = title,
+            description = description.replace('\n', "\n> "),
+        )
+    } else {
+        welcome_content
+    };
+
+    let welcome_embed = CreateEmbed::new()
+        .title(format!("Ticket #{} — {}", &ticket_id[..8.min(ticket_id.len())], type_label))
+        .description(welcome_text)
+        .color(embed_color);
+
+    let welcome = CreateMessage::new().embed(welcome_embed);
     if let Err(e) = channel.send_message(&ctx.http, welcome).await {
         error!(error = %e, channel = %channel.id, "Erreur envoi message de bienvenue");
     }
 
-    // Boutons utilisateur
-    let user_close_btn = CreateButton::new(CLOSE_BUTTON_ID)
-        .label("Fermer le ticket")
-        .style(serenity::all::ButtonStyle::Danger);
-    let invite_btn = CreateButton::new(INVITE_BUTTON_ID)
-        .label("Inviter quelqu'un")
-        .style(serenity::all::ButtonStyle::Secondary);
-    let user_row = CreateActionRow::Buttons(vec![user_close_btn, invite_btn]);
-
-    let user_msg = CreateMessage::new()
-        .content("**Commandes utilisateur :**")
-        .components(vec![user_row]);
-    if let Err(e) = channel.send_message(&ctx.http, user_msg).await {
-        error!(error = %e, channel = %channel.id, "Erreur envoi commandes utilisateur");
-    }
-
-    // Boutons staff (admin / moderateur)
+    // Boutons staff (embed) — en premier
     let staff_close_btn = CreateButton::new(CLOSE_BUTTON_ID)
         .label("Fermer le ticket")
         .style(serenity::all::ButtonStyle::Danger);
@@ -499,11 +526,37 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         .style(serenity::all::ButtonStyle::Primary);
     let staff_row = CreateActionRow::Buttons(vec![staff_close_btn, vocal_btn]);
 
+    let staff_embed = CreateEmbed::new()
+        .title("Commandes staff")
+        .description("Reserve aux administrateurs et moderateurs.")
+        .color(color_staff);
+
     let staff_msg = CreateMessage::new()
-        .content("**Commandes staff :**")
+        .embed(staff_embed)
         .components(vec![staff_row]);
     if let Err(e) = channel.send_message(&ctx.http, staff_msg).await {
         error!(error = %e, channel = %channel.id, "Erreur envoi commandes staff");
+    }
+
+    // Boutons utilisateur (embed) — en dessous
+    let user_close_btn = CreateButton::new(CLOSE_BUTTON_ID)
+        .label("Fermer le ticket")
+        .style(serenity::all::ButtonStyle::Danger);
+    let invite_btn = CreateButton::new(INVITE_BUTTON_ID)
+        .label("Inviter quelqu'un")
+        .style(serenity::all::ButtonStyle::Secondary);
+    let user_row = CreateActionRow::Buttons(vec![user_close_btn, invite_btn]);
+
+    let user_embed = CreateEmbed::new()
+        .title("Commandes utilisateur")
+        .description("Utilisez les boutons ci-dessous pour gerer votre ticket.")
+        .color(color_user);
+
+    let user_msg = CreateMessage::new()
+        .embed(user_embed)
+        .components(vec![user_row]);
+    if let Err(e) = channel.send_message(&ctx.http, user_msg).await {
+        error!(error = %e, channel = %channel.id, "Erreur envoi commandes utilisateur");
     }
 
     // Supprimer la reponse ephemeral (le "en chargement...") pour ne pas polluer
@@ -682,7 +735,30 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
         }
     }
 
+    // Verifier si le transcript DM est active (config)
+    let transcript_enabled = {
+        let data2 = ctx.data.read().await;
+        if let Some(base) = data2.get::<ApiClientKey>() {
+            let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            sentinel_shared::api_client::BaseApiClient::config_bool(&gc, "transcript_dm_enabled", true)
+        } else {
+            true
+        }
+    };
+
+    // Lire le delai de suppression du salon
+    let close_delay = {
+        let data2 = ctx.data.read().await;
+        if let Some(base) = data2.get::<ApiClientKey>() {
+            let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            sentinel_shared::api_client::BaseApiClient::config_u64(&gc, "close_delay_secs", 5)
+        } else {
+            5
+        }
+    };
+
     // Envoyer le transcript en DM a l'auteur du ticket
+    if transcript_enabled {
     if let Some(ref id) = ticket_id {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
@@ -724,8 +800,9 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
             }
         }
     }
+    } // fin if transcript_enabled
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+    tokio::time::sleep(tokio::time::Duration::from_secs(close_delay)).await;
     let _ = channel_id.delete(&ctx.http).await;
 }
 

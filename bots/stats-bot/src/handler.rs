@@ -160,6 +160,22 @@ impl EventHandler for Handler {
                             .map(|u| u.name)
                             .unwrap_or_else(|_| user_id.to_string());
 
+                        // Recuperer le channel_id et channel_name du salon quitte
+                        let (channel_id_str, channel_name) = if let Some(old_state) = &old {
+                            if let Some(ch_id) = old_state.channel_id {
+                                let name = ch_id.to_channel(&ctx.http).await
+                                    .ok()
+                                    .and_then(|c| c.guild())
+                                    .map(|c| c.name.clone())
+                                    .unwrap_or_default();
+                                (ch_id.to_string(), name)
+                            } else {
+                                (String::new(), String::new())
+                            }
+                        } else {
+                            (String::new(), String::new())
+                        };
+
                         if let Some(api) = api {
                             if let Err(e) = api
                                 .record_voice(
@@ -167,6 +183,8 @@ impl EventHandler for Handler {
                                     &user_id.to_string(),
                                     &username,
                                     seconds,
+                                    &channel_id_str,
+                                    &channel_name,
                                 )
                                 .await
                             {

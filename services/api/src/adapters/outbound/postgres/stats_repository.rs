@@ -162,4 +162,37 @@ impl StatsRepository for PgStatsRepository {
 
         Ok(row.0 as u64)
     }
+
+    async fn save_voice_session(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        channel_id: &str,
+        channel_name: &str,
+        duration_secs: u64,
+    ) -> Result<(), DomainError> {
+        let now = chrono::Utc::now();
+        let started_at = now - chrono::Duration::seconds(duration_secs as i64);
+
+        sqlx::query(
+            r#"
+            INSERT INTO voice_sessions (guild_id, user_id, username, channel_id, channel_name, duration_secs, started_at, ended_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            "#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(username)
+        .bind(channel_id)
+        .bind(channel_name)
+        .bind(duration_secs as i64)
+        .bind(started_at)
+        .bind(now)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
 }

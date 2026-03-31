@@ -15,6 +15,8 @@ pub struct RecordVoiceCommand {
     pub user_id: String,
     pub username: String,
     pub seconds: u64,
+    pub channel_id: String,
+    pub channel_name: String,
 }
 
 #[async_trait]

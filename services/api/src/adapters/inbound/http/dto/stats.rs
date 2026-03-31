@@ -19,6 +19,10 @@ pub struct RecordVoiceDto {
     pub user_id: String,
     pub username: String,
     pub seconds: u64,
+    #[serde(default)]
+    pub channel_id: String,
+    #[serde(default)]
+    pub channel_name: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -73,6 +77,8 @@ impl From<RecordVoiceDto> for RecordVoiceCommand {
             user_id: dto.user_id,
             username: dto.username,
             seconds: dto.seconds,
+            channel_id: dto.channel_id,
+            channel_name: dto.channel_name,
         }
     }
 }
