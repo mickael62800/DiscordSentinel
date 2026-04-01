@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::domain::entities::{BotDefinition, BotGuildConfig};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BotDefinitionDto {
     pub bot_name: String,
     pub display_name: String,
@@ -21,7 +21,7 @@ impl From<BotDefinition> for BotDefinitionDto {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct BotGuildConfigDto {
     pub guild_id: String,
     pub bot_name: String,

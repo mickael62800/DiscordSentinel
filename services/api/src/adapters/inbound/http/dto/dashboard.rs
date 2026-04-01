@@ -162,7 +162,7 @@ impl From<Rule> for DashboardRuleDto {
 
 // ── Guild DTO ──
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, serde::Deserialize)]
 pub struct GuildDto {
     pub guild_id: String,
     pub name: String,

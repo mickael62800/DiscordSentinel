@@ -1,6 +1,7 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use redis::AsyncCommands;
 use uuid::Uuid;
 
 use axum::extract::Query;
@@ -153,12 +154,29 @@ pub struct HeartbeatPayload {
     pub name: String,
 }
 
-/// GET /api/guilds — liste des serveurs connus
+/// GET /api/guilds — liste des serveurs connus (cache 5min)
 pub async fn list_guilds(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<GuildDto>>, ApiError> {
+    // Cache-first
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        if let Ok(Some(json)) = conn.get::<_, Option<String>>("guilds:all").await {
+            if let Ok(dtos) = serde_json::from_str::<Vec<GuildDto>>(&json) {
+                return Ok(Json(dtos));
+            }
+        }
+    }
+
     let guilds = state.guild_repo.find_all().await?;
-    Ok(Json(guilds.into_iter().map(GuildDto::from).collect()))
+    let dtos: Vec<GuildDto> = guilds.into_iter().map(GuildDto::from).collect();
+
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        if let Ok(json) = serde_json::to_string(&dtos) {
+            let _: Result<(), _> = conn.set_ex("guilds:all", json, 300u64).await;
+        }
+    }
+
+    Ok(Json(dtos))
 }
 
 /// POST /api/guilds/register — un bot enregistre/met à jour un serveur
@@ -175,5 +193,11 @@ pub async fn register_guild(
         updated_at: chrono::Utc::now(),
     };
     state.guild_repo.upsert(&guild).await?;
+
+    // Invalider le cache guilds
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        let _: Result<(), _> = conn.del("guilds:all").await;
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
