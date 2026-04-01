@@ -38,7 +38,14 @@ export function useGuildFetch<T>(
       };
       data.value = await invoke<T>(command, params);
     } catch (e) {
-      error.value = String(e);
+      const msg = String(e);
+      if (msg.includes("Connection refused") || msg.includes("network") || msg.includes("connect")) {
+        error.value = "Connexion au serveur impossible. Verifiez que l'API est demarree.";
+      } else if (msg.includes("timeout") || msg.includes("Timeout")) {
+        error.value = "Le serveur met trop de temps a repondre. Reessayez plus tard.";
+      } else {
+        error.value = "Erreur lors du chargement des donnees.";
+      }
       console.error(`Failed to invoke ${command}:`, e);
     } finally {
       loading.value = false;

@@ -4,13 +4,14 @@ import { useConduct, useConductDetail } from "../../composables/useConduct";
 import { usePagination } from "../../composables/usePagination";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 
 const { selectedGuildId } = useGuildSelector();
-const { config, leaderboard, loading } = useConduct();
+const { config, leaderboard, loading, error, fetchLeaderboard } = useConduct();
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLeaderboard } = usePagination(leaderboard);
 const { points: detailPoints, log: detailLog, loading: detailLoading, fetchDetail } = useConductDetail();
 
@@ -108,7 +109,8 @@ function backToList() {
 
     <!-- Leaderboard -->
     <div v-else>
-      <div v-if="loading" class="loading">Chargement...</div>
+      <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchLeaderboard" />
+      <div v-else-if="loading" class="loading">Chargement...</div>
       <div v-else-if="leaderboard.length === 0" class="empty">Aucun utilisateur avec des points</div>
       <table v-else class="data-table">
         <thead>

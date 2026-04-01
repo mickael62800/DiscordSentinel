@@ -5,6 +5,7 @@ import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppButton from "../atoms/AppButton.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
@@ -12,7 +13,7 @@ import FilterBar from "../molecules/FilterBar.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { statusVariant, priorityVariant } from "../../utils/variants";
 
-const { filteredTickets, loading, filterStatus, filterPriority, openCount, pendingCount, fetchTickets } = useTickets();
+const { filteredTickets, loading, error, filterStatus, filterPriority, openCount, pendingCount, fetchTickets } = useTickets();
 useRealtimeRefresh(["ticket_new", "ticket_message"], fetchTickets);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedTickets } = usePagination(filteredTickets);
 const { detail, loading: detailLoading, replying, fetchDetail, reply, close } = useTicketDetail();
@@ -85,7 +86,8 @@ function backToList() {
 
       <FilterBar :filters="filters" @update:filter="onFilterUpdate" />
 
-      <div v-if="loading" class="loading">Chargement...</div>
+      <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchTickets" />
+      <div v-else-if="loading" class="loading">Chargement...</div>
 
       <div v-else class="ticket-list">
         <div

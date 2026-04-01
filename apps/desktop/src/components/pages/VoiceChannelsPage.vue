@@ -4,12 +4,13 @@ import { useVoiceChannels, useVoiceChannelDetail } from "../../composables/useVo
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 
-const { filteredChannels, loading, filterKind, publicCount, privateCount, totalCount, fetchChannels } = useVoiceChannels();
+const { filteredChannels, loading, error, filterKind, publicCount, privateCount, totalCount, fetchChannels } = useVoiceChannels();
 useRealtimeRefresh(["voice_channel_created", "voice_channel_closed"], fetchChannels);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
 const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
@@ -104,7 +105,8 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
         </select>
       </div>
 
-      <div v-if="loading" class="loading">Chargement...</div>
+      <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchChannels" />
+      <div v-else-if="loading" class="loading">Chargement...</div>
       <div v-else-if="filteredChannels.length === 0" class="empty">Aucun salon vocal temporaire actif</div>
       <table v-else class="data-table">
         <thead>

@@ -4,7 +4,7 @@ import type { ModerationRule, UpdateRuleParams } from "../types";
 import { useGuildFetch } from "./useGuildFetch";
 
 export function useRules() {
-  const { data: rules, loading, refresh: fetchRules } = useGuildFetch<ModerationRule[]>(
+  const { data: rules, loading, error, refresh: fetchRules } = useGuildFetch<ModerationRule[]>(
     "get_rules",
     [],
   );
@@ -39,5 +39,5 @@ export function useRules() {
     editing.value = null;
   }
 
-  return { rules, loading, editing, fetchRules, toggleRule, updateRule, openEdit, closeEdit };
+  return { rules, loading, error, editing, fetchRules, toggleRule, updateRule, openEdit, closeEdit };
 }

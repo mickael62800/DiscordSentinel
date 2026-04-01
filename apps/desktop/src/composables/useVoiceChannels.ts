@@ -4,7 +4,7 @@ import type { VoiceChannel, VoiceChannelDetail } from "../types";
 import { useGuildFetch } from "./useGuildFetch";
 
 export function useVoiceChannels() {
-  const { data: channels, loading, refresh: fetchChannels } = useGuildFetch<VoiceChannel[]>(
+  const { data: channels, loading, error, refresh: fetchChannels } = useGuildFetch<VoiceChannel[]>(
     "get_voice_channels",
     [],
     { extraParams: {} },
@@ -23,7 +23,7 @@ export function useVoiceChannels() {
   const privateCount = computed(() => channels.value.filter((c) => c.kind === "private").length);
   const totalCount = computed(() => channels.value.length);
 
-  return { channels, filteredChannels, loading, filterKind, publicCount, privateCount, totalCount, fetchChannels };
+  return { channels, filteredChannels, loading, error, filterKind, publicCount, privateCount, totalCount, fetchChannels };
 }
 
 export function useVoiceChannelDetail() {

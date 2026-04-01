@@ -7,6 +7,7 @@ export function useConduct() {
   const config = ref<ConductConfig | null>(null);
   const leaderboard = ref<UserConductPoints[]>([]);
   const loading = ref(true);
+  const error = ref<string | null>(null);
   const { selectedGuildId } = useGuildSelector();
 
   async function fetchConfig() {
@@ -15,6 +16,7 @@ export function useConduct() {
     try {
       config.value = await invoke<ConductConfig>("get_conduct_config", { guildId });
     } catch (e) {
+      error.value = "Impossible de charger la configuration de conduite.";
       console.error("Failed to fetch conduct config:", e);
     }
   }
@@ -30,6 +32,7 @@ export function useConduct() {
     try {
       leaderboard.value = await invoke<UserConductPoints[]>("get_conduct_leaderboard", { guildId });
     } catch (e) {
+      error.value = "Impossible de charger le classement de conduite.";
       console.error("Failed to fetch leaderboard:", e);
     } finally {
       loading.value = false;
@@ -46,7 +49,7 @@ export function useConduct() {
     fetchLeaderboard();
   });
 
-  return { config, leaderboard, loading, fetchConfig, fetchLeaderboard };
+  return { config, leaderboard, loading, error, fetchConfig, fetchLeaderboard };
 }
 
 export function useConductDetail() {

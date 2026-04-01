@@ -19,11 +19,15 @@ export function useTickets() {
   const openCount = computed(() => tickets.value.filter((t) => t.status === "open").length);
   const pendingCount = computed(() => tickets.value.filter((t) => t.status === "pending").length);
 
+  const error = ref<string | null>(null);
+
   async function fetchTickets() {
     loading.value = true;
+    error.value = null;
     try {
       tickets.value = await invoke<Ticket[]>("get_tickets");
     } catch (e) {
+      error.value = "Impossible de charger les tickets. Verifiez la connexion au serveur.";
       console.error("Failed to fetch tickets:", e);
     } finally {
       loading.value = false;
@@ -32,7 +36,7 @@ export function useTickets() {
 
   onMounted(fetchTickets);
 
-  return { tickets, filteredTickets, loading, filterStatus, filterPriority, openCount, pendingCount, fetchTickets };
+  return { tickets, filteredTickets, loading, error, filterStatus, filterPriority, openCount, pendingCount, fetchTickets };
 }
 
 export function useTicketDetail() {
