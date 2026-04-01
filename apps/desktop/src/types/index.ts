@@ -171,6 +171,18 @@ export interface SelectOption {
   label: string;
 }
 
+export interface UserActivity {
+  id: string;
+  guild_id: string;
+  user_id: string;
+  event_type: string;
+  channel_id: string | null;
+  channel_name: string | null;
+  content: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+}
+
 export interface GuildMember {
   id: string;
   username: string;

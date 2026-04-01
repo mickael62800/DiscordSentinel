@@ -20,13 +20,20 @@ pub async fn handle_addition(ctx: &Context, new_member: &Member) {
 
     Handler::send_event(
         ctx,
-        audit_event::simple(gid_str, "member_join")
+        audit_event::simple(gid_str.clone(), "member_join")
             .with_target(&new_member.user.id, &new_member.user.name)
             .with_details(serde_json::json!({
                 "account_created_at": new_member.user.created_at().to_string(),
             })),
     )
     .await;
+
+    // Surveillance
+    Handler::track_activity(
+        ctx, &gid_str, &new_member.user.id.to_string(), "member_join",
+        None, None, None,
+        serde_json::json!({"account_created_at": new_member.user.created_at().to_string()}),
+    ).await;
 
     let data = ctx.data.read().await;
     if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
@@ -47,6 +54,12 @@ pub async fn handle_removal(ctx: &Context, guild_id: GuildId, user: &User) {
             .with_target(&user.id, &user.name),
     )
     .await;
+
+    // Surveillance
+    Handler::track_activity(
+        ctx, &gid_str, &user.id.to_string(), "member_leave",
+        None, None, None, serde_json::json!({}),
+    ).await;
 
     // Anomaly detection (kick pattern)
     let data = ctx.data.read().await;
@@ -172,6 +185,14 @@ pub async fn handle_update(
         )
         .await;
 
+        // Surveillance : pseudo change
+        Handler::track_activity(
+            ctx, &gid_str, &user_id, "nickname_changed",
+            None, None,
+            Some(&format!("{} -> {}", old_label, new_label)),
+            serde_json::json!({"old": old_label, "new": new_label}),
+        ).await;
+
         // Envoyer l'historique pseudos au backend
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
@@ -202,6 +223,12 @@ pub async fn handle_update(
                 .with_target(&user_id, user_name),
         )
         .await;
+
+        // Surveillance : avatar change
+        Handler::track_activity(
+            ctx, &gid_str, &user_id, "avatar_changed",
+            None, None, None, serde_json::json!({}),
+        ).await;
     }
 
     // Changement de roles
@@ -226,6 +253,13 @@ pub async fn handle_update(
                 })),
         )
         .await;
+
+        // Surveillance : roles changes
+        Handler::track_activity(
+            ctx, &gid_str, &user_id, "roles_changed",
+            None, None, None,
+            serde_json::json!({"old_roles": old_roles, "new_roles": new_roles}),
+        ).await;
 
         // Weekly stats
         let data = ctx.data.read().await;

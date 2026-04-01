@@ -21,7 +21,8 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::anomaly::{AnomalyDetector, AnomalyThresholds};
 use crate::config::Config;
-use crate::handler::{AnomalyDetectorKey, ConfigKey, Handler, MessageCacheKey, WeeklyTrackerKey};
+use dashmap::DashSet;
+use crate::handler::{AnomalyDetectorKey, ConfigKey, Handler, MessageCacheKey, WatchedUserIdsKey, WeeklyTrackerKey};
 use crate::message_cache::MessageCache;
 use crate::weekly_report::{WeeklyTracker, format_report};
 
@@ -65,6 +66,7 @@ async fn main() {
         ));
         data.insert::<WeeklyTrackerKey>(WeeklyTracker::new());
         data.insert::<ConfigKey>(config.clone());
+        data.insert::<WatchedUserIdsKey>(Arc::new(DashSet::new()));
     }
 
     spawn_heartbeat(api.clone());

@@ -36,7 +36,7 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
     };
     Handler::log(ctx, "info", &gid, &voice_msg).await;
 
-    let mut evt = audit_event::simple(gid, event_type)
+    let mut evt = audit_event::simple(gid.clone(), event_type)
         .with_actor(&user_id, &user_name)
         .with_details(serde_json::json!({
             "from_channel": old_channel.map(|c| c.to_string()),
@@ -45,6 +45,15 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
     evt.channel_id = new_channel.map(|c| c.to_string());
 
     Handler::send_event(ctx, evt).await;
+
+    // Surveillance
+    let channel_str = new_channel.or(old_channel).map(|c| c.to_string());
+    Handler::track_activity(
+        ctx, &gid, &user_id, event_type,
+        channel_str.as_deref(), None,
+        Some(&voice_msg),
+        serde_json::json!({"from": old_channel.map(|c| c.to_string()), "to": new_channel.map(|c| c.to_string())}),
+    ).await;
 
     if let Some(guild_id) = new.guild_id {
         let data = ctx.data.read().await;

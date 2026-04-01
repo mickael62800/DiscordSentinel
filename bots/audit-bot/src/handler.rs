@@ -1,3 +1,6 @@
+use std::sync::Arc;
+
+use dashmap::DashSet;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
@@ -43,9 +46,47 @@ impl TypeMapKey for ConfigKey {
     type Value = Config;
 }
 
+/// Cache des user_ids surveilles (rafraichi toutes les 60s)
+pub struct WatchedUserIdsKey;
+impl TypeMapKey for WatchedUserIdsKey {
+    type Value = Arc<DashSet<String>>;
+}
+
 pub struct Handler;
 
 impl Handler {
+    /// Verifie si un utilisateur est surveille
+    pub fn is_watched(ctx_data: &TypeMap, user_id: &str) -> bool {
+        ctx_data
+            .get::<WatchedUserIdsKey>()
+            .map(|set| set.contains(user_id))
+            .unwrap_or(false)
+    }
+
+    /// Enregistre l'activite d'un utilisateur surveille
+    pub async fn track_activity(
+        ctx: &Context,
+        guild_id: &str,
+        user_id: &str,
+        event_type: &str,
+        channel_id: Option<&str>,
+        channel_name: Option<&str>,
+        content: Option<&str>,
+        metadata: serde_json::Value,
+    ) {
+        let data = ctx.data.read().await;
+        if !Self::is_watched(&data, user_id) {
+            return;
+        }
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let api = ApiClient::new(base.clone());
+            let _ = api.log_user_activity(
+                guild_id, user_id, event_type,
+                channel_id, channel_name, content, metadata,
+            ).await;
+        }
+    }
+
     pub async fn send_event(ctx: &Context, event: AuditEvent) {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
@@ -80,6 +121,34 @@ impl EventHandler for Handler {
         } else {
             info!("Slash commands enregistrees : audit");
         }
+
+        // Rafraichir la liste des utilisateurs surveilles toutes les 60s
+        let ctx_clone = ctx.clone();
+        tokio::spawn(async move {
+            loop {
+                let data = ctx_clone.data.read().await;
+                if let (Some(base), Some(watched_set)) = (
+                    data.get::<ApiClientKey>(),
+                    data.get::<WatchedUserIdsKey>(),
+                ) {
+                    let api = ApiClient::new(base.clone());
+                    let watched_set = watched_set.clone();
+                    drop(data);
+
+                    for guild_id in ctx_clone.cache.guilds() {
+                        if let Ok(ids) = api.get_watched_user_ids(&guild_id.to_string()).await {
+                            for id in ids {
+                                watched_set.insert(id);
+                            }
+                        }
+                    }
+                } else {
+                    drop(data);
+                }
+
+                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+            }
+        });
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -133,6 +202,24 @@ impl EventHandler for Handler {
                     channel_id: msg.channel_id.to_string(),
                 },
             );
+        }
+
+        // Surveillance : tracker les messages des utilisateurs surveilles
+        let user_id = msg.author.id.to_string();
+        if Self::is_watched(&data, &user_id) {
+            drop(data);
+            let channel_name = msg.channel_id
+                .to_channel(&ctx.http).await.ok()
+                .and_then(|c| c.guild())
+                .map(|c| c.name.clone());
+
+            Self::track_activity(
+                &ctx, &guild_id.to_string(), &user_id, "message_sent",
+                Some(&msg.channel_id.to_string()),
+                channel_name.as_deref(),
+                Some(&msg.content),
+                serde_json::json!({"message_id": msg.id.to_string()}),
+            ).await;
         }
     }
 

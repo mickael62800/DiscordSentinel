@@ -57,6 +57,65 @@ impl ApiClient {
             .map_err(|e| format!("{e}"))
     }
 
+    /// Recupere les IDs des utilisateurs surveilles pour un serveur
+    pub async fn get_watched_user_ids(&self, guild_id: &str) -> Result<Vec<String>, String> {
+        let url = format!(
+            "{}/api/watched-users?guild_id={}",
+            self.base.base_url(),
+            guild_id
+        );
+
+        let req = self.base.client().get(&url);
+        let users: Vec<serde_json::Value> = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("{e}"))?
+            .json()
+            .await
+            .map_err(|e| format!("{e}"))?;
+
+        Ok(users
+            .iter()
+            .filter_map(|u| u.get("user_id").and_then(|v| v.as_str()).map(|s| s.to_string()))
+            .collect())
+    }
+
+    /// Enregistre un evenement d'activite pour un utilisateur surveille
+    pub async fn log_user_activity(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        event_type: &str,
+        channel_id: Option<&str>,
+        channel_name: Option<&str>,
+        content: Option<&str>,
+        metadata: serde_json::Value,
+    ) -> Result<(), String> {
+        let req = self
+            .base
+            .client()
+            .post(format!("{}/api/user-activity", self.base.base_url()))
+            .json(&serde_json::json!({
+                "guild_id": guild_id,
+                "user_id": user_id,
+                "event_type": event_type,
+                "channel_id": channel_id,
+                "channel_name": channel_name,
+                "content": content,
+                "metadata": metadata,
+            }));
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau: {e}"))?;
+
+        Ok(())
+    }
+
     pub async fn send_audit_event(&self, event: &AuditEvent) -> Result<(), String> {
         let req = self
             .base

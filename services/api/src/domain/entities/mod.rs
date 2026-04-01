@@ -51,3 +51,6 @@ pub use discord_role::DiscordRole;
 pub use strikes::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
 pub use sanction_reminder::SanctionReminder;
 pub use user_note::UserNote;
+
+mod user_activity;
+pub use user_activity::UserActivity;

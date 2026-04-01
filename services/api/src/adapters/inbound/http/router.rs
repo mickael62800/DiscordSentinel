@@ -308,6 +308,9 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/moderation/pending/{id}/resolve", patch(handlers::bot_persistence::resolve_pending_action))
         // Guild members (direct Discord API)
         .route("/api/guilds/{guild_id}/members", get(handlers::guild_members::list_members))
+        // User activity (surveillance)
+        .route("/api/user-activity", post(handlers::user_activity::create_activity))
+        .route("/api/user-activity/{guild_id}/{user_id}", get(handlers::user_activity::get_activity))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

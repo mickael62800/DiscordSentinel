@@ -20,7 +20,7 @@ pub async fn handle_delete(
     let gid_str = gid.to_string();
 
     let channel_name = super::resolve_channel_name(ctx, channel_id).await;
-    let chan_label = channel_name.as_deref().unwrap_or("?");
+    let chan_label = channel_name.clone().unwrap_or_else(|| "?".to_string());
 
     // Chercher dans le cache
     let data = ctx.data.read().await;
@@ -65,6 +65,16 @@ pub async fn handle_delete(
     }
 
     Handler::send_event(ctx, evt).await;
+
+    // Surveillance : tracker la suppression si l'auteur est surveille
+    if let Some(c) = &cached {
+        Handler::track_activity(
+            ctx, &gid_str, &c.author_id, "message_deleted",
+            Some(&channel_id.to_string()), Some(&chan_label),
+            Some(&c.content),
+            serde_json::json!({"message_id": message_id.to_string()}),
+        ).await;
+    }
 
     // Anomaly detection
     if let Some(anomaly) = data.get::<AnomalyDetectorKey>() {
@@ -133,6 +143,16 @@ pub async fn handle_update(
     evt.actor_name = author_name;
 
     Handler::send_event(ctx, evt).await;
+
+    // Surveillance : tracker l'edition si l'auteur est surveille
+    if let Some(ref author) = event.author {
+        Handler::track_activity(
+            ctx, &gid, &author.id.to_string(), "message_edited",
+            Some(&event.channel_id.to_string()), None,
+            Some(&new_content),
+            serde_json::json!({"old_content": old_content, "message_id": event.id.to_string()}),
+        ).await;
+    }
 
     // Weekly stats
     let data = ctx.data.read().await;
