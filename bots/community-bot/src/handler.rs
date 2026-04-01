@@ -57,17 +57,7 @@ impl EventHandler for Handler {
             }
         }
 
-        // Sync initiale des roles Discord vers l'API
-        sync_all_guild_roles(&ctx).await;
-
-        // Sync periodique toutes les 5 minutes
-        let ctx_clone = ctx.clone();
-        tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
-                sync_all_guild_roles(&ctx_clone).await;
-            }
-        });
+        // Note: la sync des roles est geree par roles-bot (pas de duplication)
     }
 
     // -- Auto-role quand un membre rejoint --
