@@ -6,6 +6,7 @@ import { useGuildMembers } from "../../composables/useGuildMembers";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
 import DataTable from "../organisms/DataTable.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { API_BASE_URL } from "../../utils/api";
@@ -79,6 +80,7 @@ const { searchMembers } = useGuildMembers();
 const {
   users,
   loading,
+  error: watchedError,
   searchQuery,
   riskFilter,
   selectedUser,
@@ -251,7 +253,8 @@ const dossierConductColumns: TableColumn[] = [
       </select>
     </div>
 
-    <div v-if="loading" class="loading">Chargement...</div>
+    <ErrorState v-if="watchedError" :message="watchedError" :retryable="true" @retry="fetchUsers" />
+    <div v-else-if="loading" class="loading">Chargement...</div>
 
     <div v-else class="content-layout">
       <!-- Liste des utilisateurs -->

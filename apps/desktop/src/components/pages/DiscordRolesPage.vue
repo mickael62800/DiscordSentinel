@@ -3,6 +3,7 @@ import { useDiscordRoles } from "../../composables/useDiscordRoles";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppInput from "../atoms/AppInput.vue";
 import LoadingState from "../atoms/LoadingState.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
@@ -11,7 +12,9 @@ const {
   filteredRoles,
   totalRoles,
   loading,
+  error,
   search,
+  fetchRoles,
 } = useDiscordRoles();
 
 function colorHex(color: number): string {
@@ -49,7 +52,8 @@ function formatPermissions(perms: string): string {
       />
     </div>
 
-    <LoadingState v-if="loading" />
+    <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchRoles" />
+    <LoadingState v-else-if="loading" />
 
     <div v-else-if="filteredRoles.length === 0">
       <EmptyState message="Aucun role trouve" />

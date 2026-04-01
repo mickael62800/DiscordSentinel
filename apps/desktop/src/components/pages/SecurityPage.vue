@@ -4,12 +4,13 @@ import { useSearch } from "../../composables/useSearch";
 import type { SecurityEvent } from "../../types";
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import { severityVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
-const { events, loading } = useSecurity();
+const { events, loading, error, fetchEvents } = useSecurity();
 const { search, filtered: filteredEvents } = useSearch<SecurityEvent>(
   events,
   ["event_type", "severity", "description", "created_at", (e) => e.user_ids?.join(" ")],
@@ -31,7 +32,8 @@ function eventIcon(type: string): string {
 
     <input v-model="search" type="text" placeholder="Rechercher dans tous les champs..." class="search-global" />
 
-    <LoadingState v-if="loading" />
+    <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchEvents" />
+    <LoadingState v-else-if="loading" />
 
     <div v-else class="events-list">
       <div v-for="event in filteredEvents" :key="event.id" class="event-card">

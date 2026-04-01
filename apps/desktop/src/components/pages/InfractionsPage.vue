@@ -7,11 +7,12 @@ import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppInput from "../atoms/AppInput.vue";
 import LoadingState from "../atoms/LoadingState.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import { infractionTypeVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
-const { infractions, loading, fetchInfractions } = useInfractions();
+const { infractions, loading, error, fetchInfractions } = useInfractions();
 useRealtimeRefresh(["infraction_new"], fetchInfractions);
 const { search, filtered: filteredInfractions } = useSearch<Infraction>(
   infractions,
@@ -38,7 +39,8 @@ const columns: TableColumn[] = [
       />
     </div>
 
-    <LoadingState v-if="loading" />
+    <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchInfractions" />
+    <LoadingState v-else-if="loading" />
 
     <DataTable
       v-else

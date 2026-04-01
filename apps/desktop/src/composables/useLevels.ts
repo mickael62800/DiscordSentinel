@@ -8,6 +8,7 @@ export function useLevels() {
   const leaderboard = ref<UserLevel[]>([]);
   const rewards = ref<LevelReward[]>([]);
   const loading = ref(true);
+  const error = ref<string | null>(null);
   const { selectedGuildId } = useGuildSelector();
 
   async function fetchAll() {
@@ -20,6 +21,7 @@ export function useLevels() {
       return;
     }
     loading.value = true;
+    error.value = null;
     try {
       const [c, l, r] = await Promise.all([
         invoke<LevelConfig>("get_level_config", { guildId }).catch(() => null),
@@ -30,6 +32,7 @@ export function useLevels() {
       leaderboard.value = l;
       rewards.value = r;
     } catch (e) {
+      error.value = "Impossible de charger les niveaux.";
       console.error("Erreur chargement niveaux:", e);
     } finally {
       loading.value = false;
@@ -39,5 +42,5 @@ export function useLevels() {
   onMounted(fetchAll);
   watch(selectedGuildId, fetchAll);
 
-  return { config, leaderboard, rewards, loading, fetchAll };
+  return { config, leaderboard, rewards, loading, error, fetchAll };
 }

@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { useLevels } from "../../composables/useLevels";
+import ErrorState from "../atoms/ErrorState.vue";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import type { UserLevel } from "../../types";
 
-const { config, leaderboard, rewards, loading, fetchAll } = useLevels();
+const { config, leaderboard, rewards, loading, error, fetchAll } = useLevels();
 useRealtimeRefresh(["level_up", "xp_update"], fetchAll);
 
 function progressPercent(user: UserLevel): number {
@@ -25,7 +26,8 @@ function rewardForLevel(level: number): string | null {
       Selectionnez un serveur et configurez le systeme de niveaux.
     </div>
 
-    <div v-if="loading" class="loading">Chargement...</div>
+    <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchAll" />
+    <div v-else-if="loading" class="loading">Chargement...</div>
 
     <template v-else-if="config">
       <!-- Config resume -->

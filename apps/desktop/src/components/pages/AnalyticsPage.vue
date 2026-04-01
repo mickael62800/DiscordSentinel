@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useAnalytics } from "../../composables/useAnalytics";
+import ErrorState from "../atoms/ErrorState.vue";
 import { Line, Bar, Doughnut } from "vue-chartjs";
 import {
   Chart as ChartJS,
@@ -29,7 +30,7 @@ ChartJS.register(
   Filler,
 );
 
-const { analytics, loading, days } = useAnalytics();
+const { analytics, loading, error, days, fetchAnalytics } = useAnalytics();
 
 const chartOptions = {
   responsive: true,
@@ -191,7 +192,8 @@ function heatColor(value: number, max: number): string {
       </div>
     </div>
 
-    <div v-if="loading" class="loading">Chargement des analytics...</div>
+    <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchAnalytics" />
+    <div v-else-if="loading" class="loading">Chargement des analytics...</div>
 
     <div v-else-if="analytics" class="analytics-grid">
       <!-- Moderation Trend -->

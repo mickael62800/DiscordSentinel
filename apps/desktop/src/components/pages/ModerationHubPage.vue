@@ -13,6 +13,7 @@ import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppInput from "../atoms/AppInput.vue";
 import LoadingState from "../atoms/LoadingState.vue";
+import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppButton from "../atoms/AppButton.vue";
 import FormField from "../atoms/FormField.vue";
@@ -20,7 +21,7 @@ import { infractionTypeVariant, actionVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
-const { infractions, loading: infractionsLoading, fetchInfractions } = useInfractions();
+const { infractions, loading: infractionsLoading, error: infractionsError, fetchInfractions } = useInfractions();
 useRealtimeRefresh(["infraction_new"], fetchInfractions);
 const { search: infractionsSearch, filtered: filteredInfractions } = useSearch<Infraction>(
   infractions,
@@ -219,7 +220,8 @@ async function handleLookup() {
         />
       </div>
 
-      <LoadingState v-if="infractionsLoading" />
+      <ErrorState v-if="infractionsError" :message="infractionsError" :retryable="true" @retry="fetchInfractions" />
+      <LoadingState v-else-if="infractionsLoading" />
 
       <DataTable
         v-else
