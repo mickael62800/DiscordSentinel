@@ -580,18 +580,7 @@ pub async fn handle_close_button(ctx: &Context, component: &ComponentInteraction
         None => return,
     };
 
-    // Verifier si c'est un admin/moderateur
-    let is_staff = match guild_id.member(&ctx.http, component.user.id).await {
-        Ok(member) => {
-            if let Some(guild) = guild_id.to_guild_cached(&ctx.cache) {
-                let permissions = guild.member_permissions(&member);
-                permissions.manage_messages() || permissions.administrator()
-            } else {
-                false
-            }
-        }
-        Err(_) => false,
-    };
+    let is_staff = is_staff_member(ctx, guild_id, component.user.id).await;
 
     if is_staff {
         // Staff : boutons de confirmation en ephemeral
@@ -1342,6 +1331,25 @@ pub async fn get_ticket_id_from_channel(ctx: &Context, channel_id: ChannelId) ->
 /// Verifie si un custom_id correspond a un modal de ticket
 pub fn is_ticket_modal(custom_id: &str) -> bool {
     custom_id.starts_with(MODAL_ID_PREFIX)
+}
+
+/// Verifie si un utilisateur est admin ou moderateur dans une guild.
+pub async fn is_staff_member(
+    ctx: &Context,
+    guild_id: serenity::model::id::GuildId,
+    user_id: serenity::model::id::UserId,
+) -> bool {
+    match guild_id.member(&ctx.http, user_id).await {
+        Ok(member) => {
+            if let Some(guild) = guild_id.to_guild_cached(&ctx.cache) {
+                let permissions = guild.member_permissions(&member);
+                permissions.manage_messages() || permissions.administrator()
+            } else {
+                false
+            }
+        }
+        Err(_) => false,
+    }
 }
 
 fn get_sub_options(command: &CommandInteraction) -> &[CommandDataOption] {

@@ -1076,7 +1076,7 @@ mod tests {
 
     #[tokio::test]
     async fn delete_theme_wrong_guild() {
-        let mut theme = VoiceChannelTheme {
+        let theme = VoiceChannelTheme {
             id: Uuid::new_v4(),
             guild_id: "guild2".into(), // different guild
             name: "Test".into(),
@@ -1095,7 +1095,7 @@ mod tests {
         };
         let theme_id = theme.id;
 
-        let mut repo = MockVoiceRepo::new();
+        let repo = MockVoiceRepo::new();
         repo.themes.lock().unwrap().push(theme);
         let svc = make_service(repo);
 

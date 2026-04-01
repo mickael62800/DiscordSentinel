@@ -8,6 +8,7 @@ import AppBadge from "../atoms/AppBadge.vue";
 import DataTable from "../organisms/DataTable.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
+import { API_BASE_URL } from "../../utils/api";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 import type { TableColumn, WatchedUser, GuildMember, UserActivity } from "../../types";
@@ -23,7 +24,7 @@ const activitiesLoading = ref(false);
 async function loadActivities(guildId: string, userId: string) {
   activitiesLoading.value = true;
   try {
-    const resp = await fetch(`http://localhost:3000/api/user-activity/${guildId}/${userId}?limit=50`);
+    const resp = await fetch(`${API_BASE_URL}/api/user-activity/${guildId}/${userId}?limit=50`);
     if (resp.ok) {
       activities.value = await resp.json();
     }
@@ -46,7 +47,6 @@ function eventIcon(type: string): string {
     case "role_removed": return "🏷️";
     case "member_join": return "➡️";
     case "member_leave": return "⬅️";
-    case "nickname_changed": return "✏️";
     case "avatar_changed": return "🖼️";
     case "roles_changed": return "🏷️";
     case "voice_move": return "🔀";
@@ -66,7 +66,6 @@ function eventLabel(type: string): string {
     case "role_removed": return "Role retire";
     case "member_join": return "A rejoint le serveur";
     case "member_leave": return "A quitte le serveur";
-    case "nickname_changed": return "Pseudo modifie";
     case "avatar_changed": return "Avatar modifie";
     case "roles_changed": return "Roles modifies";
     case "voice_move": return "Change de salon vocal";
@@ -128,7 +127,7 @@ async function confirmAddWatch() {
   if (!addSelectedMember.value || !selectedGuildId.value) return;
   addLoading.value = true;
   try {
-    await fetch("http://localhost:3000/api/watched-users", {
+    await fetch(`${API_BASE_URL}/api/watched-users`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

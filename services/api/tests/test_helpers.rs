@@ -121,6 +121,8 @@ pub struct StubWatchedUsers;
 impl ManageWatchedUsersUseCase for StubWatchedUsers {
     async fn list_watched_users(&self, _: Option<&str>) -> Result<Vec<WatchedUser>, DomainError> { unimplemented!() }
     async fn get_user_dossier(&self, _: &str, _: &str) -> Result<manage_watched_users::UserDossier, DomainError> { unimplemented!() }
+    async fn add_manual_watch(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn remove_manual_watch(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
 }
 
 pub struct StubAuditLogs;
@@ -317,6 +319,7 @@ fn base_state() -> AppState {
         broadcaster: Arc::new(EventBroadcaster::new()),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
         discord_api: Arc::new(DiscordApiService::new(String::new())),
+        inference: Arc::new(sentinel_api::domain::services::InferenceService::new(None, None)),
         api_key: String::new(),
         discord_bot_token: String::new(),
         pg_pool,
