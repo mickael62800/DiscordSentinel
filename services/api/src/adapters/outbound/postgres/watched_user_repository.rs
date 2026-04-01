@@ -93,48 +93,49 @@ impl WatchedUserRepository for PgWatchedUserRepository {
                 WHERE ($1::text IS NULL OR se.guild_id = $1)
                 GROUP BY se.guild_id, u.user_id
             )
-            SELECT
-                ui.user_id,
-                ui.username,
-                ui.guild_id,
-                COALESCE(g.name, ui.guild_id) AS guild_name,
-                ui.total_warns,
-                ui.total_mutes,
-                ui.total_bans,
-                ucp.points AS conduct_points,
-                cc.max_points AS max_conduct_points,
-                ui.last_incident_at,
-                COALESCE(us.security_events_count, 0) AS security_events_count,
-                ui.first_seen_at
-            FROM user_infractions ui
-            LEFT JOIN guilds g ON g.guild_id = ui.guild_id
-            LEFT JOIN user_conduct_points ucp ON ucp.guild_id = ui.guild_id AND ucp.user_id = ui.user_id
-            LEFT JOIN conduct_config cc ON cc.guild_id = ui.guild_id
-            LEFT JOIN user_security us ON us.guild_id = ui.guild_id AND us.user_id = ui.user_id
+            SELECT * FROM (
+                SELECT
+                    ui.user_id,
+                    ui.username,
+                    ui.guild_id,
+                    COALESCE(g.name, ui.guild_id) AS guild_name,
+                    ui.total_warns,
+                    ui.total_mutes,
+                    ui.total_bans,
+                    ucp.points AS conduct_points,
+                    cc.max_points AS max_conduct_points,
+                    ui.last_incident_at,
+                    COALESCE(us.security_events_count, 0) AS security_events_count,
+                    ui.first_seen_at
+                FROM user_infractions ui
+                LEFT JOIN guilds g ON g.guild_id = ui.guild_id
+                LEFT JOIN user_conduct_points ucp ON ucp.guild_id = ui.guild_id AND ucp.user_id = ui.user_id
+                LEFT JOIN conduct_config cc ON cc.guild_id = ui.guild_id
+                LEFT JOIN user_security us ON us.guild_id = ui.guild_id AND us.user_id = ui.user_id
 
-            UNION ALL
+                UNION ALL
 
-            SELECT
-                mw.user_id,
-                mw.username,
-                mw.guild_id,
-                COALESCE(g2.name, mw.guild_id) AS guild_name,
-                0 AS total_warns,
-                0 AS total_mutes,
-                0 AS total_bans,
-                NULL AS conduct_points,
-                NULL AS max_conduct_points,
-                NULL AS last_incident_at,
-                0 AS security_events_count,
-                mw.created_at AS first_seen_at
-            FROM manual_watched_users mw
-            LEFT JOIN guilds g2 ON g2.guild_id = mw.guild_id
-            WHERE ($1::text IS NULL OR mw.guild_id = $1)
-              AND NOT EXISTS (
-                  SELECT 1 FROM infractions i2
-                  WHERE i2.guild_id = mw.guild_id AND i2.user_id = mw.user_id
-              )
-
+                SELECT
+                    mw.user_id,
+                    mw.username,
+                    mw.guild_id,
+                    COALESCE(g2.name, mw.guild_id) AS guild_name,
+                    0::bigint AS total_warns,
+                    0::bigint AS total_mutes,
+                    0::bigint AS total_bans,
+                    NULL::int AS conduct_points,
+                    NULL::int AS max_conduct_points,
+                    NULL::timestamptz AS last_incident_at,
+                    0::bigint AS security_events_count,
+                    mw.created_at AS first_seen_at
+                FROM manual_watched_users mw
+                LEFT JOIN guilds g2 ON g2.guild_id = mw.guild_id
+                WHERE ($1::text IS NULL OR mw.guild_id = $1)
+                  AND NOT EXISTS (
+                      SELECT 1 FROM infractions i2
+                      WHERE i2.guild_id = mw.guild_id AND i2.user_id = mw.user_id
+                  )
+            ) combined
             ORDER BY total_warns + total_mutes + total_bans DESC, last_incident_at DESC NULLS LAST
             LIMIT 200
         "#;

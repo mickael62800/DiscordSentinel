@@ -311,6 +311,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // User activity (surveillance)
         .route("/api/user-activity", post(handlers::user_activity::create_activity))
         .route("/api/user-activity/{guild_id}/{user_id}", get(handlers::user_activity::get_activity))
+        // Models status (IA)
+        .route("/api/models/status", get(handlers::models_status::get_models_status))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

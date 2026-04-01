@@ -8,6 +8,27 @@ import AppToggle from "../atoms/AppToggle.vue";
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
+// Statut des modeles IA
+interface ModelInfo {
+  name: string;
+  model_type: string;
+  loaded: boolean;
+}
+
+const modelsStatus = ref<ModelInfo[]>([]);
+
+async function fetchModelsStatus() {
+  try {
+    const resp = await fetch("http://localhost:3000/api/models/status");
+    if (resp.ok) {
+      const data = await resp.json();
+      modelsStatus.value = data.models || [];
+    }
+  } catch (e) {
+    console.error("Erreur chargement statut modeles:", e);
+  }
+}
+
 const workerNames = ["moderation-worker", "analytics-worker"];
 
 const definitions = ref<BotDefinition[]>([]);
@@ -163,6 +184,7 @@ function selectComponent(name: string) {
 
 onMounted(() => {
   fetchDefinitions();
+  fetchModelsStatus();
   if (selectedGuildId.value) fetchConfig();
 });
 
@@ -215,6 +237,20 @@ watch(selectedComponent, loadFormValues);
           <div class="component-desc">{{ def.description }}</div>
           <div class="component-params">
             {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
+          </div>
+        </div>
+      </div>
+
+      <!-- Statut des modeles IA -->
+      <div v-if="modelsStatus.length > 0" class="models-status">
+        <h3>Modeles IA</h3>
+        <div class="models-grid">
+          <div v-for="model in modelsStatus" :key="model.model_type" class="model-card" :class="{ loaded: model.loaded }">
+            <div class="model-indicator" :class="model.loaded ? 'indicator-green' : 'indicator-red'"></div>
+            <div class="model-info">
+              <span class="model-name">{{ model.name }}</span>
+              <span class="model-status">{{ model.loaded ? 'Charge et operationnel' : 'Non charge' }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -683,5 +719,69 @@ watch(selectedComponent, loadFormValues);
 
 .toggle-state.active {
   color: var(--accent);
+}
+
+.models-status {
+  margin-bottom: 24px;
+}
+
+.models-status h3 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 12px 0;
+}
+
+.models-grid {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.model-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-width: 280px;
+}
+
+.model-card.loaded {
+  border-color: #2ecc71;
+}
+
+.model-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.indicator-green {
+  background: #2ecc71;
+  box-shadow: 0 0 8px rgba(46, 204, 113, 0.5);
+}
+
+.indicator-red {
+  background: #e74c3c;
+  box-shadow: 0 0 8px rgba(231, 76, 60, 0.5);
+}
+
+.model-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.model-name {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.model-status {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 </style>

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::job_client::JobClient;
-use crate::domain::services::DiscordApiService;
+use crate::domain::services::{DiscordApiService, InferenceService};
 use crate::ports::inbound::{
     AnalyzeImageUseCase, AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
     ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
@@ -40,6 +40,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub job_client: JobClient,
     pub discord_api: Arc<DiscordApiService>,
+    pub inference: Arc<InferenceService>,
     pub api_key: String,
     #[allow(dead_code)]
     pub discord_bot_token: String,

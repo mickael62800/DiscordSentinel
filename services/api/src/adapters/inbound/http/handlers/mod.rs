@@ -23,5 +23,6 @@ pub mod notes;
 pub mod reminders;
 pub mod strikes;
 pub mod guild_members;
+pub mod models_status;
 pub mod user_activity;
 pub mod bot_persistence;

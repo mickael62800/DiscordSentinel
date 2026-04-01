@@ -235,6 +235,7 @@ async fn main() {
         broadcaster,
         job_client,
         discord_api,
+        inference: inference.clone(),
         api_key: config.api_key.clone(),
         discord_bot_token: config.discord_bot_token.clone(),
         pg_pool: pg_pool.clone(),
