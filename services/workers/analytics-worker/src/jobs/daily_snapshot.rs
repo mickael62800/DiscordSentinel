@@ -1,6 +1,8 @@
 use sqlx::PgPool;
 use tracing::{debug, info};
 
+use sentinel_worker_common::is_worker_enabled;
+
 #[derive(sqlx::FromRow)]
 struct GuildRow {
     guild_id: String,
@@ -22,6 +24,10 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     let mut count = 0u64;
 
     for guild in &guilds {
+        if !is_worker_enabled(pool, &guild.guild_id, "analytics-worker").await {
+            continue;
+        }
+
         let result = sqlx::query(
             "INSERT INTO daily_activity (guild_id, day, messages, voice_minutes, active_members, new_members, leaves, infractions, warns, mutes, bans) \
              SELECT \

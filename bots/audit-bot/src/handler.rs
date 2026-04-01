@@ -1,4 +1,5 @@
 use serenity::async_trait;
+use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::event::MessageUpdateEvent;
 use serenity::model::gateway::Ready;
@@ -7,12 +8,40 @@ use serenity::model::id::{ChannelId, GuildId, MessageId, RoleId};
 use serenity::model::user::User;
 use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 
+use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
+use crate::anomaly::AnomalyDetector;
 use crate::api_client::{ApiClient, AuditEvent};
+use crate::commands;
+use crate::config::Config;
 use crate::handlers;
+use crate::message_cache::{CachedMessage, MessageCache};
+use crate::weekly_report::WeeklyTracker;
+
+// ── TypeMap keys ──
+
+pub struct MessageCacheKey;
+impl TypeMapKey for MessageCacheKey {
+    type Value = MessageCache;
+}
+
+pub struct AnomalyDetectorKey;
+impl TypeMapKey for AnomalyDetectorKey {
+    type Value = AnomalyDetector;
+}
+
+pub struct WeeklyTrackerKey;
+impl TypeMapKey for WeeklyTrackerKey {
+    type Value = WeeklyTracker;
+}
+
+pub struct ConfigKey;
+impl TypeMapKey for ConfigKey {
+    type Value = Config;
+}
 
 pub struct Handler;
 
@@ -40,6 +69,71 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, guilds = ready.guilds.len(), "Audit bot connecte");
         register_guilds(&ctx, &ready).await;
+
+        if let Err(e) = serenity::model::application::Command::set_global_commands(
+            &ctx.http,
+            commands::all(),
+        )
+        .await
+        {
+            error!(error = %e, "Erreur enregistrement commandes");
+        } else {
+            info!("Slash commands enregistrees : audit");
+        }
+    }
+
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = interaction {
+            if let Some(guild_id) = command.guild_id {
+                let data = ctx.data.read().await;
+                if let Some(api) = data.get::<ApiClientKey>() {
+                    if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                        return;
+                    }
+                }
+            }
+
+            if command.data.name.as_str() == "audit" {
+                commands::audit::handle(&ctx, &command).await;
+            }
+        }
+    }
+
+    /// Intercepte tous les messages pour les cacher.
+    async fn message(&self, ctx: Context, msg: Message) {
+        if msg.author.bot {
+            return;
+        }
+
+        let guild_id = match msg.guild_id {
+            Some(g) => g,
+            None => return,
+        };
+
+        // Verifier si le bot est active
+        {
+            let data = ctx.data.read().await;
+            if let Some(base) = data.get::<ApiClientKey>() {
+                let config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                if !BaseApiClient::config_bool(&config, "enabled", true) {
+                    return;
+                }
+            }
+        }
+
+        let data = ctx.data.read().await;
+        if let Some(cache) = data.get::<MessageCacheKey>() {
+            cache.store(
+                guild_id,
+                msg.id,
+                CachedMessage {
+                    author_id: msg.author.id.to_string(),
+                    author_name: msg.author.name.clone(),
+                    content: msg.content.clone(),
+                    channel_id: msg.channel_id.to_string(),
+                },
+            );
+        }
     }
 
     async fn message_delete(

@@ -25,7 +25,7 @@ use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
 use crate::domain::entities::{
     ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity,
     LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog,
-    DiscordConfig, DiscordUser, Guild, Infraction, LogEntry, ModerationActionRequest,
+    DiscordConfig, DiscordUser, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest,
     ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent,
     ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
     UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail,
@@ -41,6 +41,7 @@ tauri_passthrough!(get_dashboard_stats, DashboardService, get_stats -> ServerSta
 
 // Guilds
 tauri_passthrough!(get_guilds, GuildService, get_guilds -> Vec<Guild>);
+tauri_passthrough!(get_guild_members, GuildService, get_guild_members -> Vec<GuildMember>, guild_id: String);
 
 // Logs
 tauri_passthrough!(get_logs, LogsService, get_logs -> Vec<LogEntry>, guild_id: Option<String>);

@@ -2,7 +2,8 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 
 use crate::audit_event;
-use crate::handler::Handler;
+use crate::handler::{Handler, WeeklyTrackerKey};
+use crate::weekly_report::StatField;
 
 pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &VoiceState) {
     let gid = match new.guild_id {
@@ -44,4 +45,11 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
     evt.channel_id = new_channel.map(|c| c.to_string());
 
     Handler::send_event(ctx, evt).await;
+
+    if let Some(guild_id) = new.guild_id {
+        let data = ctx.data.read().await;
+        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
+            tracker.increment(guild_id, StatField::VoiceEvent);
+        }
+    }
 }

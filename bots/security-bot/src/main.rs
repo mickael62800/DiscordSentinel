@@ -1,4 +1,5 @@
 mod api_client;
+mod commands;
 mod config;
 mod handler;
 mod security;
@@ -15,11 +16,16 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::{
-    AccountCheckerKey, ConfigKey, Handler, QuarantineKey, RaidDetectorKey,
-    SecurityApiKey, SlowmodeKey,
+    AccountCheckerKey, AltDetectorKey, CaptchaPendingKey, ConfigKey, Handler,
+    LockdownKey, QuarantineKey, RaidDetectorKey, RecentJoinsKey, SecurityApiKey,
+    SlowmodeKey,
 };
 use crate::security::account_checker::AccountChecker;
+use crate::security::alt_detector::AltDetector;
+use crate::security::captcha::CaptchaPending;
+use crate::security::lockdown::LockdownManager;
 use crate::security::quarantine::QuarantineManager;
+use crate::security::raid_analyzer::RecentJoinsTracker;
 use crate::security::raid_detector::RaidDetector;
 use crate::security::slowmode::SlowmodeManager;
 
@@ -64,6 +70,14 @@ async fn main() {
         data.insert::<AccountCheckerKey>(AccountChecker::new(config.min_account_age_secs));
         data.insert::<QuarantineKey>(QuarantineManager::new());
         data.insert::<SlowmodeKey>(SlowmodeManager::new());
+        data.insert::<LockdownKey>(LockdownManager::new());
+        data.insert::<RecentJoinsKey>(RecentJoinsTracker::new(config.raid_join_window_secs));
+        data.insert::<CaptchaPendingKey>(CaptchaPending::new());
+        data.insert::<AltDetectorKey>(AltDetector::new(
+            config.alt_retention_secs,
+            config.alt_name_distance,
+            3600, // 1h cluster pour creation dates
+        ));
         data.insert::<ConfigKey>(config.clone());
     }
 
@@ -123,6 +137,27 @@ async fn main() {
             let expired = slowmode.expired_guilds(slowmode_duration);
             for guild_id in expired {
                 slowmode.deactivate_with_http(&http_for_slowmode, guild_id).await;
+            }
+        }
+    });
+
+    // Background task: revert lockdown apres expiration
+    let data_for_lockdown = Arc::clone(&client.data);
+    let http_for_lockdown = Arc::clone(&client.http);
+    let lockdown_duration = config.lockdown_duration_secs;
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(tokio::time::Duration::from_secs(15)).await;
+
+            let data = data_for_lockdown.read().await;
+            let lockdown = match data.get::<LockdownKey>() {
+                Some(l) => l,
+                None => continue,
+            };
+
+            let expired = lockdown.expired_guilds(lockdown_duration);
+            for guild_id in expired {
+                lockdown.deactivate_with_http(&http_for_lockdown, guild_id).await;
             }
         }
     });

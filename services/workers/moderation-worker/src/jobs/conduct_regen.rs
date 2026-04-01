@@ -2,6 +2,8 @@ use sqlx::PgPool;
 use tracing::{debug, info};
 use uuid::Uuid;
 
+use sentinel_worker_common::is_worker_enabled;
+
 #[derive(sqlx::FromRow)]
 struct UserPoints {
     guild_id: String,
@@ -37,6 +39,10 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         .map_err(|e| format!("Query configs: {e}"))?;
 
         for config in &configs {
+            if !is_worker_enabled(pool, &config.guild_id, "moderation-worker").await {
+                continue;
+            }
+
             // Trouver les utilisateurs dont la regen est due
             let query = format!(
                 "SELECT guild_id, user_id, points FROM user_conduct_points \

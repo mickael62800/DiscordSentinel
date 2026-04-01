@@ -89,10 +89,15 @@ onMounted(async () => {
 
 <template>
   <div class="ai-training-page">
-    <h1>Entrainement IA</h1>
-    <p class="subtitle">
-      Entrainez des modeles de classification et exportez-les en ONNX pour l'inference Rust
-    </p>
+    <div class="page-header-row">
+      <div>
+        <h1>Entrainement IA</h1>
+        <p class="subtitle">
+          Entrainez des modeles de classification et exportez-les en ONNX pour l'inference Rust
+        </p>
+      </div>
+      <router-link to="/ia-config" class="cross-link">Configurer les seuils d'inference &rarr;</router-link>
+    </div>
 
     <!-- Onglets modele -->
     <div class="model-tabs">
@@ -494,6 +499,11 @@ onMounted(async () => {
   background: var(--accent, #7c3aed);
   color: white;
 }
+
+/* Cross-link */
+.page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all 0.15s; }
+.cross-link:hover { background: var(--accent); color: white; }
 
 /* Erreur */
 .error-banner {

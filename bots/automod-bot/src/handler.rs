@@ -3,6 +3,7 @@ use std::time::Instant;
 
 use dashmap::{DashMap, DashSet};
 use serenity::async_trait;
+use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, MessageId, UserId};
@@ -12,8 +13,10 @@ use tracing::{error, info, warn};
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
+use crate::adaptive_slowmode::SlowmodeTracker;
 use crate::api_client::{Action, AnalyzeRequest, ApiClient, MessageMetadata};
-use crate::detectors;
+use crate::commands;
+use crate::detectors::{self, DetectorConfig};
 
 use sentinel_shared::embeds::{warn_embed, moderate_embed, danger_embed, critical_embed};
 
@@ -29,6 +32,19 @@ pub struct FloodTrackerKey;
 
 impl TypeMapKey for FloodTrackerKey {
     type Value = Arc<DashMap<(ChannelId, UserId), Vec<Instant>>>;
+}
+
+/// Couleurs des embeds lues depuis la config guild.
+struct EmbedColors {
+    warn: u32,
+    delete: u32,
+    mute: u32,
+    ban: u32,
+}
+
+pub struct SlowmodeTrackerKey;
+impl TypeMapKey for SlowmodeTrackerKey {
+    type Value = SlowmodeTracker;
 }
 
 /// Defaults si l'API ne repond pas
@@ -73,9 +89,29 @@ impl EventHandler for Handler {
             }
         };
 
+        if !BaseApiClient::config_bool(&config, "enabled", true) {
+            return;
+        }
+
         let flood_max_messages = BaseApiClient::config_u64(&config, "flood_max_messages", DEFAULT_FLOOD_MAX_MESSAGES) as usize;
         let flood_window_secs = BaseApiClient::config_u64(&config, "flood_window_secs", DEFAULT_FLOOD_WINDOW_SECS);
         let mute_duration_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+
+        // Construire la config des detecteurs depuis la guild config
+        let mut detector_config = build_detector_config(&config);
+
+        // Night mode : seuils plus stricts pendant les heures configurees
+        let night_mode_enabled = BaseApiClient::config_bool(&config, "night_mode_enabled", false);
+        if night_mode_enabled {
+            let start = BaseApiClient::config_u64(&config, "night_start_hour", 22) as u8;
+            let end = BaseApiClient::config_u64(&config, "night_end_hour", 8) as u8;
+            if is_night_mode(start, end) {
+                apply_night_mode(&mut detector_config);
+            }
+        }
+
+        // Construire les couleurs des embeds depuis la guild config
+        let colors = build_embed_colors(&config);
 
         // Verifier les salons exclus
         let ignored_channels_str = BaseApiClient::config_or(&config, "ignored_channels", "");
@@ -102,6 +138,41 @@ impl EventHandler for Handler {
             }
         }
 
+        // 0. Detection pieces jointes suspectes
+        if detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
+            const DANGEROUS_EXTENSIONS: &[&str] = &[
+                "exe", "bat", "cmd", "scr", "ps1", "vbs", "js",
+                "jar", "com", "pif", "msi", "dll", "reg", "hta",
+            ];
+
+            let suspicious = msg.attachments.iter().find(|a| {
+                let name_lower = a.filename.to_lowercase();
+                let ext = name_lower.rsplit('.').next().unwrap_or("");
+                DANGEROUS_EXTENSIONS.contains(&ext)
+                    || detector_config.suspicious_file_extensions.iter().any(|e| e == ext)
+            });
+
+            if let Some(attachment) = suspicious {
+                let embed = moderate_embed("🗑\u{fe0f} Fichier suspect supprime")
+                    .color(colors.delete)
+                    .field("📝 Raison", "Piece jointe avec extension dangereuse.", false)
+                    .field("📎 Fichier", &attachment.filename, false)
+                    .thumbnail(msg.author.face());
+                let builder = serenity::builder::CreateMessage::new().embed(embed);
+                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
+                let _ = msg.delete(&ctx.http).await;
+
+                let log_msg = format!("Fichier suspect supprime — {} : {}", msg.author.name, attachment.filename);
+                let guild_id_str = guild_id.clone();
+                let data = ctx.data.read().await;
+                if let Some(base) = data.get::<ApiClientKey>() {
+                    base.send_log("warn", &guild_id_str, &log_msg);
+                }
+                info!(user = %msg.author.name, filename = %attachment.filename, "Fichier suspect supprime");
+                return;
+            }
+        }
+
         let content = &msg.content;
 
         // 1. Detection flood
@@ -121,15 +192,14 @@ impl EventHandler for Handler {
         };
 
         if is_flood {
-            // Clear le compteur
             let data = ctx.data.read().await;
             if let Some(tracker) = data.get::<FloodTrackerKey>() {
                 tracker.remove(&(msg.channel_id, msg.author.id));
             }
             drop(data);
 
-            // Avertir + traiter comme spam
             let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                .color(colors.warn)
                 .field("📝 Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
@@ -137,26 +207,57 @@ impl EventHandler for Handler {
 
             info!(user = %msg.author.name, "Flood detecte");
 
-            // Envoyer au backend comme spam
             let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
             let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
-            send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id).await;
+            send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id, &colors).await;
             return;
         }
 
         // 2. Detection caps (avertissement seulement, pas d'infraction)
-        if detectors::spam::detect_caps(content) {
+        if detector_config.caps_enabled
+            && detectors::spam::detect_caps(content, detector_config.caps_threshold_chars)
+        {
             let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                .color(colors.warn)
                 .field("📝 Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
             let _ = msg.channel_id.send_message(&ctx.http, builder).await;
             info!(user = %msg.author.name, "Caps detecte, avertissement envoye");
-            // Pas d'appel backend, juste un avertissement
         }
 
-        // 3. Analyse locale (contenu : spam, insulte, lien)
-        let flags = detectors::analyze(content);
+        // 3. Slowmode adaptatif — tracker le volume de messages
+        {
+            let adaptive_enabled = BaseApiClient::config_bool(&config, "adaptive_slowmode_enabled", false);
+            if adaptive_enabled {
+                let threshold = BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15) as usize;
+                let slowmode_secs = BaseApiClient::config_u64(&config, "adaptive_slowmode_seconds", 5) as u16;
+
+                let data = ctx.data.read().await;
+                if let Some(tracker) = data.get::<SlowmodeTrackerKey>() {
+                    tracker.record_message(msg.channel_id);
+                    if tracker.should_activate(msg.channel_id, threshold) {
+                        // Activer le slowmode sur le channel
+                        let edit = serenity::builder::EditChannel::new().rate_limit_per_user(slowmode_secs);
+                        if let Err(e) = msg.channel_id.edit(&ctx.http, edit).await {
+                            warn!(error = %e, "Impossible d'activer le slowmode adaptatif");
+                        } else {
+                            info!(
+                                channel_id = %msg.channel_id,
+                                slowmode_secs,
+                                "Slowmode adaptatif active ({}msg/30s)",
+                                threshold
+                            );
+                            // Reset le compteur pour eviter les activations en boucle
+                            tracker.reset(msg.channel_id);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Analyse locale (spam, insulte, lien, phishing, unicode)
+        let flags = detectors::analyze(content, &detector_config);
 
         if !flags.spam && !flags.insult && !flags.link && !flags.phishing {
             return;
@@ -173,17 +274,115 @@ impl EventHandler for Handler {
         );
 
         let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
-        send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id).await;
+        send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id, &colors).await;
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Automod bot connecte");
         register_guilds(&ctx, &ready).await;
+
+        if let Err(e) = serenity::model::application::Command::set_global_commands(
+            &ctx.http,
+            commands::all(),
+        )
+        .await
+        {
+            error!(error = %e, "Erreur enregistrement commandes");
+        } else {
+            info!("Slash commands enregistrees : automod");
+        }
+    }
+
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = interaction {
+            if let Some(guild_id) = command.guild_id {
+                let data = ctx.data.read().await;
+                if let Some(api) = data.get::<ApiClientKey>() {
+                    if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                        return;
+                    }
+                }
+            }
+
+            if command.data.name.as_str() == "automod" {
+                commands::automod::handle(&ctx, &command).await;
+            }
+        }
     }
 }
 
+/// Construit la config des detecteurs depuis la guild config.
+fn build_detector_config(config: &std::collections::HashMap<String, String>) -> DetectorConfig {
+    DetectorConfig {
+        spam_enabled: BaseApiClient::config_bool(config, "spam_detection_enabled", true),
+        spam_repeat_char_threshold: BaseApiClient::config_u64(config, "spam_repeat_char_threshold", 6) as usize,
+        spam_repeat_word_threshold: BaseApiClient::config_u64(config, "spam_repeat_word_threshold", 5) as usize,
+        caps_enabled: BaseApiClient::config_bool(config, "caps_warning_enabled", true),
+        caps_threshold_chars: BaseApiClient::config_u64(config, "caps_threshold_chars", 8) as usize,
+        insult_enabled: BaseApiClient::config_bool(config, "insult_detection_enabled", true),
+        insult_custom_words: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "insult_custom_words", "")),
+        link_enabled: BaseApiClient::config_bool(config, "link_detection_enabled", true),
+        allow_discord_invites: BaseApiClient::config_bool(config, "allow_discord_invites", false),
+        allowed_domains: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "allowed_domains", "")),
+        phishing_enabled: BaseApiClient::config_bool(config, "phishing_detection_enabled", true),
+        phishing_extra_whitelist: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "phishing_extra_whitelist", "")),
+        emoji_spam_enabled: BaseApiClient::config_bool(config, "emoji_spam_enabled", true),
+        emoji_spam_max: BaseApiClient::config_u64(config, "emoji_spam_max", 10) as usize,
+        mentions_enabled: BaseApiClient::config_bool(config, "mentions_enabled", true),
+        mentions_max: BaseApiClient::config_u64(config, "mentions_max", 5) as usize,
+        suspicious_files_enabled: BaseApiClient::config_bool(config, "suspicious_files_enabled", true),
+        suspicious_file_extensions: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "suspicious_file_extensions", "")),
+        unicode_enabled: BaseApiClient::config_bool(config, "unicode_detection_enabled", true),
+        unicode_max_combining: BaseApiClient::config_u64(config, "unicode_max_combining", 3) as usize,
+        unicode_max_invisible: BaseApiClient::config_u64(config, "unicode_max_invisible", 5) as usize,
+    }
+}
+
+/// Construit les couleurs d'embeds depuis la guild config.
+fn build_embed_colors(config: &std::collections::HashMap<String, String>) -> EmbedColors {
+    EmbedColors {
+        warn:   parse_color(&BaseApiClient::config_or(config, "color_warn",   "f59e0b"), 0xf59e0b),
+        delete: parse_color(&BaseApiClient::config_or(config, "color_delete", "f97316"), 0xf97316),
+        mute:   parse_color(&BaseApiClient::config_or(config, "color_mute",   "ef4444"), 0xef4444),
+        ban:    parse_color(&BaseApiClient::config_or(config, "color_ban",    "dc2626"), 0xdc2626),
+    }
+}
+
+/// Parse une couleur hex (avec ou sans #) vers u32. Retourne `default` si invalide.
+fn parse_color(hex: &str, default: u32) -> u32 {
+    u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(default)
+}
+
+/// Verifie si l'heure actuelle est dans la plage de nuit.
+fn is_night_mode(start: u8, end: u8) -> bool {
+    let hour = time::OffsetDateTime::now_utc().hour();
+    if start > end {
+        // Passage par minuit (ex: 22h-8h)
+        hour >= start || hour < end
+    } else {
+        hour >= start && hour < end
+    }
+}
+
+/// Reduit les seuils de detection pour le mode nuit (seuils divises par ~2).
+fn apply_night_mode(config: &mut DetectorConfig) {
+    config.spam_repeat_char_threshold = (config.spam_repeat_char_threshold / 2).max(2);
+    config.spam_repeat_word_threshold = (config.spam_repeat_word_threshold / 2).max(2);
+    config.caps_threshold_chars = (config.caps_threshold_chars / 2).max(4);
+    config.emoji_spam_max = (config.emoji_spam_max / 2).max(3);
+    config.mentions_max = (config.mentions_max / 2).max(2);
+}
+
+
 /// Envoie le message au backend pour analyse et execute l'action.
-async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::DetectionFlags, mute_duration_secs: u64, log_channel_id: u64) {
+async fn send_to_backend(
+    ctx: &Context,
+    msg: &Message,
+    flags: detectors::DetectionFlags,
+    mute_duration_secs: u64,
+    log_channel_id: u64,
+    colors: &EmbedColors,
+) {
     let request = AnalyzeRequest {
         guild_id: msg.guild_id.map(|id| id.to_string()).unwrap_or_default(),
         channel_id: msg.channel_id.to_string(),
@@ -213,7 +412,6 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
         Ok(response) => {
             info!(action = ?response.action, reason = ?response.reason, "Reponse du backend");
 
-            // Log l'action dans le journal
             if response.action != Action::None {
                 let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
                 let action_label = match &response.action {
@@ -230,24 +428,22 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
                     response.reason.as_deref().unwrap_or("Automod"),
                 );
 
-                // Log vers l'API backend (base de donnees)
                 base.send_log(
                     if matches!(response.action, Action::Ban) { "error" } else { "warn" },
                     &guild_id,
                     &log_message,
                 );
 
-                // Log vers le salon Discord si configure
                 if log_channel_id != 0 {
                     send_discord_log(
                         ctx, msg, &response.action, action_label,
                         response.reason.as_deref().unwrap_or("Automod"),
-                        &request.flags, log_channel_id,
+                        &request.flags, log_channel_id, colors,
                     ).await;
                 }
             }
 
-            if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs).await {
+            if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs, colors).await {
                 error!(error = %e, "Erreur lors de l'execution de l'action");
             }
         }
@@ -255,6 +451,7 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
             warn!(error = %e, "Backend injoignable — action locale par defaut");
             if request.flags.phishing {
                 let embed = moderate_embed("🗑\u{fe0f} Message supprime")
+                    .color(colors.delete)
                     .field("📝 Raison", "Lien suspect detecte.", false)
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
@@ -262,6 +459,7 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
                 let _ = msg.delete(&ctx.http).await;
             } else if request.flags.insult {
                 let embed = moderate_embed("🗑\u{fe0f} Message supprime")
+                    .color(colors.delete)
                     .field("📝 Raison", "Langage inapproprie.", false)
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
@@ -272,13 +470,14 @@ async fn send_to_backend(ctx: &Context, msg: &Message, flags: detectors::Detecti
     }
 }
 
-/// Execute l'action decidee par le backend. Avertit toujours l'utilisateur.
+/// Execute l'action decidee par le backend.
 async fn execute_action(
     ctx: &Context,
     msg: &Message,
     action: &Action,
     reason: Option<&str>,
     mute_duration_secs: u64,
+    colors: &EmbedColors,
 ) -> Result<(), serenity::Error> {
     let reason_text = reason.unwrap_or("Automod");
 
@@ -286,6 +485,7 @@ async fn execute_action(
         Action::None => {}
         Action::Warn => {
             let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                .color(colors.warn)
                 .field("📝 Raison", reason_text, false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
@@ -293,13 +493,13 @@ async fn execute_action(
             info!(user = %msg.author.name, "Avertissement envoye");
         }
         Action::Delete => {
-            // Avertir AVANT de supprimer
             let content_preview = if msg.content.len() > 200 {
                 format!("{}...", &msg.content[..200])
             } else {
                 msg.content.clone()
             };
             let embed = moderate_embed("🗑\u{fe0f} Message supprime")
+                .color(colors.delete)
                 .field("📝 Raison", reason_text, false)
                 .field("📄 Contenu original", format!("```{}```", content_preview), false)
                 .thumbnail(msg.author.face());
@@ -311,6 +511,7 @@ async fn execute_action(
         Action::Mute => {
             let mute_minutes = mute_duration_secs / 60;
             let embed = danger_embed("🔇 Mute automatique")
+                .color(colors.mute)
                 .field("📝 Raison", reason_text, false)
                 .field("⏱ Duree", format!("{} minutes", mute_minutes), false)
                 .thumbnail(msg.author.face());
@@ -336,6 +537,7 @@ async fn execute_action(
         Action::Ban => {
             if let Some(_guild_id) = msg.guild_id {
                 let embed = critical_embed("🔨 Signalement pour bannissement")
+                    .color(colors.ban)
                     .field("📝 Raison", reason_text, false)
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
@@ -358,19 +560,18 @@ async fn send_discord_log(
     reason: &str,
     flags: &detectors::DetectionFlags,
     log_channel_id: u64,
+    colors: &EmbedColors,
 ) {
     let channel = serenity::model::id::ChannelId::new(log_channel_id);
 
-    // Icone et couleur selon la severite
     let (icon, color) = match action {
-        Action::Warn    => ("\u{26a0}\u{fe0f}", 0xf59e0b),  // Warning jaune
-        Action::Delete  => ("\u{1f5d1}\u{fe0f}", 0xf97316), // Corbeille orange
-        Action::Mute    => ("\u{1f507}", 0xef4444),          // Mute rouge
-        Action::Ban     => ("\u{1f6ab}", 0xdc2626),          // Interdit rouge fonce
-        Action::None    => ("\u{2705}", 0x22c55e),           // Check vert
+        Action::Warn    => ("\u{26a0}\u{fe0f}", colors.warn),
+        Action::Delete  => ("\u{1f5d1}\u{fe0f}", colors.delete),
+        Action::Mute    => ("\u{1f507}", colors.mute),
+        Action::Ban     => ("\u{1f6ab}", colors.ban),
+        Action::None    => ("\u{2705}", 0x22c55e),
     };
 
-    // Construire la liste des detections
     let mut detections = Vec::new();
     if flags.spam     { detections.push("\u{1f4e8} Spam"); }
     if flags.insult   { detections.push("\u{1f92c} Insulte"); }
@@ -382,7 +583,6 @@ async fn send_discord_log(
         detections.join(" | ")
     };
 
-    // Tronquer le message si trop long
     let content_preview = if msg.content.len() > 300 {
         format!("{}...", &msg.content[..300])
     } else {

@@ -10,7 +10,8 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 use tracing::info;
 
-use sentinel_shared::heartbeat::register_guilds;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::config::Config;
 use crate::state::{AfkTracker, CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
@@ -82,6 +83,21 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        let guild_id_str = match &interaction {
+            Interaction::Component(c) => c.guild_id.map(|g| g.to_string()),
+            Interaction::Modal(m) => m.guild_id.map(|g| g.to_string()),
+            _ => None,
+        };
+        if let Some(guild_id) = guild_id_str {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                if !BaseApiClient::config_bool(&config, "enabled", true) {
+                    return;
+                }
+            }
+        }
+
         match &interaction {
             Interaction::Component(component) => {
                 crate::interactions::handle_component(&ctx, component).await;
@@ -94,6 +110,15 @@ impl EventHandler for Handler {
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
+        if let Some(guild_id) = msg.guild_id {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                if !BaseApiClient::config_bool(&config, "enabled", true) {
+                    return;
+                }
+            }
+        }
         crate::handlers::message::handle_message(&ctx, &msg).await;
     }
 }

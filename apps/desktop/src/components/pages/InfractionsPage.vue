@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useInfractions } from "../../composables/useInfractions";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { useSearch } from "../../composables/useSearch";
 import type { TableColumn, Infraction } from "../../types";
 import DataTable from "../organisms/DataTable.vue";
@@ -10,7 +11,8 @@ import { infractionTypeVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
-const { infractions, loading } = useInfractions();
+const { infractions, loading, fetchInfractions } = useInfractions();
+useRealtimeRefresh(["infraction_new"], fetchInfractions);
 const { search, filtered: filteredInfractions } = useSearch<Infraction>(
   infractions,
   ["username", "user_id", "reason", "infraction_type", "moderator", "server", "created_at"],

@@ -1,22 +1,89 @@
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
 
 use reqwest::{Client, RequestBuilder};
 use serde::Serialize;
+use tokio::sync::Mutex;
 
 use crate::config::BotConfig;
 
+/// Publisher Redis pour les events temps reel.
+/// Publie sur `sentinel:events` — le Gateway relay vers le desktop.
+pub struct EventPublisher {
+    client: Mutex<Option<redis::aio::MultiplexedConnection>>,
+    redis_url: String,
+    channel: String,
+}
+
+impl EventPublisher {
+    pub fn new(redis_url: &str, channel: &str) -> Self {
+        Self {
+            client: Mutex::new(None),
+            redis_url: redis_url.to_string(),
+            channel: channel.to_string(),
+        }
+    }
+
+    /// Publie un event sur Redis (lazy-connect au premier appel).
+    pub async fn publish(&self, event: &str, data: serde_json::Value) {
+        let payload = serde_json::json!({
+            "event": event,
+            "data": data,
+        });
+
+        let payload_str = match serde_json::to_string(&payload) {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        let mut guard = self.client.lock().await;
+
+        if guard.is_none() {
+            match redis::Client::open(self.redis_url.as_str()) {
+                Ok(client) => match client.get_multiplexed_async_connection().await {
+                    Ok(conn) => *guard = Some(conn),
+                    Err(e) => {
+                        tracing::warn!(error = %e, "Redis connect failed for event publisher");
+                        return;
+                    }
+                },
+                Err(e) => {
+                    tracing::warn!(error = %e, "Redis client creation failed");
+                    return;
+                }
+            }
+        }
+
+        if let Some(ref mut conn) = *guard {
+            use redis::AsyncCommands;
+            if let Err(e) = conn.publish::<_, _, ()>(&self.channel, &payload_str).await {
+                tracing::warn!(error = %e, "Redis publish failed");
+                *guard = None;
+            }
+        }
+    }
+}
+
 /// Client HTTP de base partage entre tous les bots.
-/// Fournit : heartbeat, register_guild, send_log, get_guild_config, config helpers.
+/// Fournit : heartbeat, register_guild, send_log, get_guild_config, config helpers, event publishing.
 pub struct BaseApiClient {
     client: Client,
     base_url: String,
     api_key: String,
     bot_name: String,
+    event_publisher: Option<Arc<EventPublisher>>,
 }
 
 impl BaseApiClient {
     pub fn new<C: BotConfig>(config: &C, bot_name: &str) -> Self {
+        // Initialiser le publisher Redis si REDIS_URL est defini
+        let publisher = std::env::var("REDIS_URL").ok().map(|url| {
+            let channel = std::env::var("REDIS_CHANNEL")
+                .unwrap_or_else(|_| "sentinel:events".to_string());
+            Arc::new(EventPublisher::new(&url, &channel))
+        });
+
         Self {
             client: Client::builder()
                 .timeout(Duration::from_secs(10))
@@ -25,6 +92,7 @@ impl BaseApiClient {
             base_url: config.api_base_url().to_string(),
             api_key: config.api_key().to_string(),
             bot_name: bot_name.to_string(),
+            event_publisher: publisher,
         }
     }
 
@@ -107,6 +175,20 @@ impl BaseApiClient {
         Ok(())
     }
 
+    // ── Event Publishing (Redis temps reel) ──
+
+    /// Publie un event temps reel via Redis pour le Gateway → desktop app.
+    /// Fire-and-forget : ne bloque pas le bot.
+    pub fn publish_event(&self, event: &str, data: serde_json::Value) {
+        if let Some(ref publisher) = self.event_publisher {
+            let publisher = Arc::clone(publisher);
+            let event = event.to_string();
+            tokio::spawn(async move {
+                publisher.publish(&event, data).await;
+            });
+        }
+    }
+
     // ── Logging ──
 
     pub fn send_log(&self, level: &str, server: &str, message: &str) {
@@ -133,16 +215,28 @@ impl BaseApiClient {
             category: String,
         }
 
+        let log_data = LogPayload {
+            level: level.to_string(),
+            bot: self.bot_name.clone(),
+            server: server.to_string(),
+            message: message.to_string(),
+            category: category.to_string(),
+        };
+
+        // Publier aussi via Redis pour le temps reel desktop
+        self.publish_event("bot_log", serde_json::json!({
+            "level": log_data.level,
+            "bot": log_data.bot,
+            "server": log_data.server,
+            "message": log_data.message,
+            "category": log_data.category,
+        }));
+
+        // Persister via HTTP (fire-and-forget)
         let req = self
             .client
             .post(format!("{}/api/logs", self.base_url))
-            .json(&LogPayload {
-                level: level.to_string(),
-                bot: self.bot_name.clone(),
-                server: server.to_string(),
-                message: message.to_string(),
-                category: category.to_string(),
-            });
+            .json(&log_data);
 
         let req = self.auth(req);
         tokio::spawn(async move {

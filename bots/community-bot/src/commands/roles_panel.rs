@@ -4,7 +4,7 @@ use serenity::all::{
 };
 use tracing::{error, info};
 
-use sentinel_shared::embeds::{info_embed, neutral_embed, success_embed};
+use sentinel_shared::embeds::{info_embed, success_embed};
 
 use crate::handler::{send_role_panel, RolesApiKey};
 

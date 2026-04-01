@@ -23,6 +23,28 @@ impl ApiClient {
         Self { base }
     }
 
+    /// Recupere les derniers evenements de securite depuis le backend.
+    pub async fn list_events(&self, guild_id: &str, limit: u32) -> Result<Vec<serde_json::Value>, String> {
+        let req = self
+            .base
+            .client()
+            .get(format!(
+                "{}/api/security/events?guild_id={}&limit={}",
+                self.base.base_url(),
+                guild_id,
+                limit
+            ));
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("{e}"))?
+            .json()
+            .await
+            .map_err(|e| format!("{e}"))
+    }
+
     /// Signale un evenement de securite au backend.
     pub async fn report_event(&self, event: &SecurityEvent) -> Result<(), String> {
         let req = self

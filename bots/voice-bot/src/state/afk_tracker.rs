@@ -26,6 +26,7 @@ impl AfkTracker {
     }
 
     /// Retourne l'instant ou l'utilisateur est devenu AFK.
+    #[allow(dead_code)]
     pub fn get_afk_since(&self, user_id: UserId) -> Option<Instant> {
         self.map.get(&user_id).map(|entry| *entry.value())
     }

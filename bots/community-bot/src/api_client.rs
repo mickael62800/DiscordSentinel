@@ -126,4 +126,40 @@ impl ApiClient {
         if resp.status().as_u16() == 404 { return Ok(None); }
         resp.json::<RolePanelDetail>().await.map(Some).map_err(|e| format!("{e}"))
     }
+
+    // ── Sponsorships (fire-and-forget) ──
+
+    /// Persiste un parrainage.
+    pub async fn create_sponsorship(&self, guild_id: &str, sponsor_id: &str, sponsored_id: &str) {
+        let req = self.base.client()
+            .post(format!("{}/api/sponsorships", self.base.base_url()))
+            .json(&serde_json::json!({
+                "guild_id": guild_id,
+                "sponsor_id": sponsor_id,
+                "sponsored_id": sponsored_id,
+            }));
+        self.base.auth(req).send().await.ok();
+    }
+
+    // ── Temp Roles (fire-and-forget) ──
+
+    /// Persiste un role temporaire.
+    pub async fn create_temp_role(&self, guild_id: &str, user_id: &str, role_id: &str, expires_at: &str) {
+        let req = self.base.client()
+            .post(format!("{}/api/temp-roles", self.base.base_url()))
+            .json(&serde_json::json!({
+                "guild_id": guild_id,
+                "user_id": user_id,
+                "role_id": role_id,
+                "expires_at": expires_at,
+            }));
+        self.base.auth(req).send().await.ok();
+    }
+
+    /// Supprime un role temporaire expire.
+    pub async fn delete_temp_role(&self, guild_id: &str, user_id: &str, role_id: &str) {
+        let req = self.base.client()
+            .delete(format!("{}/api/temp-roles/{}/{}/{}", self.base.base_url(), guild_id, user_id, role_id));
+        self.base.auth(req).send().await.ok();
+    }
 }

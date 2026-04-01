@@ -11,16 +11,31 @@ use serenity::model::id::RoleId;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
+use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{neutral_embed, success_embed};
-use sentinel_shared::heartbeat::register_guilds;
+use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::api_client::{ApiClient, SyncRole};
 use crate::commands;
+use crate::exclusive_groups;
+use crate::prerequisites;
+use crate::sponsorship::SponsorshipTracker;
+use crate::temp_roles::{self, TempRoleTracker};
 
 /// Cle TypeMap pour le client API specifique au community-bot.
 pub struct RolesApiKey;
 impl TypeMapKey for RolesApiKey {
     type Value = ApiClient;
+}
+
+pub struct TempRoleKey;
+impl TypeMapKey for TempRoleKey {
+    type Value = TempRoleTracker;
+}
+
+pub struct SponsorshipKey;
+impl TypeMapKey for SponsorshipKey {
+    type Value = SponsorshipTracker;
 }
 
 pub struct Handler;
@@ -109,6 +124,7 @@ impl EventHandler for Handler {
             Interaction::Command(command) => {
                 match command.data.name.as_str() {
                     "roles-panel" => commands::roles_panel::handle(&ctx, &command).await,
+                    "parrain" => commands::sponsor::handle(&ctx, &command).await,
                     _ => {}
                 }
             }
@@ -143,6 +159,16 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
     let role = RoleId::new(role_id);
     let has_role = member.roles.contains(&role);
 
+    // Lire la config guild pour les features avancees
+    let guild_config = {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        }
+    };
+
     let embed = if has_role {
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             let _ = m.remove_role(&ctx.http, role).await;
@@ -150,11 +176,68 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         neutral_embed("\u{21a9}\u{fe0f} Role retire")
             .description(format!("Le role <@&{}> vous a ete retire.", role_id))
     } else {
+        // Verifier les prerequis
+        let prereqs_raw = BaseApiClient::config_or(&guild_config, "role_prerequisites", "");
+        let prereqs = prerequisites::parse_prerequisites(&prereqs_raw);
+        let user_roles: Vec<u64> = member.roles.iter().map(|r| r.get()).collect();
+        let joined_days = member.joined_at
+            .map(|j| {
+                let now = serenity::model::Timestamp::now().unix_timestamp();
+                ((now - j.unix_timestamp()) / 86400).max(0) as u64
+            })
+            .unwrap_or(0);
+
+        if let Err(msg) = prerequisites::check_prerequisites(&prereqs, role_id, &user_roles, joined_days) {
+            let embed = neutral_embed("Prerequis non remplis").description(msg);
+            let response = CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+            );
+            let _ = component.create_response(&ctx.http, response).await;
+            return;
+        }
+
+        // Retirer les roles exclusifs en conflit
+        let groups_raw = BaseApiClient::config_or(&guild_config, "exclusive_groups", "");
+        let groups = exclusive_groups::parse_groups(&groups_raw);
+        let conflicts = exclusive_groups::get_conflicting_roles(&groups, role_id);
+        if !conflicts.is_empty() {
+            if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
+                for conflict_id in &conflicts {
+                    let _ = m.remove_role(&ctx.http, RoleId::new(*conflict_id)).await;
+                }
+            }
+        }
+
+        // Ajouter le role
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             let _ = m.add_role(&ctx.http, role).await;
         }
-        success_embed("\u{2705} Role attribue")
-            .description(format!("Le role <@&{}> vous a ete attribue.", role_id))
+
+        // Verifier si c'est un role temporaire
+        let temp_raw = BaseApiClient::config_or(&guild_config, "temp_roles", "");
+        let temp_roles_config = temp_roles::parse_temp_roles(&temp_raw);
+        if let Some(duration) = temp_roles::get_temp_duration(&temp_roles_config, role_id) {
+            let data = ctx.data.read().await;
+            if let Some(tracker) = data.get::<TempRoleKey>() {
+                tracker.add(guild_id.get(), component.user.id.get(), role_id, duration);
+            }
+            // Persister via l'API
+            if let Some(api) = data.get::<RolesApiKey>() {
+                let expires_at = (chrono::Utc::now() + chrono::Duration::seconds(duration as i64)).to_rfc3339();
+                api.create_temp_role(
+                    &guild_id.to_string(),
+                    &component.user.id.to_string(),
+                    &role_id.to_string(),
+                    &expires_at,
+                ).await;
+            }
+        }
+
+        let mut desc = format!("Le role <@&{}> vous a ete attribue.", role_id);
+        if !conflicts.is_empty() {
+            desc.push_str("\n*(roles exclusifs retires automatiquement)*");
+        }
+        success_embed("\u{2705} Role attribue").description(desc)
     };
 
     let msg = CreateInteractionResponseMessage::new()

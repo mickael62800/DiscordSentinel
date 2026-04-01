@@ -10,6 +10,7 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use crate::api_client::{ApiClient, CreateVoiceChannelRequest};
@@ -42,6 +43,9 @@ pub async fn handle_voice_state_update(
         if let Some(base) = data.get::<ApiClientKey>() {
             match base.get_guild_config(&guild_id.to_string()).await {
                 Ok(config) => {
+                    if !BaseApiClient::config_bool(&config, "enabled", true) {
+                        return;
+                    }
                     let public_id = config.get("public_creator_channel_id")
                         .and_then(|v| v.parse::<u64>().ok())
                         .map(ChannelId::new)

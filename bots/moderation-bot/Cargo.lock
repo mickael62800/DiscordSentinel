@@ -688,6 +688,7 @@ dependencies = [
 name = "moderation-bot"
 version = "0.1.0"
 dependencies = [
+ "dashmap",
  "dotenvy",
  "futures-util",
  "redis",
@@ -1141,6 +1142,8 @@ dependencies = [
 name = "sentinel-shared"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
+ "redis",
  "reqwest",
  "serde",
  "serde_json",

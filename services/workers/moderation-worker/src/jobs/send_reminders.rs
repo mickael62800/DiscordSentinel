@@ -1,9 +1,12 @@
 use sqlx::PgPool;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+use sentinel_worker_common::is_worker_enabled;
+
 #[derive(sqlx::FromRow)]
+#[allow(dead_code)]
 struct PendingReminder {
     id: Uuid,
     guild_id: String,
@@ -36,6 +39,10 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     }
 
     for reminder in &reminders {
+        if !is_worker_enabled(pool, &reminder.guild_id, "moderation-worker").await {
+            continue;
+        }
+
         // Marquer comme envoye AVANT de tenter le broadcast (evite les doublons)
         sqlx::query("UPDATE sanction_reminders SET status = 'sent' WHERE id = $1")
             .bind(reminder.id)

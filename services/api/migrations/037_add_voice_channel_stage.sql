@@ -1,0 +1,2 @@
+ALTER TABLE voice_channels ADD COLUMN stage_enabled BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE voice_channel_themes ADD COLUMN stage_enabled BOOLEAN NOT NULL DEFAULT FALSE;

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import { useTickets, useTicketDetail } from "../../composables/useTickets";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppButton from "../atoms/AppButton.vue";
@@ -11,7 +12,8 @@ import FilterBar from "../molecules/FilterBar.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { statusVariant, priorityVariant } from "../../utils/variants";
 
-const { filteredTickets, loading, filterStatus, filterPriority, openCount, pendingCount } = useTickets();
+const { filteredTickets, loading, filterStatus, filterPriority, openCount, pendingCount, fetchTickets } = useTickets();
+useRealtimeRefresh(["ticket_new", "ticket_message"], fetchTickets);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedTickets } = usePagination(filteredTickets);
 const { detail, loading: detailLoading, replying, fetchDetail, reply, close } = useTicketDetail();
 

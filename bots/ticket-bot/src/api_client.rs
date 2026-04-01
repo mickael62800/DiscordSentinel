@@ -24,6 +24,12 @@ pub struct Ticket {
     pub created_at: String,
     pub updated_at: String,
     pub messages_count: u32,
+    #[serde(default)]
+    pub first_response_at: Option<String>,
+    #[serde(default)]
+    pub resolved_at: Option<String>,
+    #[serde(default)]
+    pub satisfaction_rating: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -167,6 +173,7 @@ impl ApiClient {
         Ok(())
     }
 
+    #[allow(dead_code)]
     pub async fn update_status(&self, id: &str, status: &str) -> Result<(), String> {
         let req = self
             .base
@@ -207,6 +214,50 @@ impl ApiClient {
             .json(&AssignPayload {
                 assignee: assignee.to_string(),
             });
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau: {e}"))?;
+
+        Ok(())
+    }
+
+    /// Met a jour les donnees SLA d'un ticket (fire-and-forget).
+    pub async fn update_ticket_sla(
+        &self,
+        id: &str,
+        first_response_at: Option<&str>,
+        resolved_at: Option<&str>,
+        satisfaction_rating: Option<u8>,
+    ) {
+        let mut body = serde_json::Map::new();
+        if let Some(fr) = first_response_at {
+            body.insert("first_response_at".to_string(), serde_json::Value::String(fr.to_string()));
+        }
+        if let Some(ra) = resolved_at {
+            body.insert("resolved_at".to_string(), serde_json::Value::String(ra.to_string()));
+        }
+        if let Some(rating) = satisfaction_rating {
+            body.insert("satisfaction_rating".to_string(), serde_json::Value::Number(rating.into()));
+        }
+
+        let req = self
+            .base
+            .client()
+            .patch(format!("{}/api/tickets/{id}/sla", self.base.base_url()))
+            .json(&body);
+
+        self.base.auth(req).send().await.ok();
+    }
+
+    pub async fn update_ticket_priority(&self, id: &str, priority: &str) -> Result<(), String> {
+        let req = self
+            .base
+            .client()
+            .patch(format!("{}/api/tickets/{id}/status", self.base.base_url()))
+            .json(&serde_json::json!({ "priority": priority }));
 
         self.base
             .auth(req)

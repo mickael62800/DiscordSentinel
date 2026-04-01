@@ -127,4 +127,32 @@ impl ApiClient {
             .await
             .map_err(|e| format!("Erreur parsing: {e}"))
     }
+
+    // ── Pending Actions (mode apprenti) ──
+
+    /// Persiste une action en attente d'approbation (fire-and-forget).
+    #[allow(dead_code)]
+    pub async fn create_pending_action(&self, action: &ModerationAction) {
+        let req = self
+            .base
+            .client()
+            .post(format!("{}/api/moderation/pending", self.base.base_url()))
+            .json(action);
+
+        self.base.auth(req).send().await.ok();
+    }
+
+    /// Met a jour le statut d'une action en attente (approved/rejected).
+    pub async fn resolve_pending_action(&self, action_id: &str, status: &str, reviewed_by: &str) {
+        let req = self
+            .base
+            .client()
+            .patch(format!("{}/api/moderation/pending/{action_id}", self.base.base_url()))
+            .json(&serde_json::json!({
+                "status": status,
+                "reviewed_by": reviewed_by,
+            }));
+
+        self.base.auth(req).send().await.ok();
+    }
 }

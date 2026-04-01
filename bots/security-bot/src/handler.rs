@@ -3,19 +3,23 @@ use serenity::model::application::Interaction;
 use serenity::model::channel::GuildChannel;
 use serenity::model::gateway::Ready;
 use serenity::model::guild::Member;
-use serenity::model::id::{GuildId, RoleId};
+use serenity::model::id::{GuildId, RoleId, UserId};
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::embeds::{danger_embed, info_embed, success_embed, warn_embed};
+use sentinel_shared::embeds::{danger_embed, success_embed, warn_embed};
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::api_client::{ApiClient, SecurityEvent};
+use crate::commands;
 use crate::config::Config;
 use crate::security::account_checker::AccountChecker;
-use crate::security::captcha;
+use crate::security::alt_detector::AltDetector;
+use crate::security::captcha::{self, CaptchaPending};
+use crate::security::lockdown::LockdownManager;
 use crate::security::quarantine::QuarantineManager;
+use crate::security::raid_analyzer::{self, JoinInfo, RecentJoinsTracker};
 use crate::security::raid_detector::RaidDetector;
 use crate::security::slowmode::SlowmodeManager;
 
@@ -51,6 +55,26 @@ impl TypeMapKey for SlowmodeKey {
     type Value = SlowmodeManager;
 }
 
+pub struct LockdownKey;
+impl TypeMapKey for LockdownKey {
+    type Value = LockdownManager;
+}
+
+pub struct RecentJoinsKey;
+impl TypeMapKey for RecentJoinsKey {
+    type Value = RecentJoinsTracker;
+}
+
+pub struct CaptchaPendingKey;
+impl TypeMapKey for CaptchaPendingKey {
+    type Value = CaptchaPending;
+}
+
+pub struct AltDetectorKey;
+impl TypeMapKey for AltDetectorKey {
+    type Value = AltDetector;
+}
+
 pub struct Handler;
 
 #[async_trait]
@@ -58,6 +82,17 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Security bot connecte");
         register_guilds(&ctx, &ready).await;
+
+        if let Err(e) = serenity::model::application::Command::set_global_commands(
+            &ctx.http,
+            commands::all(),
+        )
+        .await
+        {
+            error!(error = %e, "Erreur enregistrement commandes");
+        } else {
+            info!("Slash commands enregistrees : security");
+        }
     }
 
     /// Declenche a chaque nouveau membre qui rejoint un serveur.
@@ -82,25 +117,58 @@ impl EventHandler for Handler {
                 &format!("Nouveau membre : {} ({})", user.name, user.id),
             );
         }
-        let (base, sec_api, raid_detector, account_checker, env_config, quarantine, slowmode) =
-            match (
-                data.get::<ApiClientKey>(),
-                data.get::<SecurityApiKey>(),
-                data.get::<RaidDetectorKey>(),
-                data.get::<AccountCheckerKey>(),
-                data.get::<ConfigKey>(),
-                data.get::<QuarantineKey>(),
-                data.get::<SlowmodeKey>(),
-            ) {
-                (Some(a), Some(b), Some(c), Some(d), Some(e), Some(f), Some(g)) => (a, b, c, d, e, f, g),
-                _ => {
-                    error!(guild_id = %guild_id, "TypeMap incomplete — composants manquants");
-                    return;
-                }
-            };
+        let base = match data.get::<ApiClientKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "ApiClientKey manquant"); return; }
+        };
+        let sec_api = match data.get::<SecurityApiKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "SecurityApiKey manquant"); return; }
+        };
+        let raid_detector = match data.get::<RaidDetectorKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "RaidDetectorKey manquant"); return; }
+        };
+        let account_checker = match data.get::<AccountCheckerKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "AccountCheckerKey manquant"); return; }
+        };
+        let env_config = match data.get::<ConfigKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "ConfigKey manquant"); return; }
+        };
+        let quarantine = match data.get::<QuarantineKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "QuarantineKey manquant"); return; }
+        };
+        let slowmode = match data.get::<SlowmodeKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "SlowmodeKey manquant"); return; }
+        };
+        let lockdown = match data.get::<LockdownKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "LockdownKey manquant"); return; }
+        };
+        let recent_joins = match data.get::<RecentJoinsKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "RecentJoinsKey manquant"); return; }
+        };
+        let captcha_pending = match data.get::<CaptchaPendingKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "CaptchaPendingKey manquant"); return; }
+        };
+        let alt_detector = match data.get::<AltDetectorKey>() {
+            Some(a) => a,
+            None => { error!(guild_id = %guild_id, "AltDetectorKey manquant"); return; }
+        };
 
         // Charger la config per-guild depuis l'API (fallback sur env vars)
         let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+
+        if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
+            return;
+        }
+
         let min_account_age = BaseApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
 
         // Config quarantaine per-guild
@@ -120,9 +188,52 @@ impl EventHandler for Handler {
             .get("slowmode_seconds")
             .and_then(|v| v.parse().ok())
             .unwrap_or(env_config.slowmode_seconds);
+        let lockdown_enabled = guild_config
+            .get("lockdown_enabled")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(env_config.lockdown_enabled);
+        let captcha_type = guild_config
+            .get("captcha_type")
+            .cloned()
+            .unwrap_or_else(|| env_config.captcha_type.clone());
+        let alt_detection_enabled = guild_config
+            .get("alt_detection_enabled")
+            .map(|v| v == "true" || v == "1")
+            .unwrap_or(env_config.alt_detection_enabled);
+        let raid_pattern_enabled = guild_config
+            .get("raid_pattern_enabled")
+            .map(|v| v != "false" && v != "0")
+            .unwrap_or(env_config.raid_pattern_enabled);
+        let raid_pattern_score_threshold = guild_config
+            .get("raid_pattern_score_threshold")
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(env_config.raid_pattern_score_threshold);
+
+        // ── 0. Enregistrer le join pour l'analyse de pattern ──
+        let join_info = JoinInfo {
+            username: user.name.clone(),
+            has_avatar: user.avatar.is_some(),
+            account_created_timestamp: user.created_at().unix_timestamp(),
+        };
+        recent_joins.record(guild_id, join_info);
 
         // ── 1. Detection anti-raid ──
         let is_raid = raid_detector.record_join(guild_id);
+
+        // Analyse de pattern avancee (meme si le seuil de joins n'est pas atteint)
+        let pattern_raid = if raid_pattern_enabled {
+            let joins = recent_joins.recent(guild_id);
+            if joins.len() >= 3 {
+                let analysis = raid_analyzer::analyze_joins(&joins, 2, 3600);
+                analysis.score >= raid_pattern_score_threshold
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        let is_raid = is_raid || pattern_raid;
 
         if is_raid {
             let join_count = raid_detector.recent_joins(guild_id);
@@ -168,6 +279,11 @@ impl EventHandler for Handler {
                 slowmode.activate(&ctx, guild_id, slowmode_secs).await;
             }
 
+            // ── Lockdown auto ──
+            if lockdown_enabled {
+                lockdown.activate(&ctx, guild_id).await;
+            }
+
             // ── Quarantaine sur le membre qui a declenche ──
             if quarantine_enabled {
                 if let Some(role_id) = quarantine_role_id {
@@ -182,7 +298,7 @@ impl EventHandler for Handler {
                             .map(|g| g.name.clone())
                             .unwrap_or_else(|_| "Serveur".to_string());
 
-                        captcha::send_challenge(&ctx, user.id, &guild_name).await;
+                        send_captcha(&ctx, user.id, guild_id, &guild_name, &captcha_type, captcha_pending).await;
                     }
                 }
             }
@@ -199,6 +315,9 @@ impl EventHandler for Handler {
                             "\nSlowmode active ({}s) sur tous les salons.",
                             slowmode_secs
                         ));
+                    }
+                    if lockdown_enabled {
+                        actions.push_str("\nLockdown active — envoi de messages desactive.");
                     }
                     if quarantine_enabled {
                         actions.push_str("\nNouveaux membres mis en quarantaine.");
@@ -219,6 +338,7 @@ impl EventHandler for Handler {
             }
 
             raid_detector.reset(guild_id);
+            recent_joins.reset(guild_id);
         }
 
         // ── 2. Verification compte suspect ──
@@ -261,7 +381,7 @@ impl EventHandler for Handler {
                                 .map(|g| g.name.clone())
                                 .unwrap_or_else(|_| "Serveur".to_string());
 
-                            captcha::send_challenge(&ctx, user.id, &guild_name).await;
+                            send_captcha(&ctx, user.id, guild_id, &guild_name, &captcha_type, captcha_pending).await;
                         }
                     }
                 }
@@ -277,6 +397,68 @@ impl EventHandler for Handler {
 
             if let Err(e) = sec_api.report_event(&event).await {
                 error!(error = %e, "Erreur envoi evenement compte suspect");
+            }
+        }
+
+        // ── 3. Detection alt account ──
+        if alt_detection_enabled {
+            let alt_analysis = alt_detector.check_user(
+                guild_id,
+                &user.name,
+                user.created_at().unix_timestamp(),
+            );
+
+            if alt_analysis.is_suspicious() {
+                let mut description = format!("Alt account suspecte : {}", user.name);
+                if let Some(ref banned) = alt_analysis.similar_to_banned {
+                    description.push_str(&format!(" (nom similaire a {})", banned));
+                }
+                if let Some(ref banned) = alt_analysis.creation_near_banned {
+                    description.push_str(&format!(" (creation proche de {})", banned));
+                }
+
+                warn!(
+                    guild_id = %guild_id,
+                    user = %user.name,
+                    similar_to = ?alt_analysis.similar_to_banned,
+                    creation_near = ?alt_analysis.creation_near_banned,
+                    "Alt account suspecte"
+                );
+
+                // Quarantaine si active
+                if quarantine_enabled {
+                    if let Some(role_id) = quarantine_role_id {
+                        let quarantined = quarantine
+                            .quarantine_user(&ctx, guild_id, user.id, RoleId::new(role_id))
+                            .await;
+
+                        if quarantined {
+                            description.push_str(" — mis en quarantaine");
+
+                            if captcha_enabled {
+                                let guild_name = guild_id
+                                    .to_partial_guild(&ctx.http)
+                                    .await
+                                    .map(|g| g.name.clone())
+                                    .unwrap_or_else(|_| "Serveur".to_string());
+
+                                send_captcha(&ctx, user.id, guild_id, &guild_name, &captcha_type, captcha_pending).await;
+                            }
+                        }
+                    }
+                }
+
+                let event = SecurityEvent {
+                    guild_id: guild_id.to_string(),
+                    event_type: "alt_account_suspected".to_string(),
+                    severity: "warning".to_string(),
+                    description,
+                    user_ids: vec![user.id.to_string()],
+                };
+
+                if let Err(e) = sec_api.report_event(&event).await {
+                    error!(error = %e, "Erreur envoi evenement alt account");
+                }
             }
         }
     }
@@ -359,6 +541,15 @@ impl EventHandler for Handler {
                 &format!("Membre banni : {} ({})", banned_user.name, banned_user.id),
             );
         }
+
+        // Enregistrer le ban pour la detection d'alt accounts
+        if let Some(alt_detector) = data.get::<AltDetectorKey>() {
+            alt_detector.record_ban(
+                guild_id,
+                banned_user.name.clone(),
+                banned_user.created_at().unix_timestamp(),
+            );
+        }
     }
 
     /// Declenche quand un membre est debanni.
@@ -375,10 +566,30 @@ impl EventHandler for Handler {
         }
     }
 
-    /// Gere les interactions (bouton captcha).
+    /// Gere les interactions (slash commands + bouton captcha + captcha math).
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Component(component) = interaction {
-            if component.data.custom_id != captcha::CAPTCHA_BUTTON_ID {
+        match interaction {
+            Interaction::Command(command) => {
+                if let Some(guild_id) = command.guild_id {
+                    let data = ctx.data.read().await;
+                    if let Some(api) = data.get::<ApiClientKey>() {
+                        if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                            return;
+                        }
+                    }
+                }
+
+                if command.data.name.as_str() == "security" {
+                    commands::security::handle(&ctx, &command).await;
+                }
+                return;
+            }
+            Interaction::Component(component) => {
+            let custom_id = &component.data.custom_id;
+            let is_button_captcha = custom_id == captcha::CAPTCHA_BUTTON_ID;
+            let is_math_captcha = custom_id.starts_with(captcha::CAPTCHA_MATH_PREFIX);
+
+            if !is_button_captcha && !is_math_captcha {
                 return;
             }
 
@@ -399,7 +610,103 @@ impl EventHandler for Handler {
                     }
                 };
 
-            // Trouver dans quelle guild l'utilisateur est en quarantaine
+            // ── Captcha math : verifier la reponse ──
+            if is_math_captcha {
+                let captcha_pending = match data.get::<CaptchaPendingKey>() {
+                    Some(p) => p,
+                    None => {
+                        error!("CaptchaPendingKey manquant");
+                        return;
+                    }
+                };
+
+                // Extraire l'index du bouton presse
+                let pressed_str = custom_id.strip_prefix(captcha::CAPTCHA_MATH_PREFIX).unwrap_or("0");
+                let pressed_index: usize = pressed_str.parse().unwrap_or(0);
+
+                // Trouver le guild_id de l'utilisateur en quarantaine
+                let mut target_guild = None;
+                for gid in ctx.cache.guilds() {
+                    if quarantine.is_quarantined(gid, user_id) {
+                        target_guild = Some(gid);
+                        break;
+                    }
+                }
+
+                let guild_id = match target_guild {
+                    Some(g) => g,
+                    None => {
+                        let embed = warn_embed("\u{26a0}\u{fe0f} Deja verifie")
+                            .description("Vous n'etes pas en quarantaine.");
+                        let response = serenity::builder::CreateInteractionResponse::Message(
+                            serenity::builder::CreateInteractionResponseMessage::new()
+                                .embed(embed)
+                                .ephemeral(true),
+                        );
+                        component.create_response(&ctx.http, response).await.ok();
+                        return;
+                    }
+                };
+
+                match captcha_pending.verify(guild_id, user_id, pressed_index) {
+                    Some(true) => {
+                        // Bonne reponse — liberer
+                        captcha_pending.remove(guild_id, user_id);
+
+                        let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                        let role_id = guild_config
+                            .get("quarantine_role_id")
+                            .and_then(|v| v.parse::<u64>().ok())
+                            .or(env_config.quarantine_role_id);
+
+                        if let Some(role_id) = role_id {
+                            quarantine.release_user(&ctx, guild_id, user_id, RoleId::new(role_id)).await;
+                        }
+
+                        let event = SecurityEvent {
+                            guild_id: guild_id.to_string(),
+                            event_type: "captcha_verified".to_string(),
+                            severity: "info".to_string(),
+                            description: format!("Utilisateur {} a passe le captcha math", component.user.name),
+                            user_ids: vec![user_id.to_string()],
+                        };
+                        sec_api.report_event(&event).await.ok();
+
+                        let embed = success_embed("\u{2705} Verification reussie")
+                            .description("Bonne reponse ! Vous avez maintenant acces au serveur.");
+                        let response = serenity::builder::CreateInteractionResponse::Message(
+                            serenity::builder::CreateInteractionResponseMessage::new()
+                                .embed(embed)
+                                .ephemeral(true),
+                        );
+                        component.create_response(&ctx.http, response).await.ok();
+                    }
+                    Some(false) => {
+                        // Mauvaise reponse
+                        let embed = danger_embed("\u{274c} Mauvaise reponse")
+                            .description("Ce n'est pas la bonne reponse. Reessayez.");
+                        let response = serenity::builder::CreateInteractionResponse::Message(
+                            serenity::builder::CreateInteractionResponseMessage::new()
+                                .embed(embed)
+                                .ephemeral(true),
+                        );
+                        component.create_response(&ctx.http, response).await.ok();
+                    }
+                    None => {
+                        let embed = warn_embed("\u{26a0}\u{fe0f} Captcha expire")
+                            .description("Ce captcha n'est plus valide.");
+                        let response = serenity::builder::CreateInteractionResponse::Message(
+                            serenity::builder::CreateInteractionResponseMessage::new()
+                                .embed(embed)
+                                .ephemeral(true),
+                        );
+                        component.create_response(&ctx.http, response).await.ok();
+                    }
+                }
+                return;
+            }
+
+            // ── Captcha bouton classique ──
             let mut released = false;
 
             {
@@ -455,6 +762,27 @@ impl EventHandler for Handler {
             );
 
             component.create_response(&ctx.http, response).await.ok();
+            }
+            _ => {}
+        }
+    }
+}
+
+/// Envoie le captcha adapte selon le type configure.
+async fn send_captcha(
+    ctx: &Context,
+    user_id: UserId,
+    guild_id: GuildId,
+    guild_name: &str,
+    captcha_type: &str,
+    captcha_pending: &CaptchaPending,
+) {
+    match captcha_type {
+        "math" => {
+            captcha::send_math_challenge(ctx, user_id, guild_id, guild_name, captcha_pending).await;
+        }
+        _ => {
+            captcha::send_challenge(ctx, user_id, guild_name).await;
         }
     }
 }

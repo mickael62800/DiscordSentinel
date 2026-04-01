@@ -22,10 +22,8 @@ const generalItems = [
 ];
 
 const moderationItems = [
-  { path: "/infractions", label: "Infractions", icon: "alert-triangle" },
-  { path: "/rules", label: "Regles", icon: "shield" },
-  { path: "/bans", label: "Bannissements", icon: "user-x" },
   { path: "/moderation", label: "Moderation", icon: "gavel" },
+  { path: "/rules", label: "Regles", icon: "shield" },
   { path: "/conduct", label: "Conduite", icon: "award" },
   { path: "/watched-users", label: "Surveillance", icon: "eye" },
 ];
@@ -43,11 +41,7 @@ const securityItems = [
 ];
 
 const logItems = [
-  { path: "/logs", label: "Journaux Discord", icon: "list" },
-  { path: "/logs/bots", label: "Journaux Bots", icon: "cpu" },
-  { path: "/logs/workers", label: "Journaux Workers", icon: "activity" },
-  { path: "/logs/api", label: "Journaux API", icon: "server" },
-  { path: "/logs/websocket", label: "Journaux WebSocket", icon: "wifi" },
+  { path: "/logs", label: "Journaux", icon: "list" },
 ];
 
 const aiItems = [
@@ -56,8 +50,7 @@ const aiItems = [
 ];
 
 const configItems = [
-  { path: "/bot-config", label: "Config Bots", icon: "cpu" },
-  { path: "/worker-config", label: "Config Workers", icon: "activity" },
+  { path: "/component-config", label: "Composants", icon: "cpu" },
   { path: "/settings", label: "Parametres", icon: "settings" },
 ];
 

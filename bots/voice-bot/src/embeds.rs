@@ -80,6 +80,7 @@ pub async fn log_member_left(ctx: &Context, user_id: u64, channel_name: &str) {
     send_log(ctx, embed).await;
 }
 
+#[allow(dead_code)]
 pub async fn log_vote_kick(ctx: &Context, target_id: u64, channel_name: &str, result: &str) {
     let (emoji, color) = if result == "expulse" {
         ("👢", 0xe74c3c)
@@ -99,6 +100,7 @@ pub async fn log_vote_kick(ctx: &Context, target_id: u64, channel_name: &str, re
     send_log(ctx, embed).await;
 }
 
+#[allow(dead_code)]
 pub async fn log_transfer(ctx: &Context, from_id: u64, to_id: u64, channel_name: &str) {
     let embed = CreateEmbed::new()
         .title("🔄 Transfert de propriete")
@@ -112,6 +114,7 @@ pub async fn log_transfer(ctx: &Context, from_id: u64, to_id: u64, channel_name:
     send_log(ctx, embed).await;
 }
 
+#[allow(dead_code)]
 pub async fn log_ban(ctx: &Context, user_id: u64, channel_name: &str, duration: &str) {
     let embed = CreateEmbed::new()
         .title("🚫 Membre banni du salon")
@@ -125,6 +128,7 @@ pub async fn log_ban(ctx: &Context, user_id: u64, channel_name: &str, duration: 
     send_log(ctx, embed).await;
 }
 
+#[allow(dead_code)]
 pub async fn log_flood_mute(ctx: &Context, user_id: u64, channel_name: &str, duration_secs: u64) {
     let embed = CreateEmbed::new()
         .title("🔇 Mute anti-flood")

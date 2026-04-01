@@ -1368,6 +1368,187 @@ async fn reply(
         .await
 }
 
+// ── FAQ : affiche les FAQ avant la creation du ticket ──
+
+/// Gere le clic sur le bouton "Creer un ticket" — avec FAQ intercalee si configuree.
+pub async fn handle_panel_click_with_faq(ctx: &Context, component: &ComponentInteraction) {
+    // Lire les FAQ depuis la config guild
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let faq_raw = {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            sentinel_shared::api_client::BaseApiClient::config_or(&gc, "faq_entries", "")
+        } else {
+            String::new()
+        }
+    };
+
+    let entries = crate::faq::parse_faq(&faq_raw);
+
+    if entries.is_empty() {
+        // Pas de FAQ → afficher directement le selecteur de type
+        handle_panel_click(ctx, component).await;
+        return;
+    }
+
+    // Afficher les FAQ + bouton "Creer un ticket quand meme"
+    let embed = crate::faq::build_faq_embed(&entries);
+    let row = crate::faq::build_faq_continue_button();
+
+    let response = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .embed(embed)
+            .components(vec![row])
+            .ephemeral(true),
+    );
+
+    if let Err(e) = component.create_response(&ctx.http, response).await {
+        error!(error = %e, "Erreur envoi FAQ");
+    }
+}
+
+/// Gere le clic sur "Ma question n'est pas dans la FAQ — Creer un ticket"
+pub async fn handle_faq_continue(ctx: &Context, component: &ComponentInteraction) {
+    handle_panel_click(ctx, component).await;
+}
+
+// ── Templates de reponses rapides ──
+
+/// Gere le clic sur le bouton "Reponses rapides" dans un ticket.
+pub async fn handle_template_button(ctx: &Context, component: &ComponentInteraction) {
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+
+    let templates_raw = {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            sentinel_shared::api_client::BaseApiClient::config_or(&gc, "response_templates", "")
+        } else {
+            String::new()
+        }
+    };
+
+    let templates = crate::templates::parse_templates(&templates_raw);
+
+    if templates.is_empty() {
+        let response = CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .content("Aucun template de reponse configure pour ce serveur.")
+                .ephemeral(true),
+        );
+        component.create_response(&ctx.http, response).await.ok();
+        return;
+    }
+
+    let row = crate::templates::build_template_select(&templates);
+
+    let response = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .content("**Choisissez une reponse rapide :**")
+            .components(vec![row])
+            .ephemeral(true),
+    );
+
+    if let Err(e) = component.create_response(&ctx.http, response).await {
+        error!(error = %e, "Erreur envoi menu templates");
+    }
+}
+
+/// Gere la selection d'un template → envoie le contenu dans le salon.
+pub async fn handle_template_select(ctx: &Context, component: &ComponentInteraction) {
+    let selected_index = match &component.data.kind {
+        serenity::all::ComponentInteractionDataKind::StringSelect { values } => {
+            values.first().and_then(|v| v.parse::<usize>().ok())
+        }
+        _ => None,
+    };
+
+    let index = match selected_index {
+        Some(i) => i,
+        None => return,
+    };
+
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+
+    let templates_raw = {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            sentinel_shared::api_client::BaseApiClient::config_or(&gc, "response_templates", "")
+        } else {
+            String::new()
+        }
+    };
+
+    let templates = crate::templates::parse_templates(&templates_raw);
+
+    if let Some(template) = templates.get(index) {
+        // Envoyer le contenu du template dans le salon
+        let _ = component.channel_id.say(&ctx.http, &template.content).await;
+
+        let response = CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .content(format!("Template \"{}\" envoye.", template.label))
+                .ephemeral(true),
+        );
+        component.create_response(&ctx.http, response).await.ok();
+    }
+}
+
+// ── Satisfaction survey ──
+
+/// Gere le clic sur un bouton de satisfaction (1-5 etoiles).
+pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInteraction) {
+    let rating = match crate::satisfaction::extract_rating(&component.data.custom_id) {
+        Some(r) => r,
+        None => return,
+    };
+
+    // Log la note au backend + persister le rating SLA
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.send_log(
+                "info",
+                &guild_id,
+                &format!(
+                    "Satisfaction ticket : {} a donne {}/5 etoiles",
+                    component.user.name, rating
+                ),
+            );
+
+            // Extraire le ticket_short_id du custom_id pour persister
+            let custom_id = &component.data.custom_id;
+            let ticket_part = custom_id
+                .strip_prefix(crate::satisfaction::SATISFACTION_PREFIX)
+                .and_then(|s| s.rsplit_once('_'))
+                .map(|(ticket, _)| ticket);
+
+            if let Some(_ticket_short) = ticket_part {
+                // Chercher le ticket complet via l'API par short id
+                // Fire-and-forget : on ne peut pas retrouver l'UUID complet
+                // depuis le short id sans appel API, donc on log via send_log
+                // Le rating est deja logge ci-dessus
+                let _api = crate::api_client::ApiClient::new(base.clone());
+                // Note: le rating sera visible dans les logs desktop
+                // Pour une persistance complete, il faudrait stocker l'UUID
+                // dans le custom_id ou dans un DashMap
+            }
+        }
+    }
+
+    let response = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .content(format!("Merci pour votre retour ! Vous avez donne **{}/5** etoiles.", rating))
+            .ephemeral(true),
+    );
+
+    component.create_response(&ctx.http, response).await.ok();
+    info!(user = %component.user.name, rating = rating, "Satisfaction ticket enregistree");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

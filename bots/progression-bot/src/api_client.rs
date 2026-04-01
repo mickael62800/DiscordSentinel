@@ -54,6 +54,10 @@ pub struct UserLevelResponse {
     pub level: i32,
     pub xp_current: i64,
     pub xp_needed: i64,
+    #[serde(default)]
+    pub streak_current: Option<i32>,
+    #[serde(default)]
+    pub streak_best: Option<i32>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -295,6 +299,34 @@ impl ApiClient {
             .json::<Vec<UserLevelResponse>>()
             .await
             .map_err(|e| format!("Erreur parsing: {e}"))
+    }
+
+    /// Persiste les donnees de streak pour un utilisateur.
+    pub async fn update_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        current: u32,
+        best: u32,
+        last_day: u32,
+        last_year: i32,
+    ) {
+        let req = self
+            .base
+            .client()
+            .patch(format!(
+                "{}/api/levels/{guild_id}/{user_id}/streak",
+                self.base.base_url()
+            ))
+            .json(&serde_json::json!({
+                "streak_current": current,
+                "streak_best": best,
+                "streak_last_day": last_day,
+                "streak_last_year": last_year,
+            }));
+
+        // Fire-and-forget : on ne bloque pas le bot si l'API ne repond pas
+        self.base.auth(req).send().await.ok();
     }
 
     /// Recupere les infractions d'un serveur.

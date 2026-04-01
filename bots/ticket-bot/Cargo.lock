@@ -1176,6 +1176,8 @@ dependencies = [
 name = "sentinel-shared"
 version = "0.1.0"
 dependencies = [
+ "futures-util",
+ "redis",
  "reqwest",
  "serde",
  "serde_json",
@@ -1446,6 +1448,7 @@ name = "ticket-bot"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "dashmap",
  "dotenvy",
  "futures-util",
  "redis",

@@ -25,6 +25,38 @@ impl ApiClient {
         Self { base }
     }
 
+    pub async fn search_audit_logs(
+        &self,
+        guild_id: &str,
+        target_id: Option<&str>,
+        event_type: Option<&str>,
+        limit: u32,
+    ) -> Result<Vec<serde_json::Value>, String> {
+        let mut url = format!(
+            "{}/api/audit-logs?guild_id={}&limit={}",
+            self.base.base_url(),
+            guild_id,
+            limit
+        );
+        if let Some(tid) = target_id {
+            url.push_str(&format!("&target_id={}", tid));
+        }
+        if let Some(et) = event_type {
+            url.push_str(&format!("&event_type={}", et));
+        }
+
+        let req = self.base.client().get(&url);
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("{e}"))?
+            .json()
+            .await
+            .map_err(|e| format!("{e}"))
+    }
+
     pub async fn send_audit_event(&self, event: &AuditEvent) -> Result<(), String> {
         let req = self
             .base

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useBans } from "../../composables/useBans";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { useConfirm } from "../../composables/useConfirm";
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
@@ -27,7 +28,9 @@ const {
   searchQuery,
   executeBan,
   executeUnban,
+  fetchBans,
 } = useBans();
+useRealtimeRefresh(["infraction_new", "moderation_action"], fetchBans);
 
 function openBanModal(proposal: Infraction) {
   banModalTarget.value = proposal;

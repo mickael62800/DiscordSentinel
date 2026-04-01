@@ -52,7 +52,7 @@ function eventIcon(type: string): string {
         </div>
       </div>
 
-      <EmptyState v-if="events.length === 0" message="Aucun evenement de securite" />
+      <EmptyState v-if="filteredEvents.length === 0" message="Aucun evenement de securite" />
     </div>
   </div>
 </template>

@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use dashmap::DashSet;
 use serenity::async_trait;
+use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::MessageId;
@@ -9,10 +10,15 @@ use serenity::prelude::*;
 use serenity::all::CreateMessage;
 use tracing::{error, info, warn};
 
+use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{warn_embed, moderate_embed, danger_embed, critical_embed};
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
+use crate::analysis_queue::{AnalysisQueue, QueuedImage};
 use crate::api_client::{Action, AnalyzeImageRequest, ApiClient, Classification};
+use crate::channel_thresholds;
+use crate::commands;
+use crate::image_hash::{self, ImageHashCache};
 
 // ── TypeMap keys ──
 
@@ -24,6 +30,16 @@ impl TypeMapKey for ProcessedMessagesKey {
 pub struct MaxImageSizeKey;
 impl TypeMapKey for MaxImageSizeKey {
     type Value = u64;
+}
+
+pub struct HashCacheKey;
+impl TypeMapKey for HashCacheKey {
+    type Value = ImageHashCache;
+}
+
+pub struct QueueSenderKey;
+impl TypeMapKey for QueueSenderKey {
+    type Value = AnalysisQueue;
 }
 
 /// Extensions d'images supportees.
@@ -87,6 +103,16 @@ impl EventHandler for Handler {
 
         let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
 
+        {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                if !sentinel_shared::api_client::BaseApiClient::config_bool(&config, "enabled", true) {
+                    return;
+                }
+            }
+        }
+
         info!(
             guild_id = %guild_id,
             user = %msg.author.name,
@@ -115,6 +141,34 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Image bot connecte");
         register_guilds(&ctx, &ready).await;
+
+        if let Err(e) = serenity::model::application::Command::set_global_commands(
+            &ctx.http,
+            commands::all(),
+        )
+        .await
+        {
+            error!(error = %e, "Erreur enregistrement commandes");
+        } else {
+            info!("Slash commands enregistrees : image");
+        }
+    }
+
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = interaction {
+            if let Some(guild_id) = command.guild_id {
+                let data = ctx.data.read().await;
+                if let Some(api) = data.get::<ApiClientKey>() {
+                    if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                        return;
+                    }
+                }
+            }
+
+            if command.data.name.as_str() == "image" {
+                commands::image::handle(&ctx, &command).await;
+            }
+        }
     }
 }
 
@@ -176,12 +230,47 @@ async fn process_image_attachment(
         return;
     }
 
+    // Hash cache : verifier si l'image a deja ete analysee
+    let image_hash = image_hash::compute_hash(&image_bytes);
+    {
+        let data = ctx.data.read().await;
+        if let Some(cache) = data.get::<HashCacheKey>() {
+            if let Some(cached_action) = cache.get_cached(image_hash) {
+                info!(hash = image_hash, action = %cached_action, "Image cache hit — skip API");
+                return; // Action deja connue (none = safe, pas besoin de re-analyser)
+            }
+        }
+    }
+
     // Encoder en base64
     use base64::Engine;
     let image_b64 = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
 
     // Determiner le content type
     let content_type = detect_content_type(filename, &image_bytes);
+
+    // Seuil par salon
+    let guild_config = {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.get_guild_config(guild_id).await.unwrap_or_default()
+        } else {
+            std::collections::HashMap::new()
+        }
+    };
+
+    let thresholds_raw = BaseApiClient::config_or(&guild_config, "channel_thresholds", "");
+    let thresholds = channel_thresholds::parse_thresholds(&thresholds_raw);
+    let default_threshold = BaseApiClient::config_or(&guild_config, "confidence_threshold", "0.5")
+        .parse::<f64>().unwrap_or(0.5);
+    let confidence_override = channel_thresholds::get_channel_threshold(
+        &thresholds, msg.channel_id.get(), default_threshold,
+    );
+
+    // Detection screenshot et GIF anime
+    let filename_lower = filename.to_lowercase();
+    let is_screenshot = filename_lower.contains("screenshot") || filename_lower.contains("capture");
+    let is_animated = content_type == "image/gif" && image_bytes.len() > 100_000;
 
     let request = AnalyzeImageRequest {
         guild_id: guild_id.to_string(),
@@ -192,6 +281,9 @@ async fn process_image_attachment(
         image_data: image_b64,
         content_type,
         filename: filename.to_string(),
+        confidence_override: Some(confidence_override),
+        is_screenshot,
+        is_animated,
     };
 
     match api_client.analyze_image(&request).await {
@@ -203,6 +295,14 @@ async fn process_image_attachment(
                 filename = %filename,
                 "Reponse analyse image"
             );
+
+            // Stocker dans le hash cache
+            {
+                let data = ctx.data.read().await;
+                if let Some(cache) = data.get::<HashCacheKey>() {
+                    cache.store(image_hash, response.action.as_str());
+                }
+            }
 
             if response.action != Action::None {
                 base.send_log("warn", guild_id, &format!(
@@ -229,15 +329,35 @@ async fn process_image_attachment(
             }
         }
         Err(e) => {
+            // Tenter la queue si activee
+            let queue_enabled = BaseApiClient::config_bool(&guild_config, "queue_enabled", false);
+            if queue_enabled {
+                let data = ctx.data.read().await;
+                if let Some(queue) = data.get::<QueueSenderKey>() {
+                    let queued = QueuedImage {
+                        request,
+                        channel_id: msg.channel_id.get(),
+                        message_id: msg.id.get(),
+                        guild_id: guild_id.to_string(),
+                        author_name: msg.author.name.clone(),
+                        author_face: msg.author.face(),
+                    };
+                    if queue.enqueue(queued).await {
+                        info!(message_id = %msg.id, "Image mise en queue pour retry");
+                        return;
+                    }
+                }
+            }
+
+            // Fallback : suppression preventive
             warn!(error = %e, "Backend injoignable — suppression preventive de l'image");
             base.send_log("error", guild_id, &format!(
                 "Backend injoignable pour analyse image : {}", e
             ));
-            // Fallback : en cas de doute sur une image et API down, on supprime
             let _ = msg.delete(&ctx.http).await;
-            let embed = moderate_embed("⚠\u{fe0f} Image supprimee preventivement")
+            let embed = moderate_embed("Image supprimee preventivement")
                 .description(format!("<@{}>", msg.author.id))
-                .field("📋 Raison", "API de verification indisponible — l'image a ete supprimee par precaution.", false)
+                .field("Raison", "API de verification indisponible — l'image a ete supprimee par precaution.", false)
                 .thumbnail(msg.author.face());
             let _ = msg
                 .channel_id

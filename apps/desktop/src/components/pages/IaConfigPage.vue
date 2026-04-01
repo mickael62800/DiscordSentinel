@@ -32,8 +32,13 @@ async function handleSave() {
 
 <template>
   <div class="ia-config-page">
-    <h1>Configuration IA</h1>
-    <p class="subtitle">Seuils de confiance pour l'inference IA par serveur</p>
+    <div class="page-header-row">
+      <div>
+        <h1>Configuration IA</h1>
+        <p class="subtitle">Seuils de confiance pour l'inference IA par serveur</p>
+      </div>
+      <router-link to="/ai-training" class="cross-link">&larr; Entrainement des modeles</router-link>
+    </div>
 
     <div v-if="!guildIdFilter" class="no-guild">
       Selectionnez un serveur pour configurer les seuils IA.
@@ -226,4 +231,9 @@ async function handleSave() {
 .save-btn:hover:not(:disabled) {
   opacity: 0.9;
 }
+
+/* Cross-link */
+.page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
+.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all 0.15s; }
+.cross-link:hover { background: var(--accent); color: white; }
 </style>

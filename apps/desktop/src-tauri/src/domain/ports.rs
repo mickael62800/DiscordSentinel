@@ -2,7 +2,7 @@ use std::future::Future;
 use std::pin::Pin;
 
 use super::entities::{
-    BotDefinition, BotGuildConfig, ConfirmedBan, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry,
+    BotDefinition, BotGuildConfig, ConfirmedBan, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry,
     ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats,
     AuditLog, AutoRoleConfig, DailyActivity, LevelConfig, LevelReward, RolePanel, RolePanelDetail,
     Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier,
@@ -13,6 +13,7 @@ type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
 
 pub trait GuildRepository: Send + Sync + 'static {
     fn get_guilds(&self) -> BoxFut<Vec<Guild>>;
+    fn get_guild_members(&self, guild_id: String) -> BoxFut<Vec<GuildMember>>;
 }
 
 pub trait BotConfigRepository: Send + Sync + 'static {

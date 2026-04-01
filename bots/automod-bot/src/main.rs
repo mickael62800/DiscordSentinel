@@ -1,4 +1,6 @@
+mod adaptive_slowmode;
 mod api_client;
+mod commands;
 mod config;
 mod detectors;
 mod handler;
@@ -14,7 +16,8 @@ use sentinel_shared::config::BotConfig;
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::config::Config;
-use crate::handler::{FloodTrackerKey, Handler, ProcessedMessagesKey};
+use crate::adaptive_slowmode::SlowmodeTracker;
+use crate::handler::{FloodTrackerKey, Handler, ProcessedMessagesKey, SlowmodeTrackerKey};
 
 #[tokio::main]
 async fn main() {
@@ -46,6 +49,7 @@ async fn main() {
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<ProcessedMessagesKey>(Arc::new(DashSet::new()));
         data.insert::<FloodTrackerKey>(Arc::new(DashMap::new()));
+        data.insert::<SlowmodeTrackerKey>(SlowmodeTracker::new(30));
     }
 
     // Heartbeat task

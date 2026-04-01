@@ -10,11 +10,15 @@ use serenity::builder::CreateMessage;
 
 use sentinel_shared::embeds::success_embed;
 
-use sentinel_shared::heartbeat::register_guilds;
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::api_client::ApiClient;
 use crate::commands;
+use crate::multipliers;
+use crate::streaks::StreakTracker;
 use crate::tracker::StatsTracker;
+use crate::xp_cooldown::XpCooldown;
 
 /// Cle TypeMap pour le client API specifique au progression-bot.
 pub struct StatsApiKey;
@@ -25,6 +29,16 @@ impl TypeMapKey for StatsApiKey {
 
 /// Cle pour acceder au StatsTracker dans le TypeMap.
 pub struct TrackerKey;
+
+pub struct XpCooldownKey;
+impl TypeMapKey for XpCooldownKey {
+    type Value = XpCooldown;
+}
+
+pub struct StreakTrackerKey;
+impl TypeMapKey for StreakTrackerKey {
+    type Value = StreakTracker;
+}
 
 impl TypeMapKey for TrackerKey {
     type Value = StatsTracker;
@@ -65,6 +79,13 @@ impl EventHandler for Handler {
 
         let data = ctx.data.read().await;
 
+        if let Some(api) = data.get::<ApiClientKey>() {
+            let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            if !BaseApiClient::config_bool(&config, "enabled", true) {
+                return;
+            }
+        }
+
         // Track localement (fallback pour les commandes)
         if let Some(tracker) = data.get::<TrackerKey>() {
             tracker.record_message(guild_id.get(), msg.author.id.get()).await;
@@ -84,13 +105,99 @@ impl EventHandler for Handler {
                 warn!(error = %e, "Impossible d'envoyer les stats messages au backend");
             }
 
-            // Ajouter de l'XP (15 XP par message par defaut, gere cote API)
+            // XP Cooldown check
+            let guild_config = if let Some(base) = data.get::<ApiClientKey>() {
+                base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+            } else {
+                std::collections::HashMap::new()
+            };
+
+            let cooldown_secs = BaseApiClient::config_u64(&guild_config, "xp_cooldown_secs", 60);
+            let can_gain = if let Some(cooldown) = data.get::<XpCooldownKey>() {
+                cooldown.can_gain_xp(guild_id.get(), msg.author.id.get(), cooldown_secs)
+            } else {
+                true
+            };
+
+            if !can_gain {
+                // Message tracke mais pas d'XP
+                return;
+            }
+
+            // Record XP gain
+            if let Some(cooldown) = data.get::<XpCooldownKey>() {
+                cooldown.record_xp(guild_id.get(), msg.author.id.get());
+            }
+
+            // Streak tracking
+            let streak_enabled = BaseApiClient::config_bool(&guild_config, "streak_enabled", true);
+            let streak_mult = if streak_enabled {
+                if let Some(streak_tracker) = data.get::<StreakTrackerKey>() {
+                    let now = time::OffsetDateTime::now_utc();
+                    let update = streak_tracker.record_activity(
+                        guild_id.get(),
+                        msg.author.id.get(),
+                        now.ordinal() as u32,
+                        now.year(),
+                    );
+
+                    // Persister le streak via l'API si c'est un nouveau jour
+                    if update.new_day {
+                        let (current, best) = streak_tracker.get_streak(guild_id.get(), msg.author.id.get());
+                        if let Some(api) = data.get::<StatsApiKey>() {
+                            api.update_streak(
+                                &guild_id.to_string(),
+                                &msg.author.id.to_string(),
+                                current,
+                                best,
+                                now.ordinal() as u32,
+                                now.year(),
+                            ).await;
+                        }
+                        // Event temps reel pour le desktop
+                        if let Some(base) = data.get::<ApiClientKey>() {
+                            base.publish_event("streak_updated", serde_json::json!({
+                                "guild_id": guild_id.to_string(),
+                                "user_id": msg.author.id.to_string(),
+                                "username": msg.author.name,
+                                "streak_current": current,
+                                "streak_best": best,
+                            }));
+                        }
+                    }
+
+                    update.xp_multiplier
+                } else {
+                    1.0
+                }
+            } else {
+                1.0
+            };
+
+            // Channel & role multipliers
+            let channel_mults = multipliers::parse_multipliers(
+                &BaseApiClient::config_or(&guild_config, "xp_channel_multipliers", ""),
+            );
+            let role_mults = multipliers::parse_multipliers(
+                &BaseApiClient::config_or(&guild_config, "xp_role_multipliers", ""),
+            );
+
+            let channel_mult = multipliers::get_channel_multiplier(&channel_mults, msg.channel_id.get());
+            let user_roles: Vec<u64> = msg.member.as_ref()
+                .map(|m| m.roles.iter().map(|r| r.get()).collect())
+                .unwrap_or_default();
+            let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
+
+            let base_xp = 15.0;
+            let final_xp = (base_xp * channel_mult * role_mult * streak_mult).round() as i64;
+
+            // Ajouter l'XP (avec multiplicateurs appliques)
             match api
                 .add_xp(
                     &guild_id.to_string(),
                     &msg.author.id.to_string(),
                     &msg.author.name,
-                    15,
+                    final_xp,
                 )
                 .await
             {
@@ -133,6 +240,13 @@ impl EventHandler for Handler {
 
         let user_id = new.user_id;
         let data = ctx.data.read().await;
+
+        if let Some(api) = data.get::<ApiClientKey>() {
+            let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            if !BaseApiClient::config_bool(&config, "enabled", true) {
+                return;
+            }
+        }
 
         let was_in_voice = old.as_ref().and_then(|s| s.channel_id).is_some();
         let is_in_voice = new.channel_id.is_some();

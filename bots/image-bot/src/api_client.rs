@@ -18,6 +18,15 @@ pub struct AnalyzeImageRequest {
     pub content_type: String,
     /// Nom du fichier original
     pub filename: String,
+    /// Seuil de confiance override pour ce salon (optionnel)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub confidence_override: Option<f64>,
+    /// True si l'image est un screenshot (pour OCR cote API)
+    #[serde(default)]
+    pub is_screenshot: bool,
+    /// True si l'image est un GIF anime
+    #[serde(default)]
+    pub is_animated: bool,
 }
 
 /// Reponse du backend apres analyse d'image.

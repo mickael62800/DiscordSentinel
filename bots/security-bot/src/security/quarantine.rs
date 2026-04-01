@@ -92,6 +92,11 @@ impl QuarantineManager {
             .collect()
     }
 
+    /// Retourne le nombre total d'utilisateurs en quarantaine.
+    pub fn quarantined_count(&self) -> usize {
+        self.quarantined.len()
+    }
+
     /// Supprime un utilisateur du tracking (après kick par ex).
     pub fn remove_tracking(&self, guild_id: GuildId, user_id: UserId) {
         self.quarantined.remove(&(guild_id, user_id));

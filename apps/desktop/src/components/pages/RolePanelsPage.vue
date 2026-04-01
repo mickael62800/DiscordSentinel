@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useRolePanels } from "../../composables/useRolePanels";
+import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
 
+const { selectedGuildId } = useGuildSelector();
 const { panels, autoRoles, selectedPanel, loading, selectPanel } = useRolePanels();
 
 function styleColor(style: string): string {
@@ -17,9 +19,16 @@ function styleColor(style: string): string {
 
 <template>
   <div class="role-panels">
-    <h1>Roles & Auto-Roles</h1>
+    <div class="page-header-row">
+      <h1>Roles & Auto-Roles</h1>
+      <router-link to="/discord-roles" class="cross-link">Voir tous les roles Discord &rarr;</router-link>
+    </div>
 
-    <div v-if="loading" class="loading">Chargement...</div>
+    <div v-if="!selectedGuildId && !loading" class="empty">
+      Selectionnez un serveur pour voir les panels de roles.
+    </div>
+
+    <div v-else-if="loading" class="loading">Chargement...</div>
 
     <template v-else>
       <!-- Auto-Roles -->
@@ -167,4 +176,10 @@ function styleColor(style: string): string {
 .entry-role { font-weight: 500; }
 
 .loading, .empty { color: var(--text-secondary); padding: 40px; text-align: center; }
+
+/* Cross-link */
+.page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+.page-header-row h1 { margin-bottom: 0; }
+.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all 0.15s; }
+.cross-link:hover { background: var(--accent); color: white; }
 </style>

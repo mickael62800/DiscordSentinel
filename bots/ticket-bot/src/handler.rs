@@ -1,4 +1,3 @@
-use futures_util::StreamExt;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
@@ -7,6 +6,7 @@ use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
+use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::neutral_embed;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
@@ -14,6 +14,15 @@ use crate::api_client::ApiClient;
 use crate::commands;
 use crate::commands::ticket;
 use crate::config::ConfigKey;
+use crate::faq;
+use crate::satisfaction;
+use crate::sla::SlaTracker;
+use crate::templates;
+
+pub struct SlaTrackerKey;
+impl TypeMapKey for SlaTrackerKey {
+    type Value = SlaTracker;
+}
 
 pub struct Handler;
 
@@ -51,12 +60,33 @@ impl EventHandler for Handler {
         // Lancer le listener Redis pour la communication bidirectionnelle
         let ctx_clone3 = ctx.clone();
         tokio::spawn(async move {
-            listen_redis_events(ctx_clone3).await;
+            sentinel_shared::redis_listener::listen_redis(move |payload| {
+                let ctx = ctx_clone3.clone();
+                async move {
+                    handle_redis_event(&ctx, &payload).await;
+                }
+            }).await;
         });
     }
 
     /// Gestion des slash commands ET des interactions composants (boutons, menus, modals).
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        let guild_id_str = match &interaction {
+            Interaction::Command(c) => c.guild_id.map(|g| g.to_string()),
+            Interaction::Component(c) => c.guild_id.map(|g| g.to_string()),
+            Interaction::Modal(m) => m.guild_id.map(|g| g.to_string()),
+            _ => None,
+        };
+        if let Some(guild_id) = guild_id_str {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                if !BaseApiClient::config_bool(&config, "enabled", true) {
+                    return;
+                }
+            }
+        }
+
         match interaction {
             Interaction::Command(command) => {
                 match command.data.name.as_str() {
@@ -66,7 +96,7 @@ impl EventHandler for Handler {
             }
             Interaction::Component(component) => {
                 match component.data.custom_id.as_str() {
-                    ticket::PANEL_BUTTON_ID => ticket::handle_panel_click(&ctx, &component).await,
+                    ticket::PANEL_BUTTON_ID => ticket::handle_panel_click_with_faq(&ctx, &component).await,
                     ticket::TYPE_SELECT_ID => ticket::handle_type_select(&ctx, &component).await,
                     ticket::CLOSE_BUTTON_ID => ticket::handle_close_button(&ctx, &component).await,
                     ticket::INVITE_BUTTON_ID => ticket::handle_invite_button(&ctx, &component).await,
@@ -76,6 +106,12 @@ impl EventHandler for Handler {
                     ticket::VOCAL_USER_DECLINE_ID => ticket::handle_vocal_user_decline(&ctx, &component).await,
                     ticket::CLOSE_CONFIRM_ID => ticket::handle_close_confirm(&ctx, &component).await,
                     ticket::CLOSE_CANCEL_ID => ticket::handle_close_cancel(&ctx, &component).await,
+                    templates::TEMPLATE_BUTTON_ID => ticket::handle_template_button(&ctx, &component).await,
+                    templates::TEMPLATE_SELECT_ID => ticket::handle_template_select(&ctx, &component).await,
+                    faq::FAQ_CONTINUE_ID => ticket::handle_faq_continue(&ctx, &component).await,
+                    id if id.starts_with(satisfaction::SATISFACTION_PREFIX) => {
+                        ticket::handle_satisfaction_click(&ctx, &component).await;
+                    }
                     _ => {}
                 }
             }
@@ -92,6 +128,16 @@ impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
         if msg.author.bot {
             return;
+        }
+
+        if let Some(guild_id) = msg.guild_id {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<ApiClientKey>() {
+                let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                if !BaseApiClient::config_bool(&config, "enabled", true) {
+                    return;
+                }
+            }
         }
 
         let channel_name = msg
@@ -148,6 +194,29 @@ impl EventHandler for Handler {
             .await
         {
             error!(error = %e, ticket_id = %ticket_id, "Erreur sync message vers backend");
+        }
+
+        // SLA tracking : enregistrer la premiere reponse staff
+        if author_role == "moderator" {
+            if let Some(sla) = data.get::<SlaTrackerKey>() {
+                if let Some(duration) = sla.record_staff_response(&ticket_id) {
+                    let formatted = crate::sla::format_sla_duration(duration);
+                    info!(ticket_id = %ticket_id, first_response = %formatted, "SLA premiere reponse enregistree");
+
+                    // Persister via l'API
+                    let now = chrono::Utc::now().to_rfc3339();
+                    api.update_ticket_sla(&ticket_id, Some(&now), None, None).await;
+
+                    // Event temps reel pour le desktop
+                    if let Some(base) = data.get::<ApiClientKey>() {
+                        base.publish_event("ticket_sla_updated", serde_json::json!({
+                            "ticket_id": ticket_id,
+                            "first_response_at": now,
+                            "first_response_duration": formatted,
+                        }));
+                    }
+                }
+            }
         }
 
     }
@@ -288,54 +357,6 @@ async fn close_inactive_tickets(ctx: &Context) {
         }
 
         info!(ticket_id = %ticket.id, inactive_days = %inactive_days, "Ticket inactif ferme automatiquement");
-    }
-}
-
-/// Ecoute les events Redis (sentinel:events) pour la communication bidirectionnelle.
-/// Quand un moderateur repond a un ticket depuis l'app desktop, le message est affiche dans Discord.
-async fn listen_redis_events(ctx: Context) {
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-    let channel_name = std::env::var("REDIS_CHANNEL").unwrap_or_else(|_| "sentinel:events".to_string());
-
-    loop {
-        match redis::Client::open(redis_url.as_str()) {
-            Ok(client) => {
-                match client.get_async_pubsub().await {
-                    Ok(mut pubsub) => {
-                        if let Err(e) = pubsub.subscribe(&channel_name).await {
-                            error!(error = %e, "Erreur abonnement Redis");
-                            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                            continue;
-                        }
-
-                        info!(channel = %channel_name, "Ecoute Redis pour communication bidirectionnelle");
-
-                        loop {
-                            let msg = pubsub.on_message().next().await;
-                            if let Some(msg) = msg {
-                                let payload: String = match msg.get_payload() {
-                                    Ok(p) => p,
-                                    Err(_) => continue,
-                                };
-
-                                handle_redis_event(&ctx, &payload).await;
-                            } else {
-                                warn!("Connexion Redis perdue, reconnexion...");
-                                break;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        error!(error = %e, "Erreur connexion async Redis");
-                    }
-                }
-            }
-            Err(e) => {
-                error!(error = %e, "Erreur creation client Redis");
-            }
-        }
-
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
     }
 }
 

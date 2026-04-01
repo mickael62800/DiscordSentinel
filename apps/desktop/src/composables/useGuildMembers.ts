@@ -1,4 +1,5 @@
 import { ref, watch } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import type { GuildMember } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
 
@@ -15,11 +16,10 @@ export function useGuildMembers() {
 
     loading.value = true;
     try {
-      const resp = await fetch(`http://localhost:3000/api/guilds/${selectedGuildId.value}/members`);
-      if (resp.ok) {
-        members.value = await resp.json();
-        loaded.value = true;
-      }
+      members.value = await invoke<GuildMember[]>("get_guild_members", {
+        guildId: selectedGuildId.value,
+      });
+      loaded.value = true;
     } catch (e) {
       console.error("Erreur chargement membres:", e);
     } finally {

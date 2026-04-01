@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useVoiceChannels, useVoiceChannelDetail } from "../../composables/useVoiceChannels";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
@@ -8,7 +9,8 @@ import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 
-const { filteredChannels, loading, filterKind, publicCount, privateCount, totalCount } = useVoiceChannels();
+const { filteredChannels, loading, filterKind, publicCount, privateCount, totalCount, fetchChannels } = useVoiceChannels();
+useRealtimeRefresh(["voice_channel_created", "voice_channel_closed"], fetchChannels);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
 const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
 

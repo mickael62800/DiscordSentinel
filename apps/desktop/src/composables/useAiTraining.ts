@@ -99,7 +99,7 @@ async function fetchDatasets() {
 async function uploadDataset(modelType: ModelType, filePath: string) {
   error.value = null;
   try {
-    await invoke("ai_upload_dataset", { modelType, filePath });
+    await invoke("ai_upload_dataset", { model_type: modelType, file_path: filePath });
     await fetchDatasets();
   } catch (e) {
     error.value = String(e);
@@ -130,11 +130,11 @@ async function startTraining(config: TrainingConfig) {
   };
   try {
     await invoke("ai_start_training", {
-      modelType: config.model_type,
+      model_type: config.model_type,
       epochs: config.epochs,
-      batchSize: config.batch_size,
-      learningRate: config.learning_rate,
-      validationSplit: config.validation_split,
+      batch_size: config.batch_size,
+      learning_rate: config.learning_rate,
+      validation_split: config.validation_split,
     });
     startPolling();
   } catch (e) {
@@ -205,7 +205,7 @@ async function exportOnnx(modelType: ModelType) {
   error.value = null;
   exportResult.value = null;
   try {
-    exportResult.value = await invoke<OnnxExportResult>("ai_export_onnx", { modelType });
+    exportResult.value = await invoke<OnnxExportResult>("ai_export_onnx", { model_type: modelType });
   } catch (e) {
     error.value = String(e);
   } finally {

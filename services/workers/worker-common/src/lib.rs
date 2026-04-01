@@ -116,6 +116,24 @@ pub async fn shutdown_signal() {
     }
 }
 
+// ── Worker Enabled Check ──
+
+/// Vérifie si un worker est activé pour une guild donnée.
+/// Retourne `true` par défaut si la clé n'est pas définie (comportement inclusif).
+pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str) -> bool {
+    let result: Option<String> = sqlx::query_scalar(
+        "SELECT config_value FROM bot_guild_config \
+         WHERE guild_id = $1 AND bot_name = $2 AND config_key = 'enabled'",
+    )
+    .bind(guild_id)
+    .bind(worker_name)
+    .fetch_optional(pool)
+    .await
+    .unwrap_or(None);
+
+    result.map(|v| v != "false").unwrap_or(true)
+}
+
 // ── Periodic Scheduler ──
 
 /// Lance une tache periodique avec gestion du shutdown et reporting d'erreurs.

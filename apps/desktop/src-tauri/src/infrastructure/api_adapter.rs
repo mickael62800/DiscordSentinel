@@ -3,7 +3,7 @@ use std::pin::Pin;
 
 use reqwest::{Client, RequestBuilder, Response};
 
-use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, DiscordRole, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, DiscordRole, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
 use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
 
 pub struct ApiAdapter {
@@ -83,6 +83,10 @@ async fn check_response(resp: Response) -> Result<Response, String> {
 impl GuildRepository for ApiAdapter {
     fn get_guilds(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Guild>, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/guilds", self.base_url)))
+    }
+
+    fn get_guild_members(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<GuildMember>, String>> + Send>> {
+        self.get_json(self.client.get(format!("{}/api/guilds/{}/members", self.base_url, guild_id)))
     }
 }
 

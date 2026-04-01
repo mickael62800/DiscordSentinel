@@ -1,8 +1,12 @@
 mod api_client;
+mod badges;
 mod commands;
 mod config;
 mod handler;
+mod multipliers;
+mod streaks;
 mod tracker;
+mod xp_cooldown;
 
 use std::sync::Arc;
 
@@ -15,8 +19,10 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
 use crate::config::Config;
-use crate::handler::{Handler, StatsApiKey, TrackerKey};
+use crate::handler::{Handler, StatsApiKey, TrackerKey, XpCooldownKey, StreakTrackerKey};
+use crate::streaks::StreakTracker;
 use crate::tracker::StatsTracker;
+use crate::xp_cooldown::XpCooldown;
 
 #[tokio::main]
 async fn main() {
@@ -47,9 +53,10 @@ async fn main() {
         data.insert::<ApiClientKey>(Arc::clone(&base));
         data.insert::<StatsApiKey>(ApiClient::new(Arc::clone(&base)));
         data.insert::<TrackerKey>(StatsTracker::new());
+        data.insert::<XpCooldownKey>(XpCooldown::new());
+        data.insert::<StreakTrackerKey>(StreakTracker::new());
     }
 
-    // Heartbeat toutes les 30 secondes via le shared helper
     spawn_heartbeat(Arc::clone(&base));
 
     if let Err(e) = client.start().await {

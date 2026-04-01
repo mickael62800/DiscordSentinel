@@ -2,6 +2,8 @@ use sqlx::PgPool;
 use tracing::{debug, info};
 use uuid::Uuid;
 
+use sentinel_worker_common::is_worker_enabled;
+
 #[derive(sqlx::FromRow)]
 struct ZeroPointsUser {
     guild_id: String,
@@ -36,6 +38,10 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     let mut count = 0u64;
 
     for user in &users {
+        if !is_worker_enabled(pool, &user.guild_id, "moderation-worker").await {
+            continue;
+        }
+
         sqlx::query(
             "INSERT INTO infractions (id, guild_id, channel_id, user_id, username, message_id, content, flags, score, action, reason, duration, created_at) \
              VALUES ($1, $2, '', $3, $4, '', '', '{}'::jsonb, 0, 'ban', $5, NULL, NOW())",

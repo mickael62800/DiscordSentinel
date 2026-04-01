@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { useLevels } from "../../composables/useLevels";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import type { UserLevel } from "../../types";
 
-const { config, leaderboard, rewards, loading } = useLevels();
+const { config, leaderboard, rewards, loading, fetchAll } = useLevels();
+useRealtimeRefresh(["level_up", "xp_update"], fetchAll);
 
 function progressPercent(user: UserLevel): number {
   if (user.xp_needed <= 0) return 0;

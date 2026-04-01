@@ -9,6 +9,14 @@ pub struct Guild {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GuildMember {
+    pub id: String,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BotDefinition {
     pub bot_name: String,
     pub display_name: String,

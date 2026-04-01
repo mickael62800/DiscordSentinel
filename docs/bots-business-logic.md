@@ -43,16 +43,32 @@ Message recu
   |   - Message >= 8 caracteres, 100% majuscules
   |   - Avertissement local uniquement
   |
-6. Analyse locale du contenu (4 detecteurs)
-  |   +-- spam : repetition de caracteres (>=6) ou de mots (>=5 fois le meme)
-  |   +-- insult : dictionnaire regex FR/EN (~50 patterns)
-  |   +-- link : URLs http/https, discord.gg, discord.com/invite
-  |   +-- phishing : typosquatting Discord/Steam/crypto, IP grabbers, scam patterns
+6. Detection fichiers suspects (si active)
+  |   - Extensions dangereuses : exe, bat, cmd, scr, ps1, vbs, js, jar, com, pif, msi, dll, reg, hta
+  |   - Extensions custom configurables par guild
+  |   - Si detecte : suppression immediate + embed + log (pas d'appel /analyze)
   |
-7. Si flags detectes → POST /analyze (scoring backend + inference IA)
+7. Analyse locale du contenu (7 detecteurs)
+  |   +-- spam : repetition de caracteres (>=6) ou de mots (>=5 fois le meme)
+  |   +-- emoji spam : emojis Unicode + custom Discord excessifs (seuil configurable, defaut 10)
+  |   +-- mentions : <@id>, @everyone, @here excessifs (seuil configurable, defaut 5)
+  |   +-- insult : dictionnaire regex FR/EN (~50 patterns) + normalisation leet speak (0→o, 1→l, 3→e, 4→a, 5→s, 7→t, @→a, $→s, *→supprime) + patterns asterisque (f*ck, sh*t, b*tch) + mots personnalises
+  |   +-- link : URLs http/https, discord.gg, discord.com/invite (invites configurables)
+  |   +-- phishing : typosquatting Discord/Steam/crypto, IP grabbers, scam patterns, whitelist extra
+  |   +-- unicode : zalgo text (combining chars excessifs), caracteres invisibles (zero-width), homoglyphes (melange latin/cyrillique)
+  |
+8. Mode nuit (si active)
+  |   - Si l'heure UTC est dans la plage configuree (defaut 22h-8h)
+  |   - Divise les seuils par 2 (char_threshold, word_threshold, caps, emoji_max, mentions_max)
+  |
+9. Slowmode adaptatif (si active)
+  |   - Track le volume de messages par channel (fenetre 30s)
+  |   - Si >= threshold (defaut 15) : activer slowmode auto (defaut 5s)
+  |
+10. Si flags detectes → POST /analyze (scoring backend + inference IA)
   |   - Backend retourne : action (none/warn/delete/mute/ban) + raison + score
   |
-8. Execution de l'action
+9. Execution de l'action
       +-- warn : reponse dans le canal avec la raison
       +-- delete : avertissement puis suppression du message
       +-- mute : avertissement, suppression, timeout Discord (disable_communication_until)
@@ -75,6 +91,21 @@ Message recu
 | `ignored_channels` | [] | Canaux exclus de la moderation |
 | `ignored_roles` | [] | Roles exclus de la moderation |
 | `log_channel_id` | null | Canal pour les logs rich embed |
+| `emoji_spam_enabled` | true | Detection spam d'emojis |
+| `emoji_spam_max` | 10 | Nombre max d'emojis par message |
+| `mentions_enabled` | true | Detection mentions excessives |
+| `mentions_max` | 5 | Nombre max de mentions par message |
+| `suspicious_files_enabled` | true | Detection fichiers suspects |
+| `suspicious_file_extensions` | "" | Extensions suspectes supplementaires (CSV) |
+| `unicode_detection_enabled` | true | Detection abus Unicode (zalgo, invisibles, homoglyphes) |
+| `unicode_max_combining` | 3 | Max combining characters par lettre (zalgo) |
+| `unicode_max_invisible` | 5 | Max caracteres invisibles par message |
+| `night_mode_enabled` | false | Mode nuit (seuils plus stricts) |
+| `night_start_hour` | 22 | Heure debut mode nuit (UTC, 0-23) |
+| `night_end_hour` | 8 | Heure fin mode nuit (UTC, 0-23) |
+| `adaptive_slowmode_enabled` | false | Slowmode adaptatif automatique |
+| `adaptive_slowmode_threshold` | 15 | Seuil messages par 30s pour activation |
+| `adaptive_slowmode_seconds` | 5 | Secondes de slowmode quand active |
 
 ---
 
@@ -127,9 +158,94 @@ Gravites :
 2. Affiche : total warns/mutes/bans + 10 dernières actions
 3. Reponse ephemere (visible seulement par le moderateur)
 
+#### `/note <user> <content> [category]`
+
+1. POST `/api/notes` avec guild_id, user_id, author_id, content, category
+2. Categories : general, warning, positive, context
+3. Reponse ephemere confirmant l'ajout
+
+#### `/call <user> [reason]`
+
+1. Cree un salon textuel prive `call-{username}`
+2. Permissions : @everyone deny, target allow, moderateur allow, bot allow
+3. Topic : `[call:{moderator}:{target}] {reason}`
+4. Message d'accueil avec embed + bouton "Terminer la convocation"
+5. Clic sur le bouton → suppression du salon apres 3s
+6. Log au backend : type `call`
+
+#### `/context <message_id> [count:5]`
+
+1. Recupere N messages avant et apres via l'API Discord
+2. Affiche dans un embed ephemere avec le message cible surligne
+3. Format : `[HH:MM] @author: content`
+
+#### `/appeal`
+
+1. Cree un ticket via POST `/api/tickets` de type `appel_sanction`
+2. Reponse ephemere confirmant la creation
+3. Aussi disponible en bouton "Contester" dans les DMs de sanction
+
+#### `/export <user> [format:json]`
+
+1. GET `/api/moderation/history/{guild_id}/{user_id}`
+2. Genere le fichier CSV ou JSON
+3. Envoie en piece jointe ephemere
+
+#### `/massmute <users> <reason> [duration]`
+
+1. Parse les IDs (espaces, virgules, mentions `<@id>`)
+2. Mute chaque utilisateur individuellement
+3. Log chaque action au backend
+4. Embed recapitulatif : success/echecs
+
+#### `/massban <users> <reason>`
+
+1. Parse les IDs
+2. Ban chaque utilisateur avec raison
+3. Log chaque action au backend
+4. Embed recapitulatif
+
+### Mode apprenti moderateur
+
+Config : `apprentice_role_id` — si le moderateur a ce role, ses actions sont mises en attente.
+
+- L'action est stockee en memoire (DashMap) avec un ID unique
+- Un embed "Action proposee" est envoye dans le salon de logs avec boutons Approuver/Rejeter
+- Un moderateur senior clique Approuver → l'action est executee
+- Un moderateur senior clique Rejeter → l'action est annulee
+
+### Templates de raisons (autocomplete)
+
+Config : `reason_templates` (format `label|raison` par ligne).
+
+- Autocomplete Discord sur le champ `reason` des commandes warn, mute, ban
+- Filtrage par label ou contenu de la raison
+- Max 25 suggestions Discord
+
+### Appel de sanction
+
+Config : `appeal_enabled` (defaut true).
+
+- Bouton "Contester cette sanction" dans les DMs de warn/mute/ban
+- Clic sur le bouton → creation automatique d'un ticket `appel_sanction`
+- Commande `/appeal` comme fallback si DMs fermes
+
 ### Fallback si API indisponible
 
 L'action Discord est toujours executee. Seul le log backend est ignore.
+
+### Configuration
+
+| Parametre | Defaut | Description |
+|-----------|--------|-------------|
+| `log_channel_id` | - | Salon pour les logs de moderation |
+| `default_mute_duration_secs` | 600 | Duree mute par defaut (secondes) |
+| `max_mute_duration_secs` | 2419200 | Duree mute max (28 jours) |
+| `ban_delete_message_days` | 1 | Jours de messages supprimes au ban |
+| `apprentice_role_id` | - | Role moderateur apprenti |
+| `reason_templates` | "" | Templates raisons (label\|raison par ligne) |
+| `appeal_enabled` | true | Bouton appel de sanction dans les DMs |
+| `call_category_id` | - | Categorie Discord pour les convocations |
 
 ---
 
@@ -149,16 +265,23 @@ L'action Discord est toujours executee. Seul le log backend est ignore.
 Nouveau membre rejoint
   |
   v
-RaidDetector : compteur de joins par guild dans une fenetre glissante
+1. RaidDetector : compteur de joins par guild dans une fenetre glissante
   |
-  Si joins >= RAID_JOIN_THRESHOLD dans RAID_JOIN_WINDOW_SECS :
+2. RaidAnalyzer : analyse pattern des joins recents
+  |   +-- Noms similaires (distance Levenshtein <= 2)
+  |   +-- Ratio avatars par defaut (> 50%)
+  |   +-- Dates de creation clusterisees (ecart < 1h)
+  |   → Score composite 0-100 (+40 noms, +30 avatars, +30 creation)
+  |
+  Si joins >= threshold OU score >= raid_pattern_score_threshold :
   |
   +-- POST /api/security/events (event_type: "raid_detected")
   +-- Passer la verification du serveur au niveau "Highest"
   +-- Activer le slowmode sur tous les canaux texte (si configure)
+  +-- Activer le lockdown : deny SEND_MESSAGES @everyone (si configure)
   +-- Quarantaine + captcha sur les nouveaux arrivants (si active)
-  +-- Annonce dans le premier canal texte
-  +-- Reset du detecteur
+  +-- Annonce dans le premier canal texte (actions listees)
+  +-- Reset des detecteurs
 ```
 
 ### Verification age de compte
@@ -175,10 +298,32 @@ AccountChecker : compare user.created_at vs maintenant
   +-- Quarantaine + captcha (si active)
 ```
 
+### Detection alt accounts
+
+```
+Nouveau membre rejoint (apres check compte suspect)
+  |
+  v
+AltDetector : compare contre les bans recents du guild
+  |
+  +-- Distance Levenshtein du pseudo (seuil configurable, defaut 2)
+  +-- Proximite date de creation du compte (seuil 1h)
+  |
+  Si match :
+  |
+  +-- POST /api/security/events (event_type: "alt_account_suspected")
+  +-- Quarantaine + captcha (si active)
+  +-- NE PAS auto-ban (flag seulement)
+```
+
+Les bans sont enregistres via `guild_ban_addition` → `AltDetector.record_ban()` avec une retention configurable (defaut 7 jours).
+
 ### Systeme de quarantaine
 
 - Assigne un role restrictif au membre suspect
-- L'utilisateur recoit un DM avec un bouton "Je suis humain"
+- L'utilisateur recoit un captcha en DM (type configurable)
+- **Captcha bouton** : bouton "Je suis humain" (defaut)
+- **Captcha math** : question mathematique avec 4 choix (ex: "Combien font 7 + 3 ?"), reponse correcte stockee server-side dans DashMap
 - Tache de fond (toutes les 30s) : kick les utilisateurs qui n'ont pas repondu au captcha apres `CAPTCHA_TIMEOUT_SECS` (defaut: 5 min)
 
 ### Slowmode automatique
@@ -186,6 +331,13 @@ AccountChecker : compare user.created_at vs maintenant
 - Active le slowmode sur tous les canaux texte pendant un raid
 - Sauvegarde les valeurs precedentes pour les restaurer
 - Tache de fond (toutes les 15s) : restaure le slowmode apres expiration (`SLOWMODE_DURATION_SECS`)
+
+### Lockdown automatique
+
+- Desactive `SEND_MESSAGES` pour @everyone sur tous les salons texte pendant un raid
+- Sauvegarde les permission overwrites precedentes pour les restaurer
+- Tache de fond (toutes les 15s) : restaure les permissions apres expiration (`LOCKDOWN_DURATION_SECS`)
+- Meme pattern que SlowmodeManager (DashMap, save/restore)
 
 ### Configuration
 
@@ -197,9 +349,17 @@ AccountChecker : compare user.created_at vs maintenant
 | `QUARANTINE_ROLE_ID` | - | ID du role de quarantaine |
 | `QUARANTINE_ENABLED` | false | Active la quarantaine |
 | `CAPTCHA_ENABLED` | false | Active le captcha DM |
+| `CAPTCHA_TYPE` | button | Type de captcha (button, math) |
 | `CAPTCHA_TIMEOUT_SECS` | 300 | Timeout captcha avant kick |
 | `SLOWMODE_SECONDS` | 10 | Valeur du slowmode pendant un raid |
 | `SLOWMODE_DURATION_SECS` | 300 | Duree du slowmode automatique |
+| `LOCKDOWN_ENABLED` | false | Active le lockdown auto |
+| `LOCKDOWN_DURATION_SECS` | 300 | Duree max du lockdown |
+| `ALT_DETECTION_ENABLED` | false | Detection de comptes alt |
+| `ALT_RETENTION_SECS` | 604800 | Retention bans pour detection alt (7 jours) |
+| `ALT_NAME_DISTANCE` | 2 | Seuil distance Levenshtein pour noms alt |
+| `RAID_PATTERN_ENABLED` | true | Detection patterns de raid avancee |
+| `RAID_PATTERN_SCORE_THRESHOLD` | 60 | Score seuil pattern raid (0-100) |
 
 ---
 
@@ -252,12 +412,66 @@ Voice state update
 
 | Action | XP |
 |--------|-----|
-| Message envoye | 15 XP |
+| Message envoye | 15 XP (base, avant multiplicateurs) |
 | Minute en vocal | 5 XP |
+
+### XP Cooldown
+
+Anti-farm : un seul gain XP par message toutes les N secondes (defaut 60s, configurable). Le message est toujours tracke dans les stats, mais l'XP n'est pas ajoute si le cooldown n'est pas expire.
+
+### Streaks
+
+Bonus XP pour les jours consecutifs d'activite. Le streak est mis a jour a chaque message (1 fois par jour).
+
+| Streak | Bonus |
+|--------|-------|
+| 0-6 jours | x1.0 |
+| 7-13 jours | x1.1 |
+| 14-20 jours | x1.2 |
+| 21-27 jours | x1.3 |
+| 28-34 jours | x1.4 |
+| 35+ jours | x1.5 (max) |
+
+### Multiplicateurs XP
+
+Configurables par salon et par role :
+- `xp_channel_multipliers` : format `channel_id:multiplier` par ligne
+- `xp_role_multipliers` : format `role_id:multiplier` par ligne
+- Le multiplicateur final = `base_xp * channel_mult * role_mult * streak_bonus`
+
+### Badges
+
+8 badges debloquables, evalues a la volee en fonction des stats :
+
+| Badge | Emoji | Condition |
+|-------|-------|-----------|
+| Bavard | 💬 | 100+ messages |
+| Orateur | 🗣️ | 1000+ messages |
+| Vocal | 🎤 | 10h+ en vocal |
+| DJ | 🎧 | 100h+ en vocal |
+| Etoile montante | ⭐ | Niveau 5+ |
+| Legende | 🏆 | Niveau 20+ |
+| En feu | 🔥 | Streak 7+ jours |
+| Diamant | 💎 | Streak 30+ jours |
+
+Affiches dans `/level user`.
 
 ### Fallback
 
 Cache local `StatsTracker` utilise si l'API est indisponible.
+
+### Configuration
+
+| Parametre | Defaut | Description |
+|-----------|--------|-------------|
+| `tracking_enabled` | true | Suivi actif |
+| `leaderboard_default_size` | 10 | Taille classement par defaut |
+| `xp_cooldown_secs` | 60 | Cooldown XP par message (0 = desactive) |
+| `xp_channel_multipliers` | "" | Multiplicateurs par salon (channel_id:mult par ligne) |
+| `xp_role_multipliers` | "" | Multiplicateurs par role (role_id:mult par ligne) |
+| `streak_enabled` | true | Systeme de streaks |
+| `badges_enabled` | true | Systeme de badges |
+| `weekly_recap_enabled` | false | Recap hebdomadaire en DM |
 
 ---
 
@@ -320,11 +534,80 @@ Cache local `StatsTracker` utilise si l'API est indisponible.
 
 ### Auto-fermeture
 
-Tache de fond (toutes les 30 min) : ferme les tickets inactifs depuis 7 jours.
+Tache de fond (toutes les 30 min) : ferme les tickets inactifs depuis 7 jours (configurable, 0 = desactive).
 
 ### Synchronisation temps reel
 
 Redis pub/sub (`sentinel:events`) : les reponses des moderateurs depuis l'app desktop sont relayees dans le canal Discord.
+
+### SLA Tracking
+
+Mesure en temps reel du temps de premiere reponse staff et du temps de resolution par ticket.
+
+- `SlaTracker` (DashMap) enregistre la creation et la premiere reponse staff
+- `breached_tickets(max_minutes)` retourne les tickets sans reponse depassant le SLA
+- Les stats SLA sont incluses dans le transcript a la fermeture
+- Config : `sla_first_response_minutes` (defaut 30, 0 = desactive)
+
+### Escalade automatique
+
+Tache de fond (toutes les 5 min) : si un ticket ouvert n'a pas de reponse staff dans le delai configure, sa priorite est augmentee a "high" et un message d'alerte est envoye dans le salon.
+
+- Utilise `SlaTracker.breached_tickets()` + `mark_escalated()` pour eviter les escalades repetees
+- Config : `sla_escalation_minutes` (defaut 60, 0 = desactive)
+
+### Satisfaction survey
+
+Sondage 1-5 etoiles envoye en DM a l'auteur du ticket apres fermeture.
+
+- 5 boutons (1 a 5 etoiles) avec custom_id encodant le rating
+- La note est loguee au backend via `send_log()`
+- Config : `satisfaction_enabled` (defaut true)
+
+### Templates de reponses rapides
+
+Reponses predefinies que le staff peut envoyer en un clic via un bouton "Reponses rapides" dans le salon ticket.
+
+- Format config : `label|contenu` par ligne (cle `response_templates`)
+- Menu select Discord avec description (max 25 templates)
+- Le contenu est envoye directement dans le salon
+
+### FAQ avant creation
+
+Avant de creer un ticket, les FAQ configurees sont affichees pour resoudre le probleme sans ticket.
+
+- Format config : `question|reponse` par ligne (cle `faq_entries`)
+- Embed avec les questions/reponses (max 10)
+- Bouton "Ma question n'est pas dans la FAQ — Creer un ticket" pour continuer
+- Si pas de FAQ configuree, le selecteur de type est affiche directement
+
+### Transcript Markdown/HTML
+
+Generation de fichiers transcript formates a la fermeture du ticket.
+
+- **Markdown** : tableau recapitulatif + messages avec role badges `[Staff]`/`[User]`
+- **HTML** : template CSS inline avec theme sombre, roles colores, XSS-safe
+- Les deux formats incluent les stats SLA si disponibles
+- Config : `transcript_format` ("text" defaut, "markdown", "html")
+
+### Configuration
+
+| Parametre | Defaut | Description |
+|-----------|--------|-------------|
+| `assistance_channel_id` | requis | Salon d'assistance (panel) |
+| `ticket_category_id` | - | Categorie Discord pour les tickets |
+| `admin_role_id` | requis | Role Administrateur |
+| `moderator_role_id` | requis | Role Moderateur |
+| `max_open_per_user` | 0 | Limite tickets ouverts par utilisateur (0 = illimite) |
+| `inactive_close_days` | 7 | Jours d'inactivite avant fermeture auto (0 = desactive) |
+| `close_delay_secs` | 5 | Delai avant suppression du salon |
+| `transcript_dm_enabled` | true | Envoyer le transcript en DM |
+| `transcript_format` | text | Format transcript (text, markdown, html) |
+| `sla_first_response_minutes` | 30 | SLA premiere reponse (0 = desactive) |
+| `sla_escalation_minutes` | 60 | Delai escalade auto (0 = desactive) |
+| `satisfaction_enabled` | true | Sondage satisfaction apres fermeture |
+| `response_templates` | "" | Templates reponses (format: label\|contenu, un par ligne) |
+| `faq_entries` | "" | FAQ (format: question\|reponse, une par ligne) |
 
 ---
 
@@ -651,15 +934,57 @@ POST /api/audit-logs
 
 | Type | Details enregistres |
 |------|-------------------|
-| `message_delete` | content (si disponible), author_id |
+| `message_delete` | content, author_id, author_name (enrichi via cache messages) |
 | `message_update` | old_content, new_content |
-| `member_join` | account_age_days |
-| `member_leave` | joined_at, roles |
-| `member_ban` | reason |
+| `message_delete_bulk` | count, message_ids |
+| `member_join` | account_created_at |
+| `member_leave` | - |
+| `member_ban` | - |
+| `member_nickname_update` | old_nickname, new_nickname (+ POST /api/name-history) |
 | `member_roles_update` | old_roles, new_roles |
-| `voice_join/leave/move` | channel_name, from_channel, to_channel |
-| `role_create/update` | name, color, permissions |
-| `channel_create/delete` | name, type |
+| `member_timeout` | timeout_until |
+| `voice_join/leave/move` | from_channel, to_channel |
+| `role_create` | colour, permissions, position, mentionable, hoist |
+| `role_update` | changes, old_permissions, new_permissions, permission_diff (lisible: + MANAGE_MESSAGES, - BAN_MEMBERS) |
+| `channel_create/delete` | kind |
+| `anomaly_detected` | anomaly_type (mass_ban/mass_delete/mass_role_change), count, window_secs |
+
+### Cache messages
+
+Cache LRU en memoire (`DashMap<(GuildId, MessageId), CachedMessage>`, max 10K par guild) pour retrouver le contenu des messages supprimes. Le handler `message()` intercepte tous les messages et les cache. Lors d'un `message_delete`, le cache est consulte et le contenu original est inclus dans l'audit event.
+
+### Detection d'anomalies
+
+Compteurs a fenetre glissante par (guild_id, event_category). Si le nombre d'evenements dans la fenetre depasse le seuil configure, une alerte est generee.
+
+| Categorie | Seuil defaut | Source |
+|-----------|-------------|--------|
+| `ban` | 5 en 60s | guild_ban_addition |
+| `kick` | 5 en 60s | guild_member_removal |
+| `delete` | 20 en 60s | message_delete, message_delete_bulk |
+| `role_change` | 10 en 60s | guild_role_update |
+
+Quand une anomalie est detectee : envoi d'un `AuditEvent` type `"anomaly_detected"` + log level error + reset du compteur pour eviter les alertes en boucle.
+
+### Rapport hebdomadaire
+
+Background task qui, chaque lundi a 8h UTC, genere un embed recapitulatif pour chaque guild avec `log_channel_id` configure.
+
+Stats trackees : member joins/leaves, bans, messages supprimes/edites, changements de roles, changements de channels, evenements vocaux, anomalies detectees.
+
+Les compteurs sont accumules via `WeeklyTracker` (DashMap) et drain chaque semaine.
+
+### Configuration
+
+| Parametre | Defaut | Description |
+|-----------|--------|-------------|
+| `log_channel_id` | - | Salon pour les rapports hebdo |
+| `message_cache_size` | 10000 | Taille max du cache messages par guild |
+| `anomaly_enabled` | true | Detection d'anomalies |
+| `anomaly_mass_ban_threshold` | 5 | Seuil mass ban (en 60s) |
+| `anomaly_mass_delete_threshold` | 20 | Seuil mass delete (en 60s) |
+| `anomaly_mass_role_threshold` | 10 | Seuil mass role change (en 60s) |
+| `weekly_report_enabled` | true | Rapport hebdomadaire automatique |
 
 ---
 

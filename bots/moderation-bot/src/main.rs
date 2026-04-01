@@ -2,9 +2,11 @@ mod api_client;
 mod commands;
 mod config;
 mod handler;
+mod reason_templates;
 
 use std::sync::Arc;
 
+use dashmap::DashMap;
 use serenity::prelude::*;
 use tracing::info;
 
@@ -14,7 +16,7 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
 use crate::config::Config;
-use crate::handler::{Handler, ModerationApiKey};
+use crate::handler::{Handler, ModerationApiKey, PendingActionsKey};
 
 #[tokio::main]
 async fn main() {
@@ -42,6 +44,7 @@ async fn main() {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<ModerationApiKey>(mod_api);
+        data.insert::<PendingActionsKey>(DashMap::new());
     }
 
     // Heartbeat via shared

@@ -59,21 +59,21 @@ Discord Messages / Events / Images
 
 | Composant            | Technologie                              | Details                                                    |
 | -------------------- | ---------------------------------------- | ---------------------------------------------------------- |
-| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 84+ endpoints, 25 handlers, 17 use cases, helpers.rs, 42 migrations |
+| API Backend          | Rust, Axum 0.8, Tokio                    | Architecture hexagonale, 84+ endpoints, 25 handlers, 17 use cases, helpers.rs, 52 migrations |
 | Gateway WebSocket    | Rust, Axum 0.8, Redis pub/sub            | Service dedie temps reel, auto-reconnect                   |
 | Workers (3 + common) | Rust, Tokio, Redis, sqlx                 | 3 workers specialises + crate partagee sentinel-worker-common |
 | Base de donnees      | PostgreSQL 16                            | 37 migrations, 22+ tables                                  |
 | Cache                | Redis 7                                  | Cache regles TTL 5min, stats TTL 60s, pub/sub events       |
 | Inference IA         | ONNX Runtime 2.0, ndarray, tokenizers    | Vision (NSFW/illicite) + Text (sentiments)                 |
-| Automod Bot          | Rust, Serenity 0.12                      | Detection spam/insultes/liens/phishing + appel API         |
-| Moderation Bot       | Rust, Serenity 0.12                      | /warn /mute /ban /unmute /unban /history                   |
-| Security Bot         | Rust, Serenity 0.12, DashMap             | Anti-raid, quarantaine, captcha DM, slowmode auto          |
-| Progression Bot        | Rust, Serenity 0.12                      | /stats user, server, top + tracking temps reel + XP/levels |
-| Ticket Bot           | Rust, Serenity 0.12                      | /ticket create, close, assign                              |
-| Image Bot            | Rust, Serenity 0.12                      | Detection images NSFW/illicites via API                    |
+| Automod Bot          | Rust, Serenity 0.12, DashMap             | Detection spam/insultes/liens/phishing/emoji/mentions/fichiers/unicode + leet speak + mode nuit + slowmode adaptatif |
+| Moderation Bot       | Rust, Serenity 0.12, DashMap             | /warn /mute /ban /history /note /call /context /appeal /export /massmute /massban + mode apprenti + autocomplete templates |
+| Security Bot         | Rust, Serenity 0.12, DashMap             | Anti-raid, quarantaine, captcha (bouton/math), slowmode auto, lockdown, alt detection |
+| Progression Bot        | Rust, Serenity 0.12, DashMap             | /stats /level + XP cooldown + streaks + multiplicateurs + badges + tracking |
+| Ticket Bot           | Rust, Serenity 0.12, DashMap             | /ticket create, close, assign + SLA tracking, satisfaction survey, templates, FAQ, escalade auto, transcript MD/HTML |
+| Image Bot            | Rust, Serenity 0.12, DashMap             | Detection images NSFW/illicites via API + hash cache + seuils salon + queue retry |
 | Voice Bot            | Rust, Serenity 0.12                      | Salons dynamiques, vote kick, co-admins, whitelist/ban, invite links, AFK auto-move, themes, stage mode |
-| Audit Bot            | Rust, Serenity 0.12                      | Tracking audit logs Discord                                |
-| Community Bot          | Rust, Serenity 0.12                      | Role panels + auto-roles + sync Discord roles              |
+| Audit Bot            | Rust, Serenity 0.12, DashMap             | Tracking audit logs, cache messages, anomaly detection, permission diffs, rapport hebdo |
+| Community Bot          | Rust, Serenity 0.12, DashMap             | Role panels + auto-roles + exclusifs + prerequis + temp roles + parrainage + sync Discord |
 | Desktop App Frontend | Vue 3, TypeScript, Vite, Pinia, Chart.js | 27 pages, 24 composants UI, 29 composables                 |
 | Desktop App Backend  | Tauri 2.x, Rust                          | Architecture hexagonale, HEED/LMDB local, WebSocket        |
 | Entrainement IA      | Python, PyTorch, Transformers, ONNX      | 2 modeles : vision + text sentiment                        |
@@ -155,21 +155,39 @@ DiscordSentinel/
 |   |-- automod-bot/                    # Bot auto-moderation
 |   |   +-- src/
 |   |       |-- main.rs, handler.rs, api_client.rs, config.rs
-|   |       +-- detectors/              # spam, insult, link, phishing (avec tests)
-|   |-- moderation-bot/                 # Bot moderation manuelle
+|   |       |-- adaptive_slowmode.rs     # Slowmode adaptatif (DashMap, avec tests)
+|   |       +-- detectors/              # spam, insult, link, phishing, unicode (avec 214 tests)
+|   |-- moderation-bot/                 # Bot moderation manuelle avancee
 |   |   +-- src/
-|   |       +-- commands/               # warn, mute, ban, history
+|   |       |-- commands/               # warn, mute, ban, history, notes, call, context, appeal, export, mass (25 tests)
+|   |       +-- reason_templates.rs     # Templates raisons + autocomplete (avec tests)
 |   |-- security-bot/                   # Bot securite serveur
 |   |   +-- src/
-|   |       |-- raid_detector.rs        # Anti-raid (DashMap, thread-safe, avec tests)
-|   |       +-- account_checker.rs      # Verification age compte
-|   |-- progression-bot/                 # Bot progression (stats, XP, niveaux)
+|   |       +-- security/               # Modules securite (tous avec tests)
+|   |           |-- raid_detector.rs    # Anti-raid (DashMap, thread-safe)
+|   |           |-- raid_analyzer.rs    # Analyse patterns raid (Levenshtein, avatars, creation cluster)
+|   |           |-- account_checker.rs  # Verification age compte
+|   |           |-- quarantine.rs       # Gestion quarantaine
+|   |           |-- captcha.rs          # Captcha bouton + math (4 choix)
+|   |           |-- slowmode.rs         # Slowmode auto pendant raid
+|   |           |-- lockdown.rs         # Lockdown auto (deny SEND_MESSAGES @everyone)
+|   |           +-- alt_detector.rs     # Detection alt accounts (Levenshtein + creation proximity)
+|   |-- progression-bot/                 # Bot progression (stats, XP, niveaux, streaks, badges)
 |   |   +-- src/
 |   |       |-- tracker.rs              # Cache local (RwLock + HashMap, avec tests)
+|   |       |-- xp_cooldown.rs          # Anti-farm XP (DashMap, avec tests)
+|   |       |-- streaks.rs              # Streaks jours consecutifs (DashMap, avec tests)
+|   |       |-- multipliers.rs          # Multiplicateurs XP salon/role (avec tests)
+|   |       |-- badges.rs               # 8 badges debloquables (avec tests)
 |   |       +-- commands/               # stats.rs, level.rs
-|   |-- ticket-bot/                     # Bot tickets support
+|   |-- ticket-bot/                     # Bot tickets support avance
 |   |   +-- src/
-|   |       +-- commands/               # ticket.rs
+|   |       |-- commands/               # ticket.rs (1600+ lignes, 59 tests)
+|   |       |-- sla.rs                  # SLA tracker (DashMap, first_response, breach detection)
+|   |       |-- satisfaction.rs         # Sondage satisfaction 1-5 etoiles
+|   |       |-- templates.rs            # Templates reponses rapides (parse config)
+|   |       |-- faq.rs                  # FAQ suggestions avant creation ticket
+|   |       +-- transcript.rs           # Generation transcript Markdown/HTML (avec tests)
 |   |-- image-bot/                      # Bot detection images IA
 |   |   +-- src/
 |   |       |-- main.rs, handler.rs, api_client.rs, config.rs
@@ -180,12 +198,21 @@ DiscordSentinel/
 |   |       |-- state/                  # cooldown_tracker, flood_tracker, pending_channels, vote_tracker, afk_tracker (tous avec tests)
 |   |       |-- tasks/                  # afk_sweep.rs (tache de fond AFK auto-move)
 |   |       +-- embeds.rs              # Logging embed Discord
-|   |-- audit-bot/                      # Bot audit logs
+|   |-- audit-bot/                      # Bot audit logs avances
 |   |   +-- src/
-|   |       +-- main.rs, handler.rs, api_client.rs, config.rs
-|   +-- community-bot/                   # Bot communaute (roles, onboarding)
+|   |       |-- main.rs, handler.rs, api_client.rs, config.rs, audit_event.rs
+|   |       |-- message_cache.rs        # Cache LRU messages (DashMap, avec tests)
+|   |       |-- anomaly.rs              # Detection anomalies temps reel (avec tests)
+|   |       |-- permission_diff.rs      # Diff permissions lisible (avec tests)
+|   |       |-- weekly_report.rs        # Stats hebdo + format embed (avec tests)
+|   |       +-- handlers/               # channel, guild, invite, member, message, role, thread, voice
+|   +-- community-bot/                   # Bot communaute (roles, parrainage, onboarding)
 |       +-- src/
-|           +-- commands/               # roles_panel.rs
+|           |-- commands/               # roles_panel.rs, sponsor.rs
+|           |-- exclusive_groups.rs     # Groupes mutuellement exclusifs (avec tests)
+|           |-- prerequisites.rs        # Prerequis conditionnels (avec tests)
+|           |-- temp_roles.rs           # Roles temporaires avec expiration (avec tests)
+|           +-- sponsorship.rs          # Systeme de parrainage (avec tests)
 |
 |-- ai/                                 # Entrainement IA
 |   |-- requirements.txt                # Deps Python (torch, transformers, onnx)
@@ -217,7 +244,7 @@ DiscordSentinel/
 
 ---
 
-## Schema base de donnees (PostgreSQL — 42 migrations)
+## Schema base de donnees (PostgreSQL — 52 migrations)
 
 ### Tables principales
 
@@ -423,57 +450,96 @@ Stats globales, logs, guilds, bot heartbeat, charts activite.
 Detection locale rapide avant appel API :
 
 - **Spam** : majuscules excessives, repetition caracteres/mots, flood (configurable par guild)
-- **Insultes** : dictionnaire regex francais + anglais
-- **Liens** : URLs http/https, invitations discord.gg
-- **Phishing** : detection liens suspects
+- **Insultes** : dictionnaire regex francais + anglais + normalisation leet speak (`c0nnard`, `f*ck`, `@$$hole`) + mots personnalises
+- **Liens** : URLs http/https, invitations discord.gg (configurable)
+- **Phishing** : detection liens suspects + typosquatting Discord/Steam + scam patterns
+- **Emoji spam** : detection emojis Unicode + custom Discord excessifs (seuil configurable)
+- **Mentions excessives** : detection `<@id>`, `@everyone`, `@here` (seuil configurable)
+- **Fichiers suspects** : detection pieces jointes dangereuses (.exe, .bat, .ps1, .dll, etc.) + extensions custom
+- **Unicode abuse** : detection zalgo text (combining characters excessifs), caracteres invisibles (zero-width), homoglyphes (melange latin/cyrillique)
+- **Mode nuit** : seuils de detection divises par 2 pendant les heures configurees (ex: 22h-8h UTC)
+- **Slowmode adaptatif** : activation automatique du slowmode quand l'activite d'un salon depasse un seuil configurable
 
 Si flags detectes -> appel `POST /analyze` -> scoring (regles + IA) -> execution action.
 **Fallback** : si API injoignable, suppression locale du message.
 
-### Moderation Bot — Moderation manuelle
+### Moderation Bot — Moderation manuelle avancee
 
 | Commande                           | Description                    |
 | ---------------------------------- | ------------------------------ |
-| `/warn <user> <gravity> <reason>`  | Avertissement + DM             |
+| `/warn <user> <gravity> <reason>`  | Avertissement + DM + escalation strikes |
 | `/mute <user> <reason> [duration]` | Timeout Discord (max 28 jours) |
 | `/unmute <user>`                   | Retrait timeout                |
 | `/ban <user> <reason> [duration]`  | Bannissement (DM avant ban)    |
 | `/unban <user_id>`                 | Debannissement                 |
 | `/history <user>`                  | Historique moderation          |
+| `/note <user> <content> [cat]`     | Note moderateur (general/warning/positive/context) |
+| `/call <user> [reason]`            | Convocation dans un salon prive temporaire |
+| `/context <message_id> [count]`    | Afficher les messages autour d'un message |
+| `/appeal`                          | Contester une sanction (cree un ticket automatiquement) |
+| `/export <user> [format]`          | Exporter l'historique en CSV ou JSON |
+| `/massmute <users> <reason> [dur]` | Mute plusieurs utilisateurs en masse |
+| `/massban <users> <reason>`        | Bannir plusieurs utilisateurs en masse |
+
+Features avancees :
+- **Mode apprenti** : les moderateurs avec le role apprenti proposent des actions au lieu de les executer — boutons Approuver/Rejeter pour les seniors
+- **Templates de raisons** : raisons predefinies avec autocomplete Discord (configurable par serveur)
+- **Appel de sanction** : bouton "Contester" dans les DMs de sanction + commande `/appeal` → creation automatique de ticket
 
 ### Security Bot — Securite serveur
 
 - **Anti-raid** : detection joins massifs (configurable), activation verification, alerte
+- **Analyse pattern raid** : detection noms similaires (Levenshtein), avatars par defaut, dates de creation clusterisees, score composite 0-100
 - **Comptes suspects** : flag comptes < 24h (configurable)
 - **Quarantaine** : role restrictif assigne aux comptes suspects/raid, retrait apres captcha
-- **Captcha** : verification par bouton en DM, kick automatique si timeout (defaut 5min)
+- **Captcha** : verification par bouton en DM ou captcha math (4 choix), kick automatique si timeout (defaut 5min)
 - **Slowmode auto** : activation slowmode sur tous les salons texte pendant un raid, revert automatique
+- **Lockdown auto** : desactivation `SEND_MESSAGES` pour @everyone pendant un raid, restauration des permissions apres expiration
+- **Detection alt accounts** : comparaison des nouveaux membres avec les bans recents (distance Levenshtein + proximite date de creation), quarantaine automatique si suspicion
 
-### Image Bot — Detection images IA
+### Image Bot — Detection images IA avancee
 
 - Intercepte tous les attachments images (jpg, png, gif, webp, bmp) + embeds
 - Telecharge, encode base64, envoie a `POST /analyze/image`
 - Detection magic bytes pour le content type
-- **Fallback** : suppression preventive si API down
+- **Hash cache** : evite d'analyser deux fois la meme image (TTL configurable)
+- **Seuils par salon** : tolerance configurable par channel (ex: #art plus tolerant)
+- **Screenshot detection** : flag `is_screenshot` dans la requete pour OCR cote API
+- **GIF anime** : flag `is_animated` pour adaptation du traitement API
+- **File d'attente** : queue avec retry (3 tentatives, 10s entre chaque) au lieu de suppression preventive (opt-in)
+- **Fallback** : suppression preventive si API down et queue non activee
 
-### Progression Bot — Statistiques + XP
+### Progression Bot — Statistiques, XP et progression
 
 | Commande               | Description                                      |
 | ---------------------- | ------------------------------------------------ |
 | `/stats user [target]` | Stats utilisateur (messages, vocal, infractions) |
 | `/stats server`        | Stats globales                                   |
 | `/stats top [limit]`   | Classement (1-25)                                |
-| `/level [user]`        | Niveau et XP                                     |
+| `/level [user]`        | Niveau, XP, streak et badges                     |
+| `/level top [limit]`   | Classement niveaux                               |
 
-Tracking automatique messages + vocal + XP.
+Features avancees :
+- **XP Cooldown** : anti-farm, 1 seul gain XP par message toutes les 60s (configurable)
+- **Streaks** : bonus XP pour jours consecutifs d'activite (+10% par semaine, max 1.5x)
+- **Multiplicateurs XP** : par salon et par role (configurables par serveur)
+- **Badges** : 8 badges debloquables (Bavard, Orateur, Vocal, DJ, Etoile, Legende, En feu, Diamant)
 
-### Ticket Bot — Tickets support
+### Ticket Bot — Tickets support avance
 
 | Commande                                       | Description        |
 | ---------------------------------------------- | ------------------ |
 | `/ticket create <title> <category> [priority]` | Thread prive       |
 | `/ticket close`                                | Fermer et archiver |
 | `/ticket assign <moderator>`                   | Assigner           |
+
+Features avancees :
+- **SLA Tracking** : mesure du temps de premiere reponse staff et temps de resolution par ticket
+- **Satisfaction survey** : sondage 1-5 etoiles envoye en DM apres fermeture du ticket
+- **Templates de reponses** : reponses rapides predefinies configurables par serveur (format `label|contenu`)
+- **Escalade automatique** : augmentation de priorite si pas de reponse staff dans un delai configurable
+- **Transcript Markdown/HTML** : generation de fichiers transcript formates avec CSS, XSS-safe
+- **FAQ avant creation** : affichage de FAQ configurables avant la creation du ticket, bouton "Creer quand meme"
 
 ### Voice Bot — Salons vocaux dynamiques
 
@@ -484,13 +550,26 @@ Gestion complete : creation automatique, permissions, co-admins, vote kick, whit
 - **Liens d'invitation** : le proprietaire genere un code 8 caracteres (bouton "Lien" dans le panneau) avec duree configurable (15min/30min/1h/24h). N'importe qui utilise le code via `!join <code>` pour etre automatiquement whiteliste et autorise a rejoindre, meme si le salon est cache/verrouille. Gestion depuis l'app desktop (creation, liste, revocation, copie).
 - **AFK auto-move** : detecte les utilisateurs mute+sourd dans les salons temporaires et les deplace vers un canal AFK apres un timeout configurable. Tache de fond toutes les 60s. Respecte l'immunite du proprietaire (configurable). Config per-guild : `afk_enabled`, `afk_channel_id`, `afk_timeout_minutes`, `afk_move_owner`.
 
-### Audit Bot — Logs d'audit
+### Audit Bot — Logs d'audit avances
 
-Tracking des actions Discord (bans, kicks, modifications roles, etc.) et envoi a l'API.
+Tracking complet des actions Discord et envoi a l'API :
 
-### Community Bot — Panels de roles
+- **Cache messages** : stockage LRU (10K/guild) pour afficher le contenu des messages supprimes
+- **Anomaly detection** : detection pics d'activite suspects (mass bans, mass deletes, mass role changes) sur fenetre glissante configurable
+- **Permission diffs** : calcul et affichage lisible des changements de permissions sur les roles (+ MANAGE_MESSAGES, - BAN_MEMBERS)
+- **Historique pseudos** : envoi des changements de pseudo au backend (`POST /api/name-history`)
+- **Rapport hebdomadaire** : embed recapitulatif automatique chaque lundi (joins, bans, deletes, edits, role changes, voice events, anomalies)
+- **Events trackes** : messages (delete/edit/bulk), membres (join/leave/ban/unban/nickname/avatar/roles/timeout), channels, roles, voice, guild, threads, invites
 
-Gestion de panels de roles avec boutons de selection + auto-roles a l'arrivee de nouveaux membres.
+### Community Bot — Roles et communaute
+
+Gestion de panels de roles avec boutons + auto-roles + features avancees :
+
+- **Roles exclusifs** : groupes mutuellement exclusifs (ex: prendre "Equipe Rouge" retire "Equipe Bleue")
+- **Prerequis** : conditions pour obtenir un role (avoir un autre role, anciennete minimum)
+- **Roles temporaires** : expiration automatique configurable par role
+- **Parrainage** (`/parrain @membre`) : systeme de parrainage avec limites (1 parrain/filleul, max 3 actifs)
+- **Booster detection** : attribution auto d'un role aux server boosters
 
 ---
 
@@ -765,8 +844,8 @@ cd apps/desktop && npm run tauri dev
 | API — Value Objects         | 12    | Action, FlagType, DetectionFlags (serde, roundtrip) |
 | API — Level                 | 3     | XP calculs                                          |
 | Gateway — Broadcaster       | 6     | Subscribe, unsubscribe, max connections, broadcast  |
-| Automod Bot — Detectors     | ~20   | Spam, insult, link, phishing                        |
-| Security Bot — Raid         | ~5    | Detection joins massifs                             |
+| Automod Bot — All modules   | 214   | Spam, emoji spam, mentions, insult, link, phishing, unicode (zalgo/invisible/homoglyphs), adaptive slowmode |
+| Security Bot — All modules  | 64    | Raid detector, raid analyzer (Levenshtein), alt detector, lockdown, captcha (math), quarantine, slowmode |
 | Progression Bot — Tracker   | ~5    | Cache local                                         |
 | Voice Bot — State           | ~22   | Cooldown, flood, pending, vote, AFK tracker         |
 | API — Moderation HTTP       | 15    | Endpoints log_action, history, bans (integration)   |
@@ -779,8 +858,14 @@ cd apps/desktop && npm run tauri dev
 | API — Reminders HTTP        | 6     | Endpoints create, pending, list (integration)       |
 | API — Tickets HTTP          | 17    | CRUD tickets, status, channels (integration)        |
 | API — Voice Channels HTTP   | 23    | CRUD channels, invite links, themes (integration)   |
+| Audit Bot — All modules     | 29    | Message cache, anomaly detection, permission diffs, weekly report |
+| Ticket Bot — All modules    | 59    | SLA tracker, satisfaction, templates, FAQ, transcript MD/HTML, ticket commands |
+| Moderation Bot — All modules| 25    | Export CSV/JSON, reason templates, mass user parsing |
+| Progression Bot — All modules | 42  | XP cooldown, streaks, multipliers, badges, tracker |
+| Community Bot — All modules | 40    | Exclusive groups, prerequisites, temp roles, sponsorship |
+| Image Bot — All modules     | 18    | Hash cache, channel thresholds, analysis queue |
 
-**Total : ~230+ tests** sur 30+ fichiers avec `#[cfg(test)]` et tests d'integration
+**Total : ~650+ tests** sur 70+ fichiers avec `#[cfg(test)]` et tests d'integration
 
 ---
 
@@ -803,16 +888,16 @@ cd apps/desktop && npm run tauri dev
 
 ### Termine
 
-- [x] API Backend — Architecture hexagonale, 84+ endpoints, 25 handlers, helpers.rs, 17 use cases, 42 migrations
-- [x] Automod Bot — Detection spam/insultes/liens/phishing + appel API + fallback
-- [x] Moderation Bot — /warn /mute /ban /unmute /unban /history /note avec DM, logging, strikes et rappels
-- [x] Security Bot — Anti-raid + comptes suspects + alertes
-- [x] Progression Bot — Tracking messages/vocal + /stats + XP/levels
-- [x] Ticket Bot — /ticket create, close, assign avec threads prives
-- [x] Image Bot — Detection images NSFW/illicites via API + fallback
+- [x] API Backend — Architecture hexagonale, 84+ endpoints, 25 handlers, helpers.rs, 17 use cases, 52 migrations
+- [x] Automod Bot — Detection spam/insultes/liens/phishing/emoji/mentions/fichiers/unicode + leet speak + mode nuit + slowmode adaptatif + appel API + fallback
+- [x] Moderation Bot — /warn /mute /ban /unmute /unban /history /note /call /context /appeal /export /massmute /massban + mode apprenti + templates raisons autocomplete
+- [x] Security Bot — Anti-raid + analyse patterns (Levenshtein, avatars, creation cluster) + comptes suspects + captcha math + lockdown auto + alt detection + alertes
+- [x] Progression Bot — Tracking messages/vocal + /stats + XP/levels + cooldown anti-farm + streaks + multiplicateurs salon/role + badges
+- [x] Ticket Bot — /ticket create, close, assign + SLA tracking, satisfaction survey, templates reponses, FAQ, escalade auto, transcript MD/HTML
+- [x] Image Bot — Detection images NSFW/illicites via API + hash cache + seuils salon + queue retry + screenshot/GIF detection
 - [x] Voice Bot — Salons dynamiques, vote kick, co-admins, whitelist/ban, AFK auto-move, invite links, themes, stage mode
-- [x] Audit Bot — Tracking audit logs Discord
-- [x] Community Bot — Panels de roles + auto-roles
+- [x] Audit Bot — Tracking audit logs + cache messages + anomaly detection + permission diffs + historique pseudos + rapport hebdomadaire
+- [x] Community Bot — Panels de roles + auto-roles + exclusifs + prerequis + temp roles + parrainage + booster detection
 - [x] Desktop App — 27 pages, OAuth Discord, WebSocket temps reel, notifications natives
 - [x] Gateway WebSocket — Service dedie, Redis pub/sub, auto-reconnect, limite connexions
 - [x] Inference IA ONNX — Vision (NSFW/illicite) + Text (sentiments) integres dans l'API
@@ -824,10 +909,10 @@ cd apps/desktop && npm run tauri dev
 - [x] Watched Users — Surveillance avec dossiers complets
 - [x] Bot Config — Configuration per-guild par bot depuis l'app desktop
 - [x] Docker Compose — 15 services orchestres
-- [x] Tests unitaires — 117+ tests (API, gateway, bots)
+- [x] Tests unitaires — 650+ tests (API, gateway, bots)
 - [x] Multi-stage Docker builds — Images Alpine optimisees
 - [x] Workers specialises — 3 workers dedies (moderation, analytics, monitoring) avec heartbeat
-- [x] Anti-raid avance — Quarantaine (role restrictif), captcha DM (bouton), slowmode auto, kick timeout
+- [x] Anti-raid avance — Quarantaine, captcha DM (bouton/math), slowmode auto, lockdown auto, kick timeout, analyse patterns raid, detection alt accounts
 - [x] Config seuils IA per-guild — Table ia_config, endpoints API, page desktop avec sliders, seuils dynamiques
 - [x] Rate limiting inference — Semaphore (4 concurrent) + token bucket (20/s), HTTP 429, configurable
 - [x] Page analytics desktop — Heatmap, trends moderation, top infracteurs, peak hours, distribution actions

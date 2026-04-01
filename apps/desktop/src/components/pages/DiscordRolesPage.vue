@@ -39,6 +39,7 @@ function formatPermissions(perms: string): string {
     <div class="header">
       <h1>Roles Discord</h1>
       <span class="role-count">{{ totalRoles }} roles</span>
+      <router-link to="/role-panels" class="cross-link">&larr; Panels de roles</router-link>
     </div>
 
     <div class="toolbar">
@@ -102,6 +103,9 @@ function formatPermissions(perms: string): string {
   gap: 12px;
   margin-bottom: 24px;
 }
+
+.cross-link { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all 0.15s; }
+.cross-link:hover { background: var(--accent); color: white; }
 
 .role-count {
   font-size: 13px;

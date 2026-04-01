@@ -118,6 +118,7 @@ pub fn run() {
             presentation::commands::ws_disconnect,
             presentation::commands::ws_status,
             presentation::commands::get_guilds,
+            presentation::commands::get_guild_members,
             presentation::commands::get_dashboard_stats,
             presentation::commands::get_logs,
             presentation::commands::delete_logs_by_category,

@@ -1,22 +1,42 @@
-use futures_util::StreamExt;
+use std::time::Instant;
+
+use dashmap::DashMap;
 use serenity::async_trait;
 use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
 use serenity::model::application::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
-use tracing::{error, info, warn};
+use tracing::{error, info};
 
+use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
-use crate::api_client::ApiClient;
+use crate::api_client::{ApiClient, ModerationAction};
 use crate::commands;
+use crate::reason_templates;
 
 /// Cle TypeMap pour le client API specifique a la moderation.
 pub struct ModerationApiKey;
 impl TypeMapKey for ModerationApiKey {
     type Value = ApiClient;
 }
+
+/// Actions en attente d'approbation (mode apprenti).
+#[allow(dead_code)]
+pub struct PendingAction {
+    pub action: ModerationAction,
+    pub moderator_id: String,
+    pub proposed_at: Instant,
+}
+
+pub struct PendingActionsKey;
+impl TypeMapKey for PendingActionsKey {
+    type Value = DashMap<String, PendingAction>;
+}
+
+pub const APPROVE_PREFIX: &str = "sentinel_mod_approve_";
+pub const REJECT_PREFIX: &str = "sentinel_mod_reject_";
 
 pub struct Handler;
 
@@ -35,80 +55,230 @@ impl EventHandler for Handler {
         {
             error!(error = %e, "Impossible d'enregistrer les slash commands");
         } else {
-            info!("Slash commands enregistrees : warn, mute, unmute, ban, unban, history, note");
+            info!("Slash commands enregistrees : warn, mute, unmute, ban, unban, history, note, call, context, appeal, export, massmute, massban");
         }
 
         // Ecouter Redis pour les actions de moderation depuis le desktop
         let ctx_clone = ctx.clone();
         tokio::spawn(async move {
-            listen_redis_moderation(ctx_clone).await;
+            sentinel_shared::redis_listener::listen_redis(move |payload| {
+                let ctx = ctx_clone.clone();
+                async move {
+                    handle_redis_moderation_event(&ctx, &payload).await;
+                }
+            }).await;
         });
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(command) = interaction {
-            let cmd_name = command.data.name.clone();
-            let moderator = command.user.name.clone();
-            let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
+        match interaction {
+            Interaction::Command(command) => {
+                let cmd_name = command.data.name.clone();
+                let moderator = command.user.name.clone();
+                let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
-            match cmd_name.as_str() {
-                "warn" => commands::warn::handle(&ctx, &command).await,
-                "mute" => commands::mute::handle(&ctx, &command).await,
-                "unmute" => commands::mute::handle_unmute(&ctx, &command).await,
-                "ban" => commands::ban::handle(&ctx, &command).await,
-                "unban" => commands::ban::handle_unban(&ctx, &command).await,
-                "history" => commands::history::handle(&ctx, &command).await,
-                "note" => commands::notes::handle(&ctx, &command).await,
-                _ => {}
-            }
+                if !guild_id.is_empty() {
+                    let data = ctx.data.read().await;
+                    if let Some(api) = data.get::<ApiClientKey>() {
+                        let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                        if !BaseApiClient::config_bool(&config, "enabled", true) {
+                            return;
+                        }
+                    }
+                }
 
-            let data = ctx.data.read().await;
-            if let Some(api) = data.get::<ApiClientKey>() {
-                api.send_log("info", &guild_id, &format!("Commande /{} executee par {}", cmd_name, moderator));
+                match cmd_name.as_str() {
+                    "warn" => commands::warn::handle(&ctx, &command).await,
+                    "mute" => commands::mute::handle(&ctx, &command).await,
+                    "unmute" => commands::mute::handle_unmute(&ctx, &command).await,
+                    "ban" => commands::ban::handle(&ctx, &command).await,
+                    "unban" => commands::ban::handle_unban(&ctx, &command).await,
+                    "history" => commands::history::handle(&ctx, &command).await,
+                    "note" => commands::notes::handle(&ctx, &command).await,
+                    "call" => commands::call::handle(&ctx, &command).await,
+                    "context" => commands::context::handle(&ctx, &command).await,
+                    "appeal" => commands::appeal::handle(&ctx, &command).await,
+                    "export" => commands::export::handle(&ctx, &command).await,
+                    "massmute" => commands::mass::handle_massmute(&ctx, &command).await,
+                    "massban" => commands::mass::handle_massban(&ctx, &command).await,
+                    _ => {}
+                }
+
+                let data = ctx.data.read().await;
+                if let Some(api) = data.get::<ApiClientKey>() {
+                    api.send_log("info", &guild_id, &format!("Commande /{} executee par {}", cmd_name, moderator));
+                }
             }
+            Interaction::Component(component) => {
+                let custom_id = &component.data.custom_id;
+
+                if custom_id == commands::call::CALL_CLOSE_ID {
+                    commands::call::handle_close(&ctx, &component).await;
+                } else if custom_id.starts_with(commands::appeal::APPEAL_PREFIX) {
+                    commands::appeal::handle_appeal_button(&ctx, &component).await;
+                } else if custom_id.starts_with(APPROVE_PREFIX) {
+                    handle_approve(&ctx, &component).await;
+                } else if custom_id.starts_with(REJECT_PREFIX) {
+                    handle_reject(&ctx, &component).await;
+                }
+            }
+            Interaction::Autocomplete(autocomplete) => {
+                // Autocomplete pour le champ "reason" des commandes warn, mute, ban
+                let cmd_name = &autocomplete.data.name;
+                if matches!(cmd_name.as_str(), "warn" | "mute" | "ban") {
+                    handle_reason_autocomplete(&ctx, &autocomplete).await;
+                }
+            }
+            _ => {}
         }
     }
 }
 
-/// Ecoute Redis pour poster les actions de moderation depuis le desktop dans Discord.
-async fn listen_redis_moderation(ctx: Context) {
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".to_string());
-    let channel_name = std::env::var("REDIS_CHANNEL").unwrap_or_else(|_| "sentinel:events".to_string());
+/// Gere l'autocomplete des raisons avec les templates configurees.
+async fn handle_reason_autocomplete(
+    ctx: &Context,
+    autocomplete: &serenity::model::application::CommandInteraction,
+) {
+    let guild_id = autocomplete.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
-    loop {
-        match redis::Client::open(redis_url.as_str()) {
-            Ok(client) => {
-                match client.get_async_pubsub().await {
-                    Ok(mut pubsub) => {
-                        if let Err(e) = pubsub.subscribe(&channel_name).await {
-                            error!(error = %e, "Erreur abonnement Redis");
-                            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                            continue;
-                        }
+    // Trouver la valeur actuelle du champ "reason" (le champ focused dans l'autocomplete)
+    let current_input = autocomplete.data.options.iter()
+        .find(|o| o.name == "reason")
+        .and_then(|o| match &o.value {
+            serenity::all::CommandDataOptionValue::String(s) => Some(s.as_str()),
+            _ => None,
+        })
+        .unwrap_or("");
 
-                        info!(channel = %channel_name, "Ecoute Redis pour logs moderation");
+    // Lire les templates depuis la config
+    let templates_raw = {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            BaseApiClient::config_or(&gc, "reason_templates", "")
+        } else {
+            String::new()
+        }
+    };
 
-                        loop {
-                            let msg = pubsub.on_message().next().await;
-                            if let Some(msg) = msg {
-                                let payload: String = match msg.get_payload() {
-                                    Ok(p) => p,
-                                    Err(_) => continue,
-                                };
-                                handle_redis_moderation_event(&ctx, &payload).await;
-                            } else {
-                                warn!("Connexion Redis perdue, reconnexion...");
-                                break;
-                            }
-                        }
-                    }
-                    Err(e) => error!(error = %e, "Erreur connexion Redis"),
-                }
+    let templates = reason_templates::parse_templates(&templates_raw);
+    let filtered = reason_templates::filter_templates(&templates, current_input);
+
+    let choices: Vec<serenity::builder::AutocompleteChoice> = filtered
+        .iter()
+        .map(|t| serenity::builder::AutocompleteChoice::new(&t.label, serde_json::Value::String(t.reason.clone())))
+        .collect();
+
+    let response = serenity::builder::CreateAutocompleteResponse::new().set_choices(choices);
+
+    autocomplete.create_response(
+        &ctx.http,
+        serenity::all::CreateInteractionResponse::Autocomplete(response),
+    ).await.ok();
+}
+
+/// Gere le clic "Approuver" sur une action en attente (mode apprenti).
+async fn handle_approve(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    let pending_id = match component.data.custom_id.strip_prefix(APPROVE_PREFIX) {
+        Some(id) => id.to_string(),
+        None => return,
+    };
+
+    let data = ctx.data.read().await;
+    let pending_actions = match data.get::<PendingActionsKey>() {
+        Some(p) => p,
+        None => return,
+    };
+
+    let pending = match pending_actions.remove(&pending_id) {
+        Some((_, p)) => p,
+        None => {
+            let response = serenity::all::CreateInteractionResponse::Message(
+                serenity::all::CreateInteractionResponseMessage::new()
+                    .content("Cette action n'est plus en attente.")
+                    .ephemeral(true),
+            );
+            component.create_response(&ctx.http, response).await.ok();
+            return;
+        }
+    };
+
+    let api = match data.get::<ModerationApiKey>() {
+        Some(a) => a,
+        None => return,
+    };
+
+    // Executer l'action approuvee
+    match api.log_action(&pending.action).await {
+        Ok(_) => {
+            // Persister l'approbation via l'API
+            api.resolve_pending_action(&pending_id, "approved", &component.user.id.to_string()).await;
+
+            // Event temps reel pour le desktop
+            if let Some(base) = data.get::<ApiClientKey>() {
+                base.publish_event("pending_action_resolved", serde_json::json!({
+                    "action_id": pending_id,
+                    "status": "approved",
+                    "reviewed_by": component.user.id.to_string(),
+                    "action_type": pending.action.action_type,
+                    "target_id": pending.action.target_id,
+                }));
             }
-            Err(e) => error!(error = %e, "Erreur creation client Redis"),
+
+            let response = serenity::all::CreateInteractionResponse::Message(
+                serenity::all::CreateInteractionResponseMessage::new()
+                    .content(format!(
+                        "Action approuvee par <@{}>. {} executee sur <@{}>.",
+                        component.user.id, pending.action.action_type, pending.action.target_id
+                    )),
+            );
+            component.create_response(&ctx.http, response).await.ok();
+            info!(
+                approver = %component.user.name,
+                action = %pending.action.action_type,
+                target = %pending.action.target_name,
+                "Action apprenti approuvee"
+            );
+        }
+        Err(e) => {
+            error!(error = %e, "Erreur execution action approuvee");
+        }
+    }
+}
+
+/// Gere le clic "Rejeter" sur une action en attente (mode apprenti).
+async fn handle_reject(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    let pending_id = match component.data.custom_id.strip_prefix(REJECT_PREFIX) {
+        Some(id) => id.to_string(),
+        None => return,
+    };
+
+    let data = ctx.data.read().await;
+    let pending_actions = match data.get::<PendingActionsKey>() {
+        Some(p) => p,
+        None => return,
+    };
+
+    if let Some((_, pending)) = pending_actions.remove(&pending_id) {
+        // Persister le rejet via l'API
+        if let Some(api) = data.get::<ModerationApiKey>() {
+            api.resolve_pending_action(&pending_id, "rejected", &component.user.id.to_string()).await;
         }
 
-        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+        let response = serenity::all::CreateInteractionResponse::Message(
+            serenity::all::CreateInteractionResponseMessage::new()
+                .content(format!(
+                    "Action rejetee par <@{}>. {} sur <@{}> annulee.",
+                    component.user.id, pending.action.action_type, pending.action.target_id
+                )),
+        );
+        component.create_response(&ctx.http, response).await.ok();
+        info!(
+            rejector = %component.user.name,
+            action = %pending.action.action_type,
+            target = %pending.action.target_name,
+            "Action apprenti rejetee"
+        );
     }
 }
 
@@ -140,7 +310,6 @@ async fn handle_redis_moderation_event(ctx: &Context, payload: &str) {
         return;
     }
 
-    // Trouver le salon de logs via la config
     let log_channel_id = {
         let ctx_data = ctx.data.read().await;
         if let Some(base) = ctx_data.get::<ApiClientKey>() {
@@ -157,7 +326,6 @@ async fn handle_redis_moderation_event(ctx: &Context, payload: &str) {
         _ => return,
     };
 
-    // Construire l'embed (meme style que AutoMod)
     let (icon, action_label, color) = match action_type {
         "ban_permanent" => ("\u{1f6ab}", "Bannissement permanent", 0xdc2626u32),
         "ban_temp" => ("\u{1f6ab}", "Bannissement temporaire", 0xdc2626),
@@ -168,12 +336,12 @@ async fn handle_redis_moderation_event(ctx: &Context, payload: &str) {
         "warn" => ("\u{26a0}\u{fe0f}", "Avertissement", 0xf59e0b),
         "kick" => ("\u{1f462}", "Expulsion", 0xf97316),
         "delete" => ("\u{1f5d1}\u{fe0f}", "Message supprime", 0xf97316),
+        "call" => ("\u{1f4de}", "Convocation", 0x3498db),
         _ => ("\u{1f4cb}", "Action de moderation", 0x95a5a6),
     };
 
     let source = if moderator == "Desktop App" { "Desktop App" } else { moderator };
 
-    // Recuperer l'avatar et le username reel de la cible
     let (avatar_url, real_name) = if let Ok(uid) = target_id.parse::<u64>() {
         let user_id = serenity::model::id::UserId::new(uid);
         match user_id.to_user(&ctx.http).await {
