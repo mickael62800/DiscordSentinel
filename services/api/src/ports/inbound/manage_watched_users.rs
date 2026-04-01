@@ -27,4 +27,18 @@ pub trait ManageWatchedUsersUseCase: Send + Sync {
         guild_id: &str,
         user_id: &str,
     ) -> Result<UserDossier, DomainError>;
+
+    async fn add_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        reason: &str,
+    ) -> Result<(), DomainError>;
+
+    async fn remove_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError>;
 }

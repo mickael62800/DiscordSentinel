@@ -90,4 +90,26 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
             notes,
         })
     }
+
+    async fn add_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        reason: &str,
+    ) -> Result<(), DomainError> {
+        self.watched_repo
+            .add_manual_watch(guild_id, user_id, username, reason, "desktop")
+            .await
+    }
+
+    async fn remove_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        self.watched_repo
+            .remove_manual_watch(guild_id, user_id)
+            .await
+    }
 }

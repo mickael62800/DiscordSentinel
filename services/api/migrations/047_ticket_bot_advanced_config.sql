@@ -10,4 +10,4 @@ SET config_schema = config_schema || '[
   {"key": "faq_entries", "label": "FAQ (format: question|reponse, une par ligne)", "type": "text", "required": false, "default": ""},
   {"key": "transcript_format", "label": "Format transcript (text, markdown, html)", "type": "text", "required": false, "default": "text"}
 ]'::jsonb
-WHERE name = 'ticket-bot';
+WHERE bot_name = 'ticket-bot';

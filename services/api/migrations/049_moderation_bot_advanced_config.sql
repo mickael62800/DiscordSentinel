@@ -8,4 +8,4 @@ SET config_schema = config_schema || '[
   {"key": "appeal_enabled", "label": "Bouton appel de sanction dans les DMs", "type": "boolean", "required": false, "default": "true"},
   {"key": "call_category_id", "label": "Categorie Discord pour les convocations", "type": "channel", "required": false, "default": ""}
 ]'::jsonb
-WHERE name = 'moderation-bot';
+WHERE bot_name = 'moderation-bot';

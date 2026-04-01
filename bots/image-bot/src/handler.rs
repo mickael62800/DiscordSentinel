@@ -349,20 +349,11 @@ async fn process_image_attachment(
                 }
             }
 
-            // Fallback : suppression preventive
-            warn!(error = %e, "Backend injoignable — suppression preventive de l'image");
-            base.send_log("error", guild_id, &format!(
-                "Backend injoignable pour analyse image : {}", e
+            // Fallback : laisser passer l'image (ne pas supprimer si le backend est injoignable)
+            warn!(error = %e, "Backend injoignable — image laissee en place");
+            base.send_log("warn", guild_id, &format!(
+                "Backend injoignable pour analyse image (image non supprimee) : {}", e
             ));
-            let _ = msg.delete(&ctx.http).await;
-            let embed = moderate_embed("Image supprimee preventivement")
-                .description(format!("<@{}>", msg.author.id))
-                .field("Raison", "API de verification indisponible — l'image a ete supprimee par precaution.", false)
-                .thumbnail(msg.author.face());
-            let _ = msg
-                .channel_id
-                .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                .await;
         }
     }
 }

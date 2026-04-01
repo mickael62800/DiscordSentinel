@@ -11,4 +11,4 @@ SET config_schema = '[
   {"key": "max_sponsorships", "label": "Max filleuls actifs par parrain", "type": "number", "required": false, "default": "3"},
   {"key": "seasonal_roles", "label": "Roles saisonniers (role_id:mois_debut-mois_fin par ligne)", "type": "text", "required": false, "default": ""}
 ]'::jsonb
-WHERE name = 'community-bot';
+WHERE bot_name = 'community-bot';

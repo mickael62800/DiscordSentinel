@@ -4,6 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
+import AppToggle from "../atoms/AppToggle.vue";
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
@@ -35,6 +36,9 @@ const configFields = computed<ConfigField[]>(() => {
   const schema = selectedDefinition.value.config_schema;
   return Array.isArray(schema) ? schema : [];
 });
+
+const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
+const otherFields = computed(() => configFields.value.filter((f) => f.type !== "boolean"));
 
 function isFieldModified(key: string): boolean {
   return (formValues.value[key] ?? "") !== (savedValues.value[key] ?? "");
@@ -236,55 +240,85 @@ watch(selectedComponent, loadFormValues);
         </div>
 
         <template v-else>
-          <div
-            v-for="field in configFields"
-            :key="field.key"
-            class="form-group"
-            :class="{ modified: isFieldModified(field.key) }"
-          >
-            <label :for="field.key" class="form-label">
-              {{ field.label }}
-              <span v-if="field.required" class="required">*</span>
-              <span v-if="isFieldModified(field.key)" class="modified-badge">modifie</span>
-            </label>
+          <!-- Section toggles (6 par ligne) -->
+          <div v-if="booleanFields.length > 0" class="toggles-section">
+            <h3 class="section-title">Fonctionnalites</h3>
+            <div class="toggles-grid">
+              <div
+                v-for="field in booleanFields"
+                :key="field.key"
+                class="toggle-card"
+                :class="{ modified: isFieldModified(field.key) }"
+              >
+                <div class="toggle-card-header">
+                  <span class="toggle-card-label">{{ field.label }}</span>
+                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                </div>
+                <div class="toggle-card-control">
+                  <AppToggle
+                    :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
+                    @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
+                  />
+                  <span class="toggle-state" :class="{ active: formValues[field.key] === 'true' || formValues[field.key] === '1' }">
+                    {{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'ON' : 'OFF' }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
 
-            <!-- Worker inputs: number with unit badge -->
-            <div v-if="selectedIsWorker" class="input-row">
+          <!-- Section champs texte/number/channel/role -->
+          <div v-if="otherFields.length > 0" class="inputs-section">
+            <h3 class="section-title">Parametres</h3>
+            <div
+              v-for="field in otherFields"
+              :key="field.key"
+              class="form-group"
+              :class="{ modified: isFieldModified(field.key) }"
+            >
+              <label :for="field.key" class="form-label">
+                {{ field.label }}
+                <span v-if="field.required" class="required">*</span>
+                <span v-if="isFieldModified(field.key)" class="modified-badge">modifie</span>
+              </label>
+
+              <!-- Worker inputs: number with unit badge -->
+              <div v-if="selectedIsWorker && field.type === 'number'" class="input-row">
+                <input
+                  :id="field.key"
+                  v-model="formValues[field.key]"
+                  class="form-input"
+                  type="number"
+                  min="1"
+                  :placeholder="field.default !== undefined ? String(field.default) : ''"
+                />
+                <span class="input-unit">{{ field.label.includes('heure') ? 'h' : 'min' }}</span>
+              </div>
+
+              <!-- Other inputs -->
               <input
+                v-else
                 :id="field.key"
                 v-model="formValues[field.key]"
                 class="form-input"
-                type="number"
-                min="1"
-                :placeholder="field.default !== undefined ? String(field.default) : ''"
+                :placeholder="field.type === 'channel' ? 'Entrez l\'ID du salon Discord'
+                  : field.type === 'role' ? 'Entrez l\'ID du role Discord'
+                  : field.default !== undefined ? String(field.default)
+                  : ''"
+                :type="field.type === 'number' ? 'number' : 'text'"
               />
-              <span class="input-unit">{{ field.label.includes('heure') ? 'h' : 'min' }}</span>
+
+              <span
+                class="form-hint"
+                :class="{
+                  'hint-db': fieldStatus(field).source === 'db',
+                  'hint-default': fieldStatus(field).source === 'default',
+                  'hint-none': fieldStatus(field).source === 'none',
+                }"
+              >
+                {{ fieldStatus(field).text }}
+              </span>
             </div>
-
-            <!-- Bot inputs: text or number based on field.type -->
-            <input
-              v-else
-              :id="field.key"
-              v-model="formValues[field.key]"
-              class="form-input"
-              :placeholder="field.type === 'channel' ? 'Entrez l\'ID du salon Discord'
-                : field.type === 'role' ? 'Entrez l\'ID du role Discord'
-                : field.type === 'boolean' ? 'true ou false'
-                : field.default !== undefined ? String(field.default)
-                : ''"
-              :type="field.type === 'number' ? 'number' : 'text'"
-            />
-
-            <span
-              class="form-hint"
-              :class="{
-                'hint-db': fieldStatus(field).source === 'db',
-                'hint-default': fieldStatus(field).source === 'default',
-                'hint-none': fieldStatus(field).source === 'none',
-              }"
-            >
-              {{ fieldStatus(field).text }}
-            </span>
           </div>
 
           <div class="form-actions">
@@ -576,5 +610,78 @@ watch(selectedComponent, loadFormValues);
   color: var(--success);
   font-size: 13px;
   font-weight: 500;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 24px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toggles-section:first-child .section-title {
+  margin-top: 0;
+}
+
+.toggles-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+}
+
+.toggle-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toggle-card.modified {
+  border-color: var(--accent);
+}
+
+.toggle-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.toggle-card-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.3;
+}
+
+.modified-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  flex-shrink: 0;
+}
+
+.toggle-card-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-state {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+
+.toggle-state.active {
+  color: var(--accent);
 }
 </style>

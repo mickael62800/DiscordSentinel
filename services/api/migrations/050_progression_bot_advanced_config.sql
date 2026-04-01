@@ -10,4 +10,4 @@ SET config_schema = config_schema || '[
   {"key": "streak_enabled", "label": "Systeme de streaks (bonus XP jours consecutifs)", "type": "boolean", "required": false, "default": "true"},
   {"key": "badges_enabled", "label": "Systeme de badges", "type": "boolean", "required": false, "default": "true"}
 ]'::jsonb
-WHERE name = 'progression-bot';
+WHERE bot_name = 'progression-bot';

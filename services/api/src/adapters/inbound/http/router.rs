@@ -233,8 +233,8 @@ pub fn build_for_test(state: AppState) -> Router {
         .nest("/api", dashboard_routes())
         .route("/api/charts/activity", get(handlers::dashboard_charts::get_activity_trend))
         .route("/api/audit-logs", get(handlers::audit_logs::list_audit_logs).post(handlers::audit_logs::create_audit_log))
-        .route("/api/watched-users", get(handlers::watched_users::list_watched_users))
-        .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier))
+        .route("/api/watched-users", get(handlers::watched_users::list_watched_users).post(handlers::watched_users::add_watched_user))
+        .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier).delete(handlers::watched_users::remove_watched_user))
         .route("/api/discord-roles/{guild_id}", get(handlers::discord_roles::list_roles))
         .route("/api/discord-roles/{guild_id}/sync", post(handlers::discord_roles::sync_roles))
         .route_layer(middleware::from_fn_with_state(
@@ -289,8 +289,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // Audit logs
         .route("/api/audit-logs", get(handlers::audit_logs::list_audit_logs).post(handlers::audit_logs::create_audit_log))
         // Watched users
-        .route("/api/watched-users", get(handlers::watched_users::list_watched_users))
-        .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier))
+        .route("/api/watched-users", get(handlers::watched_users::list_watched_users).post(handlers::watched_users::add_watched_user))
+        .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier).delete(handlers::watched_users::remove_watched_user))
         // Discord roles (sync + list)
         .route("/api/discord-roles/{guild_id}", get(handlers::discord_roles::list_roles))
         .route("/api/discord-roles/{guild_id}/sync", post(handlers::discord_roles::sync_roles))
@@ -304,8 +304,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/temp-roles/{guild_id}", get(handlers::bot_persistence::list_temp_roles))
         .route("/api/temp-roles/{guild_id}/{user_id}/{role_id}", delete(handlers::bot_persistence::delete_temp_role))
         .route("/api/moderation/pending", post(handlers::bot_persistence::create_pending_action))
-        .route("/api/moderation/pending/{guild_id}", get(handlers::bot_persistence::list_pending_actions))
-        .route("/api/moderation/pending/{id}", patch(handlers::bot_persistence::resolve_pending_action))
+        .route("/api/moderation/pending/guild/{guild_id}", get(handlers::bot_persistence::list_pending_actions))
+        .route("/api/moderation/pending/{id}/resolve", patch(handlers::bot_persistence::resolve_pending_action))
         // Guild members (direct Discord API)
         .route("/api/guilds/{guild_id}/members", get(handlers::guild_members::list_members))
         .route_layer(middleware::from_fn_with_state(

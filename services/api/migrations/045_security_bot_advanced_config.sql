@@ -12,4 +12,4 @@ SET config_schema = config_schema || '[
   {"key": "raid_pattern_enabled", "label": "Detection patterns de raid avancee", "type": "boolean", "required": false, "default": "true"},
   {"key": "raid_pattern_score_threshold", "label": "Score seuil pattern raid (0-100)", "type": "number", "required": false, "default": "60"}
 ]'::jsonb
-WHERE name = 'security-bot';
+WHERE bot_name = 'security-bot';

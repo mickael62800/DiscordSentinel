@@ -10,4 +10,4 @@ SET config_schema = config_schema || '[
   {"key": "suspicious_files_enabled", "label": "Détection fichiers suspects", "type": "boolean", "required": false, "default": "true"},
   {"key": "suspicious_file_extensions", "label": "Extensions suspectes supplémentaires (CSV)", "type": "text", "required": false, "default": ""}
 ]'::jsonb
-WHERE name = 'automod-bot';
+WHERE bot_name = 'automod-bot';

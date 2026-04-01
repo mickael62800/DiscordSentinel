@@ -9,4 +9,4 @@ SET config_schema = config_schema || '[
   {"key": "queue_enabled", "label": "File d attente (au lieu de suppression preventive)", "type": "boolean", "required": false, "default": "false"},
   {"key": "queue_max_retries", "label": "Max retries file d attente", "type": "number", "required": false, "default": "3"}
 ]'::jsonb
-WHERE name = 'image-bot';
+WHERE bot_name = 'image-bot';

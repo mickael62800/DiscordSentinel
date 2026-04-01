@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import AppToggle from "../atoms/AppToggle.vue";
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
@@ -204,13 +205,20 @@ watch(selectedBot, loadFormValues);
               <span v-if="field.required" class="required">*</span>
               <span v-if="isFieldModified(field.key)" class="modified-badge">modifie</span>
             </label>
+            <div v-if="field.type === 'boolean'" class="toggle-row">
+              <AppToggle
+                :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
+                @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
+              />
+              <span class="toggle-label">{{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'Active' : 'Desactive' }}</span>
+            </div>
             <input
+              v-else
               :id="field.key"
               v-model="formValues[field.key]"
               class="form-input"
               :placeholder="field.type === 'channel' ? 'Entrez l\'ID du salon Discord'
                 : field.type === 'role' ? 'Entrez l\'ID du role Discord'
-                : field.type === 'boolean' ? 'true ou false'
                 : field.default !== undefined ? String(field.default)
                 : ''"
               :type="field.type === 'number' ? 'number' : 'text'"
@@ -485,6 +493,19 @@ watch(selectedBot, loadFormValues);
 .success-msg {
   color: var(--success);
   font-size: 13px;
+  font-weight: 500;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+
+.toggle-label {
+  font-size: 13px;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 </style>

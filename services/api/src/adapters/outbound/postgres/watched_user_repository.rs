@@ -111,7 +111,31 @@ impl WatchedUserRepository for PgWatchedUserRepository {
             LEFT JOIN user_conduct_points ucp ON ucp.guild_id = ui.guild_id AND ucp.user_id = ui.user_id
             LEFT JOIN conduct_config cc ON cc.guild_id = ui.guild_id
             LEFT JOIN user_security us ON us.guild_id = ui.guild_id AND us.user_id = ui.user_id
-            ORDER BY (ui.total_warns + ui.total_mutes + ui.total_bans) DESC, ui.last_incident_at DESC
+
+            UNION ALL
+
+            SELECT
+                mw.user_id,
+                mw.username,
+                mw.guild_id,
+                COALESCE(g2.name, mw.guild_id) AS guild_name,
+                0 AS total_warns,
+                0 AS total_mutes,
+                0 AS total_bans,
+                NULL AS conduct_points,
+                NULL AS max_conduct_points,
+                NULL AS last_incident_at,
+                0 AS security_events_count,
+                mw.created_at AS first_seen_at
+            FROM manual_watched_users mw
+            LEFT JOIN guilds g2 ON g2.guild_id = mw.guild_id
+            WHERE ($1::text IS NULL OR mw.guild_id = $1)
+              AND NOT EXISTS (
+                  SELECT 1 FROM infractions i2
+                  WHERE i2.guild_id = mw.guild_id AND i2.user_id = mw.user_id
+              )
+
+            ORDER BY total_warns + total_mutes + total_bans DESC, last_incident_at DESC NULLS LAST
             LIMIT 200
         "#;
 
@@ -122,5 +146,51 @@ impl WatchedUserRepository for PgWatchedUserRepository {
             .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         Ok(rows.into_iter().map(WatchedUser::from).collect())
+    }
+
+    async fn add_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        reason: &str,
+        added_by: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"
+            INSERT INTO manual_watched_users (guild_id, user_id, username, reason, added_by)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (guild_id, user_id) DO UPDATE SET
+                username = EXCLUDED.username,
+                reason = EXCLUDED.reason
+            "#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(username)
+        .bind(reason)
+        .bind(added_by)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn remove_manual_watch(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "DELETE FROM manual_watched_users WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(())
     }
 }

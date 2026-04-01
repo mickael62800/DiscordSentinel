@@ -1,7 +1,7 @@
 -- Migration 046 : Creer l'entree bot_definitions pour audit-bot
 -- avec config_schema pour les features avancees
 
-INSERT INTO bot_definitions (name, display_name, description, config_schema)
+INSERT INTO bot_definitions (bot_name, display_name, description, config_schema)
 VALUES (
   'audit-bot',
   'Audit Bot',
@@ -17,7 +17,7 @@ VALUES (
     {"key": "weekly_report_enabled", "label": "Rapport hebdomadaire", "type": "boolean", "required": false, "default": "true"}
   ]'::jsonb
 )
-ON CONFLICT (name) DO UPDATE SET
+ON CONFLICT (bot_name) DO UPDATE SET
   config_schema = EXCLUDED.config_schema,
   display_name = EXCLUDED.display_name,
   description = EXCLUDED.description;
