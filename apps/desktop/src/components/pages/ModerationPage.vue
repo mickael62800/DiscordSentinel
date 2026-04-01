@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, watch } from "vue";
 import { useModeration } from "../../composables/useModeration";
+import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppButton from "../atoms/AppButton.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import FormField from "../atoms/FormField.vue";
 import { actionVariant } from "../../utils/variants";
 
 const { submitting, history, historyLoading, logAction, fetchHistory } = useModeration();
+const { selectedGuildId } = useGuildSelector();
+import { useGuildMembers } from "../../composables/useGuildMembers";
+import type { GuildMember } from "../../types";
+const { searchMembers } = useGuildMembers();
 
-// Action form
-const guildId = ref("");
+// Action form — guild_id pre-rempli depuis la selection
+const guildId = ref(selectedGuildId.value || "");
 const targetId = ref("");
 const targetName = ref("");
 const actionType = ref("warn");
@@ -19,9 +24,39 @@ const duration = ref<number | undefined>(undefined);
 const success = ref<string | null>(null);
 const error = ref<string | null>(null);
 
-// History lookup
-const lookupGuildId = ref("");
+// History lookup — guild_id pre-rempli
+const lookupGuildId = ref(selectedGuildId.value || "");
 const lookupUserId = ref("");
+
+// Autocomplete membres
+const targetSearch = ref("");
+const suggestions = ref<GuildMember[]>([]);
+const showSuggestions = ref(false);
+
+function onTargetSearchInput() {
+  suggestions.value = searchMembers(targetSearch.value);
+  showSuggestions.value = suggestions.value.length > 0;
+}
+
+function selectMember(member: GuildMember) {
+  targetId.value = member.id;
+  targetName.value = member.display_name || member.username;
+  targetSearch.value = member.display_name || member.username;
+  showSuggestions.value = false;
+}
+
+function onTargetSearchBlur() {
+  // Delai pour permettre le clic sur une suggestion
+  setTimeout(() => { showSuggestions.value = false; }, 200);
+}
+
+// Sync quand le serveur change dans la sidebar
+watch(selectedGuildId, (newId) => {
+  if (newId) {
+    guildId.value = newId;
+    lookupGuildId.value = newId;
+  }
+});
 
 async function handleSubmit() {
   if (!guildId.value || !targetId.value || !targetName.value || !reason.value) {
@@ -74,12 +109,48 @@ async function handleLookup() {
               <input v-model="guildId" type="text" placeholder="ID du serveur" />
             </FormField>
           </div>
+          <div class="form-row">
+            <FormField label="Utilisateur cible">
+              <div class="autocomplete-wrapper">
+                <input
+                  v-model="targetSearch"
+                  type="text"
+                  placeholder="Rechercher un membre ou entrer un ID..."
+                  @input="onTargetSearchInput"
+                  @focus="onTargetSearchInput"
+                  @blur="onTargetSearchBlur"
+                  autocomplete="off"
+                />
+                <div v-if="showSuggestions" class="autocomplete-list">
+                  <div
+                    v-for="member in suggestions"
+                    :key="member.id"
+                    class="autocomplete-item"
+                    @mousedown="selectMember(member)"
+                  >
+                    <img
+                      v-if="member.avatar_url"
+                      :src="member.avatar_url"
+                      class="autocomplete-avatar"
+                    />
+                    <div v-else class="autocomplete-avatar-placeholder">
+                      {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
+                    </div>
+                    <div class="autocomplete-info">
+                      <span class="autocomplete-name">{{ member.display_name || member.username }}</span>
+                      <span class="autocomplete-id">{{ member.id }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </FormField>
+          </div>
           <div class="form-row two-col">
             <FormField label="ID de l'utilisateur cible">
-              <input v-model="targetId" type="text" placeholder="ID utilisateur Discord" />
+              <input v-model="targetId" type="text" placeholder="ID auto-rempli ou saisie manuelle" />
             </FormField>
             <FormField label="Nom de l'utilisateur cible">
-              <input v-model="targetName" type="text" placeholder="nom#1234" />
+              <input v-model="targetName" type="text" placeholder="Auto-rempli ou saisie manuelle" />
             </FormField>
           </div>
           <div class="form-row two-col">
@@ -274,5 +345,80 @@ async function handleLookup() {
   font-size: 13px;
   text-align: center;
   padding: 16px;
+}
+
+/* Autocomplete */
+.autocomplete-wrapper {
+  position: relative;
+}
+
+.autocomplete-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.autocomplete-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.autocomplete-item:hover {
+  background: var(--bg-hover);
+}
+
+.autocomplete-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.autocomplete-avatar-placeholder {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: white;
+  flex-shrink: 0;
+}
+
+.autocomplete-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.autocomplete-name {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.autocomplete-id {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", "Cascadia Code", monospace;
 }
 </style>

@@ -58,9 +58,11 @@ pub async fn log_action(
         "moderation_action",
         serde_json::json!({
             "action_type": action_type,
+            "target_id": target_id,
             "target_name": target_name,
             "moderator_name": moderator_name,
             "reason": reason,
+            "guild_id": guild_id,
         }),
     );
 
@@ -120,6 +122,8 @@ pub async fn execute_ban(
         .await
         .map_err(ApiError)?;
 
+    let reason = dto.reason.clone();
+
     let command = crate::ports::inbound::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new(),
@@ -133,6 +137,18 @@ pub async fn execute_ban(
         duration: None,
     };
     state.moderation_uc.log_action(command).await?;
+
+    state.broadcaster.broadcast(
+        "moderation_action",
+        serde_json::json!({
+            "action_type": "ban_permanent",
+            "target_id": &dto.user_id,
+            "target_name": &dto.user_id,
+            "moderator_name": "Desktop App",
+            "guild_id": &dto.guild_id,
+            "reason": &reason,
+        }),
+    );
 
     Ok(ok_response())
 }
@@ -154,13 +170,16 @@ pub async fn execute_unban(
         .await
         .map_err(ApiError)?;
 
+    let target_id = dto.user_id.clone();
+    let guild_id = dto.guild_id.clone();
+
     let command = crate::ports::inbound::LogModerationCommand {
-        guild_id: dto.guild_id.clone(),
+        guild_id: dto.guild_id,
         channel_id: String::new(),
         moderator_id: "desktop".into(),
         moderator_name: "Desktop App".into(),
-        target_id: dto.user_id.clone(),
-        target_name: dto.user_id,
+        target_id: target_id.clone(),
+        target_name: target_id.clone(),
         action_type: "unban".into(),
         reason: "Deban depuis le desktop".into(),
         gravity: None,
@@ -168,9 +187,19 @@ pub async fn execute_unban(
     };
     state
         .moderation_uc
-        .delete_bans_for_user(&dto.guild_id, &command.target_id)
+        .delete_bans_for_user(&guild_id, &target_id)
         .await?;
     state.moderation_uc.log_action(command).await?;
+
+    state.broadcaster.broadcast(
+        "moderation_action",
+        serde_json::json!({
+            "action_type": "unban",
+            "target_id": &target_id,
+            "moderator_name": "Desktop App",
+            "guild_id": &guild_id,
+        }),
+    );
 
     Ok(ok_response())
 }

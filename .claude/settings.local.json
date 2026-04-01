@@ -10,7 +10,11 @@
       "Bash(taskkill //F //IM sentinel-api.exe)",
       "Bash(curl -s \"http://localhost:3000/api/rules\")",
       "Bash(curl -s \"http://localhost:3000/api/rules?guild_id=1486472782303985866\")",
-      "Bash(curl -s \"http://localhost:3000/rules/1486472782303985866\")"
+      "Bash(curl -s \"http://localhost:3000/rules/1486472782303985866\")",
+      "Bash(grep -l \"pub async fn\" \"C:\\\\Users\\\\micka\\\\source\\\\repos\\\\mickael62800\\\\DiscordSentinel\\\\services\\\\api\\\\src\\\\adapters\\\\inbound\\\\http\\\\handlers\"/*.rs)",
+      "Bash(while read:*)",
+      "Bash(do basename:*)",
+      "Bash(done)"
     ]
   }
 }

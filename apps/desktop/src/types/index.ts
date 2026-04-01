@@ -171,6 +171,13 @@ export interface SelectOption {
   label: string;
 }
 
+export interface GuildMember {
+  id: string;
+  username: string;
+  display_name: string | null;
+  avatar_url: string | null;
+}
+
 export interface Ticket {
   id: string;
   title: string;

@@ -157,16 +157,16 @@ const dossierConductColumns: TableColumn[] = [
         <div v-if="filteredUsers.length === 0" class="empty">
           Aucun utilisateur surveille
         </div>
-      </div>
 
-      <PaginationBar
-        :current-page="currentPage"
-        :total-pages="totalPages"
-        :total-items="totalItems"
-        :per-page="perPage"
-        @update:current-page="currentPage = $event"
-        @update:per-page="perPage = $event"
-      />
+        <PaginationBar
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total-items="totalItems"
+          :per-page="perPage"
+          @update:current-page="currentPage = $event"
+          @update:per-page="perPage = $event"
+        />
+      </div>
 
       <!-- Panneau dossier -->
       <div v-if="selectedUser" class="dossier-panel">
@@ -341,8 +341,8 @@ const dossierConductColumns: TableColumn[] = [
 }
 
 .users-list {
-  width: 420px;
-  min-width: 420px;
+  width: 520px;
+  min-width: 520px;
   display: flex;
   flex-direction: column;
   gap: 10px;

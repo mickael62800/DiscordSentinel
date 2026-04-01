@@ -294,6 +294,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // Discord roles (sync + list)
         .route("/api/discord-roles/{guild_id}", get(handlers::discord_roles::list_roles))
         .route("/api/discord-roles/{guild_id}/sync", post(handlers::discord_roles::sync_roles))
+        // Guild members (direct Discord API)
+        .route("/api/guilds/{guild_id}/members", get(handlers::guild_members::list_members))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

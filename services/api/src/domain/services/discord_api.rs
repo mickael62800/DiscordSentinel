@@ -1,4 +1,14 @@
+use serde::Deserialize;
+
 use crate::domain::errors::DomainError;
+
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
+pub struct DiscordMember {
+    pub id: String,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+}
 
 /// Service pour les appels a l'API Discord.
 /// Centralise la logique d'interaction avec Discord (ban, unban, etc.)
@@ -64,6 +74,90 @@ impl DiscordApiService {
         }
 
         Ok(())
+    }
+
+    /// Recuperer la liste des membres d'un serveur Discord (id + username).
+    pub async fn list_members(
+        &self,
+        guild_id: &str,
+        limit: u32,
+    ) -> Result<Vec<DiscordMember>, DomainError> {
+        self.ensure_configured()?;
+
+        let mut all_members = Vec::new();
+        let mut after: Option<String> = None;
+        let page_size = std::cmp::min(limit, 1000);
+
+        loop {
+            let mut url = format!(
+                "https://discord.com/api/v10/guilds/{}/members?limit={}",
+                guild_id, page_size
+            );
+            if let Some(ref after_id) = after {
+                url.push_str(&format!("&after={}", after_id));
+            }
+
+            let resp = self
+                .client
+                .get(&url)
+                .header("Authorization", format!("Bot {}", self.token))
+                .send()
+                .await
+                .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+            if !resp.status().is_success() {
+                let status = resp.status();
+                let body = resp.text().await.unwrap_or_default();
+                return Err(DomainError::Internal(format!(
+                    "Discord list members failed ({status}): {body}"
+                )));
+            }
+
+            let members: Vec<serde_json::Value> = resp
+                .json()
+                .await
+                .map_err(|e| DomainError::Internal(format!("Discord parse error: {e}")))?;
+
+            if members.is_empty() {
+                break;
+            }
+
+            for m in &members {
+                let user = match m.get("user") {
+                    Some(u) => u,
+                    None => continue,
+                };
+
+                let id = user.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let username = user.get("username").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                let display_name = m.get("nick")
+                    .and_then(|v| v.as_str())
+                    .or_else(|| user.get("global_name").and_then(|v| v.as_str()))
+                    .map(|s| s.to_string());
+
+                let avatar_hash = user.get("avatar").and_then(|v| v.as_str());
+                let avatar_url = avatar_hash.map(|h| {
+                    format!("https://cdn.discordapp.com/avatars/{}/{}.png?size=64", id, h)
+                });
+
+                if !id.is_empty() {
+                    all_members.push(DiscordMember {
+                        id,
+                        username,
+                        display_name,
+                        avatar_url,
+                    });
+                }
+            }
+
+            if all_members.len() >= limit as usize || members.len() < page_size as usize {
+                break;
+            }
+
+            after = all_members.last().map(|m| m.id.clone());
+        }
+
+        Ok(all_members)
     }
 
     /// Debannir un utilisateur d'un serveur Discord.

@@ -22,3 +22,4 @@ pub mod ia_config;
 pub mod notes;
 pub mod reminders;
 pub mod strikes;
+pub mod guild_members;
