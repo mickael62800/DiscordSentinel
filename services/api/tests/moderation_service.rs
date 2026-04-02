@@ -44,7 +44,7 @@ impl ModerationRepository for InMemoryModerationRepo {
             .collect())
     }
 
-    async fn find_bans(&self, guild_id: Option<&str>) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_bans(&self, guild_id: Option<&str>, _limit: i64, _offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
         let actions = self.actions.lock().await;
         Ok(actions
             .iter()
@@ -293,7 +293,7 @@ async fn get_history_isolates_users() {
 #[tokio::test]
 async fn list_bans_empty() {
     let (svc, _, _) = build_service();
-    let bans = svc.list_bans(None).await.unwrap();
+    let bans = svc.list_bans(None, 50, 0).await.unwrap();
     assert!(bans.is_empty());
 }
 
@@ -304,7 +304,7 @@ async fn list_bans_excludes_non_bans() {
     svc.log_action(make_command("mute_temp", None, Some(600))).await.unwrap();
     svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
 
-    let bans = svc.list_bans(None).await.unwrap();
+    let bans = svc.list_bans(None, 50, 0).await.unwrap();
     assert_eq!(bans.len(), 1);
     assert_eq!(bans[0].action_type, "ban_permanent");
 }
@@ -326,7 +326,7 @@ async fn list_bans_filters_by_guild() {
         duration: None,
     }).await.unwrap();
 
-    let bans = svc.list_bans(Some("guild1")).await.unwrap();
+    let bans = svc.list_bans(Some("guild1"), 50, 0).await.unwrap();
     assert_eq!(bans.len(), 1);
     assert_eq!(bans[0].guild_id, "guild1");
 }
@@ -368,7 +368,7 @@ async fn delete_bans_only_for_specific_user() {
 
     svc.delete_bans_for_user("guild1", "user1").await.unwrap();
 
-    let bans = svc.list_bans(None).await.unwrap();
+    let bans = svc.list_bans(None, 50, 0).await.unwrap();
     assert_eq!(bans.len(), 1);
     assert_eq!(bans[0].target_id, "user2");
 }

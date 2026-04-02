@@ -67,6 +67,8 @@ impl WatchedUserRepository for PgWatchedUserRepository {
     async fn find_watched_users(
         &self,
         guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError> {
         let query = r#"
             WITH user_infractions AS (
@@ -137,11 +139,13 @@ impl WatchedUserRepository for PgWatchedUserRepository {
                   )
             ) combined
             ORDER BY total_warns + total_mutes + total_bans DESC, last_incident_at DESC NULLS LAST
-            LIMIT 200
+            LIMIT $2 OFFSET $3
         "#;
 
         let rows = sqlx::query_as::<_, WatchedUserRow>(query)
             .bind(guild_id)
+            .bind(limit)
+            .bind(offset)
             .fetch_all(&self.pool)
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?;

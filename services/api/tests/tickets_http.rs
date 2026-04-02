@@ -62,7 +62,7 @@ fn make_ticket(id: Uuid, title: &str, status: &str, priority: &str) -> Ticket {
 
 #[async_trait]
 impl ManageTicketsUseCase for MockTicketsUC {
-    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, _search: Option<String>, _author_id: Option<String>) -> Result<Vec<Ticket>, DomainError> {
+    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, _search: Option<String>, _author_id: Option<String>, _limit: i64, _offset: i64) -> Result<Vec<Ticket>, DomainError> {
         let mut result = self.tickets.clone();
         if let Some(s) = status {
             result.retain(|t| t.status == s);

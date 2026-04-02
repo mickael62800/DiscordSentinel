@@ -10,6 +10,15 @@ use sqlx::PgPool;
 use tokio::signal;
 use tracing::{error, info, warn};
 
+// ── Constantes ──
+
+/// Nombre max de connexions PostgreSQL par defaut.
+const DEFAULT_PG_MAX_CONNECTIONS: u32 = 5;
+/// Timeout d'acquisition de connexion PostgreSQL par defaut (secondes).
+const DEFAULT_PG_ACQUIRE_TIMEOUT_SECS: u64 = 5;
+/// Intervalle de heartbeat par defaut (secondes).
+const DEFAULT_HEARTBEAT_INTERVAL_SECS: u64 = 30;
+
 // ── Init ──
 
 /// Initialise dotenvy + tracing avec un filtre par defaut.
@@ -27,30 +36,37 @@ pub fn init_tracing(default_filter: &str) {
 // ── PostgreSQL ──
 
 /// Cree un pool PostgreSQL avec des parametres configurables via env.
+/// Retourne une erreur au lieu de panic si la connexion echoue.
 pub async fn create_pg_pool(database_url: &str) -> PgPool {
     let max_connections: u32 = std::env::var("PG_MAX_CONNECTIONS")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(5);
+        .unwrap_or(DEFAULT_PG_MAX_CONNECTIONS);
 
     let acquire_timeout: u64 = std::env::var("PG_ACQUIRE_TIMEOUT")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(5);
+        .unwrap_or(DEFAULT_PG_ACQUIRE_TIMEOUT_SECS);
 
-    PgPoolOptions::new()
+    match PgPoolOptions::new()
         .max_connections(max_connections)
         .acquire_timeout(Duration::from_secs(acquire_timeout))
         .connect(database_url)
         .await
-        .expect("Impossible de se connecter a PostgreSQL")
+    {
+        Ok(pool) => pool,
+        Err(e) => {
+            error!(error = %e, "Impossible de se connecter a PostgreSQL");
+            std::process::exit(1);
+        }
+    }
 }
 
 // ── Lifecycle Logging ──
 
 /// Envoie un log de cycle de vie a l'API.
 pub async fn send_lifecycle_log(api_url: &str, worker_name: &str, level: &str, message: &str) {
-    let _ = reqwest::Client::new()
+    if let Err(e) = reqwest::Client::new()
         .post(format!("{}/api/logs", api_url))
         .json(&serde_json::json!({
             "level": level,
@@ -60,7 +76,10 @@ pub async fn send_lifecycle_log(api_url: &str, worker_name: &str, level: &str, m
             "category": "worker",
         }))
         .send()
-        .await;
+        .await
+    {
+        warn!(error = %e, worker = worker_name, "Erreur envoi log lifecycle");
+    }
 }
 
 // ── Heartbeat ──
@@ -70,19 +89,21 @@ pub fn start_heartbeat(api_url: String, worker_name: &'static str) {
     let interval: u64 = std::env::var("HEARTBEAT_INTERVAL")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(30);
+        .unwrap_or(DEFAULT_HEARTBEAT_INTERVAL_SECS);
 
     tokio::spawn(async move {
         let client = reqwest::Client::new();
         let url = format!("{}/api/bots/heartbeat", api_url);
 
         loop {
-            let _ = client
+            if let Err(e) = client
                 .post(&url)
                 .json(&serde_json::json!({ "name": worker_name }))
                 .send()
                 .await
-                .map_err(|e| warn!(error = %e, "Heartbeat echoue"));
+            {
+                warn!(error = %e, worker = worker_name, "Heartbeat echoue");
+            }
 
             tokio::time::sleep(Duration::from_secs(interval)).await;
         }
@@ -94,17 +115,17 @@ pub fn start_heartbeat(api_url: String, worker_name: &'static str) {
 /// Attend un signal d'arret (Ctrl+C ou SIGTERM).
 pub async fn shutdown_signal() {
     let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("Impossible d'ecouter Ctrl+C");
+        if let Err(e) = signal::ctrl_c().await {
+            error!(error = %e, "Impossible d'ecouter Ctrl+C");
+        }
     };
 
     #[cfg(unix)]
     let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("Impossible d'ecouter SIGTERM")
-            .recv()
-            .await;
+        match signal::unix::signal(signal::unix::SignalKind::terminate()) {
+            Ok(mut sig) => { sig.recv().await; }
+            Err(e) => error!(error = %e, "Impossible d'ecouter SIGTERM"),
+        }
     };
 
     #[cfg(not(unix))]
@@ -118,8 +139,8 @@ pub async fn shutdown_signal() {
 
 // ── Worker Enabled Check ──
 
-/// Vérifie si un worker est activé pour une guild donnée.
-/// Retourne `true` par défaut si la clé n'est pas définie (comportement inclusif).
+/// Verifie si un worker est active pour une guild donnee.
+/// Retourne `true` par defaut si la cle n'est pas definie (comportement inclusif).
 pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str) -> bool {
     let result: Option<String> = sqlx::query_scalar(
         "SELECT config_value FROM bot_guild_config \
@@ -133,6 +154,10 @@ pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str)
 
     result.map(|v| v != "false").unwrap_or(true)
 }
+
+/// Constantes de temps utilitaires.
+pub const SECS_PER_MINUTE: u64 = 60;
+pub const SECS_PER_HOUR: u64 = 3600;
 
 // ── Periodic Scheduler ──
 
@@ -166,7 +191,7 @@ pub fn spawn_periodic<F>(
 
             if let Err(e) = task_fn(pool.clone()).await {
                 error!(task = name, error = %e, "Erreur tache periodique");
-                let _ = client
+                if let Err(log_err) = client
                     .post(format!("{}/api/logs", api_url))
                     .json(&serde_json::json!({
                         "level": "error",
@@ -176,8 +201,30 @@ pub fn spawn_periodic<F>(
                         "details": {"job": name, "error": e.to_string()},
                     }))
                     .send()
-                    .await;
+                    .await
+                {
+                    warn!(error = %log_err, task = name, "Erreur envoi log d'erreur a l'API");
+                }
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_constants_are_reasonable() {
+        assert_eq!(DEFAULT_PG_MAX_CONNECTIONS, 5);
+        assert_eq!(DEFAULT_PG_ACQUIRE_TIMEOUT_SECS, 5);
+        assert_eq!(DEFAULT_HEARTBEAT_INTERVAL_SECS, 30);
+        assert_eq!(SECS_PER_MINUTE, 60);
+        assert_eq!(SECS_PER_HOUR, 3600);
+    }
+
+    #[test]
+    fn time_constants_coherent() {
+        assert_eq!(SECS_PER_HOUR, SECS_PER_MINUTE * 60);
+    }
 }

@@ -42,8 +42,10 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
     async fn list_watched_users(
         &self,
         guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError> {
-        self.watched_repo.find_watched_users(guild_id).await
+        self.watched_repo.find_watched_users(guild_id, limit, offset).await
     }
 
     async fn get_user_dossier(
@@ -51,7 +53,7 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<UserDossier, DomainError> {
-        let users = self.watched_repo.find_watched_users(Some(guild_id)).await?;
+        let users = self.watched_repo.find_watched_users(Some(guild_id), 1000, 0).await?;
         let user = users
             .into_iter()
             .find(|u| u.user_id == user_id)

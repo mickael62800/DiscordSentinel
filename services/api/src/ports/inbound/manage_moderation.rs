@@ -20,6 +20,6 @@ pub struct LogModerationCommand {
 pub trait ManageModerationUseCase: Send + Sync {
     async fn log_action(&self, command: LogModerationCommand) -> Result<ModerationAction, DomainError>;
     async fn get_history(&self, guild_id: &str, target_id: &str) -> Result<UserModerationHistory, DomainError>;
-    async fn list_bans(&self, guild_id: Option<&str>) -> Result<Vec<ModerationAction>, DomainError>;
+    async fn list_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError>;
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError>;
 }

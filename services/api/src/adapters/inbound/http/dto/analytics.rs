@@ -21,11 +21,11 @@ impl AnalyticsQuery {
 
 // ── Heatmap ──
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct HeatmapPointDto {
     pub hour: i16,
     pub day_of_week: i16,
-    pub day_name: &'static str,
+    pub day_name: String,
     pub messages: i64,
     pub infractions: i32,
 }
@@ -35,7 +35,7 @@ impl From<HourlyActivity> for HeatmapPointDto {
         Self {
             hour: h.hour,
             day_of_week: h.day_of_week,
-            day_name: day_name(h.day_of_week),
+            day_name: day_name(h.day_of_week).to_string(),
             messages: h.messages,
             infractions: h.infractions,
         }
@@ -44,7 +44,7 @@ impl From<HourlyActivity> for HeatmapPointDto {
 
 // ── Action distribution ──
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ActionDistributionDto {
     pub action: String,
     pub count: i64,
@@ -63,7 +63,7 @@ impl From<ActionDistribution> for ActionDistributionDto {
 
 // ── Top infracteurs ──
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TopInfractorDto {
     pub user_id: String,
     pub username: String,
@@ -90,7 +90,7 @@ impl From<TopInfractor> for TopInfractorDto {
 
 // ── Trend moderation ──
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ModerationTrendDto {
     pub day: String,
     pub total: i64,
@@ -115,7 +115,7 @@ impl From<ModerationTrend> for ModerationTrendDto {
 
 // ── Peak hours ──
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct PeakHourDto {
     pub hour: i16,
     pub label: String,
@@ -136,7 +136,7 @@ impl From<PeakActivity> for PeakHourDto {
 
 // ── Reponse complete analytics ──
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct FullAnalyticsDto {
     pub heatmap: Vec<HeatmapPointDto>,
     pub action_distribution: Vec<ActionDistributionDto>,

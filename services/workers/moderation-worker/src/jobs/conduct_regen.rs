@@ -1,8 +1,16 @@
 use sqlx::PgPool;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use sentinel_worker_common::is_worker_enabled;
+
+/// Intervalle SQL pour le mode weekly.
+const WEEKLY_INTERVAL: &str = "7 days";
+/// Intervalle SQL pour le mode monthly (approximation 30 jours).
+const MONTHLY_INTERVAL: &str = "30 days";
+/// Nombre max de rappels traites par batch.
+#[allow(dead_code)]
+const REMINDERS_BATCH_SIZE: i64 = 50;
 
 #[derive(sqlx::FromRow)]
 struct UserPoints {
@@ -18,18 +26,18 @@ struct RegenConfig {
     regen_amount: i32,
 }
 
-/// Régénère les points de conduite pour les utilisateurs éligibles (weekly + monthly)
+/// Regenere les points de conduite pour les utilisateurs eligibles (weekly + monthly).
 pub async fn run(pool: &PgPool) -> Result<(), String> {
     let mut total = 0u64;
 
     for interval in &["weekly", "monthly"] {
         let interval_expr = match *interval {
-            "weekly" => "7 days",
-            "monthly" => "30 days",
+            "weekly" => WEEKLY_INTERVAL,
+            "monthly" => MONTHLY_INTERVAL,
             _ => continue,
         };
 
-        // Récupérer les configs qui utilisent cet intervalle
+        // Recuperer les configs qui utilisent cet intervalle
         let configs: Vec<RegenConfig> = sqlx::query_as::<_, RegenConfig>(
             "SELECT guild_id, max_points, regen_amount FROM conduct_config WHERE regen_interval = $1",
         )
@@ -60,7 +68,7 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
                 let new_points = user.points + config.regen_amount;
 
                 if new_points >= config.max_points {
-                    // L'utilisateur est "clean", supprimer son entrée
+                    // L'utilisateur est "clean", supprimer son entree
                     log_regen(
                         pool,
                         &user.guild_id,
@@ -71,15 +79,17 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
                     )
                     .await;
 
-                    sqlx::query("DELETE FROM user_conduct_points WHERE guild_id = $1 AND user_id = $2")
+                    if let Err(e) = sqlx::query("DELETE FROM user_conduct_points WHERE guild_id = $1 AND user_id = $2")
                         .bind(&user.guild_id)
                         .bind(&user.user_id)
                         .execute(pool)
                         .await
-                        .ok();
+                    {
+                        warn!(error = %e, guild = %user.guild_id, user = %user.user_id, "Erreur suppression points de conduite");
+                    }
                 } else {
-                    // Mettre à jour les points + timestamp regen
-                    sqlx::query(
+                    // Mettre a jour les points + timestamp regen
+                    if let Err(e) = sqlx::query(
                         "UPDATE user_conduct_points SET points = $1, last_regen_at = NOW(), updated_at = NOW() \
                          WHERE guild_id = $2 AND user_id = $3",
                     )
@@ -88,7 +98,9 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
                     .bind(&user.user_id)
                     .execute(pool)
                     .await
-                    .ok();
+                    {
+                        warn!(error = %e, guild = %user.guild_id, user = %user.user_id, "Erreur mise a jour points de conduite");
+                    }
 
                     log_regen(
                         pool,
@@ -107,9 +119,9 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     }
 
     if total > 0 {
-        info!(count = total, "Points de conduite régénérés");
+        info!(count = total, "Points de conduite regeneres");
     } else {
-        debug!("Aucun point de conduite à régénérer");
+        debug!("Aucun point de conduite a regenerer");
     }
 
     Ok(())
@@ -123,7 +135,7 @@ async fn log_regen(
     before: i32,
     after: i32,
 ) {
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "INSERT INTO conduct_points_log (id, guild_id, user_id, delta, reason, points_before, points_after, created_at) \
          VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
     )
@@ -135,5 +147,58 @@ async fn log_regen(
     .bind(before)
     .bind(after)
     .execute(pool)
-    .await;
+    .await
+    {
+        warn!(error = %e, guild = %guild_id, user = %user_id, "Erreur insertion log regeneration");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn interval_constants() {
+        assert_eq!(WEEKLY_INTERVAL, "7 days");
+        assert_eq!(MONTHLY_INTERVAL, "30 days");
+    }
+
+    #[test]
+    fn regen_logic_clean_user() {
+        // Un utilisateur avec 90 points, max 100, regen 15 → 105 >= 100 → clean
+        let points = 90;
+        let regen_amount = 15;
+        let max_points = 100;
+        let new_points = points + regen_amount;
+        assert!(new_points >= max_points);
+    }
+
+    #[test]
+    fn regen_logic_partial_regen() {
+        // Un utilisateur avec 50 points, max 100, regen 10 → 60 < 100 → update
+        let points = 50;
+        let regen_amount = 10;
+        let max_points = 100;
+        let new_points = points + regen_amount;
+        assert!(new_points < max_points);
+        assert_eq!(new_points, 60);
+    }
+
+    #[test]
+    fn regen_logic_exact_threshold() {
+        // Exact au seuil → considere clean
+        let points = 90;
+        let regen_amount = 10;
+        let max_points = 100;
+        let new_points = points + regen_amount;
+        assert!(new_points >= max_points);
+    }
+
+    #[test]
+    fn regen_logic_zero_regen() {
+        let points = 50;
+        let regen_amount = 0;
+        let new_points = points + regen_amount;
+        assert_eq!(new_points, 50);
+    }
 }

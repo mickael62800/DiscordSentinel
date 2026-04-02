@@ -57,12 +57,12 @@ impl ApiClient {
             .map_err(|e| format!("{e}"))
     }
 
-    /// Recupere les IDs des utilisateurs surveilles pour un serveur
-    pub async fn get_watched_user_ids(&self, guild_id: &str) -> Result<Vec<String>, String> {
+    /// Recupere les IDs de tous les utilisateurs surveilles (batch, tous les serveurs).
+    /// Un seul appel API au lieu de N appels par guild.
+    pub async fn get_all_watched_user_ids(&self) -> Result<Vec<String>, String> {
         let url = format!(
-            "{}/api/watched-users?guild_id={}",
+            "{}/api/watched-users?limit=1000",
             self.base.base_url(),
-            guild_id
         );
 
         let req = self.base.client().get(&url);

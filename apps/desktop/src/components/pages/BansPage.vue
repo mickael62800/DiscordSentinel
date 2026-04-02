@@ -6,17 +6,17 @@ import { useConfirm } from "../../composables/useConfirm";
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
+import BanModal from "../molecules/BanModal.vue";
 import type { Infraction, ConfirmedBan } from "../../types";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
-const banError = ref<string | null>(null);
+const banModalRef = ref<InstanceType<typeof BanModal> | null>(null);
+const unbanError = ref<string | null>(null);
 
-// Modale de ban avec raison
 const banModalVisible = ref(false);
 const banModalTarget = ref<Infraction | null>(null);
-const banModalReason = ref("");
 
 const {
   filteredProposals,
@@ -34,38 +34,33 @@ useRealtimeRefresh(["infraction_new", "moderation_action"], fetchBans);
 
 function openBanModal(proposal: Infraction) {
   banModalTarget.value = proposal;
-  banModalReason.value = proposal.reason || "";
   banModalVisible.value = true;
-  banError.value = null;
 }
 
 function closeBanModal() {
   banModalVisible.value = false;
   banModalTarget.value = null;
-  banModalReason.value = "";
 }
 
-async function confirmBan() {
+async function onBanConfirm(reason: string) {
   if (!banModalTarget.value) return;
   const proposal = banModalTarget.value;
-  const reason = banModalReason.value.trim() || "Aucune raison specifiee";
-
   try {
     await executeBan(proposal.server, proposal.user_id, reason);
     closeBanModal();
   } catch (e) {
-    banError.value = String(e);
+    banModalRef.value?.setError(String(e));
   }
 }
 
 async function handleUnban(ban: ConfirmedBan) {
-  banError.value = null;
+  unbanError.value = null;
   const ok = await confirm({ message: `Debannir ${ban.target_name} (${ban.target_id}) ?` });
   if (!ok) return;
   try {
     await executeUnban(ban.guild_id, ban.target_id);
   } catch (e) {
-    banError.value = String(e);
+    unbanError.value = String(e);
   }
 }
 </script>
@@ -83,7 +78,7 @@ async function handleUnban(ban: ConfirmedBan) {
       />
     </div>
 
-    <p v-if="banError" class="ban-error">{{ banError }}</p>
+    <p v-if="unbanError" class="ban-error">{{ unbanError }}</p>
 
     <LoadingState v-if="loading" />
 
@@ -186,50 +181,14 @@ async function handleUnban(ban: ConfirmedBan) {
       </div>
     </div>
 
-    <!-- Modale de bannissement avec raison -->
-    <teleport to="body">
-      <div v-if="banModalVisible" class="modal-overlay" @click.self="closeBanModal">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h3>Bannir un utilisateur</h3>
-            <button class="modal-close" @click="closeBanModal">&times;</button>
-          </div>
-
-          <div class="modal-body" v-if="banModalTarget">
-            <div class="modal-user">
-              <div class="user-avatar-placeholder proposal-avatar">
-                {{ banModalTarget.username.charAt(0).toUpperCase() }}
-              </div>
-              <div class="user-info">
-                <span class="username">{{ banModalTarget.username }}</span>
-                <span class="user-id">{{ banModalTarget.user_id }}</span>
-              </div>
-            </div>
-
-            <label class="modal-label">Raison du bannissement</label>
-            <textarea
-              v-model="banModalReason"
-              class="modal-textarea"
-              rows="3"
-              placeholder="Indiquez la raison du bannissement..."
-            ></textarea>
-
-            <p v-if="banError" class="ban-error">{{ banError }}</p>
-          </div>
-
-          <div class="modal-footer">
-            <button class="modal-cancel" @click="closeBanModal">Annuler</button>
-            <button
-              class="ban-btn"
-              :disabled="banning || !banModalReason.trim()"
-              @click="confirmBan"
-            >
-              {{ banning ? 'Bannissement...' : 'Confirmer le ban' }}
-            </button>
-          </div>
-        </div>
-      </div>
-    </teleport>
+    <BanModal
+      ref="banModalRef"
+      :visible="banModalVisible"
+      :target="banModalTarget"
+      :banning="banning"
+      @close="closeBanModal"
+      @confirm="onBanConfirm"
+    />
   </div>
 </template>
 
@@ -441,119 +400,4 @@ async function handleUnban(ban: ConfirmedBan) {
   margin-bottom: 12px;
 }
 
-/* Modale */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-content {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 24px;
-  cursor: pointer;
-  line-height: 1;
-}
-
-.modal-close:hover {
-  color: var(--text-primary);
-}
-
-.modal-body {
-  padding: 20px;
-}
-
-.modal-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px;
-  background: var(--bg-hover);
-  border-radius: 8px;
-}
-
-.modal-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.modal-textarea {
-  width: 100%;
-  background: var(--bg-input, var(--bg-card));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.modal-textarea:focus {
-  border-color: var(--accent);
-}
-
-.modal-textarea::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.6;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 20px;
-  border-top: 1px solid var(--border);
-}
-
-.modal-cancel {
-  background: transparent;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 16px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.modal-cancel:hover {
-  background: var(--bg-hover);
-}
 </style>

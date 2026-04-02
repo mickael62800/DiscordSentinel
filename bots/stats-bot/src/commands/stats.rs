@@ -50,7 +50,14 @@ pub fn register() -> CreateCommand {
 
 /// Dispatch la slash command.
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let sub = &command.data.options[0];
+    let sub = match command.data.options.first() {
+        Some(s) => s,
+        None => {
+            let _ = reply_text(ctx, command, "Erreur : sous-commande manquante.").await;
+            return;
+        }
+    };
+
     let result = match sub.name.as_str() {
         "user" => handle_user(ctx, command).await,
         "server" => handle_server(ctx, command).await,
@@ -63,6 +70,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 }
 
+/// Extrait les sous-options d'une sous-commande de maniere safe.
+fn get_sub_options(command: &CommandInteraction) -> Option<&Vec<serenity::all::CommandDataOption>> {
+    command.data.options.first().and_then(|opt| match &opt.value {
+        CommandDataOptionValue::SubCommand(opts) => Some(opts),
+        _ => None,
+    })
+}
+
 /// /stats user [target]
 async fn handle_user(
     ctx: &Context,
@@ -73,9 +88,9 @@ async fn handle_user(
         None => return reply_text(ctx, command, "Cette commande ne fonctionne que dans un serveur.").await,
     };
 
-    let sub_options = match &command.data.options[0].value {
-        CommandDataOptionValue::SubCommand(opts) => opts,
-        _ => return reply_text(ctx, command, "Erreur interne.").await,
+    let sub_options = match get_sub_options(command) {
+        Some(opts) => opts,
+        None => return reply_text(ctx, command, "Erreur interne.").await,
     };
 
     let target_id = sub_options
@@ -205,16 +220,16 @@ async fn handle_top(
         None => return reply_text(ctx, command, "Cette commande ne fonctionne que dans un serveur.").await,
     };
 
-    let sub_options = match &command.data.options[0].value {
-        CommandDataOptionValue::SubCommand(opts) => opts,
-        _ => return reply_text(ctx, command, "Erreur interne.").await,
+    let sub_options = match get_sub_options(command) {
+        Some(opts) => opts,
+        None => return reply_text(ctx, command, "Erreur interne.").await,
     };
 
     let limit = sub_options
         .iter()
         .find(|o| o.name == "limit")
         .and_then(|o| match &o.value {
-            CommandDataOptionValue::Integer(n) => Some(*n as u32),
+            CommandDataOptionValue::Integer(n) => Some((*n as u32).clamp(1, 25)),
             _ => None,
         })
         .unwrap_or(10);

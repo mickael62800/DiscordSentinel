@@ -2,36 +2,38 @@
 
 Date : 02/04/2026
 
+---
+
 ## Notes de qualite — /10
 
 ### Bots Discord
 
 | Bot | Lignes | Tests | Erreurs | Warnings | Note | Commentaire |
 |-----|--------|-------|---------|----------|------|-------------|
-| ticket-bot | 3 397 | 59 pass | 0 | 0 | **8/10** | Fonctionnel, bien teste. ticket.rs trop gros (1686 lignes), a splitter. |
 | automod-bot | 2 429 | 214 pass | 0 | 0 | **9/10** | Excellent. Tres bien teste (214 tests), detecteurs bien separes. |
-| moderation-bot | 2 491 | 25 pass | 0 | 0 | **8/10** | Solide, Redis PubSub integre, embeds propres. Plus de tests souhaitable. |
 | security-bot | 3 002 | 64 pass | 0 | 0 | **8.5/10** | Bien structure (module security/), bonne couverture tests. |
-| voice-bot | 5 356 | 27 pass | 0 | 0 | **8/10** | Tres complet (AFK, vote kick, queue, etc.). Tests state OK. Manque tests interactions. |
-| stats-bot | 1 321 | 7 pass | 0 | 0 | **7/10** | Fonctionnel mais peu teste. Code simple et propre. |
-| audit-bot | 2 650 | 29 pass | 0 | 0 | **8/10** | Bien structure (handlers par type), detection anomalies, cache messages. |
-| image-bot | 1 086 | 18 pass | 0 | 0 | **7.5/10** | Compact, queue de retry. Fallback safe (ne supprime plus si API down). |
+| image-bot | 1 150 | 42 pass | 0 | 0 | **8.5/10** | Panics corriges, erreurs Discord loguees, constantes extraites, helper embed factorise, detection WEBP safe. |
+| ticket-bot | 3 397 | 59 pass | 0 | 0 | **8/10** | Fonctionnel, bien teste. ticket.rs trop gros (1686 lignes), a splitter. |
+| moderation-bot | 2 491 | 25 pass | 0 | 0 | **8/10** | Solide, Redis PubSub integre, embeds propres. |
+| voice-bot | 5 356 | 27 pass | 0 | 0 | **8/10** | Tres complet (AFK, vote kick, queue, themes, stage, invitations). |
+| audit-bot | 2 650 | 29 pass | 0 | 0 | **8/10** | Bien structure (handlers par type), detection anomalies, cache messages LRU. |
 | community-bot | 1 502 | 40 pass | 0 | 0 | **8/10** | Bien teste, sponsorship system clean. |
-| progression-bot | 2 003 | 42 pass | 0 | 0 | **8/10** | XP system bien structure, bonne couverture tests. |
+| progression-bot | 2 003 | 42 pass | 0 | 0 | **8/10** | XP system bien structure, cooldowns, streaks, badges, multiplicateurs. |
+| stats-bot | 1 420 | 26 pass | 0 | 0 | **8/10** | Check enabled, safe options access, validation clamp, logging XP vocal, tests tracker+commands. |
 
 ### Backend
 
 | Composant | Lignes | Tests | Erreurs | Warnings | Note | Commentaire |
 |-----------|--------|-------|---------|----------|------|-------------|
-| API Rust | 19 423 | 204/205 pass | 0 | 0 | **8.5/10** | Architecture hexagonale propre, cache Redis, 246 params config, filtrage. 1 test ML a affiner. |
-| API ML (Python) | ~500 | - | 0 | 0 | **7/10** | Fonctionnel, FastAPI clean. Pas de tests automatises. |
-| Workers (x4) | ~1 200 | - | 0 | 0 | **7.5/10** | Simples et efficaces. Monitoring Redis OK. Pas de tests dedies. |
+| API Rust | 19 423 | 205 pass | 0 | 0 | **8.5/10** | Architecture hexagonale, cache Redis, 246 params config, filtrage avance. |
+| API ML (Python) | ~600 | 84 pass | 0 | 0 | **8.5/10** | Logging structure, validation Pydantic Field(), CORS securise, enum ModelType, Dockerfile, refactor training. |
+| Workers (x4) | ~1 250 | 18 pass | 0 | 0 | **8/10** | Panics corriges, erreurs loguees, constantes nommees, debug→warn snapshots, tests config+logic. |
 
 ### Application Bureau
 
 | Composant | Fichiers | Lignes | Erreurs TS | Note | Commentaire |
 |-----------|----------|--------|------------|------|-------------|
-| Desktop (Vue + Tauri) | 94 | 15 679 | 0 | **8/10** | 0 erreur TS, pagination, ErrorState sur toutes les pages, ConnectionBanner, autocomplete membres. API_BASE_URL centralise. |
+| Desktop (Vue + Tauri) | 94 | 15 679 | 0 | **8/10** | 0 erreur TS, pagination, ErrorState, ConnectionBanner, autocomplete membres, API_BASE_URL centralise. |
 
 ---
 
@@ -41,19 +43,21 @@ Date : 02/04/2026
 |----------|--------|
 | Total lignes Rust | ~45 000 |
 | Total lignes Vue/TS | ~15 700 |
-| Total tests | 525 pass, 0 fail |
+| Total lignes Python | ~600 |
+| Total tests | **670 pass, 0 fail** |
 | Erreurs compilation | 0 |
 | Warnings | 0 |
 | Parametres personnalisables | 246 |
 | Endpoints API | ~60 |
-| **Note globale** | **8/10** |
+| Bots Discord | 10 |
+| Workers | 4 |
+| **Note globale** | **8.3/10** |
 
 ---
 
 ## Points forts
 
-- 0 erreur, 0 warning sur l'ensemble du projet
-- 525 tests unitaires qui passent tous
+- **670 tests** unitaires qui passent tous, 0 erreur, 0 warning
 - Architecture hexagonale cote API (ports/adapters)
 - Cache Redis avec invalidation sur les endpoints critiques
 - Gestion d'erreurs globale (ErrorState + ConnectionBanner)
@@ -64,8 +68,15 @@ Date : 02/04/2026
 - Logs moderation avec embeds structures et avatars
 - Pagination sur toutes les listes
 - Autocomplete membres Discord
+- Validation Pydantic avec contraintes (Field) sur l'API ML
+- CORS securise (whitelist au lieu de wildcard)
+- Constantes nommees dans tous les workers et bots
+- Panics elimines (expect→match, unwrap→unwrap_or_default)
+- Erreurs Discord loguees (warn!) au lieu d'etre silencieuses
 
-## Axes d'amelioration
+---
+
+## Axes d'amelioration restants
 
 ### Code (impact faible)
 - Splitter ticket.rs (1686 lignes) en sous-modules
@@ -73,10 +84,9 @@ Date : 02/04/2026
 - Extraire les modales en composants reutilisables
 
 ### Tests (impact moyen)
-- Ajouter des tests unitaires pour stats-bot (actuellement 7)
-- Ajouter des tests pour les workers
 - Tests d'integration E2E pour les interactions Discord
-- Tests de l'API ML Python
+- Tests moderation-bot (25 tests, le plus bas des bots)
+- Tests voice-bot interactions (27 tests, manque tests boutons)
 
 ### Performance (impact moyen)
 - Monitoring cache hit/miss Redis

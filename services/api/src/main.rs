@@ -98,7 +98,11 @@ async fn main() {
     let notes_repo = Arc::new(PgNotesRepository::new(pg_pool.clone()));
     let reminder_repo = Arc::new(PgReminderRepository::new(pg_pool.clone()));
     let strike_repo = Arc::new(PgStrikeRepository::new(pg_pool.clone()));
-    let cache = Arc::new(RedisCache::new(redis_client.clone()));
+    let cache = Arc::new(
+        RedisCache::new(redis_client.clone())
+            .await
+            .expect("Impossible d'etablir la connexion Redis pour le cache"),
+    );
 
     // ── Event broadcaster (Redis pub/sub → gateway WebSocket) ──
     let redis_channel = std::env::var("REDIS_CHANNEL")
@@ -240,6 +244,7 @@ async fn main() {
         discord_bot_token: config.discord_bot_token.clone(),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
+        cache: Some(cache.clone()),
     };
 
     let api_log_repo = state.log_repo.clone();

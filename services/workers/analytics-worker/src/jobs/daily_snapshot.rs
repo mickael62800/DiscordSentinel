@@ -1,5 +1,5 @@
 use sqlx::PgPool;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use sentinel_worker_common::is_worker_enabled;
 
@@ -62,7 +62,7 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         if result.is_ok() {
             count += 1;
         } else if let Err(e) = result {
-            debug!(error = %e, guild = %guild.guild_id, "Erreur snapshot activité");
+            warn!(error = %e, guild = %guild.guild_id, "Erreur snapshot activite quotidienne");
         }
     }
 

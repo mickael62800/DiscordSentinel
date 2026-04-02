@@ -92,20 +92,24 @@ impl ModerationRepository for PgModerationRepository {
         Ok(rows.into_iter().map(ModerationAction::from).collect())
     }
 
-    async fn find_bans(&self, guild_id: Option<&str>) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
         let rows = match guild_id {
             Some(gid) => {
                 sqlx::query_as::<_, ActionRow>(
-                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' AND guild_id = $1 ORDER BY created_at DESC LIMIT 200",
+                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' AND guild_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
                 )
                 .bind(gid)
+                .bind(limit)
+                .bind(offset)
                 .fetch_all(&self.pool)
                 .await
             }
             None => {
                 sqlx::query_as::<_, ActionRow>(
-                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' ORDER BY created_at DESC LIMIT 200",
+                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' ORDER BY created_at DESC LIMIT $1 OFFSET $2",
                 )
+                .bind(limit)
+                .bind(offset)
                 .fetch_all(&self.pool)
                 .await
             }

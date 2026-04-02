@@ -8,6 +8,8 @@ pub trait WatchedUserRepository: Send + Sync {
     async fn find_watched_users(
         &self,
         guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError>;
 
     async fn add_manual_watch(

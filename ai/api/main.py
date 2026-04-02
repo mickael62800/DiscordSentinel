@@ -3,6 +3,7 @@ Sentinel AI Training API — FastAPI
 Pilote l'entrainement des modeles text et vision depuis l'app desktop.
 """
 
+import logging
 import os
 from pathlib import Path
 from contextlib import asynccontextmanager
@@ -11,31 +12,40 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+from constants import ALLOWED_ORIGINS
+
 load_dotenv()
 
 AI_ROOT = Path(__file__).resolve().parent.parent
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger("sentinel.ai")
 
 from routes import datasets, training, export
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Sentinel AI API demarree")
+    logger.info("Sentinel AI API demarree")
     yield
-    print("Sentinel AI API arretee")
+    logger.info("Sentinel AI API arretee")
 
 
 app = FastAPI(
     title="Sentinel AI Training API",
-    version="0.1.0",
+    version="0.2.0",
     description="API pour l'entrainement et l'export des modeles IA de DiscordSentinel",
     lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=ALLOWED_ORIGINS,
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -45,7 +55,8 @@ app.include_router(export.router, prefix="/api/ai", tags=["Export"])
 
 
 @app.get("/health")
-async def health():
+async def health() -> dict[str, str]:
+    """Verifie que l'API est en ligne."""
     return {"status": "ok", "service": "sentinel-ai"}
 
 

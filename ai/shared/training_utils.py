@@ -2,27 +2,35 @@
 Utilitaires partages pour l'entrainement text et vision.
 """
 
+import logging
+from collections import Counter
+
 import torch
 import torch.nn as nn
-from collections import Counter
+from torch.utils.data import DataLoader
+
+logger = logging.getLogger("sentinel.ai.training_utils")
 
 
 class EarlyStopping:
-    """
-    Arrete l'entrainement si la metrique ne s'ameliore pas
+    """Arrete l'entrainement si la metrique ne s'ameliore pas
     pendant `patience` epochs consecutives.
+
+    Args:
+        patience: Nombre d'epochs sans amelioration avant arret (0=desactive).
+        mode: "min" pour surveiller val_loss, "max" pour val_accuracy.
     """
 
-    def __init__(self, patience: int = 3, mode: str = "min"):
+    def __init__(self, patience: int = 3, mode: str = "min") -> None:
         self.patience = patience
-        self.mode = mode  # "min" pour val_loss, "max" pour val_accuracy
-        self.counter = 0
-        self.best_value = float("inf") if mode == "min" else float("-inf")
-        self.best_epoch = 0
-        self.should_stop = False
+        self.mode = mode
+        self.counter: int = 0
+        self.best_value: float = float("inf") if mode == "min" else float("-inf")
+        self.best_epoch: int = 0
+        self.should_stop: bool = False
 
     def step(self, value: float, epoch: int) -> bool:
-        """Retourne True si on doit s'arreter."""
+        """Evalue la metrique courante. Retourne True si on doit s'arreter."""
         improved = (
             value < self.best_value if self.mode == "min"
             else value > self.best_value
@@ -45,34 +53,48 @@ def get_class_weights(
     num_classes: int,
     device: torch.device,
 ) -> torch.Tensor:
-    """
-    Calcule les poids de classe inversement proportionnels a leur frequence.
-    weight[c] = total_samples / (num_classes * count[c])
+    """Calcule les poids de classe inversement proportionnels a leur frequence.
+
+    Formula: weight[c] = total_samples / (num_classes * count[c])
     """
     counts = Counter(labels)
     total = sum(counts.values())
-    weights = []
+    weights: list[float] = []
     for c in range(num_classes):
         count = counts.get(c, 1)
         weights.append(total / (num_classes * count))
+
+    logger.debug("Class weights: %s", {c: f"{w:.3f}" for c, w in enumerate(weights)})
     return torch.tensor(weights, dtype=torch.float32).to(device)
 
 
 def find_lr(
     model: nn.Module,
-    train_loader,
+    train_loader: DataLoader,
     optimizer: torch.optim.Optimizer,
-    criterion: nn.Module,
+    criterion: nn.Module | None,
     device: torch.device,
     start_lr: float = 1e-7,
     end_lr: float = 1.0,
     num_steps: int = 100,
     is_text: bool = False,
 ) -> tuple[list[float], list[float]]:
-    """
-    LR Range Test : fait varier le learning rate de start_lr a end_lr
-    et enregistre la loss. Le LR optimal est la ou la loss descent le plus vite.
-    Retourne (lrs, losses) pour visualisation.
+    """LR Range Test : fait varier le learning rate de start_lr a end_lr
+    et enregistre la loss. Le LR optimal est la ou la loss descend le plus vite.
+
+    Args:
+        model: Le modele a tester.
+        train_loader: Le dataloader d'entrainement.
+        optimizer: L'optimizer configure.
+        criterion: La loss function (None = utilise la loss du modele HuggingFace).
+        device: Device CPU/CUDA.
+        start_lr: LR de depart.
+        end_lr: LR maximum.
+        num_steps: Nombre de steps de test.
+        is_text: True pour les modeles text (dict batches), False pour vision (tuple).
+
+    Returns:
+        Tuple (lrs, losses) pour visualisation.
     """
     model.train()
     lr_mult = (end_lr / start_lr) ** (1 / num_steps)
@@ -82,8 +104,8 @@ def find_lr(
     original_state = {k: v.clone() for k, v in model.state_dict().items()}
     original_lr = optimizer.param_groups[0]["lr"]
 
-    lrs = []
-    losses = []
+    lrs: list[float] = []
+    losses: list[float] = []
     best_loss = float("inf")
     avg_loss = 0.0
     smoothing = 0.05
@@ -118,7 +140,7 @@ def find_lr(
         avg_loss = smoothing * loss.item() + (1 - smoothing) * avg_loss if step > 0 else loss.item()
 
         if avg_loss > best_loss * 4 and step > 10:
-            break  # Loss diverge, on arrete
+            break  # Loss diverge
 
         if avg_loss < best_loss:
             best_loss = avg_loss
@@ -138,4 +160,5 @@ def find_lr(
     for param_group in optimizer.param_groups:
         param_group["lr"] = original_lr
 
+    logger.info("LR finder: %d steps, best_loss=%.4f", len(lrs), best_loss)
     return lrs, losses

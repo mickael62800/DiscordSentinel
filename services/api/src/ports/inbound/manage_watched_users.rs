@@ -20,6 +20,8 @@ pub trait ManageWatchedUsersUseCase: Send + Sync {
     async fn list_watched_users(
         &self,
         guild_id: Option<&str>,
+        limit: i64,
+        offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError>;
 
     async fn get_user_dossier(

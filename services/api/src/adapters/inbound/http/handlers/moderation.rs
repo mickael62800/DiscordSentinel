@@ -13,6 +13,8 @@ use crate::ports::inbound::{AddStrikeCommand, CreateReminderCommand};
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
     pub guild_id: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 /// POST /api/moderation/actions — enregistrer une action de modération
@@ -209,9 +211,11 @@ pub async fn list_bans(
     State(state): State<AppState>,
     Query(params): Query<BansQuery>,
 ) -> Result<Json<Vec<BanEntryDto>>, ApiError> {
+    let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500);
+    let offset = params.offset.unwrap_or(0).max(0);
     let bans = state
         .moderation_uc
-        .list_bans(params.guild_id.as_deref())
+        .list_bans(params.guild_id.as_deref(), limit, offset)
         .await?;
     Ok(map_to_dtos(bans))
 }

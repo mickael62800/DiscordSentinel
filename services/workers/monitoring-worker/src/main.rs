@@ -1,7 +1,7 @@
 mod config;
 mod monitor;
 
-use tracing::info;
+use tracing::{error, info};
 
 use crate::config::MonitorConfig;
 use sentinel_worker_common as common;
@@ -16,13 +16,18 @@ async fn main() {
 
     info!("Demarrage de Sentinel Monitoring Worker");
 
-    let redis_client =
-        redis::Client::open(config.redis_url.as_str()).expect("URL Redis invalide");
+    let redis_client = match redis::Client::open(config.redis_url.as_str()) {
+        Ok(c) => c,
+        Err(e) => {
+            error!(error = %e, url = %config.redis_url, "URL Redis invalide");
+            std::process::exit(1);
+        }
+    };
 
     match redis_client.get_multiplexed_async_connection().await {
         Ok(_) => info!("Redis connecte"),
         Err(e) => {
-            tracing::error!("Redis indisponible: {e}");
+            error!(error = %e, "Redis indisponible");
             std::process::exit(1);
         }
     }

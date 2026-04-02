@@ -91,8 +91,8 @@ impl ManageModerationUseCase for ManageModerationService {
         Ok(history)
     }
 
-    async fn list_bans(&self, guild_id: Option<&str>) -> Result<Vec<ModerationAction>, DomainError> {
-        self.repo.find_bans(guild_id).await
+    async fn list_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
+        self.repo.find_bans(guild_id, limit, offset).await
     }
 
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {

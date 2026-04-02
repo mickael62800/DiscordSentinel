@@ -123,10 +123,70 @@ services:
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      MONITOR_CHECK_INTERVAL: ${MONITOR_CHECK_INTERVAL:-30}
       RUST_LOG: info
     depends_on:
       redis:
         condition: service_healthy
+
+  cache-worker:
+    build:
+      context: ./services/workers/cache-worker
+      dockerfile: Dockerfile
+    container_name: sentinel-cache-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
+      API_URL: http://api:3000
+      ANALYTICS_CACHE_REFRESH: ${ANALYTICS_CACHE_REFRESH:-300}
+      DASHBOARD_CACHE_REFRESH: ${DASHBOARD_CACHE_REFRESH:-600}
+      VOICE_STATS_CACHE_REFRESH: ${VOICE_STATS_CACHE_REFRESH:-3600}
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  cleanup-worker:
+    build:
+      context: ./services/workers/cleanup-worker
+      dockerfile: Dockerfile
+    container_name: sentinel-cleanup-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
+      API_URL: http://api:3000
+      VOICE_SESSIONS_RETENTION_DAYS: ${VOICE_SESSIONS_RETENTION_DAYS:-90}
+      LOGS_RETENTION_DAYS: ${LOGS_RETENTION_DAYS:-30}
+      CLOSED_TICKETS_RETENTION_DAYS: ${CLOSED_TICKETS_RETENTION_DAYS:-180}
+      CLEANUP_INTERVAL_HOURS: ${CLEANUP_INTERVAL_HOURS:-1}
+      VACUUM_ENABLED: ${VACUUM_ENABLED:-true}
+      VACUUM_INTERVAL_HOURS: ${VACUUM_INTERVAL_HOURS:-24}
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ──────────────────────────────────────────────
+  # AI
+  # ──────────────────────────────────────────────
+
+  ai-api:
+    build:
+      context: .
+      dockerfile: ai/api/Dockerfile
+    container_name: sentinel-ai-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      AI_API_PORT: "8000"
+    volumes:
+      - ./ai/training:/app/training
+    profiles:
+      - ai
 
   # ──────────────────────────────────────────────
   # Bots
@@ -262,6 +322,39 @@ services:
       RUST_LOG: info
     depends_on:
       - api
+
+  coude-bot:
+    build:
+      context: ./bots/coude-bot
+      dockerfile: Dockerfile
+    container_name: sentinel-coude-bot
+    restart: unless-stopped
+    environment:
+      COUDE_DISCORD_TOKEN: ${COUDE_DISCORD_TOKEN}
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
+      API_BASE_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+
+  coude-worker:
+    build:
+      context: ./services/workers/coude-worker
+      dockerfile: Dockerfile
+    container_name: sentinel-coude-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
+      API_URL: http://api:3000
+      COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   # ──────────────────────────────────────────────
   # Monitoring

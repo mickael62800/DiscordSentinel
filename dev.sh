@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
 # DiscordSentinel - Dev Launcher
-# Lance TOUT : API, API ML, 9 bots, desktop
+# Lance TOUT : API, API ML, 10 bots, 6 workers, desktop
 # ============================================
 
 set -e
@@ -132,7 +132,7 @@ start_service "gateway" \
 # Attendre que les APIs + gateway demarrent avant les bots et workers
 sleep 3
 
-# ── 4. Workers ──
+# ── 4. Workers (6) ──
 start_service "analytics-worker" \
     "$ROOT_DIR/services/workers/analytics-worker" \
     "cargo run" \
@@ -148,7 +148,17 @@ start_service "monitoring-worker" \
     "cargo run" \
     "$YELLOW"
 
-# ── 5. Tous les bots Discord ──
+start_service "cache-worker" \
+    "$ROOT_DIR/services/workers/cache-worker" \
+    "cargo run" \
+    "$YELLOW"
+
+start_service "cleanup-worker" \
+    "$ROOT_DIR/services/workers/cleanup-worker" \
+    "cargo run" \
+    "$YELLOW"
+
+# ── 5. Tous les bots Discord (10) ──
 start_service "audit-bot" \
     "$ROOT_DIR/bots/audit-bot" \
     "cargo run" \
@@ -184,6 +194,11 @@ start_service "progression-bot" \
     "cargo run" \
     "$BLUE"
 
+start_service "stats-bot" \
+    "$ROOT_DIR/bots/stats-bot" \
+    "cargo run" \
+    "$BLUE"
+
 start_service "ticket-bot" \
     "$ROOT_DIR/bots/ticket-bot" \
     "cargo run" \
@@ -216,13 +231,15 @@ echo -e "  API ML      : ${MAGENTA}http://localhost:8000${NC}"
 echo -e "  Gateway WS  : ${GREEN}ws://localhost:3001${NC}"
 echo -e "  Desktop     : ${CYAN}Tauri app (fenetre native)${NC}"
 echo ""
-echo -e "  Workers (3) :"
-echo -e "    ${YELLOW}analytics-worker  moderation-worker  monitoring-worker${NC}"
+echo -e "  Workers (6) :"
+echo -e "    ${YELLOW}analytics-worker   moderation-worker  monitoring-worker${NC}"
+echo -e "    ${YELLOW}cache-worker       cleanup-worker${NC}"
 echo ""
-echo -e "  Bots Discord (9) :"
-echo -e "    ${BLUE}audit-bot  automod-bot  image-bot${NC}"
-echo -e "    ${BLUE}community-bot  moderation-bot  security-bot${NC}"
-echo -e "    ${BLUE}progression-bot  ticket-bot  voice-bot${NC}"
+echo -e "  Bots Discord (10) :"
+echo -e "    ${BLUE}audit-bot     automod-bot    image-bot${NC}"
+echo -e "    ${BLUE}community-bot moderation-bot security-bot${NC}"
+echo -e "    ${BLUE}progression-bot stats-bot    ticket-bot${NC}"
+echo -e "    ${BLUE}voice-bot${NC}"
 echo ""
 echo -e "  Logs        : ${YELLOW}.logs/*.log${NC}"
 echo ""

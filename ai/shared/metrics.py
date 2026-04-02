@@ -2,9 +2,10 @@
 Metriques partagees entre les pipelines text et vision.
 """
 
-import torch
-import numpy as np
 from collections import defaultdict
+
+import torch
+from torch.utils.data import DataLoader
 
 
 def compute_metrics(
@@ -12,14 +13,20 @@ def compute_metrics(
     all_labels: list[int],
     class_names: list[str],
 ) -> dict:
-    """
-    Calcule precision, recall, F1 par classe + macro average.
-    Retourne un dict pret pour le logging.
+    """Calcule precision, recall, F1 par classe + macro average.
+
+    Args:
+        all_preds: Liste des predictions (indices de classe).
+        all_labels: Liste des labels reels.
+        class_names: Noms des classes (ordonne par index).
+
+    Returns:
+        Dict avec accuracy, macro_precision, macro_recall, macro_f1, per_class.
     """
     num_classes = len(class_names)
-    tp = defaultdict(int)
-    fp = defaultdict(int)
-    fn = defaultdict(int)
+    tp: dict[int, int] = defaultdict(int)
+    fp: dict[int, int] = defaultdict(int)
+    fn: dict[int, int] = defaultdict(int)
 
     for pred, label in zip(all_preds, all_labels):
         if pred == label:
@@ -28,7 +35,7 @@ def compute_metrics(
             fp[pred] += 1
             fn[label] += 1
 
-    per_class = {}
+    per_class: dict[str, dict] = {}
     macro_p, macro_r, macro_f1 = 0.0, 0.0, 0.0
 
     for c in range(num_classes):
@@ -61,9 +68,9 @@ def build_confusion_matrix(
     all_labels: list[int],
     num_classes: int,
 ) -> list[list[int]]:
-    """
-    Matrice de confusion [num_classes x num_classes].
-    matrix[true][pred] = count
+    """Construit une matrice de confusion [num_classes x num_classes].
+
+    matrix[true_label][predicted_label] = count
     """
     matrix = [[0] * num_classes for _ in range(num_classes)]
     for pred, label in zip(all_preds, all_labels):
@@ -74,18 +81,27 @@ def build_confusion_matrix(
 
 @torch.no_grad()
 def collect_predictions(
-    model,
-    dataloader,
+    model: torch.nn.Module,
+    dataloader: DataLoader,
     device: torch.device,
     is_text: bool = False,
 ) -> tuple[list[int], list[int]]:
-    """
-    Collecte predictions et labels sur un dataloader complet.
+    """Collecte predictions et labels sur un dataloader complet.
+
     Fonctionne pour text (dict batches) et vision (tuple batches).
+
+    Args:
+        model: Le modele en mode eval.
+        dataloader: Le dataloader a evaluer.
+        device: Device CPU/CUDA.
+        is_text: True pour text (batches en dict), False pour vision (batches en tuple).
+
+    Returns:
+        Tuple (predictions, labels) sous forme de listes d'entiers.
     """
     model.eval()
-    all_preds = []
-    all_labels = []
+    all_preds: list[int] = []
+    all_labels: list[int] = []
 
     for batch in dataloader:
         if is_text:

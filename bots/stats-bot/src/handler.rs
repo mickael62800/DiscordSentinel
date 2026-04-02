@@ -9,8 +9,7 @@ use tracing::{error, info, warn};
 use serenity::builder::CreateMessage;
 
 use sentinel_shared::embeds::success_embed;
-
-use sentinel_shared::heartbeat::register_guilds;
+use sentinel_shared::heartbeat::{register_guilds, ApiClientKey};
 
 use crate::api_client::ApiClient;
 use crate::commands;
@@ -65,6 +64,13 @@ impl EventHandler for Handler {
 
         let data = ctx.data.read().await;
 
+        // Verifier si le bot est active pour ce serveur
+        if let Some(api) = data.get::<ApiClientKey>() {
+            if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                return;
+            }
+        }
+
         // Track localement (fallback pour les commandes)
         if let Some(tracker) = data.get::<TrackerKey>() {
             tracker.record_message(guild_id.get(), msg.author.id.get()).await;
@@ -111,7 +117,9 @@ impl EventHandler for Handler {
                         if let Some(role_id_str) = &result.reward_role_id {
                             if let Ok(role_id) = role_id_str.parse::<u64>() {
                                 if let Ok(member) = guild_id.member(&ctx.http, msg.author.id).await {
-                                    let _ = member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await;
+                                    if let Err(e) = member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await {
+                                        warn!(error = %e, role_id = %role_id, "Impossible d'attribuer le role recompense");
+                                    }
                                 }
                             }
                         }
@@ -133,6 +141,13 @@ impl EventHandler for Handler {
 
         let user_id = new.user_id;
         let data = ctx.data.read().await;
+
+        // Verifier si le bot est active pour ce serveur
+        if let Some(api) = data.get::<ApiClientKey>() {
+            if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                return;
+            }
+        }
 
         let was_in_voice = old.as_ref().and_then(|s| s.channel_id).is_some();
         let is_in_voice = new.channel_id.is_some();
@@ -194,14 +209,17 @@ impl EventHandler for Handler {
                             // Ajouter XP vocal (5 XP par minute)
                             let xp_amount = (seconds / 60) as i64 * 5;
                             if xp_amount > 0 {
-                                let _ = api
+                                if let Err(e) = api
                                     .add_xp(
                                         &guild_id.to_string(),
                                         &user_id.to_string(),
                                         &username,
                                         xp_amount,
                                     )
-                                    .await;
+                                    .await
+                                {
+                                    warn!(error = %e, xp = xp_amount, "Erreur ajout XP vocal");
+                                }
                             }
                         }
                     }

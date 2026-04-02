@@ -115,7 +115,7 @@ impl ManageModerationUseCase for MockModerationUC {
         })
     }
 
-    async fn list_bans(&self, guild_id: Option<&str>) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn list_bans(&self, guild_id: Option<&str>, _limit: i64, _offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
         let bans: Vec<ModerationAction> = self
             .actions
             .iter()

@@ -65,7 +65,7 @@ impl ManageInfractionsUseCase for StubInfractions {
 pub struct StubTickets;
 #[async_trait]
 impl ManageTicketsUseCase for StubTickets {
-    async fn list_tickets(&self, _: Option<String>, _: Option<String>, _: Option<String>, _: Option<String>) -> Result<Vec<Ticket>, DomainError> { unimplemented!() }
+    async fn list_tickets(&self, _: Option<String>, _: Option<String>, _: Option<String>, _: Option<String>, _: i64, _: i64) -> Result<Vec<Ticket>, DomainError> { unimplemented!() }
     async fn get_ticket_detail(&self, _: &str) -> Result<TicketDetail, DomainError> { unimplemented!() }
     async fn create_ticket(&self, _: CreateTicketCommand) -> Result<Ticket, DomainError> { unimplemented!() }
     async fn reply_ticket(&self, _: ReplyTicketCommand) -> Result<(), DomainError> { unimplemented!() }
@@ -87,7 +87,7 @@ pub struct StubModeration;
 impl ManageModerationUseCase for StubModeration {
     async fn log_action(&self, _: LogModerationCommand) -> Result<ModerationAction, DomainError> { unimplemented!() }
     async fn get_history(&self, _: &str, _: &str) -> Result<UserModerationHistory, DomainError> { unimplemented!() }
-    async fn list_bans(&self, _: Option<&str>) -> Result<Vec<ModerationAction>, DomainError> { unimplemented!() }
+    async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { unimplemented!() }
     async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
 }
 
@@ -119,7 +119,7 @@ impl ManageConductUseCase for StubConduct {
 pub struct StubWatchedUsers;
 #[async_trait]
 impl ManageWatchedUsersUseCase for StubWatchedUsers {
-    async fn list_watched_users(&self, _: Option<&str>) -> Result<Vec<WatchedUser>, DomainError> { unimplemented!() }
+    async fn list_watched_users(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<WatchedUser>, DomainError> { unimplemented!() }
     async fn get_user_dossier(&self, _: &str, _: &str) -> Result<manage_watched_users::UserDossier, DomainError> { unimplemented!() }
     async fn add_manual_watch(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn remove_manual_watch(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
@@ -324,6 +324,7 @@ fn base_state() -> AppState {
         discord_bot_token: String::new(),
         pg_pool,
         redis_client,
+        cache: None,
     }
 }
 

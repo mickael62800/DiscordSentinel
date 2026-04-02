@@ -20,6 +20,19 @@ use crate::channel_thresholds;
 use crate::commands;
 use crate::image_hash::{self, ImageHashCache};
 
+// ── Constantes ──
+
+/// Taille max du cache de deduplication avant nettoyage.
+const DEDUP_CACHE_LIMIT: usize = 1000;
+/// Nombre d'entrees a supprimer lors d'un nettoyage du cache dedup.
+const DEDUP_CLEANUP_SIZE: usize = 500;
+/// Taille max par defaut d'une image (10 Mo).
+pub const DEFAULT_MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024;
+/// Duree de mute par defaut en secondes (10 minutes).
+const DEFAULT_MUTE_DURATION_SECS: u64 = 600;
+/// Taille minimum d'un GIF pour etre considere comme anime.
+const ANIMATED_GIF_MIN_SIZE: usize = 100_000;
+
 // ── TypeMap keys ──
 
 pub struct ProcessedMessagesKey;
@@ -92,8 +105,8 @@ impl EventHandler for Handler {
                     return;
                 }
                 // Nettoyage periodique
-                if processed.len() > 1000 {
-                    let to_remove: Vec<_> = processed.iter().take(500).map(|e| *e).collect();
+                if processed.len() > DEDUP_CACHE_LIMIT {
+                    let to_remove: Vec<_> = processed.iter().take(DEDUP_CLEANUP_SIZE).map(|e| *e).collect();
                     for id in to_remove {
                         processed.remove(&id);
                     }
@@ -107,7 +120,7 @@ impl EventHandler for Handler {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
                 let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
-                if !sentinel_shared::api_client::BaseApiClient::config_bool(&config, "enabled", true) {
+                if !BaseApiClient::config_bool(&config, "enabled", true) {
                     return;
                 }
             }
@@ -205,7 +218,7 @@ async fn process_image_attachment(
                 return;
             }
         };
-        let max_size = data.get::<MaxImageSizeKey>().copied().unwrap_or(10 * 1024 * 1024);
+        let max_size = data.get::<MaxImageSizeKey>().copied().unwrap_or(DEFAULT_MAX_IMAGE_SIZE);
         (base, max_size)
     };
 
@@ -270,7 +283,7 @@ async fn process_image_attachment(
     // Detection screenshot et GIF anime
     let filename_lower = filename.to_lowercase();
     let is_screenshot = filename_lower.contains("screenshot") || filename_lower.contains("capture");
-    let is_animated = content_type == "image/gif" && image_bytes.len() > 100_000;
+    let is_animated = content_type == "image/gif" && image_bytes.len() > ANIMATED_GIF_MIN_SIZE;
 
     let request = AnalyzeImageRequest {
         guild_id: guild_id.to_string(),
@@ -359,7 +372,7 @@ async fn process_image_attachment(
 }
 
 /// Detecte le content type depuis l'extension ou les magic bytes.
-fn detect_content_type(filename: &str, bytes: &[u8]) -> String {
+pub(crate) fn detect_content_type(filename: &str, bytes: &[u8]) -> String {
     // Magic bytes
     if bytes.len() >= 4 {
         if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
@@ -371,8 +384,10 @@ fn detect_content_type(filename: &str, bytes: &[u8]) -> String {
         if bytes.starts_with(b"GIF8") {
             return "image/gif".to_string();
         }
-        if bytes.starts_with(b"RIFF") && bytes.len() >= 12 && &bytes[8..12] == b"WEBP" {
-            return "image/webp".to_string();
+        if bytes.starts_with(b"RIFF") && bytes.len() >= 12 {
+            if bytes.get(8..12) == Some(b"WEBP") {
+                return "image/webp".to_string();
+            }
         }
     }
 
@@ -393,7 +408,7 @@ fn detect_content_type(filename: &str, bytes: &[u8]) -> String {
 }
 
 /// Formate les classifications en une chaine lisible.
-fn format_classifications(classifications: &[Classification]) -> String {
+pub(crate) fn format_classifications(classifications: &[Classification]) -> String {
     if classifications.is_empty() {
         return "Aucune".to_string();
     }
@@ -402,6 +417,20 @@ fn format_classifications(classifications: &[Classification]) -> String {
         .map(|c| format!("{} ({:.0}%)", c.label, c.confidence * 100.0))
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+/// Construit un embed d'action sur image avec les champs communs.
+fn build_action_embed(
+    base_embed: serenity::builder::CreateEmbed,
+    msg: &Message,
+    reason_text: &str,
+    detection_text: &str,
+) -> serenity::builder::CreateEmbed {
+    base_embed
+        .description(format!("<@{}>", msg.author.id))
+        .field("\u{1f4dd} Raison", reason_text, false)
+        .field("\u{1f3f7}\u{fe0f} Detection", detection_text, false)
+        .thumbnail(msg.author.face())
 }
 
 /// Execute l'action decidee par le backend.
@@ -419,69 +448,78 @@ async fn execute_action(
     match action {
         Action::None => {}
         Action::Warn => {
-            let embed = warn_embed("⚠\u{fe0f} Avertissement — Image")
-                .description(format!("<@{}>", msg.author.id))
-                .field("📝 Raison", reason_text, false)
-                .field("🏷\u{fe0f} Detection", &detection_text, false)
-                .thumbnail(msg.author.face());
-            msg.channel_id
+            let embed = build_action_embed(
+                warn_embed("\u{26a0}\u{fe0f} Avertissement — Image"), msg, reason_text, &detection_text,
+            );
+            if let Err(e) = msg.channel_id
                 .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                .await?;
+                .await
+            {
+                warn!(error = %e, "Erreur envoi embed avertissement image");
+            }
             info!(user = %msg.author.name, "Avertissement image envoye");
         }
         Action::Delete => {
-            let embed = moderate_embed("🗑\u{fe0f} Image supprimee")
-                .description(format!("<@{}>", msg.author.id))
-                .field("📝 Raison", reason_text, false)
-                .field("🏷\u{fe0f} Detection", &detection_text, false)
-                .thumbnail(msg.author.face());
-            let _ = msg
-                .channel_id
+            let embed = build_action_embed(
+                moderate_embed("\u{1f5d1}\u{fe0f} Image supprimee"), msg, reason_text, &detection_text,
+            );
+            if let Err(e) = msg.channel_id
                 .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                .await;
+                .await
+            {
+                warn!(error = %e, "Erreur envoi embed suppression image");
+            }
             msg.delete(&ctx.http).await?;
             info!(message_id = %msg.id, "Message avec image supprime");
         }
         Action::Mute => {
-            let mute_duration_secs: u64 = duration.unwrap_or(600); // 10 min par defaut
+            let mute_duration_secs: u64 = duration.unwrap_or(DEFAULT_MUTE_DURATION_SECS);
             let mute_minutes = mute_duration_secs / 60;
-            let embed = danger_embed("🔇 Mute — Image interdite")
+            let embed = danger_embed("\u{1f507} Mute — Image interdite")
                 .description(format!("<@{}>", msg.author.id))
-                .field("📝 Raison", reason_text, false)
-                .field("⏱\u{fe0f} Duree", format!("{mute_minutes} minutes"), false)
+                .field("\u{1f4dd} Raison", reason_text, false)
+                .field("\u{23f1}\u{fe0f} Duree", format!("{mute_minutes} minutes"), false)
                 .thumbnail(msg.author.face());
-            let _ = msg
-                .channel_id
+            if let Err(e) = msg.channel_id
                 .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                .await;
+                .await
+            {
+                warn!(error = %e, "Erreur envoi embed mute image");
+            }
             msg.delete(&ctx.http).await?;
 
             if let (Some(guild_id), Ok(_member)) = (msg.guild_id, msg.member(&ctx.http).await) {
                 let mut member = guild_id.member(&ctx.http, msg.author.id).await?;
-                let secs = std::time::SystemTime::now()
+                let now_secs = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as i64
-                    + mute_duration_secs as i64;
-                let datetime =
-                    time::OffsetDateTime::from_unix_timestamp(secs).expect("timestamp invalide");
-                let timeout = serenity::model::Timestamp::from(datetime);
-                member
-                    .disable_communication_until_datetime(&ctx.http, timeout)
-                    .await?;
-                info!(user = %msg.author.name, "Utilisateur mute pour image");
+                    .unwrap_or_default()
+                    .as_secs() as i64;
+                let target_secs = now_secs + mute_duration_secs as i64;
+                match time::OffsetDateTime::from_unix_timestamp(target_secs) {
+                    Ok(datetime) => {
+                        let timeout = serenity::model::Timestamp::from(datetime);
+                        member
+                            .disable_communication_until_datetime(&ctx.http, timeout)
+                            .await?;
+                        info!(user = %msg.author.name, duration_secs = mute_duration_secs, "Utilisateur mute pour image");
+                    }
+                    Err(e) => {
+                        error!(error = %e, secs = target_secs, "Timestamp invalide pour mute");
+                    }
+                }
             }
         }
         Action::Ban => {
             if let Some(guild_id) = msg.guild_id {
-                let embed = critical_embed("🔨 Ban — Image interdite")
-                    .description(format!("<@{}>", msg.author.id))
-                    .field("📝 Raison", reason_text, false)
-                    .thumbnail(msg.author.face());
-                let _ = msg
-                    .channel_id
+                let embed = build_action_embed(
+                    critical_embed("\u{1f528} Ban — Image interdite"), msg, reason_text, &detection_text,
+                );
+                if let Err(e) = msg.channel_id
                     .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                    .await;
+                    .await
+                {
+                    warn!(error = %e, "Erreur envoi embed ban image");
+                }
                 guild_id
                     .ban_with_reason(&ctx.http, msg.author.id, 1, reason_text)
                     .await?;
@@ -491,4 +529,173 @@ async fn execute_action(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api_client::Classification;
+
+    // ── detect_content_type ──
+
+    #[test]
+    fn detect_jpeg_magic_bytes() {
+        let bytes = &[0xFF, 0xD8, 0xFF, 0xE0, 0x00];
+        assert_eq!(detect_content_type("unknown.bin", bytes), "image/jpeg");
+    }
+
+    #[test]
+    fn detect_png_magic_bytes() {
+        let bytes = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A];
+        assert_eq!(detect_content_type("unknown.bin", bytes), "image/png");
+    }
+
+    #[test]
+    fn detect_gif_magic_bytes() {
+        let bytes = b"GIF89a\x00\x01";
+        assert_eq!(detect_content_type("unknown.bin", bytes), "image/gif");
+    }
+
+    #[test]
+    fn detect_webp_magic_bytes() {
+        let mut bytes = vec![0u8; 16];
+        bytes[0..4].copy_from_slice(b"RIFF");
+        bytes[8..12].copy_from_slice(b"WEBP");
+        assert_eq!(detect_content_type("unknown.bin", &bytes), "image/webp");
+    }
+
+    #[test]
+    fn detect_webp_too_short_falls_back() {
+        // RIFF header mais moins de 12 bytes
+        let bytes = b"RIFF1234";
+        // Trop court pour verifier WEBP, fallback sur extension
+        assert_eq!(detect_content_type("image.webp", bytes), "image/webp");
+    }
+
+    #[test]
+    fn detect_by_extension_png() {
+        let bytes = &[0x00, 0x00]; // Pas de magic bytes valides
+        assert_eq!(detect_content_type("photo.PNG", bytes), "image/png");
+    }
+
+    #[test]
+    fn detect_by_extension_gif() {
+        assert_eq!(detect_content_type("anim.gif", &[0x00]), "image/gif");
+    }
+
+    #[test]
+    fn detect_by_extension_webp() {
+        assert_eq!(detect_content_type("img.webp", &[0x00]), "image/webp");
+    }
+
+    #[test]
+    fn detect_by_extension_bmp() {
+        assert_eq!(detect_content_type("img.bmp", &[0x00]), "image/bmp");
+    }
+
+    #[test]
+    fn detect_fallback_default_jpeg() {
+        // Aucune extension reconnue, aucun magic byte → default jpeg
+        assert_eq!(detect_content_type("file.dat", &[0x00]), "image/jpeg");
+    }
+
+    #[test]
+    fn detect_empty_bytes() {
+        assert_eq!(detect_content_type("photo.jpg", &[]), "image/jpeg");
+    }
+
+    #[test]
+    fn magic_bytes_take_priority_over_extension() {
+        // Magic bytes PNG mais extension .jpg → doit retourner PNG
+        let bytes = &[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A];
+        assert_eq!(detect_content_type("photo.jpg", bytes), "image/png");
+    }
+
+    // ── format_classifications ──
+
+    #[test]
+    fn format_empty_classifications() {
+        assert_eq!(format_classifications(&[]), "Aucune");
+    }
+
+    #[test]
+    fn format_single_classification() {
+        let c = vec![Classification { label: "nsfw".to_string(), confidence: 0.92 }];
+        assert_eq!(format_classifications(&c), "nsfw (92%)");
+    }
+
+    #[test]
+    fn format_multiple_classifications() {
+        let c = vec![
+            Classification { label: "nsfw".to_string(), confidence: 0.85 },
+            Classification { label: "illicit".to_string(), confidence: 0.12 },
+        ];
+        assert_eq!(format_classifications(&c), "nsfw (85%), illicit (12%)");
+    }
+
+    #[test]
+    fn format_zero_confidence() {
+        let c = vec![Classification { label: "safe".to_string(), confidence: 0.0 }];
+        assert_eq!(format_classifications(&c), "safe (0%)");
+    }
+
+    #[test]
+    fn format_full_confidence() {
+        let c = vec![Classification { label: "nsfw".to_string(), confidence: 1.0 }];
+        assert_eq!(format_classifications(&c), "nsfw (100%)");
+    }
+
+    // ── Action ──
+
+    #[test]
+    fn action_as_str() {
+        assert_eq!(Action::None.as_str(), "none");
+        assert_eq!(Action::Warn.as_str(), "warn");
+        assert_eq!(Action::Delete.as_str(), "delete");
+        assert_eq!(Action::Mute.as_str(), "mute");
+        assert_eq!(Action::Ban.as_str(), "ban");
+    }
+
+    #[test]
+    fn action_equality() {
+        assert_eq!(Action::None, Action::None);
+        assert_ne!(Action::Warn, Action::Delete);
+    }
+
+    // ── Constantes ──
+
+    #[test]
+    fn default_max_image_size_is_10mb() {
+        assert_eq!(DEFAULT_MAX_IMAGE_SIZE, 10 * 1024 * 1024);
+    }
+
+    #[test]
+    fn default_mute_is_10_minutes() {
+        assert_eq!(DEFAULT_MUTE_DURATION_SECS, 600);
+    }
+
+    #[test]
+    fn dedup_cleanup_smaller_than_limit() {
+        assert!(DEDUP_CLEANUP_SIZE < DEDUP_CACHE_LIMIT);
+    }
+
+    #[test]
+    fn supported_extensions_complete() {
+        assert!(SUPPORTED_EXTENSIONS.contains(&"jpg"));
+        assert!(SUPPORTED_EXTENSIONS.contains(&"jpeg"));
+        assert!(SUPPORTED_EXTENSIONS.contains(&"png"));
+        assert!(SUPPORTED_EXTENSIONS.contains(&"gif"));
+        assert!(SUPPORTED_EXTENSIONS.contains(&"webp"));
+        assert!(SUPPORTED_EXTENSIONS.contains(&"bmp"));
+    }
+
+    #[test]
+    fn supported_content_types_match_extensions() {
+        // Chaque extension devrait avoir un content type correspondant
+        assert!(SUPPORTED_CONTENT_TYPES.contains(&"image/jpeg"));
+        assert!(SUPPORTED_CONTENT_TYPES.contains(&"image/png"));
+        assert!(SUPPORTED_CONTENT_TYPES.contains(&"image/gif"));
+        assert!(SUPPORTED_CONTENT_TYPES.contains(&"image/webp"));
+        assert!(SUPPORTED_CONTENT_TYPES.contains(&"image/bmp"));
+    }
 }

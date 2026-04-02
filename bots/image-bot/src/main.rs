@@ -67,7 +67,7 @@ async fn main() {
     let http_for_queue = Arc::clone(&client.http);
     tokio::spawn(async move {
         while let Some(queued) = rx.recv().await {
-            let api_client = ApiClient::new(Arc::clone(&api_for_queue), 10 * 1024 * 1024);
+            let api_client = ApiClient::new(Arc::clone(&api_for_queue), handler::DEFAULT_MAX_IMAGE_SIZE);
             let max_retries = 3u32;
 
             let mut success = false;
@@ -101,13 +101,17 @@ async fn main() {
                 // Suppression preventive apres echec de tous les retries
                 let channel = serenity::model::id::ChannelId::new(queued.channel_id);
                 let message = serenity::model::id::MessageId::new(queued.message_id);
-                let _ = channel.delete_message(&http_for_queue, message).await;
+                if let Err(e) = channel.delete_message(&http_for_queue, message).await {
+                    warn!(error = %e, message_id = queued.message_id, "Queue: impossible de supprimer le message");
+                }
                 let embed = moderate_embed("Image supprimee (queue)")
                     .description("API indisponible apres plusieurs tentatives.");
-                let _ = channel.send_message(
+                if let Err(e) = channel.send_message(
                     &http_for_queue,
                     serenity::builder::CreateMessage::new().embed(embed),
-                ).await;
+                ).await {
+                    warn!(error = %e, "Queue: impossible d'envoyer l'embed de notification");
+                }
                 error!(message_id = queued.message_id, "Queue: suppression preventive apres {} retries", max_retries);
             }
         }

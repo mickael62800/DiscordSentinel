@@ -123,6 +123,7 @@ impl EventHandler for Handler {
         }
 
         // Rafraichir la liste des utilisateurs surveilles toutes les 60s
+        // Un seul appel batch au lieu de N appels par guild
         let ctx_clone = ctx.clone();
         tokio::spawn(async move {
             loop {
@@ -135,11 +136,16 @@ impl EventHandler for Handler {
                     let watched_set = watched_set.clone();
                     drop(data);
 
-                    for guild_id in ctx_clone.cache.guilds() {
-                        if let Ok(ids) = api.get_watched_user_ids(&guild_id.to_string()).await {
+                    // Batch : 1 seul appel pour tous les serveurs
+                    match api.get_all_watched_user_ids().await {
+                        Ok(ids) => {
+                            watched_set.clear();
                             for id in ids {
                                 watched_set.insert(id);
                             }
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, "Erreur rafraichissement watched users");
                         }
                     }
                 } else {

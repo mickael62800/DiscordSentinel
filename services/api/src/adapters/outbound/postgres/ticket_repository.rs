@@ -84,7 +84,7 @@ impl From<MessageRow> for TicketMessage {
 
 #[async_trait]
 impl TicketRepository for PgTicketRepository {
-    async fn find_all(&self, status: Option<&str>, priority: Option<&str>, search: Option<&str>, author_id: Option<&str>) -> Result<Vec<Ticket>, DomainError> {
+    async fn find_all(&self, status: Option<&str>, priority: Option<&str>, search: Option<&str>, author_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<Ticket>, DomainError> {
         let mut qb: sqlx::QueryBuilder<sqlx::Postgres> = sqlx::QueryBuilder::new(
             r#"
             SELECT t.id, t.title, t.status, t.priority, t.author_id, t.author_name,
@@ -123,8 +123,11 @@ impl TicketRepository for PgTicketRepository {
                      t.channel_id, t.voice_channel_id, t.invited_user_id,
                      t.created_at, t.updated_at
             ORDER BY t.updated_at DESC
-            "#,
+            LIMIT "#,
         );
+        qb.push_bind(limit);
+        qb.push(" OFFSET ");
+        qb.push_bind(offset);
 
         let rows = qb.build_query_as::<TicketRow>()
             .fetch_all(&self.pool)

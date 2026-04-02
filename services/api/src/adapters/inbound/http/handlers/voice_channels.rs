@@ -1,5 +1,6 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::Json;
+use serde::Deserialize;
 
 use crate::adapters::inbound::http::dto::voice_channels::{
     AddCoAdminDto, AddWhitelistDto, BanFromChannelDto, CreateInviteLinkDto, CreateThemeDto,
@@ -15,21 +16,35 @@ use crate::ports::inbound::{
     ManageWhitelistCommand, TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
 };
 
+#[derive(Debug, Deserialize)]
+pub struct PaginationQuery {
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
+}
+
 // ── Channels ──
 
 pub async fn list_all_channels(
     State(state): State<AppState>,
+    Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
+    let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500) as usize;
+    let offset = params.offset.unwrap_or(0).max(0) as usize;
     let channels = state.voice_channels_uc.list_all_channels().await?;
-    Ok(map_to_dtos(channels))
+    let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
+    Ok(map_to_dtos(page))
 }
 
 pub async fn list_channels(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
+    Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
+    let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200) as usize;
+    let offset = params.offset.unwrap_or(0).max(0) as usize;
     let channels = state.voice_channels_uc.list_channels(&guild_id).await?;
-    Ok(map_to_dtos(channels))
+    let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
+    Ok(map_to_dtos(page))
 }
 
 pub async fn get_channel_detail(

@@ -9,6 +9,8 @@ pub struct ListTicketsQuery {
     pub priority: Option<String>,
     pub search: Option<String>,
     pub author_id: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 #[derive(Debug, Deserialize)]

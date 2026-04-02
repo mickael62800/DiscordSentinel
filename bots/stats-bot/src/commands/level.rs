@@ -51,7 +51,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let sub = &command.data.options[0];
+    let sub = match command.data.options.first() {
+        Some(s) => s,
+        None => {
+            respond(ctx, command, "Erreur : sous-commande manquante.").await;
+            return;
+        }
+    };
 
     match sub.name.as_str() {
         "user" => handle_user(ctx, command, &guild_id).await,
@@ -60,10 +66,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 }
 
+/// Extrait les sous-options d'une sous-commande de maniere safe.
+fn get_sub_options(command: &CommandInteraction) -> Option<&Vec<serenity::all::CommandDataOption>> {
+    command.data.options.first().and_then(|opt| match &opt.value {
+        CommandDataOptionValue::SubCommand(opts) => Some(opts),
+        _ => None,
+    })
+}
+
 async fn handle_user(ctx: &Context, command: &CommandInteraction, guild_id: &str) {
-    let sub_options = match &command.data.options[0].value {
-        CommandDataOptionValue::SubCommand(opts) => opts,
-        _ => return,
+    let sub_options = match get_sub_options(command) {
+        Some(opts) => opts,
+        None => return,
     };
 
     let target_id = sub_options
@@ -112,16 +126,16 @@ async fn handle_user(ctx: &Context, command: &CommandInteraction, guild_id: &str
 }
 
 async fn handle_top(ctx: &Context, command: &CommandInteraction, guild_id: &str) {
-    let sub_options = match &command.data.options[0].value {
-        CommandDataOptionValue::SubCommand(opts) => opts,
-        _ => return,
+    let sub_options = match get_sub_options(command) {
+        Some(opts) => opts,
+        None => return,
     };
 
     let limit = sub_options
         .iter()
         .find(|o| o.name == "limit")
         .and_then(|o| match &o.value {
-            CommandDataOptionValue::Integer(n) => Some(*n as u32),
+            CommandDataOptionValue::Integer(n) => Some((*n as u32).clamp(1, 25)),
             _ => None,
         })
         .unwrap_or(10);
@@ -165,9 +179,10 @@ async fn handle_top(ctx: &Context, command: &CommandInteraction, guild_id: &str)
     }
 }
 
-fn make_progress_bar(current: i64, needed: i64) -> String {
+/// Genere une barre de progression ASCII.
+pub fn make_progress_bar(current: i64, needed: i64) -> String {
     let pct = if needed > 0 {
-        (current as f64 / needed as f64).min(1.0)
+        (current as f64 / needed as f64).clamp(0.0, 1.0)
     } else {
         0.0
     };
@@ -187,4 +202,60 @@ async fn respond(ctx: &Context, command: &CommandInteraction, content: &str) {
         .ephemeral(true);
     let response = CreateInteractionResponse::Message(msg);
     let _ = command.create_response(&ctx.http, response).await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_progress_bar_zero() {
+        let bar = make_progress_bar(0, 100);
+        assert_eq!(bar, "[          ] 0%");
+    }
+
+    #[test]
+    fn test_progress_bar_full() {
+        let bar = make_progress_bar(100, 100);
+        assert_eq!(bar, "[==========] 100%");
+    }
+
+    #[test]
+    fn test_progress_bar_half() {
+        let bar = make_progress_bar(50, 100);
+        assert_eq!(bar, "[=====     ] 50%");
+    }
+
+    #[test]
+    fn test_progress_bar_over_100() {
+        // Current > needed : clampe a 100%
+        let bar = make_progress_bar(150, 100);
+        assert_eq!(bar, "[==========] 100%");
+    }
+
+    #[test]
+    fn test_progress_bar_needed_zero() {
+        // Division par zero protegee
+        let bar = make_progress_bar(50, 0);
+        assert_eq!(bar, "[          ] 0%");
+    }
+
+    #[test]
+    fn test_progress_bar_negative_current() {
+        let bar = make_progress_bar(-10, 100);
+        assert_eq!(bar, "[          ] 0%");
+    }
+
+    #[test]
+    fn test_progress_bar_30_percent() {
+        let bar = make_progress_bar(30, 100);
+        assert_eq!(bar, "[===       ] 30%");
+    }
+
+    #[test]
+    fn test_progress_bar_99_percent() {
+        let bar = make_progress_bar(99, 100);
+        // 99% → 9.9 → 9 filled, 1 empty
+        assert_eq!(bar, "[========= ] 99%");
+    }
 }

@@ -26,7 +26,13 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
             };
 
             // Recuperer tous les services connus
-            let known: Vec<String> = conn.smembers("bots:known").await.unwrap_or_default();
+            let known: Vec<String> = match conn.smembers::<_, Vec<String>>("bots:known").await {
+                Ok(k) => k,
+                Err(e) => {
+                    warn!(error = %e, "Erreur lecture bots:known depuis Redis");
+                    continue;
+                }
+            };
 
             let mut current_online: HashSet<String> = HashSet::new();
 
@@ -51,13 +57,10 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
             // Detecter les services qui viennent de passer offline
             for name in &previous_online {
                 if !current_online.contains(name) {
-                    let is_worker = name.contains("worker");
-                    let label = if is_worker { "Worker" } else { "Bot" };
+                    let label = service_label(name);
+                    warn!(service = %name, label = label, "Service hors ligne");
 
-                    warn!("{} hors ligne : {}", label, name);
-
-                    // Envoyer un log a l'API
-                    let _ = http
+                    if let Err(e) = http
                         .post(format!("{}/api/logs", config.api_url))
                         .json(&serde_json::json!({
                             "level": "error",
@@ -67,32 +70,35 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                             "category": "worker",
                         }))
                         .send()
-                        .await;
+                        .await
+                    {
+                        warn!(error = %e, service = %name, "Erreur envoi alerte offline a l'API");
+                    }
 
-                    // Envoyer un evenement WebSocket via Redis pub/sub
                     let event = serde_json::json!({
                         "event": "bot_status",
                         "data": {
                             "bot": name,
                             "online": false,
-                            "type": if is_worker { "worker" } else { "bot" },
+                            "type": if name.contains("worker") { "worker" } else { "bot" },
                         }
                     });
-                    let _: Result<(), _> = conn
-                        .publish("sentinel:events", event.to_string())
-                        .await;
+                    if let Err(e) = conn
+                        .publish::<_, _, ()>("sentinel:events", event.to_string())
+                        .await
+                    {
+                        warn!(error = %e, "Erreur publication event offline sur Redis");
+                    }
                 }
             }
 
             // Detecter les services qui viennent de revenir en ligne
             for name in &current_online {
                 if !previous_online.contains(name) {
-                    let is_worker = name.contains("worker");
-                    let label = if is_worker { "Worker" } else { "Bot" };
+                    let label = service_label(name);
+                    info!(service = %name, label = label, "Service en ligne");
 
-                    info!("{} en ligne : {}", label, name);
-
-                    let _ = http
+                    if let Err(e) = http
                         .post(format!("{}/api/logs", config.api_url))
                         .json(&serde_json::json!({
                             "level": "info",
@@ -102,23 +108,58 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                             "category": "worker",
                         }))
                         .send()
-                        .await;
+                        .await
+                    {
+                        warn!(error = %e, service = %name, "Erreur envoi alerte online a l'API");
+                    }
 
                     let event = serde_json::json!({
                         "event": "bot_status",
                         "data": {
                             "bot": name,
                             "online": true,
-                            "type": if is_worker { "worker" } else { "bot" },
+                            "type": if name.contains("worker") { "worker" } else { "bot" },
                         }
                     });
-                    let _: Result<(), _> = conn
-                        .publish("sentinel:events", event.to_string())
-                        .await;
+                    if let Err(e) = conn
+                        .publish::<_, _, ()>("sentinel:events", event.to_string())
+                        .await
+                    {
+                        warn!(error = %e, "Erreur publication event online sur Redis");
+                    }
                 }
             }
 
             previous_online = current_online;
         }
     });
+}
+
+/// Retourne le label d'un service (Bot ou Worker).
+fn service_label(name: &str) -> &'static str {
+    if name.contains("worker") { "Worker" } else { "Bot" }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn service_label_bot() {
+        assert_eq!(service_label("automod-bot"), "Bot");
+        assert_eq!(service_label("image-bot"), "Bot");
+    }
+
+    #[test]
+    fn service_label_worker() {
+        assert_eq!(service_label("moderation-worker"), "Worker");
+        assert_eq!(service_label("analytics-worker"), "Worker");
+        assert_eq!(service_label("monitoring-worker"), "Worker");
+    }
+
+    #[test]
+    fn service_label_unknown() {
+        // Pas de "worker" dans le nom → default "Bot"
+        assert_eq!(service_label("custom-service"), "Bot");
+    }
 }

@@ -12,15 +12,19 @@ use crate::adapters::inbound::http::state::AppState;
 #[derive(Debug, Deserialize)]
 pub struct WatchedUsersQueryParams {
     pub guild_id: Option<String>,
+    pub limit: Option<i64>,
+    pub offset: Option<i64>,
 }
 
 pub async fn list_watched_users(
     State(state): State<AppState>,
     Query(params): Query<WatchedUsersQueryParams>,
 ) -> Result<Json<Vec<WatchedUserResponseDto>>, ApiError> {
+    let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200);
+    let offset = params.offset.unwrap_or(0).max(0);
     let users = state
         .watched_users_uc
-        .list_watched_users(params.guild_id.as_deref())
+        .list_watched_users(params.guild_id.as_deref(), limit, offset)
         .await?;
     Ok(map_to_dtos(users))
 }

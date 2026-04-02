@@ -34,7 +34,7 @@ pub struct AssignTicketCommand {
 
 #[async_trait]
 pub trait ManageTicketsUseCase: Send + Sync {
-    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, search: Option<String>, author_id: Option<String>) -> Result<Vec<Ticket>, DomainError>;
+    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, search: Option<String>, author_id: Option<String>, limit: i64, offset: i64) -> Result<Vec<Ticket>, DomainError>;
     async fn get_ticket_detail(&self, id: &str) -> Result<TicketDetail, DomainError>;
     async fn create_ticket(&self, command: CreateTicketCommand) -> Result<Ticket, DomainError>;
     async fn reply_ticket(&self, command: ReplyTicketCommand) -> Result<(), DomainError>;

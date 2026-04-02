@@ -44,10 +44,9 @@ fn build_cors(allowed_origins: &str) -> CorsLayer {
 
 // ── Route groups ──
 
-fn bot_routes() -> Router<AppState> {
+/// Routes bot standard (sans les endpoints lourds d'inference deplacés dans heavy_routes).
+fn bot_routes_standard() -> Router<AppState> {
     Router::new()
-        .route("/analyze", post(handlers::analyze::analyze))
-        .route("/analyze/image", post(handlers::analyze_image::analyze_image))
         .route("/rules/{guild_id}", get(handlers::rules::get_rules))
         .route("/rules", post(handlers::rules::create_rule))
         .route("/rules/{guild_id}/{rule_id}", delete(handlers::rules::delete_rule))
@@ -215,7 +214,12 @@ fn dashboard_routes() -> Router<AppState> {
 /// Construit le router sans rate limiter ni ConnectInfo — pour les tests d'integration.
 pub fn build_for_test(state: AppState) -> Router {
     let protected = Router::new()
-        .merge(bot_routes())
+        // Endpoints lourds (sans rate limit en test)
+        .route("/analyze", post(handlers::analyze::analyze))
+        .route("/analyze/image", post(handlers::analyze_image::analyze_image))
+        .nest("/api/analytics", analytics_routes())
+        // Routes standard
+        .merge(bot_routes_standard())
         .nest("/api/tickets", ticket_routes())
         .nest("/api/security", security_routes())
         .nest("/api/moderation", moderation_routes())
@@ -227,7 +231,6 @@ pub fn build_for_test(state: AppState) -> Router {
         .nest("/api/levels", level_routes())
         .nest("/api/role-panels", role_panel_routes())
         .nest("/api/auto-roles", auto_role_routes())
-        .nest("/api/analytics", analytics_routes())
         .nest("/api/stats", stats_routes())
         .route("/api/stats", get(handlers::dashboard::get_dashboard_stats))
         .nest("/api", dashboard_routes())
@@ -253,19 +256,41 @@ pub fn build_for_test(state: AppState) -> Router {
 pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, allowed_origins: &str) -> Router {
     let limiter = RateLimiter::new(rate_limit_per_sec);
 
-    // Spawn cleanup task (purge stale IP buckets every 60s)
+    // Limiter strict pour les endpoints lourds (inference IA, analytics)
+    // Par defaut : 5 req/s (burst 50) vs standard qui est typiquement 50-100 req/s
+    let heavy_rate: u64 = std::env::var("HEAVY_RATE_LIMIT_PER_SEC")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5);
+    let heavy_limiter = RateLimiter::new(heavy_rate);
+
+    // Spawn cleanup tasks (purge stale IP buckets every 60s)
     let limiter_cleanup = limiter.clone();
+    let heavy_cleanup = heavy_limiter.clone();
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
             limiter_cleanup.cleanup().await;
+            heavy_cleanup.cleanup().await;
         }
     });
 
-    // Routes protegees par auth + rate limit
+    // Routes lourdes avec rate limit strict (inference IA + analytics)
+    let heavy_routes = Router::new()
+        .route("/analyze", post(handlers::analyze::analyze))
+        .route("/analyze/image", post(handlers::analyze_image::analyze_image))
+        .nest("/api/analytics", analytics_routes())
+        .route_layer(middleware::from_fn_with_state(
+            heavy_limiter,
+            rate_limit_middleware,
+        ));
+
+    // Routes protegees par auth + rate limit standard
     let protected = Router::new()
-        // Bot-facing routes (scoring, rules, infractions)
-        .merge(bot_routes())
+        // Routes lourdes (limiter strict)
+        .merge(heavy_routes)
+        // Bot-facing routes (scoring, rules, infractions) — sans /analyze (deplace dans heavy)
+        .merge(bot_routes_standard())
         // App-facing routes (nested by domain)
         .nest("/api/tickets", ticket_routes())
         .nest("/api/security", security_routes())
@@ -278,7 +303,6 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .nest("/api/levels", level_routes())
         .nest("/api/role-panels", role_panel_routes())
         .nest("/api/auto-roles", auto_role_routes())
-        .nest("/api/analytics", analytics_routes())
         .nest("/api/stats", stats_routes())
         // Dashboard stats (hors du nest /api pour eviter le conflit avec /api/stats)
         .route("/api/stats", get(handlers::dashboard::get_dashboard_stats))
@@ -313,6 +337,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/user-activity/{guild_id}/{user_id}", get(handlers::user_activity::get_activity))
         // Models status (IA)
         .route("/api/models/status", get(handlers::models_status::get_models_status))
+        // Cache monitoring
+        .route("/api/cache/stats", get(handlers::cache_stats::get_cache_stats))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

@@ -32,11 +32,11 @@ impl ManageTicketsService {
 
 #[async_trait]
 impl ManageTicketsUseCase for ManageTicketsService {
-    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, search: Option<String>, author_id: Option<String>) -> Result<Vec<Ticket>, DomainError> {
+    async fn list_tickets(&self, status: Option<String>, priority: Option<String>, search: Option<String>, author_id: Option<String>, limit: i64, offset: i64) -> Result<Vec<Ticket>, DomainError> {
         let has_filters = status.is_some() || priority.is_some() || search.is_some() || author_id.is_some();
 
-        // Cache-first uniquement si pas de filtres
-        if !has_filters {
+        // Cache-first uniquement si pas de filtres et premiere page
+        if !has_filters && offset == 0 {
             if let Some(json) = self.cache.get_json("tickets:all").await? {
                 if let Ok(tickets) = serde_json::from_str::<Vec<Ticket>>(&json) {
                     return Ok(tickets);
@@ -49,6 +49,8 @@ impl ManageTicketsUseCase for ManageTicketsService {
             priority.as_deref(),
             search.as_deref(),
             author_id.as_deref(),
+            limit,
+            offset,
         ).await?;
 
         // Populate cache uniquement si pas de filtres
@@ -213,7 +215,7 @@ mod tests {
 
     #[async_trait]
     impl TicketRepository for MockTicketRepo {
-        async fn find_all(&self, status: Option<&str>, _priority: Option<&str>, _search: Option<&str>, _author_id: Option<&str>) -> Result<Vec<Ticket>, DomainError> {
+        async fn find_all(&self, status: Option<&str>, _priority: Option<&str>, _search: Option<&str>, _author_id: Option<&str>, _limit: i64, _offset: i64) -> Result<Vec<Ticket>, DomainError> {
             let tickets = self.tickets.lock().unwrap();
             Ok(tickets.iter().filter(|t| {
                 status.map_or(true, |s| t.status == s)
@@ -326,7 +328,7 @@ mod tests {
         let (service, _repo) = make_service();
         service.create_ticket(make_create_cmd()).await.unwrap();
 
-        let tickets = service.list_tickets(None, None, None, None).await.unwrap();
+        let tickets = service.list_tickets(None, None, None, None, 50, 0).await.unwrap();
         assert_eq!(tickets.len(), 1);
     }
 
@@ -335,10 +337,10 @@ mod tests {
         let (service, _repo) = make_service();
         service.create_ticket(make_create_cmd()).await.unwrap();
 
-        let open = service.list_tickets(Some("open".to_string()), None, None, None).await.unwrap();
+        let open = service.list_tickets(Some("open".to_string()), None, None, None, 50, 0).await.unwrap();
         assert_eq!(open.len(), 1);
 
-        let closed = service.list_tickets(Some("closed".to_string()), None, None, None).await.unwrap();
+        let closed = service.list_tickets(Some("closed".to_string()), None, None, None, 50, 0).await.unwrap();
         assert_eq!(closed.len(), 0);
     }
 
