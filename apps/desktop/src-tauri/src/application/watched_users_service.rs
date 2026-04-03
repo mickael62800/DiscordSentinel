@@ -19,4 +19,8 @@ impl WatchedUsersService {
     pub async fn get_user_dossier(&self, guild_id: String, user_id: String) -> Result<UserDossier, String> {
         self.repo.get_user_dossier(guild_id, user_id).await
     }
+
+    pub async fn remove_watched_user(&self, guild_id: String, user_id: String) -> Result<(), String> {
+        self.repo.remove_watched_user(guild_id, user_id).await
+    }
 }

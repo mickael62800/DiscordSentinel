@@ -27,4 +27,8 @@ impl ConductService {
     pub async fn get_log(&self, guild_id: String, user_id: String) -> Result<Vec<ConductPointsLog>, String> {
         self.repo.get_log(guild_id, user_id).await
     }
+
+    pub async fn adjust_points(&self, guild_id: String, user_id: String, amount: i32, reason: String) -> Result<UserConductPoints, String> {
+        self.repo.adjust_points(guild_id, user_id, amount, reason).await
+    }
 }

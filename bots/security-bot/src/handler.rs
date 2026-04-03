@@ -1,3 +1,4 @@
+use chrono::DateTime;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::GuildChannel;
@@ -11,7 +12,7 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{danger_embed, success_embed, warn_embed};
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
-use crate::api_client::{ApiClient, SecurityEvent};
+use crate::api_client::{ApiClient, MemberPayload, SecurityEvent, SyncMembersPayload, UpdateMemberPayload};
 use crate::commands;
 use crate::config::Config;
 use crate::security::account_checker::AccountChecker;
@@ -93,6 +94,51 @@ impl EventHandler for Handler {
         } else {
             info!("Slash commands enregistrees : security");
         }
+
+        // ── Sync des membres au demarrage ──
+        let ctx_clone = ctx.clone();
+        tokio::spawn(async move {
+            let data = ctx_clone.data.read().await;
+            let sec_api = match data.get::<SecurityApiKey>() {
+                Some(a) => a,
+                None => { error!("SecurityApiKey manquant pour sync membres"); return; }
+            };
+
+            for guild in &ready.guilds {
+                let guild_id = guild.id;
+                match guild_id.members(&ctx_clone.http, None, None).await {
+                    Ok(members) => {
+                        let payloads: Vec<MemberPayload> = members.iter().map(|m| {
+                            let roles: Vec<String> = m.roles.iter().map(|r| r.to_string()).collect();
+                            MemberPayload {
+                                guild_id: guild_id.to_string(),
+                                user_id: m.user.id.to_string(),
+                                username: m.user.name.clone(),
+                                display_name: m.nick.clone(),
+                                avatar: m.user.avatar.as_ref().map(|a| a.to_string()),
+                                roles: serde_json::json!(roles),
+                                joined_at: m.joined_at.map(|t| DateTime::from_timestamp(t.unix_timestamp(), 0)).flatten(),
+                                account_created: Some(DateTime::from_timestamp(m.user.created_at().unix_timestamp(), 0)).flatten(),
+                                is_bot: m.user.bot,
+                                last_seen_at: None,
+                            }
+                        }).collect();
+
+                        let count = payloads.len();
+                        let payload = SyncMembersPayload {
+                            guild_id: guild_id.to_string(),
+                            members: payloads,
+                        };
+
+                        match sec_api.sync_members(&payload).await {
+                            Ok(()) => info!(guild_id = %guild_id, members = count, "Membres synchronises"),
+                            Err(e) => error!(guild_id = %guild_id, error = %e, "Erreur sync membres"),
+                        }
+                    }
+                    Err(e) => error!(guild_id = %guild_id, error = %e, "Impossible de recuperer les membres"),
+                }
+            }
+        });
     }
 
     /// Declenche a chaque nouveau membre qui rejoint un serveur.
@@ -108,6 +154,26 @@ impl EventHandler for Handler {
         );
 
         let data = ctx.data.read().await;
+
+        // Enregistrer le membre dans la BDD
+        if let Some(sec_api) = data.get::<SecurityApiKey>() {
+            let roles: Vec<String> = new_member.roles.iter().map(|r| r.to_string()).collect();
+            let member_payload = MemberPayload {
+                guild_id: guild_id.to_string(),
+                user_id: user.id.to_string(),
+                username: user.name.clone(),
+                display_name: new_member.nick.clone(),
+                avatar: user.avatar.as_ref().map(|a| a.to_string()),
+                roles: serde_json::json!(roles),
+                joined_at: new_member.joined_at.map(|t| DateTime::from_timestamp(t.unix_timestamp(), 0)).flatten(),
+                account_created: Some(DateTime::from_timestamp(user.created_at().unix_timestamp(), 0)).flatten(),
+                is_bot: user.bot,
+                last_seen_at: None,
+            };
+            if let Err(e) = sec_api.register_member(&member_payload).await {
+                warn!(error = %e, "Erreur register_member");
+            }
+        }
 
         // Log l'arrivee dans le journal
         if let Some(base) = data.get::<ApiClientKey>() {
@@ -474,12 +540,44 @@ impl EventHandler for Handler {
         info!(guild_id = %guild_id, user = %user.name, "Membre parti");
 
         let data = ctx.data.read().await;
+
+        // Supprimer le membre de la BDD
+        if let Some(sec_api) = data.get::<SecurityApiKey>() {
+            if let Err(e) = sec_api.remove_member(&guild_id.to_string(), &user.id.to_string()).await {
+                warn!(error = %e, "Erreur remove_member");
+            }
+        }
+
         if let Some(base) = data.get::<ApiClientKey>() {
             base.send_log(
                 "info",
                 &guild_id.to_string(),
                 &format!("Membre parti : {} ({})", user.name, user.id),
             );
+        }
+    }
+
+    /// Declenche quand un membre est mis a jour (pseudo, roles, avatar).
+    async fn guild_member_update(&self, ctx: Context, _old: Option<Member>, new_member: Option<Member>, _event: serenity::model::event::GuildMemberUpdateEvent) {
+        let member = match new_member {
+            Some(m) => m,
+            None => return,
+        };
+        let guild_id = member.guild_id;
+        let user = &member.user;
+
+        let data = ctx.data.read().await;
+        if let Some(sec_api) = data.get::<SecurityApiKey>() {
+            let roles: Vec<String> = member.roles.iter().map(|r| r.to_string()).collect();
+            let payload = UpdateMemberPayload {
+                username: Some(user.name.clone()),
+                display_name: member.nick.clone(),
+                avatar: user.avatar.as_ref().map(|a| a.to_string()),
+                roles: Some(serde_json::json!(roles)),
+            };
+            if let Err(e) = sec_api.update_member(&guild_id.to_string(), &user.id.to_string(), &payload).await {
+                warn!(error = %e, "Erreur update_member");
+            }
         }
     }
 

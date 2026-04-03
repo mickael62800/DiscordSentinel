@@ -45,3 +45,6 @@ pub use discord_role_repository::DiscordRoleRepository;
 pub use notes_repository::NotesRepository;
 pub use reminder_repository::ReminderRepository;
 pub use strike_repository::StrikeRepository;
+
+mod member_repository;
+pub use member_repository::MemberRepository;

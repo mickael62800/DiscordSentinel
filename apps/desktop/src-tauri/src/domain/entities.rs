@@ -99,12 +99,33 @@ pub struct LogEntry {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Infraction {
     pub id: String,
+    #[serde(default)]
+    pub guild_id: String,
+    #[serde(default)]
+    pub channel_id: String,
+    #[serde(default)]
     pub user_id: String,
+    #[serde(default)]
     pub username: String,
-    pub server: String,
-    pub infraction_type: String,
+    #[serde(default)]
+    pub message_id: String,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default)]
+    pub score: f64,
+    #[serde(default)]
+    pub action: String,
+    #[serde(default)]
     pub reason: String,
+    pub duration: Option<u64>,
+    #[serde(default)]
     pub created_at: String,
+    // Legacy fields (old format)
+    #[serde(default)]
+    pub server: String,
+    #[serde(default)]
+    pub infraction_type: String,
+    #[serde(default)]
     pub moderator: String,
 }
 
@@ -209,6 +230,12 @@ pub struct ModerationActionResponse {
     pub action_type: String,
     pub target_name: String,
     pub reason: String,
+    #[serde(default)]
+    pub escalation_action: Option<String>,
+    #[serde(default)]
+    pub escalation_duration: Option<u64>,
+    #[serde(default)]
+    pub strikes_count: Option<u32>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -418,6 +445,8 @@ pub struct UserDossier {
     pub moderation_actions: Vec<ModerationActionResponse>,
     pub security_events: Vec<SecurityEvent>,
     pub conduct_log: Vec<ConductPointsLog>,
+    #[serde(default)]
+    pub notes: Vec<serde_json::Value>,
 }
 
 // ── Conduct ──
@@ -453,6 +482,59 @@ pub struct ConductPointsLog {
     pub points_before: i32,
     pub points_after: i32,
     pub created_at: String,
+}
+
+// ── Members (page Membres) ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Member {
+    pub guild_id: String,
+    pub user_id: String,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub avatar: Option<String>,
+    pub roles: serde_json::Value,
+    pub joined_at: Option<String>,
+    pub account_created: Option<String>,
+    pub is_bot: bool,
+    pub last_seen_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MemberSummary {
+    pub member: Member,
+    pub conduct: MemberConduct,
+    pub infractions: MemberInfractions,
+    pub moderation: MemberModeration,
+    pub stats: MemberStats,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MemberConduct {
+    pub points: i32,
+    pub max_points: i32,
+    pub log: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MemberInfractions {
+    pub total: i64,
+    pub recent: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MemberModeration {
+    pub total_warns: i64,
+    pub total_mutes: i64,
+    pub total_bans: i64,
+    pub actions: Vec<serde_json::Value>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MemberStats {
+    pub message_count: i64,
+    pub voice_seconds: i64,
+    pub last_active: Option<String>,
 }
 
 // ── Discord Roles ──

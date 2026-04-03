@@ -174,6 +174,15 @@ fn auto_role_routes() -> Router<AppState> {
         .route("/{guild_id}/{role_id}", delete(handlers::role_panels::delete_auto_role))
 }
 
+fn member_routes() -> Router<AppState> {
+    Router::new()
+        .route("/{guild_id}", get(handlers::guild_members::list_members_db))
+        .route("/{guild_id}/{user_id}", get(handlers::guild_members::get_member).patch(handlers::guild_members::update_member).delete(handlers::guild_members::remove_member))
+        .route("/{guild_id}/{user_id}/summary", get(handlers::guild_members::get_member_summary))
+        .route("/sync", post(handlers::guild_members::sync_members))
+        .route("/register", post(handlers::guild_members::register_member))
+}
+
 fn analytics_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(handlers::analytics::get_full_analytics))
@@ -240,6 +249,7 @@ pub fn build_for_test(state: AppState) -> Router {
         .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier).delete(handlers::watched_users::remove_watched_user))
         .route("/api/discord-roles/{guild_id}", get(handlers::discord_roles::list_roles))
         .route("/api/discord-roles/{guild_id}/sync", post(handlers::discord_roles::sync_roles))
+        .nest("/api/members", member_routes())
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -330,6 +340,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/moderation/pending", post(handlers::bot_persistence::create_pending_action))
         .route("/api/moderation/pending/guild/{guild_id}", get(handlers::bot_persistence::list_pending_actions))
         .route("/api/moderation/pending/{id}/resolve", patch(handlers::bot_persistence::resolve_pending_action))
+        // Members (DB-backed)
+        .nest("/api/members", member_routes())
         // Guild members (direct Discord API)
         .route("/api/guilds/{guild_id}/members", get(handlers::guild_members::list_members))
         // User activity (surveillance)

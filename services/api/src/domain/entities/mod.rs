@@ -54,3 +54,6 @@ pub use user_note::UserNote;
 
 mod user_activity;
 pub use user_activity::UserActivity;
+
+mod guild_member;
+pub use guild_member::{GuildMember, MemberSummary, MemberConduct, MemberInfractions, MemberModeration, MemberStats};

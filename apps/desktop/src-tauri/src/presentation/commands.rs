@@ -20,14 +20,15 @@ use crate::application::levels_service::LevelsService;
 use crate::application::role_panels_service::RolePanelsService;
 use crate::application::discord_roles_service::DiscordRolesService;
 use crate::application::watched_users_service::WatchedUsersService;
+use crate::application::members_service::MembersService;
 use crate::application::ia_config_service::{IaConfigService, IaConfig};
 use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
 use crate::domain::entities::{
     ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity,
     LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog,
-    DiscordConfig, DiscordUser, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest,
-    ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent,
-    ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
+    DiscordConfig, DiscordUser, Guild, GuildMember, Infraction, LogEntry, Member, MemberSummary,
+    ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail,
+    SecurityEvent, ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
     UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail,
     WatchedUser, DiscordRole,
 };
@@ -42,6 +43,11 @@ tauri_passthrough!(get_dashboard_stats, DashboardService, get_stats -> ServerSta
 // Guilds
 tauri_passthrough!(get_guilds, GuildService, get_guilds -> Vec<Guild>);
 tauri_passthrough!(get_guild_members, GuildService, get_guild_members -> Vec<GuildMember>, guild_id: String);
+
+// Members
+tauri_passthrough!(get_members, MembersService, get_members -> Vec<Member>, guild_id: String);
+tauri_passthrough!(get_member, MembersService, get_member -> Member, guild_id: String, user_id: String);
+tauri_passthrough!(get_member_summary, MembersService, get_member_summary -> MemberSummary, guild_id: String, user_id: String);
 
 // Logs
 tauri_passthrough!(get_logs, LogsService, get_logs -> Vec<LogEntry>, guild_id: Option<String>);
@@ -103,12 +109,14 @@ tauri_passthrough!(get_audit_logs, AuditLogsService, get_audit_logs -> Vec<Audit
 // Watched Users
 tauri_passthrough!(get_watched_users, WatchedUsersService, get_watched_users -> Vec<WatchedUser>, guild_id: Option<String>);
 tauri_passthrough!(get_user_dossier, WatchedUsersService, get_user_dossier -> UserDossier, guild_id: String, user_id: String);
+tauri_passthrough!(remove_watched_user, WatchedUsersService, remove_watched_user -> (), guild_id: String, user_id: String);
 
 // Conduct
 tauri_passthrough!(get_conduct_config, ConductService, get_config -> ConductConfig, guild_id: String);
 tauri_passthrough!(get_conduct_leaderboard, ConductService, get_leaderboard -> Vec<UserConductPoints>, guild_id: String);
 tauri_passthrough!(get_conduct_points, ConductService, get_points -> UserConductPoints, guild_id: String, user_id: String);
 tauri_passthrough!(get_conduct_log, ConductService, get_log -> Vec<ConductPointsLog>, guild_id: String, user_id: String);
+tauri_passthrough!(adjust_conduct_points, ConductService, adjust_points -> UserConductPoints, guild_id: String, user_id: String, amount: i32, reason: String);
 
 // IA Config
 tauri_passthrough!(get_ia_config, IaConfigService, get_config -> IaConfig, guild_id: String);

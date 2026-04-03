@@ -228,6 +228,7 @@ function conductPercent(user: WatchedUser): number | null {
         :activities="activities"
         :activities-loading="activitiesLoading"
         @close="selectUser(null)"
+        @removed="fetchUsers"
       />
     </div>
 
@@ -298,8 +299,8 @@ function conductPercent(user: WatchedUser): number | null {
 }
 
 .users-list {
-  width: 520px;
-  min-width: 520px;
+  width: 720px;
+  min-width: 720px;
   display: flex;
   flex-direction: column;
   gap: 10px;

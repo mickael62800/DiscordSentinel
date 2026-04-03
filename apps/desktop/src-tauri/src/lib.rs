@@ -24,6 +24,7 @@ use application::levels_service::LevelsService;
 use application::role_panels_service::RolePanelsService;
 use application::discord_roles_service::DiscordRolesService;
 use application::watched_users_service::WatchedUsersService;
+use application::members_service::MembersService;
 use domain::ports::AppAdapter;
 use infrastructure::api_adapter::ApiAdapter;
 use infrastructure::config_store::ConfigStore;
@@ -66,6 +67,7 @@ pub fn run() {
     let role_panels_svc = Arc::new(RolePanelsService::new(adapter.clone()));
     let discord_roles_svc = Arc::new(DiscordRolesService::new(adapter.clone()));
     let watched_users_svc = Arc::new(WatchedUsersService::new(adapter.clone()));
+    let members_svc = Arc::new(MembersService::new(adapter.clone()));
 
     // IA config uses direct HTTP (no repository trait needed)
     let (ia_base_url, ia_api_key) = match &api_config {
@@ -102,6 +104,7 @@ pub fn run() {
         .manage(role_panels_svc)
         .manage(discord_roles_svc)
         .manage(watched_users_svc)
+        .manage(members_svc)
         .manage(ia_config_svc)
         .manage(analytics_svc)
         .invoke_handler(tauri::generate_handler![
@@ -159,6 +162,7 @@ pub fn run() {
             presentation::commands::get_audit_logs,
             presentation::commands::get_watched_users,
             presentation::commands::get_user_dossier,
+            presentation::commands::remove_watched_user,
             presentation::commands::get_ia_config,
             presentation::commands::save_ia_config,
             presentation::commands::get_full_analytics,
@@ -167,7 +171,11 @@ pub fn run() {
             presentation::commands::ai_start_training,
             presentation::commands::ai_training_status,
             presentation::commands::ai_stop_training,
+            presentation::commands::adjust_conduct_points,
             presentation::commands::ai_export_onnx,
+            presentation::commands::get_members,
+            presentation::commands::get_member,
+            presentation::commands::get_member_summary,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

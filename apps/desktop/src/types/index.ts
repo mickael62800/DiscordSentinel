@@ -517,3 +517,50 @@ export interface DiscordRole {
   member_count: number;
   synced_at: string;
 }
+
+// ── Members (page Membres) ──
+
+export interface Member {
+  guild_id: string;
+  user_id: string;
+  username: string;
+  display_name: string | null;
+  avatar: string | null;
+  roles: string[];
+  joined_at: string | null;
+  account_created: string | null;
+  is_bot: boolean;
+  last_seen_at: string | null;
+}
+
+export interface MemberConduct {
+  points: number;
+  max_points: number;
+  log: Record<string, unknown>[];
+}
+
+export interface MemberInfractions {
+  total: number;
+  recent: Record<string, unknown>[];
+}
+
+export interface MemberModeration {
+  total_warns: number;
+  total_mutes: number;
+  total_bans: number;
+  actions: Record<string, unknown>[];
+}
+
+export interface MemberStats {
+  message_count: number;
+  voice_seconds: number;
+  last_active: string | null;
+}
+
+export interface MemberSummary {
+  member: Member;
+  conduct: MemberConduct;
+  infractions: MemberInfractions;
+  moderation: MemberModeration;
+  stats: MemberStats;
+}

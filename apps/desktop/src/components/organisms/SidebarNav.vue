@@ -23,9 +23,8 @@ const generalItems = [
 
 const moderationItems = [
   { path: "/moderation", label: "Moderation", icon: "gavel" },
+  { path: "/members", label: "Membres", icon: "users" },
   { path: "/rules", label: "Regles", icon: "shield" },
-  { path: "/conduct", label: "Conduite", icon: "award" },
-  { path: "/watched-users", label: "Surveillance", icon: "eye" },
 ];
 
 const communityItems = [

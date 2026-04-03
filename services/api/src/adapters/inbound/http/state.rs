@@ -7,7 +7,7 @@ use crate::domain::services::{DiscordApiService, InferenceService};
 use crate::ports::inbound::{
     AnalyzeImageUseCase, AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
     ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
-    ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
+    ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageMembersUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
 use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, IaConfigRepository, LogRepository};
 
@@ -30,6 +30,7 @@ pub struct AppState {
     pub notes_uc: Arc<dyn ManageNotesUseCase>,
     pub reminders_uc: Arc<dyn ManageRemindersUseCase>,
     pub strikes_uc: Arc<dyn ManageStrikesUseCase>,
+    pub members_uc: Arc<dyn ManageMembersUseCase>,
     pub analytics_repo: Arc<dyn AnalyticsRepository>,
     pub daily_activity_repo: Arc<dyn DailyActivityRepository>,
     pub log_repo: Arc<dyn LogRepository>,

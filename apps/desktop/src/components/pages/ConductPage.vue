@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { useConduct, useConductDetail } from "../../composables/useConduct";
 import { usePagination } from "../../composables/usePagination";
 import { useGuildSelector } from "../../composables/useGuildSelector";
@@ -16,6 +17,30 @@ const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedL
 const { points: detailPoints, log: detailLog, loading: detailLoading, fetchDetail } = useConductDetail();
 
 const selectedUser = ref<string | null>(null);
+const adjustAmount = ref(1);
+const adjustReason = ref("");
+const adjusting = ref(false);
+
+async function adjustPoints(positive: boolean) {
+  if (!selectedGuildId.value || !selectedUser.value || !adjustReason.value) return;
+  adjusting.value = true;
+  try {
+    const amount = positive ? Math.abs(adjustAmount.value) : -Math.abs(adjustAmount.value);
+    await invoke("adjust_conduct_points", {
+      guildId: selectedGuildId.value,
+      userId: selectedUser.value,
+      amount,
+      reason: adjustReason.value,
+    });
+    adjustReason.value = "";
+    await fetchDetail(selectedGuildId.value, selectedUser.value);
+    await fetchLeaderboard();
+  } catch (e) {
+    console.error("Erreur ajustement points:", e);
+  } finally {
+    adjusting.value = false;
+  }
+}
 
 function pointsVariant(points: number, max: number): "success" | "warning" | "danger" | "default" {
   const ratio = points / max;
@@ -78,6 +103,36 @@ function backToList() {
             {{ detailPoints.points }}
           </span>
           <span class="points-max">/ {{ config?.max_points ?? 12 }}</span>
+        </div>
+
+        <!-- Ajuster les points -->
+        <div class="adjust-section">
+          <h3>Ajuster les points</h3>
+          <div class="adjust-form">
+            <input
+              v-model.number="adjustAmount"
+              type="number"
+              min="1"
+              max="12"
+              class="adjust-input"
+            />
+            <input
+              v-model="adjustReason"
+              type="text"
+              class="adjust-reason"
+              placeholder="Raison de l'ajustement..."
+            />
+            <button
+              class="adjust-btn add"
+              :disabled="adjusting || !adjustReason"
+              @click="adjustPoints(true)"
+            >+ Ajouter</button>
+            <button
+              class="adjust-btn remove"
+              :disabled="adjusting || !adjustReason"
+              @click="adjustPoints(false)"
+            >- Retirer</button>
+          </div>
         </div>
 
         <h3>Historique des mouvements</h3>
@@ -283,6 +338,91 @@ function backToList() {
   font-size: 24px;
   color: var(--text-secondary);
   margin-left: 4px;
+}
+
+.adjust-section {
+  margin-bottom: 24px;
+}
+
+.adjust-section h3 {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.adjust-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.adjust-input {
+  width: 60px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 14px;
+  text-align: center;
+}
+
+.adjust-reason {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.adjust-reason::placeholder {
+  color: var(--text-secondary);
+}
+
+.adjust-reason:focus,
+.adjust-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.2);
+}
+
+.adjust-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+  white-space: nowrap;
+}
+
+.adjust-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.adjust-btn.add {
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success);
+}
+
+.adjust-btn.add:hover:not(:disabled) {
+  background: var(--success);
+  color: white;
+}
+
+.adjust-btn.remove {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.adjust-btn.remove:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
 }
 
 .text-danger {

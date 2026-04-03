@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { ref } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { useFormatDate } from "../../composables/useFormatDate";
 import AppBadge from "../atoms/AppBadge.vue";
 import DataTable from "../organisms/DataTable.vue";
@@ -6,7 +8,7 @@ import ActivityTimeline from "./ActivityTimeline.vue";
 import type { TableColumn, WatchedUser, UserActivity } from "../../types";
 import { actionVariant, severityVariant } from "../../utils/variants";
 
-defineProps<{
+const props = defineProps<{
   user: WatchedUser | null;
   dossier: any | null;
   dossierLoading: boolean;
@@ -16,7 +18,28 @@ defineProps<{
 
 const emit = defineEmits<{
   close: [];
+  removed: [];
 }>();
+
+const removing = ref(false);
+
+async function removeFromWatch() {
+  if (!props.user) return;
+  if (!confirm(`Retirer ${props.user.username} de la surveillance ?`)) return;
+  removing.value = true;
+  try {
+    await invoke("remove_watched_user", {
+      guildId: props.user.guild_id,
+      userId: props.user.user_id,
+    });
+    emit("removed");
+    emit("close");
+  } catch (e) {
+    console.error("Erreur suppression surveillance:", e);
+  } finally {
+    removing.value = false;
+  }
+}
 
 const { formatShortDateTime: fmt } = useFormatDate();
 
@@ -68,7 +91,12 @@ const dossierConductColumns: TableColumn[] = [
         <h2>Dossier : {{ user.username }}</h2>
         <AppBadge :label="riskLabel(user.risk_level)" :variant="severityVariant(user.risk_level)" />
       </div>
-      <button class="close-btn" @click="emit('close')">&times;</button>
+      <div class="dossier-actions">
+        <button class="remove-watch-btn" :disabled="removing" @click="removeFromWatch">
+          {{ removing ? 'Suppression...' : 'Retirer surveillance' }}
+        </button>
+        <button class="close-btn" @click="emit('close')">&times;</button>
+      </div>
     </div>
 
     <div class="dossier-summary">
@@ -209,6 +237,34 @@ const dossierConductColumns: TableColumn[] = [
 .dossier-title h2 {
   font-size: 18px;
   margin: 0;
+}
+
+.dossier-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.remove-watch-btn {
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.remove-watch-btn:hover {
+  background: var(--danger);
+  color: white;
+}
+
+.remove-watch-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .close-btn {

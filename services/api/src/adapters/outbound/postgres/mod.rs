@@ -43,3 +43,6 @@ pub use discord_role_repository::PgDiscordRoleRepository;
 pub use notes_repository::PgNotesRepository;
 pub use reminder_repository::PgReminderRepository;
 pub use strike_repository::PgStrikeRepository;
+
+mod member_repository;
+pub use member_repository::PgMemberRepository;

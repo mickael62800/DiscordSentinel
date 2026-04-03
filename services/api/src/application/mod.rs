@@ -33,3 +33,6 @@ pub use manage_notes_service::ManageNotesService;
 pub use manage_reminders_service::ManageRemindersService;
 pub use manage_strikes_service::ManageStrikesService;
 pub use manage_watched_users_service::ManageWatchedUsersService;
+
+mod manage_members_service;
+pub use manage_members_service::ManageMembersService;

@@ -3,7 +3,7 @@ use std::pin::Pin;
 
 use super::entities::{
     BotDefinition, BotGuildConfig, ConfirmedBan, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry,
-    ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats,
+    Member, MemberSummary, ModerationActionRequest, ModerationActionResponse, ModerationRule, SecurityEvent, ServerStats,
     AuditLog, AutoRoleConfig, DailyActivity, LevelConfig, LevelReward, RolePanel, RolePanelDetail,
     Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier,
     TopUser, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser, DiscordRole,
@@ -72,6 +72,7 @@ pub trait ConductRepository: Send + Sync + 'static {
     fn get_leaderboard(&self, guild_id: String) -> BoxFut<Vec<UserConductPoints>>;
     fn get_points(&self, guild_id: String, user_id: String) -> BoxFut<UserConductPoints>;
     fn get_log(&self, guild_id: String, user_id: String) -> BoxFut<Vec<ConductPointsLog>>;
+    fn adjust_points(&self, guild_id: String, user_id: String, amount: i32, reason: String) -> BoxFut<UserConductPoints>;
 }
 
 pub trait RolePanelsRepository: Send + Sync + 'static {
@@ -98,10 +99,17 @@ pub trait AuditLogRepository: Send + Sync + 'static {
 pub trait WatchedUsersRepository: Send + Sync + 'static {
     fn get_watched_users(&self, guild_id: Option<String>) -> BoxFut<Vec<WatchedUser>>;
     fn get_user_dossier(&self, guild_id: String, user_id: String) -> BoxFut<UserDossier>;
+    fn remove_watched_user(&self, guild_id: String, user_id: String) -> BoxFut<()>;
 }
 
 pub trait DiscordRolesRepository: Send + Sync + 'static {
     fn get_discord_roles(&self, guild_id: String) -> BoxFut<Vec<DiscordRole>>;
+}
+
+pub trait MembersRepository: Send + Sync + 'static {
+    fn get_members(&self, guild_id: String) -> BoxFut<Vec<Member>>;
+    fn get_member(&self, guild_id: String, user_id: String) -> BoxFut<Member>;
+    fn get_member_summary(&self, guild_id: String, user_id: String) -> BoxFut<MemberSummary>;
 }
 
 pub trait AppAdapter:
@@ -122,5 +130,6 @@ pub trait AppAdapter:
     + DashboardChartsRepository
     + RolePanelsRepository
     + DiscordRolesRepository
+    + MembersRepository
 {
 }

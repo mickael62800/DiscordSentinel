@@ -8,9 +8,7 @@ import RulesPage from "../components/pages/RulesPage.vue";
 import SecurityPage from "../components/pages/SecurityPage.vue";
 import TicketsPage from "../components/pages/TicketsPage.vue";
 import VoiceChannelsPage from "../components/pages/VoiceChannelsPage.vue";
-import ConductPage from "../components/pages/ConductPage.vue";
 import ComponentConfigPage from "../components/pages/ComponentConfigPage.vue";
-import WatchedUsersPage from "../components/pages/WatchedUsersPage.vue";
 import LevelsPage from "../components/pages/LevelsPage.vue";
 import RolePanelsPage from "../components/pages/RolePanelsPage.vue";
 import DiscordRolesPage from "../components/pages/DiscordRolesPage.vue";
@@ -18,6 +16,7 @@ import AuditPage from "../components/pages/AuditPage.vue";
 import AnalyticsPage from "../components/pages/AnalyticsPage.vue";
 import AiTrainingPage from "../components/pages/AiTrainingPage.vue";
 import IaConfigPage from "../components/pages/IaConfigPage.vue";
+import MembersPage from "../components/pages/MembersPage.vue";
 import SettingsPage from "../components/pages/SettingsPage.vue";
 
 export const routes: RouteRecordRaw[] = [
@@ -30,9 +29,10 @@ export const routes: RouteRecordRaw[] = [
   { path: "/security", name: "security", component: SecurityPage },
   { path: "/tickets", name: "tickets", component: TicketsPage },
   { path: "/voice-channels", name: "voice-channels", component: VoiceChannelsPage },
-  { path: "/conduct", name: "conduct", component: ConductPage },
+  { path: "/members", name: "members", component: MembersPage },
+  { path: "/conduct", redirect: "/members" },
+  { path: "/watched-users", redirect: "/members" },
   { path: "/component-config", name: "component-config", component: ComponentConfigPage },
-  { path: "/watched-users", name: "watched-users", component: WatchedUsersPage },
   { path: "/levels", name: "levels", component: LevelsPage },
   { path: "/role-panels", name: "role-panels", component: RolePanelsPage },
   { path: "/discord-roles", name: "discord-roles", component: DiscordRolesPage },

@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use serde::Serialize;
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 use sentinel_shared::api_client::BaseApiClient;
 
@@ -11,6 +12,34 @@ pub struct SecurityEvent {
     pub severity: String,
     pub description: String,
     pub user_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MemberPayload {
+    pub guild_id: String,
+    pub user_id: String,
+    pub username: String,
+    pub display_name: Option<String>,
+    pub avatar: Option<String>,
+    pub roles: serde_json::Value,
+    pub joined_at: Option<DateTime<Utc>>,
+    pub account_created: Option<DateTime<Utc>>,
+    pub is_bot: bool,
+    pub last_seen_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SyncMembersPayload {
+    pub guild_id: String,
+    pub members: Vec<MemberPayload>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UpdateMemberPayload {
+    pub username: Option<String>,
+    pub display_name: Option<String>,
+    pub avatar: Option<String>,
+    pub roles: Option<serde_json::Value>,
 }
 
 /// Client specifique au security-bot, encapsule le BaseApiClient partage.
@@ -59,6 +88,69 @@ impl ApiClient {
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
 
+        Ok(())
+    }
+
+    /// Sync tous les membres d'un serveur vers l'API.
+    pub async fn sync_members(&self, payload: &SyncMembersPayload) -> Result<(), String> {
+        let req = self
+            .base
+            .client()
+            .post(format!("{}/api/members/sync", self.base.base_url()))
+            .json(payload);
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("sync_members: {e}"))?;
+        Ok(())
+    }
+
+    /// Enregistre un nouveau membre.
+    pub async fn register_member(&self, member: &MemberPayload) -> Result<(), String> {
+        let req = self
+            .base
+            .client()
+            .post(format!("{}/api/members/register", self.base.base_url()))
+            .json(member);
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("register_member: {e}"))?;
+        Ok(())
+    }
+
+    /// Supprime un membre (depart du serveur).
+    pub async fn remove_member(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
+        let req = self
+            .base
+            .client()
+            .delete(format!("{}/api/members/{}/{}", self.base.base_url(), guild_id, user_id));
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("remove_member: {e}"))?;
+        Ok(())
+    }
+
+    /// Met a jour un membre (changement pseudo, avatar, roles).
+    pub async fn update_member(&self, guild_id: &str, user_id: &str, payload: &UpdateMemberPayload) -> Result<(), String> {
+        let req = self
+            .base
+            .client()
+            .patch(format!("{}/api/members/{}/{}", self.base.base_url(), guild_id, user_id))
+            .json(payload);
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("update_member: {e}"))?;
         Ok(())
     }
 }

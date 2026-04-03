@@ -37,6 +37,9 @@ pub use manage_watched_users::ManageWatchedUsersUseCase;
 pub use manage_notes::{AddNoteCommand, ManageNotesUseCase};
 pub use manage_reminders::{CreateReminderCommand, ManageRemindersUseCase};
 pub use manage_strikes::{AddStrikeCommand, ManageStrikesUseCase, SaveStrikeConfigCommand};
+pub mod manage_members;
+pub use manage_members::{ManageMembersUseCase, SyncMembersCommand, RegisterMemberCommand, UpdateMemberCommand};
+
 pub use manage_voice_channels::{
     BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
     ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,

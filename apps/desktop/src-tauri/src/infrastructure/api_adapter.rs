@@ -3,8 +3,8 @@ use std::pin::Pin;
 
 use reqwest::{Client, RequestBuilder, Response};
 
-use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, DiscordRole, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
-use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
+use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, DiscordRole, Member, MemberSummary, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, MembersRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
 
 pub struct ApiAdapter {
     client: Client,
@@ -270,6 +270,13 @@ impl ConductRepository for ApiAdapter {
     fn get_log(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<ConductPointsLog>, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/conduct/{}/{}/log", self.base_url, guild_id, user_id)))
     }
+
+    fn adjust_points(&self, guild_id: String, user_id: String, amount: i32, reason: String) -> Pin<Box<dyn Future<Output = Result<UserConductPoints, String>> + Send>> {
+        self.get_json(
+            self.client.post(format!("{}/api/conduct/{}/{}/add", self.base_url, guild_id, user_id))
+                .json(&serde_json::json!({ "amount": amount, "reason": reason }))
+        )
+    }
 }
 
 // --- Dashboard Charts ---
@@ -330,6 +337,10 @@ impl WatchedUsersRepository for ApiAdapter {
     fn get_user_dossier(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<UserDossier, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/watched-users/{}/{}", self.base_url, guild_id, user_id)))
     }
+
+    fn remove_watched_user(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.delete(format!("{}/api/watched-users/{}/{}", self.base_url, guild_id, user_id)))
+    }
 }
 
 // --- Role Panels ---
@@ -351,6 +362,20 @@ impl RolePanelsRepository for ApiAdapter {
 impl DiscordRolesRepository for ApiAdapter {
     fn get_discord_roles(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<DiscordRole>, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/discord-roles/{}", self.base_url, guild_id)))
+    }
+}
+
+impl MembersRepository for ApiAdapter {
+    fn get_members(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<Member>, String>> + Send>> {
+        self.get_json(self.client.get(format!("{}/api/members/{}", self.base_url, guild_id)))
+    }
+
+    fn get_member(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<Member, String>> + Send>> {
+        self.get_json(self.client.get(format!("{}/api/members/{}/{}", self.base_url, guild_id, user_id)))
+    }
+
+    fn get_member_summary(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<MemberSummary, String>> + Send>> {
+        self.get_json(self.client.get(format!("{}/api/members/{}/{}/summary", self.base_url, guild_id, user_id)))
     }
 }
 

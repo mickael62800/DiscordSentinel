@@ -158,7 +158,7 @@ start_service "cleanup-worker" \
     "cargo run" \
     "$YELLOW"
 
-# ── 5. Tous les bots Discord (10) ──
+# ── 5. Tous les bots Discord (12) ──
 start_service "audit-bot" \
     "$ROOT_DIR/bots/audit-bot" \
     "cargo run" \
@@ -209,6 +209,16 @@ start_service "voice-bot" \
     "cargo run" \
     "$BLUE"
 
+start_service "roles-bot" \
+    "$ROOT_DIR/bots/roles-bot" \
+    "cargo run" \
+    "$BLUE"
+
+start_service "coude-bot" \
+    "$ROOT_DIR/bots/coude-bot" \
+    "cargo run" \
+    "$BLUE"
+
 # ── 6. Desktop App (Tauri + Vue) ──
 if [ -d "$ROOT_DIR/apps/desktop" ]; then
     if [ ! -d "$ROOT_DIR/apps/desktop/node_modules" ]; then
@@ -235,11 +245,11 @@ echo -e "  Workers (6) :"
 echo -e "    ${YELLOW}analytics-worker   moderation-worker  monitoring-worker${NC}"
 echo -e "    ${YELLOW}cache-worker       cleanup-worker${NC}"
 echo ""
-echo -e "  Bots Discord (10) :"
+echo -e "  Bots Discord (12) :"
 echo -e "    ${BLUE}audit-bot     automod-bot    image-bot${NC}"
 echo -e "    ${BLUE}community-bot moderation-bot security-bot${NC}"
 echo -e "    ${BLUE}progression-bot stats-bot    ticket-bot${NC}"
-echo -e "    ${BLUE}voice-bot${NC}"
+echo -e "    ${BLUE}voice-bot     roles-bot      coude-bot${NC}"
 echo ""
 echo -e "  Logs        : ${YELLOW}.logs/*.log${NC}"
 echo ""

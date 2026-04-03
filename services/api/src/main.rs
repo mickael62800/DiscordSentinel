@@ -9,7 +9,7 @@ use sentinel_api::adapters::inbound::http::{router, state::AppState};
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
-    PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
+    PgMemberRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
     PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
 };
 use sentinel_api::adapters::outbound::job_client::JobClient;
@@ -17,7 +17,7 @@ use sentinel_api::adapters::outbound::redis_cache::RedisCache;
 use sentinel_api::application::{
     AnalyzeImageService, AnalyzeMessageService, ManageConductService, ManageInfractionsService,
     ManageModerationService, ManageRulesService, ManageSecurityService, ManageStatsService,
-    ManageAuditLogsService, ManageLevelsService, ManageNotesService, ManageRemindersService, ManageRolePanelsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
+    ManageAuditLogsService, ManageLevelsService, ManageMembersService, ManageNotesService, ManageRemindersService, ManageRolePanelsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
 };
 use sentinel_api::domain::services::{DiscordApiService, InferenceService, TextTokenizer};
 use sentinel_api::config::AppConfig;
@@ -192,6 +192,7 @@ async fn main() {
     let notes_uc = Arc::new(ManageNotesService::new(notes_repo));
     let reminders_uc = Arc::new(ManageRemindersService::new(reminder_repo));
     let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo));
+    let member_repo = Arc::new(PgMemberRepository::new(pg_pool.clone()));
     let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
@@ -200,6 +201,14 @@ async fn main() {
         security_uc.clone(),
         conduct_uc.clone(),
         notes_uc.clone(),
+    ));
+
+    let members_uc = Arc::new(ManageMembersService::new(
+        member_repo,
+        infractions_uc.clone(),
+        moderation_uc.clone(),
+        conduct_uc.clone(),
+        stats_uc.clone(),
     ));
 
     // ── Discord API service ──
@@ -229,6 +238,7 @@ async fn main() {
         notes_uc,
         reminders_uc,
         strikes_uc,
+        members_uc,
         analytics_repo,
         daily_activity_repo,
         log_repo,
