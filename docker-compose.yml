@@ -89,8 +89,8 @@ services:
 
   moderation-worker:
     build:
-      context: ./services/workers/moderation-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/workers/moderation-worker/Dockerfile
     container_name: sentinel-moderation-worker
     restart: unless-stopped
     environment:
@@ -102,8 +102,8 @@ services:
 
   analytics-worker:
     build:
-      context: ./services/workers/analytics-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/workers/analytics-worker/Dockerfile
     container_name: sentinel-analytics-worker
     restart: unless-stopped
     environment:
@@ -116,8 +116,8 @@ services:
 
   monitoring-worker:
     build:
-      context: ./services/workers/monitoring-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/workers/monitoring-worker/Dockerfile
     container_name: sentinel-monitoring-worker
     restart: unless-stopped
     environment:
@@ -131,8 +131,8 @@ services:
 
   cache-worker:
     build:
-      context: ./services/workers/cache-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/workers/cache-worker/Dockerfile
     container_name: sentinel-cache-worker
     restart: unless-stopped
     environment:
@@ -151,8 +151,8 @@ services:
 
   cleanup-worker:
     build:
-      context: ./services/workers/cleanup-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/workers/cleanup-worker/Dockerfile
     container_name: sentinel-cleanup-worker
     restart: unless-stopped
     environment:
@@ -194,8 +194,8 @@ services:
 
   automod-bot:
     build:
-      context: ./bots/automod-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/automod-bot/Dockerfile
     container_name: sentinel-automod-bot
     restart: unless-stopped
     environment:
@@ -208,8 +208,8 @@ services:
 
   moderation-bot:
     build:
-      context: ./bots/moderation-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/moderation-bot/Dockerfile
     container_name: sentinel-moderation-bot
     restart: unless-stopped
     environment:
@@ -222,8 +222,8 @@ services:
 
   security-bot:
     build:
-      context: ./bots/security-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/security-bot/Dockerfile
     container_name: sentinel-security-bot
     restart: unless-stopped
     environment:
@@ -236,8 +236,8 @@ services:
 
   ticket-bot:
     build:
-      context: ./bots/ticket-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/ticket-bot/Dockerfile
     container_name: sentinel-ticket-bot
     restart: unless-stopped
     environment:
@@ -250,8 +250,8 @@ services:
 
   image-bot:
     build:
-      context: ./bots/image-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/image-bot/Dockerfile
     container_name: sentinel-image-bot
     restart: unless-stopped
     environment:
@@ -265,8 +265,8 @@ services:
 
   voice-bot:
     build:
-      context: ./bots/voice-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/voice-bot/Dockerfile
     container_name: sentinel-voice-bot
     restart: unless-stopped
     environment:
@@ -283,8 +283,8 @@ services:
 
   progression-bot:
     build:
-      context: ./bots/progression-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/progression-bot/Dockerfile
     container_name: sentinel-progression-bot
     restart: unless-stopped
     environment:
@@ -297,8 +297,8 @@ services:
 
   audit-bot:
     build:
-      context: ./bots/audit-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/audit-bot/Dockerfile
     container_name: sentinel-audit-bot
     restart: unless-stopped
     environment:
@@ -311,8 +311,8 @@ services:
 
   community-bot:
     build:
-      context: ./bots/community-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/community-bot/Dockerfile
     container_name: sentinel-community-bot
     restart: unless-stopped
     environment:
@@ -325,8 +325,8 @@ services:
 
   roles-bot:
     build:
-      context: ./bots/roles-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/roles-bot/Dockerfile
     container_name: sentinel-roles-bot
     restart: unless-stopped
     environment:
@@ -337,24 +337,10 @@ services:
     depends_on:
       - api
 
-  stats-bot:
-    build:
-      context: ./bots/stats-bot
-      dockerfile: Dockerfile
-    container_name: sentinel-stats-bot
-    restart: unless-stopped
-    environment:
-      DISCORD_TOKEN: ${STATS_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
   coude-bot:
     build:
-      context: ./bots/coude-bot
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: bots/coude-bot/Dockerfile
     container_name: sentinel-coude-bot
     restart: unless-stopped
     environment:
@@ -371,8 +357,8 @@ services:
 
   coude-worker:
     build:
-      context: ./services/workers/coude-worker
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/workers/coude-worker/Dockerfile
     container_name: sentinel-coude-worker
     restart: unless-stopped
     environment:

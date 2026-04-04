@@ -1,7 +1,7 @@
 # ── Build stage ──
-FROM rust:1.83-alpine AS builder
+FROM rust:1.88-alpine AS builder
 
-RUN apk add --no-cache musl-dev
+RUN apk add --no-cache musl-dev pkgconf openssl-dev openssl-libs-static
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
