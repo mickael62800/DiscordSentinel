@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useLogs } from "../../composables/useLogs";
+import { usePagination } from "../../composables/usePagination";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { useConfirm } from "../../composables/useConfirm";
 import { levelVariant } from "../../utils/variants";
@@ -9,6 +10,7 @@ import FilterBar from "../molecules/FilterBar.vue";
 import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
+import PaginationBar from "../molecules/PaginationBar.vue";
 
 const props = withDefaults(defineProps<{
   title: string;
@@ -29,6 +31,8 @@ const props = withDefaults(defineProps<{
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
 const { filteredLogs, sources, loading, filterLevel, filterBot, dateFrom, dateTo, search, clearLogs } = useLogs(props.category);
+
+const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLogs } = usePagination(filteredLogs, 50);
 
 const hasDetailsColumn = computed(() => props.columns.some((c) => c.key === "details"));
 
@@ -88,7 +92,7 @@ async function handleClear() {
     <DataTable
       v-else
       :columns="columns"
-      :rows="(filteredLogs as unknown as Record<string, unknown>[])"
+      :rows="(paginatedLogs as unknown as Record<string, unknown>[])"
       :empty-message="emptyMessage"
     >
       <template #cell-timestamp="{ value }">
@@ -105,6 +109,16 @@ async function handleClear() {
         </slot>
       </template>
     </DataTable>
+
+    <PaginationBar
+      v-if="!loading && filteredLogs.length > 0"
+      :current-page="currentPage"
+      :total-pages="totalPages"
+      :total-items="totalItems"
+      :per-page="perPage"
+      @update:current-page="currentPage = $event"
+      @update:per-page="perPage = $event"
+    />
   </div>
 </template>
 

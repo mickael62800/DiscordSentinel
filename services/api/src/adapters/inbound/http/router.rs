@@ -349,6 +349,7 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/user-activity/{guild_id}/{user_id}", get(handlers::user_activity::get_activity))
         // Models status (IA)
         .route("/api/models/status", get(handlers::models_status::get_models_status))
+        .route("/api/models/reload", post(handlers::models_status::reload_model))
         // Cache monitoring
         .route("/api/cache/stats", get(handlers::cache_stats::get_cache_stats))
         .route_layer(middleware::from_fn_with_state(

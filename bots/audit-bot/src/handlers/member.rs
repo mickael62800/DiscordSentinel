@@ -213,6 +213,25 @@ pub async fn handle_update(
     let old_avatar = old.as_ref().and_then(|m| m.avatar.map(|a| a.to_string()));
     let new_avatar = new_member.avatar.map(|a| a.to_string());
     if old_avatar != new_avatar {
+        // Construire les URLs d'avatar
+        let old_avatar_url = old.as_ref().and_then(|m| {
+            m.avatar.map(|hash| {
+                let ext = if hash.is_animated() { "gif" } else { "png" };
+                format!("https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size=128", gid, m.user.id, hash, ext)
+            })
+        });
+        let new_avatar_url = new_member.avatar.map(|hash| {
+            let ext = if hash.is_animated() { "gif" } else { "png" };
+            format!("https://cdn.discordapp.com/guilds/{}/users/{}/avatars/{}.{}?size=128", gid, new_member.user.id, hash, ext)
+        });
+        // Fallback sur l'avatar global si pas d'avatar serveur
+        let new_url = new_avatar_url.unwrap_or_else(|| {
+            new_member.user.avatar.map(|hash| {
+                let ext = if hash.is_animated() { "gif" } else { "png" };
+                format!("https://cdn.discordapp.com/avatars/{}/{}.{}?size=128", new_member.user.id, hash, ext)
+            }).unwrap_or_default()
+        });
+
         Handler::log(ctx, "info", &gid_str, &format!(
             "{} a change son avatar serveur", user_name
         )).await;
@@ -220,14 +239,19 @@ pub async fn handle_update(
         Handler::send_event(
             ctx,
             audit_event::simple(gid_str.clone(), "member_avatar_update")
-                .with_target(&user_id, user_name),
+                .with_target(&user_id, user_name)
+                .with_details(serde_json::json!({
+                    "old_avatar_url": old_avatar_url,
+                    "new_avatar_url": new_url,
+                })),
         )
         .await;
 
         // Surveillance : avatar change
         Handler::track_activity(
             ctx, &gid_str, &user_id, "avatar_changed",
-            None, None, None, serde_json::json!({}),
+            None, None, None,
+            serde_json::json!({"new_avatar_url": new_url}),
         ).await;
     }
 

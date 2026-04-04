@@ -119,6 +119,11 @@ pub async fn handle_update(
         None => return,
     };
 
+    // Ignorer les messages edites par des bots
+    if event.author.as_ref().map(|a| a.bot).unwrap_or(false) {
+        return;
+    }
+
     let author_id = event.author.as_ref().map(|a| a.id.to_string());
     let author_name = event.author.as_ref().map(|a| a.name.clone());
     let new_content = event.content.clone().unwrap_or_default();

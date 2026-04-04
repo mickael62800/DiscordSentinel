@@ -1,6 +1,8 @@
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use tracing::info;
 
 use crate::adapters::inbound::http::state::AppState;
 
@@ -45,4 +47,32 @@ pub async fn get_models_status(
     ];
 
     Json(ModelsStatusResponse { models })
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ReloadRequest {
+    pub model_type: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ReloadResponse {
+    pub success: bool,
+    pub message: String,
+}
+
+/// POST /api/models/reload — recharge un modele ONNX a chaud
+pub async fn reload_model(
+    State(state): State<AppState>,
+    Json(req): Json<ReloadRequest>,
+) -> (StatusCode, Json<ReloadResponse>) {
+    info!(model_type = %req.model_type, "Rechargement du modele demande");
+    match state.inference.reload(&req.model_type) {
+        Ok(msg) => {
+            info!("{}", msg);
+            (StatusCode::OK, Json(ReloadResponse { success: true, message: msg }))
+        }
+        Err(msg) => {
+            (StatusCode::INTERNAL_SERVER_ERROR, Json(ReloadResponse { success: false, message: msg }))
+        }
+    }
 }

@@ -1,5 +1,5 @@
 use std::path::Path;
-use std::sync::Mutex;
+use std::sync::{Mutex, RwLock};
 
 use ndarray::{Array2, Array4};
 use ort::session::Session;
@@ -15,82 +15,96 @@ pub struct InferenceClassification {
 
 /// Service d'inference ONNX — charge les modeles au demarrage.
 /// Les sessions sont protegees par Mutex car `session.run()` requiert `&mut`.
+/// Le RwLock externe permet de recharger les modeles a chaud.
 pub struct InferenceService {
-    vision_session: Option<Mutex<Session>>,
-    text_session: Option<Mutex<Session>>,
+    vision_session: RwLock<Option<Mutex<Session>>>,
+    text_session: RwLock<Option<Mutex<Session>>>,
 }
 
 impl InferenceService {
+    fn load_session(path: &str, label: &str) -> Option<Mutex<Session>> {
+        if !Path::new(path).exists() {
+            warn!(path = %path, "Modele {} ONNX introuvable — inference desactivee", label);
+            return None;
+        }
+        let result = (|| -> Result<Session, Box<dyn std::error::Error>> {
+            let builder = Session::builder()?;
+            let mut builder = builder.with_intra_threads(4).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
+            let session = builder.commit_from_file(path)?;
+            Ok(session)
+        })();
+        match result {
+            Ok(session) => {
+                info!(path = %path, "Modele {} ONNX charge", label);
+                Some(Mutex::new(session))
+            }
+            Err(e) => {
+                warn!(error = %e, "Erreur chargement modele {} ONNX", label);
+                None
+            }
+        }
+    }
+
     /// Charge les modeles ONNX depuis les chemins fournis.
     /// Si un modele n'est pas trouve, le service fonctionne en mode degrade.
     pub fn new(vision_model_path: Option<&str>, text_model_path: Option<&str>) -> Self {
-        let vision_session = vision_model_path.and_then(|p| {
-            if !Path::new(p).exists() {
-                warn!(path = %p, "Modele vision ONNX introuvable — inference vision desactivee");
-                return None;
-            }
-            let result = (|| -> Result<Session, Box<dyn std::error::Error>> {
-                let builder = Session::builder()?;
-                let mut builder = builder.with_intra_threads(4).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                let session = builder.commit_from_file(p)?;
-                Ok(session)
-            })();
-            match result {
-                Ok(session) => {
-                    info!(path = %p, "Modele vision ONNX charge");
-                    Some(Mutex::new(session))
-                }
-                Err(e) => {
-                    warn!(error = %e, "Erreur chargement modele vision ONNX");
-                    None
-                }
-            }
-        });
-
-        let text_session = text_model_path.and_then(|p| {
-            if !Path::new(p).exists() {
-                warn!(path = %p, "Modele text ONNX introuvable — inference text desactivee");
-                return None;
-            }
-            let result = (|| -> Result<Session, Box<dyn std::error::Error>> {
-                let builder = Session::builder()?;
-                let mut builder = builder.with_intra_threads(4).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-                let session = builder.commit_from_file(p)?;
-                Ok(session)
-            })();
-            match result {
-                Ok(session) => {
-                    info!(path = %p, "Modele text ONNX charge");
-                    Some(Mutex::new(session))
-                }
-                Err(e) => {
-                    warn!(error = %e, "Erreur chargement modele text ONNX");
-                    None
-                }
-            }
-        });
+        let vision_session = vision_model_path.and_then(|p| Self::load_session(p, "vision"));
+        let text_session = text_model_path.and_then(|p| Self::load_session(p, "text"));
 
         Self {
-            vision_session,
-            text_session,
+            vision_session: RwLock::new(vision_session),
+            text_session: RwLock::new(text_session),
+        }
+    }
+
+    /// Recharge un modele a chaud sans redemarrage.
+    pub fn reload(&self, model_type: &str) -> Result<String, String> {
+        match model_type {
+            "text-sentiment" | "text" => {
+                let path = std::env::var("TEXT_MODEL_PATH").unwrap_or_default();
+                if path.is_empty() {
+                    return Err("TEXT_MODEL_PATH non configure".into());
+                }
+                let session = Self::load_session(&path, "text");
+                let loaded = session.is_some();
+                *self.text_session.write().map_err(|e| format!("Lock error: {e}"))? = session;
+                if loaded {
+                    Ok(format!("Modele text recharge depuis {}", path))
+                } else {
+                    Err(format!("Echec rechargement text depuis {}", path))
+                }
+            }
+            "image-classification" | "vision" => {
+                let path = std::env::var("VISION_MODEL_PATH").unwrap_or_default();
+                if path.is_empty() {
+                    return Err("VISION_MODEL_PATH non configure".into());
+                }
+                let session = Self::load_session(&path, "vision");
+                let loaded = session.is_some();
+                *self.vision_session.write().map_err(|e| format!("Lock error: {e}"))? = session;
+                if loaded {
+                    Ok(format!("Modele vision recharge depuis {}", path))
+                } else {
+                    Err(format!("Echec rechargement vision depuis {}", path))
+                }
+            }
+            _ => Err(format!("Type de modele inconnu: {}", model_type)),
         }
     }
 
     pub fn vision_available(&self) -> bool {
-        self.vision_session.is_some()
+        self.vision_session.read().map(|s| s.is_some()).unwrap_or(false)
     }
 
     pub fn text_available(&self) -> bool {
-        self.text_session.is_some()
+        self.text_session.read().map(|s| s.is_some()).unwrap_or(false)
     }
 
     /// Inference vision : prend une image preprocessee (1, 3, 224, 224) normalisee.
-    /// Retourne les classifications (safe, nsfw, illicit) avec confidences.
     pub fn classify_image(&self, image_tensor: Array4<f32>) -> Result<Vec<InferenceClassification>, String> {
-        let mutex = self.vision_session.as_ref()
-            .ok_or("Modele vision non charge")?;
-        let mut session = mutex.lock()
-            .map_err(|e| format!("Lock session vision: {e}"))?;
+        let guard = self.vision_session.read().map_err(|e| format!("RwLock error: {e}"))?;
+        let mutex = guard.as_ref().ok_or("Modele vision non charge")?;
+        let mut session = mutex.lock().map_err(|e| format!("Lock session vision: {e}"))?;
 
         let input = Value::from_array(image_tensor)
             .map_err(|e| format!("Erreur creation tensor: {e}"))?;
@@ -106,29 +120,20 @@ impl InferenceService {
         let probabilities = softmax(logits);
 
         let labels = ["safe", "nsfw", "illicit"];
-        let classifications: Vec<InferenceClassification> = labels
-            .iter()
-            .zip(probabilities.iter())
-            .map(|(label, &confidence)| InferenceClassification {
-                label: label.to_string(),
-                confidence,
-            })
-            .collect();
-
-        Ok(classifications)
+        Ok(labels.iter().zip(probabilities.iter())
+            .map(|(label, &confidence)| InferenceClassification { label: label.to_string(), confidence })
+            .collect())
     }
 
     /// Inference text : prend des token IDs et un attention mask.
-    /// Retourne les classifications (neutral, anger, rage, threat, harassment).
     pub fn classify_text(
         &self,
         input_ids: Array2<i64>,
         attention_mask: Array2<i64>,
     ) -> Result<Vec<InferenceClassification>, String> {
-        let mutex = self.text_session.as_ref()
-            .ok_or("Modele text non charge")?;
-        let mut session = mutex.lock()
-            .map_err(|e| format!("Lock session text: {e}"))?;
+        let guard = self.text_session.read().map_err(|e| format!("RwLock error: {e}"))?;
+        let mutex = guard.as_ref().ok_or("Modele text non charge")?;
+        let mut session = mutex.lock().map_err(|e| format!("Lock session text: {e}"))?;
 
         let ids_value = Value::from_array(input_ids)
             .map_err(|e| format!("Erreur creation tensor input_ids: {e}"))?;
@@ -146,16 +151,9 @@ impl InferenceService {
         let probabilities = softmax(logits);
 
         let labels = ["neutral", "anger", "rage", "threat", "harassment"];
-        let classifications: Vec<InferenceClassification> = labels
-            .iter()
-            .zip(probabilities.iter())
-            .map(|(label, &confidence)| InferenceClassification {
-                label: label.to_string(),
-                confidence,
-            })
-            .collect();
-
-        Ok(classifications)
+        Ok(labels.iter().zip(probabilities.iter())
+            .map(|(label, &confidence)| InferenceClassification { label: label.to_string(), confidence })
+            .collect())
     }
 }
 

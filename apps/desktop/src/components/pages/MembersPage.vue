@@ -37,11 +37,11 @@ const {
   closeMember,
 } = useMembers();
 
-// Tabs: liste
-const listTab = ref<"all" | "humans" | "bots">("all");
-
 // Tabs: detail
 const detailTab = ref<"profil" | "conduite" | "surveillance">("profil");
+
+// Filtre surveillance
+const watchFilter = ref<"all" | "watched" | "unwatched">("all");
 
 // Adjust form
 const adjustAmount = ref(1);
@@ -52,10 +52,15 @@ const adjusting = ref(false);
 const watchAction = ref(false);
 
 const tabFilteredMembers = computed(() => {
-  let list = filteredMembers.value;
-  if (listTab.value === "humans") list = list.filter((m) => !m.is_bot);
-  if (listTab.value === "bots") list = list.filter((m) => m.is_bot);
-  return list;
+  let list = filteredMembers.value.filter((m) => !m.is_bot);
+  if (watchFilter.value === "watched") list = list.filter((m) => isWatched(m.user_id));
+  if (watchFilter.value === "unwatched") list = list.filter((m) => !isWatched(m.user_id));
+  // Surveilles en premier
+  return list.sort((a, b) => {
+    const aW = isWatched(a.user_id) ? 0 : 1;
+    const bW = isWatched(b.user_id) ? 0 : 1;
+    return aW - bW;
+  });
 });
 
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedMembers } = usePagination(tabFilteredMembers);
@@ -157,16 +162,14 @@ function rolesCount(roles: unknown): number {
       <span v-if="!loading" class="member-count">{{ tabFilteredMembers.length }} membres</span>
     </div>
 
-    <!-- List tabs -->
-    <div class="tabs">
-      <button :class="['tab', { active: listTab === 'all' }]" @click="listTab = 'all'">Tous</button>
-      <button :class="['tab', { active: listTab === 'humans' }]" @click="listTab = 'humans'">Humains</button>
-      <button :class="['tab', { active: listTab === 'bots' }]" @click="listTab = 'bots'">Bots</button>
-    </div>
-
     <!-- Filters -->
     <div class="filters">
       <input v-model="search" type="text" class="search-input" placeholder="Rechercher par nom ou ID..." />
+      <select v-model="watchFilter" class="sort-select">
+        <option value="all">Tous les membres</option>
+        <option value="watched">Surveilles uniquement</option>
+        <option value="unwatched">Non surveilles</option>
+      </select>
       <select v-model="sortBy" class="sort-select">
         <option value="username">Tri par nom</option>
         <option value="joined_at">Tri par date d'arrivee</option>
@@ -195,7 +198,6 @@ function rolesCount(roles: unknown): number {
             </div>
             <div class="member-badges">
               <AppBadge v-if="isWatched(member.user_id)" label="SURVEILLE" variant="warning" />
-              <AppBadge v-if="member.is_bot" label="BOT" variant="info" />
             </div>
           </div>
           <div class="member-card-footer">
@@ -218,7 +220,17 @@ function rolesCount(roles: unknown): number {
 
       <!-- ===== RIGHT: Detail panel ===== -->
       <div v-if="selectedMember" class="detail-panel">
-        <button class="close-btn" @click="closeMember">&times;</button>
+        <div class="panel-top-actions">
+          <button
+            v-if="isWatched(selectedMember.member.user_id)"
+            class="unwatch-top-btn"
+            :disabled="watchAction"
+            @click="unwatch"
+          >
+            Retirer surveillance
+          </button>
+          <button class="close-btn" @click="closeMember">&times;</button>
+        </div>
 
         <div v-if="loadingSummary" class="loading">Chargement...</div>
         <template v-else>
@@ -564,9 +576,9 @@ function rolesCount(roles: unknown): number {
 
 /* Left list */
 .members-list {
-  width: 420px;
-  min-width: 420px;
-  max-width: 420px;
+  width: 720px;
+  min-width: 720px;
+  max-width: 720px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -628,10 +640,39 @@ function rolesCount(roles: unknown): number {
   position: relative;
 }
 
-.close-btn {
+.panel-top-actions {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unwatch-top-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.unwatch-top-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.unwatch-top-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.close-btn {
   background: none;
   border: 1px solid var(--border);
   color: var(--text-secondary);

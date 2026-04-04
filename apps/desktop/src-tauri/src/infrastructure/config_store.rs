@@ -1,13 +1,109 @@
 use std::fs;
 use std::path::PathBuf;
 
+use aes_gcm::aead::{Aead, KeyInit, OsRng};
+use aes_gcm::{Aes256Gcm, Nonce};
 use heed::types::Str;
 use heed::{Database, Env, EnvOpenOptions};
+use sha2::{Digest, Sha256};
 
 use crate::domain::entities::{ApiConfig, DiscordConfig};
 
 const DB_DIR: &str = "discord-sentinel";
 const DB_NAME: &str = "config";
+const TOKEN_KEY_PREFIX: &str = "bot_token:";
+
+/// Convertit un bot_name en nom de variable .env pour le token
+/// ex: "voice-bot" -> "VOICE_DISCORD_TOKEN", "audit-bot" -> "AUDIT_DISCORD_TOKEN"
+fn bot_name_to_env_key(bot_name: &str) -> String {
+    let prefix = bot_name
+        .trim_end_matches("-bot")
+        .trim_end_matches("-worker")
+        .to_uppercase()
+        .replace('-', "_");
+    format!("{}_DISCORD_TOKEN", prefix)
+}
+
+/// Chemin du fichier .env a la racine du projet
+fn env_file_path() -> Option<std::path::PathBuf> {
+    // Remonter depuis l'executable jusqu'a la racine du projet
+    let exe = std::env::current_exe().ok()?;
+    let mut dir = exe.parent()?;
+    // Remonter tant qu'on ne trouve pas .env
+    for _ in 0..10 {
+        let env_path = dir.join(".env");
+        if env_path.exists() {
+            return Some(env_path);
+        }
+        dir = dir.parent()?;
+    }
+    None
+}
+
+fn read_env_token(bot_name: &str) -> Option<String> {
+    let path = env_file_path()?;
+    let content = fs::read_to_string(&path).ok()?;
+    let key = bot_name_to_env_key(bot_name);
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('#') || trimmed.is_empty() {
+            continue;
+        }
+        if let Some(value) = trimmed.strip_prefix(&key).and_then(|rest| rest.strip_prefix('=')) {
+            let v = value.trim();
+            if !v.is_empty() {
+                return Some(v.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn write_env_token(bot_name: &str, token: &str) -> Result<(), String> {
+    let path = env_file_path().ok_or("Fichier .env introuvable")?;
+    let content = fs::read_to_string(&path).map_err(|e| format!("Lecture .env: {}", e))?;
+    let key = bot_name_to_env_key(bot_name);
+    let new_line = format!("{}={}", key, token);
+
+    let mut found = false;
+    let mut lines: Vec<String> = content
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim();
+            if trimmed.starts_with(&key) && trimmed[key.len()..].starts_with('=') {
+                found = true;
+                new_line.clone()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+
+    if !found {
+        lines.push(new_line);
+    }
+
+    fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("Ecriture .env: {}", e))
+}
+
+fn remove_env_token(bot_name: &str) -> Result<(), String> {
+    let path = match env_file_path() {
+        Some(p) => p,
+        None => return Ok(()),
+    };
+    let content = fs::read_to_string(&path).map_err(|e| format!("Lecture .env: {}", e))?;
+    let key = bot_name_to_env_key(bot_name);
+
+    let lines: Vec<&str> = content
+        .lines()
+        .filter(|line| {
+            let trimmed = line.trim();
+            !(trimmed.starts_with(&key) && trimmed[key.len()..].starts_with('='))
+        })
+        .collect();
+
+    fs::write(&path, lines.join("\n") + "\n").map_err(|e| format!("Ecriture .env: {}", e))
+}
 
 pub struct ConfigStore {
     env: Env,
@@ -137,5 +233,143 @@ impl ConfigStore {
 
         wtxn.commit()
             .map_err(|e| format!("Failed to commit: {}", e))
+    }
+
+    // ── Token encryption ──
+
+    fn derive_key() -> [u8; 32] {
+        let hostname = hostname::get()
+            .map(|h| h.to_string_lossy().to_string())
+            .unwrap_or_else(|_| "sentinel-fallback".into());
+        let seed = format!("discord-sentinel::{}", hostname);
+        let mut hasher = Sha256::new();
+        hasher.update(seed.as_bytes());
+        hasher.finalize().into()
+    }
+
+    fn encrypt_token(plaintext: &str) -> Result<String, String> {
+        use aes_gcm::aead::rand_core::RngCore;
+        let key = Self::derive_key();
+        let cipher = Aes256Gcm::new_from_slice(&key)
+            .map_err(|e| format!("Cipher init error: {}", e))?;
+        let mut nonce_bytes = [0u8; 12];
+        OsRng.fill_bytes(&mut nonce_bytes);
+        let nonce = Nonce::from_slice(&nonce_bytes);
+        let ciphertext = cipher
+            .encrypt(nonce, plaintext.as_bytes())
+            .map_err(|e| format!("Encryption error: {}", e))?;
+        // Store as: base64(nonce + ciphertext)
+        let mut combined = Vec::with_capacity(12 + ciphertext.len());
+        combined.extend_from_slice(&nonce_bytes);
+        combined.extend_from_slice(&ciphertext);
+        use base64::Engine;
+        Ok(base64::engine::general_purpose::STANDARD.encode(&combined))
+    }
+
+    fn decrypt_token(encoded: &str) -> Result<String, String> {
+        use base64::Engine;
+        let combined = base64::engine::general_purpose::STANDARD
+            .decode(encoded)
+            .map_err(|e| format!("Base64 decode error: {}", e))?;
+        if combined.len() < 13 {
+            return Err("Invalid encrypted token".into());
+        }
+        let (nonce_bytes, ciphertext) = combined.split_at(12);
+        let key = Self::derive_key();
+        let cipher = Aes256Gcm::new_from_slice(&key)
+            .map_err(|e| format!("Cipher init error: {}", e))?;
+        let nonce = Nonce::from_slice(nonce_bytes);
+        let plaintext = cipher
+            .decrypt(nonce, ciphertext)
+            .map_err(|_| "Decryption failed — token may be corrupted or from another machine".to_string())?;
+        String::from_utf8(plaintext)
+            .map_err(|e| format!("UTF-8 decode error: {}", e))
+    }
+
+    pub fn save_bot_token(&self, bot_name: &str, token: &str) -> Result<(), String> {
+        // 1. Sauver chiffre dans LMDB
+        let encrypted = Self::encrypt_token(token)?;
+        let key = format!("{}{}", TOKEN_KEY_PREFIX, bot_name);
+        let mut wtxn = self.env.write_txn()
+            .map_err(|e| format!("Failed to create write txn: {}", e))?;
+        self.db
+            .put(&mut wtxn, &key, &encrypted)
+            .map_err(|e| format!("Failed to write token: {}", e))?;
+        wtxn.commit()
+            .map_err(|e| format!("Failed to commit: {}", e))?;
+        // 2. Ecrire aussi dans le .env pour que les bots puissent le lire
+        let _ = write_env_token(bot_name, token);
+        Ok(())
+    }
+
+    pub fn get_bot_token(&self, bot_name: &str) -> Result<Option<String>, String> {
+        // LMDB d'abord
+        let key = format!("{}{}", TOKEN_KEY_PREFIX, bot_name);
+        let rtxn = self.env.read_txn()
+            .map_err(|e| format!("Failed to create read txn: {}", e))?;
+        match self.db.get(&rtxn, &key)
+            .map_err(|e| format!("Failed to read token: {}", e))? {
+            Some(encrypted) => Ok(Some(Self::decrypt_token(encrypted)?)),
+            None => {
+                // Fallback: lire depuis .env
+                Ok(read_env_token(bot_name))
+            }
+        }
+    }
+
+    /// Retourne (bot_name, has_token) — combine LMDB + .env
+    pub fn get_all_bot_tokens(&self) -> Result<Vec<(String, bool)>, String> {
+        let rtxn = self.env.read_txn()
+            .map_err(|e| format!("Failed to create read txn: {}", e))?;
+        let mut map = std::collections::HashMap::new();
+
+        // LMDB tokens
+        let iter = self.db.iter(&rtxn)
+            .map_err(|e| format!("Failed to iterate: {}", e))?;
+        for item in iter {
+            let (key, _value) = item.map_err(|e| format!("Iter error: {}", e))?;
+            if let Some(bot_name) = key.strip_prefix(TOKEN_KEY_PREFIX) {
+                map.insert(bot_name.to_string(), true);
+            }
+        }
+
+        // Completer avec les tokens du .env qui ne sont pas dans LMDB
+        if let Some(path) = env_file_path() {
+            if let Ok(content) = fs::read_to_string(&path) {
+                for line in content.lines() {
+                    let trimmed = line.trim();
+                    if trimmed.starts_with('#') || trimmed.is_empty() || !trimmed.contains("_DISCORD_TOKEN=") {
+                        continue;
+                    }
+                    if let Some((env_key, value)) = trimmed.split_once('=') {
+                        if value.trim().is_empty() {
+                            continue;
+                        }
+                        // Convertir env key -> bot name: VOICE_DISCORD_TOKEN -> voice-bot
+                        let bot_name = env_key
+                            .trim_end_matches("_DISCORD_TOKEN")
+                            .to_lowercase()
+                            .replace('_', "-")
+                            + "-bot";
+                        map.entry(bot_name).or_insert(true);
+                    }
+                }
+            }
+        }
+
+        Ok(map.into_iter().collect())
+    }
+
+    pub fn delete_bot_token(&self, bot_name: &str) -> Result<(), String> {
+        // Supprimer du LMDB
+        let key = format!("{}{}", TOKEN_KEY_PREFIX, bot_name);
+        let mut wtxn = self.env.write_txn()
+            .map_err(|e| format!("Failed to create write txn: {}", e))?;
+        let _ = self.db.delete(&mut wtxn, &key);
+        wtxn.commit()
+            .map_err(|e| format!("Failed to commit: {}", e))?;
+        // Supprimer aussi du .env
+        let _ = remove_env_token(bot_name);
+        Ok(())
     }
 }

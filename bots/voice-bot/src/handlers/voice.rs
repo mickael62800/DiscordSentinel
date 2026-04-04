@@ -147,9 +147,26 @@ async fn create_temp_channel(
     let cat_name = format!("Salon de {display_name}");
     let everyone_role = guild_id.everyone_role();
 
-    // 1. Creer la categorie
+    // Charger la position de base depuis la config guild
+    let base_position: Option<u16> = {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.get_guild_config(&guild_id.to_string())
+                .await
+                .ok()
+                .and_then(|cfg| cfg.get("voice_base_position").and_then(|v| v.parse().ok()))
+        } else {
+            None
+        }
+    };
+
+    // 1. Creer la categorie (avec position si configuree)
+    let mut create_cat = CreateChannel::new(&cat_name).kind(ChannelType::Category);
+    if let Some(pos) = base_position {
+        create_cat = create_cat.position(pos);
+    }
     let cat = match guild_id
-        .create_channel(&ctx.http, CreateChannel::new(&cat_name).kind(ChannelType::Category))
+        .create_channel(&ctx.http, create_cat)
         .await
     {
         Ok(ch) => ch,

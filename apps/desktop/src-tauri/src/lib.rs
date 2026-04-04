@@ -176,6 +176,10 @@ pub fn run() {
             presentation::commands::get_members,
             presentation::commands::get_member,
             presentation::commands::get_member_summary,
+            presentation::commands::save_bot_token,
+            presentation::commands::get_bot_token,
+            presentation::commands::get_all_bot_tokens,
+            presentation::commands::delete_bot_token,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

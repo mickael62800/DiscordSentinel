@@ -41,6 +41,56 @@ const formValues = ref<Record<string, string>>({});
 const savedValues = ref<Record<string, string>>({});
 const successMessage = ref("");
 
+// ── Token management ──
+const tokenMap = ref<Record<string, boolean>>({});
+const tokenInputs = ref<Record<string, string>>({});
+const tokenVisible = ref<Record<string, boolean>>({});
+const savingToken = ref<string | null>(null);
+const tokenSuccess = ref<string | null>(null);
+
+async function fetchTokens() {
+  try {
+    const tokens = await invoke<[string, boolean][]>("get_all_bot_tokens");
+    const map: Record<string, boolean> = {};
+    for (const [name, has] of tokens) {
+      map[name] = has;
+    }
+    tokenMap.value = map;
+  } catch (e) {
+    console.error("Erreur chargement tokens:", e);
+  }
+}
+
+async function saveToken(botName: string) {
+  const token = tokenInputs.value[botName];
+  if (!token) return;
+  savingToken.value = botName;
+  try {
+    await invoke("save_bot_token", { botName, token });
+    tokenMap.value[botName] = true;
+    tokenInputs.value[botName] = "";
+    tokenSuccess.value = botName;
+    setTimeout(() => (tokenSuccess.value = null), 3000);
+  } catch (e) {
+    console.error("Erreur sauvegarde token:", e);
+  } finally {
+    savingToken.value = null;
+  }
+}
+
+async function deleteToken(botName: string) {
+  try {
+    await invoke("delete_bot_token", { botName });
+    tokenMap.value[botName] = false;
+  } catch (e) {
+    console.error("Erreur suppression token:", e);
+  }
+}
+
+function toggleTokenVisibility(botName: string) {
+  tokenVisible.value[botName] = !tokenVisible.value[botName];
+}
+
 function isWorker(botName: string): boolean {
   return workerNames.includes(botName);
 }
@@ -61,6 +111,22 @@ const configFields = computed<ConfigField[]>(() => {
 
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
 const otherFields = computed(() => configFields.value.filter((f) => f.type !== "boolean"));
+
+const allTogglesOn = computed(() =>
+  booleanFields.value.length > 0 && booleanFields.value.every((f) => formValues.value[f.key] === "true" || formValues.value[f.key] === "1"),
+);
+
+function enableAllToggles() {
+  for (const field of booleanFields.value) {
+    formValues.value[field.key] = "true";
+  }
+}
+
+function disableAllToggles() {
+  for (const field of booleanFields.value) {
+    formValues.value[field.key] = "false";
+  }
+}
 
 function isFieldModified(key: string): boolean {
   return (formValues.value[key] ?? "") !== (savedValues.value[key] ?? "");
@@ -186,6 +252,7 @@ function selectComponent(name: string) {
 onMounted(() => {
   fetchDefinitions();
   fetchModelsStatus();
+  fetchTokens();
   if (selectedGuildId.value) fetchConfig();
 });
 
@@ -213,7 +280,7 @@ watch(selectedComponent, loadFormValues);
         <span class="server-name">{{ selectedGuild?.name }}</span>
       </div>
 
-      <!-- Grid of all components (bots + workers) -->
+      <!-- Grid of all components (bots + workers) — 3 colonnes -->
       <div class="component-grid">
         <div
           v-for="def in definitions"
@@ -224,20 +291,56 @@ watch(selectedComponent, loadFormValues);
         >
           <div class="component-card-header">
             <div class="component-name">{{ def.display_name }}</div>
-            <AppBadge
-              v-if="isWorker(def.bot_name)"
-              label="Worker"
-              variant="warning"
-            />
-            <AppBadge
-              v-else
-              label="Bot"
-              variant="info"
-            />
+            <div class="component-badges">
+              <span
+                class="token-badge"
+                :class="tokenMap[def.bot_name] ? 'token-ok' : 'token-missing'"
+              >
+                {{ tokenMap[def.bot_name] ? 'Token OK' : 'Pas de token' }}
+              </span>
+              <AppBadge
+                v-if="isWorker(def.bot_name)"
+                label="Worker"
+                variant="warning"
+              />
+              <AppBadge
+                v-else
+                label="Bot"
+                variant="info"
+              />
+            </div>
           </div>
           <div class="component-desc">{{ def.description }}</div>
           <div class="component-params">
             {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
+          </div>
+
+          <!-- Token inline -->
+          <div class="token-section" @click.stop>
+            <div v-if="tokenMap[def.bot_name]" class="token-configured">
+              <span class="token-status-text">Token chiffre enregistre</span>
+              <button class="btn-token-delete" @click.stop="deleteToken(def.bot_name)">Supprimer</button>
+            </div>
+            <div v-else class="token-input-row">
+              <input
+                v-model="tokenInputs[def.bot_name]"
+                :type="tokenVisible[def.bot_name] ? 'text' : 'password'"
+                class="token-input"
+                placeholder="Coller le token Discord..."
+                @click.stop
+              />
+              <button class="btn-token-eye" @click.stop="toggleTokenVisibility(def.bot_name)">
+                {{ tokenVisible[def.bot_name] ? 'Masquer' : 'Voir' }}
+              </button>
+              <button
+                class="btn-token-save"
+                :disabled="!tokenInputs[def.bot_name] || savingToken === def.bot_name"
+                @click.stop="saveToken(def.bot_name)"
+              >
+                {{ savingToken === def.bot_name ? '...' : 'Sauver' }}
+              </button>
+            </div>
+            <span v-if="tokenSuccess === def.bot_name" class="token-saved-msg">Token chiffre et sauvegarde !</span>
           </div>
         </div>
       </div>
@@ -279,7 +382,15 @@ watch(selectedComponent, loadFormValues);
         <template v-else>
           <!-- Section toggles (6 par ligne) -->
           <div v-if="booleanFields.length > 0" class="toggles-section">
-            <h3 class="section-title">Fonctionnalites</h3>
+            <div class="section-title-row">
+              <h3 class="section-title">Fonctionnalites</h3>
+              <button
+                class="btn-toggle-all"
+                @click="allTogglesOn ? disableAllToggles() : enableAllToggles()"
+              >
+                {{ allTogglesOn ? 'Tout desactiver' : 'Tout activer' }}
+              </button>
+            </div>
             <div class="toggles-grid">
               <div
                 v-for="field in booleanFields"
@@ -430,7 +541,7 @@ watch(selectedComponent, loadFormValues);
 
 .component-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   margin-bottom: 24px;
 }
@@ -458,6 +569,12 @@ watch(selectedComponent, loadFormValues);
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
+}
+
+.component-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .component-name {
@@ -649,19 +766,46 @@ watch(selectedComponent, loadFormValues);
   font-weight: 500;
 }
 
+.section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 24px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.toggles-section:first-child .section-title-row {
+  margin-top: 0;
+}
+
 .section-title {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin: 24px 0 12px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
-.toggles-section:first-child .section-title {
-  margin-top: 0;
+.btn-toggle-all {
+  padding: 5px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.btn-toggle-all:hover {
+  background: var(--accent);
+  color: white;
 }
 
 .toggles-grid {
@@ -785,4 +929,23 @@ watch(selectedComponent, loadFormValues);
   font-size: 12px;
   color: var(--text-secondary);
 }
+
+/* ── Token styles ── */
+.token-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap; }
+.token-ok { color: #22c55e; background: rgba(34, 197, 94, 0.12); }
+.token-missing { color: var(--text-secondary); background: rgba(255, 255, 255, 0.06); }
+.token-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+.token-configured { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.token-status-text { font-size: 11px; color: #22c55e; font-weight: 500; }
+.btn-token-delete { font-size: 11px; padding: 3px 10px; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 6px; cursor: pointer; opacity: 0.7; transition: opacity 0.15s; }
+.btn-token-delete:hover { opacity: 1; }
+.token-input-row { display: flex; align-items: center; gap: 6px; }
+.token-input { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 12px; font-family: monospace; min-width: 0; }
+.token-input:focus { outline: none; border-color: var(--accent); }
+.token-input::placeholder { color: var(--text-secondary); opacity: 0.5; }
+.btn-token-eye { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 11px; padding: 4px 8px; flex-shrink: 0; color: var(--text-secondary); transition: color 0.15s; }
+.btn-token-eye:hover { color: var(--text-primary); border-color: var(--accent); }
+.btn-token-save { padding: 5px 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.btn-token-save:disabled { opacity: 0.4; cursor: not-allowed; }
+.token-saved-msg { display: block; font-size: 11px; color: #22c55e; margin-top: 4px; font-weight: 500; }
 </style>

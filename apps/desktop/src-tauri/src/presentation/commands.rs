@@ -198,6 +198,40 @@ pub fn save_api_config(
     service.save_api_config(ApiConfig { api_url, api_key })
 }
 
+// --- Bot Token commands ---
+
+#[tauri::command]
+pub fn save_bot_token(
+    service: State<'_, Arc<AuthService>>,
+    bot_name: String,
+    token: String,
+) -> Result<(), String> {
+    service.save_bot_token(&bot_name, &token)
+}
+
+#[tauri::command]
+pub fn get_bot_token(
+    service: State<'_, Arc<AuthService>>,
+    bot_name: String,
+) -> Result<Option<String>, String> {
+    service.get_bot_token(&bot_name)
+}
+
+#[tauri::command]
+pub fn get_all_bot_tokens(
+    service: State<'_, Arc<AuthService>>,
+) -> Result<Vec<(String, bool)>, String> {
+    service.get_all_bot_tokens()
+}
+
+#[tauri::command]
+pub fn delete_bot_token(
+    service: State<'_, Arc<AuthService>>,
+    bot_name: String,
+) -> Result<(), String> {
+    service.delete_bot_token(&bot_name)
+}
+
 // --- Rules (complex) ---
 
 #[tauri::command]

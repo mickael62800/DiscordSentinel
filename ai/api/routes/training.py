@@ -26,6 +26,21 @@ _state_lock = threading.Lock()
 router = APIRouter()
 
 
+def _notify_reload(model_type: str) -> None:
+    """Notifie l'API Rust de recharger le modele ONNX apres export."""
+    import os
+    import requests
+    api_url = os.environ.get("API_BASE_URL", "http://localhost:3000")
+    try:
+        resp = requests.post(f"{api_url}/api/models/reload", json={"model_type": model_type}, timeout=10)
+        if resp.ok:
+            logger.info("API notifiee de recharger le modele %s", model_type)
+        else:
+            logger.warning("API reload returned %d: %s", resp.status_code, resp.text)
+    except Exception as e:
+        logger.warning("Impossible de notifier l'API pour reload: %s", e)
+
+
 # ── Training State ──
 
 
@@ -598,6 +613,19 @@ def _train_text(req: TrainingRequest) -> None:
         if not state._stop_flag and not state.early_stopped:
             state.phase = "termine"
 
+        # Auto-export ONNX du best model
+        state.phase = "export ONNX automatique"
+        try:
+            from routes.export import _export_text
+            result = _export_text()
+            logger.info("Auto-export text ONNX termine: %s (%d octets)", result.file_path, result.file_size_bytes)
+            # Notifier l'API Rust de recharger le modele
+            _notify_reload("text-sentiment")
+        except Exception as e:
+            logger.warning("Auto-export text ONNX echoue (non bloquant): %s", e)
+
+        state.phase = "termine"
+
     except Exception as e:
         logger.exception("Erreur entrainement text-sentiment")
         state.phase = f"erreur: {e}"
@@ -764,6 +792,18 @@ def _train_vision(req: TrainingRequest) -> None:
 
         if not state._stop_flag and not state.early_stopped:
             state.phase = "termine"
+
+        # Auto-export ONNX du best model
+        state.phase = "export ONNX automatique"
+        try:
+            from routes.export import _export_vision
+            result = _export_vision()
+            logger.info("Auto-export vision ONNX termine: %s (%d octets)", result.file_path, result.file_size_bytes)
+            _notify_reload("image-classification")
+        except Exception as e:
+            logger.warning("Auto-export vision ONNX echoue (non bloquant): %s", e)
+
+        state.phase = "termine"
 
     except Exception as e:
         logger.exception("Erreur entrainement image-classification")

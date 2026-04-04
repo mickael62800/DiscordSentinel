@@ -168,6 +168,8 @@ export function useMembers() {
       }),
     });
     if (!resp.ok) throw new Error("Erreur ajout surveillance");
+    // Rafraichir la liste des surveilles
+    watchedUsers.value = await invoke<WatchedUser[]>("get_watched_users", { guildId: selectedGuildId.value });
   }
 
   async function removeFromWatch(userId: string) {
@@ -176,6 +178,8 @@ export function useMembers() {
       guildId: selectedGuildId.value,
       userId,
     });
+    // Retirer localement pour mise a jour immediate
+    watchedUsers.value = watchedUsers.value.filter((u) => u.user_id !== userId);
   }
 
   function closeMember() {

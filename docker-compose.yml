@@ -323,6 +323,34 @@ services:
     depends_on:
       - api
 
+  roles-bot:
+    build:
+      context: ./bots/roles-bot
+      dockerfile: Dockerfile
+    container_name: sentinel-roles-bot
+    restart: unless-stopped
+    environment:
+      DISCORD_TOKEN: ${ROLES_DISCORD_TOKEN}
+      API_BASE_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
+      RUST_LOG: info
+    depends_on:
+      - api
+
+  stats-bot:
+    build:
+      context: ./bots/stats-bot
+      dockerfile: Dockerfile
+    container_name: sentinel-stats-bot
+    restart: unless-stopped
+    environment:
+      DISCORD_TOKEN: ${STATS_DISCORD_TOKEN}
+      API_BASE_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
+      RUST_LOG: info
+    depends_on:
+      - api
+
   coude-bot:
     build:
       context: ./bots/coude-bot

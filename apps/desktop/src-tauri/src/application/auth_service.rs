@@ -59,6 +59,22 @@ impl AuthService {
         self.config_store.save_api_config(&config)
     }
 
+    pub fn save_bot_token(&self, bot_name: &str, token: &str) -> Result<(), String> {
+        self.config_store.save_bot_token(bot_name, token)
+    }
+
+    pub fn get_bot_token(&self, bot_name: &str) -> Result<Option<String>, String> {
+        self.config_store.get_bot_token(bot_name)
+    }
+
+    pub fn get_all_bot_tokens(&self) -> Result<Vec<(String, bool)>, String> {
+        self.config_store.get_all_bot_tokens()
+    }
+
+    pub fn delete_bot_token(&self, bot_name: &str) -> Result<(), String> {
+        self.config_store.delete_bot_token(bot_name)
+    }
+
     pub async fn start_oauth_flow(&self) -> Result<DiscordUser, String> {
         let config = self
             .config_store
