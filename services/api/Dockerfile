@@ -1,9 +1,12 @@
-# ── Build stage (Debian pour compatibilite ONNX Runtime) ──
-FROM rust:1.88-slim AS builder
+# ── Build stage (Debian Trixie pour compatibilite glibc 2.38+ / ONNX Runtime) ──
+FROM debian:trixie-slim AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    pkg-config libssl-dev libstdc++6 libstdc++-12-dev ca-certificates g++ \
+    curl build-essential pkg-config libssl-dev ca-certificates g++ \
     && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock* ./
@@ -14,10 +17,10 @@ COPY migrations ./migrations
 RUN touch src/main.rs src/lib.rs && cargo build --release
 
 # ── Runtime stage ──
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates libssl3 libstdc++6 \
+    ca-certificates libssl3t64 libstdc++6 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app/target/release/sentinel-api /usr/local/bin/sentinel-api

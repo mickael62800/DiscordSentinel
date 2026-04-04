@@ -199,7 +199,7 @@ services:
     container_name: sentinel-automod-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${AUTOMOD_DISCORD_TOKEN}
+      AUTOMOD_DISCORD_TOKEN: ${AUTOMOD_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
@@ -213,7 +213,7 @@ services:
     container_name: sentinel-moderation-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${MODERATION_DISCORD_TOKEN}
+      MODERATION_DISCORD_TOKEN: ${MODERATION_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
@@ -227,7 +227,7 @@ services:
     container_name: sentinel-security-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${SECURITY_DISCORD_TOKEN}
+      SECURITY_DISCORD_TOKEN: ${SECURITY_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
@@ -241,7 +241,7 @@ services:
     container_name: sentinel-ticket-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${TICKET_DISCORD_TOKEN}
+      TICKET_DISCORD_TOKEN: ${TICKET_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
@@ -255,7 +255,7 @@ services:
     container_name: sentinel-image-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${IMAGE_DISCORD_TOKEN}
+      IMAGE_DISCORD_TOKEN: ${IMAGE_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       MAX_IMAGE_SIZE: ${MAX_IMAGE_SIZE:-10485760}
@@ -270,10 +270,10 @@ services:
     container_name: sentinel-voice-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${VOICE_DISCORD_TOKEN}
+      VOICE_DISCORD_TOKEN: ${VOICE_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
-      GUILD_ID: ${VOICE_GUILD_ID}
+      VOICE_GUILD_ID: ${VOICE_GUILD_ID}
       PUBLIC_CREATOR_CHANNEL_ID: ${VOICE_PUBLIC_CREATOR_CHANNEL_ID}
       PRIVATE_CREATOR_CHANNEL_ID: ${VOICE_PRIVATE_CREATOR_CHANNEL_ID}
       LOG_CHANNEL_ID: ${VOICE_LOG_CHANNEL_ID:-}
@@ -288,7 +288,7 @@ services:
     container_name: sentinel-progression-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${PROGRESSION_DISCORD_TOKEN}
+      PROGRESSION_DISCORD_TOKEN: ${PROGRESSION_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
@@ -330,7 +330,7 @@ services:
     container_name: sentinel-roles-bot
     restart: unless-stopped
     environment:
-      DISCORD_TOKEN: ${ROLES_DISCORD_TOKEN}
+      ROLES_DISCORD_TOKEN: ${ROLES_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
