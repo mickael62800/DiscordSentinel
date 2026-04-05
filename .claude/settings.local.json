@@ -32,7 +32,15 @@
       "Bash(ssh:*)",
       "Bash(ssh-add -l)",
       "Bash(git add:*)",
-      "Bash(git commit -m ':*)"
+      "Bash(git commit -m ':*)",
+      "Bash(docker compose restart:*)",
+      "Bash(docker compose ps:*)",
+      "Bash(docker compose logs:*)",
+      "Bash(sudo ufw:*)",
+      "Bash(sudo iptables:*)",
+      "Bash(curl:*)",
+      "Bash(sudo ip6tables:*)",
+      "Bash(docker compose:*)"
     ]
   }
 }

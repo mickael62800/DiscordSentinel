@@ -51,7 +51,7 @@ fn bot_routes_standard() -> Router<AppState> {
         .route("/rules", post(handlers::rules::create_rule))
         .route("/rules/{guild_id}/{rule_id}", delete(handlers::rules::delete_rule))
         .route("/infractions/{guild_id}", get(handlers::infractions::list_infractions))
-        .route("/infractions/{id}", delete(handlers::infractions::delete_infraction))
+        .route("/infractions/delete/{id}", delete(handlers::infractions::delete_infraction))
 }
 
 fn ticket_routes() -> Router<AppState> {
