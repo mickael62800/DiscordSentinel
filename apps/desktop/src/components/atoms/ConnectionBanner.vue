@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
-import { API_BASE_URL } from "../../utils/api";
+import { getApiBaseUrl } from "../../utils/api";
 
 const apiStatus = ref<"ok" | "down" | "checking">("checking");
 let interval: ReturnType<typeof setInterval> | null = null;
 
 async function checkApi() {
   try {
-    const resp = await fetch(`${API_BASE_URL}/health`, { signal: AbortSignal.timeout(3000) });
+    const baseUrl = await getApiBaseUrl();
+    const resp = await fetch(`${baseUrl}/health`, { signal: AbortSignal.timeout(3000) });
     apiStatus.value = resp.ok ? "ok" : "down";
   } catch {
     apiStatus.value = "down";

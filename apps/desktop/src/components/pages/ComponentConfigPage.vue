@@ -5,7 +5,7 @@ import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppToggle from "../atoms/AppToggle.vue";
-import { API_BASE_URL } from "../../utils/api";
+import { getApiBaseUrl } from "../../utils/api";
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
@@ -20,7 +20,8 @@ const modelsStatus = ref<ModelInfo[]>([]);
 
 async function fetchModelsStatus() {
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/models/status`);
+    const baseUrl = await getApiBaseUrl();
+    const resp = await fetch(`${baseUrl}/api/models/status`);
     if (resp.ok) {
       const data = await resp.json();
       modelsStatus.value = data.models || [];

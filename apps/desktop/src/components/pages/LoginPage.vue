@@ -36,6 +36,10 @@ async function handleLogin() {
       </AppButton>
 
       <p v-if="error" class="error-msg">{{ error }}</p>
+
+      <router-link to="/setup" class="setup-link">
+        Configurer la connexion (API, token...)
+      </router-link>
     </div>
   </div>
 </template>
@@ -121,5 +125,19 @@ h1 {
   margin-top: 16px;
   color: var(--danger);
   font-size: 13px;
+}
+
+.setup-link {
+  display: inline-block;
+  margin-top: 20px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.setup-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
 }
 </style>

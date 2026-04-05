@@ -34,19 +34,19 @@ pub fn run() {
     let config_store = ConfigStore::new().expect("Failed to initialize LMDB config store");
     let api_config = config_store.get_api_config().ok().flatten();
 
-    let adapter: Arc<dyn AppAdapter> = match api_config {
+    let api_adapter = match api_config {
         Some(ref cfg) => {
             println!("Using API adapter: {}", cfg.api_url);
             Arc::new(ApiAdapter::new(cfg.api_url.clone(), cfg.api_key.clone()))
         }
         None => {
-            // Fallback : utiliser l'API locale par defaut au lieu du mock
             let default_url = std::env::var("API_BASE_URL").unwrap_or_else(|_| "http://localhost:3000".to_string());
             let default_key = std::env::var("API_KEY").unwrap_or_default();
             println!("No API config found, using API adapter with default: {}", default_url);
             Arc::new(ApiAdapter::new(default_url, default_key))
         }
     };
+    let adapter: Arc<dyn AppAdapter> = api_adapter.clone();
 
     let auth_svc = Arc::new(AuthService::new(config_store));
     let realtime_svc = Arc::new(RealtimeService::new());
@@ -85,6 +85,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_dialog::init())
+        .manage(api_adapter)
         .manage(auth_svc)
         .manage(realtime_svc)
         .manage(dashboard_svc)

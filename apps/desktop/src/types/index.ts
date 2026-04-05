@@ -76,7 +76,9 @@ export interface Infraction {
   username: string;
   server: string;
   infraction_type: string;
+  action?: string;
   reason: string;
+  score?: number;
   created_at: string;
   moderator: string;
 }
@@ -428,12 +430,19 @@ export interface WatchedUser {
   first_seen_at: string;
 }
 
+export interface DossierNote {
+  author_name: string;
+  content: string;
+  created_at?: string;
+}
+
 export interface UserDossier {
   user: WatchedUser;
   infractions: Infraction[];
   moderation_actions: ModerationActionResponse[];
   security_events: SecurityEvent[];
   conduct_log: ConductPointsLog[];
+  notes?: DossierNote[];
 }
 
 // ── IA Config (seuils confiance per-guild) ──

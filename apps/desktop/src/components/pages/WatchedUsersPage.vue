@@ -8,7 +8,7 @@ import ErrorState from "../atoms/ErrorState.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import AddWatchModal from "../molecules/AddWatchModal.vue";
 import UserDossierPanel from "../molecules/UserDossierPanel.vue";
-import { API_BASE_URL } from "../../utils/api";
+import { getApiBaseUrl } from "../../utils/api";
 
 import type { WatchedUser, UserActivity } from "../../types";
 import { severityVariant } from "../../utils/variants";
@@ -23,7 +23,8 @@ const activitiesLoading = ref(false);
 async function loadActivities(guildId: string, userId: string) {
   activitiesLoading.value = true;
   try {
-    const resp = await fetch(`${API_BASE_URL}/api/user-activity/${guildId}/${userId}?limit=50`);
+    const baseUrl = await getApiBaseUrl();
+    const resp = await fetch(`${baseUrl}/api/user-activity/${guildId}/${userId}?limit=50`);
     if (resp.ok) {
       activities.value = await resp.json();
     }

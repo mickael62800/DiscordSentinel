@@ -20,7 +20,6 @@ const {
   selectedMember,
   loadingSummary,
   conductConfig,
-  conductPoints,
   conductLog,
   conductLoading,
   dossier,

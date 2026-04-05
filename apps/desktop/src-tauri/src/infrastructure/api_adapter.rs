@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::RwLock;
 
 use reqwest::{Client, RequestBuilder, Response};
 
@@ -8,8 +9,8 @@ use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsReposi
 
 pub struct ApiAdapter {
     client: Client,
-    base_url: String,
-    api_key: String,
+    base_url: RwLock<String>,
+    api_key: RwLock<String>,
 }
 
 impl ApiAdapter {
@@ -19,23 +20,38 @@ impl ApiAdapter {
                 .timeout(std::time::Duration::from_secs(30))
                 .build()
                 .unwrap_or_else(|_| Client::new()),
-            base_url,
-            api_key,
+            base_url: RwLock::new(base_url),
+            api_key: RwLock::new(api_key),
         }
     }
 
+    pub fn update_config(&self, base_url: String, api_key: String) {
+        *self.base_url.write().unwrap() = base_url;
+        *self.api_key.write().unwrap() = api_key;
+    }
+
+    fn base_url(&self) -> String {
+        self.base_url.read().unwrap().clone()
+    }
+
+    fn api_key(&self) -> String {
+        self.api_key.read().unwrap().clone()
+    }
+
     fn auth(&self, req: RequestBuilder) -> RequestBuilder {
-        if self.api_key.is_empty() {
+        let key = self.api_key();
+        if key.is_empty() {
             req
         } else {
-            req.bearer_auth(&self.api_key)
+            req.bearer_auth(&key)
         }
     }
 
     fn url_with_guild(&self, path: &str, guild_id: &Option<String>) -> String {
+        let base = self.base_url();
         match guild_id {
-            Some(gid) => format!("{}/{}?guild_id={}", self.base_url, path, gid),
-            None => format!("{}/{}", self.base_url, path),
+            Some(gid) => format!("{}/{}?guild_id={}", base, path, gid),
+            None => format!("{}/{}", base, path),
         }
     }
 
@@ -82,11 +98,11 @@ async fn check_response(resp: Response) -> Result<Response, String> {
 
 impl GuildRepository for ApiAdapter {
     fn get_guilds(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Guild>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/guilds", self.base_url)))
+        self.get_json(self.client.get(format!("{}/api/guilds", self.base_url())))
     }
 
     fn get_guild_members(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<GuildMember>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/guilds/{}/members", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/guilds/{}/members", self.base_url(), guild_id)))
     }
 }
 
@@ -94,24 +110,24 @@ impl GuildRepository for ApiAdapter {
 
 impl BotConfigRepository for ApiAdapter {
     fn get_definitions(&self) -> Pin<Box<dyn Future<Output = Result<Vec<BotDefinition>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/bots/definitions", self.base_url)))
+        self.get_json(self.client.get(format!("{}/api/bots/definitions", self.base_url())))
     }
 
     fn get_guild_config(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<BotGuildConfig>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/bots/config/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/bots/config/{}", self.base_url(), guild_id)))
     }
 
     fn set_config(&self, guild_id: String, bot_name: String, key: String, value: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { guild_id: String, bot_name: String, config_key: String, config_value: String }
-        self.send_only(self.client.post(format!("{}/api/bots/config", self.base_url))
+        self.send_only(self.client.post(format!("{}/api/bots/config", self.base_url()))
             .json(&Payload { guild_id, bot_name, config_key: key, config_value: value }))
     }
 
     fn delete_config(&self, guild_id: String, bot_name: String, key: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { guild_id: String, bot_name: String, config_key: String }
-        self.send_only(self.client.delete(format!("{}/api/bots/config", self.base_url))
+        self.send_only(self.client.delete(format!("{}/api/bots/config", self.base_url()))
             .json(&Payload { guild_id, bot_name, config_key: key }))
     }
 }
@@ -120,7 +136,7 @@ impl BotConfigRepository for ApiAdapter {
 
 impl StatsRepository for ApiAdapter {
     fn get_dashboard_stats(&self) -> Pin<Box<dyn Future<Output = Result<ServerStats, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/stats", self.base_url)))
+        self.get_json(self.client.get(format!("{}/api/stats", self.base_url())))
     }
 }
 
@@ -132,7 +148,7 @@ impl LogsRepository for ApiAdapter {
     }
 
     fn delete_logs_by_category(&self, category: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
-        self.send_only(self.client.delete(format!("{}/api/logs/{}", self.base_url, category)))
+        self.send_only(self.client.delete(format!("{}/api/logs/{}", self.base_url(), category)))
     }
 }
 
@@ -154,7 +170,7 @@ impl RulesRepository for ApiAdapter {
     fn toggle_rule(&self, id: String, enabled: bool) -> Pin<Box<dyn Future<Output = Result<bool, String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { enabled: bool }
-        let req = self.auth(self.client.patch(format!("{}/api/rules/{}", self.base_url, id)))
+        let req = self.auth(self.client.patch(format!("{}/api/rules/{}", self.base_url(), id)))
             .json(&Payload { enabled });
         Box::pin(async move {
             let resp = req.send().await.map_err(|e| format!("Connection failed: {}", e))?;
@@ -164,7 +180,7 @@ impl RulesRepository for ApiAdapter {
     }
 
     fn update_rule(&self, params: UpdateRuleParams) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
-        self.send_only(self.client.post(format!("{}/rules", self.base_url)).json(&params))
+        self.send_only(self.client.post(format!("{}/rules", self.base_url())).json(&params))
     }
 }
 
@@ -172,28 +188,28 @@ impl RulesRepository for ApiAdapter {
 
 impl TicketsRepository for ApiAdapter {
     fn get_tickets(&self) -> Pin<Box<dyn Future<Output = Result<Vec<Ticket>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/tickets", self.base_url)))
+        self.get_json(self.client.get(format!("{}/api/tickets", self.base_url())))
     }
 
     fn get_ticket_detail(&self, id: String) -> Pin<Box<dyn Future<Output = Result<TicketDetail, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/tickets/{}", self.base_url, id)))
+        self.get_json(self.client.get(format!("{}/api/tickets/{}", self.base_url(), id)))
     }
 
     fn reply_ticket(&self, ticket_id: String, content: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { content: String }
-        self.send_only(self.client.post(format!("{}/api/tickets/{}/messages", self.base_url, ticket_id))
+        self.send_only(self.client.post(format!("{}/api/tickets/{}/messages", self.base_url(), ticket_id))
             .json(&Payload { content }))
     }
 
     fn close_ticket(&self, id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
-        self.send_only(self.client.patch(format!("{}/api/tickets/{}/close", self.base_url, id)))
+        self.send_only(self.client.patch(format!("{}/api/tickets/{}/close", self.base_url(), id)))
     }
 
     fn assign_ticket(&self, id: String, assignee: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { assignee: String }
-        self.send_only(self.client.patch(format!("{}/api/tickets/{}/assign", self.base_url, id))
+        self.send_only(self.client.patch(format!("{}/api/tickets/{}/assign", self.base_url(), id))
             .json(&Payload { assignee }))
     }
 }
@@ -211,11 +227,11 @@ impl SecurityRepository for ApiAdapter {
 
 impl ModerationRepository for ApiAdapter {
     fn log_action(&self, action: ModerationActionRequest) -> Pin<Box<dyn Future<Output = Result<ModerationActionResponse, String>> + Send>> {
-        self.get_json(self.client.post(format!("{}/api/moderation/actions", self.base_url)).json(&action))
+        self.get_json(self.client.post(format!("{}/api/moderation/actions", self.base_url())).json(&action))
     }
 
     fn get_history(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<UserModerationHistory, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/moderation/history/{}/{}", self.base_url, guild_id, user_id)))
+        self.get_json(self.client.get(format!("{}/api/moderation/history/{}/{}", self.base_url(), guild_id, user_id)))
     }
 
     fn get_confirmed_bans(&self, guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<ConfirmedBan>, String>> + Send>> {
@@ -225,14 +241,14 @@ impl ModerationRepository for ApiAdapter {
     fn execute_ban(&self, guild_id: String, user_id: String, reason: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { guild_id: String, user_id: String, reason: String }
-        self.send_only(self.client.post(format!("{}/api/moderation/execute-ban", self.base_url))
+        self.send_only(self.client.post(format!("{}/api/moderation/execute-ban", self.base_url()))
             .json(&Payload { guild_id, user_id, reason }))
     }
 
     fn execute_unban(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         #[derive(serde::Serialize)]
         struct Payload { guild_id: String, user_id: String }
-        self.send_only(self.client.post(format!("{}/api/moderation/execute-unban", self.base_url))
+        self.send_only(self.client.post(format!("{}/api/moderation/execute-unban", self.base_url()))
             .json(&Payload { guild_id, user_id }))
     }
 }
@@ -242,38 +258,38 @@ impl ModerationRepository for ApiAdapter {
 impl VoiceChannelRepository for ApiAdapter {
     fn get_channels(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<VoiceChannel>, String>> + Send>> {
         let url = if guild_id.is_empty() {
-            format!("{}/api/voice-channels/_all", self.base_url)
+            format!("{}/api/voice-channels/_all", self.base_url())
         } else {
-            format!("{}/api/voice-channels/{}", self.base_url, guild_id)
+            format!("{}/api/voice-channels/{}", self.base_url(), guild_id)
         };
         self.get_json(self.client.get(url))
     }
 
     fn get_channel_detail(&self, channel_id: String) -> Pin<Box<dyn Future<Output = Result<VoiceChannelDetail, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/voice-channels/by-channel/{}", self.base_url, channel_id)))
+        self.get_json(self.client.get(format!("{}/api/voice-channels/by-channel/{}", self.base_url(), channel_id)))
     }
 }
 
 impl ConductRepository for ApiAdapter {
     fn get_config(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<ConductConfig, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/conduct/config/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/conduct/config/{}", self.base_url(), guild_id)))
     }
 
     fn get_leaderboard(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<UserConductPoints>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/conduct/{}/leaderboard", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/conduct/{}/leaderboard", self.base_url(), guild_id)))
     }
 
     fn get_points(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<UserConductPoints, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/conduct/{}/{}", self.base_url, guild_id, user_id)))
+        self.get_json(self.client.get(format!("{}/api/conduct/{}/{}", self.base_url(), guild_id, user_id)))
     }
 
     fn get_log(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<ConductPointsLog>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/conduct/{}/{}/log", self.base_url, guild_id, user_id)))
+        self.get_json(self.client.get(format!("{}/api/conduct/{}/{}/log", self.base_url(), guild_id, user_id)))
     }
 
     fn adjust_points(&self, guild_id: String, user_id: String, amount: i32, reason: String) -> Pin<Box<dyn Future<Output = Result<UserConductPoints, String>> + Send>> {
         self.get_json(
-            self.client.post(format!("{}/api/conduct/{}/{}/add", self.base_url, guild_id, user_id))
+            self.client.post(format!("{}/api/conduct/{}/{}/add", self.base_url(), guild_id, user_id))
                 .json(&serde_json::json!({ "amount": amount, "reason": reason }))
         )
     }
@@ -283,7 +299,7 @@ impl ConductRepository for ApiAdapter {
 
 impl DashboardChartsRepository for ApiAdapter {
     fn get_activity_trend(&self, guild_id: Option<String>, days: Option<i32>) -> Pin<Box<dyn Future<Output = Result<Vec<DailyActivity>, String>> + Send>> {
-        let mut url = format!("{}/api/charts/activity", self.base_url);
+        let mut url = format!("{}/api/charts/activity", self.base_url());
         let mut params = Vec::new();
         if let Some(gid) = guild_id { params.push(format!("guild_id={gid}")); }
         if let Some(d) = days { params.push(format!("days={d}")); }
@@ -293,7 +309,7 @@ impl DashboardChartsRepository for ApiAdapter {
 
     fn get_top_users(&self, guild_id: String, limit: Option<u32>) -> Pin<Box<dyn Future<Output = Result<Vec<TopUser>, String>> + Send>> {
         let l = limit.unwrap_or(10);
-        self.get_json(self.client.get(format!("{}/api/stats/{}/leaderboard?limit={}", self.base_url, guild_id, l)))
+        self.get_json(self.client.get(format!("{}/api/stats/{}/leaderboard?limit={}", self.base_url(), guild_id, l)))
     }
 }
 
@@ -301,15 +317,15 @@ impl DashboardChartsRepository for ApiAdapter {
 
 impl LevelRepository for ApiAdapter {
     fn get_level_config(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<LevelConfig, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/levels/config/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/levels/config/{}", self.base_url(), guild_id)))
     }
 
     fn get_level_leaderboard(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<UserLevel>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/levels/{}/leaderboard", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/levels/{}/leaderboard", self.base_url(), guild_id)))
     }
 
     fn get_level_rewards(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<LevelReward>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/levels/rewards/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/levels/rewards/{}", self.base_url(), guild_id)))
     }
 }
 
@@ -317,7 +333,7 @@ impl LevelRepository for ApiAdapter {
 
 impl AuditLogRepository for ApiAdapter {
     fn get_audit_logs(&self, guild_id: Option<String>, event_type: Option<String>, limit: Option<i64>) -> Pin<Box<dyn Future<Output = Result<Vec<AuditLog>, String>> + Send>> {
-        let mut url = format!("{}/api/audit-logs", self.base_url);
+        let mut url = format!("{}/api/audit-logs", self.base_url());
         let mut params = Vec::new();
         if let Some(gid) = guild_id { params.push(format!("guild_id={gid}")); }
         if let Some(et) = event_type { params.push(format!("event_type={et}")); }
@@ -335,11 +351,11 @@ impl WatchedUsersRepository for ApiAdapter {
     }
 
     fn get_user_dossier(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<UserDossier, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/watched-users/{}/{}", self.base_url, guild_id, user_id)))
+        self.get_json(self.client.get(format!("{}/api/watched-users/{}/{}", self.base_url(), guild_id, user_id)))
     }
 
     fn remove_watched_user(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
-        self.send_only(self.client.delete(format!("{}/api/watched-users/{}/{}", self.base_url, guild_id, user_id)))
+        self.send_only(self.client.delete(format!("{}/api/watched-users/{}/{}", self.base_url(), guild_id, user_id)))
     }
 }
 
@@ -347,35 +363,35 @@ impl WatchedUsersRepository for ApiAdapter {
 
 impl RolePanelsRepository for ApiAdapter {
     fn get_panels(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<RolePanel>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/role-panels/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/role-panels/{}", self.base_url(), guild_id)))
     }
 
     fn get_panel(&self, panel_id: String) -> Pin<Box<dyn Future<Output = Result<RolePanelDetail, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/role-panels/detail/{}", self.base_url, panel_id)))
+        self.get_json(self.client.get(format!("{}/api/role-panels/detail/{}", self.base_url(), panel_id)))
     }
 
     fn get_auto_roles(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<AutoRoleConfig>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/auto-roles/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/auto-roles/{}", self.base_url(), guild_id)))
     }
 }
 
 impl DiscordRolesRepository for ApiAdapter {
     fn get_discord_roles(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<DiscordRole>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/discord-roles/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/discord-roles/{}", self.base_url(), guild_id)))
     }
 }
 
 impl MembersRepository for ApiAdapter {
     fn get_members(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<Member>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/members/{}", self.base_url, guild_id)))
+        self.get_json(self.client.get(format!("{}/api/members/{}", self.base_url(), guild_id)))
     }
 
     fn get_member(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<Member, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/members/{}/{}", self.base_url, guild_id, user_id)))
+        self.get_json(self.client.get(format!("{}/api/members/{}/{}", self.base_url(), guild_id, user_id)))
     }
 
     fn get_member_summary(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<MemberSummary, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/members/{}/{}/summary", self.base_url, guild_id, user_id)))
+        self.get_json(self.client.get(format!("{}/api/members/{}/{}/summary", self.base_url(), guild_id, user_id)))
     }
 }
 

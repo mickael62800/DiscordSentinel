@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useGuildMembers } from "../../composables/useGuildMembers";
-import { API_BASE_URL } from "../../utils/api";
+import { getApiBaseUrl } from "../../utils/api";
 import type { GuildMember } from "../../types";
 
 const props = defineProps<{
@@ -54,7 +54,8 @@ async function confirmAddWatch() {
   if (!addSelectedMember.value || !props.guildId) return;
   addLoading.value = true;
   try {
-    await fetch(`${API_BASE_URL}/api/watched-users`, {
+    const baseUrl = await getApiBaseUrl();
+    await fetch(`${baseUrl}/api/watched-users`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

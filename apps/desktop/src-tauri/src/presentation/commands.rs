@@ -2,6 +2,7 @@ use std::sync::Arc;
 use tauri::{AppHandle, State};
 
 use crate::application::auth_service::AuthService;
+use crate::infrastructure::api_adapter::ApiAdapter;
 use crate::application::dashboard_service::DashboardService;
 use crate::application::infractions_service::InfractionsService;
 use crate::application::logs_service::LogsService;
@@ -192,10 +193,13 @@ pub fn get_api_config(
 #[tauri::command]
 pub fn save_api_config(
     service: State<'_, Arc<AuthService>>,
+    adapter: State<'_, Arc<ApiAdapter>>,
     api_url: String,
     api_key: String,
 ) -> Result<(), String> {
-    service.save_api_config(ApiConfig { api_url, api_key })
+    service.save_api_config(ApiConfig { api_url: api_url.clone(), api_key: api_key.clone() })?;
+    adapter.update_config(api_url, api_key);
+    Ok(())
 }
 
 // --- Bot Token commands ---

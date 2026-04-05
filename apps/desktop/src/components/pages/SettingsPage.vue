@@ -7,6 +7,7 @@ import AppInput from "../atoms/AppInput.vue";
 import AppToggle from "../atoms/AppToggle.vue";
 import AppButton from "../atoms/AppButton.vue";
 import { useAuth } from "../../composables/useAuth";
+import { resetApiBaseUrlCache } from "../../utils/api";
 import type { ApiConfig } from "../../types";
 
 const router = useRouter();
@@ -46,6 +47,7 @@ async function saveApiConfig() {
       apiUrl: apiUrl.value.trim(),
       apiKey: apiKey.value.trim(),
     });
+    resetApiBaseUrlCache();
     apiSaved.value = true;
     if (savedTimer) clearTimeout(savedTimer);
     savedTimer = setTimeout(() => { apiSaved.value = false; }, 2000);

@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { invoke } from "@tauri-apps/api/core";
 import { useAuth } from "../../composables/useAuth";
+import { resetApiBaseUrlCache } from "../../utils/api";
 import AppButton from "../atoms/AppButton.vue";
 
 const router = useRouter();
@@ -34,6 +35,7 @@ async function nextStep() {
       apiUrl: apiUrl.value.trim(),
       apiKey: apiKey.value.trim(),
     });
+    resetApiBaseUrlCache();
     step.value = 2;
   } catch (e) {
     error.value = String(e);
