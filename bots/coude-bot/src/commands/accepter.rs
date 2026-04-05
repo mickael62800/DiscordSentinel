@@ -1,6 +1,6 @@
 use serenity::all::{
     ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage, EditMessage,
+    CreateInteractionResponseMessage,
 };
 use serenity::model::id::ChannelId;
 use tracing::error;
