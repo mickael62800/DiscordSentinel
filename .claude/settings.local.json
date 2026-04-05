@@ -14,7 +14,25 @@
       "Bash(grep -l \"pub async fn\" \"C:\\\\Users\\\\micka\\\\source\\\\repos\\\\mickael62800\\\\DiscordSentinel\\\\services\\\\api\\\\src\\\\adapters\\\\inbound\\\\http\\\\handlers\"/*.rs)",
       "Bash(while read:*)",
       "Bash(do basename:*)",
-      "Bash(done)"
+      "Bash(done)",
+      "Bash(git reset:*)",
+      "Bash(docker system prune:*)",
+      "Bash(chmod +x:*)",
+      "Bash(ls:*)",
+      "Bash(docker compose up:*)",
+      "Bash(ping:*)",
+      "Bash(speedtest-cli --simple)",
+      "Bash(curl -s -o /dev/null -w \"Download speed test \\(10MB\\):\\\\n  Time: %{time_total}s\\\\n  Speed: %{speed_download} bytes/s\\\\n\" https://speed.hetzner.de/10MB.bin)",
+      "Bash(curl -s -o /dev/null -w \"Time: %{time_total}s\\\\nSpeed: %{speed_download} bytes/s\\\\n\" -k https://speed.hetzner.de/10MB.bin)",
+      "Bash(curl -s -o /dev/null -w \"Time: %{time_total}s\\\\nSpeed: %{speed_download} bytes/s\\\\n\" http://ipv4.download.thinkbroadband.com/10MB.zip)",
+      "Bash(docker stats:*)",
+      "Bash(dpkg -l)",
+      "Bash(sudo apt:*)",
+      "Bash(git pull:*)",
+      "Bash(ssh:*)",
+      "Bash(ssh-add -l)",
+      "Bash(git add:*)",
+      "Bash(git commit -m ':*)"
     ]
   }
 }
