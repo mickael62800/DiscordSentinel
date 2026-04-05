@@ -38,4 +38,12 @@ impl ManageInfractionsUseCase for ManageInfractionsService {
     async fn count_today(&self) -> Result<u64, DomainError> {
         self.infraction_repo.count_today().await
     }
+
+    async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError> {
+        self.infraction_repo.find_by_id(id).await
+    }
+
+    async fn delete_infraction(&self, id: &str) -> Result<bool, DomainError> {
+        self.infraction_repo.delete_by_id(id).await
+    }
 }

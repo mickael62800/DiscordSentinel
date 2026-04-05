@@ -15,4 +15,6 @@ pub trait InfractionRepository: Send + Sync {
 
     async fn find_all(&self, limit: i64, offset: i64) -> Result<Vec<Infraction>, DomainError>;
     async fn count_today(&self) -> Result<u64, DomainError>;
+    async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError>;
+    async fn delete_by_id(&self, id: &str) -> Result<bool, DomainError>;
 }

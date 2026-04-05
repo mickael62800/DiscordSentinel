@@ -158,6 +158,10 @@ impl InfractionsRepository for ApiAdapter {
     fn get_infractions(&self, guild_id: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<Infraction>, String>> + Send>> {
         self.get_json(self.client.get(self.url_with_guild("api/infractions", &guild_id)))
     }
+
+    fn delete_infraction(&self, id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.delete(format!("{}/api/infractions/{}", self.base_url(), id)))
+    }
 }
 
 // --- Rules ---

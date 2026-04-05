@@ -22,7 +22,7 @@ import { infractionTypeVariant, actionVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
-const { infractions, loading: infractionsLoading, error: infractionsError, fetchInfractions } = useInfractions();
+const { infractions, loading: infractionsLoading, error: infractionsError, fetchInfractions, deleting, deleteInfraction } = useInfractions();
 useRealtimeRefresh(["infraction_new"], fetchInfractions);
 const { search: infractionsSearch, filtered: filteredInfractions } = useSearch<Infraction>(
   infractions,
@@ -35,7 +35,15 @@ const infractionsColumns: TableColumn[] = [
   { key: "reason", label: "Raison" },
   { key: "moderator", label: "Moderateur" },
   { key: "created_at", label: "Date" },
+  { key: "actions", label: "" },
 ];
+
+async function onDeleteInfraction(id: string) {
+  const ok = await confirm({ message: "Annuler cette infraction ? Cette action est irreversible." });
+  if (ok) {
+    await deleteInfraction(id);
+  }
+}
 
 // --- Bans ---
 import { useBans } from "../../composables/useBans";
@@ -236,6 +244,16 @@ async function handleLookup() {
         </template>
         <template #cell-created_at="{ value }">
           <span class="mono">{{ fmt(String(value)) }}</span>
+        </template>
+        <template #cell-actions="{ row }">
+          <AppButton
+            variant="secondary"
+            size="small"
+            :disabled="deleting"
+            @click.stop="onDeleteInfraction((row as Record<string, unknown>).id as string)"
+          >
+            Annuler
+          </AppButton>
         </template>
       </DataTable>
     </div>

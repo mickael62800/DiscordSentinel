@@ -153,4 +153,30 @@ impl InfractionRepository for PgInfractionRepository {
 
         Ok(row.0 as u64)
     }
+
+    async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError> {
+        let uuid = Uuid::parse_str(id)
+            .map_err(|_| DomainError::NotFound(format!("ID invalide: {id}")))?;
+
+        let row = sqlx::query_as::<_, InfractionRow>("SELECT * FROM infractions WHERE id = $1")
+            .bind(uuid)
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.map(Infraction::from))
+    }
+
+    async fn delete_by_id(&self, id: &str) -> Result<bool, DomainError> {
+        let uuid = Uuid::parse_str(id)
+            .map_err(|_| DomainError::NotFound(format!("ID invalide: {id}")))?;
+
+        let result = sqlx::query("DELETE FROM infractions WHERE id = $1")
+            .bind(uuid)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(result.rows_affected() > 0)
+    }
 }

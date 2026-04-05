@@ -26,4 +26,8 @@ pub trait ManageInfractionsUseCase: Send + Sync {
     ) -> Result<Vec<Infraction>, DomainError>;
 
     async fn count_today(&self) -> Result<u64, DomainError>;
+
+    async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError>;
+
+    async fn delete_infraction(&self, id: &str) -> Result<bool, DomainError>;
 }

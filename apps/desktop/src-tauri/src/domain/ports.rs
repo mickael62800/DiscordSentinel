@@ -34,6 +34,7 @@ pub trait LogsRepository: Send + Sync + 'static {
 
 pub trait InfractionsRepository: Send + Sync + 'static {
     fn get_infractions(&self, guild_id: Option<String>) -> BoxFut<Vec<Infraction>>;
+    fn delete_infraction(&self, id: String) -> BoxFut<()>;
 }
 
 pub trait RulesRepository: Send + Sync + 'static {

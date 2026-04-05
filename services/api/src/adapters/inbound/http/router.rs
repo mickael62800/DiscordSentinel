@@ -51,6 +51,7 @@ fn bot_routes_standard() -> Router<AppState> {
         .route("/rules", post(handlers::rules::create_rule))
         .route("/rules/{guild_id}/{rule_id}", delete(handlers::rules::delete_rule))
         .route("/infractions/{guild_id}", get(handlers::infractions::list_infractions))
+        .route("/infractions/{id}", delete(handlers::infractions::delete_infraction))
 }
 
 fn ticket_routes() -> Router<AppState> {
@@ -210,6 +211,7 @@ fn dashboard_routes() -> Router<AppState> {
         .route("/logs", get(handlers::dashboard::get_logs).post(handlers::dashboard::create_log))
         .route("/logs/{category}", delete(handlers::dashboard::delete_logs_by_category))
         .route("/infractions", get(handlers::dashboard::get_all_infractions))
+        .route("/infractions/{id}", delete(handlers::infractions::delete_infraction))
         .route("/rules", get(handlers::dashboard::get_all_rules))
         .route("/rules/{id}", patch(handlers::dashboard::toggle_rule))
         .route("/bots/heartbeat", post(handlers::dashboard::bot_heartbeat))

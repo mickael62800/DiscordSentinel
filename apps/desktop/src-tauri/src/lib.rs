@@ -127,6 +127,7 @@ pub fn run() {
             presentation::commands::get_logs,
             presentation::commands::delete_logs_by_category,
             presentation::commands::get_infractions,
+            presentation::commands::delete_infraction,
             presentation::commands::get_rules,
             presentation::commands::toggle_rule,
             presentation::commands::update_rule,

@@ -56,6 +56,7 @@ tauri_passthrough!(delete_logs_by_category, LogsService, delete_logs_by_category
 
 // Infractions
 tauri_passthrough!(get_infractions, InfractionsService, get_infractions -> Vec<Infraction>, guild_id: Option<String>);
+tauri_passthrough!(delete_infraction, InfractionsService, delete_infraction -> (), id: String);
 
 // Rules
 tauri_passthrough!(get_rules, RulesService, get_rules -> Vec<ModerationRule>, guild_id: Option<String>);

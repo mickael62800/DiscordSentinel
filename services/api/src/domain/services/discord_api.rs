@@ -160,6 +160,52 @@ impl DiscordApiService {
         Ok(all_members)
     }
 
+    /// Envoyer un message prive a un utilisateur Discord.
+    pub async fn send_dm(
+        &self,
+        user_id: &str,
+        content: &str,
+    ) -> Result<(), DomainError> {
+        self.ensure_configured()?;
+
+        // 1. Creer un canal DM
+        let dm_resp = self
+            .client
+            .post("https://discord.com/api/v10/users/@me/channels")
+            .header("Authorization", format!("Bot {}", self.token))
+            .json(&serde_json::json!({ "recipient_id": user_id }))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord DM channel error: {e}")))?;
+
+        if !dm_resp.status().is_success() {
+            let body = dm_resp.text().await.unwrap_or_default();
+            tracing::warn!("Impossible d'ouvrir un DM avec {user_id}: {body}");
+            return Ok(()); // Ne pas faire echouer la suppression si le DM echoue
+        }
+
+        let channel: serde_json::Value = dm_resp.json().await
+            .map_err(|e| DomainError::Internal(format!("Discord DM parse error: {e}")))?;
+        let channel_id = channel["id"].as_str().unwrap_or_default();
+
+        // 2. Envoyer le message
+        let msg_resp = self
+            .client
+            .post(format!("https://discord.com/api/v10/channels/{channel_id}/messages"))
+            .header("Authorization", format!("Bot {}", self.token))
+            .json(&serde_json::json!({ "content": content }))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord send DM error: {e}")))?;
+
+        if !msg_resp.status().is_success() {
+            let body = msg_resp.text().await.unwrap_or_default();
+            tracing::warn!("Echec envoi DM a {user_id}: {body}");
+        }
+
+        Ok(())
+    }
+
     /// Debannir un utilisateur d'un serveur Discord.
     pub async fn unban_user(
         &self,
