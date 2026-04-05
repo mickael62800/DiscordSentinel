@@ -357,6 +357,10 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/models/reload", post(handlers::models_status::reload_model))
         // Cache monitoring
         .route("/api/cache/stats", get(handlers::cache_stats::get_cache_stats))
+        // Coup de coude
+        .route("/api/coude/{guild_id}/combats", get(handlers::coude::list_combats))
+        .route("/api/coude/{guild_id}/players", get(handlers::coude::list_players))
+        .route("/api/coude/combats/{combat_id}", delete(handlers::coude::cancel_combat))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
