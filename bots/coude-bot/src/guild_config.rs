@@ -109,6 +109,12 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "cancel_penalty", 5) as f64 / 100.0
     }
 
+    // ── Delai de paris ──
+
+    pub fn bet_delay_secs(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "bet_delay_secs", 300)
+    }
+
     // ── Daily Chaos ──
 
     pub fn daily_chaos_enabled(&self) -> bool {
