@@ -5,7 +5,7 @@ use serenity::all::{
 };
 
 use crate::game::shop::{self, SHOP_ITEMS};
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("shop")
@@ -41,6 +41,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             CommandDataOptionValue::String(s) => Some(s.clone()),
             _ => None,
         });
+
+    let config = load_guild_config(ctx, &guild_id).await;
 
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();

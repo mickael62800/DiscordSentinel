@@ -4,7 +4,7 @@ use serenity::all::{
 };
 use uuid::Uuid;
 
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub const REFUSE_PREFIX: &str = "coude_refuse:";
 

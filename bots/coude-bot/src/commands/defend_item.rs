@@ -6,7 +6,7 @@ use serenity::all::{
 use uuid::Uuid;
 
 use crate::game::shop;
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub const DEFEND_PREFIX: &str = "coude_defend:";
 pub const DEFEND_SELECT_PREFIX: &str = "coude_defend_select:";

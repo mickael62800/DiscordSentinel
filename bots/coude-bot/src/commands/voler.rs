@@ -6,7 +6,7 @@ use serenity::all::{
 };
 
 use crate::game::progression;
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 const FAIL_MESSAGES: &[&str] = &[
     "\u{1f921} {user} a essaye de voler {target} mais s'est pris les pieds dans le tapis !",
@@ -52,10 +52,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    let config = load_guild_config(ctx, &guild_id).await;
+    if !config.steal_enabled() {
+        reply_ephemeral(ctx, command, "Le vol est desactive sur ce serveur.").await;
+        return;
+    }
+
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();
 
-    // Verifier le cooldown (30 minutes)
+    // Verifier le cooldown
     match db.check_cooldown(&guild_id, &thief_id, "voler").await {
         Ok(Some(expires_at)) => {
             let remaining = expires_at

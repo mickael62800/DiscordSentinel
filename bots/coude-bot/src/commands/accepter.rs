@@ -10,7 +10,7 @@ use crate::db::Combat;
 use crate::game::chaos::ChaosEvent;
 use crate::game::combat;
 use crate::game::progression;
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub const ACCEPT_PREFIX: &str = "coude_accept:";
 

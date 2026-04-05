@@ -4,7 +4,7 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("prime")
@@ -28,6 +28,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
     };
+
+    let config = load_guild_config(ctx, &guild_id).await;
+    if !config.enabled() {
+        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        return;
+    }
 
     let target_id = command
         .data

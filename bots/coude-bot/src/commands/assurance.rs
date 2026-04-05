@@ -4,9 +4,7 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::handler::GameDbKey;
-
-const INSURANCE_COST: i64 = 50;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("assurance")
@@ -24,6 +22,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let user_id = command.user.id.to_string();
 
+    let config = load_guild_config(ctx, &guild_id).await;
+    let insurance_cost = config.insurance_cost();
+
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();
 
@@ -38,13 +39,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    if player.coins < INSURANCE_COST {
+    if player.coins < insurance_cost {
         reply_ephemeral(
             ctx,
             command,
             &format!(
                 "Pas assez de coins ! L'assurance coute {} coins, tu en as {}.",
-                INSURANCE_COST, player.coins
+                insurance_cost, player.coins
             ),
         )
         .await;
@@ -71,7 +72,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Deduire le cout
     if let Err(e) = db
-        .update_player_coins(&guild_id, &user_id, -INSURANCE_COST)
+        .update_player_coins(&guild_id, &user_id, -insurance_cost)
         .await
     {
         reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
@@ -87,7 +88,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if let Err(e) = db.buy_insurance(&guild_id, &user_id, is_scam).await {
         // Rembourser
         let _ = db
-            .update_player_coins(&guild_id, &user_id, INSURANCE_COST)
+            .update_player_coins(&guild_id, &user_id, insurance_cost)
             .await;
         reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
         return;
@@ -112,7 +113,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .title("\u{1f6e1}\u{fe0f} Assurance activee !")
         .description(description)
         .color(0x3498DB)
-        .field("Cout", format!("{} coins", INSURANCE_COST), true)
+        .field("Cout", format!("{} coins", insurance_cost), true)
         .field("Duree", "1 heure", true)
         .field("Protection", "50% des pertes de combat", true)
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))

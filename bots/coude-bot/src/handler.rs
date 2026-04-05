@@ -8,10 +8,11 @@ use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-use sentinel_shared::heartbeat::register_guilds;
+use sentinel_shared::heartbeat::{register_guilds, ApiClientKey};
 
 use crate::commands;
 use crate::db::GameDb;
+use crate::guild_config::CoudeConfig;
 
 /// Cle TypeMap pour le client de base de donnees du jeu.
 pub struct GameDbKey;
@@ -23,6 +24,13 @@ impl TypeMapKey for GameDbKey {
 pub struct GuildIdsKey;
 impl TypeMapKey for GuildIdsKey {
     type Value = Vec<GuildId>;
+}
+
+/// Charge la config guild depuis l'API (avec cache Redis cote API, TTL 15min).
+pub async fn load_guild_config(ctx: &Context, guild_id: &str) -> CoudeConfig {
+    let data = ctx.data.read().await;
+    let api = data.get::<ApiClientKey>().unwrap();
+    CoudeConfig::load(api, guild_id).await
 }
 
 pub struct Handler;
@@ -116,8 +124,21 @@ async fn run_daily_chaos(ctx: &Context) {
         None => return,
     };
 
+    drop(data); // Liberer le lock avant les appels async
+
     for guild_id in guild_ids {
         let gid = guild_id.to_string();
+
+        let config = load_guild_config(ctx, &gid).await;
+        if !config.enabled() || !config.daily_chaos_enabled() {
+            continue;
+        }
+
+        let data = ctx.data.read().await;
+        let db = match data.get::<GameDbKey>() {
+            Some(db) => db,
+            None => return,
+        };
 
         let players = match db.get_random_players(&gid, 2).await {
             Ok(p) if p.len() >= 2 => p,

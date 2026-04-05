@@ -5,7 +5,7 @@ use serenity::all::{
 };
 
 use crate::game::progression;
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("coude")
@@ -90,6 +90,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    let config = load_guild_config(ctx, &guild_id).await;
+    if !config.enabled() {
+        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        return;
+    }
+
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();
 
@@ -134,9 +140,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Verifier la mise
-    if mise < 1 {
-        reply_ephemeral(ctx, command, "La mise minimum est de 1 coin.").await;
+    // Verifier la mise (limites depuis la config)
+    if mise < config.min_bet() {
+        reply_ephemeral(ctx, command, &format!("La mise minimum est de {} coins.", config.min_bet())).await;
+        return;
+    }
+    if mise > config.max_bet() {
+        reply_ephemeral(ctx, command, &format!("La mise maximum est de {} coins.", config.max_bet())).await;
         return;
     }
     if attacker.coins < mise {

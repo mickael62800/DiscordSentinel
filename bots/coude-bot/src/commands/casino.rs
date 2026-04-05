@@ -6,7 +6,7 @@ use serenity::all::{
 };
 
 use crate::game::progression;
-use crate::handler::GameDbKey;
+use crate::handler::{GameDbKey, load_guild_config};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("casino")
@@ -37,6 +37,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             _ => None,
         })
         .unwrap_or(10);
+
+    let config = load_guild_config(ctx, &guild_id).await;
+    if !config.casino_enabled() {
+        reply_ephemeral(ctx, command, "Le casino est desactive sur ce serveur.").await;
+        return;
+    }
+    if mise > config.casino_max_bet() {
+        reply_ephemeral(ctx, command, &format!("La mise max au casino est de {} coins.", config.casino_max_bet())).await;
+        return;
+    }
 
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();
