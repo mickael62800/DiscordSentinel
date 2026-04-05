@@ -17,6 +17,7 @@ import AnalyticsPage from "../components/pages/AnalyticsPage.vue";
 import AiTrainingPage from "../components/pages/AiTrainingPage.vue";
 import IaConfigPage from "../components/pages/IaConfigPage.vue";
 import MembersPage from "../components/pages/MembersPage.vue";
+import CoudePage from "../components/pages/CoudePage.vue";
 import SettingsPage from "../components/pages/SettingsPage.vue";
 
 export const routes: RouteRecordRaw[] = [
@@ -40,5 +41,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/analytics", name: "analytics", component: AnalyticsPage },
   { path: "/ai-training", name: "ai-training", component: AiTrainingPage },
   { path: "/ia-config", name: "ia-config", component: IaConfigPage },
+  { path: "/coude", name: "coude", component: CoudePage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

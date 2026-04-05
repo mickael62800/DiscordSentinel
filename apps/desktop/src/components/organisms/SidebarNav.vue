@@ -43,6 +43,10 @@ const logItems = [
   { path: "/logs", label: "Journaux", icon: "list" },
 ];
 
+const gameItems = [
+  { path: "/coude", label: "Coup de Coude", icon: "zap" },
+];
+
 const aiItems = [
   { path: "/ai-training", label: "Entrainement", icon: "layers" },
   { path: "/ia-config", label: "Config IA", icon: "brain" },
@@ -139,6 +143,16 @@ onMounted(() => {
       <div class="nav-separator"><span>Logs</span></div>
       <NavItem
         v-for="item in logItems"
+        :key="item.path"
+        :path="item.path"
+        :label="item.label"
+        :icon="item.icon"
+        :active="route.path === item.path"
+      />
+
+      <div class="nav-separator"><span>Jeu</span></div>
+      <NavItem
+        v-for="item in gameItems"
         :key="item.path"
         :path="item.path"
         :label="item.label"
