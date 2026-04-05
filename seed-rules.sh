@@ -47,9 +47,9 @@ echo ""
 #   spam              | 1.0    | 2.0  | 4.0    | 6.0  | 9.0
 #   insult            | 1.5    | 2.0  | 3.0    | 5.0  | 8.0
 #   link              | 0.5    | 3.0  | 5.0    | 7.0  | 9.0
-#   phishing          | 3.0    | 1.0  | 1.0    | 2.0  | 4.0
+#   phishing          | 3.0    | 1.0  | 2.0    | 3.0  | 5.0
 #   nsfw              | 2.0    | 1.0  | 2.0    | 4.0  | 7.0
-#   illicit           | 3.0    | 1.0  | 1.0    | 2.0  | 5.0
+#   illicit           | 3.0    | 1.0  | 2.0    | 3.0  | 5.0
 #   anger             | 0.8    | 3.0  | 5.0    | 7.0  | 9.0
 #   rage              | 1.5    | 2.0  | 3.0    | 5.0  | 7.0
 #   threat            | 2.5    | 1.0  | 2.0    | 3.0  | 5.0
@@ -61,9 +61,9 @@ VALUES
   (gen_random_uuid(), '$GUILD_ID', 'spam',       1.0, 2.0, 4.0, 6.0, 9.0, true),
   (gen_random_uuid(), '$GUILD_ID', 'insult',     1.5, 2.0, 3.0, 5.0, 8.0, true),
   (gen_random_uuid(), '$GUILD_ID', 'link',       0.5, 3.0, 5.0, 7.0, 9.0, true),
-  (gen_random_uuid(), '$GUILD_ID', 'phishing',   3.0, 1.0, 1.0, 2.0, 4.0, true),
+  (gen_random_uuid(), '$GUILD_ID', 'phishing',   3.0, 1.0, 2.0, 3.0, 5.0, true),
   (gen_random_uuid(), '$GUILD_ID', 'nsfw',       2.0, 1.0, 2.0, 4.0, 7.0, true),
-  (gen_random_uuid(), '$GUILD_ID', 'illicit',    3.0, 1.0, 1.0, 2.0, 5.0, true),
+  (gen_random_uuid(), '$GUILD_ID', 'illicit',    3.0, 1.0, 2.0, 3.0, 5.0, true),
   (gen_random_uuid(), '$GUILD_ID', 'anger',      0.8, 3.0, 5.0, 7.0, 9.0, true),
   (gen_random_uuid(), '$GUILD_ID', 'rage',       1.5, 2.0, 3.0, 5.0, 7.0, true),
   (gen_random_uuid(), '$GUILD_ID', 'threat',     2.5, 1.0, 2.0, 3.0, 5.0, true),
