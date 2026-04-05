@@ -362,6 +362,7 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/coude/{guild_id}/combats", get(handlers::coude::list_combats))
         .route("/api/coude/{guild_id}/players", get(handlers::coude::list_players))
         .route("/api/coude/combats/{combat_id}", delete(handlers::coude::cancel_combat))
+        .route("/api/coude/players/{guild_id}/{user_id}/coins", patch(handlers::coude::adjust_coins))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
