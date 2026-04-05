@@ -116,17 +116,13 @@ impl EventHandler for Handler {
 }
 
 async fn run_daily_chaos(ctx: &Context) {
-    let data = ctx.data.read().await;
-    let db = match data.get::<GameDbKey>() {
-        Some(db) => db,
-        None => return,
+    let guild_ids = {
+        let data = ctx.data.read().await;
+        match data.get::<GuildIdsKey>() {
+            Some(ids) => ids.clone(),
+            None => return,
+        }
     };
-    let guild_ids = match data.get::<GuildIdsKey>() {
-        Some(ids) => ids.clone(),
-        None => return,
-    };
-
-    drop(data); // Liberer le lock avant les appels async
 
     for guild_id in guild_ids {
         let gid = guild_id.to_string();

@@ -93,6 +93,7 @@ pub struct ServerEvent {
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
+#[allow(dead_code)]
 pub struct LeaderboardEntry {
     pub user_id: String,
     pub username: String,
@@ -140,6 +141,7 @@ pub struct GameDb {
     pool: PgPool,
 }
 
+#[allow(dead_code)]
 impl GameDb {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
@@ -833,7 +835,7 @@ impl GameDb {
 
         // Commission pour les combattants : 15% du pot (10% gagnant + 5% perdant)
         let fighter_cut = (total_pot as f64 * 0.15) as i64;
-        let distributable_pot = total_pot - fighter_cut; // 85% restant pour les parieurs
+        let _distributable_pot = total_pot - fighter_cut; // 85% restant pour les parieurs
 
         let mut results = Vec::new();
         let mut fighter_bonus: Option<FighterBetBonus> = None;

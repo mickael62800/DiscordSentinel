@@ -59,6 +59,7 @@ pub const CLASS_TANK: ClassStats = ClassStats {
     description: "Lent mais increvable",
 };
 
+#[allow(dead_code)]
 pub const ALL_CLASSES: &[&ClassStats] = &[&CLASS_BOURRIN, &CLASS_AGILE, &CLASS_FOURBE, &CLASS_TANK];
 
 pub fn get_class(name: &str) -> &'static ClassStats {

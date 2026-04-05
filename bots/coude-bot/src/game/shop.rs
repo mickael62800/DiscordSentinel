@@ -1,4 +1,5 @@
 /// Definition d'un objet achetable en boutique.
+#[allow(dead_code)]
 pub struct ShopItem {
     pub key: &'static str,
     pub name: &'static str,

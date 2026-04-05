@@ -21,6 +21,7 @@ pub fn title_for_level(level: i32) -> &'static str {
 
 /// Verifie si le joueur devrait monter de niveau.
 /// Retourne le nouveau niveau si level up, None sinon.
+#[allow(dead_code)]
 pub fn check_level_up(current_level: i32, current_xp: i64) -> Option<i32> {
     if current_level >= MAX_LEVEL {
         return None;

@@ -215,11 +215,6 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
             )
             .await;
 
-        // Supprimer le message original de defi (celui avec les boutons)
-        if let Ok(msg_id) = combat_record.channel_id.parse::<u64>() {
-            // On ne peut pas facilement retrouver le message original ici
-            // Le message de defi sera obsolete mais les boutons ne fonctionneront plus (status != pending)
-        }
     }
 }
 
