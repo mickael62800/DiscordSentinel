@@ -103,6 +103,12 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "refusal_penalty", 20) as f64 / 100.0
     }
 
+    // ── Annulation ──
+
+    pub fn cancel_penalty(&self) -> f64 {
+        BaseApiClient::config_u64(&self.raw, "cancel_penalty", 5) as f64 / 100.0
+    }
+
     // ── Daily Chaos ──
 
     pub fn daily_chaos_enabled(&self) -> bool {

@@ -338,7 +338,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ))
         .style(ButtonStyle::Danger);
 
-    let row = CreateActionRow::Buttons(vec![accept_btn, item_btn, refuse_btn]);
+    let cancel_btn = CreateButton::new(format!("coude_cancel:{}", combat.id))
+        .label("Annuler")
+        .emoji(serenity::model::channel::ReactionType::Unicode(
+            "\u{274c}".to_string(),
+        ))
+        .style(ButtonStyle::Secondary);
+
+    let row = CreateActionRow::Buttons(vec![accept_btn, item_btn, refuse_btn, cancel_btn]);
 
     command
         .create_response(

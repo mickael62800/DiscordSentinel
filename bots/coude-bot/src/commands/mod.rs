@@ -1,4 +1,5 @@
 pub mod accepter;
+pub mod annuler;
 pub mod assurance;
 pub mod casino;
 pub mod coude;

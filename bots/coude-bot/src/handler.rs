@@ -106,6 +106,8 @@ impl EventHandler for Handler {
                     commands::defend_item::handle_defend_button(&ctx, &component).await;
                 } else if custom_id.starts_with(commands::refuser::REFUSE_PREFIX) {
                     commands::refuser::handle(&ctx, &component).await;
+                } else if custom_id.starts_with(commands::annuler::CANCEL_PREFIX) {
+                    commands::annuler::handle(&ctx, &component).await;
                 }
             }
             _ => {}
