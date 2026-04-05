@@ -367,6 +367,8 @@ services:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
       API_URL: http://api:3000
       COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
+      BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
+      COUDE_DISCORD_TOKEN: ${COUDE_DISCORD_TOKEN}
       RUST_LOG: info
     depends_on:
       postgres:

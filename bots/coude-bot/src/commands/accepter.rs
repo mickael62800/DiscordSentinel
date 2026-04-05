@@ -1,8 +1,6 @@
-use std::time::Duration;
-
 use serenity::all::{
     ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage, EditMessage,
+    CreateInteractionResponseMessage, EditMessage,
 };
 use serenity::model::id::ChannelId;
 use tracing::error;
@@ -67,21 +65,29 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
+    // Charger la config pour le delai
     drop(data);
-
-    // Charger la config pour le delai de paris
     let config = load_guild_config(ctx, &combat_record.guild_id).await;
-    let bet_delay = config.bet_delay_secs();
+    let delay_min = config.bet_delay_secs() / 60;
+
+    // Passer le combat en phase "betting" avec le message_id
+    let data = ctx.data.read().await;
+    let db = data.get::<GameDbKey>().unwrap();
+    let message_id = component.message.id.to_string();
+
+    if let Err(e) = db.set_combat_betting(combat_id, &message_id).await {
+        reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+        return;
+    }
 
     // Remplacer le message de defi par "Combat accepte, paris ouverts"
-    let delay_min = bet_delay / 60;
     let waiting_embed = CreateEmbed::new()
         .title("\u{270a} Combat accepte !")
         .description(format!(
             "<@{}> a accepte le defi de <@{}> !\n\n\
             \u{1f3b2} **Les paris sont ouverts pendant {} minute(s) !**\n\
             Utilisez `/pari` pour miser sur le vainqueur.\n\n\
-            \u{23f3} Le combat se resoudra automatiquement...",
+            \u{23f3} Le combat sera resolu automatiquement par le serveur...",
             combat_record.defender_id,
             combat_record.attacker_id,
             delay_min,
@@ -102,31 +108,6 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         )
         .await
         .ok();
-
-    // Attendre le delai de paris
-    let ctx_clone = ctx.clone();
-    let combat_clone = combat_record.clone();
-    let channel_id = component.channel_id;
-    let message_id = component.message.id;
-
-    tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(bet_delay)).await;
-
-        // Resoudre le combat apres le delai
-        let result_embed = resolve_combat_internal(&ctx_clone, &combat_clone, channel_id).await;
-
-        if let Some(embed) = result_embed {
-            // Editer le message avec le resultat
-            channel_id
-                .edit_message(
-                    &ctx_clone.http,
-                    message_id,
-                    EditMessage::new().embed(embed).components(vec![]),
-                )
-                .await
-                .ok();
-        }
-    });
 }
 
 /// Resoud le combat et met a jour la base de donnees.

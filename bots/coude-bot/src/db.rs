@@ -518,6 +518,18 @@ impl GameDb {
         Ok(())
     }
 
+    /// Passe un combat en phase de paris (betting).
+    pub async fn set_combat_betting(&self, id: Uuid, message_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE coude_combats SET status = 'betting', accepted_at = NOW(), message_id = $1 WHERE id = $2"
+        )
+        .bind(message_id)
+        .bind(id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     pub async fn expire_combat(&self, id: Uuid) -> Result<(), sqlx::Error> {
         sqlx::query("UPDATE coude_combats SET status = 'expired', resolved_at = NOW() WHERE id = $1")
             .bind(id)
