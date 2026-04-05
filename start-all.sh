@@ -112,7 +112,8 @@ echo -e "${CYAN}── API ──${NC}"
 for svc in "${BACKEND[@]}"; do
   start_service "$svc"
 done
-sleep 3
+echo -e "${YELLOW}  Attente 20s que l'API demarre...${NC}"
+sleep 20
 
 # 3. Gateway
 echo ""
