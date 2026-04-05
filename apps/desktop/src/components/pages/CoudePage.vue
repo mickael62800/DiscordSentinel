@@ -22,8 +22,16 @@ const players = ref<CoudePlayer[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const cancelling = ref(false);
-const coinAmount = ref(100);
-const adjusting = ref(false);
+const coinAmounts = ref<Record<string, number>>({});
+const adjusting = ref<string | null>(null);
+
+function getCoinAmount(userId: string): number {
+  return coinAmounts.value[userId] ?? 10;
+}
+
+function setCoinAmount(userId: string, val: number) {
+  coinAmounts.value[userId] = val;
+}
 
 async function fetchCombats() {
   if (!selectedGuildId.value) return;
@@ -72,7 +80,7 @@ async function cancelCombat(id: string) {
 
 async function adjustCoins(userId: string, amount: number) {
   if (!selectedGuildId.value) return;
-  adjusting.value = true;
+  adjusting.value = userId;
   try {
     await invoke("adjust_coude_coins", {
       guildId: selectedGuildId.value,
@@ -83,7 +91,7 @@ async function adjustCoins(userId: string, amount: number) {
   } catch (e) {
     error.value = String(e);
   } finally {
-    adjusting.value = false;
+    adjusting.value = null;
   }
 }
 
@@ -216,11 +224,6 @@ onMounted(() => fetchCombats());
       <EmptyState v-else-if="players.length === 0" message="Aucun joueur" />
 
       <div v-else>
-        <div class="coin-amount-bar">
-          <label>Montant :</label>
-          <input v-model.number="coinAmount" type="number" min="1" class="coin-input" />
-          <span class="coin-hint">coins par clic</span>
-        </div>
         <div class="players-table">
         <table>
           <thead>
@@ -256,8 +259,16 @@ onMounted(() => fetchCombats());
               <td class="mono">{{ p.casino_wins }}W / {{ p.casino_losses }}L</td>
               <td>
                 <div class="coin-actions">
-                  <button class="coin-btn remove" :disabled="adjusting" @click="adjustCoins(p.user_id, -coinAmount)">-</button>
-                  <button class="coin-btn add" :disabled="adjusting" @click="adjustCoins(p.user_id, coinAmount)">+</button>
+                  <button class="coin-btn remove" :disabled="adjusting === p.user_id" @click="adjustCoins(p.user_id, -getCoinAmount(p.user_id))">-</button>
+                  <input
+                    type="number"
+                    min="1"
+                    step="10"
+                    class="coin-input-inline"
+                    :value="getCoinAmount(p.user_id)"
+                    @input="setCoinAmount(p.user_id, Number(($event.target as HTMLInputElement).value) || 10)"
+                  />
+                  <button class="coin-btn add" :disabled="adjusting === p.user_id" @click="adjustCoins(p.user_id, getCoinAmount(p.user_id))">+</button>
                 </div>
               </td>
             </tr>
@@ -467,33 +478,21 @@ onMounted(() => fetchCombats());
   color: var(--text-secondary);
 }
 
-.coin-amount-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-  font-size: 13px;
-}
-
-.coin-input {
-  width: 80px;
-  padding: 6px 10px;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-primary);
-  font-size: 13px;
-  text-align: center;
-}
-
-.coin-hint {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
 .coin-actions {
   display: flex;
+  align-items: center;
   gap: 4px;
+}
+
+.coin-input-inline {
+  width: 55px;
+  padding: 4px 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  font-size: 12px;
+  text-align: center;
 }
 
 .coin-btn {
