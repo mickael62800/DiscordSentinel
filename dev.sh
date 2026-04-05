@@ -158,7 +158,12 @@ start_service "cleanup-worker" \
     "cargo run" \
     "$YELLOW"
 
-# ── 5. Tous les bots Discord (12) ──
+start_service "coude-worker" \
+    "$ROOT_DIR/services/workers/coude-worker" \
+    "cargo run" \
+    "$YELLOW"
+
+# ── 5. Tous les bots Discord (11) ──
 start_service "audit-bot" \
     "$ROOT_DIR/bots/audit-bot" \
     "cargo run" \
@@ -191,11 +196,6 @@ start_service "security-bot" \
 
 start_service "progression-bot" \
     "$ROOT_DIR/bots/progression-bot" \
-    "cargo run" \
-    "$BLUE"
-
-start_service "stats-bot" \
-    "$ROOT_DIR/bots/stats-bot" \
     "cargo run" \
     "$BLUE"
 
@@ -241,14 +241,14 @@ echo -e "  API ML      : ${MAGENTA}http://localhost:8000${NC}"
 echo -e "  Gateway WS  : ${GREEN}ws://localhost:3001${NC}"
 echo -e "  Desktop     : ${CYAN}Tauri app (fenetre native)${NC}"
 echo ""
-echo -e "  Workers (6) :"
+echo -e "  Workers (7) :"
 echo -e "    ${YELLOW}analytics-worker   moderation-worker  monitoring-worker${NC}"
-echo -e "    ${YELLOW}cache-worker       cleanup-worker${NC}"
+echo -e "    ${YELLOW}cache-worker       cleanup-worker     coude-worker${NC}"
 echo ""
-echo -e "  Bots Discord (12) :"
+echo -e "  Bots Discord (11) :"
 echo -e "    ${BLUE}audit-bot     automod-bot    image-bot${NC}"
 echo -e "    ${BLUE}community-bot moderation-bot security-bot${NC}"
-echo -e "    ${BLUE}progression-bot stats-bot    ticket-bot${NC}"
+echo -e "    ${BLUE}progression-bot ticket-bot${NC}"
 echo -e "    ${BLUE}voice-bot     roles-bot      coude-bot${NC}"
 echo ""
 echo -e "  Logs        : ${YELLOW}.logs/*.log${NC}"
