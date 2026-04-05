@@ -25,6 +25,7 @@ use application::role_panels_service::RolePanelsService;
 use application::discord_roles_service::DiscordRolesService;
 use application::watched_users_service::WatchedUsersService;
 use application::members_service::MembersService;
+use application::coude_service::CoudeService;
 use domain::ports::AppAdapter;
 use infrastructure::api_adapter::ApiAdapter;
 use infrastructure::config_store::ConfigStore;
@@ -68,6 +69,7 @@ pub fn run() {
     let discord_roles_svc = Arc::new(DiscordRolesService::new(adapter.clone()));
     let watched_users_svc = Arc::new(WatchedUsersService::new(adapter.clone()));
     let members_svc = Arc::new(MembersService::new(adapter.clone()));
+    let coude_svc = Arc::new(CoudeService::new(adapter.clone()));
 
     // IA config uses direct HTTP (no repository trait needed)
     let (ia_base_url, ia_api_key) = match &api_config {
@@ -106,6 +108,7 @@ pub fn run() {
         .manage(discord_roles_svc)
         .manage(watched_users_svc)
         .manage(members_svc)
+        .manage(coude_svc)
         .manage(ia_config_svc)
         .manage(analytics_svc)
         .invoke_handler(tauri::generate_handler![
@@ -178,6 +181,9 @@ pub fn run() {
             presentation::commands::get_members,
             presentation::commands::get_member,
             presentation::commands::get_member_summary,
+            presentation::commands::get_coude_combats,
+            presentation::commands::get_coude_players,
+            presentation::commands::cancel_coude_combat,
             presentation::commands::save_bot_token,
             presentation::commands::get_bot_token,
             presentation::commands::get_all_bot_tokens,

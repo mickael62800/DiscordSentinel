@@ -69,13 +69,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 }
             };
 
-            if player.coins < item.price {
+            let price = config.shop_price(item.key);
+
+            if player.coins < price {
                 reply_ephemeral(
                     ctx,
                     command,
                     &format!(
                         "Pas assez de coins ! Tu as {} coins, il en faut {}.",
-                        player.coins, item.price
+                        player.coins, price
                     ),
                 )
                 .await;
@@ -84,7 +86,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
             // Deduire les coins
             if let Err(e) = db
-                .update_player_coins(&guild_id, &command.user.id.to_string(), -item.price)
+                .update_player_coins(&guild_id, &command.user.id.to_string(), -price)
                 .await
             {
                 reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
@@ -104,7 +106,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .title(format!("{} Achat reussi !", item.emoji))
                 .description(format!(
                     "<@{}> a achete **{} {}** pour **{} coins** !\n\n_{}_",
-                    command.user.id, item.emoji, item.name, item.price, item.description
+                    command.user.id, item.emoji, item.name, price, item.description
                 ))
                 .color(0x3498DB)
                 .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
@@ -121,13 +123,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .ok();
         }
         None => {
-            // Afficher la boutique
+            // Afficher la boutique avec les prix depuis la config
             let mut desc = String::from("Utilise `/shop acheter:<item>` pour acheter !\n\n");
 
             for item in SHOP_ITEMS {
+                let price = config.shop_price(item.key);
                 desc.push_str(&format!(
                     "{} **{}** — **{} coins**\n> _{}_\n\n",
-                    item.emoji, item.name, item.price, item.description
+                    item.emoji, item.name, price, item.description
                 ));
             }
 

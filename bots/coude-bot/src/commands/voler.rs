@@ -139,13 +139,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Poser le cooldown
-    if let Err(e) = db.set_cooldown(&guild_id, &thief_id, "voler", 1800).await {
+    if let Err(e) = db.set_cooldown(&guild_id, &thief_id, "voler", config.steal_cooldown_secs()).await {
         reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
         return;
     }
 
-    // Determiner le succes : 30% de base, 50% pour les fourbes
-    let success_rate = if thief.class == "fourbe" { 50 } else { 30 };
+    // Determiner le succes : base depuis config, +20% pour les fourbes
+    let base_rate = config.steal_success_rate();
+    let success_rate = if thief.class == "fourbe" { base_rate + 20 } else { base_rate };
     let roll: u32 = {
         let mut rng = rand::thread_rng();
         rng.gen_range(1..=100)

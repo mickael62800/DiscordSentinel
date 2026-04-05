@@ -7,6 +7,7 @@ use super::entities::{
     AuditLog, AutoRoleConfig, DailyActivity, LevelConfig, LevelReward, RolePanel, RolePanelDetail,
     Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier,
     TopUser, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser, DiscordRole,
+    CoudeCombat, CoudePlayer,
 };
 
 type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
@@ -113,6 +114,12 @@ pub trait MembersRepository: Send + Sync + 'static {
     fn get_member_summary(&self, guild_id: String, user_id: String) -> BoxFut<MemberSummary>;
 }
 
+pub trait CoudeRepository: Send + Sync + 'static {
+    fn get_combats(&self, guild_id: String, status: Option<String>) -> BoxFut<Vec<CoudeCombat>>;
+    fn get_players(&self, guild_id: String) -> BoxFut<Vec<CoudePlayer>>;
+    fn cancel_combat(&self, combat_id: String) -> BoxFut<()>;
+}
+
 pub trait AppAdapter:
     GuildRepository
     + BotConfigRepository
@@ -132,5 +139,6 @@ pub trait AppAdapter:
     + RolePanelsRepository
     + DiscordRolesRepository
     + MembersRepository
+    + CoudeRepository
 {
 }

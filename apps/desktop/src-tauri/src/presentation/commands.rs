@@ -3,6 +3,7 @@ use tauri::{AppHandle, State};
 
 use crate::application::auth_service::AuthService;
 use crate::infrastructure::api_adapter::ApiAdapter;
+use crate::application::coude_service::CoudeService;
 use crate::application::dashboard_service::DashboardService;
 use crate::application::infractions_service::InfractionsService;
 use crate::application::logs_service::LogsService;
@@ -31,7 +32,7 @@ use crate::domain::entities::{
     ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail,
     SecurityEvent, ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
     UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail,
-    WatchedUser, DiscordRole,
+    WatchedUser, DiscordRole, CoudeCombat, CoudePlayer,
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -57,6 +58,11 @@ tauri_passthrough!(delete_logs_by_category, LogsService, delete_logs_by_category
 // Infractions
 tauri_passthrough!(get_infractions, InfractionsService, get_infractions -> Vec<Infraction>, guild_id: Option<String>);
 tauri_passthrough!(delete_infraction, InfractionsService, delete_infraction -> (), id: String);
+
+// Coup de Coude
+tauri_passthrough!(get_coude_combats, CoudeService, get_combats -> Vec<CoudeCombat>, guild_id: String, status: Option<String>);
+tauri_passthrough!(get_coude_players, CoudeService, get_players -> Vec<CoudePlayer>, guild_id: String);
+tauri_passthrough!(cancel_coude_combat, CoudeService, cancel_combat -> (), combat_id: String);
 
 // Rules
 tauri_passthrough!(get_rules, RulesService, get_rules -> Vec<ModerationRule>, guild_id: Option<String>);

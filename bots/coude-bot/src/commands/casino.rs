@@ -27,6 +27,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    let config = load_guild_config(ctx, &guild_id).await;
+    if !config.casino_enabled() {
+        reply_ephemeral(ctx, command, "Le casino est desactive sur ce serveur.").await;
+        return;
+    }
+
     let mise = command
         .data
         .options
@@ -36,13 +42,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             CommandDataOptionValue::Integer(v) => Some(*v),
             _ => None,
         })
-        .unwrap_or(10);
+        .unwrap_or(config.default_bet());
 
-    let config = load_guild_config(ctx, &guild_id).await;
-    if !config.casino_enabled() {
-        reply_ephemeral(ctx, command, "Le casino est desactive sur ce serveur.").await;
-        return;
-    }
     if mise > config.casino_max_bet() {
         reply_ephemeral(ctx, command, &format!("La mise max au casino est de {} coins.", config.casino_max_bet())).await;
         return;

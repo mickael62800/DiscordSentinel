@@ -72,8 +72,11 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    // Penalite : 20% de la mise
-    let penalty = (combat_record.mise as f64 * 0.20).max(1.0) as i64;
+    // Charger la config guild pour les penalites
+    let config = load_guild_config(ctx, &combat_record.guild_id).await;
+
+    // Penalite depuis la config
+    let penalty = (combat_record.mise as f64 * config.refusal_penalty()).max(1.0) as i64;
 
     // Mettre a jour le combat
     let shame_msg = {
@@ -115,10 +118,11 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 
     let mut description = refuse_msg;
 
-    if cowardice >= 5 {
+    if cowardice >= config.cowardice_threshold() {
+        let penalty_pct = (config.cowardice_penalty() * 100.0) as i32;
         description.push_str(&format!(
-            "\n\n\u{1f414} **<@{}> est un lache notoire !** ({} refus)\nLes laches gagnent 20% de moins en combat.",
-            combat_record.defender_id, cowardice
+            "\n\n\u{1f414} **<@{}> est un lache notoire !** ({} refus)\nLes laches gagnent {}% de moins en combat.",
+            combat_record.defender_id, cowardice, penalty_pct
         ));
     }
 

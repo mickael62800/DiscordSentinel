@@ -20,3 +20,4 @@ pub mod ia_config_service;
 pub mod analytics_service;
 pub mod discord_roles_service;
 pub mod members_service;
+pub mod coude_service;

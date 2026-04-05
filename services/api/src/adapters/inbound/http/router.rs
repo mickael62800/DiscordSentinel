@@ -252,6 +252,9 @@ pub fn build_for_test(state: AppState) -> Router {
         .route("/api/discord-roles/{guild_id}", get(handlers::discord_roles::list_roles))
         .route("/api/discord-roles/{guild_id}/sync", post(handlers::discord_roles::sync_roles))
         .nest("/api/members", member_routes())
+        .route("/api/coude/{guild_id}/combats", get(handlers::coude::list_combats))
+        .route("/api/coude/{guild_id}/players", get(handlers::coude::list_players))
+        .route("/api/coude/combats/{combat_id}", delete(handlers::coude::cancel_combat))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

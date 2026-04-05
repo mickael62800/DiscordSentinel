@@ -4,8 +4,8 @@ use std::sync::RwLock;
 
 use reqwest::{Client, RequestBuilder, Response};
 
-use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity, DiscordRole, Member, MemberSummary, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
-use crate::domain::ports::{AppAdapter, AuditLogRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, MembersRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
+use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, CoudeCombat, CoudePlayer, DailyActivity, DiscordRole, Member, MemberSummary, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
+use crate::domain::ports::{AppAdapter, AuditLogRepository, CoudeRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, MembersRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
 
 pub struct ApiAdapter {
     client: Client,
@@ -396,6 +396,24 @@ impl MembersRepository for ApiAdapter {
 
     fn get_member_summary(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<MemberSummary, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/members/{}/{}/summary", self.base_url(), guild_id, user_id)))
+    }
+}
+
+impl CoudeRepository for ApiAdapter {
+    fn get_combats(&self, guild_id: String, status: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<CoudeCombat>, String>> + Send>> {
+        let mut url = format!("{}/api/coude/{}/combats", self.base_url(), guild_id);
+        if let Some(s) = status {
+            url = format!("{}?status={}", url, s);
+        }
+        self.get_json(self.client.get(url))
+    }
+
+    fn get_players(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<CoudePlayer>, String>> + Send>> {
+        self.get_json(self.client.get(format!("{}/api/coude/{}/players", self.base_url(), guild_id)))
+    }
+
+    fn cancel_combat(&self, combat_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.delete(format!("{}/api/coude/combats/{}", self.base_url(), combat_id)))
     }
 }
 

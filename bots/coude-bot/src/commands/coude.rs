@@ -40,6 +40,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    let config = load_guild_config(ctx, &guild_id).await;
+    if !config.enabled() {
+        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
+        return;
+    }
+
     let target_id = command
         .data
         .options
@@ -65,7 +71,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             CommandDataOptionValue::Integer(v) => Some(*v),
             _ => None,
         })
-        .unwrap_or(10);
+        .unwrap_or(config.default_bet());
 
     let special = command
         .data
@@ -87,12 +93,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     if target.bot {
         reply_ephemeral(ctx, command, "Tu ne peux pas defier un bot !").await;
-        return;
-    }
-
-    let config = load_guild_config(ctx, &guild_id).await;
-    if !config.enabled() {
-        reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
         return;
     }
 

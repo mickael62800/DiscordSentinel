@@ -79,10 +79,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // 5% de chance que ce soit une arnaque
+    // Chance d'arnaque depuis la config
     let is_scam = {
         let mut rng = rand::thread_rng();
-        rng.gen_range(1..=100) <= 5
+        rng.gen_range(1..=100) <= config.insurance_scam_rate()
     };
 
     if let Err(e) = db.buy_insurance(&guild_id, &user_id, is_scam).await {

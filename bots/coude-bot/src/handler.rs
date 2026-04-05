@@ -148,8 +148,8 @@ async fn run_daily_chaos(ctx: &Context) {
         let victim = &players[0];
         let winner = &players[1];
 
-        // Victime perd 20% de ses coins
-        let amount = (victim.coins as f64 * 0.20) as i64;
+        // Victime perd X% de ses coins (depuis la config)
+        let amount = (victim.coins as f64 * config.daily_chaos_percent()) as i64;
         if amount < 1 {
             continue;
         }

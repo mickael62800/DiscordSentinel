@@ -553,3 +553,47 @@ pub struct DiscordRole {
     pub member_count: i32,
     pub synced_at: String,
 }
+
+// ── Coup de Coude ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CoudeCombat {
+    pub id: String,
+    pub guild_id: String,
+    pub attacker_id: String,
+    pub attacker_name: String,
+    pub defender_id: String,
+    pub defender_name: String,
+    pub mise: i64,
+    pub status: String,
+    pub winner_id: Option<String>,
+    pub attacker_roll: Option<i32>,
+    pub defender_roll: Option<i32>,
+    pub chaos_event: Option<String>,
+    pub special_attack: Option<String>,
+    pub defender_special: Option<String>,
+    pub coins_transferred: Option<i64>,
+    pub result_message: Option<String>,
+    pub created_at: String,
+    pub resolved_at: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct CoudePlayer {
+    pub user_id: String,
+    pub username: String,
+    pub coins: i64,
+    pub total_wins: i32,
+    pub total_losses: i32,
+    pub total_draws: i32,
+    pub total_earned: i64,
+    pub total_lost: i64,
+    pub total_stolen: i64,
+    pub cowardice_count: i32,
+    pub casino_wins: i32,
+    pub casino_losses: i32,
+    pub level: i32,
+    pub xp: i64,
+    pub class: Option<String>,
+    pub title: Option<String>,
+}
