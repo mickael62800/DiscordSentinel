@@ -184,6 +184,7 @@ pub fn run() {
             presentation::commands::get_coude_combats,
             presentation::commands::get_coude_players,
             presentation::commands::cancel_coude_combat,
+            presentation::commands::adjust_coude_coins,
             presentation::commands::save_bot_token,
             presentation::commands::get_bot_token,
             presentation::commands::get_all_bot_tokens,

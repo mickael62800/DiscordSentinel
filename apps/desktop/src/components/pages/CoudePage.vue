@@ -22,6 +22,8 @@ const players = ref<CoudePlayer[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const cancelling = ref(false);
+const coinAmount = ref(100);
+const adjusting = ref(false);
 
 async function fetchCombats() {
   if (!selectedGuildId.value) return;
@@ -65,6 +67,23 @@ async function cancelCombat(id: string) {
     error.value = String(e);
   } finally {
     cancelling.value = false;
+  }
+}
+
+async function adjustCoins(userId: string, amount: number) {
+  if (!selectedGuildId.value) return;
+  adjusting.value = true;
+  try {
+    await invoke("adjust_coude_coins", {
+      guildId: selectedGuildId.value,
+      userId,
+      amount,
+    });
+    await fetchPlayers();
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    adjusting.value = false;
   }
 }
 
@@ -196,7 +215,13 @@ onMounted(() => fetchCombats());
       <LoadingState v-else-if="loading" />
       <EmptyState v-else-if="players.length === 0" message="Aucun joueur" />
 
-      <div v-else class="players-table">
+      <div v-else>
+        <div class="coin-amount-bar">
+          <label>Montant :</label>
+          <input v-model.number="coinAmount" type="number" min="1" class="coin-input" />
+          <span class="coin-hint">coins par clic</span>
+        </div>
+        <div class="players-table">
         <table>
           <thead>
             <tr>
@@ -208,6 +233,7 @@ onMounted(() => fetchCombats());
               <th>Win%</th>
               <th>Vol</th>
               <th>Casino</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -228,9 +254,16 @@ onMounted(() => fetchCombats());
               <td class="mono">{{ winRate(p) }}</td>
               <td class="mono">{{ p.total_stolen.toLocaleString() }}</td>
               <td class="mono">{{ p.casino_wins }}W / {{ p.casino_losses }}L</td>
+              <td>
+                <div class="coin-actions">
+                  <button class="coin-btn remove" :disabled="adjusting" @click="adjustCoins(p.user_id, -coinAmount)">-</button>
+                  <button class="coin-btn add" :disabled="adjusting" @click="adjustCoins(p.user_id, coinAmount)">+</button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   </div>
@@ -432,5 +465,73 @@ onMounted(() => fetchCombats());
 
 .text-muted {
   color: var(--text-secondary);
+}
+
+.coin-amount-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+
+.coin-input {
+  width: 80px;
+  padding: 6px 10px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: center;
+}
+
+.coin-hint {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.coin-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.coin-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+}
+
+.coin-btn.add {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.3);
+}
+
+.coin-btn.add:hover:not(:disabled) {
+  background: rgba(34, 197, 94, 0.3);
+}
+
+.coin-btn.remove {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.coin-btn.remove:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.coin-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 </style>

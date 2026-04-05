@@ -415,6 +415,11 @@ impl CoudeRepository for ApiAdapter {
     fn cancel_combat(&self, combat_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         self.send_only(self.client.delete(format!("{}/api/coude/combats/{}", self.base_url(), combat_id)))
     }
+
+    fn adjust_coins(&self, guild_id: String, user_id: String, amount: i64) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.patch(format!("{}/api/coude/players/{}/{}/coins", self.base_url(), guild_id, user_id))
+            .json(&serde_json::json!({ "amount": amount })))
+    }
 }
 
 impl AppAdapter for ApiAdapter {}

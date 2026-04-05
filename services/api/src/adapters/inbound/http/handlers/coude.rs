@@ -1,4 +1,5 @@
 use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
 use axum::Json;
 use serde::{Deserialize, Serialize};
 
@@ -172,4 +173,34 @@ pub async fn cancel_combat(
     .await;
 
     Ok(ok_response())
+}
+
+// ── Adjust coins ──
+
+#[derive(Debug, Deserialize)]
+pub struct AdjustCoinsDto {
+    pub amount: i64,
+}
+
+/// PATCH /api/coude/players/{guild_id}/{user_id}/coins — ajouter ou retirer des coins
+pub async fn adjust_coins(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(dto): Json<AdjustCoinsDto>,
+) -> Result<StatusCode, ApiError> {
+    let result = sqlx::query(
+        "UPDATE coude_players SET coins = coins + $1 WHERE guild_id = $2 AND user_id = $3"
+    )
+    .bind(dto.amount)
+    .bind(&guild_id)
+    .bind(&user_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    if result.rows_affected() == 0 {
+        return Err(DomainError::NotFound("Joueur introuvable".into()).into());
+    }
+
+    Ok(StatusCode::NO_CONTENT)
 }

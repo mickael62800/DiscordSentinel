@@ -118,6 +118,7 @@ pub trait CoudeRepository: Send + Sync + 'static {
     fn get_combats(&self, guild_id: String, status: Option<String>) -> BoxFut<Vec<CoudeCombat>>;
     fn get_players(&self, guild_id: String) -> BoxFut<Vec<CoudePlayer>>;
     fn cancel_combat(&self, combat_id: String) -> BoxFut<()>;
+    fn adjust_coins(&self, guild_id: String, user_id: String, amount: i64) -> BoxFut<()>;
 }
 
 pub trait AppAdapter:

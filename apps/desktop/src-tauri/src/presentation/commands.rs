@@ -63,6 +63,7 @@ tauri_passthrough!(delete_infraction, InfractionsService, delete_infraction -> (
 tauri_passthrough!(get_coude_combats, CoudeService, get_combats -> Vec<CoudeCombat>, guild_id: String, status: Option<String>);
 tauri_passthrough!(get_coude_players, CoudeService, get_players -> Vec<CoudePlayer>, guild_id: String);
 tauri_passthrough!(cancel_coude_combat, CoudeService, cancel_combat -> (), combat_id: String);
+tauri_passthrough!(adjust_coude_coins, CoudeService, adjust_coins -> (), guild_id: String, user_id: String, amount: i64);
 
 // Rules
 tauri_passthrough!(get_rules, RulesService, get_rules -> Vec<ModerationRule>, guild_id: Option<String>);
