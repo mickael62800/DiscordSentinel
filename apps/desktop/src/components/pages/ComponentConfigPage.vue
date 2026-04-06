@@ -33,6 +33,13 @@ async function fetchModelsStatus() {
 
 const workerNames = ["moderation-worker", "analytics-worker"];
 
+// Workers qui n'ont PAS besoin de token Discord
+const workersWithoutToken = ["analytics-worker", "cache-worker", "cleanup-worker", "moderation-worker", "monitoring-worker"];
+
+function needsToken(botName: string): boolean {
+  return !workersWithoutToken.includes(botName);
+}
+
 const definitions = ref<BotDefinition[]>([]);
 const configs = ref<BotGuildConfig[]>([]);
 const selectedComponent = ref<string | null>(null);
@@ -298,6 +305,7 @@ watch(selectedComponent, loadFormValues);
             <div class="component-name">{{ def.display_name }}</div>
             <div class="component-badges">
               <span
+                v-if="needsToken(def.bot_name)"
                 class="token-badge"
                 :class="tokenMap[def.bot_name] ? 'token-ok' : 'token-missing'"
               >
@@ -320,8 +328,8 @@ watch(selectedComponent, loadFormValues);
             {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
           </div>
 
-          <!-- Token inline -->
-          <div class="token-section" @click.stop>
+          <!-- Token inline (seulement pour les composants qui en ont besoin) -->
+          <div v-if="needsToken(def.bot_name)" class="token-section" @click.stop>
             <div v-if="tokenMap[def.bot_name]" class="token-configured">
               <span class="token-status-text">Token chiffre enregistre</span>
               <button class="btn-token-delete" @click.stop="deleteToken(def.bot_name)">Supprimer</button>
