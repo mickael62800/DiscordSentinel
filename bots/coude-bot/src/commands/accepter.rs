@@ -75,9 +75,16 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     let db = data.get::<GameDbKey>().unwrap();
     let message_id = component.message.id.to_string();
 
-    if let Err(e) = db.set_combat_betting(combat_id, &message_id).await {
-        reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
-        return;
+    match db.set_combat_betting(combat_id, &message_id).await {
+        Ok(false) => {
+            reply_ephemeral(ctx, component, "Ce combat n'est plus en attente.").await;
+            return;
+        }
+        Err(e) => {
+            reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+            return;
+        }
+        Ok(true) => {}
     }
 
     // Remplacer le message de defi par "Combat accepte, paris ouverts"

@@ -121,7 +121,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
     } else if roll <= 2 + 50 + 25 + 15 {
         // 15% win x5
-        let win = mise * 5;
+        let win = mise.saturating_mul(5);
         (
             "\u{1f525} x5 !",
             format!(
@@ -134,7 +134,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
     } else {
         // 8% jackpot x10
-        let win = mise * 10;
+        let win = mise.saturating_mul(10);
         (
             "\u{1f451} JACKPOT x10 !!!",
             format!(

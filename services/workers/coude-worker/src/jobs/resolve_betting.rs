@@ -33,12 +33,18 @@ struct PlayerStats {
 pub async fn run(pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), String> {
     // Recuperer les combats en phase de paris dont le delai est depasse
     // On utilise un delai par defaut de 300s, la config guild sera lue par combat si besoin
+    // Verrouiller atomiquement : passer les combats de "betting" a "resolving"
+    // pour eviter qu'un autre worker les traite en parallele
     let combats = sqlx::query_as::<_, BettingCombat>(
-        r#"SELECT id, guild_id, channel_id, message_id,
+        r#"UPDATE coude_combats SET status = 'resolving'
+        WHERE id IN (
+            SELECT id FROM coude_combats
+            WHERE status = 'betting' AND accepted_at < NOW() - INTERVAL '5 minutes'
+            FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, guild_id, channel_id, message_id,
             attacker_id, attacker_name, defender_id, defender_name,
             mise, special_attack, defender_special
-        FROM coude_combats
-        WHERE status = 'betting' AND accepted_at < NOW() - INTERVAL '5 minutes'
         "#,
     )
     .fetch_all(pool)

@@ -521,15 +521,16 @@ impl GameDb {
     }
 
     /// Passe un combat en phase de paris (betting).
-    pub async fn set_combat_betting(&self, id: Uuid, message_id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE coude_combats SET status = 'betting', accepted_at = NOW(), message_id = $1 WHERE id = $2"
+    /// Retourne false si le combat n'est plus en "pending" (double-accept protection).
+    pub async fn set_combat_betting(&self, id: Uuid, message_id: &str) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE coude_combats SET status = 'betting', accepted_at = NOW(), message_id = $1 WHERE id = $2 AND status = 'pending'"
         )
         .bind(message_id)
         .bind(id)
         .execute(&self.pool)
         .await?;
-        Ok(())
+        Ok(result.rows_affected() > 0)
     }
 
     pub async fn expire_combat(&self, id: Uuid) -> Result<(), sqlx::Error> {
@@ -1242,7 +1243,7 @@ impl GameDb {
 
     // ── XP / Leveling ──
 
-    /// Ajoute de l'XP a un joueur. Retourne (new_xp, new_level, leveled_up, stat_points_gained).
+    /// Ajoute de l'XP a un joueur (atomique). Retourne (new_xp, new_level, leveled_up, stat_points_gained).
     pub async fn add_xp(
         &self,
         guild_id: &str,
@@ -1251,20 +1252,25 @@ impl GameDb {
     ) -> Result<(i64, i32, bool, i32), sqlx::Error> {
         use crate::game::progression;
 
-        // Recuperer le joueur actuel
+        if amount <= 0 {
+            return Ok((0, 0, false, 0));
+        }
+
+        // Transaction pour eviter la race condition sur l'XP
+        let mut tx = self.pool.begin().await?;
+
         let player: Player = sqlx::query_as(
-            "SELECT * FROM coude_players WHERE guild_id = $1 AND user_id = $2",
+            "SELECT * FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
         .bind(guild_id)
         .bind(user_id)
-        .fetch_one(&self.pool)
+        .fetch_one(&mut *tx)
         .await?;
 
         let mut new_xp = player.xp + amount;
         let mut new_level = player.level;
         let mut total_stat_points = 0i32;
 
-        // Check multi-level-up
         while new_level < progression::MAX_LEVEL {
             let needed = progression::xp_for_level(new_level);
             if new_xp >= needed {
@@ -1276,7 +1282,6 @@ impl GameDb {
             }
         }
 
-        // Cap XP at max level
         if new_level >= progression::MAX_LEVEL {
             new_level = progression::MAX_LEVEL;
         }
@@ -1297,8 +1302,10 @@ impl GameDb {
         .bind(new_level)
         .bind(total_stat_points)
         .bind(new_title)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
+
+        tx.commit().await?;
 
         Ok((new_xp, new_level, leveled_up, total_stat_points))
     }
