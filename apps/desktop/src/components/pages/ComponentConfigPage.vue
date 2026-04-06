@@ -112,6 +112,10 @@ const configFields = computed<ConfigField[]>(() => {
 
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
 const otherFields = computed(() => configFields.value.filter((f) => f.type !== "boolean"));
+const numberFields = computed(() => configFields.value.filter((f) => f.type === "number"));
+const channelFields = computed(() => configFields.value.filter((f) => f.type === "channel"));
+const roleFields = computed(() => configFields.value.filter((f) => f.type === "role"));
+const textFields = computed(() => configFields.value.filter((f) => f.type === "text"));
 
 const allTogglesOn = computed(() =>
   booleanFields.value.length > 0 && booleanFields.value.every((f) => formValues.value[f.key] === "true" || formValues.value[f.key] === "1"),
@@ -420,61 +424,124 @@ watch(selectedComponent, loadFormValues);
             </div>
           </div>
 
-          <!-- Section champs texte/number/channel/role -->
-          <div v-if="otherFields.length > 0" class="inputs-section">
-            <h3 class="section-title">Parametres</h3>
-            <div
-              v-for="field in otherFields"
-              :key="field.key"
-              class="form-group"
-              :class="{ modified: isFieldModified(field.key) }"
-            >
-              <label :for="field.key" class="form-label">
-                {{ field.label }}
-                <span v-if="field.description" class="tooltip-wrap">
-                  <span class="info-icon">i</span>
-                  <span class="tooltip-text">{{ field.description }}</span>
-                </span>
-                <span v-if="field.required" class="required">*</span>
-                <span v-if="isFieldModified(field.key)" class="modified-badge">modifie</span>
-              </label>
+          <!-- Section Valeurs numeriques -->
+          <div v-if="numberFields.length > 0" class="inputs-section">
+            <h3 class="section-title">Valeurs</h3>
+            <div class="fields-grid">
+              <div
+                v-for="field in numberFields"
+                :key="field.key"
+                class="field-card"
+                :class="{ modified: isFieldModified(field.key) }"
+              >
+                <label :for="field.key" class="form-label">
+                  {{ field.label }}
+                  <span v-if="field.description" class="tooltip-wrap">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">{{ field.description }}</span>
+                  </span>
+                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                </label>
+                <input
+                  :id="field.key"
+                  v-model="formValues[field.key]"
+                  class="form-input form-input-number"
+                  type="number"
+                  min="0"
+                  :placeholder="field.default !== undefined ? String(field.default) : '0'"
+                />
+                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+              </div>
+            </div>
+          </div>
 
-              <!-- Worker inputs: number with unit badge -->
-              <div v-if="selectedIsWorker && field.type === 'number'" class="input-row">
+          <!-- Section Salons -->
+          <div v-if="channelFields.length > 0" class="inputs-section">
+            <h3 class="section-title">Salons</h3>
+            <div class="fields-grid">
+              <div
+                v-for="field in channelFields"
+                :key="field.key"
+                class="field-card"
+                :class="{ modified: isFieldModified(field.key) }"
+              >
+                <label :for="field.key" class="form-label">
+                  {{ field.label }}
+                  <span v-if="field.description" class="tooltip-wrap">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">{{ field.description }}</span>
+                  </span>
+                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                </label>
                 <input
                   :id="field.key"
                   v-model="formValues[field.key]"
                   class="form-input"
-                  type="number"
-                  min="1"
+                  type="text"
+                  placeholder="ID du salon Discord"
+                />
+                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section Roles -->
+          <div v-if="roleFields.length > 0" class="inputs-section">
+            <h3 class="section-title">Roles</h3>
+            <div class="fields-grid">
+              <div
+                v-for="field in roleFields"
+                :key="field.key"
+                class="field-card"
+                :class="{ modified: isFieldModified(field.key) }"
+              >
+                <label :for="field.key" class="form-label">
+                  {{ field.label }}
+                  <span v-if="field.description" class="tooltip-wrap">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">{{ field.description }}</span>
+                  </span>
+                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                </label>
+                <input
+                  :id="field.key"
+                  v-model="formValues[field.key]"
+                  class="form-input"
+                  type="text"
+                  placeholder="ID du role Discord"
+                />
+                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Section Texte / Listes -->
+          <div v-if="textFields.length > 0" class="inputs-section">
+            <h3 class="section-title">Texte & Listes</h3>
+            <div class="fields-grid fields-grid-text">
+              <div
+                v-for="field in textFields"
+                :key="field.key"
+                class="field-card field-card-wide"
+                :class="{ modified: isFieldModified(field.key) }"
+              >
+                <label :for="field.key" class="form-label">
+                  {{ field.label }}
+                  <span v-if="field.description" class="tooltip-wrap">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">{{ field.description }}</span>
+                  </span>
+                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                </label>
+                <input
+                  :id="field.key"
+                  v-model="formValues[field.key]"
+                  class="form-input"
+                  type="text"
                   :placeholder="field.default !== undefined ? String(field.default) : ''"
                 />
-                <span class="input-unit">{{ field.label.includes('heure') ? 'h' : 'min' }}</span>
+                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
               </div>
-
-              <!-- Other inputs -->
-              <input
-                v-else
-                :id="field.key"
-                v-model="formValues[field.key]"
-                class="form-input"
-                :placeholder="field.type === 'channel' ? 'Entrez l\'ID du salon Discord'
-                  : field.type === 'role' ? 'Entrez l\'ID du role Discord'
-                  : field.default !== undefined ? String(field.default)
-                  : ''"
-                :type="field.type === 'number' ? 'number' : 'text'"
-              />
-
-              <span
-                class="form-hint"
-                :class="{
-                  'hint-db': fieldStatus(field).source === 'db',
-                  'hint-default': fieldStatus(field).source === 'default',
-                  'hint-none': fieldStatus(field).source === 'none',
-                }"
-              >
-                {{ fieldStatus(field).text }}
-              </span>
             </div>
           </div>
 
@@ -689,6 +756,34 @@ watch(selectedComponent, loadFormValues);
   padding: 20px 0;
 }
 
+/* Grid 3 colonnes pour les champs */
+.fields-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.fields-grid-text {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.field-card {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.field-card.modified {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.field-card-wide {
+  grid-column: span 1;
+}
+
 .form-group {
   margin-bottom: 16px;
   padding: 12px;
@@ -747,7 +842,22 @@ watch(selectedComponent, loadFormValues);
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
-  font-family: monospace;
+  font-family: "JetBrains Mono", "Cascadia Code", monospace;
+}
+
+/* Masquer les fleches up/down des inputs number */
+.form-input-number {
+  -moz-appearance: textfield;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.form-input-number::-webkit-inner-spin-button,
+.form-input-number::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .input-row .form-input {
