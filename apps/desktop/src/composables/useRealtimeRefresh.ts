@@ -1,4 +1,4 @@
-import { onUnmounted } from "vue";
+import { onMounted, onUnmounted } from "vue";
 import { useRealtime } from "./useRealtime";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 
@@ -19,22 +19,30 @@ export function useRealtimeRefresh(
   const debounceMs = options?.debounceMs ?? 500;
   const unlisteners: UnlistenFn[] = [];
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let mounted = true;
 
   function debouncedCallback() {
+    if (!mounted) return;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => {
-      callback();
+      if (mounted) callback();
       timer = null;
     }, debounceMs);
   }
 
-  for (const eventType of eventTypes) {
-    onEvent(eventType, debouncedCallback).then((unlisten) => {
-      unlisteners.push(unlisten);
-    });
-  }
+  onMounted(async () => {
+    for (const eventType of eventTypes) {
+      const unlisten = await onEvent(eventType, debouncedCallback);
+      if (mounted) {
+        unlisteners.push(unlisten);
+      } else {
+        unlisten(); // Deja demonte, cleanup immediatement
+      }
+    }
+  });
 
   onUnmounted(() => {
+    mounted = false;
     if (timer) clearTimeout(timer);
     for (const unlisten of unlisteners) {
       unlisten();

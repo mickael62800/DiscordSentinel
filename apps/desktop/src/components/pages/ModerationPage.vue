@@ -52,10 +52,8 @@ function onTargetSearchBlur() {
 
 // Sync quand le serveur change dans la sidebar
 watch(selectedGuildId, (newId) => {
-  if (newId) {
-    guildId.value = newId;
-    lookupGuildId.value = newId;
-  }
+  guildId.value = newId ?? "";
+  lookupGuildId.value = newId ?? "";
 });
 
 async function handleSubmit() {

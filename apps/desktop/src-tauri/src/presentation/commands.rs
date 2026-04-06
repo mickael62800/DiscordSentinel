@@ -260,6 +260,16 @@ pub async fn update_rule(
     threshold_ban: f64,
     enabled: bool,
 ) -> Result<(), String> {
+    // Validation des bornes
+    if weight < 0.0 || weight > 10.0 {
+        return Err("Le poids doit etre entre 0 et 10".into());
+    }
+    for (name, val) in [("warn", threshold_warn), ("delete", threshold_delete), ("mute", threshold_mute), ("ban", threshold_ban)] {
+        if val < 0.0 || val > 100.0 {
+            return Err(format!("Le seuil {} doit etre entre 0 et 100", name));
+        }
+    }
+
     service.update_rule(UpdateRuleParams {
         guild_id,
         flag_type,

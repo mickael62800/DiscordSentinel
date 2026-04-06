@@ -1,4 +1,4 @@
-import { ref, onMounted, type Ref } from "vue";
+import { ref, onMounted, onUnmounted, type Ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 
 export function useFetch<T>(
@@ -9,23 +9,32 @@ export function useFetch<T>(
   const data = ref<T>(initialValue) as Ref<T>;
   const loading = ref(true);
   const error = ref<string | null>(null);
+  let mounted = true;
 
   async function refresh() {
     loading.value = true;
     error.value = null;
     try {
-      data.value = params
+      const result = params
         ? await invoke<T>(command, params)
         : await invoke<T>(command);
+      if (mounted) {
+        data.value = result;
+      }
     } catch (e) {
-      error.value = String(e);
+      if (mounted) {
+        error.value = String(e);
+      }
       console.error(`Failed to invoke ${command}:`, e);
     } finally {
-      loading.value = false;
+      if (mounted) {
+        loading.value = false;
+      }
     }
   }
 
   onMounted(refresh);
+  onUnmounted(() => { mounted = false; });
 
   return { data, loading, error, refresh };
 }

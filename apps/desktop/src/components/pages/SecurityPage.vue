@@ -47,7 +47,7 @@ function eventIcon(type: string): string {
             <span class="event-time">{{ fmt(event.created_at) }}</span>
           </div>
           <p class="event-description">{{ event.description }}</p>
-          <div v-if="event.user_ids.length > 0" class="event-users">
+          <div v-if="event.user_ids?.length > 0" class="event-users">
             <span class="users-label">Utilisateurs concernes :</span>
             <span v-for="uid in event.user_ids" :key="uid" class="user-chip">{{ uid }}</span>
           </div>
