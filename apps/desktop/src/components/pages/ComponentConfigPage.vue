@@ -401,6 +401,10 @@ watch(selectedComponent, loadFormValues);
               >
                 <div class="toggle-card-header">
                   <span class="toggle-card-label">{{ field.label }}</span>
+                  <span v-if="field.description" class="tooltip-wrap">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">{{ field.description }}</span>
+                  </span>
                   <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
                 </div>
                 <div class="toggle-card-control">
@@ -427,6 +431,10 @@ watch(selectedComponent, loadFormValues);
             >
               <label :for="field.key" class="form-label">
                 {{ field.label }}
+                <span v-if="field.description" class="tooltip-wrap">
+                  <span class="info-icon">i</span>
+                  <span class="tooltip-text">{{ field.description }}</span>
+                </span>
                 <span v-if="field.required" class="required">*</span>
                 <span v-if="isFieldModified(field.key)" class="modified-badge">modifie</span>
               </label>
@@ -494,6 +502,66 @@ watch(selectedComponent, loadFormValues);
 </template>
 
 <style scoped>
+/* Tooltip info icon */
+.tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  font-style: italic;
+  cursor: help;
+  flex-shrink: 0;
+}
+
+.tooltip-text {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 400;
+  font-style: normal;
+  white-space: normal;
+  width: max-content;
+  max-width: 280px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 100;
+  line-height: 1.4;
+}
+
+.tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-top-color: var(--border);
+}
+
+.tooltip-wrap:hover .tooltip-text {
+  display: block;
+}
+
 .page {
   padding: 24px;
 }
