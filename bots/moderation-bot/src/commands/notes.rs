@@ -54,7 +54,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let data = ctx.data.read().await;
-    let api = data.get::<ModerationApiKey>().unwrap();
+    let api = match data.get::<ModerationApiKey>() {
+        Some(a) => a,
+        None => { tracing::error!("ModerationApiKey manquant"); return; }
+    };
 
     match api.add_note(
         &guild_id.to_string(),

@@ -63,6 +63,10 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Aucun ID utilisateur valide detecte.").await;
         return;
     }
+    if user_ids.len() > 200 {
+        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Maximum 200 utilisateurs par commande.").await;
+        return;
+    }
 
     // Repondre immediatement (defer)
     command.create_response(
@@ -78,7 +82,10 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
     let mut failures = 0u32;
 
     let data = ctx.data.read().await;
-    let api = data.get::<ModerationApiKey>().unwrap();
+    let api = match data.get::<ModerationApiKey>() {
+        Some(a) => a,
+        None => { tracing::error!("ModerationApiKey manquant"); return; }
+    };
 
     for uid in &user_ids {
         let user_id = serenity::model::id::UserId::new(*uid);
@@ -151,6 +158,10 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Aucun ID utilisateur valide detecte.").await;
         return;
     }
+    if user_ids.len() > 200 {
+        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Maximum 200 utilisateurs par commande.").await;
+        return;
+    }
 
     command.create_response(
         &ctx.http,
@@ -164,7 +175,10 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
     let mut failures = 0u32;
 
     let data = ctx.data.read().await;
-    let api = data.get::<ModerationApiKey>().unwrap();
+    let api = match data.get::<ModerationApiKey>() {
+        Some(a) => a,
+        None => { tracing::error!("ModerationApiKey manquant"); return; }
+    };
 
     for uid in &user_ids {
         let user_id = serenity::model::id::UserId::new(*uid);

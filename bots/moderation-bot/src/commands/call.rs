@@ -130,7 +130,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Log au backend
     {
         let data = ctx.data.read().await;
-        let api = data.get::<ModerationApiKey>().unwrap();
+        let api = match data.get::<ModerationApiKey>() {
+            Some(a) => a,
+            None => { tracing::error!("ModerationApiKey manquant"); return; }
+        };
         let action = ModerationAction {
             guild_id: guild_id.to_string(),
             channel_id: channel.id.to_string(),

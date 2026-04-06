@@ -31,7 +31,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let username = target.as_ref().map(|u| u.name.as_str()).unwrap_or("inconnu");
 
     let data = ctx.data.read().await;
-    let api = data.get::<ModerationApiKey>().unwrap();
+    let api = match data.get::<ModerationApiKey>() {
+        Some(a) => a,
+        None => { tracing::error!("ModerationApiKey manquant"); return; }
+    };
 
     match api.get_history(&guild_id.to_string(), &target_id.to_string()).await {
         Ok(history) => {

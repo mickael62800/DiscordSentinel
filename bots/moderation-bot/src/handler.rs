@@ -203,6 +203,12 @@ async fn handle_approve(ctx: &Context, component: &serenity::model::application:
         }
     };
 
+    // Cleanup : supprimer les actions en attente > 24h
+    if pending_actions.len() > 50 {
+        let now = Instant::now();
+        pending_actions.retain(|_, p| now.duration_since(p.proposed_at).as_secs() < 86400);
+    }
+
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
         None => return,
@@ -304,7 +310,11 @@ async fn handle_redis_moderation_event(ctx: &Context, payload: &str) {
     let target_name = data.get("target_name").and_then(|v| v.as_str()).unwrap_or(target_id);
     let moderator = data.get("moderator_name").and_then(|v| v.as_str()).unwrap_or("Inconnu");
     let guild_id = data.get("guild_id").and_then(|v| v.as_str()).unwrap_or("");
-    let reason = data.get("reason").and_then(|v| v.as_str()).unwrap_or("Aucune raison specifiee");
+    let reason_raw = data.get("reason").and_then(|v| v.as_str()).unwrap_or("Aucune raison specifiee");
+    let reason: String = reason_raw.chars().take(500).collect::<String>()
+        .replace("```", "` ` `")
+        .replace("||", "| |")
+        .replace('@', "@\u{200b}");
 
     if guild_id.is_empty() {
         return;

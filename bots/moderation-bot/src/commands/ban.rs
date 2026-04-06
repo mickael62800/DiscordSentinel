@@ -48,9 +48,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
         .unwrap();
 
-    let reason = options.iter().find(|o| o.name == "reason")
+    let reason_raw = options.iter().find(|o| o.name == "reason")
         .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
         .unwrap_or("Aucune raison");
+    let reason: &str = &reason_raw.chars().take(500).collect::<String>();
 
     let duration_hours = options.iter().find(|o| o.name == "duration")
         .and_then(|o| match &o.value { CommandDataOptionValue::Integer(n) => Some(*n), _ => None });
@@ -107,7 +108,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Log dans le backend
     let data = ctx.data.read().await;
-    let api = data.get::<ModerationApiKey>().unwrap();
+    let api = match data.get::<ModerationApiKey>() {
+        Some(a) => a,
+        None => { tracing::error!("ModerationApiKey manquant"); return; }
+    };
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
@@ -167,7 +171,10 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
 
     // Log
     let data = ctx.data.read().await;
-    let api = data.get::<ModerationApiKey>().unwrap();
+    let api = match data.get::<ModerationApiKey>() {
+        Some(a) => a,
+        None => { tracing::error!("ModerationApiKey manquant"); return; }
+    };
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
