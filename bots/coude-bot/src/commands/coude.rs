@@ -364,33 +364,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .await
         .ok();
 
-    // Notifier le defenseur par DM
-    if let Ok(dm_channel) = target.create_dm_channel(&ctx.http).await {
-        let dm_embed = CreateEmbed::new()
-            .title("\u{1f44a} Tu as ete defie !")
-            .description(format!(
-                "**{}** t'a defie en Coup de Coude pour **{} coins** !\n\n\
-                Rends-toi dans <#{}> pour accepter ou refuser le defi.",
-                command.user.name, mise, combat_channel
-            ))
-            .color(0xFFA500)
-            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
-            .timestamp(serenity::model::Timestamp::now());
-
-        let _ = dm_channel.send_message(
-            &ctx.http,
-            CreateMessage::new().embed(dm_embed),
-        ).await;
-    }
-
-    // Notification simplifiee dans le salon notifications
+    // Notifier dans le salon notifications (mention du defenseur)
     if let Some(notif_ch) = config.channel_notifications() {
         if let Ok(ch_id) = notif_ch.parse::<u64>() {
             let notif_embed = CreateEmbed::new()
                 .title("\u{2694}\u{fe0f} Nouveau defi !")
                 .description(format!(
-                    "**{}** defie **{}** pour **{} coins** !\n\nRendez-vous dans <#{}> pour parier !",
-                    command.user.name, target.name, mise, combat_channel
+                    "<@{}> ! **{}** te defie en Coup de Coude pour **{} coins** !\n\n\
+                    Rends-toi dans <#{}> pour accepter ou refuser.\n\
+                    Les autres : venez parier avec `/pari` !",
+                    target.id, command.user.name, mise, combat_channel
                 ))
                 .color(0xFFA500)
                 .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))

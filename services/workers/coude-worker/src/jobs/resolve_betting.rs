@@ -174,8 +174,20 @@ async fn resolve_single(
     .bind(&combat.guild_id).bind(&loser_id).bind(coins_transferred)
     .execute(pool).await.map_err(|e| format!("loser coins: {e}"))?;
 
-    // Resoudre les paris
-    resolve_bets(pool, combat.id, &winner_id).await;
+    // Resoudre les paris — retourne (total gagne par parieurs gagnants, total perdu par parieurs perdants, details)
+    let bet_results = resolve_bets(pool, combat.id, &winner_id, &combat.guild_id).await;
+
+    // Bonus combat : le gagnant du combat recoit 10% des paris perdants
+    if bet_results.total_lost_by_bettors > 0 {
+        let combat_bonus = bet_results.total_lost_by_bettors / 10; // 10% des paris perdants
+        if combat_bonus > 0 {
+            let _ = sqlx::query(
+                "UPDATE coude_players SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
+            )
+            .bind(&combat.guild_id).bind(&winner_id).bind(combat_bonus)
+            .execute(pool).await;
+        }
+    }
 
     // XP
     let _ = sqlx::query(
@@ -206,7 +218,7 @@ async fn resolve_single(
     );
     post_result_to_discord(bot_token, target_channel, combat.message_id.as_deref(), &embed_msg).await;
 
-    // Notification simplifiee dans channel_notifications
+    // Notifications dans le salon notifications (combattants + parieurs)
     let notif_channel = sqlx::query_scalar::<_, String>(
         "SELECT config_value FROM bot_guild_configs WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_notifications'"
     )
@@ -217,47 +229,75 @@ async fn resolve_single(
     .flatten()
     .filter(|v| !v.is_empty());
 
-    if let Some(notif_ch) = notif_channel {
-        let notif_msg = format!(
-            "Le combat entre **{}** et **{}** est termine !\nResultat dans <#{}>",
-            combat.attacker_name, combat.defender_name, target_channel
+    if let Some(ref notif_ch) = notif_channel {
+        // Notifier les combattants (mention dans le salon)
+        let special_info = match (&combat.special_attack, &combat.defender_special) {
+            (Some(atk), Some(def)) => format!("\nItems : **{}** vs **{}**", atk, def),
+            (Some(atk), None) => format!("\nItem : **{}**", atk),
+            (None, Some(def)) => format!("\nItem defenseur : **{}**", def),
+            (None, None) => String::new(),
+        };
+
+        let combat_bonus_info = if bet_results.total_lost_by_bettors > 0 {
+            let bonus = bet_results.total_lost_by_bettors / 10;
+            format!("\nBonus paris : **+{} coins** (10% des paris perdants)", bonus)
+        } else {
+            String::new()
+        };
+
+        let winner_name = if winner_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name };
+        let combat_notif = format!(
+            "<@{}> <@{}> — Combat termine !\n\n\
+            Gagnant : **{}**\n\
+            Mise : **{} coins** | Rolls : {} vs {}\n\
+            Gain combat : **+{} coins**{}{}\n",
+            combat.attacker_id, combat.defender_id,
+            winner_name,
+            combat.mise, atk_roll, def_roll,
+            coins_transferred, combat_bonus_info, special_info,
         );
-        post_result_to_discord(bot_token, &notif_ch, None, &notif_msg).await;
+        post_result_to_discord(bot_token, notif_ch, None, &combat_notif).await;
+
+        // Notifier chaque parieur
+        for detail in &bet_results.details {
+            let pari_notif = if detail.won {
+                format!(
+                    "<@{}> Tu as **gagne** ton pari ! Tu avais mise **{} coins** sur **{}** — gain : **+{} coins**",
+                    detail.bettor_id, detail.amount,
+                    if detail.backed_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name },
+                    detail.payout,
+                )
+            } else {
+                format!(
+                    "<@{}> Tu as **perdu** ton pari. Tu avais mise **{} coins** sur **{}** — perte : **-{} coins**",
+                    detail.bettor_id, detail.amount,
+                    if detail.backed_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name },
+                    detail.amount,
+                )
+            };
+            post_result_to_discord(bot_token, notif_ch, None, &pari_notif).await;
+        }
     }
-
-    // DM aux deux joueurs avec le detail du combat
-    let special_info = match (&combat.special_attack, &combat.defender_special) {
-        (Some(atk), Some(def)) => format!("\nItem attaquant : **{}** | Item defenseur : **{}**", atk, def),
-        (Some(atk), None) => format!("\nItem attaquant : **{}**", atk),
-        (None, Some(def)) => format!("\nItem defenseur : **{}**", def),
-        (None, None) => String::new(),
-    };
-
-    let dm_content = format!(
-        "**Resultat du Coup de Coude !**\n\n\
-        {} vs {}\n\
-        Mise : **{} coins**\n\
-        Rolls : {} vs {}\n\n\
-        Gagnant : **{}**\n\
-        Coins transferes : **{} coins**{}\n\n\
-        _Coup de Coude | Sentinel_",
-        combat.attacker_name, combat.defender_name,
-        combat.mise,
-        atk_roll, def_roll,
-        if winner_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name },
-        coins_transferred,
-        special_info,
-    );
-
-    send_dm(bot_token, &combat.attacker_id, &dm_content).await;
-    send_dm(bot_token, &combat.defender_id, &dm_content).await;
 
     info!(combat_id = %combat.id, winner = %winner_id, "Combat betting resolu par le worker");
 
     Ok(())
 }
 
-async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str) {
+struct BetResult {
+    total_lost_by_bettors: i64,
+    details: Vec<BetDetail>,
+}
+
+struct BetDetail {
+    bettor_id: String,
+    backed_id: String,
+    amount: i64,
+    won: bool,
+    payout: i64,
+}
+
+async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str, _guild_id: &str) -> BetResult {
     #[derive(sqlx::FromRow)]
     struct Bet { id: Uuid, guild_id: String, bettor_id: String, backed_id: String, amount: i64 }
 
@@ -269,19 +309,41 @@ async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str) {
     .await
     .unwrap_or_default();
 
+    let mut total_lost_by_bettors = 0i64;
+    let mut details = Vec::new();
+
     for bet in &bets {
         if bet.backed_id == winner_id {
+            // Parieur gagnant : recoit x2
             let payout = bet.amount * 2;
             let _ = sqlx::query("UPDATE coude_players SET coins = coins + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2")
                 .bind(&bet.guild_id).bind(&bet.bettor_id).bind(payout)
                 .execute(pool).await;
             let _ = sqlx::query("UPDATE coude_bets SET won = true, payout = $2 WHERE id = $1")
                 .bind(bet.id).bind(payout).execute(pool).await;
+            details.push(BetDetail {
+                bettor_id: bet.bettor_id.clone(),
+                backed_id: bet.backed_id.clone(),
+                amount: bet.amount,
+                won: true,
+                payout,
+            });
         } else {
+            // Parieur perdant : perd sa mise
+            total_lost_by_bettors += bet.amount;
             let _ = sqlx::query("UPDATE coude_bets SET won = false, payout = 0 WHERE id = $1")
                 .bind(bet.id).execute(pool).await;
+            details.push(BetDetail {
+                bettor_id: bet.bettor_id.clone(),
+                backed_id: bet.backed_id.clone(),
+                amount: bet.amount,
+                won: false,
+                payout: 0,
+            });
         }
     }
+
+    BetResult { total_lost_by_bettors, details }
 }
 
 async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: Option<&str>, content: &str) {
@@ -330,48 +392,3 @@ async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: O
         .await;
 }
 
-/// Envoie un DM a un utilisateur Discord via l'API REST.
-async fn send_dm(bot_token: &str, user_id: &str, content: &str) {
-    if bot_token.is_empty() {
-        return;
-    }
-
-    let client = reqwest::Client::new();
-
-    // 1. Creer le canal DM
-    let dm_url = "https://discord.com/api/v10/users/@me/channels";
-    let dm_resp = client.post(dm_url)
-        .header("Authorization", format!("Bot {}", bot_token))
-        .json(&serde_json::json!({ "recipient_id": user_id }))
-        .send()
-        .await;
-
-    let channel_id = match dm_resp {
-        Ok(r) if r.status().is_success() => {
-            match r.json::<serde_json::Value>().await {
-                Ok(v) => v["id"].as_str().unwrap_or("").to_string(),
-                Err(_) => return,
-            }
-        }
-        _ => return, // DM fermes ou erreur, on ignore
-    };
-
-    if channel_id.is_empty() {
-        return;
-    }
-
-    // 2. Envoyer le message
-    let msg_url = format!("https://discord.com/api/v10/channels/{}/messages", channel_id);
-    let _ = client.post(&msg_url)
-        .header("Authorization", format!("Bot {}", bot_token))
-        .json(&serde_json::json!({
-            "embeds": [{
-                "title": "Resultat de votre combat !",
-                "description": content,
-                "color": 0x57F287,
-                "footer": { "text": "Coup de Coude | Sentinel" }
-            }]
-        }))
-        .send()
-        .await;
-}
