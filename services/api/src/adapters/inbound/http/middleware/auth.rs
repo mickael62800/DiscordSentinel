@@ -6,14 +6,15 @@ use axum::response::Response;
 use crate::adapters::inbound::http::state::AppState;
 
 /// Middleware d'authentification par Bearer token.
-/// Passe si aucune clé API n'est configurée (dev mode).
+/// Passe si aucune clé API n'est configurée (dev mode — log un warning).
 pub async fn auth_middleware(
     axum::extract::State(state): axum::extract::State<AppState>,
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    // Pas de clé configurée → tout passe
+    // Pas de clé configurée → tout passe (dev mode)
     if state.api_key.is_empty() {
+        tracing::warn!("API_KEY non configuree — auth desactivee (dev mode). NE PAS utiliser en production !");
         return Ok(next.run(request).await);
     }
 

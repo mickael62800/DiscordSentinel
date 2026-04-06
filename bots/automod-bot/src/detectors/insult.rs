@@ -30,14 +30,20 @@ fn normalize_leet(content: &str) -> String {
         .chars()
         .filter_map(|c| match c {
             '0' => Some('o'),
-            '1' => Some('l'),
+            '1' | '!' => Some('i'),
             '3' => Some('e'),
             '4' => Some('a'),
             '5' => Some('s'),
+            '6' => Some('g'),
             '7' => Some('t'),
+            '8' => Some('b'),
+            '9' => Some('g'),
             '@' => Some('a'),
             '$' => Some('s'),
-            '*' => None, // supprimé
+            '(' => Some('c'),
+            '+' => Some('t'),
+            '|' => Some('l'),
+            '*' | '.' | '_' | '-' => None, // caracteres de separation supprimes
             other => Some(other),
         })
         .collect()
@@ -226,6 +232,22 @@ mod tests {
     fn normalize_star_removed() {
         assert_eq!(normalize_leet("f*ck"), "fck");
     }
+    #[test]
+    fn normalize_exclamation() {
+        assert_eq!(normalize_leet("b!tch"), "bitch");
+    }
+    #[test]
+    fn normalize_parenthesis() {
+        assert_eq!(normalize_leet("(unt"), "cunt");
+    }
+    #[test]
+    fn normalize_separators_removed() {
+        assert_eq!(normalize_leet("c.o.n.n.a.r.d"), "connard");
+    }
+    #[test]
+    fn leet_bitch_excl() { assert!(detect("b!tch", &[])); }
+    #[test]
+    fn leet_separated_dots() { assert!(detect("c.o.n.n.a.r.d", &[])); }
     #[test]
     fn normalize_clean_unchanged() {
         assert_eq!(normalize_leet("hello"), "hello");

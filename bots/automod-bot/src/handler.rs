@@ -243,8 +243,9 @@ impl EventHandler for Handler {
                 let data = ctx.data.read().await;
                 if let Some(tracker) = data.get::<SlowmodeTrackerKey>() {
                     tracker.record_message(msg.channel_id);
-                    if tracker.should_activate(msg.channel_id, threshold) {
-                        // Activer le slowmode sur le channel
+                    if tracker.should_activate(msg.channel_id, threshold)
+                        && tracker.try_start_activation(msg.channel_id)
+                    {
                         let edit = serenity::builder::EditChannel::new().rate_limit_per_user(slowmode_secs);
                         if let Err(e) = msg.channel_id.edit(&ctx.http, edit).await {
                             warn!(error = %e, "Impossible d'activer le slowmode adaptatif");
@@ -255,9 +256,13 @@ impl EventHandler for Handler {
                                 "Slowmode adaptatif active ({}msg/30s)",
                                 threshold
                             );
-                            // Reset le compteur pour eviter les activations en boucle
                             tracker.reset(msg.channel_id);
                         }
+                        tracker.finish_activation(msg.channel_id);
+                    }
+                    // Cleanup periodique
+                    if tracker.tracked_channels() > 500 {
+                        tracker.cleanup();
                     }
                 }
             }

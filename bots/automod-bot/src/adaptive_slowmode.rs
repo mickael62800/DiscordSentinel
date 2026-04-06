@@ -1,12 +1,14 @@
 use std::time::{Duration, Instant};
 
-use dashmap::DashMap;
+use dashmap::{DashMap, DashSet};
 use serenity::model::id::ChannelId;
 
 /// Tracker d'activite par channel pour le slowmode adaptatif.
 pub struct SlowmodeTracker {
     /// channel_id -> timestamps des messages recents
     counters: DashMap<ChannelId, Vec<Instant>>,
+    /// channels en cours d'activation (evite les activations multiples)
+    activating: DashSet<ChannelId>,
     window: Duration,
 }
 
@@ -14,6 +16,7 @@ impl SlowmodeTracker {
     pub fn new(window_secs: u64) -> Self {
         Self {
             counters: DashMap::new(),
+            activating: DashSet::new(),
             window: Duration::from_secs(window_secs),
         }
     }
@@ -44,10 +47,29 @@ impl SlowmodeTracker {
             .unwrap_or(false)
     }
 
+    /// Tente de demarrer l'activation du slowmode. Retourne true si ok (pas deja en cours).
+    pub fn try_start_activation(&self, channel_id: ChannelId) -> bool {
+        self.activating.insert(channel_id)
+    }
+
+    /// Termine l'activation du slowmode.
+    pub fn finish_activation(&self, channel_id: ChannelId) {
+        self.activating.remove(&channel_id);
+    }
+
     /// Reset le compteur d'un channel.
     #[allow(dead_code)]
     pub fn reset(&self, channel_id: ChannelId) {
         self.counters.remove(&channel_id);
+    }
+
+    /// Supprime les channels inactifs (pas de message depuis > 2x la fenetre).
+    pub fn cleanup(&self) {
+        let now = Instant::now();
+        let max_age = self.window * 2;
+        self.counters.retain(|_, ts| {
+            !ts.is_empty() && now.duration_since(*ts.last().unwrap()) < max_age
+        });
     }
 
     /// Retourne le nombre de channels actuellement suivis.
