@@ -225,6 +225,33 @@ async fn resolve_single(
         post_result_to_discord(bot_token, &notif_ch, None, &notif_msg).await;
     }
 
+    // DM aux deux joueurs avec le detail du combat
+    let special_info = match (&combat.special_attack, &combat.defender_special) {
+        (Some(atk), Some(def)) => format!("\nItem attaquant : **{}** | Item defenseur : **{}**", atk, def),
+        (Some(atk), None) => format!("\nItem attaquant : **{}**", atk),
+        (None, Some(def)) => format!("\nItem defenseur : **{}**", def),
+        (None, None) => String::new(),
+    };
+
+    let dm_content = format!(
+        "**Resultat du Coup de Coude !**\n\n\
+        {} vs {}\n\
+        Mise : **{} coins**\n\
+        Rolls : {} vs {}\n\n\
+        Gagnant : **{}**\n\
+        Coins transferes : **{} coins**{}\n\n\
+        _Coup de Coude | Sentinel_",
+        combat.attacker_name, combat.defender_name,
+        combat.mise,
+        atk_roll, def_roll,
+        if winner_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name },
+        coins_transferred,
+        special_info,
+    );
+
+    send_dm(bot_token, &combat.attacker_id, &dm_content).await;
+    send_dm(bot_token, &combat.defender_id, &dm_content).await;
+
     info!(combat_id = %combat.id, winner = %winner_id, "Combat betting resolu par le worker");
 
     Ok(())
@@ -272,7 +299,7 @@ async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: O
             .header("Authorization", format!("Bot {}", bot_token))
             .json(&serde_json::json!({
                 "embeds": [{
-                    "title": "Resultat Resultat du Coup de Coude !",
+                    "title": "Resultat du Coup de Coude !",
                     "description": content,
                     "color": 0x57F287
                 }],
@@ -294,9 +321,55 @@ async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: O
         .header("Authorization", format!("Bot {}", bot_token))
         .json(&serde_json::json!({
             "embeds": [{
-                "title": "Resultat Resultat du Coup de Coude !",
+                "title": "Resultat du Coup de Coude !",
                 "description": content,
                 "color": 0x57F287
+            }]
+        }))
+        .send()
+        .await;
+}
+
+/// Envoie un DM a un utilisateur Discord via l'API REST.
+async fn send_dm(bot_token: &str, user_id: &str, content: &str) {
+    if bot_token.is_empty() {
+        return;
+    }
+
+    let client = reqwest::Client::new();
+
+    // 1. Creer le canal DM
+    let dm_url = "https://discord.com/api/v10/users/@me/channels";
+    let dm_resp = client.post(dm_url)
+        .header("Authorization", format!("Bot {}", bot_token))
+        .json(&serde_json::json!({ "recipient_id": user_id }))
+        .send()
+        .await;
+
+    let channel_id = match dm_resp {
+        Ok(r) if r.status().is_success() => {
+            match r.json::<serde_json::Value>().await {
+                Ok(v) => v["id"].as_str().unwrap_or("").to_string(),
+                Err(_) => return,
+            }
+        }
+        _ => return, // DM fermes ou erreur, on ignore
+    };
+
+    if channel_id.is_empty() {
+        return;
+    }
+
+    // 2. Envoyer le message
+    let msg_url = format!("https://discord.com/api/v10/channels/{}/messages", channel_id);
+    let _ = client.post(&msg_url)
+        .header("Authorization", format!("Bot {}", bot_token))
+        .json(&serde_json::json!({
+            "embeds": [{
+                "title": "Resultat de votre combat !",
+                "description": content,
+                "color": 0x57F287,
+                "footer": { "text": "Coup de Coude | Sentinel" }
             }]
         }))
         .send()
