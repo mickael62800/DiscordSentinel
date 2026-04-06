@@ -2,6 +2,7 @@ import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { Member, MemberSummary, UserConductPoints, ConductPointsLog, ConductConfig, UserDossier, WatchedUser } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { getApiBaseUrl } from "../utils/api";
 
 const members = ref<Member[]>([]);
 const watchedUsers = ref<WatchedUser[]>([]);
@@ -157,7 +158,8 @@ export function useMembers() {
 
   async function addToWatch(userId: string, username: string) {
     if (!selectedGuildId.value) return;
-    const resp = await fetch(`http://localhost:3000/api/watched-users`, {
+    const baseUrl = await getApiBaseUrl();
+    const resp = await fetch(`${baseUrl}/api/watched-users`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

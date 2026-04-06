@@ -56,7 +56,8 @@ const addModalRef = ref<InstanceType<typeof AddWatchModal> | null>(null);
 
 function openAddModal() {
   addModalVisible.value = true;
-  addModalRef.value?.openReset();
+  // openReset apres le prochain tick pour que le ref soit monte
+  setTimeout(() => addModalRef.value?.openReset(), 50);
 }
 
 function closeAddModal() {

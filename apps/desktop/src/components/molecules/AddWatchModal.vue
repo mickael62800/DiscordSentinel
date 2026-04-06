@@ -76,7 +76,6 @@ async function confirmAddWatch() {
 </script>
 
 <template>
-  <teleport to="body">
     <div v-if="visible" class="modal-overlay" @click.self="closeModal">
       <div class="modal-content">
         <div class="modal-header">
@@ -148,7 +147,6 @@ async function confirmAddWatch() {
         </div>
       </div>
     </div>
-  </teleport>
 </template>
 
 <style scoped>
