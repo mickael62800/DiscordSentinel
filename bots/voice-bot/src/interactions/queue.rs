@@ -224,10 +224,26 @@ async fn handle_queue_refuse(ctx: &Context, component: &ComponentInteraction) {
         }
     }
 
+    // Notifier l'utilisateur refuse par DM
+    if let Ok(user) = target_user_id.to_user(&ctx.http).await {
+        if let Ok(dm) = user.create_dm_channel(&ctx.http).await {
+            let embed = serenity::builder::CreateEmbed::new()
+                .title("\u{274c} Acces refuse")
+                .description("Votre demande d'acces au salon vocal a ete refusee.")
+                .color(0xED4245)
+                .timestamp(serenity::model::Timestamp::now());
+
+            let _ = dm.send_message(
+                &ctx.http,
+                serenity::builder::CreateMessage::new().embed(embed),
+            ).await;
+        }
+    }
+
     super::respond_ephemeral(
         ctx,
         component,
-        &format!("<@{target_id}> a ete refuse."),
+        &format!("<@{target_id}> a ete refuse et notifie."),
     )
     .await;
 }

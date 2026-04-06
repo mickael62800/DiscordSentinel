@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use serenity::all::ButtonStyle;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateChannel, CreateEmbed, CreateMessage, CreateSelectMenu,
@@ -90,7 +91,7 @@ pub async fn handle_voice_state_update(
             create_temp_channel(ctx, guild_id, user_id, "private").await;
         } else {
             // Verifier file d'attente + donner acces panel membres
-            check_queue_join(ctx, channel_id, user_id).await;
+            check_queue_join(ctx, guild_id, channel_id, user_id).await;
             grant_members_panel_access(ctx, channel_id, user_id).await;
         }
     }
@@ -712,37 +713,47 @@ async fn check_and_delete_empty(
 
 async fn check_queue_join(
     ctx: &Context,
+    guild_id: serenity::model::id::GuildId,
     channel_id: ChannelId,
     user_id: serenity::model::id::UserId,
 ) {
+    if user_id.get() == 0 {
+        return;
+    }
+
     let data = ctx.data.read().await;
-    let _base = match data.get::<ApiClientKey>() {
+    let base = match data.get::<ApiClientKey>() {
         Some(b) => b,
         None => return,
     };
 
-    // Verifier si c'est un canal d'attente en consultant les channels du guild
-    // Pour simplifier, on verifie si le nom contient "Attente"
-    let channel_name = embeds::get_channel_name(ctx, channel_id).await;
-    if !channel_name.starts_with("Attente") {
-        return;
-    }
+    // Chercher dans l'API quel voice channel a ce queue_channel_id
+    let api = crate::api_client::ApiClient::new(Arc::clone(base));
+    let channels = match api.list_channels(&guild_id.to_string()).await {
+        Ok(chs) => chs,
+        Err(_) => return,
+    };
 
-    // Trouver le voice channel correspondant et notifier l'owner
-    // Le text_channel associe est dans le TextToVoiceMap
-    // On cherche le voice channel qui a cette queue
-    let text_channel_id = data.get::<TextToVoiceMapKey>().and_then(|map| {
-        // Pour l'instant, on parcourt pour trouver
-        map.iter().next().map(|entry| *entry.key())
+    let channel_id_str = channel_id.get().to_string();
+    let parent_channel = channels.iter().find(|ch| {
+        ch.queue_channel_id.as_deref() == Some(&channel_id_str)
     });
+
+    let parent = match parent_channel {
+        Some(ch) => ch,
+        None => return, // Pas un canal d'attente connu
+    };
+
+    // Trouver le salon texte (admin panel) associe
+    let text_channel_id = parent.text_channel_id.as_ref()
+        .and_then(|id| id.parse::<u64>().ok())
+        .map(ChannelId::new);
+
+    let owner_id = parent.owner_id.clone();
 
     drop(data);
 
-    if user_id.get() == 0 {
-        return; // Sanity check
-    }
-
-    // Envoyer une notification dans le salon texte config
+    // 1. Notifier dans le salon admin avec boutons Accepter/Refuser
     if let Some(text_id) = text_channel_id {
         let accept_id = format!("queue_accept_{}", user_id.get());
         let refuse_id = format!("queue_refuse_{}", user_id.get());
@@ -756,12 +767,45 @@ async fn check_queue_join(
                 .style(ButtonStyle::Danger),
         ];
 
+        let embed = serenity::builder::CreateEmbed::new()
+            .title("\u{1f514} File d'attente")
+            .description(format!(
+                "<@{}> attend d'etre accepte dans votre salon vocal.",
+                user_id
+            ))
+            .color(0xFFA500)
+            .footer(serenity::builder::CreateEmbedFooter::new("Cliquez pour accepter ou refuser"))
+            .timestamp(serenity::model::Timestamp::now());
+
         let message = CreateMessage::new()
-            .content(format!("**<@{user_id}> est en file d'attente !**"))
+            .embed(embed)
             .components(vec![CreateActionRow::Buttons(buttons)]);
 
         if let Err(why) = text_id.send_message(&ctx.http, message).await {
             warn!(error = %why, "Erreur notification file d'attente");
+        }
+    }
+
+    // 2. Notifier l'owner par DM
+    if let Ok(owner_uid) = owner_id.parse::<u64>() {
+        let owner_user_id = serenity::model::id::UserId::new(owner_uid);
+        if let Ok(user) = owner_user_id.to_user(&ctx.http).await {
+            if let Ok(dm) = user.create_dm_channel(&ctx.http).await {
+                let dm_embed = serenity::builder::CreateEmbed::new()
+                    .title("\u{1f514} Quelqu'un attend dans votre salon !")
+                    .description(format!(
+                        "<@{}> est en file d'attente pour rejoindre votre salon vocal.\n\n\
+                        Rendez-vous dans le panel admin de votre salon pour accepter ou refuser.",
+                        user_id
+                    ))
+                    .color(0xFFA500)
+                    .timestamp(serenity::model::Timestamp::now());
+
+                let _ = dm.send_message(
+                    &ctx.http,
+                    CreateMessage::new().embed(dm_embed),
+                ).await;
+            }
         }
     }
 }
