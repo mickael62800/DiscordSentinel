@@ -32,6 +32,18 @@ impl XpCooldown {
     /// Enregistre le gain d'XP pour le cooldown.
     pub fn record_xp(&self, guild_id: u64, user_id: u64) {
         self.last_xp.insert((guild_id, user_id), Instant::now());
+
+        // Nettoyage periodique : toutes les 10 000 insertions environ
+        if self.last_xp.len() > 10_000 {
+            self.cleanup(300); // Supprimer les entrees > 5 min
+        }
+    }
+
+    /// Supprime les entrees plus vieilles que `max_age_secs`.
+    pub fn cleanup(&self, max_age_secs: u64) {
+        let cutoff = Duration::from_secs(max_age_secs);
+        let now = Instant::now();
+        self.last_xp.retain(|_, last| now.duration_since(*last) < cutoff);
     }
 }
 

@@ -182,6 +182,44 @@ impl LevelRepository for PgLevelRepository {
         Ok(())
     }
 
+    async fn add_xp_atomic(&self, guild_id: &str, user_id: &str, username: &str, amount: i64, source: XpSource) -> Result<UserLevel, DomainError> {
+        // Determine quelles colonnes incrementer selon la source
+        let (xp_col, _level_col) = match source {
+            XpSource::Text => ("xp_text", "level_text"),
+            XpSource::Voice => ("xp_voice", "level_voice"),
+            XpSource::Days => return Err(DomainError::ValidationError("Days source cannot gain XP".into())),
+        };
+
+        // INSERT ou UPDATE atomique : XP total + XP source en une seule requete
+        let query = format!(
+            r#"INSERT INTO user_levels (id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, updated_at)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, 0,
+                       CASE WHEN '{xp_col}' = 'xp_text' THEN $4 ELSE 0 END,
+                       0,
+                       CASE WHEN '{xp_col}' = 'xp_voice' THEN $4 ELSE 0 END,
+                       0, NOW(), NOW())
+               ON CONFLICT (guild_id, user_id) DO UPDATE SET
+                 username = $3,
+                 xp = user_levels.xp + $4,
+                 {xp_col} = user_levels.{xp_col} + $4,
+                 last_xp_at = NOW(),
+                 updated_at = NOW()
+               RETURNING id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at"#,
+            xp_col = xp_col
+        );
+
+        let row = sqlx::query_as::<_, UserLevelRow>(&query)
+            .bind(guild_id)
+            .bind(user_id)
+            .bind(username)
+            .bind(amount)
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(UserLevel::from(row))
+    }
+
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
         let rows = sqlx::query_as::<_, UserLevelRow>(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 ORDER BY xp DESC LIMIT $2",
@@ -199,6 +237,7 @@ impl LevelRepository for PgLevelRepository {
         let order_col = match source {
             XpSource::Text => "xp_text",
             XpSource::Voice => "xp_voice",
+            XpSource::Days => "created_at",
         };
         let query = format!(
             "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 ORDER BY {} DESC LIMIT $2",

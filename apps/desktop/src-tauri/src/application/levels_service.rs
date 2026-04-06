@@ -23,4 +23,12 @@ impl LevelsService {
     pub async fn get_rewards(&self, guild_id: String) -> Result<Vec<LevelReward>, String> {
         self.repo.get_level_rewards(guild_id).await
     }
+
+    pub async fn set_reward(&self, guild_id: String, level: i32, role_id: String, source: String) -> Result<LevelReward, String> {
+        self.repo.set_level_reward(guild_id, level, role_id, source).await
+    }
+
+    pub async fn delete_reward(&self, guild_id: String, level: i32, source: String) -> Result<(), String> {
+        self.repo.delete_level_reward(guild_id, level, source).await
+    }
 }

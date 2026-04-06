@@ -158,6 +158,8 @@ pub fn run() {
             presentation::commands::get_level_config,
             presentation::commands::get_level_leaderboard,
             presentation::commands::get_level_rewards,
+            presentation::commands::set_level_reward,
+            presentation::commands::delete_level_reward,
             presentation::commands::get_role_panels,
             presentation::commands::get_role_panel_detail,
             presentation::commands::get_auto_roles,

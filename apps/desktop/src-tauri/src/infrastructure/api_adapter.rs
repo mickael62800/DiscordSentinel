@@ -331,6 +331,19 @@ impl LevelRepository for ApiAdapter {
     fn get_level_rewards(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<LevelReward>, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/levels/rewards/{}", self.base_url(), guild_id)))
     }
+
+    fn set_level_reward(&self, guild_id: String, level: i32, role_id: String, source: String) -> Pin<Box<dyn Future<Output = Result<LevelReward, String>> + Send>> {
+        self.get_json(self.client.post(format!("{}/api/levels/rewards", self.base_url())).json(&serde_json::json!({
+            "guild_id": guild_id,
+            "level": level,
+            "role_id": role_id,
+            "source": source,
+        })))
+    }
+
+    fn delete_level_reward(&self, guild_id: String, level: i32, source: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.delete(format!("{}/api/levels/rewards/{}/{}", self.base_url(), guild_id, level)).query(&[("source", source)]))
+    }
 }
 
 // --- Audit Logs ---

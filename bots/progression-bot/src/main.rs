@@ -19,7 +19,7 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
 use crate::config::Config;
-use crate::handler::{Handler, StatsApiKey, TrackerKey, XpCooldownKey, StreakTrackerKey};
+use crate::handler::{Handler, StatsApiKey, TrackerKey, XpCooldownKey, StreakTrackerKey, RewardsCacheKey, RewardsCache};
 use crate::streaks::StreakTracker;
 use crate::tracker::StatsTracker;
 use crate::xp_cooldown::XpCooldown;
@@ -55,6 +55,7 @@ async fn main() {
         data.insert::<TrackerKey>(StatsTracker::new());
         data.insert::<XpCooldownKey>(XpCooldown::new());
         data.insert::<StreakTrackerKey>(StreakTracker::new());
+        data.insert::<RewardsCacheKey>(Arc::new(RewardsCache::new()));
     }
 
     spawn_heartbeat(Arc::clone(&base));

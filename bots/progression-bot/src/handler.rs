@@ -1,3 +1,7 @@
+use std::sync::Arc;
+use std::time::Instant;
+
+use dashmap::DashMap;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
@@ -13,12 +17,42 @@ use sentinel_shared::embeds::success_embed;
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
-use crate::api_client::ApiClient;
+use crate::api_client::{ApiClient, RewardEntry};
 use crate::commands;
 use crate::multipliers;
 use crate::streaks::StreakTracker;
 use crate::tracker::StatsTracker;
 use crate::xp_cooldown::XpCooldown;
+
+/// Cache des rewards par guild avec TTL de 5 minutes.
+pub struct RewardsCache {
+    cache: DashMap<String, (Vec<RewardEntry>, Instant)>,
+}
+
+impl RewardsCache {
+    pub fn new() -> Self {
+        Self { cache: DashMap::new() }
+    }
+
+    pub fn get(&self, guild_id: &str) -> Option<Vec<RewardEntry>> {
+        self.cache.get(guild_id).and_then(|entry| {
+            if entry.1.elapsed().as_secs() < 300 { // 5 minutes TTL
+                Some(entry.0.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    pub fn set(&self, guild_id: &str, rewards: Vec<RewardEntry>) {
+        self.cache.insert(guild_id.to_string(), (rewards, Instant::now()));
+    }
+}
+
+pub struct RewardsCacheKey;
+impl TypeMapKey for RewardsCacheKey {
+    type Value = Arc<RewardsCache>;
+}
 
 /// Cle TypeMap pour le client API specifique au progression-bot.
 pub struct StatsApiKey;
@@ -79,12 +113,16 @@ impl EventHandler for Handler {
 
         let data = ctx.data.read().await;
 
-        if let Some(api) = data.get::<ApiClientKey>() {
+        // Charger la config guild UNE SEULE FOIS
+        let guild_config = if let Some(api) = data.get::<ApiClientKey>() {
             let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
             if !BaseApiClient::config_bool(&config, "enabled", true) {
                 return;
             }
-        }
+            config
+        } else {
+            std::collections::HashMap::new()
+        };
 
         // Track localement (fallback pour les commandes)
         if let Some(tracker) = data.get::<TrackerKey>() {
@@ -104,13 +142,6 @@ impl EventHandler for Handler {
             {
                 warn!(error = %e, "Impossible d'envoyer les stats messages au backend");
             }
-
-            // XP Cooldown check
-            let guild_config = if let Some(base) = data.get::<ApiClientKey>() {
-                base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
-            } else {
-                std::collections::HashMap::new()
-            };
 
             let cooldown_secs = BaseApiClient::config_u64(&guild_config, "xp_cooldown_secs", 60);
             let can_gain = if let Some(cooldown) = data.get::<XpCooldownKey>() {
@@ -189,7 +220,10 @@ impl EventHandler for Handler {
             let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
 
             let base_xp = 15.0;
-            let final_xp = (base_xp * channel_mult * role_mult * streak_mult).round() as i64;
+            let final_xp = (base_xp * channel_mult * role_mult * streak_mult)
+                .round()
+                .min(1000.0)
+                .max(1.0) as i64;
 
             // Ajouter l'XP texte
             match api
@@ -215,15 +249,16 @@ impl EventHandler for Handler {
                             &ctx.http,
                             CreateMessage::new().embed(embed),
                         ).await;
+                    }
 
-                        // Attribuer le role recompense si configure
-                        if let Some(role_id_str) = &result.reward_role_id {
-                            if let Ok(role_id) = role_id_str.parse::<u64>() {
-                                if let Ok(member) = guild_id.member(&ctx.http, msg.author.id).await {
-                                    let _ = member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await;
-                                }
-                            }
-                        }
+                    // Verifier les roles seulement au level-up ou premiere activite (retour d'un membre)
+                    let needs_role_check = result.leveled_up || (result.old_level == 0 && result.user.level_text > 0);
+                    if needs_role_check {
+                        let lt = result.user.level_text;
+                        let lv = result.user.level_voice;
+                        let lg = result.user.level;
+                        drop(data);
+                        check_and_assign_all_roles(&ctx, guild_id, msg.author.id, lt, lv, lg).await;
                     }
                 }
                 Err(e) => {
@@ -323,7 +358,6 @@ impl EventHandler for Handler {
                                     Ok(result) => {
                                         if result.leveled_up {
                                             let level = result.user.level_voice;
-                                            // Poster le level-up vocal dans le premier channel texte disponible
                                             if let Ok(channels) = guild_id.channels(&ctx.http).await {
                                                 if let Some(ch) = channels.values().find(|c| c.kind == serenity::model::channel::ChannelType::Text) {
                                                     let embed = success_embed("\u{1f3a4} LEVEL UP Vocal !")
@@ -337,15 +371,15 @@ impl EventHandler for Handler {
                                                     ).await;
                                                 }
                                             }
+                                        }
 
-                                            // Attribuer le role recompense si configure
-                                            if let Some(role_id_str) = &result.reward_role_id {
-                                                if let Ok(role_id) = role_id_str.parse::<u64>() {
-                                                    if let Ok(member) = guild_id.member(&ctx.http, user_id).await {
-                                                        let _ = member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await;
-                                                    }
-                                                }
-                                            }
+                                        // Verifier les roles seulement au level-up ou premiere activite
+                                        let needs_role_check = result.leveled_up || (result.old_level == 0 && result.user.level_voice > 0);
+                                        if needs_role_check {
+                                            let lt = result.user.level_text;
+                                            let lv = result.user.level_voice;
+                                            let lg = result.user.level;
+                                            check_and_assign_all_roles(&ctx, guild_id, user_id, lt, lv, lg).await;
                                         }
                                     }
                                     Err(e) => {
@@ -368,6 +402,108 @@ impl EventHandler for Handler {
                 "stats" => commands::stats::handle(&ctx, &command).await,
                 "level" => commands::level::handle(&ctx, &command).await,
                 _ => {}
+            }
+        }
+    }
+}
+
+/// Verifie TOUS les rewards (texte, vocal, jours) et attribue les roles manquants.
+/// Fonctionne aussi pour les utilisateurs qui reviennent : leurs niveaux sont en base,
+/// donc tous les roles en dessous de leur niveau seront re-attribues.
+///
+/// Modes de calcul (parametre guild "xp_role_mode") :
+/// - "separate" (defaut) : texte = niveau texte, vocal = niveau vocal
+/// - "max" : on prend le max(niveau texte, niveau vocal) pour les 2
+/// - "total" : on prend le niveau global (XP total)
+async fn check_and_assign_all_roles(
+    ctx: &Context,
+    guild_id: serenity::model::id::GuildId,
+    user_id: serenity::model::id::UserId,
+    level_text: i32,
+    level_voice: i32,
+    level_global: i32,
+) {
+    // Recuperer le membre (pour les roles actuels et la date d'arrivee)
+    let member = match guild_id.member(&ctx.http, user_id).await {
+        Ok(m) => m,
+        Err(_) => return,
+    };
+
+    let member_roles: Vec<u64> = member.roles.iter().map(|r| r.get()).collect();
+
+    // Calculer les jours d'anciennete
+    let days_since_join = member.joined_at
+        .map(|ts| {
+            let now = serenity::model::Timestamp::now();
+            (now.unix_timestamp() - ts.unix_timestamp()) / 86400
+        })
+        .unwrap_or(0);
+
+    let data = ctx.data.read().await;
+
+    // Lire le mode de calcul XP depuis la config guild
+    let xp_role_mode = if let Some(base) = data.get::<ApiClientKey>() {
+        let config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+        BaseApiClient::config_or(&config, "xp_role_mode", "separate").to_string()
+    } else {
+        "separate".to_string()
+    };
+
+    // Calculer les niveaux effectifs selon le mode
+    let (effective_text, effective_voice) = match xp_role_mode.as_str() {
+        "max" => {
+            let max_level = level_text.max(level_voice);
+            (max_level, max_level)
+        }
+        "total" => (level_global, level_global),
+        _ => (level_text, level_voice), // "separate" par defaut
+    };
+
+    // Recuperer les rewards (avec cache TTL 5 min)
+    let guild_str = guild_id.to_string();
+    let rewards_cache = data.get::<RewardsCacheKey>().cloned();
+    let rewards = if let Some(ref cache) = rewards_cache {
+        if let Some(cached) = cache.get(&guild_str) {
+            cached
+        } else if let Some(api) = data.get::<StatsApiKey>() {
+            match api.get_all_rewards(&guild_str).await {
+                Ok(r) => { cache.set(&guild_str, r.clone()); r }
+                Err(_) => return,
+            }
+        } else {
+            return;
+        }
+    } else if let Some(api) = data.get::<StatsApiKey>() {
+        match api.get_all_rewards(&guild_str).await {
+            Ok(r) => r,
+            Err(_) => return,
+        }
+    } else {
+        return;
+    };
+
+    if rewards.is_empty() {
+        return;
+    }
+
+    // Verifier chaque reward et attribuer les roles manquants
+    for reward in &rewards {
+        let threshold = reward.level;
+        let qualifies = match reward.source.as_str() {
+            "text" => effective_text >= threshold,
+            "voice" => effective_voice >= threshold,
+            "days" => days_since_join >= threshold as i64,
+            _ => false,
+        };
+
+        if qualifies {
+            if let Ok(role_id) = reward.role_id.parse::<u64>() {
+                if !member_roles.contains(&role_id) {
+                    match member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await {
+                        Ok(_) => info!(guild=%guild_id, user=%user_id, role=%role_id, source=%reward.source, "Role attribue automatiquement"),
+                        Err(e) => warn!(guild=%guild_id, user=%user_id, role=%role_id, error=%e, "Echec attribution role"),
+                    }
+                }
             }
         }
     }

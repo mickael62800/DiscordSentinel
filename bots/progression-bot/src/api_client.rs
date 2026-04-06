@@ -87,6 +87,16 @@ pub struct AddXpResponse {
     pub source: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct RewardEntry {
+    pub id: String,
+    pub guild_id: String,
+    pub level: i32,
+    pub role_id: String,
+    pub source: String,
+}
+
 // ── Request DTOs ──
 
 #[derive(Debug, Serialize)]
@@ -355,6 +365,26 @@ impl ApiClient {
 
         // Fire-and-forget : on ne bloque pas le bot si l'API ne repond pas
         self.base.auth(req).send().await.ok();
+    }
+
+    /// Recupere tous les rewards (text, voice, days) pour un serveur.
+    pub async fn get_all_rewards(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<RewardEntry>, String> {
+        let req = self.base.client().get(format!(
+            "{}/api/levels/rewards/{guild_id}",
+            self.base.base_url()
+        ));
+
+        self.base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau: {e}"))?
+            .json::<Vec<RewardEntry>>()
+            .await
+            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     /// Recupere les infractions d'un serveur.

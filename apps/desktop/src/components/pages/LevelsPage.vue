@@ -1,15 +1,109 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, watch } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import { useLevels } from "../../composables/useLevels";
+import { useGuildSelector } from "../../composables/useGuildSelector";
 import ErrorState from "../atoms/ErrorState.vue";
-import type { UserLevel } from "../../types";
+import type { UserLevel, DiscordRole } from "../../types";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 
-const { config, leaderboard, rewards, loading, error, fetchAll } = useLevels();
+const { config, leaderboard, rewards, roles, loading, error, fetchAll, setReward, deleteReward } = useLevels();
+const { selectedGuildId } = useGuildSelector();
 useRealtimeRefresh(["level_up", "xp_update"], fetchAll);
 
 type ViewMode = "global" | "text" | "voice";
+type PageTab = "leaderboard" | "rewards";
 const viewMode = ref<ViewMode>("global");
+const pageTab = ref<PageTab>("leaderboard");
+
+// Mode de calcul XP pour les roles
+const xpRoleMode = ref<string>("separate");
+const xpRoleModeLoading = ref(false);
+
+async function loadXpRoleMode() {
+  if (!selectedGuildId.value) return;
+  try {
+    const configs = await invoke<Array<{config_key: string; config_value: string}>>("get_bot_guild_config", {
+      guildId: selectedGuildId.value,
+    });
+    const found = configs.find((c: {config_key: string}) => c.config_key === "xp_role_mode");
+    xpRoleMode.value = found?.config_value ?? "separate";
+  } catch {
+    xpRoleMode.value = "separate";
+  }
+}
+
+async function saveXpRoleMode(mode: string) {
+  if (!selectedGuildId.value) return;
+  xpRoleModeLoading.value = true;
+  try {
+    await invoke("set_bot_config", {
+      guildId: selectedGuildId.value,
+      botName: "progression",
+      configKey: "xp_role_mode",
+      configValue: mode,
+    });
+    xpRoleMode.value = mode;
+  } catch (e) {
+    console.error("Erreur sauvegarde xp_role_mode:", e);
+  } finally {
+    xpRoleModeLoading.value = false;
+  }
+}
+
+watch(selectedGuildId, loadXpRoleMode, { immediate: true });
+
+const roleSearch = ref("");
+const saving = ref<string | null>(null);
+
+// Roles filtres (exclure @everyone et les roles bot-managed)
+const filteredRoles = computed(() => {
+  let list = roles.value
+    .filter((r: DiscordRole) => r.name !== "@everyone" && !r.managed)
+    .sort((a: DiscordRole, b: DiscordRole) => b.position - a.position);
+  if (roleSearch.value) {
+    const q = roleSearch.value.toLowerCase();
+    list = list.filter((r) => r.name.toLowerCase().includes(q));
+  }
+  return list;
+});
+
+// Trouver le reward pour un role + source
+function getRewardLevel(roleId: string, source: string): number | null {
+  const r = rewards.value.find((rw) => rw.role_id === roleId && rw.source === source);
+  return r ? r.level : null;
+}
+
+// Mettre a jour un reward
+async function updateReward(roleId: string, source: string, levelStr: string) {
+  const level = parseInt(levelStr);
+  saving.value = `${roleId}-${source}`;
+  try {
+    if (!levelStr || isNaN(level) || level <= 0) {
+      // Supprimer le reward existant
+      const existing = rewards.value.find((rw) => rw.role_id === roleId && rw.source === source);
+      if (existing) {
+        await deleteReward(existing.level, source);
+      }
+    } else {
+      // Supprimer l'ancien si le niveau a change
+      const existing = rewards.value.find((rw) => rw.role_id === roleId && rw.source === source);
+      if (existing && existing.level !== level) {
+        await deleteReward(existing.level, source);
+      }
+      await setReward(level, roleId, source);
+    }
+  } catch (e) {
+    console.error("Erreur mise a jour reward:", e);
+  } finally {
+    saving.value = null;
+  }
+}
+
+function roleColor(color: number): string {
+  if (color === 0) return "var(--text-secondary)";
+  return `#${color.toString(16).padStart(6, "0")}`;
+}
 
 function progressPercent(current: number, needed: number): number {
   if (needed <= 0) return 0;
@@ -43,33 +137,18 @@ function userNeeded(user: UserLevel): number {
 function sortedLeaderboard(): UserLevel[] {
   return [...leaderboard.value].sort((a, b) => userXp(b) - userXp(a));
 }
-
-function rewardForLevel(level: number, source: string): string | null {
-  const r = rewards.value.find((rw) => rw.level === level && rw.source === source);
-  return r ? r.role_id : null;
-}
-
-function hasReward(user: UserLevel): boolean {
-  if (viewMode.value === "text") return !!rewardForLevel(user.level_text, "text");
-  if (viewMode.value === "voice") return !!rewardForLevel(user.level_voice, "voice");
-  return !!rewardForLevel(user.level_text, "text") || !!rewardForLevel(user.level_voice, "voice");
-}
 </script>
 
 <template>
   <div class="levels">
     <h1>Niveaux & XP</h1>
 
-    <div v-if="!config && !loading" class="empty">
-      Selectionnez un serveur et configurez le systeme de niveaux.
-    </div>
-
     <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchAll" />
     <div v-else-if="loading" class="loading">Chargement...</div>
 
-    <template v-else-if="config">
+    <template v-else>
       <!-- Config resume -->
-      <div class="config-bar">
+      <div v-if="config" class="config-bar">
         <div class="config-item">
           <span class="config-value">{{ config.xp_per_message }}</span>
           <span class="config-label">XP / message</span>
@@ -94,58 +173,158 @@ function hasReward(user: UserLevel): boolean {
         </div>
       </div>
 
-      <!-- View mode tabs -->
-      <div class="view-tabs">
-        <button :class="['tab', { active: viewMode === 'global' }]" @click="viewMode = 'global'">
-          Global
-        </button>
-        <button :class="['tab tab-text', { active: viewMode === 'text' }]" @click="viewMode = 'text'">
-          Texte
-        </button>
-        <button :class="['tab tab-voice', { active: viewMode === 'voice' }]" @click="viewMode = 'voice'">
-          Vocal
-        </button>
-      </div>
-
-      <!-- Leaderboard -->
-      <div class="leaderboard">
-        <div
-          v-for="(user, index) in sortedLeaderboard()"
-          :key="user.id"
-          :class="['user-row', { 'top-3': index < 3 }]"
+      <!-- Mode de calcul XP -->
+      <div class="xp-mode-bar">
+        <span class="xp-mode-label">Mode d'attribution des roles :</span>
+        <select
+          class="xp-mode-select"
+          :value="xpRoleMode"
+          :disabled="xpRoleModeLoading"
+          @change="saveXpRoleMode(($event.target as HTMLSelectElement).value)"
         >
-          <div class="rank">
-            <span :class="['rank-number', `rank-${index + 1}`]">{{ index + 1 }}</span>
-          </div>
-          <div class="user-avatar-placeholder">{{ user.username.charAt(0).toUpperCase() }}</div>
-          <div class="user-info">
-            <div class="user-header">
-              <span class="user-name">{{ user.username }}</span>
-              <span class="user-level">Niv. {{ userLevel(user) }}</span>
-              <span v-if="hasReward(user)" class="reward-badge">Role</span>
-            </div>
-            <div class="progress-container">
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: progressPercent(userCurrent(user), userNeeded(user)) + '%' }"></div>
-              </div>
-              <span class="progress-text">{{ userCurrent(user) }} / {{ userNeeded(user) }} XP</span>
-            </div>
-            <!-- Mini stats texte/vocal en mode global -->
-            <div v-if="viewMode === 'global'" class="mini-stats">
-              <span class="mini-stat text">Texte Niv.{{ user.level_text }}</span>
-              <span class="mini-stat voice">Vocal Niv.{{ user.level_voice }}</span>
-            </div>
-          </div>
-          <div class="user-xp">
-            <span class="xp-total">{{ userXp(user).toLocaleString() }}</span>
-            <span class="xp-label">XP {{ viewMode === 'text' ? 'texte' : viewMode === 'voice' ? 'vocal' : 'total' }}</span>
-          </div>
+          <option value="separate">Separe (texte = niveau texte, vocal = niveau vocal)</option>
+          <option value="max">Le plus grand (max entre texte et vocal)</option>
+          <option value="total">Total (XP texte + vocal combines)</option>
+        </select>
+      </div>
+
+      <!-- Page tabs -->
+      <div class="page-tabs">
+        <button :class="['page-tab', { active: pageTab === 'leaderboard' }]" @click="pageTab = 'leaderboard'">
+          Classement
+        </button>
+        <button :class="['page-tab', { active: pageTab === 'rewards' }]" @click="pageTab = 'rewards'">
+          Roles par niveau
+        </button>
+      </div>
+
+      <!-- ===== LEADERBOARD ===== -->
+      <template v-if="pageTab === 'leaderboard'">
+        <!-- View mode tabs -->
+        <div class="view-tabs">
+          <button :class="['tab', { active: viewMode === 'global' }]" @click="viewMode = 'global'">Global</button>
+          <button :class="['tab tab-text', { active: viewMode === 'text' }]" @click="viewMode = 'text'">Texte</button>
+          <button :class="['tab tab-voice', { active: viewMode === 'voice' }]" @click="viewMode = 'voice'">Vocal</button>
         </div>
 
-        <div v-if="leaderboard.length === 0" class="empty">
-          Aucun membre n'a encore d'XP sur ce serveur.
+        <div class="leaderboard">
+          <div
+            v-for="(user, index) in sortedLeaderboard()"
+            :key="user.id"
+            :class="['user-row', { 'top-3': index < 3 }]"
+          >
+            <div class="rank">
+              <span :class="['rank-number', `rank-${index + 1}`]">{{ index + 1 }}</span>
+            </div>
+            <div class="user-avatar-placeholder">{{ user.username.charAt(0).toUpperCase() }}</div>
+            <div class="user-info">
+              <div class="user-header">
+                <span class="user-name">{{ user.username }}</span>
+                <span class="user-level">Niv. {{ userLevel(user) }}</span>
+              </div>
+              <div class="progress-container">
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: progressPercent(userCurrent(user), userNeeded(user)) + '%' }"></div>
+                </div>
+                <span class="progress-text">{{ userCurrent(user) }} / {{ userNeeded(user) }} XP</span>
+              </div>
+              <div v-if="viewMode === 'global'" class="mini-stats">
+                <span class="mini-stat text">Texte Niv.{{ user.level_text }}</span>
+                <span class="mini-stat voice">Vocal Niv.{{ user.level_voice }}</span>
+              </div>
+            </div>
+            <div class="user-xp">
+              <span class="xp-total">{{ userXp(user).toLocaleString() }}</span>
+              <span class="xp-label">XP {{ viewMode === 'text' ? 'texte' : viewMode === 'voice' ? 'vocal' : 'total' }}</span>
+            </div>
+          </div>
+
+          <div v-if="leaderboard.length === 0" class="empty">
+            Aucun membre n'a encore d'XP sur ce serveur.
+          </div>
         </div>
-      </div>
+      </template>
+
+      <!-- ===== REWARDS ===== -->
+      <template v-if="pageTab === 'rewards'">
+          <div class="rewards-header">
+            <p class="rewards-desc">
+              Definissez le niveau texte et/ou vocal requis pour obtenir chaque role. Laissez vide pour les roles non lies a l'XP.
+            </p>
+            <input v-model="roleSearch" class="role-search" placeholder="Rechercher un role..." />
+          </div>
+
+          <div class="rewards-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>Role</th>
+                  <th>Membres</th>
+                  <th class="col-level">Niveau Texte</th>
+                  <th class="col-level">Niveau Vocal</th>
+                  <th class="col-level">Jours</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="role in filteredRoles" :key="role.id">
+                  <td>
+                    <div class="role-cell">
+                      <span class="role-dot" :style="{ background: roleColor(role.color) }"></span>
+                      <span class="role-name">{{ role.name }}</span>
+                    </div>
+                  </td>
+                  <td class="mono">{{ role.member_count }}</td>
+                  <td>
+                    <div class="level-input-wrap">
+                      <input
+                        type="number"
+                        min="0"
+                        class="level-input"
+                        placeholder="-"
+                        :value="getRewardLevel(role.id, 'text') ?? ''"
+                        :disabled="saving !== null"
+                        @change="updateReward(role.id, 'text', ($event.target as HTMLInputElement).value)"
+                      />
+                      <span v-if="saving === `${role.id}-text`" class="saving-indicator"></span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="level-input-wrap">
+                      <input
+                        type="number"
+                        min="0"
+                        class="level-input"
+                        placeholder="-"
+                        :value="getRewardLevel(role.id, 'voice') ?? ''"
+                        :disabled="saving !== null"
+                        @change="updateReward(role.id, 'voice', ($event.target as HTMLInputElement).value)"
+                      />
+                      <span v-if="saving === `${role.id}-voice`" class="saving-indicator"></span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="level-input-wrap">
+                      <input
+                        type="number"
+                        min="0"
+                        class="level-input"
+                        placeholder="-"
+                        :value="getRewardLevel(role.id, 'days') ?? ''"
+                        :disabled="saving !== null"
+                        @change="updateReward(role.id, 'days', ($event.target as HTMLInputElement).value)"
+                      />
+                      <span v-if="saving === `${role.id}-days`" class="saving-indicator"></span>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div v-if="filteredRoles.length === 0" class="empty">
+            Aucun role trouve. Les roles sont synchronises par le bot communaute.
+          </div>
+      </template>
     </template>
   </div>
 </template>
@@ -190,6 +369,64 @@ function hasReward(user: UserLevel): boolean {
 
 .text-success { color: var(--success); }
 .text-danger { color: var(--danger); }
+
+/* XP mode */
+.xp-mode-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.xp-mode-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.xp-mode-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  flex: 1;
+  max-width: 450px;
+}
+
+/* Page tabs */
+.page-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+
+.page-tab {
+  padding: 10px 20px;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s;
+}
+
+.page-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.page-tab:hover:not(.active) {
+  color: var(--text-primary);
+}
 
 /* View tabs */
 .view-tabs {
@@ -307,15 +544,6 @@ function hasReward(user: UserLevel): boolean {
   border-radius: 4px;
 }
 
-.reward-badge {
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--warning);
-  background-color: var(--warning-bg);
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
 .progress-container {
   display: flex;
   align-items: center;
@@ -389,6 +617,122 @@ function hasReward(user: UserLevel): boolean {
   font-size: 10px;
   color: var(--text-secondary);
   text-transform: uppercase;
+}
+
+/* Rewards section */
+.rewards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  gap: 16px;
+}
+
+.rewards-desc {
+  color: var(--text-secondary);
+  font-size: 13px;
+  flex: 1;
+}
+
+.role-search {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  width: 220px;
+}
+
+.rewards-table {
+  overflow-x: auto;
+}
+
+.rewards-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rewards-table th {
+  text-align: left;
+  padding: 10px 12px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.rewards-table td {
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rewards-table tr:hover {
+  background: var(--bg-secondary);
+}
+
+.col-level {
+  width: 140px;
+}
+
+.role-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.role-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.role-name {
+  font-weight: 600;
+}
+
+.level-input-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.level-input {
+  width: 70px;
+  padding: 6px 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  text-align: center;
+  font-family: "JetBrains Mono", "Cascadia Code", monospace;
+}
+
+.level-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.saving-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin-left: 6px;
+  animation: pulse 0.8s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+.mono {
+  font-family: monospace;
 }
 
 .loading, .empty {

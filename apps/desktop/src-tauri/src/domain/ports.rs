@@ -92,6 +92,8 @@ pub trait LevelRepository: Send + Sync + 'static {
     fn get_level_config(&self, guild_id: String) -> BoxFut<LevelConfig>;
     fn get_level_leaderboard(&self, guild_id: String) -> BoxFut<Vec<UserLevel>>;
     fn get_level_rewards(&self, guild_id: String) -> BoxFut<Vec<LevelReward>>;
+    fn set_level_reward(&self, guild_id: String, level: i32, role_id: String, source: String) -> BoxFut<LevelReward>;
+    fn delete_level_reward(&self, guild_id: String, level: i32, source: String) -> BoxFut<()>;
 }
 
 pub trait AuditLogRepository: Send + Sync + 'static {

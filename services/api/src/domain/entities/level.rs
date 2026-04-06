@@ -6,6 +6,7 @@ use uuid::Uuid;
 pub enum XpSource {
     Text,
     Voice,
+    Days,
 }
 
 impl XpSource {
@@ -13,12 +14,14 @@ impl XpSource {
         match self {
             XpSource::Text => "text",
             XpSource::Voice => "voice",
+            XpSource::Days => "days",
         }
     }
 
     pub fn from_str(s: &str) -> Self {
         match s {
             "voice" => XpSource::Voice,
+            "days" => XpSource::Days,
             _ => XpSource::Text,
         }
     }

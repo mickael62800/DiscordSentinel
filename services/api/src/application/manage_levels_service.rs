@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use uuid::Uuid;
 
 use crate::domain::entities::{level_from_xp, LevelConfig, LevelReward, UserLevel, XpSource};
 use crate::domain::errors::DomainError;
@@ -31,6 +30,17 @@ impl ManageLevelsUseCase for ManageLevelsService {
     }
 
     async fn save_config(&self, cmd: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> {
+        // Validation des bornes
+        if cmd.xp_per_message < 1 || cmd.xp_per_message > 1000 {
+            return Err(DomainError::ValidationError("xp_per_message doit etre entre 1 et 1000".into()));
+        }
+        if cmd.xp_per_voice_minute < 1 || cmd.xp_per_voice_minute > 1000 {
+            return Err(DomainError::ValidationError("xp_per_voice_minute doit etre entre 1 et 1000".into()));
+        }
+        if cmd.xp_cooldown_secs < 0 || cmd.xp_cooldown_secs > 3600 {
+            return Err(DomainError::ValidationError("xp_cooldown_secs doit etre entre 0 et 3600".into()));
+        }
+
         let now = Utc::now();
         let config = LevelConfig {
             guild_id: cmd.guild_id,
@@ -49,52 +59,42 @@ impl ManageLevelsUseCase for ManageLevelsService {
     }
 
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
-        let now = Utc::now();
-        let existing = self.repo.get_user_level(&cmd.guild_id, &cmd.user_id).await?;
+        // Validation
+        if cmd.amount <= 0 {
+            return Err(DomainError::ValidationError("Le montant XP doit etre positif".into()));
+        }
+        if cmd.amount > 10000 {
+            return Err(DomainError::ValidationError("Le montant XP ne peut pas depasser 10000".into()));
+        }
 
-        let (old_xp, old_xp_text, old_xp_voice, id) = match &existing {
-            Some(u) => (u.xp, u.xp_text, u.xp_voice, u.id),
-            None => (0, 0, 0, Uuid::new_v4()),
-        };
+        // Lire l'ancien etat pour detecter les level-ups
+        let old = self.repo.get_user_level(&cmd.guild_id, &cmd.user_id).await?;
+        let old_level_text = old.as_ref().map(|u| u.level_text).unwrap_or(0);
+        let old_level_voice = old.as_ref().map(|u| u.level_voice).unwrap_or(0);
 
-        // Ajouter l'XP a la source correspondante ET au total
-        let (new_xp_text, new_xp_voice) = match cmd.source {
-            XpSource::Text => (old_xp_text + cmd.amount, old_xp_voice),
-            XpSource::Voice => (old_xp_text, old_xp_voice + cmd.amount),
-        };
-        let new_xp = old_xp + cmd.amount;
+        // UPDATE atomique — pas de race condition
+        let mut user_level = self.repo.add_xp_atomic(
+            &cmd.guild_id,
+            &cmd.user_id,
+            &cmd.username,
+            cmd.amount,
+            cmd.source,
+        ).await?;
 
-        let new_level = level_from_xp(new_xp);
-        let new_level_text = level_from_xp(new_xp_text);
-        let new_level_voice = level_from_xp(new_xp_voice);
+        // Recalculer les niveaux depuis l'XP (la DB stocke juste l'XP, les niveaux sont derives)
+        user_level.level = level_from_xp(user_level.xp);
+        user_level.level_text = level_from_xp(user_level.xp_text);
+        user_level.level_voice = level_from_xp(user_level.xp_voice);
+
+        // Mettre a jour les niveaux en base
+        self.repo.upsert_user_level(&user_level).await?;
 
         // Detecter le level-up de la source specifique
-        let old_source_level = match cmd.source {
-            XpSource::Text => existing.as_ref().map(|u| u.level_text).unwrap_or(0),
-            XpSource::Voice => existing.as_ref().map(|u| u.level_voice).unwrap_or(0),
+        let (old_source_level, new_source_level) = match cmd.source {
+            XpSource::Text => (old_level_text, user_level.level_text),
+            XpSource::Voice => (old_level_voice, user_level.level_voice),
+            XpSource::Days => (0, 0),
         };
-        let new_source_level = match cmd.source {
-            XpSource::Text => new_level_text,
-            XpSource::Voice => new_level_voice,
-        };
-
-        let user_level = UserLevel {
-            id,
-            guild_id: cmd.guild_id.clone(),
-            user_id: cmd.user_id.clone(),
-            username: cmd.username,
-            xp: new_xp,
-            level: new_level,
-            xp_text: new_xp_text,
-            level_text: new_level_text,
-            xp_voice: new_xp_voice,
-            level_voice: new_level_voice,
-            last_xp_at: now,
-            created_at: existing.map(|u| u.created_at).unwrap_or(now),
-            updated_at: now,
-        };
-
-        self.repo.upsert_user_level(&user_level).await?;
 
         let leveled_up = new_source_level > old_source_level;
         let reward_role_id = if leveled_up {
@@ -141,7 +141,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
 
     async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str, source: XpSource) -> Result<LevelReward, DomainError> {
         let reward = LevelReward {
-            id: Uuid::new_v4(),
+            id: uuid::Uuid::new_v4(),
             guild_id: guild_id.to_string(),
             level,
             role_id: role_id.to_string(),

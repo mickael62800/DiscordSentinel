@@ -111,6 +111,8 @@ tauri_passthrough!(get_top_users, DashboardChartsService, get_top_users -> Vec<T
 tauri_passthrough!(get_level_config, LevelsService, get_config -> LevelConfig, guild_id: String);
 tauri_passthrough!(get_level_leaderboard, LevelsService, get_leaderboard -> Vec<UserLevel>, guild_id: String);
 tauri_passthrough!(get_level_rewards, LevelsService, get_rewards -> Vec<LevelReward>, guild_id: String);
+tauri_passthrough!(set_level_reward, LevelsService, set_reward -> LevelReward, guild_id: String, level: i32, role_id: String, source: String);
+tauri_passthrough!(delete_level_reward, LevelsService, delete_reward -> (), guild_id: String, level: i32, source: String);
 
 // Audit Logs
 tauri_passthrough!(get_audit_logs, AuditLogsService, get_audit_logs -> Vec<AuditLog>, guild_id: Option<String>, event_type: Option<String>, limit: Option<i64>);
