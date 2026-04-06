@@ -760,7 +760,9 @@ watch(selectedComponent, loadFormValues);
 .fields-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 16px;
+  margin-top: 12px;
+  margin-bottom: 8px;
 }
 
 .fields-grid-text {
@@ -768,11 +770,14 @@ watch(selectedComponent, loadFormValues);
 }
 
 .field-card {
-  padding: 12px;
-  border-radius: 8px;
+  padding: 16px 18px;
+  border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--bg-card);
   transition: border-color 0.2s, background 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .field-card.modified {
@@ -804,7 +809,8 @@ watch(selectedComponent, loadFormValues);
   font-size: 13px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+  min-height: 20px;
 }
 
 .required {
@@ -836,13 +842,14 @@ watch(selectedComponent, loadFormValues);
 
 .form-input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 11px 14px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-primary);
   color: var(--text-primary);
   font-size: 14px;
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
+  margin-top: auto;
 }
 
 /* Masquer les fleches up/down des inputs number */
@@ -852,6 +859,7 @@ watch(selectedComponent, loadFormValues);
   font-size: 16px;
   font-weight: 600;
   letter-spacing: 0.5px;
+  padding: 12px 14px;
 }
 
 .form-input-number::-webkit-inner-spin-button,
@@ -967,6 +975,15 @@ watch(selectedComponent, loadFormValues);
   margin: 0;
   padding: 0;
   border: none;
+}
+
+.inputs-section {
+  margin-top: 24px;
+  margin-bottom: 16px;
+}
+
+.inputs-section + .inputs-section {
+  margin-top: 32px;
 }
 
 .btn-toggle-all {
