@@ -1,5 +1,6 @@
 use serenity::all::{
-    CommandInteraction, Context, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CommandInteraction, Context, CreateEmbed, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateMessage,
 };
 
 /// Verifie que la commande est utilisee dans le bon salon.
@@ -41,4 +42,43 @@ async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
             ),
         )
         .await;
+}
+
+/// Poste un embed dans le salon d'activites configure.
+/// Si pas configure, poste dans le salon courant via create_response.
+/// Retourne true si l'embed a ete poste dans le salon d'activites (la reponse reste a faire).
+pub async fn post_activity(
+    ctx: &Context,
+    command: &CommandInteraction,
+    activity_channel: Option<String>,
+    embed: CreateEmbed,
+) {
+    match activity_channel.and_then(|id| id.parse::<u64>().ok()) {
+        Some(ch_id) => {
+            // Poster dans le salon activites
+            let channel = serenity::model::id::ChannelId::new(ch_id);
+            let _ = channel.send_message(
+                &ctx.http,
+                CreateMessage::new().embed(embed),
+            ).await;
+            // Repondre en ephemere pour confirmer
+            let _ = command.create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(format!("Resultat poste dans <#{}>.", ch_id))
+                        .ephemeral(true),
+                ),
+            ).await;
+        }
+        None => {
+            // Pas de salon configure → poster ici
+            let _ = command.create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().embed(embed),
+                ),
+            ).await;
+        }
+    }
 }

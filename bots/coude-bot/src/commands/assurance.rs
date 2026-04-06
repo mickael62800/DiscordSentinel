@@ -122,15 +122,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 
-    command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed),
-            ),
-        )
-        .await
-        .ok();
+    crate::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
