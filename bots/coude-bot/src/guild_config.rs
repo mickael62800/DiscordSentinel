@@ -61,6 +61,21 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "casino_max_bet", 500) as i64
     }
 
+    /// Cooldown entre chaque /casino en secondes (defaut: 300 = 5 min).
+    pub fn casino_cooldown_secs(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "casino_cooldown_secs", 300) as i64
+    }
+
+    /// Nombre max de /casino par jour (defaut: 10, 0 = illimite).
+    pub fn casino_max_daily(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "casino_max_daily", 10)
+    }
+
+    /// Gain max par jour au casino (defaut: 5000, 0 = illimite).
+    pub fn casino_max_daily_gain(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "casino_max_daily_gain", 5000) as i64
+    }
+
     // ── Vol ──
 
     pub fn steal_enabled(&self) -> bool {

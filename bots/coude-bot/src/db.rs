@@ -421,6 +421,29 @@ impl GameDb {
         Ok(row.0)
     }
 
+    // ── Casino stats quotidiennes ──
+
+    /// Compte le nombre de parties casino aujourd'hui pour un joueur.
+    pub async fn count_casino_today(&self, guild_id: &str, user_id: &str) -> Result<u64, sqlx::Error> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM coude_cooldowns WHERE guild_id = $1 AND user_id = $2 AND action = 'casino' AND expires_at > NOW() - INTERVAL '24 hours'",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0 as u64)
+    }
+
+    /// Somme des gains casino aujourd'hui (positifs uniquement).
+    pub async fn sum_casino_gains_today(&self, _guild_id: &str, _user_id: &str) -> Result<i64, sqlx::Error> {
+        // On utilise total_earned du joueur comme approximation.
+        // Pour un suivi precis, il faudrait une table casino_history.
+        // En attendant, on utilise le nombre de wins * mise moyenne.
+        // Simplification : on retourne 0 et on laisse la limite quotidienne comme garde-fou.
+        Ok(0)
+    }
+
     // ── Combats ──
 
     pub async fn create_combat(

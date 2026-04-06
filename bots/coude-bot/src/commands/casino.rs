@@ -55,6 +55,52 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();
 
+    // Cooldown casino
+    let cooldown_secs = config.casino_cooldown_secs();
+    if cooldown_secs > 0 {
+        match db.check_cooldown(&guild_id, &command.user.id.to_string(), "casino").await {
+            Ok(Some(expires_at)) => {
+                let remaining = expires_at
+                    .signed_duration_since(chrono::Utc::now())
+                    .num_seconds();
+                if remaining > 0 {
+                    let mins = remaining / 60;
+                    let secs = remaining % 60;
+                    reply_ephemeral(
+                        ctx, command,
+                        &format!("Tu dois attendre encore {}m{}s avant de rejouer au casino !", mins, secs),
+                    ).await;
+                    return;
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+                return;
+            }
+        }
+    }
+
+    // Limite quotidienne de parties
+    let max_daily = config.casino_max_daily();
+    if max_daily > 0 {
+        let today_count = db.count_casino_today(&guild_id, &command.user.id.to_string()).await.unwrap_or(0);
+        if today_count >= max_daily {
+            reply_ephemeral(ctx, command, &format!("Tu as atteint la limite de {} parties de casino par jour !", max_daily)).await;
+            return;
+        }
+    }
+
+    // Limite quotidienne de gains
+    let max_daily_gain = config.casino_max_daily_gain();
+    if max_daily_gain > 0 {
+        let today_gain = db.sum_casino_gains_today(&guild_id, &command.user.id.to_string()).await.unwrap_or(0);
+        if today_gain >= max_daily_gain {
+            reply_ephemeral(ctx, command, &format!("Tu as atteint le plafond de gains au casino ({} coins/jour) !", max_daily_gain)).await;
+            return;
+        }
+    }
+
     let player = match db
         .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
         .await
@@ -146,6 +192,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             false,
         )
     };
+
+    // Poser le cooldown
+    if cooldown_secs > 0 {
+        let _ = db.set_cooldown(&guild_id, &command.user.id.to_string(), "casino", cooldown_secs).await;
+    }
 
     // Appliquer le resultat
     if is_faillite {
