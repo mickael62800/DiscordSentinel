@@ -244,7 +244,11 @@ impl EventHandler for Handler {
             .unwrap_or(env_config.quarantine_enabled);
         let quarantine_role_id = guild_config
             .get("quarantine_role_id")
-            .and_then(|v| v.parse::<u64>().ok())
+            .and_then(|v| {
+                v.parse::<u64>().map_err(|_| {
+                    tracing::warn!(guild=%guild_id, value=%v, "quarantine_role_id invalide dans la config guild");
+                }).ok()
+            })
             .or(env_config.quarantine_role_id);
         let captcha_enabled = guild_config
             .get("captcha_enabled")
@@ -370,7 +374,9 @@ impl EventHandler for Handler {
             }
 
             // Envoyer une alerte dans le premier salon texte trouve
-            if let Ok(channels) = guild_id.channels(&ctx.http).await {
+            match guild_id.channels(&ctx.http).await {
+            Err(e) => tracing::warn!(guild=%guild_id, error=%e, "Impossible de charger les channels pour l'alerte raid"),
+            Ok(channels) => {
                 if let Some(channel) = channels
                     .values()
                     .find(|c| c.kind == serenity::model::channel::ChannelType::Text)
@@ -401,7 +407,7 @@ impl EventHandler for Handler {
                         .await
                         .ok();
                 }
-            }
+            }}
 
             raid_detector.reset(guild_id);
             recent_joins.reset(guild_id);
@@ -718,9 +724,15 @@ impl EventHandler for Handler {
                     }
                 };
 
-                // Extraire l'index du bouton presse
-                let pressed_str = custom_id.strip_prefix(captcha::CAPTCHA_MATH_PREFIX).unwrap_or("0");
-                let pressed_index: usize = pressed_str.parse().unwrap_or(0);
+                // Extraire et valider l'index du bouton presse
+                let pressed_str = custom_id.strip_prefix(captcha::CAPTCHA_MATH_PREFIX).unwrap_or("");
+                let pressed_index: usize = match pressed_str.parse::<usize>() {
+                    Ok(i) if i < 4 => i,
+                    _ => {
+                        tracing::warn!(user=%user_id, index=%pressed_str, "Index captcha invalide");
+                        return;
+                    }
+                };
 
                 // Trouver le guild_id de l'utilisateur en quarantaine
                 let mut target_guild = None;
@@ -780,7 +792,8 @@ impl EventHandler for Handler {
                         component.create_response(&ctx.http, response).await.ok();
                     }
                     Some(false) => {
-                        // Mauvaise reponse
+                        // Mauvaise reponse — log pour detection brute-force
+                        tracing::warn!(guild=%guild_id, user=%user_id, index=%pressed_index, "Echec captcha math");
                         let embed = danger_embed("\u{274c} Mauvaise reponse")
                             .description("Ce n'est pas la bonne reponse. Reessayez.");
                         let response = serenity::builder::CreateInteractionResponse::Message(

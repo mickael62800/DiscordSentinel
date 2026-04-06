@@ -63,8 +63,15 @@ impl Config {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(300),
-            captcha_type: std::env::var("CAPTCHA_TYPE")
-                .unwrap_or_else(|_| "button".to_string()),
+            captcha_type: {
+                let ct = std::env::var("CAPTCHA_TYPE").unwrap_or_else(|_| "button".to_string());
+                if ct != "button" && ct != "math" {
+                    tracing::warn!(value=%ct, "CAPTCHA_TYPE invalide, utilisation de 'button' par defaut");
+                    "button".to_string()
+                } else {
+                    ct
+                }
+            },
             lockdown_enabled: std::env::var("LOCKDOWN_ENABLED")
                 .map(|v| v == "true" || v == "1")
                 .unwrap_or(false),

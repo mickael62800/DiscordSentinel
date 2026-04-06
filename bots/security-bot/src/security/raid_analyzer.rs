@@ -103,12 +103,15 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
 }
 
 /// Verifie si un groupe de noms contient des paires avec distance <= max_distance.
+/// Limite a 50 noms pour eviter O(n^2) excessif.
 pub fn has_similar_usernames(names: &[String], max_distance: usize) -> bool {
     if names.len() < 2 {
         return false;
     }
 
-    let lowered: Vec<String> = names.iter().map(|n| n.to_lowercase()).collect();
+    // Limiter pour eviter DoS sur gros raids
+    let capped = if names.len() > 50 { &names[..50] } else { names };
+    let lowered: Vec<String> = capped.iter().map(|n| n.to_lowercase()).collect();
 
     for i in 0..lowered.len() {
         for j in (i + 1)..lowered.len() {

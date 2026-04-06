@@ -33,8 +33,15 @@ impl RaidDetector {
         // Ajouter le nouveau join
         timestamps.push(now);
 
-        // Vérifier le seuil
-        timestamps.len() as u64 >= self.threshold
+        let result = timestamps.len() as u64 >= self.threshold;
+        drop(entry);
+
+        // Cleanup periodique : supprimer les guildes avec vecteur vide
+        if self.joins.len() > 1000 {
+            self.joins.retain(|_, ts| !ts.is_empty());
+        }
+
+        result
     }
 
     /// Retourne le nombre de joins récents pour un guild.
