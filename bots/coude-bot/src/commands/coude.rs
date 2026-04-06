@@ -42,6 +42,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let config = load_guild_config(ctx, &guild_id).await;
+    if !crate::channel_check::check_channel(ctx, command, config.channel_combats()).await {
+        return;
+    }
     if !config.enabled() {
         reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
         return;
@@ -203,11 +206,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    // Creer le combat
+    // Creer le combat (channel_id = salon combats configure)
+    let combat_channel = config.channel_combats().unwrap(); // deja verifie par check_channel
     let combat = match db
         .create_combat(
             &guild_id,
-            &command.channel_id.to_string(),
+            &combat_channel,
             &command.user.id.to_string(),
             &command.user.name,
             &target.id.to_string(),
@@ -361,14 +365,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .ok();
 
     // Notifier le defenseur par DM
-    let channel_id = command.channel_id;
     if let Ok(dm_channel) = target.create_dm_channel(&ctx.http).await {
         let dm_embed = CreateEmbed::new()
             .title("\u{1f44a} Tu as ete defie !")
             .description(format!(
                 "**{}** t'a defie en Coup de Coude pour **{} coins** !\n\n\
                 Rends-toi dans <#{}> pour accepter ou refuser le defi.",
-                command.user.name, mise, channel_id
+                command.user.name, mise, combat_channel
             ))
             .color(0xFFA500)
             .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
@@ -378,6 +381,25 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             &ctx.http,
             CreateMessage::new().embed(dm_embed),
         ).await;
+    }
+
+    // Notification simplifiee dans le salon notifications
+    if let Some(notif_ch) = config.channel_notifications() {
+        if let Ok(ch_id) = notif_ch.parse::<u64>() {
+            let notif_embed = CreateEmbed::new()
+                .title("\u{2694}\u{fe0f} Nouveau defi !")
+                .description(format!(
+                    "**{}** defie **{}** pour **{} coins** !\n\nRendez-vous dans <#{}> pour parier !",
+                    command.user.name, target.name, mise, combat_channel
+                ))
+                .color(0xFFA500)
+                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+                .timestamp(serenity::model::Timestamp::now());
+
+            let _ = serenity::model::id::ChannelId::new(ch_id)
+                .send_message(&ctx.http, CreateMessage::new().embed(notif_embed))
+                .await;
+        }
     }
 }
 

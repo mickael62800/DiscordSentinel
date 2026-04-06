@@ -53,6 +53,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let config = load_guild_config(ctx, &guild_id).await;
+    if !crate::channel_check::check_channel(ctx, command, config.channel_activites()).await {
+        return;
+    }
     if !config.steal_enabled() {
         reply_ephemeral(ctx, command, "Le vol est desactive sur ce serveur.").await;
         return;

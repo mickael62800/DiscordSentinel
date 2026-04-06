@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use rand::Rng;
-use serenity::all::{ChannelType, CreateEmbed, CreateEmbedFooter, CreateMessage, GuildId};
+use serenity::all::{CreateEmbed, CreateEmbedFooter, CreateMessage, GuildId};
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::gateway::Ready;
@@ -175,29 +175,27 @@ async fn run_daily_chaos(ctx: &Context) {
             error!(error = %e, guild = %gid, "Erreur daily chaos log");
         }
 
-        // Trouver le premier channel texte pour poster l'annonce
-        let channels = match guild_id.channels(&ctx.http).await {
-            Ok(c) => c,
-            Err(_) => continue,
+        // Poster dans le salon annonces configure
+        let announce_channel = match config.channel_announcements() {
+            Some(id) => match id.parse::<u64>() {
+                Ok(n) => serenity::model::id::ChannelId::new(n),
+                Err(_) => continue,
+            },
+            None => continue, // Pas de salon configure → pas de chaos
         };
 
-        let text_channel = channels.values().find(|c| c.kind == ChannelType::Text);
+        let embed = CreateEmbed::new()
+            .title("\u{1f32a}\u{fe0f} LA ROUE DU DESTIN A TOURNE !")
+            .description(format!(
+                "\u{1f480} <@{}> perd **{} coins** (-20%)\n\u{1f381} <@{}> gagne **{} coins** gratuitement !\n\nLa vie est injuste. Coup de Coude aussi.",
+                victim.user_id, amount, winner.user_id, amount
+            ))
+            .color(0x9B59B6)
+            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .timestamp(serenity::model::Timestamp::now());
 
-        if let Some(channel) = text_channel {
-            let embed = CreateEmbed::new()
-                .title("\u{1f32a}\u{fe0f} LA ROUE DU DESTIN A TOURNE !")
-                .description(format!(
-                    "\u{1f480} <@{}> perd **{} coins** (-20%)\n\u{1f381} <@{}> gagne **{} coins** gratuitement !\n\nLa vie est injuste. Coup de Coude aussi.",
-                    victim.user_id, amount, winner.user_id, amount
-                ))
-                .color(0x9B59B6)
-                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
-                .timestamp(serenity::model::Timestamp::now());
-
-            let _ = channel
-                .id
-                .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                .await;
-        }
+        let _ = announce_channel
+            .send_message(&ctx.http, CreateMessage::new().embed(embed))
+            .await;
     }
 }

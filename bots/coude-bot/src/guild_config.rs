@@ -154,4 +154,18 @@ impl CoudeConfig {
         let v = BaseApiClient::config_or(&self.raw, "log_channel_id", "");
         if v.is_empty() { None } else { Some(v) }
     }
+
+    // ── Salons par groupe de commandes ──
+
+    fn channel_opt(&self, key: &str) -> Option<String> {
+        let v = BaseApiClient::config_or(&self.raw, key, "");
+        if v.is_empty() { None } else { Some(v) }
+    }
+
+    pub fn channel_combats(&self) -> Option<String> { self.channel_opt("channel_combats") }
+    pub fn channel_leaderboard(&self) -> Option<String> { self.channel_opt("channel_leaderboard") }
+    pub fn channel_profil(&self) -> Option<String> { self.channel_opt("channel_profil") }
+    pub fn channel_activites(&self) -> Option<String> { self.channel_opt("channel_activites") }
+    pub fn channel_announcements(&self) -> Option<String> { self.channel_opt("channel_announcements") }
+    pub fn channel_notifications(&self) -> Option<String> { self.channel_opt("channel_notifications") }
 }

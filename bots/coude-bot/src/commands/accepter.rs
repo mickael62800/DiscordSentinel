@@ -1,6 +1,6 @@
 use serenity::all::{
     ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CreateInteractionResponseMessage, CreateMessage,
 };
 use serenity::model::id::ChannelId;
 use tracing::error;
@@ -108,6 +108,29 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         )
         .await
         .ok();
+
+    // Notification dans le salon notifications
+    if let Some(notif_ch) = config.channel_notifications() {
+        if let Ok(ch_id) = notif_ch.parse::<u64>() {
+            let combat_channel = config.channel_combats().unwrap_or_default();
+            let notif_embed = CreateEmbed::new()
+                .title("\u{1f3b0} Paris ouverts !")
+                .description(format!(
+                    "**{}** vs **{}** pour **{} coins** !\n\n\
+                    \u{23f3} Paris ouverts pendant **{} minute(s)** !\n\
+                    Utilisez `/pari` dans <#{}> pour miser.",
+                    combat_record.attacker_name, combat_record.defender_name,
+                    combat_record.mise, delay_min, combat_channel,
+                ))
+                .color(0x57F287)
+                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+                .timestamp(serenity::model::Timestamp::now());
+
+            let _ = serenity::model::id::ChannelId::new(ch_id)
+                .send_message(&ctx.http, CreateMessage::new().embed(notif_embed))
+                .await;
+        }
+    }
 }
 
 /// Resoud le combat et met a jour la base de donnees.

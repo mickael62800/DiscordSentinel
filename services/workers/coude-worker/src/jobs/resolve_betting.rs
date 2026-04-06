@@ -178,12 +178,44 @@ async fn resolve_single(
         "UPDATE coude_players SET xp = xp + 5, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
     ).bind(&combat.guild_id).bind(&loser_id).execute(pool).await;
 
+    // Lire le salon combats configure (fallback: canal du combat)
+    let configured_channel = sqlx::query_scalar::<_, String>(
+        "SELECT config_value FROM bot_guild_configs WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_combats'"
+    )
+    .bind(&combat.guild_id)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .filter(|v| !v.is_empty());
+
+    let target_channel = configured_channel.as_deref().unwrap_or(&combat.channel_id);
+
     // Poster le resultat sur Discord
     let embed_msg = format!(
         "**Resultat du Coup de Coude !**\n\n{}\n\n<@{}> vs <@{}>\nMise : {} coins",
         result_msg, combat.attacker_id, combat.defender_id, combat.mise
     );
-    post_result_to_discord(bot_token, &combat.channel_id, combat.message_id.as_deref(), &embed_msg).await;
+    post_result_to_discord(bot_token, target_channel, combat.message_id.as_deref(), &embed_msg).await;
+
+    // Notification simplifiee dans channel_notifications
+    let notif_channel = sqlx::query_scalar::<_, String>(
+        "SELECT config_value FROM bot_guild_configs WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_notifications'"
+    )
+    .bind(&combat.guild_id)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .filter(|v| !v.is_empty());
+
+    if let Some(notif_ch) = notif_channel {
+        let notif_msg = format!(
+            "Le combat entre **{}** et **{}** est termine !\nResultat dans <#{}>",
+            combat.attacker_name, combat.defender_name, target_channel
+        );
+        post_result_to_discord(bot_token, &notif_ch, None, &notif_msg).await;
+    }
 
     info!(combat_id = %combat.id, winner = %winner_id, "Combat betting resolu par le worker");
 

@@ -1,3 +1,4 @@
+mod channel_check;
 mod commands;
 mod config;
 mod db;

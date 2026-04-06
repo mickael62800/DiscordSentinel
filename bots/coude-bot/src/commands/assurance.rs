@@ -23,6 +23,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let user_id = command.user.id.to_string();
 
     let config = load_guild_config(ctx, &guild_id).await;
+    if !crate::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+        return;
+    }
     let insurance_cost = config.insurance_cost();
 
     let data = ctx.data.read().await;

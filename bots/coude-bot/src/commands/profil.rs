@@ -27,6 +27,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let config = load_guild_config(ctx, &guild_id).await;
+    if !crate::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+        return;
+    }
     if !config.enabled() {
         reply_ephemeral(ctx, command, "Le jeu Coup de Coude est desactive sur ce serveur.").await;
         return;
