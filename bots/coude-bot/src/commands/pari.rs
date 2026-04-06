@@ -98,9 +98,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Chercher un combat pending pour le combattant (comme attaquant ou defenseur)
+    // Chercher un combat en phase de paris pour le combattant
     let combat = match db
-        .get_pending_combat_for_player(&guild_id, &target_id_str)
+        .get_betting_combat_for_player(&guild_id, &target_id_str)
         .await
     {
         Ok(Some(c)) => c,
@@ -108,7 +108,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             reply_ephemeral(
                 ctx,
                 command,
-                &format!("<@{}> n'a aucun combat en attente !", target_id),
+                &format!("<@{}> n'a aucun combat ouvert aux paris !", target_id),
             )
             .await;
             return;

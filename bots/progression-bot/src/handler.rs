@@ -191,22 +191,24 @@ impl EventHandler for Handler {
             let base_xp = 15.0;
             let final_xp = (base_xp * channel_mult * role_mult * streak_mult).round() as i64;
 
-            // Ajouter l'XP (avec multiplicateurs appliques)
+            // Ajouter l'XP texte
             match api
                 .add_xp(
                     &guild_id.to_string(),
                     &msg.author.id.to_string(),
                     &msg.author.name,
                     final_xp,
+                    "text",
                 )
                 .await
             {
                 Ok(result) => {
                     if result.leveled_up {
-                        let embed = success_embed("\u{1f389} LEVEL UP !")
+                        let level = result.user.level_text;
+                        let embed = success_embed("\u{1f4dd} LEVEL UP Texte !")
                             .description(format!(
-                                "<@{}> est maintenant **niveau {}** !",
-                                msg.author.id, result.user.level
+                                "<@{}> est maintenant **niveau {} en texte** !",
+                                msg.author.id, level
                             ))
                             .thumbnail(msg.author.face());
                         let _ = msg.channel_id.send_message(
@@ -308,14 +310,48 @@ impl EventHandler for Handler {
                             // Ajouter XP vocal (5 XP par minute)
                             let xp_amount = (seconds / 60) as i64 * 5;
                             if xp_amount > 0 {
-                                let _ = api
+                                match api
                                     .add_xp(
                                         &guild_id.to_string(),
                                         &user_id.to_string(),
                                         &username,
                                         xp_amount,
+                                        "voice",
                                     )
-                                    .await;
+                                    .await
+                                {
+                                    Ok(result) => {
+                                        if result.leveled_up {
+                                            let level = result.user.level_voice;
+                                            // Poster le level-up vocal dans le premier channel texte disponible
+                                            if let Ok(channels) = guild_id.channels(&ctx.http).await {
+                                                if let Some(ch) = channels.values().find(|c| c.kind == serenity::model::channel::ChannelType::Text) {
+                                                    let embed = success_embed("\u{1f3a4} LEVEL UP Vocal !")
+                                                        .description(format!(
+                                                            "<@{}> est maintenant **niveau {} en vocal** !",
+                                                            user_id, level
+                                                        ));
+                                                    let _ = ch.id.send_message(
+                                                        &ctx.http,
+                                                        CreateMessage::new().embed(embed),
+                                                    ).await;
+                                                }
+                                            }
+
+                                            // Attribuer le role recompense si configure
+                                            if let Some(role_id_str) = &result.reward_role_id {
+                                                if let Ok(role_id) = role_id_str.parse::<u64>() {
+                                                    if let Ok(member) = guild_id.member(&ctx.http, user_id).await {
+                                                        let _ = member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    Err(e) => {
+                                        tracing::debug!(error = %e, "Erreur ajout XP vocal");
+                                    }
+                                }
                             }
                         }
                     }

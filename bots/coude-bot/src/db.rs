@@ -768,13 +768,13 @@ impl GameDb {
 
     // ── Bets (Paris) ──
 
-    pub async fn get_pending_combat_for_player(
+    pub async fn get_betting_combat_for_player(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<Combat>, sqlx::Error> {
         sqlx::query_as::<_, Combat>(
-            "SELECT * FROM coude_combats WHERE guild_id = $1 AND (attacker_id = $2 OR defender_id = $2) AND status = 'pending' ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM coude_combats WHERE guild_id = $1 AND (attacker_id = $2 OR defender_id = $2) AND status = 'betting' ORDER BY created_at DESC LIMIT 1",
         )
         .bind(guild_id)
         .bind(user_id)
@@ -1009,6 +1009,99 @@ impl GameDb {
     ) -> Result<(), sqlx::Error> {
         self.update_player_coins(guild_id, from_id, -amount).await?;
         self.update_player_coins(guild_id, to_id, amount).await?;
+        Ok(())
+    }
+
+    /// Enregistre un vol reussi : met a jour total_stolen/total_earned pour le voleur
+    /// et total_lost pour la victime, en plus du transfert de coins.
+    pub async fn record_steal(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        victim_id: &str,
+        amount: i64,
+    ) -> Result<(), sqlx::Error> {
+        // Retirer les coins a la victime + comptabiliser total_lost
+        sqlx::query(
+            r#"
+            UPDATE coude_players
+            SET coins = GREATEST(0, coins - $3),
+                total_lost = total_lost + $3,
+                updated_at = NOW()
+            WHERE guild_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(guild_id)
+        .bind(victim_id)
+        .bind(amount)
+        .execute(&self.pool)
+        .await?;
+
+        // Ajouter les coins au voleur + comptabiliser total_stolen et total_earned
+        sqlx::query(
+            r#"
+            UPDATE coude_players
+            SET coins = coins + $3,
+                total_stolen = total_stolen + $3,
+                total_earned = total_earned + $3,
+                updated_at = NOW()
+            WHERE guild_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(guild_id)
+        .bind(thief_id)
+        .bind(amount)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Enregistre un gain (prime, bonus, etc.) : met a jour coins + total_earned.
+    pub async fn record_coins_earned(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE coude_players
+            SET coins = coins + $3,
+                total_earned = total_earned + $3,
+                updated_at = NOW()
+            WHERE guild_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(amount)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Enregistre une perte seche (vol rate, penalite, etc.) : met a jour total_lost.
+    pub async fn record_coins_lost(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            r#"
+            UPDATE coude_players
+            SET coins = GREATEST(0, coins - $3),
+                total_lost = total_lost + $3,
+                updated_at = NOW()
+            WHERE guild_id = $1 AND user_id = $2
+            "#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(amount)
+        .execute(&self.pool)
+        .await?;
         Ok(())
     }
 

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{LevelConfig, LevelReward, UserLevel};
+use crate::domain::entities::{LevelConfig, LevelReward, UserLevel, XpSource};
 use crate::domain::errors::DomainError;
 
 pub struct SaveLevelConfigCommand {
@@ -19,6 +19,7 @@ pub struct AddXpCommand {
     pub user_id: String,
     pub username: String,
     pub amount: i64,
+    pub source: XpSource,
 }
 
 pub struct AddXpResult {
@@ -26,6 +27,7 @@ pub struct AddXpResult {
     pub leveled_up: bool,
     pub old_level: i32,
     pub reward_role_id: Option<String>,
+    pub source: XpSource,
 }
 
 #[async_trait]
@@ -35,7 +37,9 @@ pub trait ManageLevelsUseCase: Send + Sync {
     async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError>;
     async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<UserLevel, DomainError>;
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
+    async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError>;
     async fn get_rewards(&self, guild_id: &str) -> Result<Vec<LevelReward>, DomainError>;
-    async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str) -> Result<LevelReward, DomainError>;
-    async fn delete_reward(&self, guild_id: &str, level: i32) -> Result<(), DomainError>;
+    async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError>;
+    async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str, source: XpSource) -> Result<LevelReward, DomainError>;
+    async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError>;
 }

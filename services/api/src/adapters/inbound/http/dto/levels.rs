@@ -35,18 +35,28 @@ pub struct AddXpDto {
     pub user_id: String,
     pub username: String,
     pub amount: i64,
+    /// "text" ou "voice" (defaut: "text")
+    #[serde(default = "default_source")]
+    pub source: String,
 }
+
+fn default_source() -> String { "text".to_string() }
 
 #[derive(Debug, Deserialize)]
 pub struct SetRewardDto {
     pub guild_id: String,
     pub level: i32,
     pub role_id: String,
+    /// "text" ou "voice" (defaut: "text")
+    #[serde(default = "default_source")]
+    pub source: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct LevelLeaderboardParams {
     pub limit: Option<i64>,
+    /// "text", "voice" ou absent (= total)
+    pub source: Option<String>,
 }
 
 // ── Response DTOs ──
@@ -73,6 +83,14 @@ pub struct UserLevelDto {
     pub level: i32,
     pub xp_current: i64,
     pub xp_needed: i64,
+    pub xp_text: i64,
+    pub level_text: i32,
+    pub xp_text_current: i64,
+    pub xp_text_needed: i64,
+    pub xp_voice: i64,
+    pub level_voice: i32,
+    pub xp_voice_current: i64,
+    pub xp_voice_needed: i64,
     pub last_xp_at: String,
 }
 
@@ -82,6 +100,7 @@ pub struct LevelRewardDto {
     pub guild_id: String,
     pub level: i32,
     pub role_id: String,
+    pub source: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -90,6 +109,7 @@ pub struct AddXpResponseDto {
     pub leveled_up: bool,
     pub old_level: i32,
     pub reward_role_id: Option<String>,
+    pub source: String,
 }
 
 // ── From impls ──
@@ -127,6 +147,8 @@ impl From<LevelConfig> for LevelConfigDto {
 impl From<UserLevel> for UserLevelDto {
     fn from(u: UserLevel) -> Self {
         let (xp_current, xp_needed) = xp_progress(u.xp);
+        let (xp_text_current, xp_text_needed) = xp_progress(u.xp_text);
+        let (xp_voice_current, xp_voice_needed) = xp_progress(u.xp_voice);
         Self {
             id: u.id.to_string(),
             guild_id: u.guild_id,
@@ -136,6 +158,14 @@ impl From<UserLevel> for UserLevelDto {
             level: u.level,
             xp_current,
             xp_needed,
+            xp_text: u.xp_text,
+            level_text: u.level_text,
+            xp_text_current,
+            xp_text_needed,
+            xp_voice: u.xp_voice,
+            level_voice: u.level_voice,
+            xp_voice_current,
+            xp_voice_needed,
             last_xp_at: u.last_xp_at.to_rfc3339(),
         }
     }
@@ -148,6 +178,7 @@ impl From<LevelReward> for LevelRewardDto {
             guild_id: r.guild_id,
             level: r.level,
             role_id: r.role_id,
+            source: r.source.as_str().to_string(),
         }
     }
 }
@@ -159,6 +190,7 @@ impl From<AddXpResult> for AddXpResponseDto {
             leveled_up: r.leveled_up,
             old_level: r.old_level,
             reward_role_id: r.reward_role_id,
+            source: r.source.as_str().to_string(),
         }
     }
 }

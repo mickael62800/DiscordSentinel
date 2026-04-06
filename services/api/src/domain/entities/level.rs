@@ -1,6 +1,29 @@
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
+/// Source d'XP : texte (messages) ou vocal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum XpSource {
+    Text,
+    Voice,
+}
+
+impl XpSource {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            XpSource::Text => "text",
+            XpSource::Voice => "voice",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "voice" => XpSource::Voice,
+            _ => XpSource::Text,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct LevelConfig {
@@ -25,6 +48,10 @@ pub struct UserLevel {
     pub username: String,
     pub xp: i64,
     pub level: i32,
+    pub xp_text: i64,
+    pub level_text: i32,
+    pub xp_voice: i64,
+    pub level_voice: i32,
     pub last_xp_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -36,6 +63,7 @@ pub struct LevelReward {
     pub guild_id: String,
     pub level: i32,
     pub role_id: String,
+    pub source: XpSource,
 }
 
 /// XP requis pour atteindre un niveau donne (progression exponentielle).

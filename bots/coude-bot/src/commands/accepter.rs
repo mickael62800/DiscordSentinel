@@ -239,7 +239,7 @@ pub async fn resolve_combat_internal(
 
             if prime_amount > 0 {
                 let _ = db
-                    .update_player_coins(&combat_record.guild_id, winner_id, prime_amount)
+                    .record_coins_earned(&combat_record.guild_id, winner_id, prime_amount)
                     .await;
             }
 

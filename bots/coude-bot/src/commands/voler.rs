@@ -163,9 +163,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         let stolen = (target_player.coins as f64 * steal_pct) as i64;
         let stolen = stolen.max(1);
 
-        // Transferer les coins
+        // Transferer les coins + comptabiliser le vol
         if let Err(e) = db
-            .transfer_coins(&guild_id, &target_id_str, &thief_id, stolen)
+            .record_steal(&guild_id, &thief_id, &target_id_str, stolen)
             .await
         {
             reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
@@ -197,12 +197,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
             .timestamp(serenity::model::Timestamp::now())
     } else {
-        // Perdre 15% de ses propres coins
+        // Perdre 15% de ses propres coins + comptabiliser la perte
         let lost = (thief.coins as f64 * 0.15) as i64;
         let lost = lost.max(1);
 
         let _ = db
-            .update_player_coins(&guild_id, &thief_id, -lost)
+            .record_coins_lost(&guild_id, &thief_id, lost)
             .await;
 
         let fail_msg = {

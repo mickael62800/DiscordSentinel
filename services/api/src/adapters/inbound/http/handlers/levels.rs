@@ -8,6 +8,7 @@ use crate::adapters::inbound::http::dto::levels::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::entities::XpSource;
 use crate::ports::inbound::manage_levels::AddXpCommand;
 
 pub async fn get_config(
@@ -33,6 +34,7 @@ pub async fn add_xp(
     let guild_id = dto.guild_id.clone();
     let user_id = dto.user_id.clone();
     let amount = dto.amount;
+    let source = XpSource::from_str(&dto.source);
 
     let result = state
         .levels_uc
@@ -41,6 +43,7 @@ pub async fn add_xp(
             user_id: dto.user_id,
             username: dto.username,
             amount: dto.amount,
+            source,
         })
         .await?;
 
@@ -50,6 +53,7 @@ pub async fn add_xp(
             "guild_id": &guild_id,
             "user_id": &user_id,
             "amount": amount,
+            "source": source.as_str(),
         }),
     );
 
@@ -70,7 +74,11 @@ pub async fn get_leaderboard(
     Query(params): Query<LevelLeaderboardParams>,
 ) -> Result<Json<Vec<UserLevelDto>>, ApiError> {
     let limit = normalize_limit(params.limit, 25, 100);
-    let levels = state.levels_uc.get_leaderboard(&guild_id, limit).await?;
+    let levels = match params.source.as_deref() {
+        Some("text") => state.levels_uc.get_leaderboard_by_source(&guild_id, XpSource::Text, limit).await?,
+        Some("voice") => state.levels_uc.get_leaderboard_by_source(&guild_id, XpSource::Voice, limit).await?,
+        _ => state.levels_uc.get_leaderboard(&guild_id, limit).await?,
+    };
     Ok(map_to_dtos(levels))
 }
 
@@ -86,9 +94,10 @@ pub async fn set_reward(
     State(state): State<AppState>,
     Json(dto): Json<SetRewardDto>,
 ) -> Result<Json<LevelRewardDto>, ApiError> {
+    let source = XpSource::from_str(&dto.source);
     let reward = state
         .levels_uc
-        .set_reward(&dto.guild_id, dto.level, &dto.role_id)
+        .set_reward(&dto.guild_id, dto.level, &dto.role_id, source)
         .await?;
     Ok(single_dto(reward))
 }
@@ -96,7 +105,14 @@ pub async fn set_reward(
 pub async fn delete_reward(
     State(state): State<AppState>,
     Path((guild_id, level)): Path<(String, i32)>,
+    Query(params): Query<DeleteRewardParams>,
 ) -> Result<Json<()>, ApiError> {
-    state.levels_uc.delete_reward(&guild_id, level).await?;
+    let source = XpSource::from_str(params.source.as_deref().unwrap_or("text"));
+    state.levels_uc.delete_reward(&guild_id, level, source).await?;
     Ok(Json(()))
+}
+
+#[derive(serde::Deserialize)]
+pub struct DeleteRewardParams {
+    pub source: Option<String>,
 }

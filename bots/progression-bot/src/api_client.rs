@@ -55,6 +55,22 @@ pub struct UserLevelResponse {
     pub xp_current: i64,
     pub xp_needed: i64,
     #[serde(default)]
+    pub xp_text: i64,
+    #[serde(default)]
+    pub level_text: i32,
+    #[serde(default)]
+    pub xp_text_current: i64,
+    #[serde(default)]
+    pub xp_text_needed: i64,
+    #[serde(default)]
+    pub xp_voice: i64,
+    #[serde(default)]
+    pub level_voice: i32,
+    #[serde(default)]
+    pub xp_voice_current: i64,
+    #[serde(default)]
+    pub xp_voice_needed: i64,
+    #[serde(default)]
     pub streak_current: Option<i32>,
     #[serde(default)]
     pub streak_best: Option<i32>,
@@ -67,6 +83,8 @@ pub struct AddXpResponse {
     pub leveled_up: bool,
     pub old_level: i32,
     pub reward_role_id: Option<String>,
+    #[serde(default)]
+    pub source: Option<String>,
 }
 
 // ── Request DTOs ──
@@ -225,12 +243,14 @@ impl ApiClient {
 
     // ── Levels / XP ──
 
+    /// Ajoute de l'XP a un utilisateur avec la source specifiee.
     pub async fn add_xp(
         &self,
         guild_id: &str,
         user_id: &str,
         username: &str,
         amount: i64,
+        source: &str,
     ) -> Result<AddXpResponse, String> {
         #[derive(Serialize)]
         struct Payload {
@@ -238,6 +258,7 @@ impl ApiClient {
             user_id: String,
             username: String,
             amount: i64,
+            source: String,
         }
 
         let req = self
@@ -249,6 +270,7 @@ impl ApiClient {
                 user_id: user_id.to_string(),
                 username: username.to_string(),
                 amount,
+                source: source.to_string(),
             });
 
         self.base
@@ -281,15 +303,21 @@ impl ApiClient {
             .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
+    /// Recupere le leaderboard des niveaux, optionnellement filtre par source.
     pub async fn get_level_leaderboard(
         &self,
         guild_id: &str,
         limit: u32,
+        source: Option<&str>,
     ) -> Result<Vec<UserLevelResponse>, String> {
-        let req = self.base.client().get(format!(
+        let mut url = format!(
             "{}/api/levels/{guild_id}/leaderboard?limit={limit}",
             self.base.base_url()
-        ));
+        );
+        if let Some(s) = source {
+            url.push_str(&format!("&source={s}"));
+        }
+        let req = self.base.client().get(url);
 
         self.base
             .auth(req)

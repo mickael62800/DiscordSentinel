@@ -68,8 +68,8 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    // Retirer la penalite
-    if let Err(e) = db.update_player_coins(&guild_id, &combat.attacker_id, -penalty).await {
+    // Retirer la penalite + comptabiliser dans total_lost
+    if let Err(e) = db.record_coins_lost(&guild_id, &combat.attacker_id, penalty).await {
         respond_ephemeral(ctx, component, &format!("Erreur penalite : {e}")).await;
         return;
     }

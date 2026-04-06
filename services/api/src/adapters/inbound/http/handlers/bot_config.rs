@@ -7,7 +7,6 @@ use crate::adapters::inbound::http::dto::bot_config::{
     BotDefinitionDto, BotGuildConfigDto, DeleteConfigDto, SetConfigDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::state::AppState;
 
 const DEFINITIONS_TTL: u64 = 3600; // 1 heure

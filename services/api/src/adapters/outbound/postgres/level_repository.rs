@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{LevelConfig, LevelReward, UserLevel};
+use crate::domain::entities::{LevelConfig, LevelReward, UserLevel, XpSource};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::LevelRepository;
 
@@ -38,6 +38,10 @@ struct UserLevelRow {
     username: String,
     xp: i64,
     level: i32,
+    xp_text: i64,
+    level_text: i32,
+    xp_voice: i64,
+    level_voice: i32,
     last_xp_at: chrono::DateTime<chrono::Utc>,
     created_at: chrono::DateTime<chrono::Utc>,
     updated_at: chrono::DateTime<chrono::Utc>,
@@ -49,6 +53,7 @@ struct LevelRewardRow {
     guild_id: String,
     level: i32,
     role_id: String,
+    source: String,
 }
 
 impl From<LevelConfigRow> for LevelConfig {
@@ -77,6 +82,10 @@ impl From<UserLevelRow> for UserLevel {
             username: r.username,
             xp: r.xp,
             level: r.level,
+            xp_text: r.xp_text,
+            level_text: r.level_text,
+            xp_voice: r.xp_voice,
+            level_voice: r.level_voice,
             last_xp_at: r.last_xp_at,
             created_at: r.created_at,
             updated_at: r.updated_at,
@@ -91,6 +100,7 @@ impl From<LevelRewardRow> for LevelReward {
             guild_id: r.guild_id,
             level: r.level,
             role_id: r.role_id,
+            source: XpSource::from_str(&r.source),
         }
     }
 }
@@ -135,7 +145,7 @@ impl LevelRepository for PgLevelRepository {
 
     async fn get_user_level(&self, guild_id: &str, user_id: &str) -> Result<Option<UserLevel>, DomainError> {
         let row = sqlx::query_as::<_, UserLevelRow>(
-            "SELECT * FROM user_levels WHERE guild_id = $1 AND user_id = $2",
+            "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id)
         .bind(user_id)
@@ -148,10 +158,11 @@ impl LevelRepository for PgLevelRepository {
 
     async fn upsert_user_level(&self, user: &UserLevel) -> Result<(), DomainError> {
         sqlx::query(
-            r#"INSERT INTO user_levels (id, guild_id, user_id, username, xp, level, last_xp_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+            r#"INSERT INTO user_levels (id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
                ON CONFLICT (guild_id, user_id) DO UPDATE SET
-                 username = $4, xp = $5, level = $6, last_xp_at = $7, updated_at = NOW()"#,
+                 username = $4, xp = $5, level = $6, xp_text = $7, level_text = $8,
+                 xp_voice = $9, level_voice = $10, last_xp_at = $11, updated_at = NOW()"#,
         )
         .bind(user.id)
         .bind(&user.guild_id)
@@ -159,6 +170,10 @@ impl LevelRepository for PgLevelRepository {
         .bind(&user.username)
         .bind(user.xp)
         .bind(user.level)
+        .bind(user.xp_text)
+        .bind(user.level_text)
+        .bind(user.xp_voice)
+        .bind(user.level_voice)
         .bind(user.last_xp_at)
         .execute(&self.pool)
         .await
@@ -169,7 +184,7 @@ impl LevelRepository for PgLevelRepository {
 
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
         let rows = sqlx::query_as::<_, UserLevelRow>(
-            "SELECT * FROM user_levels WHERE guild_id = $1 ORDER BY xp DESC LIMIT $2",
+            "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 ORDER BY xp DESC LIMIT $2",
         )
         .bind(guild_id)
         .bind(limit)
@@ -180,9 +195,28 @@ impl LevelRepository for PgLevelRepository {
         Ok(rows.into_iter().map(UserLevel::from).collect())
     }
 
+    async fn get_leaderboard_by_source(&self, guild_id: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+        let order_col = match source {
+            XpSource::Text => "xp_text",
+            XpSource::Voice => "xp_voice",
+        };
+        let query = format!(
+            "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 ORDER BY {} DESC LIMIT $2",
+            order_col
+        );
+        let rows = sqlx::query_as::<_, UserLevelRow>(&query)
+            .bind(guild_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(UserLevel::from).collect())
+    }
+
     async fn get_rewards(&self, guild_id: &str) -> Result<Vec<LevelReward>, DomainError> {
         let rows = sqlx::query_as::<_, LevelRewardRow>(
-            "SELECT * FROM level_rewards WHERE guild_id = $1 ORDER BY level ASC",
+            "SELECT id, guild_id, level, role_id, source FROM level_rewards WHERE guild_id = $1 ORDER BY source, level ASC",
         )
         .bind(guild_id)
         .fetch_all(&self.pool)
@@ -192,16 +226,30 @@ impl LevelRepository for PgLevelRepository {
         Ok(rows.into_iter().map(LevelReward::from).collect())
     }
 
+    async fn get_rewards_by_source(&self, guild_id: &str, source: XpSource) -> Result<Vec<LevelReward>, DomainError> {
+        let rows = sqlx::query_as::<_, LevelRewardRow>(
+            "SELECT id, guild_id, level, role_id, source FROM level_rewards WHERE guild_id = $1 AND source = $2 ORDER BY level ASC",
+        )
+        .bind(guild_id)
+        .bind(source.as_str())
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(LevelReward::from).collect())
+    }
+
     async fn upsert_reward(&self, reward: &LevelReward) -> Result<(), DomainError> {
         sqlx::query(
-            r#"INSERT INTO level_rewards (id, guild_id, level, role_id)
-               VALUES ($1, $2, $3, $4)
-               ON CONFLICT (guild_id, level) DO UPDATE SET role_id = $4"#,
+            r#"INSERT INTO level_rewards (id, guild_id, level, role_id, source)
+               VALUES ($1, $2, $3, $4, $5)
+               ON CONFLICT (guild_id, level, source) DO UPDATE SET role_id = $4"#,
         )
         .bind(reward.id)
         .bind(&reward.guild_id)
         .bind(reward.level)
         .bind(&reward.role_id)
+        .bind(reward.source.as_str())
         .execute(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
@@ -209,10 +257,11 @@ impl LevelRepository for PgLevelRepository {
         Ok(())
     }
 
-    async fn delete_reward(&self, guild_id: &str, level: i32) -> Result<(), DomainError> {
-        sqlx::query("DELETE FROM level_rewards WHERE guild_id = $1 AND level = $2")
+    async fn delete_reward(&self, guild_id: &str, level: i32, source: XpSource) -> Result<(), DomainError> {
+        sqlx::query("DELETE FROM level_rewards WHERE guild_id = $1 AND level = $2 AND source = $3")
             .bind(guild_id)
             .bind(level)
+            .bind(source.as_str())
             .execute(&self.pool)
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?;

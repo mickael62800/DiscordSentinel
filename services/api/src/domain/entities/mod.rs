@@ -34,7 +34,7 @@ pub use role_panel::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
 pub use dashboard_stats::DashboardStats;
 pub use guild::Guild;
 pub use infraction::Infraction;
-pub use level::{xp_progress, level_from_xp, LevelConfig, LevelReward, UserLevel};
+pub use level::{xp_progress, xp_for_level, level_from_xp, LevelConfig, LevelReward, UserLevel, XpSource};
 pub use log_entry::LogEntry;
 pub use message_analysis::MessageAnalysis;
 pub use moderation_action::{ModerationAction, UserModerationHistory};

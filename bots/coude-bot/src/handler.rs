@@ -152,9 +152,9 @@ async fn run_daily_chaos(ctx: &Context) {
             continue;
         }
 
-        // Transferer
+        // Transferer + comptabiliser (total_lost pour la victime, total_earned pour le gagnant)
         if let Err(e) = db
-            .transfer_coins(&gid, &victim.user_id, &winner.user_id, amount)
+            .record_steal(&gid, &winner.user_id, &victim.user_id, amount)
             .await
         {
             error!(error = %e, guild = %gid, "Erreur daily chaos transfer");
