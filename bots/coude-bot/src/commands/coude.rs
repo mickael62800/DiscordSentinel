@@ -2,6 +2,7 @@ use serenity::all::{
     ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateEmbed,
     CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateMessage,
 };
 
 use crate::game::progression;
@@ -358,6 +359,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
         .ok();
+
+    // Notifier le defenseur par DM
+    let channel_id = command.channel_id;
+    if let Ok(dm_channel) = target.create_dm_channel(&ctx.http).await {
+        let dm_embed = CreateEmbed::new()
+            .title("\u{1f44a} Tu as ete defie !")
+            .description(format!(
+                "**{}** t'a defie en Coup de Coude pour **{} coins** !\n\n\
+                Rends-toi dans <#{}> pour accepter ou refuser le defi.",
+                command.user.name, mise, channel_id
+            ))
+            .color(0xFFA500)
+            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .timestamp(serenity::model::Timestamp::now());
+
+        let _ = dm_channel.send_message(
+            &ctx.http,
+            CreateMessage::new().embed(dm_embed),
+        ).await;
+    }
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
