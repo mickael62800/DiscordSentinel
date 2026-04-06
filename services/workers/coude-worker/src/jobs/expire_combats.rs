@@ -16,17 +16,22 @@ struct ExpiredCombat {
     pub mise: i64,
 }
 
-/// Expire les combats en attente depuis plus de 24 heures.
+/// Expire les combats en attente dont la duree configuree est depassee.
 /// - Le defenseur perd 20% de la mise
 /// - Le compteur de lachete du defenseur est incremente
 /// - La mise de l'attaquant est remboursee (pas de penalite)
 /// - Les paris sur ce combat sont rembourses
 pub async fn run(pool: &PgPool) -> Result<(), String> {
+    // Lire la duree d'expiration par guild (defaut 24h = 86400s)
+    // On utilise le min de toutes les guilds pour la requete globale,
+    // puis on verifie individuellement par guild
     let combats = sqlx::query_as::<_, ExpiredCombat>(
         r#"
-        SELECT id, guild_id, channel_id, attacker_id, attacker_name, defender_id, defender_name, mise
-        FROM coude_combats
-        WHERE status = 'pending' AND created_at < NOW() - INTERVAL '24 hours'
+        SELECT c.id, c.guild_id, c.channel_id, c.attacker_id, c.attacker_name, c.defender_id, c.defender_name, c.mise
+        FROM coude_combats c
+        LEFT JOIN bot_guild_configs cfg ON cfg.guild_id = c.guild_id AND cfg.bot_name = 'coude' AND cfg.config_key = 'combat_expire_secs'
+        WHERE c.status = 'pending'
+          AND c.created_at < NOW() - MAKE_INTERVAL(secs := COALESCE(cfg.config_value::int, 86400))
         "#,
     )
     .fetch_all(pool)

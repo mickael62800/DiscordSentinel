@@ -55,19 +55,24 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    // Verifier l'expiration (24 heures)
+    // Charger la config
+    drop(data);
+    let config = load_guild_config(ctx, &combat_record.guild_id).await;
+
+    // Verifier l'expiration (configurable, defaut 24h)
+    let expire_secs = config.combat_expire_secs() as i64;
     let elapsed = chrono::Utc::now()
         .signed_duration_since(combat_record.created_at)
         .num_seconds();
-    if elapsed > 86400 {
+    if elapsed > expire_secs {
+        let data = ctx.data.read().await;
+        let db = data.get::<GameDbKey>().unwrap();
         let _ = db.expire_combat(combat_id).await;
-        reply_ephemeral(ctx, component, "Ce defi a expire ! (24h)").await;
+        let expire_label = if expire_secs >= 3600 { format!("{}h", expire_secs / 3600) } else { format!("{}min", expire_secs / 60) };
+        reply_ephemeral(ctx, component, &format!("Ce defi a expire ! ({})", expire_label)).await;
         return;
     }
 
-    // Charger la config pour le delai
-    drop(data);
-    let config = load_guild_config(ctx, &combat_record.guild_id).await;
     let delay_min = config.bet_delay_secs() / 60;
 
     // Passer le combat en phase "betting" avec le message_id

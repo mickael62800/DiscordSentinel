@@ -61,6 +61,11 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "casino_max_bet", 500) as i64
     }
 
+    /// Duree d'expiration d'un defi en secondes (defaut: 86400 = 24h).
+    pub fn combat_expire_secs(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "combat_expire_secs", 86400)
+    }
+
     /// Cooldown entre chaque /casino en secondes (defaut: 300 = 5 min).
     pub fn casino_cooldown_secs(&self) -> i64 {
         BaseApiClient::config_u64(&self.raw, "casino_cooldown_secs", 300) as i64
