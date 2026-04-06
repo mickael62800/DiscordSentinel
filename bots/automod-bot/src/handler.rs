@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use dashmap::{DashMap, DashSet};
+use dashmap::DashMap;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
@@ -20,11 +20,11 @@ use crate::detectors::{self, DetectorConfig};
 
 use sentinel_shared::embeds::{warn_embed, moderate_embed, danger_embed, critical_embed};
 
-/// Deduplication des messages deja traites
+/// Deduplication des messages deja traites (avec timestamp pour cleanup)
 pub struct ProcessedMessagesKey;
 
 impl TypeMapKey for ProcessedMessagesKey {
-    type Value = Arc<DashSet<MessageId>>;
+    type Value = Arc<DashMap<MessageId, Instant>>;
 }
 
 /// Flood tracker : (channel_id, user_id) -> liste de timestamps
@@ -66,14 +66,14 @@ impl EventHandler for Handler {
         {
             let data = ctx.data.read().await;
             if let Some(processed) = data.get::<ProcessedMessagesKey>() {
-                if !processed.insert(msg.id) {
+                let now = Instant::now();
+                if processed.contains_key(&msg.id) {
                     return;
                 }
-                if processed.len() > 1000 {
-                    let to_remove: Vec<_> = processed.iter().take(500).map(|e| *e).collect();
-                    for id in to_remove {
-                        processed.remove(&id);
-                    }
+                processed.insert(msg.id, now);
+                // Cleanup : supprimer les entrees > 5 minutes
+                if processed.len() > 2000 {
+                    processed.retain(|_, ts| now.duration_since(*ts).as_secs() < 300);
                 }
             }
         }
@@ -185,7 +185,14 @@ impl EventHandler for Handler {
                 let timestamps = entry.value_mut();
                 timestamps.retain(|t| now.duration_since(*t).as_secs() < flood_window_secs);
                 timestamps.push(now);
-                timestamps.len() >= flood_max_messages
+                let flood = timestamps.len() >= flood_max_messages;
+                // Cleanup periodique : supprimer les utilisateurs inactifs > 10 min
+                if tracker.len() > 5000 {
+                    tracker.retain(|_, ts| {
+                        !ts.is_empty() && now.duration_since(*ts.last().unwrap()).as_secs() < 600
+                    });
+                }
+                flood
             } else {
                 false
             }
@@ -309,6 +316,16 @@ impl EventHandler for Handler {
             }
         }
     }
+}
+
+/// Sanitise le contenu utilisateur pour l'affichage dans les embeds Discord.
+/// Empeche l'injection de markdown, mentions, spoilers, etc.
+fn sanitize_embed_content(content: &str, max_len: usize) -> String {
+    let truncated: String = content.chars().take(max_len).collect();
+    truncated
+        .replace("```", "` ` `")
+        .replace("||", "| |")
+        .replace('@', "@\u{200b}") // zero-width space pour bloquer les mentions
 }
 
 /// Construit la config des detecteurs depuis la guild config.
@@ -448,19 +465,24 @@ async fn send_to_backend(
             }
         }
         Err(e) => {
-            warn!(error = %e, "Backend injoignable — action locale par defaut");
-            if request.flags.phishing {
-                let embed = moderate_embed("🗑\u{fe0f} Message supprime")
-                    .color(colors.delete)
-                    .field("📝 Raison", "Lien suspect detecte.", false)
-                    .thumbnail(msg.author.face());
-                let builder = serenity::builder::CreateMessage::new().embed(embed);
-                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
-                let _ = msg.delete(&ctx.http).await;
+            error!(error = %e, "Backend injoignable — action locale par defaut");
+            // En mode fallback, supprimer les messages flagges (phishing, insulte, spam, lien)
+            let reason = if request.flags.phishing {
+                Some("Lien suspect detecte.")
             } else if request.flags.insult {
-                let embed = moderate_embed("🗑\u{fe0f} Message supprime")
+                Some("Langage inapproprie.")
+            } else if request.flags.spam {
+                Some("Spam detecte.")
+            } else if request.flags.link {
+                Some("Lien non autorise.")
+            } else {
+                None
+            };
+
+            if let Some(reason_text) = reason {
+                let embed = moderate_embed("🗑\u{fe0f} Message supprime (mode hors-ligne)")
                     .color(colors.delete)
-                    .field("📝 Raison", "Langage inapproprie.", false)
+                    .field("📝 Raison", reason_text, false)
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
                 let _ = msg.channel_id.send_message(&ctx.http, builder).await;
@@ -493,11 +515,7 @@ async fn execute_action(
             info!(user = %msg.author.name, "Avertissement envoye");
         }
         Action::Delete => {
-            let content_preview = if msg.content.len() > 200 {
-                format!("{}...", &msg.content[..200])
-            } else {
-                msg.content.clone()
-            };
+            let content_preview = sanitize_embed_content(&msg.content, 200);
             let embed = moderate_embed("🗑\u{fe0f} Message supprime")
                 .color(colors.delete)
                 .field("📝 Raison", reason_text, false)
@@ -583,11 +601,7 @@ async fn send_discord_log(
         detections.join(" | ")
     };
 
-    let content_preview = if msg.content.len() > 300 {
-        format!("{}...", &msg.content[..300])
-    } else {
-        msg.content.clone()
-    };
+    let content_preview = sanitize_embed_content(&msg.content, 300);
 
     let embed = serenity::builder::CreateEmbed::new()
         .author(serenity::builder::CreateEmbedAuthor::new(

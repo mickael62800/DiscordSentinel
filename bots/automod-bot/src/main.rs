@@ -7,7 +7,7 @@ mod handler;
 
 use std::sync::Arc;
 
-use dashmap::{DashMap, DashSet};
+use dashmap::DashMap;
 use serenity::prelude::*;
 use tracing::info;
 
@@ -47,7 +47,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
-        data.insert::<ProcessedMessagesKey>(Arc::new(DashSet::new()));
+        data.insert::<ProcessedMessagesKey>(Arc::new(DashMap::new()));
         data.insert::<FloodTrackerKey>(Arc::new(DashMap::new()));
         data.insert::<SlowmodeTrackerKey>(SlowmodeTracker::new(30));
     }

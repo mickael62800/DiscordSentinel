@@ -34,12 +34,18 @@ pub struct AnalyzeResponseDto {
 
 impl From<AnalyzeRequestDto> for AnalyzeMessageCommand {
     fn from(dto: AnalyzeRequestDto) -> Self {
+        // Tronquer le contenu a 2500 chars (Discord = 2000 + marge)
+        let content = if dto.content.len() > 2500 {
+            dto.content.chars().take(2500).collect()
+        } else {
+            dto.content
+        };
         Self {
             guild_id: dto.guild_id,
             channel_id: dto.channel_id,
             user_id: dto.user_id,
             username: dto.username,
-            content: dto.content,
+            content,
             flags: dto.flags,
             message_id: dto.metadata.message_id,
             timestamp: dto.metadata.timestamp,
