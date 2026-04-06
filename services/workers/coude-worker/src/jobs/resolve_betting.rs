@@ -5,6 +5,7 @@ use uuid::Uuid;
 
 /// Combat en phase de paris dont le delai est depasse.
 #[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)]
 struct BettingCombat {
     pub id: Uuid,
     pub guild_id: String,
@@ -20,6 +21,7 @@ struct BettingCombat {
 }
 
 #[derive(Debug, sqlx::FromRow)]
+#[allow(dead_code)]
 struct PlayerStats {
     pub user_id: String,
     pub coins: i64,

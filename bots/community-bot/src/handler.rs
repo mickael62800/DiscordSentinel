@@ -15,7 +15,7 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{neutral_embed, success_embed};
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
-use crate::api_client::{ApiClient, SyncRole};
+use crate::api_client::ApiClient;
 use crate::commands;
 use crate::exclusive_groups;
 use crate::prerequisites;
@@ -295,44 +295,3 @@ pub async fn send_role_panel(
     channel_id.send_message(&ctx.http, message).await
 }
 
-/// Synchronise les roles Discord de toutes les guilds vers l'API backend.
-async fn sync_all_guild_roles(ctx: &Context) {
-    let data = ctx.data.read().await;
-    let api = match data.get::<RolesApiKey>() {
-        Some(a) => a,
-        None => return,
-    };
-
-    let guilds = ctx.cache.guilds();
-    for guild_id in guilds {
-        let roles = match guild_id.roles(&ctx.http).await {
-            Ok(r) => r,
-            Err(e) => {
-                warn!(error = %e, guild = %guild_id, "Erreur recuperation roles Discord");
-                continue;
-            }
-        };
-
-        let sync_roles: Vec<SyncRole> = roles
-            .values()
-            .map(|r| SyncRole {
-                id: r.id.to_string(),
-                name: r.name.clone(),
-                color: r.colour.0 as i32,
-                position: r.position as i32,
-                permissions: r.permissions.bits().to_string(),
-                mentionable: r.mentionable,
-                managed: r.managed,
-                icon: r.icon.as_ref().map(|i| i.to_string()),
-                member_count: 0, // Discord ne fournit pas ce chiffre via l'API roles
-            })
-            .collect();
-
-        let count = sync_roles.len();
-        if let Err(e) = api.sync_discord_roles(&guild_id.to_string(), sync_roles).await {
-            warn!(error = %e, guild = %guild_id, "Erreur sync roles vers API");
-        } else {
-            info!(guild = %guild_id, roles = count, "Roles Discord synchronises");
-        }
-    }
-}
