@@ -30,10 +30,9 @@ impl MessageCache {
 
     /// Stocke un message dans le cache.
     pub fn store(&self, guild_id: GuildId, message_id: MessageId, cached: CachedMessage) {
-        let mut count = self.counts.entry(guild_id).or_insert(0);
-
-        // Eviction si on depasse la limite : supprimer les plus anciens
-        if *count >= self.max_per_guild {
+        // Eviction si on depasse la limite (verifier AVANT de prendre le lock counts)
+        let current_count = self.counts.get(&guild_id).map(|c| *c).unwrap_or(0);
+        if current_count >= self.max_per_guild {
             let to_remove: Vec<(GuildId, MessageId)> = self
                 .cache
                 .iter()
@@ -45,11 +44,30 @@ impl MessageCache {
             for key in &to_remove {
                 self.cache.remove(key);
             }
-            *count -= to_remove.len();
+            if let Some(mut count) = self.counts.get_mut(&guild_id) {
+                *count = count.saturating_sub(to_remove.len());
+            }
         }
 
         self.cache.insert((guild_id, message_id), cached);
+        let mut count = self.counts.entry(guild_id).or_insert(0);
         *count += 1;
+
+        // Garde de securite globale : empecher le cache de depasser 2x la limite
+        if *count > self.max_per_guild * 2 {
+            let excess = *count - self.max_per_guild;
+            let to_remove: Vec<(GuildId, MessageId)> = self
+                .cache
+                .iter()
+                .filter(|e| e.key().0 == guild_id)
+                .take(excess)
+                .map(|e| *e.key())
+                .collect();
+            for key in &to_remove {
+                self.cache.remove(key);
+            }
+            *count = count.saturating_sub(to_remove.len());
+        }
     }
 
     /// Recupere un message du cache.

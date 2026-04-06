@@ -77,7 +77,16 @@ async fn main() {
         let http_for_report = Arc::clone(&client.http);
         let api_for_report = Arc::clone(&api);
         tokio::spawn(async move {
-            let mut last_report_week: Option<u8> = None;
+            // Si on demarre un lundi apres 8h, marquer le rapport comme deja envoye
+            // pour eviter un doublon au restart
+            let mut last_report_week: Option<u8> = {
+                let now = time::OffsetDateTime::now_utc();
+                if now.weekday() == time::Weekday::Monday && now.hour() >= 8 {
+                    Some(now.iso_week())
+                } else {
+                    None
+                }
+            };
 
             loop {
                 tokio::time::sleep(tokio::time::Duration::from_secs(3600)).await;

@@ -30,8 +30,8 @@ pub async fn handle_delete(
 
     let (log_msg, details) = match &cached {
         Some(c) => {
-            let preview = if c.content.len() > 100 {
-                format!("{}...", &c.content[..100])
+            let preview = if c.content.chars().count() > 100 {
+                format!("{}...", c.content.chars().take(100).collect::<String>())
             } else {
                 c.content.clone()
             };

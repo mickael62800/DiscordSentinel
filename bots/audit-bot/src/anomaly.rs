@@ -55,6 +55,10 @@ impl AnomalyDetector {
 
         // Nettoyer hors fenetre
         timestamps.retain(|t| now.duration_since(*t) < self.window);
+        // Securite : limiter la taille du vecteur
+        if timestamps.len() > 500 {
+            timestamps.drain(0..timestamps.len() - 100);
+        }
         timestamps.push(now);
 
         let count = timestamps.len();

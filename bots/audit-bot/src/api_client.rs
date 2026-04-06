@@ -123,11 +123,17 @@ impl ApiClient {
             .post(format!("{}/api/audit-logs", self.base.base_url()))
             .json(event);
 
-        self.base
+        let resp = self.base
             .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("API error {}: {}", status, body));
+        }
 
         Ok(())
     }
