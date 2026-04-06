@@ -122,14 +122,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Tirage
+    // Tirage sur 10000 pour precision 0.01%
     let roll: u32 = {
         let mut rng = rand::thread_rng();
-        rng.gen_range(1..=100)
+        rng.gen_range(1..=10000)
     };
 
-    let (title, description, gain, color, is_faillite) = if roll <= 2 {
-        // 2% faillite_totale
+    // 0.5% faillite = 50/10000
+    // 69.49% perdu = 6949/10000
+    // 25% x2 = 2500/10000
+    // 5% x5 = 500/10000
+    // 0.01% x10 = 1/10000
+    let (title, description, gain, color, is_faillite) = if roll <= 50 {
+        // 0.5% faillite totale
         (
             "\u{1f4a3} FAILLITE TOTALE !",
             format!(
@@ -140,8 +145,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             0xED4245u32,
             true,
         )
-    } else if roll <= 2 + 50 {
-        // 50% lose all bet
+    } else if roll <= 50 + 6949 {
+        // 69.49% perdu
         (
             "\u{1f3b0} Perdu !",
             format!(
@@ -152,8 +157,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             0xED4245,
             false,
         )
-    } else if roll <= 2 + 50 + 25 {
-        // 25% win x2
+    } else if roll <= 50 + 6949 + 2500 {
+        // 25% x2
         let win = mise * 2;
         (
             "\u{1f389} x2 !",
@@ -161,12 +166,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 "<@{}> remporte **{} coins** ! (x2)\n\n\u{2728} Bien joue !",
                 command.user.id, win
             ),
-            win - mise, // net gain
+            win - mise,
             0xF1C40F,
             false,
         )
-    } else if roll <= 2 + 50 + 25 + 15 {
-        // 15% win x5
+    } else if roll <= 50 + 6949 + 2500 + 500 {
+        // 5% x5
         let win = mise.saturating_mul(5);
         (
             "\u{1f525} x5 !",
@@ -179,7 +184,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             false,
         )
     } else {
-        // 8% jackpot x10
+        // 0.01% jackpot x10
         let win = mise.saturating_mul(10);
         (
             "\u{1f451} JACKPOT x10 !!!",
