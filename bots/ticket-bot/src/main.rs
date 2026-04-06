@@ -87,6 +87,9 @@ async fn check_escalations(
         None => return,
     };
 
+    // Nettoyer les tickets orphelins > 48h
+    sla_tracker.cleanup_stale();
+
     let api_client = ApiClient::new(api.clone());
     let tickets = match api_client.list_tickets().await {
         Ok(t) => t,

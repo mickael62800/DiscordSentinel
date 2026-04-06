@@ -85,6 +85,16 @@ impl SlaTracker {
     pub fn is_escalated(&self, ticket_id: &str) -> bool {
         self.escalated.contains_key(ticket_id)
     }
+
+    /// Supprime les entrees de tickets crees il y a plus de 48h (tickets oublies/orphelins).
+    pub fn cleanup_stale(&self) {
+        let now = Instant::now();
+        let max_age = Duration::from_secs(48 * 3600);
+        self.created.retain(|_, ts| now.duration_since(*ts) < max_age);
+        // Nettoyer aussi les first_response et escalated orphelins
+        self.first_response.retain(|id, _| self.created.contains_key(id));
+        self.escalated.retain(|id, _| self.created.contains_key(id));
+    }
 }
 
 /// Formate une duree en texte lisible.
