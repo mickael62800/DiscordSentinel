@@ -391,6 +391,22 @@ pub struct UserLevel {
     pub level: i32,
     pub xp_current: i64,
     pub xp_needed: i64,
+    #[serde(default)]
+    pub xp_text: i64,
+    #[serde(default)]
+    pub level_text: i32,
+    #[serde(default)]
+    pub xp_text_current: i64,
+    #[serde(default)]
+    pub xp_text_needed: i64,
+    #[serde(default)]
+    pub xp_voice: i64,
+    #[serde(default)]
+    pub level_voice: i32,
+    #[serde(default)]
+    pub xp_voice_current: i64,
+    #[serde(default)]
+    pub xp_voice_needed: i64,
     pub last_xp_at: String,
 }
 
@@ -400,7 +416,11 @@ pub struct LevelReward {
     pub guild_id: String,
     pub level: i32,
     pub role_id: String,
+    #[serde(default = "default_reward_source")]
+    pub source: String,
 }
+
+fn default_reward_source() -> String { "text".to_string() }
 
 // ── Audit Logs ──
 

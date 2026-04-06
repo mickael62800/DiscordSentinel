@@ -386,6 +386,14 @@ export interface UserLevel {
   level: number;
   xp_current: number;
   xp_needed: number;
+  xp_text: number;
+  level_text: number;
+  xp_text_current: number;
+  xp_text_needed: number;
+  xp_voice: number;
+  level_voice: number;
+  xp_voice_current: number;
+  xp_voice_needed: number;
   last_xp_at: string;
 }
 
@@ -394,6 +402,7 @@ export interface LevelReward {
   guild_id: string;
   level: number;
   role_id: string;
+  source: string;
 }
 
 // ── Audit Logs ──

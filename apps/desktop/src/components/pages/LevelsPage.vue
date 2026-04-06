@@ -1,20 +1,58 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useLevels } from "../../composables/useLevels";
 import ErrorState from "../atoms/ErrorState.vue";
-import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import type { UserLevel } from "../../types";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 
 const { config, leaderboard, rewards, loading, error, fetchAll } = useLevels();
 useRealtimeRefresh(["level_up", "xp_update"], fetchAll);
 
-function progressPercent(user: UserLevel): number {
-  if (user.xp_needed <= 0) return 0;
-  return Math.min(100, Math.round((user.xp_current / user.xp_needed) * 100));
+type ViewMode = "global" | "text" | "voice";
+const viewMode = ref<ViewMode>("global");
+
+function progressPercent(current: number, needed: number): number {
+  if (needed <= 0) return 0;
+  return Math.min(100, Math.round((current / needed) * 100));
 }
 
-function rewardForLevel(level: number): string | null {
-  const r = rewards.value.find((rw) => rw.level === level);
+function userLevel(user: UserLevel): number {
+  if (viewMode.value === "text") return user.level_text;
+  if (viewMode.value === "voice") return user.level_voice;
+  return user.level;
+}
+
+function userXp(user: UserLevel): number {
+  if (viewMode.value === "text") return user.xp_text;
+  if (viewMode.value === "voice") return user.xp_voice;
+  return user.xp;
+}
+
+function userCurrent(user: UserLevel): number {
+  if (viewMode.value === "text") return user.xp_text_current;
+  if (viewMode.value === "voice") return user.xp_voice_current;
+  return user.xp_current;
+}
+
+function userNeeded(user: UserLevel): number {
+  if (viewMode.value === "text") return user.xp_text_needed;
+  if (viewMode.value === "voice") return user.xp_voice_needed;
+  return user.xp_needed;
+}
+
+function sortedLeaderboard(): UserLevel[] {
+  return [...leaderboard.value].sort((a, b) => userXp(b) - userXp(a));
+}
+
+function rewardForLevel(level: number, source: string): string | null {
+  const r = rewards.value.find((rw) => rw.level === level && rw.source === source);
   return r ? r.role_id : null;
+}
+
+function hasReward(user: UserLevel): boolean {
+  if (viewMode.value === "text") return !!rewardForLevel(user.level_text, "text");
+  if (viewMode.value === "voice") return !!rewardForLevel(user.level_voice, "voice");
+  return !!rewardForLevel(user.level_text, "text") || !!rewardForLevel(user.level_voice, "voice");
 }
 </script>
 
@@ -56,10 +94,23 @@ function rewardForLevel(level: number): string | null {
         </div>
       </div>
 
+      <!-- View mode tabs -->
+      <div class="view-tabs">
+        <button :class="['tab', { active: viewMode === 'global' }]" @click="viewMode = 'global'">
+          Global
+        </button>
+        <button :class="['tab tab-text', { active: viewMode === 'text' }]" @click="viewMode = 'text'">
+          Texte
+        </button>
+        <button :class="['tab tab-voice', { active: viewMode === 'voice' }]" @click="viewMode = 'voice'">
+          Vocal
+        </button>
+      </div>
+
       <!-- Leaderboard -->
       <div class="leaderboard">
         <div
-          v-for="(user, index) in leaderboard"
+          v-for="(user, index) in sortedLeaderboard()"
           :key="user.id"
           :class="['user-row', { 'top-3': index < 3 }]"
         >
@@ -70,19 +121,24 @@ function rewardForLevel(level: number): string | null {
           <div class="user-info">
             <div class="user-header">
               <span class="user-name">{{ user.username }}</span>
-              <span class="user-level">Niv. {{ user.level }}</span>
-              <span v-if="rewardForLevel(user.level)" class="reward-badge">Role</span>
+              <span class="user-level">Niv. {{ userLevel(user) }}</span>
+              <span v-if="hasReward(user)" class="reward-badge">Role</span>
             </div>
             <div class="progress-container">
               <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: progressPercent(user) + '%' }"></div>
+                <div class="progress-fill" :style="{ width: progressPercent(userCurrent(user), userNeeded(user)) + '%' }"></div>
               </div>
-              <span class="progress-text">{{ user.xp_current }} / {{ user.xp_needed }} XP</span>
+              <span class="progress-text">{{ userCurrent(user) }} / {{ userNeeded(user) }} XP</span>
+            </div>
+            <!-- Mini stats texte/vocal en mode global -->
+            <div v-if="viewMode === 'global'" class="mini-stats">
+              <span class="mini-stat text">Texte Niv.{{ user.level_text }}</span>
+              <span class="mini-stat voice">Vocal Niv.{{ user.level_voice }}</span>
             </div>
           </div>
           <div class="user-xp">
-            <span class="xp-total">{{ user.xp.toLocaleString() }}</span>
-            <span class="xp-label">XP total</span>
+            <span class="xp-total">{{ userXp(user).toLocaleString() }}</span>
+            <span class="xp-label">XP {{ viewMode === 'text' ? 'texte' : viewMode === 'voice' ? 'vocal' : 'total' }}</span>
           </div>
         </div>
 
@@ -103,7 +159,7 @@ function rewardForLevel(level: number): string | null {
 .config-bar {
   display: flex;
   gap: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
 }
 
@@ -134,6 +190,45 @@ function rewardForLevel(level: number): string | null {
 
 .text-success { color: var(--success); }
 .text-danger { color: var(--danger); }
+
+/* View tabs */
+.view-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tab {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tab:hover {
+  background: var(--bg-hover);
+}
+
+.tab.active {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.tab-text.active {
+  background: #3498DB;
+  border-color: #3498DB;
+}
+
+.tab-voice.active {
+  background: #E91E63;
+  border-color: #E91E63;
+}
 
 /* Leaderboard */
 .leaderboard {
@@ -249,6 +344,30 @@ function rewardForLevel(level: number): string | null {
   white-space: nowrap;
   min-width: 100px;
   text-align: right;
+}
+
+/* Mini stats for global view */
+.mini-stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.mini-stat {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+.mini-stat.text {
+  color: #3498DB;
+  background: rgba(52, 152, 219, 0.1);
+}
+
+.mini-stat.voice {
+  color: #E91E63;
+  background: rgba(233, 30, 99, 0.1);
 }
 
 .user-xp {
