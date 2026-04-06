@@ -44,7 +44,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let sub = &command.data.options[0];
+    let sub = match command.data.options.first() {
+        Some(s) => s,
+        None => { respond(ctx, command, "Aucune sous-commande fournie.").await; return; }
+    };
 
     match sub.name.as_str() {
         "deploy" => handle_deploy(ctx, command, &guild_id.to_string()).await,

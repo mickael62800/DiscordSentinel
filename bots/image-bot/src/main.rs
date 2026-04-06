@@ -8,7 +8,7 @@ mod image_hash;
 
 use std::sync::Arc;
 
-use dashmap::DashSet;
+use dashmap::DashMap;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
@@ -54,7 +54,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
-        data.insert::<ProcessedMessagesKey>(Arc::new(DashSet::new()));
+        data.insert::<ProcessedMessagesKey>(Arc::new(DashMap::new()));
         data.insert::<MaxImageSizeKey>(config.max_image_size);
         data.insert::<HashCacheKey>(ImageHashCache::new(300));
         data.insert::<QueueSenderKey>(queue);

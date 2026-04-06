@@ -25,6 +25,11 @@ impl ImageHashCache {
 
     /// Retourne l'action cached si pas expiree.
     pub fn get_cached(&self, hash: u64) -> Option<String> {
+        // Nettoyage periodique quand le cache depasse 5000 entrees
+        if self.cache.len() > 5000 {
+            self.cleanup_expired();
+        }
+
         let entry = self.cache.get(&hash)?;
         let (action, stored_at) = entry.value();
         if Instant::now().duration_since(*stored_at) < self.ttl {
@@ -34,6 +39,14 @@ impl ImageHashCache {
             self.cache.remove(&hash);
             None
         }
+    }
+
+    /// Supprime toutes les entrees dont le TTL est expire.
+    pub fn cleanup_expired(&self) {
+        let ttl = self.ttl;
+        self.cache.retain(|_, (_, stored_at)| {
+            Instant::now().duration_since(*stored_at) < ttl
+        });
     }
 
     /// Stocke le resultat d'une analyse.

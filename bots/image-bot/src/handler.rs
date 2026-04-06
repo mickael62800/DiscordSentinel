@@ -1,6 +1,7 @@
 use std::sync::Arc;
+use std::time::Instant;
 
-use dashmap::DashSet;
+use dashmap::DashMap;
 use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
@@ -24,8 +25,8 @@ use crate::image_hash::{self, ImageHashCache};
 
 /// Taille max du cache de deduplication avant nettoyage.
 const DEDUP_CACHE_LIMIT: usize = 1000;
-/// Nombre d'entrees a supprimer lors d'un nettoyage du cache dedup.
-const DEDUP_CLEANUP_SIZE: usize = 500;
+/// Duree de vie des entrees dedup en secondes.
+const DEDUP_TTL_SECS: u64 = 300;
 /// Taille max par defaut d'une image (10 Mo).
 pub const DEFAULT_MAX_IMAGE_SIZE: u64 = 10 * 1024 * 1024;
 /// Duree de mute par defaut en secondes (10 minutes).
@@ -37,7 +38,7 @@ const ANIMATED_GIF_MIN_SIZE: usize = 100_000;
 
 pub struct ProcessedMessagesKey;
 impl TypeMapKey for ProcessedMessagesKey {
-    type Value = Arc<DashSet<MessageId>>;
+    type Value = Arc<DashMap<MessageId, Instant>>;
 }
 
 pub struct MaxImageSizeKey;
@@ -101,15 +102,13 @@ impl EventHandler for Handler {
         {
             let data = ctx.data.read().await;
             if let Some(processed) = data.get::<ProcessedMessagesKey>() {
-                if !processed.insert(msg.id) {
+                if processed.contains_key(&msg.id) {
                     return;
                 }
-                // Nettoyage periodique
+                processed.insert(msg.id, Instant::now());
+                // Nettoyage periodique : supprimer les entrees > TTL
                 if processed.len() > DEDUP_CACHE_LIMIT {
-                    let to_remove: Vec<_> = processed.iter().take(DEDUP_CLEANUP_SIZE).map(|e| *e).collect();
-                    for id in to_remove {
-                        processed.remove(&id);
-                    }
+                    processed.retain(|_, ts| ts.elapsed().as_secs() < DEDUP_TTL_SECS);
                 }
             }
         }
@@ -133,8 +132,24 @@ impl EventHandler for Handler {
             "Image(s) detectee(s)"
         );
 
+        // Lire la taille max configuree
+        let max_size = {
+            let data = ctx.data.read().await;
+            data.get::<MaxImageSizeKey>().copied().unwrap_or(DEFAULT_MAX_IMAGE_SIZE)
+        };
+
         // Traiter chaque image du message
         for attachment in &image_attachments {
+            // Verifier la taille avant telechargement
+            if attachment.size as u64 > max_size {
+                warn!(
+                    size = attachment.size,
+                    max = max_size,
+                    filename = %attachment.filename,
+                    "Image trop volumineuse, ignoree avant telechargement"
+                );
+                continue;
+            }
             process_image_attachment(&ctx, &msg, &attachment.url, &attachment.filename, &guild_id)
                 .await;
         }
