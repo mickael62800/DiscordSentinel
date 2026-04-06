@@ -129,10 +129,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     // 0.5% faillite = 50/10000
-    // 69.49% perdu = 6949/10000
+    // 69.4% perdu = 6940/10000
     // 25% x2 = 2500/10000
     // 5% x5 = 500/10000
-    // 0.01% x10 = 1/10000
+    // 0.1% x10 = 10/10000
     let (title, description, gain, color, is_faillite) = if roll <= 50 {
         // 0.5% faillite totale
         (
@@ -145,8 +145,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             0xED4245u32,
             true,
         )
-    } else if roll <= 50 + 6949 {
-        // 69.49% perdu
+    } else if roll <= 50 + 6940 {
+        // 69.4% perdu
         (
             "\u{1f3b0} Perdu !",
             format!(
@@ -157,7 +157,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             0xED4245,
             false,
         )
-    } else if roll <= 50 + 6949 + 2500 {
+    } else if roll <= 50 + 6940 + 2500 {
         // 25% x2
         let win = mise * 2;
         (
@@ -170,7 +170,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             0xF1C40F,
             false,
         )
-    } else if roll <= 50 + 6949 + 2500 + 500 {
+    } else if roll <= 50 + 6940 + 2500 + 500 {
         // 5% x5
         let win = mise.saturating_mul(5);
         (
@@ -184,7 +184,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             false,
         )
     } else {
-        // 0.01% jackpot x10
+        // 0.1% jackpot x10
         let win = mise.saturating_mul(10);
         (
             "\u{1f451} JACKPOT x10 !!!",
