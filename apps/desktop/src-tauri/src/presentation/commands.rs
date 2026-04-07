@@ -359,6 +359,9 @@ pub async fn ai_get_datasets(
     let resp = reqwest::Client::new()
         .get(format!("{}/api/ai/datasets", base))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    if !resp.status().is_success() {
+        return Ok(serde_json::json!({"datasets": [], "error": "Endpoints IA non disponibles"}));
+    }
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
@@ -382,6 +385,9 @@ pub async fn ai_upload_dataset(
         .post(format!("{}/api/ai/datasets/{}/upload", base, model_type))
         .multipart(form)
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Erreur upload: {}", resp.status()));
+    }
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
@@ -405,6 +411,9 @@ pub async fn ai_start_training(
             "validation_split": validation_split,
         }))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Erreur training: {}", resp.status()));
+    }
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
@@ -416,6 +425,9 @@ pub async fn ai_training_status(
     let resp = reqwest::Client::new()
         .get(format!("{}/api/ai/training/status", base))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    if !resp.status().is_success() {
+        return Ok(serde_json::json!({"status": "unavailable"}));
+    }
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
@@ -427,6 +439,9 @@ pub async fn ai_stop_training(
     let resp = reqwest::Client::new()
         .post(format!("{}/api/ai/training/stop", base))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Erreur stop: {}", resp.status()));
+    }
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
@@ -439,5 +454,8 @@ pub async fn ai_export_onnx(
     let resp = reqwest::Client::new()
         .post(format!("{}/api/ai/export/{}", base, model_type))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("Erreur export: {}", resp.status()));
+    }
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
