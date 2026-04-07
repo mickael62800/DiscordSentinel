@@ -88,9 +88,18 @@ async function fetchDatasets() {
   loading.value = true;
   error.value = null;
   try {
-    datasets.value = await invoke<DatasetInfo[]>("ai_get_datasets");
+    const result = await invoke<DatasetInfo[] | { datasets?: DatasetInfo[]; error?: string }>("ai_get_datasets");
+    if (Array.isArray(result)) {
+      datasets.value = result;
+    } else if (result && Array.isArray(result.datasets)) {
+      datasets.value = result.datasets;
+      if (result.error) error.value = result.error;
+    } else {
+      datasets.value = [];
+    }
   } catch (e) {
     error.value = String(e);
+    datasets.value = [];
   } finally {
     loading.value = false;
   }
@@ -147,19 +156,26 @@ async function startTraining(config: TrainingConfig) {
 async function pollStatus() {
   try {
     pollCount++;
-    const result = await invoke<TrainingStatus>("ai_training_status");
+    const result = await invoke<TrainingStatus | { status: string }>("ai_training_status");
 
-    if (!result.running && !hasSeenRunning && pollCount <= 3) {
+    // Si l'API IA n'est pas disponible, ignorer silencieusement
+    if (!result || (result as { status: string }).status === "unavailable") {
       return;
     }
 
-    status.value = result;
+    const trainingResult = result as TrainingStatus;
 
-    if (result.epoch_history && result.epoch_history.length > 0) {
-      epochHistory.value = result.epoch_history;
+    if (!trainingResult.running && !hasSeenRunning && pollCount <= 3) {
+      return;
     }
 
-    if (result.running) {
+    status.value = trainingResult;
+
+    if (trainingResult.epoch_history && trainingResult.epoch_history.length > 0) {
+      epochHistory.value = trainingResult.epoch_history;
+    }
+
+    if (trainingResult.running) {
       hasSeenRunning = true;
     }
 
@@ -217,13 +233,17 @@ async function exportOnnx(modelType: ModelType) {
 /// Appele quand on arrive sur la page pour recuperer l'etat reel.
 async function syncWithBackend() {
   try {
-    const result = await invoke<TrainingStatus>("ai_training_status");
-    status.value = result;
-    if (result.epoch_history && result.epoch_history.length > 0) {
-      epochHistory.value = result.epoch_history;
+    const result = await invoke<TrainingStatus | { status: string }>("ai_training_status");
+    if (!result || (result as { status: string }).status === "unavailable") {
+      return;
+    }
+    const trainingResult = result as TrainingStatus;
+    status.value = trainingResult;
+    if (trainingResult.epoch_history && trainingResult.epoch_history.length > 0) {
+      epochHistory.value = trainingResult.epoch_history;
     }
     // Si un training est en cours cote backend, relancer le polling
-    if (result.running && !pollTimer) {
+    if (trainingResult.running && !pollTimer) {
       hasSeenRunning = true;
       startPolling();
     }
