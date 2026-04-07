@@ -102,6 +102,9 @@ tauri_passthrough!(get_auto_roles, RolePanelsService, get_auto_roles -> Vec<Auto
 
 // Discord Roles
 tauri_passthrough!(get_discord_roles, DiscordRolesService, get_discord_roles -> Vec<DiscordRole>, guild_id: String);
+tauri_passthrough!(create_discord_role, DiscordRolesService, create_role -> serde_json::Value, guild_id: String, name: String, color: u32, permissions: Option<String>);
+tauri_passthrough!(edit_discord_role, DiscordRolesService, edit_role -> serde_json::Value, guild_id: String, role_id: String, name: Option<String>, color: Option<u32>, permissions: Option<String>, mentionable: Option<bool>);
+tauri_passthrough!(delete_discord_role, DiscordRolesService, delete_role -> (), guild_id: String, role_id: String);
 
 // Dashboard Charts
 tauri_passthrough!(get_activity_trend, DashboardChartsService, get_activity_trend -> Vec<DailyActivity>, guild_id: Option<String>, days: Option<i32>);

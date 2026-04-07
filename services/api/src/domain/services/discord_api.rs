@@ -206,6 +206,107 @@ impl DiscordApiService {
         Ok(())
     }
 
+    // ── Gestion des roles ──
+
+    /// Creer un role Discord.
+    pub async fn create_role(
+        &self,
+        guild_id: &str,
+        name: &str,
+        color: u32,
+        permissions: Option<&str>,
+    ) -> Result<serde_json::Value, DomainError> {
+        self.ensure_configured()?;
+        let url = format!("https://discord.com/api/v10/guilds/{}/roles", guild_id);
+
+        let mut body = serde_json::json!({
+            "name": name,
+            "color": color,
+            "mentionable": false,
+        });
+        if let Some(perms) = permissions {
+            body["permissions"] = serde_json::Value::String(perms.to_string());
+        }
+
+        let resp = self.client
+            .post(&url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!("Discord create_role failed: {body}")));
+        }
+
+        resp.json::<serde_json::Value>()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Parse error: {e}")))
+    }
+
+    /// Modifier un role Discord.
+    pub async fn edit_role(
+        &self,
+        guild_id: &str,
+        role_id: &str,
+        name: Option<&str>,
+        color: Option<u32>,
+        permissions: Option<&str>,
+        mentionable: Option<bool>,
+    ) -> Result<serde_json::Value, DomainError> {
+        self.ensure_configured()?;
+        let url = format!("https://discord.com/api/v10/guilds/{}/roles/{}", guild_id, role_id);
+
+        let mut body = serde_json::json!({});
+        if let Some(n) = name { body["name"] = serde_json::Value::String(n.to_string()); }
+        if let Some(c) = color { body["color"] = serde_json::json!(c); }
+        if let Some(p) = permissions { body["permissions"] = serde_json::Value::String(p.to_string()); }
+        if let Some(m) = mentionable { body["mentionable"] = serde_json::json!(m); }
+
+        let resp = self.client
+            .patch(&url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!("Discord edit_role failed: {body}")));
+        }
+
+        resp.json::<serde_json::Value>()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Parse error: {e}")))
+    }
+
+    /// Supprimer un role Discord.
+    pub async fn delete_role(
+        &self,
+        guild_id: &str,
+        role_id: &str,
+    ) -> Result<(), DomainError> {
+        self.ensure_configured()?;
+        let url = format!("https://discord.com/api/v10/guilds/{}/roles/{}", guild_id, role_id);
+
+        let resp = self.client
+            .delete(&url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        if !resp.status().is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!("Discord delete_role failed: {body}")));
+        }
+
+        Ok(())
+    }
+
     /// Debannir un utilisateur d'un serveur Discord.
     pub async fn unban_user(
         &self,

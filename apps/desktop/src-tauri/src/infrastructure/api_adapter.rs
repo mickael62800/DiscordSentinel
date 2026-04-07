@@ -396,6 +396,27 @@ impl DiscordRolesRepository for ApiAdapter {
     fn get_discord_roles(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<DiscordRole>, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/discord-roles/{}", self.base_url(), guild_id)))
     }
+
+    fn create_discord_role(&self, guild_id: String, name: String, color: u32, permissions: Option<String>) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, String>> + Send>> {
+        self.get_json(self.client.post(format!("{}/api/discord-roles/{}/create", self.base_url(), guild_id)).json(&serde_json::json!({
+            "name": name,
+            "color": color,
+            "permissions": permissions,
+        })))
+    }
+
+    fn edit_discord_role(&self, guild_id: String, role_id: String, name: Option<String>, color: Option<u32>, permissions: Option<String>, mentionable: Option<bool>) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, String>> + Send>> {
+        self.get_json(self.client.patch(format!("{}/api/discord-roles/{}/{}", self.base_url(), guild_id, role_id)).json(&serde_json::json!({
+            "name": name,
+            "color": color,
+            "permissions": permissions,
+            "mentionable": mentionable,
+        })))
+    }
+
+    fn delete_discord_role(&self, guild_id: String, role_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.delete(format!("{}/api/discord-roles/{}/{}", self.base_url(), guild_id, role_id)))
+    }
 }
 
 impl MembersRepository for ApiAdapter {

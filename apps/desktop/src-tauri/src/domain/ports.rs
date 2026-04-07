@@ -108,6 +108,9 @@ pub trait WatchedUsersRepository: Send + Sync + 'static {
 
 pub trait DiscordRolesRepository: Send + Sync + 'static {
     fn get_discord_roles(&self, guild_id: String) -> BoxFut<Vec<DiscordRole>>;
+    fn create_discord_role(&self, guild_id: String, name: String, color: u32, permissions: Option<String>) -> BoxFut<serde_json::Value>;
+    fn edit_discord_role(&self, guild_id: String, role_id: String, name: Option<String>, color: Option<u32>, permissions: Option<String>, mentionable: Option<bool>) -> BoxFut<serde_json::Value>;
+    fn delete_discord_role(&self, guild_id: String, role_id: String) -> BoxFut<()>;
 }
 
 pub trait MembersRepository: Send + Sync + 'static {

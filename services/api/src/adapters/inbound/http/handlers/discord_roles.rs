@@ -67,6 +67,54 @@ pub async fn list_roles(
     Ok(map_to_dtos(roles))
 }
 
+/// POST /api/discord-roles/{guild_id}/create — Creer un role Discord
+pub async fn create_role(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(body): Json<CreateRoleRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let result = state.discord_api
+        .create_role(&guild_id, &body.name, body.color, body.permissions.as_deref())
+        .await?;
+    Ok(Json(result))
+}
+
+/// PATCH /api/discord-roles/{guild_id}/{role_id} — Modifier un role Discord
+pub async fn edit_role(
+    State(state): State<AppState>,
+    Path((guild_id, role_id)): Path<(String, String)>,
+    Json(body): Json<EditRoleRequest>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let result = state.discord_api
+        .edit_role(&guild_id, &role_id, body.name.as_deref(), body.color, body.permissions.as_deref(), body.mentionable)
+        .await?;
+    Ok(Json(result))
+}
+
+/// DELETE /api/discord-roles/{guild_id}/{role_id} — Supprimer un role Discord
+pub async fn delete_role(
+    State(state): State<AppState>,
+    Path((guild_id, role_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    state.discord_api.delete_role(&guild_id, &role_id).await?;
+    Ok(Json(serde_json::json!({ "deleted": true })))
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct CreateRoleRequest {
+    pub name: String,
+    pub color: u32,
+    pub permissions: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub struct EditRoleRequest {
+    pub name: Option<String>,
+    pub color: Option<u32>,
+    pub permissions: Option<String>,
+    pub mentionable: Option<bool>,
+}
+
 /// POST /api/discord-roles/{guild_id}/sync — Synchronise les roles (appele par le bot)
 pub async fn sync_roles(
     State(state): State<AppState>,
