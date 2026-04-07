@@ -73,18 +73,20 @@ pub async fn handle_voice_state_update(
     let channel_changed = old_channel != new_channel;
 
     if channel_changed {
+        let user_label = {
+            let name = user_id.to_user(&ctx.http).await
+                .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
+            format!("{} (`{}`)", name, user_id)
+        };
+
         // Session card : membre rejoint un nouveau salon
         if let Some(channel_id) = new_channel {
-            let user_name = user_id.to_user(&ctx.http).await
-                .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
-            embeds::session_member_joined(ctx, channel_id, &user_name).await;
+            embeds::session_member_joined(ctx, channel_id, &user_label).await;
         }
 
         // Session card : membre quitte un salon
         if let Some(old_channel_id) = old_channel {
-            let user_name = user_id.to_user(&ctx.http).await
-                .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
-            embeds::session_member_left(ctx, old_channel_id, &user_name, "?").await;
+            embeds::session_member_left(ctx, old_channel_id, &user_label, "?").await;
         }
     }
 
@@ -342,9 +344,12 @@ async fn create_temp_channel(
     }
 
     // Creer la carte de session dans le salon de logs
-    let creator_name = user_id.to_user(&ctx.http).await
-        .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
-    embeds::create_session_card(ctx, voice_channel_id, &creator_name, kind).await;
+    let creator_label = {
+        let name = user_id.to_user(&ctx.http).await
+            .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
+        format!("{} (`{}`)", name, user_id)
+    };
+    embeds::create_session_card(ctx, voice_channel_id, &creator_label, kind).await;
 }
 
 pub async fn send_control_panel(
