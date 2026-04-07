@@ -405,6 +405,28 @@ impl EventHandler for Handler {
             }
         }
     }
+
+    /// Nouveau membre — attribuer le role par defaut.
+    async fn guild_member_addition(&self, ctx: Context, new_member: serenity::model::guild::Member) {
+        let guild_id = new_member.guild_id;
+
+        let data = ctx.data.read().await;
+        let default_role_id = if let Some(base) = data.get::<ApiClientKey>() {
+            let config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let role_str = BaseApiClient::config_or(&config, "default_role_id", "");
+            if role_str.is_empty() { None } else { role_str.parse::<u64>().ok() }
+        } else {
+            None
+        };
+        drop(data);
+
+        if let Some(role_id) = default_role_id {
+            match new_member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await {
+                Ok(_) => info!(guild=%guild_id, user=%new_member.user.id, role=%role_id, "Role par defaut attribue au nouveau membre"),
+                Err(e) => warn!(guild=%guild_id, user=%new_member.user.id, error=%e, "Echec attribution role par defaut"),
+            }
+        }
+    }
 }
 
 /// Verifie TOUS les rewards (texte, vocal, jours) et attribue les roles manquants.
@@ -486,22 +508,61 @@ async fn check_and_assign_all_roles(
         return;
     }
 
-    // Verifier chaque reward et attribuer les roles manquants
-    for reward in &rewards {
-        let threshold = reward.level;
-        let qualifies = match reward.source.as_str() {
-            "text" => effective_text >= threshold,
-            "voice" => effective_voice >= threshold,
-            "days" => days_since_join >= threshold as i64,
-            _ => false,
+    // Grouper les rewards par source pour trouver le plus haut role qualifie par categorie
+    // et retirer les roles inferieurs
+    let sources = ["text", "voice", "days"];
+
+    for source in &sources {
+        // Tous les rewards de cette source, tries par level decroissant
+        let mut source_rewards: Vec<&crate::api_client::RewardEntry> = rewards
+            .iter()
+            .filter(|r| r.source == *source)
+            .collect();
+        source_rewards.sort_by(|a, b| b.level.cmp(&a.level));
+
+        let effective_level = match *source {
+            "text" => effective_text,
+            "voice" => effective_voice,
+            "days" => days_since_join as i32,
+            _ => 0,
         };
 
-        if qualifies {
-            if let Ok(role_id) = reward.role_id.parse::<u64>() {
-                if !member_roles.contains(&role_id) {
-                    match member.add_role(&ctx.http, serenity::model::id::RoleId::new(role_id)).await {
-                        Ok(_) => info!(guild=%guild_id, user=%user_id, role=%role_id, source=%reward.source, "Role attribue automatiquement"),
-                        Err(e) => warn!(guild=%guild_id, user=%user_id, role=%role_id, error=%e, "Echec attribution role"),
+        // Trouver le plus haut role qualifie
+        let best_reward = source_rewards.iter().find(|r| effective_level >= r.level);
+
+        // Tous les role_ids de cette source (pour savoir lesquels retirer)
+        let all_source_role_ids: Vec<u64> = source_rewards
+            .iter()
+            .filter_map(|r| r.role_id.parse::<u64>().ok())
+            .collect();
+
+        match best_reward {
+            Some(reward) => {
+                if let Ok(best_role_id) = reward.role_id.parse::<u64>() {
+                    // Ajouter le meilleur role si pas deja present
+                    if !member_roles.contains(&best_role_id) {
+                        match member.add_role(&ctx.http, serenity::model::id::RoleId::new(best_role_id)).await {
+                            Ok(_) => info!(guild=%guild_id, user=%user_id, role=%best_role_id, source=%source, "Role attribue"),
+                            Err(e) => warn!(guild=%guild_id, user=%user_id, role=%best_role_id, error=%e, "Echec attribution role"),
+                        }
+                    }
+
+                    // Retirer tous les autres roles de cette source
+                    for role_id in &all_source_role_ids {
+                        if *role_id != best_role_id && member_roles.contains(role_id) {
+                            match member.remove_role(&ctx.http, serenity::model::id::RoleId::new(*role_id)).await {
+                                Ok(_) => info!(guild=%guild_id, user=%user_id, role=%role_id, source=%source, "Ancien role retire"),
+                                Err(e) => warn!(guild=%guild_id, user=%user_id, role=%role_id, error=%e, "Echec retrait ancien role"),
+                            }
+                        }
+                    }
+                }
+            }
+            None => {
+                // Pas qualifie pour aucun role de cette source — retirer tous les roles de cette source
+                for role_id in &all_source_role_ids {
+                    if member_roles.contains(role_id) {
+                        let _ = member.remove_role(&ctx.http, serenity::model::id::RoleId::new(*role_id)).await;
                     }
                 }
             }
