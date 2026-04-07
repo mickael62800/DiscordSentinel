@@ -294,7 +294,13 @@ impl EventHandler for Handler {
         }
 
         let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
-        send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id, &colors).await;
+
+        // Spawn en background pour ne pas bloquer le bot
+        let ctx_clone = ctx.clone();
+        let msg_clone = msg.clone();
+        tokio::spawn(async move {
+            send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors).await;
+        });
     }
 
     async fn ready(&self, ctx: Context, ready: Ready) {
