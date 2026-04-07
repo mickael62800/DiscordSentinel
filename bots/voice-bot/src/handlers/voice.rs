@@ -67,22 +67,24 @@ pub async fn handle_voice_state_update(
         }
     };
 
-    // Session card : membre rejoint un salon vocal
-    if let Some(channel_id) = new.channel_id {
-        let user_name = user_id.to_user(&ctx.http).await
-            .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
-        embeds::session_member_joined(ctx, channel_id, &user_name).await;
-    }
+    // Determiner si c'est un vrai join/leave/move (pas un mute/unmute/camera)
+    let old_channel = old.as_ref().and_then(|s| s.channel_id);
+    let new_channel = new.channel_id;
+    let channel_changed = old_channel != new_channel;
 
-    // Session card : membre quitte un salon vocal
-    if let Some(ref old_state) = old {
-        if let Some(old_channel_id) = old_state.channel_id {
-            if new.channel_id.is_none() || new.channel_id != Some(old_channel_id) {
-                let user_name = user_id.to_user(&ctx.http).await
-                    .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
-                // Calculer la duree approximative (on n'a pas le join time precis ici)
-                embeds::session_member_left(ctx, old_channel_id, &user_name, "?").await;
-            }
+    if channel_changed {
+        // Session card : membre rejoint un nouveau salon
+        if let Some(channel_id) = new_channel {
+            let user_name = user_id.to_user(&ctx.http).await
+                .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
+            embeds::session_member_joined(ctx, channel_id, &user_name).await;
+        }
+
+        // Session card : membre quitte un salon
+        if let Some(old_channel_id) = old_channel {
+            let user_name = user_id.to_user(&ctx.http).await
+                .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
+            embeds::session_member_left(ctx, old_channel_id, &user_name, "?").await;
         }
     }
 
