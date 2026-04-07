@@ -34,7 +34,10 @@ async fn main() {
     info!(api_url = %config.base().api_base_url, "Demarrage de l'automod bot");
 
     // Intents necessaires : lire les messages dans les guilds
-    let intents = GatewayIntents::GUILDS | GatewayIntents::GUILD_MESSAGES | GatewayIntents::MESSAGE_CONTENT;
+    let intents = GatewayIntents::GUILDS
+        | GatewayIntents::GUILD_MEMBERS
+        | GatewayIntents::GUILD_MESSAGES
+        | GatewayIntents::MESSAGE_CONTENT;
 
     let base_api = Arc::new(BaseApiClient::new(&config, "automod-bot"));
 

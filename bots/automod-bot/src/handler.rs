@@ -291,6 +291,13 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Automod bot connecte");
+
+        // Definir le statut en ligne
+        ctx.set_presence(
+            Some(serenity::gateway::ActivityData::watching("les messages")),
+            serenity::model::user::OnlineStatus::Online,
+        );
+
         register_guilds(&ctx, &ready).await;
 
         if let Err(e) = serenity::model::application::Command::set_global_commands(
@@ -548,8 +555,13 @@ async fn execute_action(
                     .unwrap()
                     .as_secs() as i64
                     + mute_duration_secs as i64;
-                let datetime = time::OffsetDateTime::from_unix_timestamp(secs)
-                    .expect("timestamp invalide");
+                let datetime = match time::OffsetDateTime::from_unix_timestamp(secs) {
+                    Ok(dt) => dt,
+                    Err(e) => {
+                        error!(error = %e, "Timestamp invalide pour le mute");
+                        return Ok(());
+                    }
+                };
                 let timeout = serenity::model::Timestamp::from(datetime);
                 member
                     .disable_communication_until_datetime(&ctx.http, timeout)
