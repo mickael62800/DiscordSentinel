@@ -271,9 +271,8 @@ impl EventHandler for Handler {
         // 4. Analyse locale (spam, insulte, lien, phishing, unicode)
         let flags = detectors::analyze(content, &detector_config);
 
-        if !flags.spam && !flags.insult && !flags.link && !flags.phishing {
-            return;
-        }
+        // Toujours envoyer a l'API pour l'analyse IA (meme sans flags locaux)
+        // L'IA detecte la rage, menaces, harcelement que les regex ne voient pas
 
         info!(
             guild_id = ?msg.guild_id,
