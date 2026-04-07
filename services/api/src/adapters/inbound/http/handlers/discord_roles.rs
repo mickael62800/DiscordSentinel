@@ -86,7 +86,7 @@ pub async fn edit_role(
     Json(body): Json<EditRoleRequest>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let result = state.discord_api
-        .edit_role(&guild_id, &role_id, body.name.as_deref(), body.color, body.permissions.as_deref(), body.mentionable)
+        .edit_role(&guild_id, &role_id, body.name.as_deref(), body.color, body.permissions.as_deref(), body.mentionable, body.hoist)
         .await?;
     Ok(Json(result))
 }
@@ -113,6 +113,7 @@ pub struct EditRoleRequest {
     pub color: Option<u32>,
     pub permissions: Option<String>,
     pub mentionable: Option<bool>,
+    pub hoist: Option<bool>,
 }
 
 /// POST /api/discord-roles/{guild_id}/sync — Synchronise les roles (appele par le bot)

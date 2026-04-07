@@ -17,8 +17,8 @@ impl DiscordRolesService {
         self.repo.create_discord_role(guild_id, name, color, permissions).await
     }
 
-    pub async fn edit_role(&self, guild_id: String, role_id: String, name: Option<String>, color: Option<u32>, permissions: Option<String>, mentionable: Option<bool>) -> Result<serde_json::Value, String> {
-        self.repo.edit_discord_role(guild_id, role_id, name, color, permissions, mentionable).await
+    pub async fn edit_role(&self, guild_id: String, role_id: String, name: Option<String>, color: Option<u32>, permissions: Option<String>, mentionable: Option<bool>, hoist: Option<bool>) -> Result<serde_json::Value, String> {
+        self.repo.edit_discord_role(guild_id, role_id, name, color, permissions, mentionable, hoist).await
     }
 
     pub async fn delete_role(&self, guild_id: String, role_id: String) -> Result<(), String> {

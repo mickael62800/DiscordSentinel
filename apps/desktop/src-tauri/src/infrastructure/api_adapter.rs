@@ -405,12 +405,13 @@ impl DiscordRolesRepository for ApiAdapter {
         })))
     }
 
-    fn edit_discord_role(&self, guild_id: String, role_id: String, name: Option<String>, color: Option<u32>, permissions: Option<String>, mentionable: Option<bool>) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, String>> + Send>> {
+    fn edit_discord_role(&self, guild_id: String, role_id: String, name: Option<String>, color: Option<u32>, permissions: Option<String>, mentionable: Option<bool>, hoist: Option<bool>) -> Pin<Box<dyn Future<Output = Result<serde_json::Value, String>> + Send>> {
         self.get_json(self.client.patch(format!("{}/api/discord-roles/{}/{}", self.base_url(), guild_id, role_id)).json(&serde_json::json!({
             "name": name,
             "color": color,
             "permissions": permissions,
             "mentionable": mentionable,
+            "hoist": hoist,
         })))
     }
 

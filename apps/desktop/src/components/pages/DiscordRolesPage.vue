@@ -54,13 +54,51 @@ const editingRole = ref<string | null>(null);
 const editName = ref("");
 const editColor = ref("#000000");
 const editMentionable = ref(false);
+const editHoist = ref(false);
+const editPerms = ref<Record<string, boolean>>({});
 const saving = ref(false);
 
-function startEdit(role: { id: string; name: string; color: number; mentionable: boolean }) {
+const PERMISSION_FLAGS: { key: string; label: string; bit: bigint }[] = [
+  { key: "admin", label: "Administrateur", bit: 0x8n },
+  { key: "manage_guild", label: "Gerer le serveur", bit: 0x20n },
+  { key: "manage_roles", label: "Gerer les roles", bit: 0x10000000n },
+  { key: "manage_channels", label: "Gerer les salons", bit: 0x10n },
+  { key: "kick", label: "Expulser", bit: 0x2n },
+  { key: "ban", label: "Bannir", bit: 0x4n },
+  { key: "moderate_members", label: "Moderer les membres", bit: 0x10000000000n },
+  { key: "manage_messages", label: "Gerer les messages", bit: 0x2000n },
+  { key: "mention_everyone", label: "Mentionner @everyone", bit: 0x20000n },
+  { key: "send_messages", label: "Envoyer des messages", bit: 0x800n },
+  { key: "connect", label: "Se connecter (vocal)", bit: 0x100000n },
+  { key: "speak", label: "Parler (vocal)", bit: 0x200000n },
+  { key: "mute_members", label: "Muter des membres", bit: 0x400000n },
+  { key: "move_members", label: "Deplacer des membres", bit: 0x1000000n },
+];
+
+function parsePerms(permsStr: string): Record<string, boolean> {
+  const bits = BigInt(permsStr);
+  const result: Record<string, boolean> = {};
+  for (const flag of PERMISSION_FLAGS) {
+    result[flag.key] = (bits & flag.bit) !== 0n;
+  }
+  return result;
+}
+
+function buildPermsString(perms: Record<string, boolean>): string {
+  let bits = 0n;
+  for (const flag of PERMISSION_FLAGS) {
+    if (perms[flag.key]) bits |= flag.bit;
+  }
+  return bits.toString();
+}
+
+function startEdit(role: { id: string; name: string; color: number; mentionable: boolean; permissions: string }) {
   editingRole.value = role.id;
   editName.value = role.name;
   editColor.value = `#${role.color.toString(16).padStart(6, "0")}`;
   editMentionable.value = role.mentionable;
+  editHoist.value = false; // Discord API ne retourne pas hoist dans notre sync, on laisse a false
+  editPerms.value = parsePerms(role.permissions);
 }
 
 function cancelEdit() {
@@ -72,13 +110,15 @@ async function saveEdit() {
   saving.value = true;
   try {
     const colorInt = parseInt(editColor.value.replace("#", ""), 16);
+    const permsStr = buildPermsString(editPerms.value);
     await invoke("edit_discord_role", {
       guildId: selectedGuildId.value,
       roleId: editingRole.value,
       name: editName.value.trim() || null,
       color: colorInt,
-      permissions: null,
+      permissions: permsStr,
       mentionable: editMentionable.value,
+      hoist: editHoist.value,
     });
     editingRole.value = null;
     await fetchRoles();
@@ -198,12 +238,34 @@ function formatPermissions(perms: string): string {
 
         <!-- Mode edition -->
         <div v-if="editingRole === role.id" class="edit-form">
-          <div class="edit-row">
-            <input v-model="editName" type="text" class="edit-input" placeholder="Nom" />
-            <input v-model="editColor" type="color" class="color-picker" />
-            <label class="edit-check">
-              <input v-model="editMentionable" type="checkbox" /> Mentionnable
-            </label>
+          <div class="edit-section">
+            <span class="edit-section-title">General</span>
+            <div class="edit-row">
+              <input v-model="editName" type="text" class="edit-input" placeholder="Nom" />
+              <input v-model="editColor" type="color" class="color-picker" />
+            </div>
+            <div class="edit-toggles">
+              <label class="edit-check">
+                <input v-model="editMentionable" type="checkbox" /> Mentionnable
+              </label>
+              <label class="edit-check">
+                <input v-model="editHoist" type="checkbox" /> Affiche separement
+              </label>
+            </div>
+          </div>
+          <div class="edit-section">
+            <span class="edit-section-title">Permissions</span>
+            <div class="perms-grid">
+              <label
+                v-for="flag in PERMISSION_FLAGS"
+                :key="flag.key"
+                class="perm-check"
+                :class="{ active: editPerms[flag.key] }"
+              >
+                <input v-model="editPerms[flag.key]" type="checkbox" />
+                {{ flag.label }}
+              </label>
+            </div>
           </div>
           <div class="edit-actions">
             <button class="btn-cancel-sm" @click="cancelEdit">Annuler</button>
@@ -439,4 +501,28 @@ function formatPermissions(perms: string): string {
   padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
 }
 .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Edit sections */
+.edit-section { margin-bottom: 12px; }
+.edit-section-title {
+  font-size: 11px; font-weight: 600; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;
+}
+.edit-toggles { display: flex; gap: 16px; margin-top: 8px; }
+
+/* Permissions grid */
+.perms-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+}
+.perm-check {
+  font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;
+  cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.15s;
+  border: 1px solid transparent;
+}
+.perm-check:hover { background: var(--bg-hover); }
+.perm-check.active {
+  color: var(--accent); background: rgba(88, 101, 242, 0.08);
+  border-color: rgba(88, 101, 242, 0.2);
+}
+.perm-check input[type="checkbox"] { accent-color: var(--accent); }
 </style>

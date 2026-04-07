@@ -255,6 +255,7 @@ impl DiscordApiService {
         color: Option<u32>,
         permissions: Option<&str>,
         mentionable: Option<bool>,
+        hoist: Option<bool>,
     ) -> Result<serde_json::Value, DomainError> {
         self.ensure_configured()?;
         let url = format!("https://discord.com/api/v10/guilds/{}/roles/{}", guild_id, role_id);
@@ -264,6 +265,7 @@ impl DiscordApiService {
         if let Some(c) = color { body["color"] = serde_json::json!(c); }
         if let Some(p) = permissions { body["permissions"] = serde_json::Value::String(p.to_string()); }
         if let Some(m) = mentionable { body["mentionable"] = serde_json::json!(m); }
+        if let Some(h) = hoist { body["hoist"] = serde_json::json!(h); }
 
         let resp = self.client
             .patch(&url)
