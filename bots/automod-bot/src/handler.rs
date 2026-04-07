@@ -271,18 +271,27 @@ impl EventHandler for Handler {
         // 4. Analyse locale (spam, insulte, lien, phishing, unicode)
         let flags = detectors::analyze(content, &detector_config);
 
-        // Toujours envoyer a l'API pour l'analyse IA (meme sans flags locaux)
-        // L'IA detecte la rage, menaces, harcelement que les regex ne voient pas
+        // Verifier si l'IA texte est activee pour cette guild
+        let ia_text_enabled = BaseApiClient::config_bool(&config, "text_enabled", true);
 
-        info!(
-            guild_id = ?msg.guild_id,
-            user = %msg.author.name,
-            flags.spam = flags.spam,
-            flags.insult = flags.insult,
-            flags.link = flags.link,
-            flags.phishing = flags.phishing,
-            "Message flagge"
-        );
+        // Envoyer a l'API si flags locaux detectes OU si l'IA est activee
+        let should_analyze = flags.spam || flags.insult || flags.link || flags.phishing || ia_text_enabled;
+
+        if !should_analyze {
+            return;
+        }
+
+        if flags.spam || flags.insult || flags.link || flags.phishing {
+            info!(
+                guild_id = ?msg.guild_id,
+                user = %msg.author.name,
+                flags.spam = flags.spam,
+                flags.insult = flags.insult,
+                flags.link = flags.link,
+                flags.phishing = flags.phishing,
+                "Message flagge localement"
+            );
+        }
 
         let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
         send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id, &colors).await;

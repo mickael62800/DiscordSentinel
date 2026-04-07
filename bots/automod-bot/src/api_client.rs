@@ -56,13 +56,28 @@ impl ApiClient {
     }
 
     /// Envoie un message au backend pour analyse et retourne l'action a effectuer.
-    pub async fn analyze(&self, request: &AnalyzeRequest) -> Result<AnalyzeResponse, reqwest::Error> {
+    /// Timeout de 5 secondes pour eviter de bloquer le bot.
+    pub async fn analyze(&self, request: &AnalyzeRequest) -> Result<AnalyzeResponse, String> {
         let req = self
             .base
             .client()
             .post(format!("{}/analyze", self.base.base_url()))
+            .timeout(std::time::Duration::from_secs(5))
             .json(request);
 
-        self.base.auth(req).send().await?.json().await
+        let resp = self.base.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau: {e}"))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("API error {}: {}", status, body));
+        }
+
+        resp.json::<AnalyzeResponse>()
+            .await
+            .map_err(|e| format!("Parse error: {e}"))
     }
 }
