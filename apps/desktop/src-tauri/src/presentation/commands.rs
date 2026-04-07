@@ -347,20 +347,28 @@ pub async fn ws_status(
 // AI Training (proxy to Python API)
 // ─────────────────────────────────────────────────────────────
 
-fn ai_api_url() -> String {
-    std::env::var("AI_API_URL").unwrap_or_else(|_| "http://localhost:8000".into())
+fn ai_base_url(adapter: &crate::infrastructure::api_adapter::ApiAdapter) -> String {
+    adapter.base_url()
 }
 
 #[tauri::command]
-pub async fn ai_get_datasets() -> Result<serde_json::Value, String> {
+pub async fn ai_get_datasets(
+    adapter: tauri::State<'_, std::sync::Arc<crate::infrastructure::api_adapter::ApiAdapter>>,
+) -> Result<serde_json::Value, String> {
+    let base = ai_base_url(&adapter);
     let resp = reqwest::Client::new()
-        .get(format!("{}/api/ai/datasets", ai_api_url()))
+        .get(format!("{}/api/ai/datasets", base))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
 #[tauri::command]
-pub async fn ai_upload_dataset(model_type: String, file_path: String) -> Result<serde_json::Value, String> {
+pub async fn ai_upload_dataset(
+    adapter: tauri::State<'_, std::sync::Arc<crate::infrastructure::api_adapter::ApiAdapter>>,
+    model_type: String,
+    file_path: String,
+) -> Result<serde_json::Value, String> {
+    let base = ai_base_url(&adapter);
     let file_bytes = std::fs::read(&file_path).map_err(|e| format!("Lecture fichier: {e}"))?;
     let file_name = std::path::Path::new(&file_path)
         .file_name()
@@ -371,7 +379,7 @@ pub async fn ai_upload_dataset(model_type: String, file_path: String) -> Result<
     let form = reqwest::multipart::Form::new().part("file", part);
 
     let resp = reqwest::Client::new()
-        .post(format!("{}/api/ai/datasets/{}/upload", ai_api_url(), model_type))
+        .post(format!("{}/api/ai/datasets/{}/upload", base, model_type))
         .multipart(form)
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
@@ -379,14 +387,16 @@ pub async fn ai_upload_dataset(model_type: String, file_path: String) -> Result<
 
 #[tauri::command]
 pub async fn ai_start_training(
+    adapter: tauri::State<'_, std::sync::Arc<crate::infrastructure::api_adapter::ApiAdapter>>,
     model_type: String,
     epochs: u32,
     batch_size: u32,
     learning_rate: f64,
     validation_split: f64,
 ) -> Result<serde_json::Value, String> {
+    let base = ai_base_url(&adapter);
     let resp = reqwest::Client::new()
-        .post(format!("{}/api/ai/training/start", ai_api_url()))
+        .post(format!("{}/api/ai/training/start", base))
         .json(&serde_json::json!({
             "model_type": model_type,
             "epochs": epochs,
@@ -399,25 +409,35 @@ pub async fn ai_start_training(
 }
 
 #[tauri::command]
-pub async fn ai_training_status() -> Result<serde_json::Value, String> {
+pub async fn ai_training_status(
+    adapter: tauri::State<'_, std::sync::Arc<crate::infrastructure::api_adapter::ApiAdapter>>,
+) -> Result<serde_json::Value, String> {
+    let base = ai_base_url(&adapter);
     let resp = reqwest::Client::new()
-        .get(format!("{}/api/ai/training/status", ai_api_url()))
+        .get(format!("{}/api/ai/training/status", base))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
 #[tauri::command]
-pub async fn ai_stop_training() -> Result<serde_json::Value, String> {
+pub async fn ai_stop_training(
+    adapter: tauri::State<'_, std::sync::Arc<crate::infrastructure::api_adapter::ApiAdapter>>,
+) -> Result<serde_json::Value, String> {
+    let base = ai_base_url(&adapter);
     let resp = reqwest::Client::new()
-        .post(format!("{}/api/ai/training/stop", ai_api_url()))
+        .post(format!("{}/api/ai/training/stop", base))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }
 
 #[tauri::command]
-pub async fn ai_export_onnx(model_type: String) -> Result<serde_json::Value, String> {
+pub async fn ai_export_onnx(
+    adapter: tauri::State<'_, std::sync::Arc<crate::infrastructure::api_adapter::ApiAdapter>>,
+    model_type: String,
+) -> Result<serde_json::Value, String> {
+    let base = ai_base_url(&adapter);
     let resp = reqwest::Client::new()
-        .post(format!("{}/api/ai/export/{}", ai_api_url(), model_type))
+        .post(format!("{}/api/ai/export/{}", base, model_type))
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
     resp.json::<serde_json::Value>().await.map_err(|e| format!("Parse error: {e}"))
 }

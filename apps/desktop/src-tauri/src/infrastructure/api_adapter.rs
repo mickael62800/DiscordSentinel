@@ -30,7 +30,7 @@ impl ApiAdapter {
         *self.api_key.write().unwrap() = api_key;
     }
 
-    fn base_url(&self) -> String {
+    pub fn base_url(&self) -> String {
         self.base_url.read().unwrap().clone()
     }
 
