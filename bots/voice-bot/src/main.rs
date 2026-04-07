@@ -4,6 +4,7 @@ mod embeds;
 mod handler;
 mod handlers;
 mod interactions;
+pub mod session_card;
 mod state;
 mod tasks;
 
@@ -21,7 +22,7 @@ use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::{
     AfkTrackerKey, ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
-    PendingChannelsKey, TextToVoiceMapKey, VoiceOwnerMapKey, VoteTrackerKey,
+    PendingChannelsKey, SessionCardKey, TextToVoiceMapKey, VoiceOwnerMapKey, VoteTrackerKey,
 };
 use crate::state::{AfkTracker, CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
 
@@ -99,6 +100,7 @@ async fn main() {
         data.insert::<MembersToVoiceMapKey>(members_to_voice);
         data.insert::<VoiceOwnerMapKey>(voice_owner);
         data.insert::<AfkTrackerKey>(Arc::new(AfkTracker::new()));
+        data.insert::<SessionCardKey>(Arc::new(DashMap::new()));
     }
 
     spawn_heartbeat(api);

@@ -67,18 +67,21 @@ pub async fn handle_voice_state_update(
         }
     };
 
-    // Log : membre rejoint un salon vocal
+    // Session card : membre rejoint un salon vocal
     if let Some(channel_id) = new.channel_id {
-        let name = embeds::get_channel_name(ctx, channel_id).await;
-        embeds::log_member_joined(ctx, user_id.get(), &name).await;
+        let user_name = user_id.to_user(&ctx.http).await
+            .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
+        embeds::session_member_joined(ctx, channel_id, &user_name).await;
     }
 
-    // Log : membre quitte un salon vocal
-    if let Some(old_state) = old {
+    // Session card : membre quitte un salon vocal
+    if let Some(ref old_state) = old {
         if let Some(old_channel_id) = old_state.channel_id {
             if new.channel_id.is_none() || new.channel_id != Some(old_channel_id) {
-                let name = embeds::get_channel_name(ctx, old_channel_id).await;
-                embeds::log_member_left(ctx, user_id.get(), &name).await;
+                let user_name = user_id.to_user(&ctx.http).await
+                    .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
+                // Calculer la duree approximative (on n'a pas le join time precis ici)
+                embeds::session_member_left(ctx, old_channel_id, &user_name, "?").await;
             }
         }
     }
@@ -336,7 +339,10 @@ async fn create_temp_channel(
         }
     }
 
-    embeds::log_channel_created(ctx, user_id.get(), kind, &cat_name, "aucune").await;
+    // Creer la carte de session dans le salon de logs
+    let creator_name = user_id.to_user(&ctx.http).await
+        .map(|u| u.name).unwrap_or_else(|_| user_id.to_string());
+    embeds::create_session_card(ctx, voice_channel_id, &creator_name, kind).await;
 }
 
 pub async fn send_control_panel(
@@ -690,7 +696,8 @@ async fn check_and_delete_empty(
         error!(error = %why, "Erreur suppression salon vocal");
     } else {
         info!(channel = %channel_name, "Salon vocal supprime");
-        embeds::log_channel_deleted(ctx, &channel_name, "vocal").await;
+        // Calculer la duree depuis la creation (approximation)
+        embeds::session_closed(ctx, voice_channel_id, "session terminee").await;
     }
 
     // Supprimer la categorie en dernier

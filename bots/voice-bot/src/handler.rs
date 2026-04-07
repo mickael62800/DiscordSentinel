@@ -66,6 +66,13 @@ impl TypeMapKey for AfkTrackerKey {
     type Value = Arc<AfkTracker>;
 }
 
+/// Carte live de session vocale dans le salon de logs.
+/// voice_channel_id -> SessionCard
+pub struct SessionCardKey;
+impl TypeMapKey for SessionCardKey {
+    type Value = Arc<DashMap<ChannelId, crate::session_card::SessionCard>>;
+}
+
 pub struct Handler;
 
 #[async_trait]
