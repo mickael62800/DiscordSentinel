@@ -31,7 +31,7 @@ async function fetchModelsStatus() {
   }
 }
 
-const workerNames = ["moderation-worker", "analytics-worker"];
+const workerNames = ["moderation-worker", "analytics-worker", "cache-worker", "cleanup-worker", "coude-worker", "monitoring-worker"];
 
 // Workers qui n'ont PAS besoin de token Discord
 const workersWithoutToken = ["analytics-worker", "cache-worker", "cleanup-worker", "moderation-worker", "monitoring-worker"];
