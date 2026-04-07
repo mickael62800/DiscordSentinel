@@ -4,6 +4,20 @@ use serenity::prelude::*;
 use crate::handler::{ConfigKey, SessionCardKey};
 use crate::session_card::SessionCard;
 
+/// Si le clone a obtenu un log_message_id (renvoi initial), le reecrit dans le DashMap.
+async fn sync_message_id(ctx: &Context, voice_channel_id: ChannelId, card: &SessionCard) {
+    if let Some(mid) = card.log_message_id {
+        let data = ctx.data.read().await;
+        if let Some(cards) = data.get::<SessionCardKey>() {
+            if let Some(mut entry) = cards.get_mut(&voice_channel_id) {
+                if entry.log_message_id.is_none() {
+                    entry.log_message_id = Some(mid);
+                }
+            }
+        }
+    }
+}
+
 fn get_log_channel(data: &tokio::sync::RwLockReadGuard<'_, TypeMap>) -> Option<ChannelId> {
     data.get::<ConfigKey>()
         .and_then(|config| config.log_channel_id)
@@ -46,7 +60,7 @@ pub async fn create_session_card(
 
 /// Ajoute un evenement "membre rejoint" a la carte de session.
 pub async fn session_member_joined(ctx: &Context, voice_channel_id: ChannelId, user_name: &str) {
-    let card_clone = {
+    let mut card_clone = {
         let data = ctx.data.read().await;
         let cards = match data.get::<SessionCardKey>() {
             Some(c) => c,
@@ -61,11 +75,12 @@ pub async fn session_member_joined(ctx: &Context, voice_channel_id: ChannelId, u
         entry.clone()
     };
     card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
 }
 
 /// Ajoute un evenement "membre parti" a la carte de session.
 pub async fn session_member_left(ctx: &Context, voice_channel_id: ChannelId, user_name: &str, duration_text: &str) {
-    let card_clone = {
+    let mut card_clone = {
         let data = ctx.data.read().await;
         let cards = match data.get::<SessionCardKey>() {
             Some(c) => c,
@@ -80,11 +95,12 @@ pub async fn session_member_left(ctx: &Context, voice_channel_id: ChannelId, use
         entry.clone()
     };
     card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
 }
 
 /// Finalise la carte de session quand le salon est supprime.
 pub async fn session_closed(ctx: &Context, voice_channel_id: ChannelId, total_duration: &str) {
-    let card_clone = {
+    let mut card_clone = {
         let data = ctx.data.read().await;
         let cards = match data.get::<SessionCardKey>() {
             Some(c) => c,
@@ -102,6 +118,7 @@ pub async fn session_closed(ctx: &Context, voice_channel_id: ChannelId, total_du
         entry.clone()
     };
     card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
 
     // Nettoyer du cache
     let data = ctx.data.read().await;
@@ -113,7 +130,7 @@ pub async fn session_closed(ctx: &Context, voice_channel_id: ChannelId, total_du
 /// Ajoute un evenement custom a la carte.
 #[allow(dead_code)]
 pub async fn session_event(ctx: &Context, voice_channel_id: ChannelId, text: &str) {
-    let card_clone = {
+    let mut card_clone = {
         let data = ctx.data.read().await;
         let cards = match data.get::<SessionCardKey>() {
             Some(c) => c,
@@ -127,6 +144,7 @@ pub async fn session_event(ctx: &Context, voice_channel_id: ChannelId, text: &st
         entry.clone()
     };
     card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
 }
 
 // ── Helpers ──

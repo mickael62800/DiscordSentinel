@@ -133,10 +133,15 @@ impl SessionCard {
     }
 
     /// Met a jour la carte existante dans le salon de logs.
-    pub async fn update(&self, ctx: &Context) {
+    /// Si le message initial n'a jamais ete envoye, tente de l'envoyer.
+    pub async fn update(&mut self, ctx: &Context) {
         let message_id = match self.log_message_id {
             Some(id) => id,
-            None => return,
+            None => {
+                tracing::info!("Carte session sans message_id, renvoi initial");
+                self.send_initial(ctx).await;
+                return;
+            }
         };
 
         let embed = self.build_embed();
