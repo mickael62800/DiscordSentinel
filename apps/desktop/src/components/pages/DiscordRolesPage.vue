@@ -209,6 +209,73 @@ function formatPermissions(perms: string): string {
       </div>
     </div>
 
+    <!-- Modale edition -->
+    <div v-if="editingRole" class="modal-overlay" @click.self="cancelEdit">
+      <div class="modal-content modal-edit">
+        <div class="modal-header-bar">
+          <h3>Modifier le role</h3>
+          <button class="modal-close" @click="cancelEdit">&times;</button>
+        </div>
+
+        <div class="edit-body">
+          <div class="edit-section">
+            <span class="edit-section-title">Apparence</span>
+            <div class="edit-grid-2">
+              <div class="edit-field">
+                <label>Nom</label>
+                <input v-model="editName" type="text" class="modal-input" placeholder="Nom du role" />
+              </div>
+              <div class="edit-field">
+                <label>Couleur</label>
+                <div class="color-row">
+                  <input v-model="editColor" type="color" class="color-picker-lg" />
+                  <span class="color-hex">{{ editColor }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="edit-section">
+            <span class="edit-section-title">Options</span>
+            <div class="options-row">
+              <label class="option-toggle" :class="{ active: editMentionable }">
+                <input v-model="editMentionable" type="checkbox" />
+                <span class="option-label">Mentionnable</span>
+                <span class="option-desc">Les membres peuvent mentionner ce role</span>
+              </label>
+              <label class="option-toggle" :class="{ active: editHoist }">
+                <input v-model="editHoist" type="checkbox" />
+                <span class="option-label">Afficher separement</span>
+                <span class="option-desc">Separe les membres dans la sidebar</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="edit-section">
+            <span class="edit-section-title">Permissions</span>
+            <div class="perms-grid">
+              <label
+                v-for="flag in PERMISSION_FLAGS"
+                :key="flag.key"
+                class="perm-chip"
+                :class="{ active: editPerms[flag.key] }"
+              >
+                <input v-model="editPerms[flag.key]" type="checkbox" class="perm-cb" />
+                <span>{{ flag.label }}</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn-cancel" @click="cancelEdit">Annuler</button>
+          <button class="btn-save" :disabled="saving" @click="saveEdit">
+            {{ saving ? 'Sauvegarde...' : 'Sauvegarder' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchRoles" />
     <LoadingState v-else-if="loading" />
 
@@ -236,47 +303,7 @@ function formatPermissions(perms: string): string {
           </div>
         </div>
 
-        <!-- Mode edition -->
-        <div v-if="editingRole === role.id" class="edit-form">
-          <div class="edit-section">
-            <span class="edit-section-title">General</span>
-            <div class="edit-row">
-              <input v-model="editName" type="text" class="edit-input" placeholder="Nom" />
-              <input v-model="editColor" type="color" class="color-picker" />
-            </div>
-            <div class="edit-toggles">
-              <label class="edit-check">
-                <input v-model="editMentionable" type="checkbox" /> Mentionnable
-              </label>
-              <label class="edit-check">
-                <input v-model="editHoist" type="checkbox" /> Affiche separement
-              </label>
-            </div>
-          </div>
-          <div class="edit-section">
-            <span class="edit-section-title">Permissions</span>
-            <div class="perms-grid">
-              <label
-                v-for="flag in PERMISSION_FLAGS"
-                :key="flag.key"
-                class="perm-check"
-                :class="{ active: editPerms[flag.key] }"
-              >
-                <input v-model="editPerms[flag.key]" type="checkbox" />
-                {{ flag.label }}
-              </label>
-            </div>
-          </div>
-          <div class="edit-actions">
-            <button class="btn-cancel-sm" @click="cancelEdit">Annuler</button>
-            <button class="btn-save-sm" :disabled="saving" @click="saveEdit">
-              {{ saving ? '...' : 'Sauver' }}
-            </button>
-          </div>
-        </div>
-
-        <!-- Mode lecture -->
-        <div v-else class="role-details">
+        <div class="role-details">
           <div class="detail-row">
             <span class="detail-label">Position</span>
             <span class="detail-value">{{ role.position }}</span>
@@ -436,93 +463,126 @@ function formatPermissions(perms: string): string {
 .btn-create:hover { opacity: 0.85; }
 
 /* Role actions */
-.role-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
+.role-actions { display: flex; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .btn-edit {
-  background: rgba(88, 101, 242, 0.15); color: var(--accent); border: 1px solid rgba(88, 101, 242, 0.3);
-  border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  flex: 1; text-align: center;
+  background: rgba(88, 101, 242, 0.1); color: var(--accent); border: 1px solid rgba(88, 101, 242, 0.2);
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
 }
-.btn-edit:hover { background: rgba(88, 101, 242, 0.3); }
+.btn-edit:hover { background: rgba(88, 101, 242, 0.2); }
 .btn-delete {
-  background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);
-  border-radius: 6px; padding: 4px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
+  text-align: center;
+  background: transparent; color: var(--text-secondary); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;
+  transition: all 0.15s;
 }
-.btn-delete:hover { background: rgba(239, 68, 68, 0.3); }
+.btn-delete:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
 .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* Edit form inline */
-.edit-form { margin-top: 10px; padding: 12px; background: var(--bg-secondary); border-radius: 8px; }
-.edit-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.edit-input {
-  flex: 1; min-width: 150px; padding: 8px 10px; background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: 6px; color: var(--text-primary); font-size: 13px;
-}
-.edit-input:focus { border-color: var(--accent); outline: none; }
-.edit-check { font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; cursor: pointer; }
-.edit-actions { display: flex; gap: 8px; margin-top: 8px; justify-content: flex-end; }
-.btn-cancel-sm {
-  background: transparent; border: 1px solid var(--border); border-radius: 6px;
-  padding: 4px 12px; color: var(--text-primary); font-size: 12px; cursor: pointer;
-}
-.btn-save-sm {
-  background: var(--accent); color: white; border: none; border-radius: 6px;
-  padding: 4px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
-}
-.btn-save-sm:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Color picker */
 .color-picker { width: 36px; height: 36px; border: none; border-radius: 6px; cursor: pointer; padding: 0; }
-.color-row { display: flex; align-items: center; gap: 10px; }
-.color-hex { font-size: 13px; font-family: monospace; color: var(--text-secondary); }
+.color-picker-lg { width: 44px; height: 44px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; padding: 0; }
+.color-row { display: flex; align-items: center; gap: 12px; }
+.color-hex { font-size: 14px; font-family: "JetBrains Mono", monospace; color: var(--text-secondary); }
 
-/* Modal */
+/* Modal shared */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; z-index: 1000;
 }
 .modal-content {
-  background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
-  padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  width: 100%; max-width: 420px; box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  overflow: hidden;
 }
-.modal-content h3 { margin: 0 0 16px 0; font-size: 18px; }
-.modal-field { margin-bottom: 14px; }
-.modal-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px; }
-.modal-input {
-  width: 100%; padding: 10px 12px; background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text-primary); font-size: 14px;
-}
-.modal-input:focus { border-color: var(--accent); outline: none; }
-.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
-.btn-cancel {
-  background: transparent; border: 1px solid var(--border); border-radius: 6px;
-  padding: 8px 16px; color: var(--text-primary); font-size: 13px; cursor: pointer;
-}
-.btn-save {
-  background: var(--accent); color: white; border: none; border-radius: 6px;
-  padding: 8px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
-}
-.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+.modal-content h3 { margin: 0; }
 
-/* Edit sections */
-.edit-section { margin-bottom: 12px; }
-.edit-section-title {
-  font-size: 11px; font-weight: 600; color: var(--text-secondary);
-  text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 8px;
+/* Modal create */
+.modal-content:not(.modal-edit) { padding: 24px; }
+.modal-content:not(.modal-edit) h3 { margin-bottom: 20px; font-size: 18px; }
+.modal-field { margin-bottom: 16px; }
+.modal-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+.modal-input {
+  width: 100%; padding: 11px 14px; background: var(--bg-primary); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text-primary); font-size: 14px; box-sizing: border-box;
 }
-.edit-toggles { display: flex; gap: 16px; margin-top: 8px; }
+.modal-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(88,101,242,0.15); }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+/* Modal edit */
+.modal-edit { max-width: 560px; }
+.modal-header-bar {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 20px 24px; border-bottom: 1px solid var(--border);
+}
+.modal-header-bar h3 { font-size: 17px; font-weight: 700; }
+.modal-close {
+  background: none; border: none; color: var(--text-secondary); font-size: 22px;
+  cursor: pointer; width: 32px; height: 32px; border-radius: 6px; display: flex;
+  align-items: center; justify-content: center; transition: all 0.15s;
+}
+.modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.edit-body { padding: 20px 24px; max-height: 60vh; overflow-y: auto; }
+
+.edit-section { margin-bottom: 24px; }
+.edit-section:last-child { margin-bottom: 0; }
+.edit-section-title {
+  font-size: 11px; font-weight: 700; color: var(--text-secondary);
+  text-transform: uppercase; letter-spacing: 0.8px; display: block;
+  margin-bottom: 12px; padding-bottom: 6px; border-bottom: 1px solid var(--border);
+}
+
+.edit-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.edit-field label {
+  display: block; font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-bottom: 6px;
+}
+
+/* Options toggles */
+.options-row { display: flex; gap: 12px; }
+.option-toggle {
+  flex: 1; display: flex; flex-direction: column; gap: 2px; cursor: pointer;
+  padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-primary); transition: all 0.15s;
+}
+.option-toggle:hover { border-color: var(--accent); }
+.option-toggle.active { border-color: var(--accent); background: rgba(88,101,242,0.06); }
+.option-toggle input { display: none; }
+.option-label { font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.option-desc { font-size: 11px; color: var(--text-secondary); }
 
 /* Permissions grid */
-.perms-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+.perms-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.perm-chip {
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+  padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--bg-primary); font-size: 13px; color: var(--text-secondary);
+  transition: all 0.15s; user-select: none;
 }
-.perm-check {
-  font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px;
-  cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: all 0.15s;
-  border: 1px solid transparent;
+.perm-chip:hover { border-color: rgba(88,101,242,0.3); background: var(--bg-hover); }
+.perm-chip.active {
+  color: var(--accent); background: rgba(88,101,242,0.08);
+  border-color: rgba(88,101,242,0.3); font-weight: 600;
 }
-.perm-check:hover { background: var(--bg-hover); }
-.perm-check.active {
-  color: var(--accent); background: rgba(88, 101, 242, 0.08);
-  border-color: rgba(88, 101, 242, 0.2);
+.perm-cb { accent-color: var(--accent); width: 16px; height: 16px; }
+
+.modal-footer {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 16px 24px; border-top: 1px solid var(--border); background: var(--bg-secondary);
 }
-.perm-check input[type="checkbox"] { accent-color: var(--accent); }
+
+.btn-cancel {
+  background: transparent; border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 18px; color: var(--text-primary); font-size: 13px; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-cancel:hover { background: var(--bg-hover); }
+.btn-save {
+  background: var(--accent); color: white; border: none; border-radius: 8px;
+  padding: 9px 24px; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-save:hover { opacity: 0.9; }
+.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 </style>
