@@ -366,10 +366,17 @@ watch(selectedComponent, loadFormValues);
             <div class="model-indicator" :class="model.loaded ? 'indicator-green' : 'indicator-red'"></div>
             <div class="model-info">
               <span class="model-name">{{ model.name }}</span>
-              <span class="model-status">{{ model.loaded ? 'Charge et operationnel' : 'Non charge' }}</span>
+              <span class="model-status">{{ model.loaded ? 'Charge et operationnel' : 'Non charge — fichier ONNX manquant' }}</span>
             </div>
+            <span class="model-badge" :class="model.loaded ? 'badge-ok' : 'badge-ko'">
+              {{ model.loaded ? 'OK' : 'MANQUANT' }}
+            </span>
           </div>
         </div>
+      </div>
+      <div v-else class="models-status models-unavailable">
+        <h3>Modeles IA</h3>
+        <p class="models-empty">Impossible de charger le statut des modeles IA. Verifiez que l'API est accessible.</p>
       </div>
 
       <!-- Config form -->
@@ -1132,6 +1139,39 @@ watch(selectedComponent, loadFormValues);
 .model-status {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.model-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-left: auto;
+}
+
+.badge-ok {
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+}
+
+.badge-ko {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.models-unavailable {
+  opacity: 0.6;
+}
+
+.models-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 /* ── Token styles ── */
