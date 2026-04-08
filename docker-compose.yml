@@ -74,8 +74,8 @@ services:
 
   gateway:
     build:
-      context: ./services/gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/gateway/Dockerfile
     container_name: sentinel-gateway
     restart: unless-stopped
     ports:
@@ -383,15 +383,11 @@ services:
     restart: unless-stopped
     environment:
       COUDE_DISCORD_TOKEN: ${COUDE_DISCORD_TOKEN}
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
       API_BASE_URL: http://api:3000
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
-      postgres:
-        condition: service_healthy
-      api:
-        condition: service_started
+      - api
 
   coude-worker:
     build:
