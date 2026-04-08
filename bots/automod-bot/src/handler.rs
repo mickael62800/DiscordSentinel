@@ -320,12 +320,6 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Automod bot connecte");
 
-        // Definir le statut en ligne
-        ctx.set_presence(
-            Some(serenity::gateway::ActivityData::watching("les messages")),
-            serenity::model::user::OnlineStatus::Online,
-        );
-
         register_guilds(&ctx, &ready).await;
 
         if let Err(e) = serenity::model::application::Command::set_global_commands(
