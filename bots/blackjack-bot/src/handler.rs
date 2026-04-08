@@ -30,20 +30,32 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(command) = interaction {
-            if let Some(guild_id) = command.guild_id {
-                let data = ctx.data.read().await;
-                if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
-                    if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
-                        return;
+        match interaction {
+            Interaction::Command(command) => {
+                if let Some(guild_id) = command.guild_id {
+                    let data = ctx.data.read().await;
+                    if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+                        if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                            return;
+                        }
                     }
                 }
-            }
 
-            match command.data.name.as_str() {
-                "blackjack" => commands::blackjack::handle(&ctx, &command).await,
-                _ => {}
+                match command.data.name.as_str() {
+                    "blackjack" => commands::blackjack::handle(&ctx, &command).await,
+                    _ => {}
+                }
             }
+            Interaction::Component(component) => {
+                let custom_id = &component.data.custom_id;
+                if custom_id.starts_with("bj_hit:")
+                    || custom_id.starts_with("bj_stand:")
+                    || custom_id.starts_with("bj_double:")
+                {
+                    commands::blackjack::handle_component(&ctx, &component).await;
+                }
+            }
+            _ => {}
         }
     }
 }

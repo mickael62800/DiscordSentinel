@@ -4,7 +4,8 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("assurance")
@@ -29,15 +30,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let insurance_cost = config.insurance_cost();
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
-    let player = match db
+    let player = match api
         .get_or_create_player(&guild_id, &user_id, &command.user.name)
         .await
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -56,7 +57,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Verifier si deja assure
-    match db.get_active_insurance(&guild_id, &user_id).await {
+    match api.get_active_insurance(&guild_id, &user_id).await {
         Ok(Some(_)) => {
             reply_ephemeral(
                 ctx,
@@ -68,17 +69,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Ok(None) => {}
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     }
 
     // Deduire le cout
-    if let Err(e) = db
+    if let Err(e) = api
         .update_player_coins(&guild_id, &user_id, -insurance_cost)
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
@@ -88,15 +89,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         rng.gen_range(1..=100) <= config.insurance_scam_rate()
     };
 
-    if let Err(e) = db.buy_insurance(&guild_id, &user_id, is_scam).await {
+    if let Err(e) = api.buy_insurance(&guild_id, &user_id, is_scam).await {
         // Rembourser
-        if let Err(e2) = db
+        if let Err(e2) = api
             .update_player_coins(&guild_id, &user_id, insurance_cost)
             .await
         {
             tracing::warn!(error = %e2, "Echec DB update_player_coins remboursement");
         }
-        reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 

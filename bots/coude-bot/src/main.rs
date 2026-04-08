@@ -1,3 +1,4 @@
+pub mod api_client;
 mod channel_check;
 mod commands;
 mod config;
@@ -9,7 +10,6 @@ mod handler;
 use std::sync::Arc;
 
 use serenity::prelude::*;
-use sqlx::postgres::PgPoolOptions;
 use tracing::info;
 
 use sentinel_shared::api_client::BaseApiClient;
@@ -17,8 +17,13 @@ use sentinel_shared::config::BotConfig;
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::config::Config;
-use crate::db::GameDb;
-use crate::handler::{GameDbKey, Handler};
+use crate::handler::Handler;
+
+/// Cle TypeMap pour le client API du jeu.
+pub struct GameApiKey;
+impl TypeMapKey for GameApiKey {
+    type Value = api_client::ApiClient;
+}
 
 #[tokio::main]
 async fn main() {
@@ -32,18 +37,11 @@ async fn main() {
 
     info!(api_url = %config.base().api_base_url, "Demarrage du coude bot");
 
-    // Connexion a la base de donnees
-    let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&config.database_url)
-        .await
-        .expect("Impossible de se connecter a la base de donnees");
-
-    let game_db = GameDb::new(pool);
-
     let intents = GatewayIntents::GUILDS | GatewayIntents::GUILD_MEMBERS;
 
     let base_api = Arc::new(BaseApiClient::new(&config, "coude-bot"));
+
+    let api_client = api_client::ApiClient::new(Arc::clone(&base_api));
 
     let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
@@ -53,7 +51,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
-        data.insert::<GameDbKey>(game_db);
+        data.insert::<GameApiKey>(api_client);
     }
 
     // Heartbeat via shared

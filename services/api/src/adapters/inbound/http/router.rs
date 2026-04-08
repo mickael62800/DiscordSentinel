@@ -198,6 +198,76 @@ fn auto_role_routes() -> Router<AppState> {
         .route("/{guild_id}/{role_id}", delete(handlers::role_panels::delete_auto_role))
 }
 
+fn coude_routes() -> Router<AppState> {
+    Router::new()
+        // Existing
+        .route("/{guild_id}/combats", get(handlers::coude::list_combats))
+        .route("/{guild_id}/players", get(handlers::coude::list_players))
+        .route("/combats/{combat_id}", delete(handlers::coude::cancel_combat))
+        .route("/players/{guild_id}/{user_id}/coins", patch(handlers::coude::adjust_coins))
+        // Player CRUD
+        .route("/{guild_id}/players/get-or-create", post(handlers::coude::get_or_create_player))
+        .route("/{guild_id}/players/{user_id}", get(handlers::coude::get_player))
+        .route("/{guild_id}/players/{user_id}/class", patch(handlers::coude::update_player_class))
+        .route("/{guild_id}/players/{user_id}/xp", post(handlers::coude::add_xp))
+        .route("/{guild_id}/players/{user_id}/spend-stat", post(handlers::coude::spend_stat_point))
+        // Stats recording
+        .route("/{guild_id}/players/{user_id}/record-win", post(handlers::coude::record_win))
+        .route("/{guild_id}/players/{user_id}/record-loss", post(handlers::coude::record_loss))
+        .route("/{guild_id}/players/{user_id}/record-draw", post(handlers::coude::record_draw))
+        .route("/{guild_id}/players/{user_id}/increment-cowardice", post(handlers::coude::increment_cowardice))
+        .route("/{guild_id}/players/{user_id}/increment-chaos", post(handlers::coude::increment_chaos))
+        .route("/{guild_id}/players/{user_id}/coins-earned", post(handlers::coude::record_coins_earned))
+        .route("/{guild_id}/players/{user_id}/coins-lost", post(handlers::coude::record_coins_lost))
+        // Casino
+        .route("/{guild_id}/players/{user_id}/casino-win", post(handlers::coude::record_casino_win))
+        .route("/{guild_id}/players/{user_id}/casino-loss", post(handlers::coude::record_casino_loss))
+        .route("/{guild_id}/players/{user_id}/casino-faillite", post(handlers::coude::record_casino_faillite))
+        .route("/{guild_id}/players/{user_id}/casino-today", get(handlers::coude::count_casino_today))
+        // Combat lifecycle
+        .route("/{guild_id}/combats/create", post(handlers::coude::create_combat))
+        .route("/combats/{combat_id}/detail", get(handlers::coude::get_combat))
+        .route("/{guild_id}/combats/pending/attacker/{user_id}", get(handlers::coude::get_pending_for_attacker))
+        .route("/{guild_id}/combats/pending/defender/{user_id}", get(handlers::coude::get_pending_for_defender))
+        .route("/combats/{combat_id}/resolve", post(handlers::coude::resolve_combat))
+        .route("/combats/{combat_id}/betting", post(handlers::coude::set_combat_betting))
+        .route("/combats/{combat_id}/expire", post(handlers::coude::expire_combat))
+        .route("/combats/{combat_id}/defender-special", post(handlers::coude::set_defender_special))
+        .route("/combats/expired", get(handlers::coude::get_expired_combats))
+        // Bets
+        .route("/{guild_id}/bets", post(handlers::coude::place_bet))
+        .route("/combats/{combat_id}/bets", get(handlers::coude::get_combat_bets))
+        .route("/{guild_id}/combats/betting/{user_id}", get(handlers::coude::get_betting_combat))
+        .route("/combats/{combat_id}/resolve-bets", post(handlers::coude::resolve_bets))
+        .route("/combats/{combat_id}/refund-bets", post(handlers::coude::refund_bets))
+        // Cooldowns
+        .route("/{guild_id}/cooldown/{user_id}/{action}", get(handlers::coude::check_cooldown))
+        .route("/{guild_id}/cooldown/{user_id}/{action}", post(handlers::coude::set_cooldown))
+        // Economy
+        .route("/{guild_id}/transfer", post(handlers::coude::transfer_coins))
+        .route("/{guild_id}/steal", post(handlers::coude::record_steal))
+        // Primes
+        .route("/{guild_id}/primes", post(handlers::coude::create_prime))
+        .route("/{guild_id}/primes/{target_id}/active", get(handlers::coude::get_active_primes))
+        .route("/{guild_id}/primes/claim", post(handlers::coude::claim_primes))
+        // Insurance
+        .route("/{guild_id}/insurance/buy", post(handlers::coude::buy_insurance))
+        .route("/{guild_id}/insurance/{user_id}", get(handlers::coude::get_active_insurance))
+        .route("/insurance/{insurance_id}/expire", post(handlers::coude::expire_insurance))
+        // Leaderboard
+        .route("/{guild_id}/leaderboard/{category}", get(handlers::coude::leaderboard))
+        // Utility
+        .route("/guilds", get(handlers::coude::get_all_guild_ids))
+        .route("/{guild_id}/players/random", get(handlers::coude::get_random_players))
+        .route("/{guild_id}/daily-chaos", post(handlers::coude::log_daily_chaos))
+        .route("/{guild_id}/events", get(handlers::coude::get_active_events))
+        // Inventory
+        .route("/{guild_id}/inventory/{user_id}", get(handlers::coude::get_inventory))
+        .route("/{guild_id}/inventory/{user_id}/add", post(handlers::coude::add_item))
+        .route("/{guild_id}/inventory/{user_id}/use", post(handlers::coude::use_item))
+        .route("/{guild_id}/inventory/{user_id}/has/{item_key}", get(handlers::coude::has_item))
+}
+
 fn member_routes() -> Router<AppState> {
     Router::new()
         .route("/{guild_id}", get(handlers::guild_members::list_members_db))
@@ -280,10 +350,7 @@ pub fn build_for_test(state: AppState) -> Router {
         .route("/api/discord-roles/{guild_id}/create", post(handlers::discord_roles::create_role))
         .route("/api/discord-roles/{guild_id}/{role_id}", patch(handlers::discord_roles::edit_role).delete(handlers::discord_roles::delete_role))
         .nest("/api/members", member_routes())
-        .route("/api/coude/{guild_id}/combats", get(handlers::coude::list_combats))
-        .route("/api/coude/{guild_id}/players", get(handlers::coude::list_players))
-        .route("/api/coude/combats/{combat_id}", delete(handlers::coude::cancel_combat))
-        .route("/api/coude/players/{guild_id}/{user_id}/coins", patch(handlers::coude::adjust_coins))
+        .nest("/api/coude", coude_routes())
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -389,10 +456,7 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // Cache monitoring
         .route("/api/cache/stats", get(handlers::cache_stats::get_cache_stats))
         // Coup de coude
-        .route("/api/coude/{guild_id}/combats", get(handlers::coude::list_combats))
-        .route("/api/coude/{guild_id}/players", get(handlers::coude::list_players))
-        .route("/api/coude/combats/{combat_id}", delete(handlers::coude::cancel_combat))
-        .route("/api/coude/players/{guild_id}/{user_id}/coins", patch(handlers::coude::adjust_coins))
+        .nest("/api/coude", coude_routes())
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

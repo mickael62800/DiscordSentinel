@@ -2,9 +2,9 @@ use serenity::all::{
     ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter,
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use uuid::Uuid;
 
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub const REFUSE_PREFIX: &str = "coude_refuse:";
 
@@ -23,30 +23,22 @@ const SHAME_MESSAGES: &[&str] = &[
 ];
 
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
-    let combat_id_str = match component.data.custom_id.strip_prefix(REFUSE_PREFIX) {
-        Some(id) => id,
+    let combat_id = match component.data.custom_id.strip_prefix(REFUSE_PREFIX) {
+        Some(id) => id.to_string(),
         None => return,
     };
 
-    let combat_id = match Uuid::parse_str(combat_id_str) {
-        Ok(id) => id,
-        Err(_) => {
-            reply_ephemeral(ctx, component, "ID de combat invalide.").await;
-            return;
-        }
-    };
-
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
-    let combat_record = match db.get_combat(combat_id).await {
+    let combat_record = match api.get_combat(&combat_id).await {
         Ok(Some(c)) => c,
         Ok(None) => {
             reply_ephemeral(ctx, component, "Combat introuvable.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -63,12 +55,15 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Expiration (24 heures)
+    let created = chrono::DateTime::parse_from_rfc3339(&combat_record.created_at)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|_| chrono::Utc::now());
     let elapsed = chrono::Utc::now()
-        .signed_duration_since(combat_record.created_at)
+        .signed_duration_since(created)
         .num_seconds();
     if elapsed > 86400 {
-        if let Err(e) = db.expire_combat(combat_id).await {
-            tracing::warn!(error = %e, "Echec DB expire_combat");
+        if let Err(e) = api.expire_combat(&combat_id).await {
+            tracing::warn!(error = %e, "Echec API expire_combat");
         }
         reply_ephemeral(ctx, component, "Ce defi a expire ! (24h)").await;
         return;
@@ -92,9 +87,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         combat_record.defender_id, shame_msg, penalty
     );
 
-    if let Err(e) = db
+    if let Err(e) = api
         .resolve_combat(
-            combat_id,
+            &combat_id,
             "refused",
             None,
             None,
@@ -105,18 +100,18 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         )
         .await
     {
-        reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+        reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
         return;
     }
 
     // Retirer les coins et incrementer la lachete
-    if let Err(e) = db
+    if let Err(e) = api
         .update_player_coins(&combat_record.guild_id, &combat_record.defender_id, -penalty)
         .await
     {
-        tracing::warn!(error = %e, "Echec DB update_player_coins refus");
+        tracing::warn!(error = %e, "Echec API update_player_coins refus");
     }
-    let cowardice = db
+    let cowardice = api
         .increment_cowardice(&combat_record.guild_id, &combat_record.defender_id)
         .await
         .unwrap_or(0);

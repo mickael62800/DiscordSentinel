@@ -2,13 +2,19 @@ pub mod accepter;
 pub mod annuler;
 pub mod assurance;
 pub mod casino;
+pub mod classe;
 pub mod coude;
 pub mod defend_item;
+pub mod donner;
+pub mod hp;
 pub mod leaderboard;
 pub mod pari;
 pub mod prime;
 pub mod profil;
 pub mod refuser;
+pub mod repos;
+pub mod reset_stats;
+pub mod saison;
 pub mod shop_cmd;
 pub mod train;
 pub mod voler;
@@ -27,5 +33,11 @@ pub fn all() -> Vec<CreateCommand> {
         voler::register(),
         assurance::register(),
         train::register(),
+        classe::register(),
+        donner::register(),
+        hp::register(),
+        repos::register(),
+        saison::register(),
+        reset_stats::register(),
     ]
 }

@@ -6,7 +6,8 @@ use serenity::all::{
 };
 
 use crate::game::progression;
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("coude")
@@ -28,7 +29,7 @@ pub fn register() -> CreateCommand {
                 .add_string_choice("Coup traitre", "coup_traitre")
                 .add_string_choice("Rage", "rage")
                 .add_string_choice("Explosion", "explosion")
-                .add_string_choice("Inversion", "inversion"),
+                .add_string_choice("Poison", "poison"),
         )
 }
 
@@ -101,27 +102,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
     // Creer/recuperer les joueurs
-    let attacker = match db
+    let attacker = match api
         .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
         .await
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
 
-    let defender_player = match db
+    let defender_player = match api
         .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
         .await
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -167,7 +168,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Verifier pas de combat en cours
-    if let Ok(Some(_)) = db
+    if let Ok(Some(_)) = api
         .get_pending_combat_for_attacker(&guild_id, &command.user.id.to_string())
         .await
     {
@@ -177,13 +178,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Verifier l'item special
     if let Some(ref item_key) = special {
-        let has = match db
+        let has = match api
             .has_item(&guild_id, &command.user.id.to_string(), item_key)
             .await
         {
             Ok(h) => h,
             Err(e) => {
-                reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
                 return;
             }
         };
@@ -197,18 +198,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
         // Consommer l'item
-        if let Err(e) = db
+        if let Err(e) = api
             .use_item(&guild_id, &command.user.id.to_string(), item_key)
             .await
         {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     }
 
     // Creer le combat (channel_id = salon combats configure)
     let combat_channel = config.channel_combats().unwrap(); // deja verifie par check_channel
-    let combat = match db
+    let combat = match api
         .create_combat(
             &guild_id,
             &combat_channel,
@@ -260,9 +261,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Bloodbath event : auto-accept
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
-    let events = db.get_active_events(&guild_id).await.unwrap_or_else(|e| {
-        tracing::warn!(error = %e, "Echec DB get_active_events");
+    let api = data.get::<GameApiKey>().unwrap();
+    let events = api.get_active_events(&guild_id).await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "Echec API get_active_events");
         vec![]
     });
     let bloodbath = events.iter().any(|e| e.event_type == "bloodbath");

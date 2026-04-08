@@ -5,7 +5,8 @@ use serenity::all::{
 };
 
 use crate::game::shop::{self, SHOP_ITEMS};
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("shop")
@@ -13,13 +14,17 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "acheter", "Objet a acheter")
                 .required(false)
-                .add_string_choice("Explosion (200)", "explosion")
-                .add_string_choice("Inversion (500)", "inversion")
-                .add_string_choice("Mindgame (150)", "mindgame")
+                .add_string_choice("Potion de Soin (80)", "potion_soin")
                 .add_string_choice("Rage (100)", "rage")
-                .add_string_choice("Attaque surprise (300)", "surprise")
-                .add_string_choice("Double coup (250)", "double_coup")
-                .add_string_choice("Coup traitre (350)", "coup_traitre"),
+                .add_string_choice("Mindgame (150)", "mindgame")
+                .add_string_choice("Antidote (150)", "antidote")
+                .add_string_choice("Explosion (200)", "explosion")
+                .add_string_choice("Potion Majeure (200)", "potion_majeure")
+                .add_string_choice("Double Coup (250)", "double_coup")
+                .add_string_choice("Bouclier (250)", "bouclier")
+                .add_string_choice("Attaque Surprise (300)", "surprise")
+                .add_string_choice("Poison (300)", "poison")
+                .add_string_choice("Coup Traitre (350)", "coup_traitre"),
         )
 }
 
@@ -48,7 +53,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
     match buy_key {
         Some(key) => {
@@ -61,13 +66,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 }
             };
 
-            let player = match db
+            let player = match api
                 .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
                 .await
             {
                 Ok(p) => p,
                 Err(e) => {
-                    reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+                    reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
                     return;
                 }
             };
@@ -88,20 +93,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
 
             // Deduire les coins
-            if let Err(e) = db
+            if let Err(e) = api
                 .update_player_coins(&guild_id, &command.user.id.to_string(), -price)
                 .await
             {
-                reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
                 return;
             }
 
             // Ajouter l'item
-            if let Err(e) = db
+            if let Err(e) = api
                 .add_item(&guild_id, &command.user.id.to_string(), &key)
                 .await
             {
-                reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
                 return;
             }
 
@@ -130,7 +135,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
 
             // Afficher l'inventaire du joueur
-            let inventory = db
+            let inventory = api
                 .get_inventory(&guild_id, &command.user.id.to_string())
                 .await
                 .unwrap_or_default();

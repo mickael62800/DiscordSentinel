@@ -6,7 +6,8 @@ use serenity::all::{
 };
 
 use crate::game::progression;
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("casino")
@@ -53,14 +54,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
     // Cooldown casino
     let cooldown_secs = config.casino_cooldown_secs();
     if cooldown_secs > 0 {
-        match db.check_cooldown(&guild_id, &command.user.id.to_string(), "casino").await {
-            Ok(Some(expires_at)) => {
-                let remaining = expires_at
+        match api.check_cooldown(&guild_id, &command.user.id.to_string(), "casino").await {
+            Ok(Some(expires_at_str)) => {
+                let expires = chrono::DateTime::parse_from_rfc3339(&expires_at_str)
+                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                    .unwrap_or_else(|_| chrono::Utc::now());
+                let remaining = expires
                     .signed_duration_since(chrono::Utc::now())
                     .num_seconds();
                 if remaining > 0 {
@@ -75,7 +79,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
             Ok(None) => {}
             Err(e) => {
-                reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
                 return;
             }
         }
@@ -84,7 +88,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Limite quotidienne de parties
     let max_daily = config.casino_max_daily();
     if max_daily > 0 {
-        let today_count = db.count_casino_today(&guild_id, &command.user.id.to_string()).await.unwrap_or(0);
+        let today_count = api.count_casino_today(&guild_id, &command.user.id.to_string()).await.unwrap_or(0);
         if today_count >= max_daily {
             reply_ephemeral(ctx, command, &format!("Tu as atteint la limite de {} parties de casino par jour !", max_daily)).await;
             return;
@@ -94,20 +98,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Limite quotidienne de gains
     let max_daily_gain = config.casino_max_daily_gain();
     if max_daily_gain > 0 {
-        let today_gain = db.sum_casino_gains_today(&guild_id, &command.user.id.to_string()).await.unwrap_or(0);
+        let today_gain = api.sum_casino_gains_today(&guild_id, &command.user.id.to_string()).await.unwrap_or(0);
         if today_gain >= max_daily_gain {
             reply_ephemeral(ctx, command, &format!("Tu as atteint le plafond de gains au casino ({} coins/jour) !", max_daily_gain)).await;
             return;
         }
     }
 
-    let player = match db
+    let player = match api
         .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
         .await
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -200,32 +204,32 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Poser le cooldown
     if cooldown_secs > 0 {
-        if let Err(e) = db.set_cooldown(&guild_id, &command.user.id.to_string(), "casino", cooldown_secs).await {
-            tracing::warn!(error = %e, "Echec DB set_cooldown casino");
+        if let Err(e) = api.set_cooldown(&guild_id, &command.user.id.to_string(), "casino", cooldown_secs).await {
+            tracing::warn!(error = %e, "Echec API set_cooldown casino");
         }
     }
 
     // Appliquer le resultat
     if is_faillite {
-        if let Err(e) = db
+        if let Err(e) = api
             .record_casino_faillite(&guild_id, &command.user.id.to_string())
             .await
         {
-            tracing::warn!(error = %e, "Echec DB record_casino_faillite");
+            tracing::warn!(error = %e, "Echec API record_casino_faillite");
         }
     } else if gain >= 0 {
-        if let Err(e) = db
+        if let Err(e) = api
             .record_casino_win(&guild_id, &command.user.id.to_string(), gain)
             .await
         {
-            tracing::warn!(error = %e, "Echec DB record_casino_win");
+            tracing::warn!(error = %e, "Echec API record_casino_win");
         }
     } else {
-        if let Err(e) = db
+        if let Err(e) = api
             .record_casino_loss(&guild_id, &command.user.id.to_string(), -gain)
             .await
         {
-            tracing::warn!(error = %e, "Echec DB record_casino_loss");
+            tracing::warn!(error = %e, "Echec API record_casino_loss");
         }
     }
 
@@ -233,7 +237,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let mut xp_line = String::new();
     if roll > 92 {
         if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-            db.add_xp(&guild_id, &command.user.id.to_string(), 10).await
+            api.add_xp(&guild_id, &command.user.id.to_string(), 10).await
         {
             xp_line.push_str(&format!("\n\n\u{2b06}\u{fe0f} +10 XP (Jackpot bonus !)"));
             if leveled_up {

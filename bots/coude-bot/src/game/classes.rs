@@ -9,6 +9,12 @@ pub struct ClassStats {
     pub dodge_chance: f64,
     pub steal_bonus: f64,
     pub description: &'static str,
+    /// Passif de classe (identifiant interne)
+    pub passif_key: &'static str,
+    /// Description du passif pour l'affichage
+    pub passif_description: &'static str,
+    /// Message de revelation en combat
+    pub passif_reveal: &'static str,
 }
 
 pub const CLASS_BOURRIN: ClassStats = ClassStats {
@@ -21,6 +27,9 @@ pub const CLASS_BOURRIN: ClassStats = ClassStats {
     dodge_chance: 0.0,
     steal_bonus: 0.0,
     description: "Frappe fort mais encaisse mal",
+    passif_key: "berserker",
+    passif_description: "Berserker : +25% ATK quand HP < 30%",
+    passif_reveal: "La rage envahit {joueur}... Son attaque explose ! C'est un BOURRIN !",
 };
 
 pub const CLASS_AGILE: ClassStats = ClassStats {
@@ -33,6 +42,9 @@ pub const CLASS_AGILE: ClassStats = ClassStats {
     dodge_chance: 0.15,
     steal_bonus: 0.0,
     description: "Esquive souvent mais frappe faible",
+    passif_key: "esquive",
+    passif_description: "Esquive : 15% de chance d'esquiver par round",
+    passif_reveal: "{joueur} fait un pas de cote et esquive completement le coup ! C'est un AGILE !",
 };
 
 pub const CLASS_FOURBE: ClassStats = ClassStats {
@@ -45,6 +57,9 @@ pub const CLASS_FOURBE: ClassStats = ClassStats {
     dodge_chance: 0.0,
     steal_bonus: 0.20,
     description: "Manipule les regles",
+    passif_key: "vampirisme",
+    passif_description: "Vampirisme : vole 10% des degats infliges en HP",
+    passif_reveal: "{joueur} aspire l'energie de son adversaire ! C'est un FOURBE !",
 };
 
 pub const CLASS_TANK: ClassStats = ClassStats {
@@ -57,6 +72,9 @@ pub const CLASS_TANK: ClassStats = ClassStats {
     dodge_chance: 0.0,
     steal_bonus: 0.0,
     description: "Lent mais increvable",
+    passif_key: "blindage",
+    passif_description: "Blindage : -5 degats recus par round",
+    passif_reveal: "Le coup rebondit sur {joueur} comme sur un mur ! C'est un TANK !",
 };
 
 #[allow(dead_code)]
@@ -70,4 +88,10 @@ pub fn get_class(name: &str) -> &'static ClassStats {
         "tank" => &CLASS_TANK,
         _ => &CLASS_BOURRIN,
     }
+}
+
+/// Verifie si un nom de classe est valide.
+#[allow(dead_code)]
+pub fn is_valid_class(name: &str) -> bool {
+    matches!(name, "bourrin" | "agile" | "fourbe" | "tank")
 }

@@ -6,60 +6,119 @@ pub struct ShopItem {
     pub emoji: &'static str,
     pub price: i64,
     pub description: &'static str,
+    /// Categorie : "combat", "soin", "defense"
+    pub category: &'static str,
 }
 
 pub const SHOP_ITEMS: &[ShopItem] = &[
+    // ── Items de combat ──
     ShopItem {
-        key: "explosion",
-        name: "Explosion",
-        emoji: "\u{1f4a3}",
-        price: 200,
-        description: "Les deux joueurs perdent toute la mise",
-    },
-    ShopItem {
-        key: "inversion",
-        name: "Inversion",
-        emoji: "\u{1f504}",
-        price: 500,
-        description: "Echange tes coins avec ceux de l'adversaire",
+        key: "rage",
+        name: "Rage",
+        emoji: "\u{1f621}",
+        price: 100,
+        description: "+50% ATK mais -30% DEF pendant le combat",
+        category: "combat",
     },
     ShopItem {
         key: "mindgame",
         name: "Mindgame",
         emoji: "\u{1f9e0}",
         price: 150,
-        description: "Vois le roll de l'adversaire avant de jouer",
+        description: "Revele la classe et les HP de l'adversaire avant le combat",
+        category: "combat",
     },
     ShopItem {
-        key: "rage",
-        name: "Rage",
-        emoji: "\u{1f621}",
-        price: 100,
-        description: "+50 attaque mais -50 defense",
-    },
-    ShopItem {
-        key: "surprise",
-        name: "Attaque surprise",
-        emoji: "\u{1f4a8}",
-        price: 300,
-        description: "L'adversaire ne peut pas refuser",
+        key: "explosion",
+        name: "Explosion",
+        emoji: "\u{1f4a3}",
+        price: 200,
+        description: "Les deux joueurs perdent 50% de la mise (defenseur uniquement)",
+        category: "combat",
     },
     ShopItem {
         key: "double_coup",
-        name: "Double coup",
+        name: "Double Coup",
         emoji: "\u{270a}\u{270a}",
         price: 250,
-        description: "Lance le de deux fois et garde le meilleur",
+        description: "Lance 2d20 et garde le meilleur a chaque round",
+        category: "combat",
+    },
+    ShopItem {
+        key: "surprise",
+        name: "Attaque Surprise",
+        emoji: "\u{1f4a8}",
+        price: 300,
+        description: "L'adversaire ne peut pas refuser le defi",
+        category: "combat",
     },
     ShopItem {
         key: "coup_traitre",
-        name: "Coup traitre",
+        name: "Coup Traitre",
         emoji: "\u{1f5e1}\u{fe0f}",
         price: 350,
-        description: "Ignore le bonus de defense adverse",
+        description: "Reduit la DEF adverse de 50% pendant le combat",
+        category: "combat",
+    },
+    ShopItem {
+        key: "poison",
+        name: "Poison",
+        emoji: "\u{2620}\u{fe0f}",
+        price: 300,
+        description: "L'adversaire perd 5 HP par round pendant le combat",
+        category: "combat",
+    },
+    ShopItem {
+        key: "bouclier",
+        name: "Bouclier",
+        emoji: "\u{1f6e1}\u{fe0f}",
+        price: 250,
+        description: "+20% DEF pendant tout le combat",
+        category: "defense",
+    },
+    // ── Potions (hors combat) ──
+    ShopItem {
+        key: "potion_soin",
+        name: "Potion de Soin",
+        emoji: "\u{1f9ea}",
+        price: 80,
+        description: "+30 HP (utilisable hors combat)",
+        category: "soin",
+    },
+    ShopItem {
+        key: "potion_majeure",
+        name: "Potion Majeure",
+        emoji: "\u{1f48a}",
+        price: 200,
+        description: "+80 HP (utilisable hors combat)",
+        category: "soin",
+    },
+    ShopItem {
+        key: "antidote",
+        name: "Antidote",
+        emoji: "\u{1f49a}",
+        price: 150,
+        description: "Immunise contre le poison pendant 1 combat",
+        category: "defense",
     },
 ];
 
 pub fn get_item(key: &str) -> Option<&'static ShopItem> {
     SHOP_ITEMS.iter().find(|i| i.key == key)
+}
+
+/// Verifie si un item est une potion (utilisable hors combat).
+#[allow(dead_code)]
+pub fn is_potion(key: &str) -> bool {
+    matches!(key, "potion_soin" | "potion_majeure")
+}
+
+/// Retourne le montant de HP restaure par une potion.
+#[allow(dead_code)]
+pub fn potion_heal_amount(key: &str) -> i32 {
+    match key {
+        "potion_soin" => 30,
+        "potion_majeure" => 80,
+        _ => 0,
+    }
 }

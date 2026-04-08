@@ -4,7 +4,8 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("pari")
@@ -74,16 +75,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
     // Creer/recuperer le parieur
-    let bettor = match db
+    let bettor = match api
         .get_or_create_player(&guild_id, &bettor_id, &command.user.name)
         .await
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -102,7 +103,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Chercher un combat en phase de paris pour le combattant
-    let combat = match db
+    let combat = match api
         .get_betting_combat_for_player(&guild_id, &target_id_str)
         .await
     {
@@ -117,7 +118,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -134,16 +135,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Deduire la mise du parieur
-    if let Err(e) = db.update_player_coins(&guild_id, &bettor_id, -mise).await {
-        reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+    if let Err(e) = api.update_player_coins(&guild_id, &bettor_id, -mise).await {
+        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
     // Inserer le pari
-    if let Err(e) = db
+    if let Err(e) = api
         .place_bet(
             &guild_id,
-            combat.id,
+            &combat.id,
             &bettor_id,
             &command.user.name,
             &target_id_str,
@@ -152,8 +153,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .await
     {
         // Rembourser en cas d'erreur
-        if let Err(e2) = db.update_player_coins(&guild_id, &bettor_id, mise).await {
-            tracing::warn!(error = %e2, "Echec DB update_player_coins remboursement pari");
+        if let Err(e2) = api.update_player_coins(&guild_id, &bettor_id, mise).await {
+            tracing::warn!(error = %e2, "Echec API update_player_coins remboursement pari");
         }
         reply_ephemeral(ctx, command, &format!("Erreur pari : {e}")).await;
         return;

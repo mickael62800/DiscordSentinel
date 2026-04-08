@@ -6,7 +6,8 @@ use serenity::all::{
 
 use crate::game::classes;
 use crate::game::progression;
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("profil")
@@ -55,17 +56,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
-    let player = match db.get_or_create_player(&guild_id, &target.id.to_string(), &target.name).await {
+    let player = match api.get_or_create_player(&guild_id, &target.id.to_string(), &target.name).await {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur base de donnees : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
 
-    let class = classes::get_class(&player.class);
+    let class = classes::get_class(player.class.as_deref().unwrap_or("bourrin"));
     let title = progression::title_for_level(player.level);
 
     let effective_atk = class.base_atk + (player.level - 1) * class.atk_growth + player.atk;

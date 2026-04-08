@@ -6,7 +6,8 @@ use serenity::all::{
 
 use crate::game::classes;
 use crate::game::progression;
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("train")
@@ -58,16 +59,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
     // Verifier que le joueur existe
-    let player = match db
+    let player = match api
         .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
         .await
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -85,7 +86,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let updated = match db
+    let updated = match api
         .spend_stat_point(&guild_id, &command.user.id.to_string(), db_stat)
         .await
     {
@@ -96,7 +97,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let class = classes::get_class(&updated.class);
+    let class = classes::get_class(updated.class.as_deref().unwrap_or("bourrin"));
     let effective_atk = class.base_atk + (updated.level - 1) * class.atk_growth + updated.atk;
     let effective_def = class.base_def + (updated.level - 1) * class.def_growth + updated.def;
     let hp = progression::display_hp(effective_def);

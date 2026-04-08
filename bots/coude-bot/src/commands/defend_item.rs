@@ -3,21 +3,21 @@ use serenity::all::{
     CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind,
     CreateSelectMenuOption,
 };
-use uuid::Uuid;
 
 use crate::game::shop;
-use crate::handler::GameDbKey;
+use crate::GameApiKey;
 
 pub const DEFEND_PREFIX: &str = "coude_defend:";
 pub const DEFEND_SELECT_PREFIX: &str = "coude_defend_select:";
 
 /// Items utilisables en defense.
 const DEFENSIVE_ITEMS: &[&str] = &[
-    "rage",         // +50 attaque -50 defense (risque)
-    "double_coup",  // Lance le de deux fois
-    "explosion",    // Les deux perdent
-    "mindgame",     // Voir le roll adverse
-    "inversion",    // Echange les coins
+    "rage",         // +50% attaque -30% defense (risque)
+    "double_coup",  // Lance le de deux fois par round
+    "explosion",    // Les deux perdent 50% de la mise
+    "mindgame",     // Revele la classe et HP adverses
+    "bouclier",     // +20% DEF pendant le combat
+    "antidote",     // Immunise contre le poison
 ];
 
 /// Gere le clic sur le bouton "Objet" — affiche l'inventaire du defenseur.
@@ -27,26 +27,18 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
         None => return,
     };
 
-    let combat_id = match Uuid::parse_str(combat_id_str) {
-        Ok(id) => id,
-        Err(_) => {
-            reply_ephemeral(ctx, component, "ID de combat invalide.").await;
-            return;
-        }
-    };
-
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
     // Verifier le combat
-    let combat_record = match db.get_combat(combat_id).await {
+    let combat_record = match api.get_combat(combat_id_str).await {
         Ok(Some(c)) => c,
         Ok(None) => {
             reply_ephemeral(ctx, component, "Combat introuvable.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -63,7 +55,7 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
     }
 
     // Recuperer l'inventaire du defenseur
-    let inventory = db
+    let inventory = api
         .get_inventory(&combat_record.guild_id, &combat_record.defender_id)
         .await
         .unwrap_or_default();
@@ -138,14 +130,6 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         None => return,
     };
 
-    let combat_id = match Uuid::parse_str(combat_id_str) {
-        Ok(id) => id,
-        Err(_) => {
-            reply_ephemeral(ctx, component, "ID de combat invalide.").await;
-            return;
-        }
-    };
-
     let selected_item = match &component.data.kind {
         serenity::all::ComponentInteractionDataKind::StringSelect { values } => {
             values.first().cloned().unwrap_or_default()
@@ -154,16 +138,16 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
     };
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
-    let combat_record = match db.get_combat(combat_id).await {
+    let combat_record = match api.get_combat(combat_id_str).await {
         Ok(Some(c)) => c,
         Ok(None) => {
             reply_ephemeral(ctx, component, "Combat introuvable.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -180,7 +164,7 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
 
     // Consommer l'objet si ce n'est pas "none"
     if selected_item != "none" {
-        if let Err(e) = db
+        if let Err(e) = api
             .use_item(
                 &combat_record.guild_id,
                 &combat_record.defender_id,
@@ -193,7 +177,7 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         }
 
         // Enregistrer l'objet defensif dans le combat
-        if let Err(e) = db.set_defender_special(combat_id, &selected_item).await {
+        if let Err(e) = api.set_defender_special(combat_id_str, &selected_item).await {
             tracing::warn!(error = %e, "Erreur set_defender_special");
         }
     }

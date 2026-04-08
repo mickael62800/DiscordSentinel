@@ -162,12 +162,16 @@ impl CoudeConfig {
     pub fn shop_price(&self, item_key: &str) -> i64 {
         let config_key = format!("shop_{}_price", item_key);
         let default = match item_key {
-            "explosion" => 200,
-            "inversion" => 500,
-            "mindgame" => 150,
+            "potion_soin" => 80,
             "rage" => 100,
-            "surprise" => 300,
+            "mindgame" => 150,
+            "antidote" => 150,
+            "explosion" => 200,
+            "potion_majeure" => 200,
             "double_coup" => 250,
+            "bouclier" => 250,
+            "surprise" => 300,
+            "poison" => 300,
             "coup_traitre" => 350,
             _ => 100,
         };

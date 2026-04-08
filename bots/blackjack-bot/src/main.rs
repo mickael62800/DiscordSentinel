@@ -1,3 +1,4 @@
+mod api_client;
 mod commands;
 mod config;
 mod handler;
@@ -11,8 +12,15 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
+use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::Handler;
+
+/// TypeMap key for the blackjack ApiClient.
+pub struct GameApiKey;
+impl TypeMapKey for GameApiKey {
+    type Value = ApiClient;
+}
 
 #[tokio::main]
 async fn main() {
@@ -30,6 +38,8 @@ async fn main() {
 
     let base_api = Arc::new(BaseApiClient::new(&config, "blackjack-bot"));
 
+    let api_client = ApiClient::new(Arc::clone(&base_api));
+
     let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .await
@@ -38,6 +48,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
+        data.insert::<GameApiKey>(api_client);
     }
 
     spawn_heartbeat(Arc::clone(&base_api));

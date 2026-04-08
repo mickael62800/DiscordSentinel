@@ -4,41 +4,33 @@ use serenity::all::{
 };
 use serenity::model::id::ChannelId;
 use tracing::error;
-use uuid::Uuid;
 
-use crate::db::Combat;
+use crate::api_client::Combat;
 use crate::game::chaos::ChaosEvent;
 use crate::game::combat;
 use crate::game::progression;
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub const ACCEPT_PREFIX: &str = "coude_accept:";
 
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
-    let combat_id_str = match component.data.custom_id.strip_prefix(ACCEPT_PREFIX) {
-        Some(id) => id,
+    let combat_id = match component.data.custom_id.strip_prefix(ACCEPT_PREFIX) {
+        Some(id) => id.to_string(),
         None => return,
     };
 
-    let combat_id = match Uuid::parse_str(combat_id_str) {
-        Ok(id) => id,
-        Err(_) => {
-            reply_ephemeral(ctx, component, "ID de combat invalide.").await;
-            return;
-        }
-    };
-
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
-    let combat_record = match db.get_combat(combat_id).await {
+    let combat_record = match api.get_combat(&combat_id).await {
         Ok(Some(c)) => c,
         Ok(None) => {
             reply_ephemeral(ctx, component, "Combat introuvable.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -61,14 +53,17 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 
     // Verifier l'expiration (configurable, defaut 24h)
     let expire_secs = config.combat_expire_secs() as i64;
+    let created = chrono::DateTime::parse_from_rfc3339(&combat_record.created_at)
+        .map(|dt| dt.with_timezone(&chrono::Utc))
+        .unwrap_or_else(|_| chrono::Utc::now());
     let elapsed = chrono::Utc::now()
-        .signed_duration_since(combat_record.created_at)
+        .signed_duration_since(created)
         .num_seconds();
     if elapsed > expire_secs {
         let data = ctx.data.read().await;
-        let db = data.get::<GameDbKey>().unwrap();
-        if let Err(e) = db.expire_combat(combat_id).await {
-            tracing::warn!(error = %e, "Echec DB expire_combat");
+        let api = data.get::<GameApiKey>().unwrap();
+        if let Err(e) = api.expire_combat(&combat_id).await {
+            tracing::warn!(error = %e, "Echec API expire_combat");
         }
         let expire_label = if expire_secs >= 3600 { format!("{}h", expire_secs / 3600) } else { format!("{}min", expire_secs / 60) };
         reply_ephemeral(ctx, component, &format!("Ce defi a expire ! ({})", expire_label)).await;
@@ -79,16 +74,16 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 
     // Passer le combat en phase "betting" avec le message_id
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
     let message_id = component.message.id.to_string();
 
-    match db.set_combat_betting(combat_id, &message_id).await {
+    match api.set_combat_betting(&combat_id, &message_id).await {
         Ok(false) => {
             reply_ephemeral(ctx, component, "Ce combat n'est plus en attente.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
         Ok(true) => {}
@@ -161,9 +156,9 @@ pub async fn resolve_combat_internal(
     _channel_id: ChannelId,
 ) -> Option<CreateEmbed> {
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
-    let attacker = match db
+    let attacker = match api
         .get_player(&combat_record.guild_id, &combat_record.attacker_id)
         .await
     {
@@ -171,7 +166,7 @@ pub async fn resolve_combat_internal(
         _ => return None,
     };
 
-    let defender = match db
+    let defender = match api
         .get_player(&combat_record.guild_id, &combat_record.defender_id)
         .await
     {
@@ -179,17 +174,22 @@ pub async fn resolve_combat_internal(
         _ => return None,
     };
 
-    let events = db
+    let events = api
         .get_active_events(&combat_record.guild_id)
         .await
         .unwrap_or_else(|e| {
-            tracing::warn!(error = %e, "Echec DB get_active_events");
+            tracing::warn!(error = %e, "Echec API get_active_events");
             vec![]
         });
+
+    let atk_hp_max = combat::calculate_hp_max(&attacker);
+    let def_hp_max = combat::calculate_hp_max(&defender);
 
     let result = combat::resolve_combat(
         &attacker,
         &defender,
+        atk_hp_max,
+        def_hp_max,
         combat_record.mise,
         combat_record.special_attack.as_deref(),
         combat_record.defender_special.as_deref(),
@@ -197,22 +197,28 @@ pub async fn resolve_combat_internal(
     );
 
     // Mettre a jour la base de donnees
-    let chaos_key = result.chaos_event.as_ref().map(|c| c.key());
+    // Aggregate chaos info from rounds
+    let first_chaos = result.rounds.iter().find_map(|r| r.chaos_event);
+    let chaos_key = first_chaos.as_ref().map(|c| c.key());
 
-    if let Err(e) = db
+    // Use first round rolls for DB compat, or 0 if no rounds
+    let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);
+    let first_def_roll = result.rounds.first().map(|r| r.defender_roll).unwrap_or(0);
+
+    if let Err(e) = api
         .resolve_combat(
-            combat_record.id,
+            &combat_record.id,
             "accepted",
             result.winner_id.as_deref(),
-            Some(result.attacker_roll),
-            Some(result.defender_roll),
+            Some(first_atk_roll),
+            Some(first_def_roll),
             chaos_key,
             &result.message,
             result.coins_won,
         )
         .await
     {
-        error!(error = %e, "Erreur resolution combat DB");
+        error!(error = %e, "Erreur resolution combat API");
         return None;
     }
 
@@ -223,13 +229,13 @@ pub async fn resolve_combat_internal(
             let mut actual_loss = result.coins_lost_by_loser;
             let mut insurance_msg: Option<String> = None;
 
-            if let Ok(Some(insurance)) = db
+            if let Ok(Some(insurance)) = api
                 .get_active_insurance(&combat_record.guild_id, loser_id)
                 .await
             {
                 // Consommer l'assurance
-                if let Err(e) = db.expire_insurance(insurance.id).await {
-                    tracing::warn!(error = %e, "Echec DB expire_insurance");
+                if let Err(e) = api.expire_insurance(&insurance.id).await {
+                    tracing::warn!(error = %e, "Echec API expire_insurance");
                 }
 
                 if insurance.is_scam {
@@ -250,7 +256,7 @@ pub async fn resolve_combat_internal(
             }
 
             // Gagnant recoit
-            if let Err(e) = db
+            if let Err(e) = api
                 .record_win(
                     &combat_record.guild_id,
                     winner_id,
@@ -262,7 +268,7 @@ pub async fn resolve_combat_internal(
                 error!(error = %e, "Erreur record_win");
             }
             // Perdant perd (montant ajuste par l'assurance)
-            if let Err(e) = db
+            if let Err(e) = api
                 .record_loss(&combat_record.guild_id, loser_id, actual_loss)
                 .await
             {
@@ -270,7 +276,7 @@ pub async fn resolve_combat_internal(
             }
 
             // Primes : si le perdant a des primes, le gagnant les recupere
-            let prime_amount = db
+            let prime_amount = api
                 .claim_primes(
                     &combat_record.guild_id,
                     loser_id,
@@ -285,27 +291,27 @@ pub async fn resolve_combat_internal(
                 .unwrap_or(0);
 
             if prime_amount > 0 {
-                if let Err(e) = db
+                if let Err(e) = api
                     .record_coins_earned(&combat_record.guild_id, winner_id, prime_amount)
                     .await
                 {
-                    tracing::warn!(error = %e, "Echec DB record_coins_earned");
+                    tracing::warn!(error = %e, "Echec API record_coins_earned");
                 }
             }
 
             // Chaos event tracking
-            if result.chaos_event.is_some() {
-                if let Err(e) = db
+            if result.chaos_events_count > 0 {
+                if let Err(e) = api
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.attacker_id)
                     .await
                 {
-                    tracing::warn!(error = %e, "Echec DB increment_chaos_events attacker");
+                    tracing::warn!(error = %e, "Echec API increment_chaos_events attacker");
                 }
-                if let Err(e) = db
+                if let Err(e) = api
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.defender_id)
                     .await
                 {
-                    tracing::warn!(error = %e, "Echec DB increment_chaos_events defender");
+                    tracing::warn!(error = %e, "Echec API increment_chaos_events defender");
                 }
             }
 
@@ -325,7 +331,7 @@ pub async fn resolve_combat_internal(
             let mut xp_msg_lines: Vec<String> = Vec::new();
 
             if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-                db.add_xp(&combat_record.guild_id, winner_id, winner_xp).await
+                api.add_xp(&combat_record.guild_id, winner_id, winner_xp).await
             {
                 xp_msg_lines.push(format!(
                     "\u{2b06}\u{fe0f} <@{}> gagne **+{} XP**{}",
@@ -343,7 +349,7 @@ pub async fn resolve_combat_internal(
             }
 
             if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-                db.add_xp(&combat_record.guild_id, loser_id, loser_xp).await
+                api.add_xp(&combat_record.guild_id, loser_id, loser_xp).await
             {
                 xp_msg_lines.push(format!(
                     "\u{2b06}\u{fe0f} <@{}> gagne **+{} XP**",
@@ -358,27 +364,9 @@ pub async fn resolve_combat_internal(
                 }
             }
 
-            // Inversion special
-            if combat_record.special_attack.as_deref() == Some("inversion") {
-                let atk_coins = attacker.coins;
-                let def_coins = defender.coins;
-                if let Err(e) = db
-                    .set_player_coins(&combat_record.guild_id, &attacker.user_id, def_coins)
-                    .await
-                {
-                    tracing::warn!(error = %e, "Echec DB set_player_coins attacker");
-                }
-                if let Err(e) = db
-                    .set_player_coins(&combat_record.guild_id, &defender.user_id, atk_coins)
-                    .await
-                {
-                    tracing::warn!(error = %e, "Echec DB set_player_coins defender");
-                }
-            }
-
             // Resoudre les paris (parieurs + bonus combattants)
-            let (bet_results, fighter_bonus) = db
-                .resolve_bets(combat_record.id, Some(winner_id))
+            let (bet_results, fighter_bonus) = api
+                .resolve_bets(&combat_record.id, Some(winner_id))
                 .await
                 .unwrap_or((vec![], None));
 
@@ -393,7 +381,7 @@ pub async fn resolve_combat_internal(
                     } else {
                         lines.push(format!(
                             "\u{274c} **{}** perd sa mise de **{} coins**",
-                            br.bettor_name, br.amount
+                            br.bettor_name, br.amount_bet
                         ));
                     }
                 }
@@ -423,7 +411,7 @@ pub async fn resolve_combat_internal(
                 None
             };
 
-            let color = if result.chaos_event.is_some() {
+            let color = if result.chaos_events_count > 0 {
                 0x9B59B6
             } else {
                 0x57F287
@@ -434,15 +422,14 @@ pub async fn resolve_combat_internal(
                 .description(&result.message)
                 .color(color)
                 .field(
-                    "Degats",
+                    "Combat",
                     format!(
-                        "<@{}> : {} dmg (roll {}) | <@{}> : {} dmg (roll {})",
+                        "{} rounds | <@{}> : {}/{} HP | <@{}> : {}/{} HP",
+                        result.total_rounds,
                         combat_record.attacker_id,
-                        result.attacker_damage,
-                        result.attacker_roll,
+                        result.attacker_hp_final, result.attacker_hp_max,
                         combat_record.defender_id,
-                        result.defender_damage,
-                        result.defender_roll
+                        result.defender_hp_final, result.defender_hp_max,
                     ),
                     false,
                 )
@@ -477,9 +464,10 @@ pub async fn resolve_combat_internal(
         }
         _ => {
             // Match nul (accident_debile ou egalite)
-            if let Some(ChaosEvent::AccidentDebile) = result.chaos_event {
+            let had_accident = result.rounds.iter().any(|r| r.chaos_event == Some(ChaosEvent::AccidentDebile));
+            if had_accident {
                 // Les deux perdent la mise
-                if let Err(e) = db
+                if let Err(e) = api
                     .record_draw(
                         &combat_record.guild_id,
                         &combat_record.attacker_id,
@@ -487,9 +475,9 @@ pub async fn resolve_combat_internal(
                     )
                     .await
                 {
-                    tracing::warn!(error = %e, "Echec DB record_draw attacker");
+                    tracing::warn!(error = %e, "Echec API record_draw attacker");
                 }
-                if let Err(e) = db
+                if let Err(e) = api
                     .record_draw(
                         &combat_record.guild_id,
                         &combat_record.defender_id,
@@ -497,25 +485,25 @@ pub async fn resolve_combat_internal(
                     )
                     .await
                 {
-                    tracing::warn!(error = %e, "Echec DB record_draw defender");
+                    tracing::warn!(error = %e, "Echec API record_draw defender");
                 }
-                if let Err(e) = db
+                if let Err(e) = api
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.attacker_id)
                     .await
                 {
-                    tracing::warn!(error = %e, "Echec DB increment_chaos_events attacker");
+                    tracing::warn!(error = %e, "Echec API increment_chaos_events attacker");
                 }
-                if let Err(e) = db
+                if let Err(e) = api
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.defender_id)
                     .await
                 {
-                    tracing::warn!(error = %e, "Echec DB increment_chaos_events defender");
+                    tracing::warn!(error = %e, "Echec API increment_chaos_events defender");
                 }
             }
 
             // Resoudre les paris (egalite/accident = tout le monde perd)
-            let (bet_results, _) = db
-                .resolve_bets(combat_record.id, None)
+            let (bet_results, _) = api
+                .resolve_bets(&combat_record.id, None)
                 .await
                 .unwrap_or((vec![], None));
 
@@ -524,7 +512,7 @@ pub async fn resolve_combat_internal(
                 for br in &bet_results {
                     lines.push(format!(
                         "\u{274c} **{}** perd sa mise de **{} coins**",
-                        br.bettor_name, br.amount
+                        br.bettor_name, br.amount_bet
                     ));
                 }
                 Some(lines.join("\n"))

@@ -1,40 +1,156 @@
 use rand::Rng;
 
-use crate::db::{Player, ServerEvent};
+use crate::api_client::{Player, ServerEvent};
 use crate::game::chaos::{self, ChaosEvent};
 use crate::game::classes;
 use crate::game::progression;
 
-/// Resultat d'un combat resolu.
-pub struct CombatResult {
-    /// None si match nul (accident_debile)
-    pub winner_id: Option<String>,
-    pub loser_id: Option<String>,
+// ══════════════════════════════════════════════════════════════════════
+// ── Flavor text ──
+// ══════════════════════════════════════════════════════════════════════
+
+const COMBAT_START: &[&str] = &[
+    "\u{2694}\u{fe0f} {attaquant} craque ses doigts et regarde {defenseur} droit dans les yeux...",
+    "\u{1f514} DING DING ! Le match {attaquant} vs {defenseur} commence !",
+    "\u{1f3ac} Les lumieres s'eteignent... le spot s'allume sur {attaquant} et {defenseur} !",
+    "\u{1f32a}\u{fe0f} L'arene tremble ! {attaquant} et {defenseur} entrent en scene !",
+    "\u{2620}\u{fe0f} Ca va saigner ! {attaquant} defie {defenseur} ! Prenez vos popcorns !",
+];
+
+const ROUND_ATTACK: &[&str] = &[
+    "\u{1f4a5} {attaquant} envoie un coup de coude VIOLENT ! {degats} degats !",
+    "\u{1f44a} {attaquant} frappe avec precision ! {degats} degats !",
+    "\u{1f9b5} {attaquant} enchaine avec un coup vicieux ! {degats} degats !",
+    "\u{1f4ab} {attaquant} met toute sa force dans ce coup ! {degats} degats !",
+    "\u{1f94a} BOUM ! {attaquant} connecte un coup solide ! {degats} degats !",
+];
+
+const ROUND_WEAK: &[&str] = &[
+    "\u{1f6e1}\u{fe0f} {defenseur} encaisse sans broncher ! {degats} degats seulement.",
+    "\u{1f634} {attaquant} tape comme un chatonnet... {degats} degats.",
+    "\u{1f9f1} {defenseur} est un MUR. {degats} petits degats.",
+    "\u{1f41c} {attaquant} chatouille {defenseur}. {degats} degats.",
+];
+
+const COMBAT_KO: &[&str] = &[
+    "\u{2620}\u{fe0f} {perdant} s'ecroule ! K.O. ! {gagnant} remporte le combat !",
+    "\u{1f480} C'est TERMINE ! {perdant} est a terre ! {gagnant} leve le poing !",
+    "\u{1f3c6} {gagnant} acheve {perdant} avec un dernier coup ! VICTOIRE !",
+    "\u{1faa6} Repose en paix la dignite de {perdant}. {gagnant} domine !",
+];
+
+const COMBAT_TIMEOUT: &[&str] = &[
+    "\u{23f0} TEMPS ECOULE ! {gagnant} gagne aux points ({hp_g}% HP vs {hp_p}% HP) !",
+    "\u{1f514} Fin du match ! {gagnant} l'emporte avec {hp_g}% de vie restante !",
+    "\u{1f4ca} Les juges tranchent : {gagnant} gagne avec {hp_g}% HP contre {hp_p}% !",
+];
+
+const COMBAT_DRAW: &[&str] = &[
+    "\u{1f91d} Les deux combattants sont a bout de souffle ! Match nul !",
+    "\u{2696}\u{fe0f} Impossible de les departager ! Egalite parfaite !",
+    "\u{1fae0} Personne ne gagne... personne ne perd... c'est frustrant.",
+];
+
+// ══════════════════════════════════════════════════════════════════════
+// ── Structs ──
+// ══════════════════════════════════════════════════════════════════════
+
+/// Result of a single round.
+pub struct RoundResult {
+    pub round_number: i32,
     pub attacker_roll: i32,
     pub defender_roll: i32,
     pub attacker_damage: i32,
     pub defender_damage: i32,
+    pub attacker_hp_after: i32,
+    pub defender_hp_after: i32,
     pub chaos_event: Option<ChaosEvent>,
+    pub attacker_passif: Option<String>,
+    pub defender_passif: Option<String>,
+    pub message: String,
+}
+
+/// Full combat result.
+pub struct CombatResult {
+    pub winner_id: Option<String>,
+    pub loser_id: Option<String>,
+    pub rounds: Vec<RoundResult>,
+    pub total_rounds: i32,
+    pub attacker_hp_final: i32,
+    pub defender_hp_final: i32,
+    pub attacker_hp_max: i32,
+    pub defender_hp_max: i32,
+    pub chaos_events_count: i32,
     pub coins_won: i64,
     pub coins_lost_by_loser: i64,
     pub stolen_bonus: i64,
+    pub vol_coins: i64,
     pub message: String,
-    /// true si le gagnant est l'underdog (3+ niveaux en dessous)
     pub is_giant_killer: bool,
+    pub attacker_class_revealed: Option<String>,
+    pub defender_class_revealed: Option<String>,
 }
 
-/// Calcule les stats effectives d'un joueur.
-fn effective_stats(player: &Player) -> (i32, i32) {
-    let class = classes::get_class(&player.class);
+// ══════════════════════════════════════════════════════════════════════
+// ── Helpers ──
+// ══════════════════════════════════════════════════════════════════════
+
+fn pick_random<'a>(templates: &'a [&'a str]) -> &'a str {
+    let mut rng = rand::thread_rng();
+    let idx = rng.gen_range(0..templates.len());
+    templates[idx]
+}
+
+fn fmt_template(template: &str, replacements: &[(&str, &str)]) -> String {
+    let mut s = template.to_string();
+    for (key, val) in replacements {
+        s = s.replace(key, val);
+    }
+    s
+}
+
+/// Calcule les stats effectives d'un joueur (ATK, DEF).
+pub fn effective_stats(player: &Player) -> (i32, i32) {
+    let class = classes::get_class(player.class.as_deref().unwrap_or("bourrin"));
     let atk = class.base_atk + (player.level - 1) * class.atk_growth + player.atk;
     let def = class.base_def + (player.level - 1) * class.def_growth + player.def;
     (atk, def)
 }
 
-/// Resoud un combat entre deux joueurs.
+/// Calculate maximum HP for a player.
+pub fn calculate_hp_max(player: &Player) -> i32 {
+    let (_, def) = effective_stats(player);
+    100 + def * 2
+}
+
+/// Calculate damage for one hit.
+fn calc_damage(roll: i32, atk: i32, enemy_def: i32) -> i32 {
+    let degats_bruts = (roll as f64 * atk as f64) / 10.0;
+    let reduction = enemy_def as f64 / (enemy_def as f64 + 50.0);
+    let degats = degats_bruts * (1.0 - reduction);
+    3i32.max(degats as i32)
+}
+
+/// Determine max rounds from combined HP.
+fn max_rounds(combined_hp: i32) -> i32 {
+    if combined_hp < 250 {
+        3
+    } else if combined_hp <= 400 {
+        5
+    } else {
+        7
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ── Main combat function ──
+// ══════════════════════════════════════════════════════════════════════
+
 pub fn resolve_combat(
     attacker: &Player,
     defender: &Player,
+    attacker_current_hp: i32,
+    defender_current_hp: i32,
     mise: i64,
     special: Option<&str>,
     defender_special: Option<&str>,
@@ -42,13 +158,12 @@ pub fn resolve_combat(
 ) -> CombatResult {
     let mut rng = rand::thread_rng();
 
-    let _atk_class = classes::get_class(&attacker.class);
-    let def_class = classes::get_class(&defender.class);
+    let atk_class = classes::get_class(attacker.class.as_deref().unwrap_or("bourrin"));
+    let def_class = classes::get_class(defender.class.as_deref().unwrap_or("bourrin"));
 
-    let (mut atk_effective_atk, _atk_effective_def) = effective_stats(attacker);
-    let (_def_effective_atk_stat, def_effective_def) = effective_stats(defender);
-    let (def_effective_atk, _) = effective_stats(defender);
-    let (_, atk_effective_def) = effective_stats(attacker);
+    // Base effective stats
+    let (mut atk_atk, mut atk_def) = effective_stats(attacker);
+    let (mut def_atk, mut def_def) = effective_stats(defender);
 
     // Matchmaking handicap
     let (handicap, _blocked) = progression::matchmaking_handicap(attacker.level, defender.level);
@@ -56,284 +171,607 @@ pub fn resolve_combat(
     let stronger_is_attacker = attacker.level > defender.level;
     let stronger_is_defender = defender.level > attacker.level;
 
-    // Appliquer le handicap au plus fort
     if stronger_is_attacker && level_gap >= 3 {
-        atk_effective_atk = (atk_effective_atk as f64 * handicap) as i32;
+        atk_atk = (atk_atk as f64 * handicap) as i32;
     }
-    let mut def_effective_atk_adj = def_effective_atk;
     if stronger_is_defender && level_gap >= 3 {
-        def_effective_atk_adj = (def_effective_atk as f64 * handicap) as i32;
+        def_atk = (def_atk as f64 * handicap) as i32;
     }
 
-    // Rolls de base (1-100)
-    let mut atk_roll: i32 = rng.gen_range(1..=100);
-    let mut def_roll: i32 = rng.gen_range(1..=100);
+    // ── Item effects (global, applied once) ──
 
-    // Double coup attaquant : lance deux fois et garde le meilleur
-    if special == Some("double_coup") {
-        let second_roll: i32 = rng.gen_range(1..=100);
-        atk_roll = atk_roll.max(second_roll);
-    }
-
-    // Double coup defenseur : lance deux fois et garde le meilleur
-    if defender_special == Some("double_coup") {
-        let second_roll: i32 = rng.gen_range(1..=100);
-        def_roll = def_roll.max(second_roll);
-    }
-
-    // Rage attaquant : +50% ATK effective
-    let mut atk_bonus_flat = 0i32;
-    let mut def_bonus_flat = 0i32;
-
+    // Rage: +50% ATK, -30% DEF
     if special == Some("rage") {
-        atk_bonus_flat += 50;
+        atk_atk = (atk_atk as f64 * 1.5) as i32;
+        atk_def = (atk_def as f64 * 0.7) as i32;
     }
     if defender_special == Some("rage") {
-        def_bonus_flat += 50;
+        def_atk = (def_atk as f64 * 1.5) as i32;
+        def_def = (def_def as f64 * 0.7) as i32;
     }
 
-    // Coup traitre attaquant : ignore la defense adverse
-    let ignore_def_def = special == Some("coup_traitre");
-    let ignore_def_atk = defender_special == Some("coup_traitre");
+    // Coup traitre: reduce enemy DEF by 50%
+    if special == Some("coup_traitre") {
+        def_def = (def_def as f64 * 0.5) as i32;
+    }
+    if defender_special == Some("coup_traitre") {
+        atk_def = (atk_def as f64 * 0.5) as i32;
+    }
 
-    // Calcul des degats : damage = max(5, (roll * ATK / 50) - enemy_DEF)
-    let attacker_atk_total = atk_effective_atk + atk_bonus_flat;
-    let defender_atk_total = def_effective_atk_adj + def_bonus_flat;
+    // Bouclier: +20% DEF
+    if special == Some("bouclier") {
+        atk_def = (atk_def as f64 * 1.2) as i32;
+    }
+    if defender_special == Some("bouclier") {
+        def_def = (def_def as f64 * 1.2) as i32;
+    }
 
-    let defender_def_for_calc = if ignore_def_def { 0 } else { def_effective_def };
-    let attacker_def_for_calc = if ignore_def_atk { 0 } else { atk_effective_def };
+    // Recalculate HP max with modified DEF
+    let atk_hp_max = 100 + atk_def * 2;
+    let def_hp_max = 100 + def_def * 2;
 
-    let attacker_damage = 5i32.max((atk_roll * attacker_atk_total / 50) - defender_def_for_calc);
-    let defender_damage = 5i32.max((def_roll * defender_atk_total / 50) - attacker_def_for_calc);
+    let mut atk_hp = attacker_current_hp.min(atk_hp_max);
+    let mut def_hp = defender_current_hp.min(def_hp_max);
 
-    // Esquive de l'agile
-    let dodged = if def_class.dodge_chance > 0.0 {
-        rng.gen_bool(def_class.dodge_chance)
-    } else {
-        false
-    };
+    // Has double_coup?
+    let atk_double = special == Some("double_coup");
+    let def_double = defender_special == Some("double_coup");
 
-    // Chaos
-    let chaos_event = chaos::roll_chaos();
+    // Has poison?
+    let atk_poison = special == Some("poison");
+    let def_poison = defender_special == Some("poison");
 
-    // Happy hour : gains x2
+    // Happy hour
     let happy_hour = active_events.iter().any(|e| e.event_type == "happy_hour");
     let multiplier = if happy_hour { 2 } else { 1 };
 
-    // Cowardice penalty : laches gagnent 20% de moins
+    // Cowardice penalty
     let coward_penalty_atk = if attacker.cowardice_count >= 5 { 0.80 } else { 1.0 };
     let coward_penalty_def = if defender.cowardice_count >= 5 { 0.80 } else { 1.0 };
 
-    // Explosion defenseur : les deux perdent
+    let atk_name = format!("<@{}>", attacker.user_id);
+    let def_name = format!("<@{}>", defender.user_id);
+
+    // ── Explosion: early exit, both lose 50% of mise ──
     if defender_special == Some("explosion") {
+        let lost = (mise as f64 * 0.5) as i64;
         return CombatResult {
             winner_id: None,
             loser_id: None,
-            attacker_roll: atk_roll,
-            defender_roll: def_roll,
-            attacker_damage,
-            defender_damage,
-            chaos_event: None,
+            rounds: vec![],
+            total_rounds: 0,
+            attacker_hp_final: atk_hp,
+            defender_hp_final: def_hp,
+            attacker_hp_max: atk_hp_max,
+            defender_hp_max: def_hp_max,
+            chaos_events_count: 0,
             coins_won: 0,
-            coins_lost_by_loser: mise,
+            coins_lost_by_loser: lost,
             stolen_bonus: 0,
+            vol_coins: 0,
             message: format!(
-                "\u{1f4a3} **EXPLOSION !** <@{}> active une bombe ! Les deux perdent **{} coins** !",
-                defender.user_id, mise
+                "\u{1f4a3} **EXPLOSION !** {} active une bombe ! Les deux perdent **{} coins** !",
+                def_name, lost
             ),
             is_giant_killer: false,
+            attacker_class_revealed: None,
+            defender_class_revealed: None,
         };
     }
 
-    // Gestion chaos prioritaire
-    if let Some(ChaosEvent::AccidentDebile) = chaos_event {
-        return CombatResult {
-            winner_id: None,
-            loser_id: None,
+    // ── Combat start message ──
+    let start_msg = fmt_template(
+        pick_random(COMBAT_START),
+        &[("{attaquant}", &atk_name), ("{defenseur}", &def_name)],
+    );
+
+    let rounds_max = max_rounds(atk_hp_max + def_hp_max);
+    let mut rounds: Vec<RoundResult> = Vec::new();
+    let mut chaos_count = 0;
+    let mut vol_coins_total: i64 = 0;
+    let mut attacker_class_revealed: Option<String> = None;
+    let mut defender_class_revealed: Option<String> = None;
+
+    // ══════════════════════════════════════════════════════════════════
+    // ── Combat loop ──
+    // ══════════════════════════════════════════════════════════════════
+
+    for round_num in 1..=rounds_max {
+        let mut round_msg = format!("**--- Round {} ---**\n", round_num);
+        let mut atk_passif: Option<String> = None;
+        let mut def_passif: Option<String> = None;
+
+        // ── Rolls ──
+        let mut atk_roll: i32 = rng.gen_range(1..=20);
+        let mut def_roll: i32 = rng.gen_range(1..=20);
+
+        if atk_double {
+            let second: i32 = rng.gen_range(1..=20);
+            atk_roll = atk_roll.max(second);
+        }
+        if def_double {
+            let second: i32 = rng.gen_range(1..=20);
+            def_roll = def_roll.max(second);
+        }
+
+        // ── Effective ATK this round (class passives) ──
+        let mut atk_atk_round = atk_atk;
+        let mut def_atk_round = def_atk;
+
+        // Bourrin: Berserker — ATK +25% when HP < 30%
+        if atk_class.name == "bourrin" && atk_hp < (atk_hp_max as f64 * 0.3) as i32 {
+            atk_atk_round = (atk_atk_round as f64 * 1.25) as i32;
+            atk_passif = Some("berserker".to_string());
+            attacker_class_revealed = Some("bourrin".to_string());
+        }
+        if def_class.name == "bourrin" && def_hp < (def_hp_max as f64 * 0.3) as i32 {
+            def_atk_round = (def_atk_round as f64 * 1.25) as i32;
+            def_passif = Some("berserker".to_string());
+            defender_class_revealed = Some("bourrin".to_string());
+        }
+
+        // ── Base damage calc ──
+        let mut atk_dmg = calc_damage(atk_roll, atk_atk_round, def_def);
+        let mut def_dmg = calc_damage(def_roll, def_atk_round, atk_def);
+
+        // ── Tank: Blindage — reduce damage taken by 5 flat (after formula) ──
+        if atk_class.name == "tank" {
+            def_dmg = (def_dmg - 5).max(1);
+            if atk_passif.is_none() {
+                atk_passif = Some("blindage".to_string());
+            }
+            attacker_class_revealed = Some("tank".to_string());
+        }
+        if def_class.name == "tank" {
+            atk_dmg = (atk_dmg - 5).max(1);
+            if def_passif.is_none() {
+                def_passif = Some("blindage".to_string());
+            }
+            defender_class_revealed = Some("tank".to_string());
+        }
+
+        // ── Agile: Esquive — dodge chance per round ──
+        let atk_dodged = if atk_class.dodge_chance > 0.0 {
+            rng.gen_bool(atk_class.dodge_chance.min(1.0))
+        } else {
+            false
+        };
+        let def_dodged = if def_class.dodge_chance > 0.0 {
+            rng.gen_bool(def_class.dodge_chance.min(1.0))
+        } else {
+            false
+        };
+
+        if atk_dodged {
+            def_dmg = 0;
+            atk_passif = Some("esquive".to_string());
+            attacker_class_revealed = Some("agile".to_string());
+            round_msg.push_str(&format!(
+                "\u{1f3c3} {} esquive le coup !\n", atk_name
+            ));
+        }
+        if def_dodged {
+            atk_dmg = 0;
+            def_passif = Some("esquive".to_string());
+            defender_class_revealed = Some("agile".to_string());
+            round_msg.push_str(&format!(
+                "\u{1f3c3} {} esquive le coup !\n", def_name
+            ));
+        }
+
+        // ── Chaos event (8% per round) ──
+        let chaos_event = chaos::roll_chaos();
+        // We use roll_chaos which has 18% total; for now we treat it as-is
+        // (will be adjusted to 8% per-round in chaos.rs separately)
+
+        if let Some(ref ce) = chaos_event {
+            chaos_count += 1;
+            match ce {
+                ChaosEvent::CritiqueSauvage => {
+                    // x2 damage for whoever deals more this round
+                    if atk_dmg >= def_dmg {
+                        atk_dmg *= 2;
+                        round_msg.push_str(&format!(
+                            "{} **{}** — {} inflige x2 degats ce round !\n",
+                            ce.emoji(), ce.label(), atk_name
+                        ));
+                    } else {
+                        def_dmg *= 2;
+                        round_msg.push_str(&format!(
+                            "{} **{}** — {} inflige x2 degats ce round !\n",
+                            ce.emoji(), ce.label(), def_name
+                        ));
+                    }
+                }
+                ChaosEvent::EsquiveDivine => {
+                    // Defender dodges and counter-attacks with +50% damage
+                    atk_dmg = 0;
+                    def_dmg = (def_dmg as f64 * 1.5) as i32;
+                    round_msg.push_str(&format!(
+                        "{} **{}** — {} esquive et contre-attaque a +50% !\n",
+                        ce.emoji(), ce.label(), def_name
+                    ));
+                }
+                ChaosEvent::AccidentDebile => {
+                    // Both take 10% of their max HP
+                    let atk_self_dmg = (atk_hp_max as f64 * 0.1) as i32;
+                    let def_self_dmg = (def_hp_max as f64 * 0.1) as i32;
+                    atk_hp -= atk_self_dmg;
+                    def_hp -= def_self_dmg;
+                    round_msg.push_str(&format!(
+                        "{} **{}** — Les deux prennent des degats ! ({} et {} HP perdus)\n",
+                        ce.emoji(), ce.label(), atk_self_dmg, def_self_dmg
+                    ));
+                }
+                ChaosEvent::Glissade => {
+                    // Attacker hits himself
+                    atk_hp -= atk_dmg;
+                    atk_dmg = 0;
+                    round_msg.push_str(&format!(
+                        "{} **{}** — {} se frappe lui-meme !\n",
+                        ce.emoji(), ce.label(), atk_name
+                    ));
+                }
+                ChaosEvent::Vol => {
+                    // Winner of this round steals 5% of opponent's coins
+                    let steal_amount = (mise as f64 * 0.05) as i64;
+                    vol_coins_total += steal_amount;
+                    round_msg.push_str(&format!(
+                        "{} **{}** — {} coins voles en bonus !\n",
+                        ce.emoji(), ce.label(), steal_amount
+                    ));
+                }
+            }
+        }
+
+        // ── Apply poison ──
+        if atk_poison {
+            def_hp -= 5;
+            round_msg.push_str(&format!(
+                "\u{2620}\u{fe0f} {} subit 5 degats de poison !\n", def_name
+            ));
+        }
+        if def_poison {
+            atk_hp -= 5;
+            round_msg.push_str(&format!(
+                "\u{2620}\u{fe0f} {} subit 5 degats de poison !\n", atk_name
+            ));
+        }
+
+        // ── Apply damage simultaneously ──
+        def_hp -= atk_dmg;
+        atk_hp -= def_dmg;
+
+        // ── Fourbe: Vampirisme — heal 10% of damage dealt ──
+        if atk_class.name == "fourbe" && atk_dmg > 0 {
+            let heal = (atk_dmg as f64 * 0.1) as i32;
+            atk_hp = (atk_hp + heal).min(atk_hp_max);
+            if atk_passif.is_none() {
+                atk_passif = Some("vampirisme".to_string());
+            }
+            attacker_class_revealed = Some("fourbe".to_string());
+            if heal > 0 {
+                round_msg.push_str(&format!(
+                    "\u{1fa78} {} se soigne de {} HP (vampirisme) !\n", atk_name, heal
+                ));
+            }
+        }
+        if def_class.name == "fourbe" && def_dmg > 0 {
+            let heal = (def_dmg as f64 * 0.1) as i32;
+            def_hp = (def_hp + heal).min(def_hp_max);
+            if def_passif.is_none() {
+                def_passif = Some("vampirisme".to_string());
+            }
+            defender_class_revealed = Some("fourbe".to_string());
+            if heal > 0 {
+                round_msg.push_str(&format!(
+                    "\u{1fa78} {} se soigne de {} HP (vampirisme) !\n", def_name, heal
+                ));
+            }
+        }
+
+        // Clamp HP to 0 minimum
+        atk_hp = atk_hp.max(0);
+        def_hp = def_hp.max(0);
+
+        // ── Round flavor text ──
+        if atk_dmg > 0 {
+            let templates = if atk_dmg < 5 { ROUND_WEAK } else { ROUND_ATTACK };
+            let txt = fmt_template(
+                pick_random(templates),
+                &[
+                    ("{attaquant}", &atk_name),
+                    ("{defenseur}", &def_name),
+                    ("{degats}", &atk_dmg.to_string()),
+                ],
+            );
+            round_msg.push_str(&txt);
+            round_msg.push('\n');
+        }
+        if def_dmg > 0 {
+            let templates = if def_dmg < 5 { ROUND_WEAK } else { ROUND_ATTACK };
+            let txt = fmt_template(
+                pick_random(templates),
+                &[
+                    ("{attaquant}", &def_name),
+                    ("{defenseur}", &atk_name),
+                    ("{degats}", &def_dmg.to_string()),
+                ],
+            );
+            round_msg.push_str(&txt);
+            round_msg.push('\n');
+        }
+
+        round_msg.push_str(&format!(
+            "\u{2764}\u{fe0f} {} : {}/{} HP | {} : {}/{} HP",
+            atk_name, atk_hp, atk_hp_max, def_name, def_hp, def_hp_max
+        ));
+
+        rounds.push(RoundResult {
+            round_number: round_num,
             attacker_roll: atk_roll,
             defender_roll: def_roll,
-            attacker_damage,
-            defender_damage,
+            attacker_damage: atk_dmg,
+            defender_damage: def_dmg,
+            attacker_hp_after: atk_hp,
+            defender_hp_after: def_hp,
             chaos_event,
-            coins_won: 0,
-            coins_lost_by_loser: mise,
-            stolen_bonus: 0,
-            message: format!(
-                "\u{1f4a9} **ACCIDENT DEBILE !** Les deux joueurs glissent et perdent {} coins chacun !",
-                mise
-            ),
-            is_giant_killer: false,
-        };
+            attacker_passif: atk_passif,
+            defender_passif: def_passif,
+            message: round_msg,
+        });
+
+        // ── Check KO ──
+        if atk_hp <= 0 || def_hp <= 0 {
+            break;
+        }
     }
 
-    if let Some(ChaosEvent::Glissade) = chaos_event {
-        // L'attaquant se frappe => le defenseur gagne
-        let gain = (mise as f64 * coward_penalty_def) as i64 * multiplier;
-        return CombatResult {
-            winner_id: Some(defender.user_id.clone()),
-            loser_id: Some(attacker.user_id.clone()),
-            attacker_roll: atk_roll,
-            defender_roll: def_roll,
-            attacker_damage,
-            defender_damage,
-            chaos_event,
-            coins_won: gain,
-            coins_lost_by_loser: mise,
-            stolen_bonus: 0,
-            message: format!(
-                "\u{1faa4} **GLISSADE !** <@{}> se frappe lui-meme ! <@{}> empoche {} coins !",
-                attacker.user_id, defender.user_id, gain
-            ),
-            is_giant_killer: false,
-        };
-    }
+    // ══════════════════════════════════════════════════════════════════
+    // ── Determine winner ──
+    // ══════════════════════════════════════════════════════════════════
 
-    // Determine le gagnant par les degats
-    let (winner, loser, winner_damage, loser_damage, winner_coward, _winner_is_attacker) = if dodged {
-        (&defender, &attacker, defender_damage, attacker_damage, coward_penalty_def, false)
-    } else if let Some(ChaosEvent::EsquiveDivine) = chaos_event {
-        (&defender, &attacker, defender_damage, attacker_damage, coward_penalty_def, false)
-    } else if attacker_damage > defender_damage {
-        (&attacker, &defender, attacker_damage, defender_damage, coward_penalty_atk, true)
-    } else if defender_damage > attacker_damage {
-        (&defender, &attacker, defender_damage, attacker_damage, coward_penalty_def, false)
+    let total_rounds = rounds.len() as i32;
+    let atk_hp_pct = if atk_hp_max > 0 {
+        (atk_hp as f64 / atk_hp_max as f64 * 100.0) as i32
     } else {
-        // Egalite : match nul, pas de transfert
-        return CombatResult {
-            winner_id: None,
-            loser_id: None,
-            attacker_roll: atk_roll,
-            defender_roll: def_roll,
-            attacker_damage,
-            defender_damage,
-            chaos_event: None,
-            coins_won: 0,
-            coins_lost_by_loser: 0,
-            stolen_bonus: 0,
-            message: format!(
-                "\u{1f91d} **EGALITE !** Les deux joueurs ont fait {} degats ! Personne ne perd de coins.",
-                attacker_damage
-            ),
-            is_giant_killer: false,
-        };
+        0
     };
-
-    // Marge de victoire pour le pourcentage de mise
-    let margin = (winner_damage - loser_damage).abs();
-    let (mise_pct, margin_label) = if margin < 10 {
-        (0.60, "serree")
-    } else if margin <= 20 {
-        (0.80, "correcte")
-    } else {
-        (1.00, "nette")
-    };
-
-    // Calcul des gains de base avec marge
-    let mut gain = (mise as f64 * mise_pct) as i64;
-    // Minimum 1 coin
-    if gain < 1 {
-        gain = 1;
-    }
-
-    // Giant killer : underdog wins against someone 3+ levels above
-    let is_giant_killer = level_gap >= 3 && winner.level < loser.level;
-
-    // Si underdog gagne contre 3+ niveaux au-dessus → double mise
-    if is_giant_killer {
-        gain *= 2;
-    }
-
-    // Chaos bonus
-    if let Some(ChaosEvent::CritiqueSauvage) = chaos_event {
-        gain *= 3;
-    }
-    if let Some(ChaosEvent::Vol) = chaos_event {
-        gain = (gain as f64 * 1.20) as i64;
-    }
-
-    // Fourbe steal bonus
-    let winner_class = classes::get_class(&winner.class);
-    let stolen_bonus = if winner_class.steal_bonus > 0.0 {
-        (mise as f64 * winner_class.steal_bonus) as i64
+    let def_hp_pct = if def_hp_max > 0 {
+        (def_hp as f64 / def_hp_max as f64 * 100.0) as i32
     } else {
         0
     };
 
-    gain += stolen_bonus;
+    let ko = atk_hp <= 0 || def_hp <= 0;
+
+    // Determine winner/loser
+    let (winner_id, loser_id, winner_pct, loser_pct, winner_coward) = if atk_hp <= 0 && def_hp <= 0 {
+        // Both KO at same time -> compare who had more HP% before last round
+        // Treat as draw
+        (None, None, atk_hp_pct, def_hp_pct, 1.0)
+    } else if def_hp <= 0 {
+        (
+            Some(attacker.user_id.clone()),
+            Some(defender.user_id.clone()),
+            atk_hp_pct,
+            def_hp_pct,
+            coward_penalty_atk,
+        )
+    } else if atk_hp <= 0 {
+        (
+            Some(defender.user_id.clone()),
+            Some(attacker.user_id.clone()),
+            def_hp_pct,
+            atk_hp_pct,
+            coward_penalty_def,
+        )
+    } else if atk_hp_pct > def_hp_pct {
+        // Timeout: highest HP% wins
+        (
+            Some(attacker.user_id.clone()),
+            Some(defender.user_id.clone()),
+            atk_hp_pct,
+            def_hp_pct,
+            coward_penalty_atk,
+        )
+    } else if def_hp_pct > atk_hp_pct {
+        (
+            Some(defender.user_id.clone()),
+            Some(attacker.user_id.clone()),
+            def_hp_pct,
+            atk_hp_pct,
+            coward_penalty_def,
+        )
+    } else {
+        // Equal HP% -> draw
+        (None, None, atk_hp_pct, def_hp_pct, 1.0)
+    };
+
+    let is_draw = winner_id.is_none();
+
+    // ── Gains calculation based on HP% margin ──
+    let hp_diff = (atk_hp_pct - def_hp_pct).abs();
+    let (win_pct, lose_pct) = if hp_diff < 15 {
+        (0.70, 0.60)
+    } else if hp_diff <= 40 {
+        (0.85, 0.80)
+    } else {
+        (1.00, 1.00)
+    };
+
+    if is_draw {
+        // ── Draw path ──
+        let mut final_msg = format!("{}\n\n", start_msg);
+        for r in &rounds {
+            final_msg.push_str(&r.message);
+            final_msg.push_str("\n\n");
+        }
+        final_msg.push_str(pick_random(COMBAT_DRAW));
+
+        return CombatResult {
+            winner_id: None,
+            loser_id: None,
+            rounds,
+            total_rounds,
+            attacker_hp_final: atk_hp,
+            defender_hp_final: def_hp,
+            attacker_hp_max: atk_hp_max,
+            defender_hp_max: def_hp_max,
+            chaos_events_count: chaos_count,
+            coins_won: 0,
+            coins_lost_by_loser: 0,
+            stolen_bonus: 0,
+            vol_coins: vol_coins_total,
+            message: final_msg,
+            is_giant_killer: false,
+            attacker_class_revealed,
+            defender_class_revealed,
+        };
+    }
+
+    // ── Winner path ──
+    let mut coins_won = (mise as f64 * win_pct) as i64;
+    let coins_lost = (mise as f64 * lose_pct) as i64;
+
+    if coins_won < 1 {
+        coins_won = 1;
+    }
+
+    // Giant killer: 3+ level gap underdog winning
+    let is_giant = if let (Some(ref wid), Some(ref lid)) = (&winner_id, &loser_id) {
+        let winner_lvl = if *wid == attacker.user_id { attacker.level } else { defender.level };
+        let loser_lvl = if *lid == attacker.user_id { attacker.level } else { defender.level };
+        level_gap >= 3 && winner_lvl < loser_lvl
+    } else {
+        false
+    };
+
+    // Fourbe steal bonus
+    let winner_class_name = if winner_id.as_deref() == Some(&attacker.user_id) {
+        atk_class.name
+    } else {
+        def_class.name
+    };
+    let w_class = classes::get_class(winner_class_name);
+    let stolen_bonus_val = if w_class.steal_bonus > 0.0 {
+        (mise as f64 * w_class.steal_bonus) as i64
+    } else {
+        0
+    };
+    coins_won += stolen_bonus_val;
 
     // Cowardice penalty
-    gain = (gain as f64 * winner_coward) as i64;
+    coins_won = (coins_won as f64 * winner_coward) as i64;
 
     // Happy hour
-    gain *= multiplier;
+    coins_won *= multiplier;
 
-    // Message construction
-    let mut msg = String::new();
+    // ── Build final message ──
+    let winner_name = if winner_id.as_deref() == Some(&attacker.user_id) {
+        &atk_name
+    } else {
+        &def_name
+    };
+    let loser_name = if winner_id.as_deref() == Some(&attacker.user_id) {
+        &def_name
+    } else {
+        &atk_name
+    };
 
-    if dodged {
-        msg.push_str(&format!(
-            "\u{1f3c3} <@{}> esquive avec grace ! ",
-            defender.user_id
-        ));
+    let mut final_msg = format!("{}\n\n", start_msg);
+
+    // Append round summaries
+    for r in &rounds {
+        final_msg.push_str(&r.message);
+        final_msg.push_str("\n\n");
     }
 
-    if let Some(ref chaos) = chaos_event {
-        msg.push_str(&format!("\n{} **{}** — {} ", chaos.emoji(), chaos.label(), chaos.description()));
+    // Ending
+    if ko {
+        let ko_txt = fmt_template(
+            pick_random(COMBAT_KO),
+            &[("{perdant}", loser_name), ("{gagnant}", winner_name)],
+        );
+        final_msg.push_str(&ko_txt);
+    } else {
+        let timeout_txt = fmt_template(
+            pick_random(COMBAT_TIMEOUT),
+            &[
+                ("{gagnant}", winner_name),
+                ("{hp_g}", &winner_pct.to_string()),
+                ("{hp_p}", &loser_pct.to_string()),
+            ],
+        );
+        final_msg.push_str(&timeout_txt);
     }
 
-    msg.push_str(&format!(
-        "\n\u{1f3c6} <@{}> gagne et empoche **{} coins** ! (Degats: {} vs {}) — Victoire **{}**",
-        winner.user_id, gain, winner_damage, loser_damage, margin_label
+    final_msg.push_str(&format!(
+        "\n\u{1f4b0} {} empoche **{} coins** ! {} perd **{} coins** !",
+        winner_name, coins_won, loser_name, coins_lost
     ));
 
-    if is_giant_killer {
-        msg.push_str(&format!(
-            "\n\u{1f525} **GIANT KILLER !** <@{}> terrasse un adversaire de {} niveaux au-dessus ! Mise doublee !",
-            winner.user_id, level_gap
+    if is_giant {
+        final_msg.push_str(&format!(
+            "\n\u{1f525} **GIANT KILLER !** {} terrasse un adversaire de {} niveaux au-dessus ! +15 XP bonus !",
+            winner_name, level_gap
         ));
     }
 
-    if stolen_bonus > 0 {
-        msg.push_str(&format!("\n\u{1f5e1}\u{fe0f} Bonus fourbe : +{} coins voles !", stolen_bonus));
+    if vol_coins_total > 0 {
+        final_msg.push_str(&format!(
+            "\n\u{1f4b0} Vol a la Tire total : +{} coins voles !",
+            vol_coins_total
+        ));
+    }
+
+    if stolen_bonus_val > 0 {
+        final_msg.push_str(&format!(
+            "\n\u{1f5e1}\u{fe0f} Bonus fourbe : +{} coins voles !",
+            stolen_bonus_val
+        ));
     }
 
     if happy_hour {
-        msg.push_str("\n\u{1f389} **HAPPY HOUR** — Gains doubles !");
+        final_msg.push_str("\n\u{1f389} **HAPPY HOUR** — Gains doubles !");
     }
 
     if winner_coward < 1.0 {
-        msg.push_str(&format!(
-            "\n\u{1f414} Le gagnant est un lache notoire... -20% sur les gains !"
-        ));
+        final_msg.push_str("\n\u{1f414} Le gagnant est un lache notoire... -20% sur les gains !");
     }
 
     if level_gap >= 3 {
         let handicap_pct = ((1.0 - handicap) * 100.0) as i32;
         if stronger_is_attacker {
-            msg.push_str(&format!(
-                "\n\u{2696}\u{fe0f} Handicap matchmaking : <@{}> a -{}% ATK",
-                attacker.user_id, handicap_pct
+            final_msg.push_str(&format!(
+                "\n\u{2696}\u{fe0f} Handicap matchmaking : {} a -{}% ATK",
+                atk_name, handicap_pct
             ));
         } else if stronger_is_defender {
-            msg.push_str(&format!(
-                "\n\u{2696}\u{fe0f} Handicap matchmaking : <@{}> a -{}% ATK",
-                defender.user_id, handicap_pct
+            final_msg.push_str(&format!(
+                "\n\u{2696}\u{fe0f} Handicap matchmaking : {} a -{}% ATK",
+                def_name, handicap_pct
             ));
         }
     }
 
     CombatResult {
-        winner_id: Some(winner.user_id.clone()),
-        loser_id: Some(loser.user_id.clone()),
-        attacker_roll: atk_roll,
-        defender_roll: def_roll,
-        attacker_damage,
-        defender_damage,
-        chaos_event,
-        coins_won: gain,
-        coins_lost_by_loser: mise,
-        stolen_bonus,
-        message: msg,
-        is_giant_killer,
+        winner_id,
+        loser_id,
+        rounds,
+        total_rounds,
+        attacker_hp_final: atk_hp,
+        defender_hp_final: def_hp,
+        attacker_hp_max: atk_hp_max,
+        defender_hp_max: def_hp_max,
+        chaos_events_count: chaos_count,
+        coins_won,
+        coins_lost_by_loser: coins_lost,
+        stolen_bonus: 0,
+        vol_coins: vol_coins_total,
+        message: final_msg,
+        is_giant_killer: is_giant,
+        attacker_class_revealed,
+        defender_class_revealed,
     }
 }

@@ -11,14 +11,7 @@ use tracing::{error, info, warn};
 use sentinel_shared::heartbeat::{register_guilds, ApiClientKey};
 
 use crate::commands;
-use crate::db::GameDb;
 use crate::guild_config::CoudeConfig;
-
-/// Cle TypeMap pour le client de base de donnees du jeu.
-pub struct GameDbKey;
-impl TypeMapKey for GameDbKey {
-    type Value = GameDb;
-}
 
 /// Cle TypeMap pour stocker les guild IDs connus.
 pub struct GuildIdsKey;
@@ -92,6 +85,12 @@ impl EventHandler for Handler {
                     "voler" => commands::voler::handle(&ctx, &command).await,
                     "assurance" => commands::assurance::handle(&ctx, &command).await,
                     "train" => commands::train::handle(&ctx, &command).await,
+                    "classe" => commands::classe::handle(&ctx, &command).await,
+                    "donner" => commands::donner::handle(&ctx, &command).await,
+                    "hp" => commands::hp::handle(&ctx, &command).await,
+                    "repos" => commands::repos::handle(&ctx, &command).await,
+                    "saison" => commands::saison::handle(&ctx, &command).await,
+                    "reset-stats" => commands::reset_stats::handle(&ctx, &command).await,
                     _ => {}
                 }
             }
@@ -108,6 +107,10 @@ impl EventHandler for Handler {
                     commands::refuser::handle(&ctx, &component).await;
                 } else if custom_id.starts_with(commands::annuler::CANCEL_PREFIX) {
                     commands::annuler::handle(&ctx, &component).await;
+                } else if custom_id.starts_with(commands::classe::CLASS_SELECT_PREFIX) {
+                    commands::classe::handle_select(&ctx, &component).await;
+                } else if custom_id.starts_with(commands::voler::STEAL_DEFEND_PREFIX) {
+                    commands::voler::handle_defend(&ctx, &component).await;
                 }
             }
             _ => {}
@@ -133,12 +136,12 @@ async fn run_daily_chaos(ctx: &Context) {
         }
 
         let data = ctx.data.read().await;
-        let db = match data.get::<GameDbKey>() {
-            Some(db) => db,
+        let api = match data.get::<crate::GameApiKey>() {
+            Some(api) => api,
             None => return,
         };
 
-        let players = match db.get_random_players(&gid, 2).await {
+        let players = match api.get_random_players(&gid, 2).await {
             Ok(p) if p.len() >= 2 => p,
             _ => continue,
         };
@@ -153,7 +156,7 @@ async fn run_daily_chaos(ctx: &Context) {
         }
 
         // Transferer + comptabiliser (total_lost pour la victime, total_earned pour le gagnant)
-        if let Err(e) = db
+        if let Err(e) = api
             .record_steal(&gid, &winner.user_id, &victim.user_id, amount)
             .await
         {
@@ -161,7 +164,7 @@ async fn run_daily_chaos(ctx: &Context) {
             continue;
         }
 
-        if let Err(e) = db
+        if let Err(e) = api
             .log_daily_chaos(
                 &gid,
                 &victim.user_id,

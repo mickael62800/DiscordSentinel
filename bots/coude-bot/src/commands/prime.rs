@@ -4,7 +4,8 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::handler::{GameDbKey, load_guild_config};
+use crate::GameApiKey;
+use crate::handler::load_guild_config;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("prime")
@@ -74,15 +75,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let data = ctx.data.read().await;
-    let db = data.get::<GameDbKey>().unwrap();
+    let api = data.get::<GameApiKey>().unwrap();
 
-    let player = match db
+    let player = match api
         .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
         .await
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -98,24 +99,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Creer le joueur cible s'il n'existe pas
-    if let Err(e) = db
+    if let Err(e) = api
         .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
         .await
     {
-        tracing::warn!(error = %e, "Echec DB get_or_create_player cible prime");
+        tracing::warn!(error = %e, "Echec API get_or_create_player cible prime");
     }
 
     // Deduire les coins
-    if let Err(e) = db
+    if let Err(e) = api
         .update_player_coins(&guild_id, &command.user.id.to_string(), -amount)
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
     // Creer la prime
-    if let Err(e) = db
+    if let Err(e) = api
         .create_prime(
             &guild_id,
             &target.id.to_string(),
@@ -126,12 +127,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
+        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
     // Verifier le total des primes actives sur la cible
-    let active_primes = db
+    let active_primes = api
         .get_active_primes(&guild_id, &target.id.to_string())
         .await
         .unwrap_or_default();

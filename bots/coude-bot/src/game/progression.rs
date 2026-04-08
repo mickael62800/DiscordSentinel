@@ -46,9 +46,35 @@ pub fn matchmaking_handicap(attacker_level: i32, defender_level: i32) -> (f64, b
     }
 }
 
-/// Calcule les HP affiches : 100 + DEF / 2.
+/// Calcule les HP max d'un joueur : 100 + DEF_effective * 2.
+/// Remplace l'ancien display_hp (100 + DEF/2) qui etait cosmetique.
+pub fn calculate_hp_max(effective_def: i32) -> i32 {
+    100 + effective_def * 2
+}
+
+/// Alias pour compatibilite.
+#[allow(dead_code)]
 pub fn display_hp(effective_def: i32) -> i32 {
-    100 + effective_def / 2
+    calculate_hp_max(effective_def)
+}
+
+/// Calcule la regeneration naturelle de HP depuis la derniere mise a jour.
+/// +10 HP par heure, plafonne a hp_max.
+#[allow(dead_code)]
+pub fn calculate_regen(hp_current: i32, hp_max: i32, hours_elapsed: f64) -> i32 {
+    let regen = (hours_elapsed * 10.0) as i32;
+    (hp_current + regen).min(hp_max)
+}
+
+/// Nombre de rounds max selon les HP combines des deux joueurs.
+pub fn max_rounds(combined_hp: i32) -> i32 {
+    if combined_hp < 250 {
+        3
+    } else if combined_hp <= 400 {
+        5
+    } else {
+        7
+    }
 }
 
 #[cfg(test)]

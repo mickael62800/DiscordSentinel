@@ -66,6 +66,7 @@ name = "blackjack-bot"
 version = "0.1.0"
 dependencies = [
  "dotenvy",
+ "rand 0.8.5",
  "reqwest",
  "sentinel-shared",
  "serde",
