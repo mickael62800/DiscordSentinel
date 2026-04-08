@@ -2,6 +2,7 @@ import { ref, computed } from "vue";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 import type { Notification } from "../types";
+import { useToast } from "./useToast";
 
 const notifications = ref<Notification[]>([]);
 const panelOpen = ref(false);
@@ -16,6 +17,8 @@ export function useNotifications() {
     if (listening) return;
     listening = true;
 
+    const toast = useToast();
+
     const u1 = await listen<{ event: string; data: unknown }>("ws:event", (e) => {
       const wsEvent = e.payload;
       const notif = eventToNotification(wsEvent);
@@ -27,6 +30,22 @@ export function useNotifications() {
         }
         if (notif.severity === "critical" || notif.severity === "high") {
           sendNativeNotification(notif);
+        }
+        // Toast automatique pour les events critiques/high
+        if (notif.severity === "critical") {
+          toast.error(`${notif.title} — ${notif.message}`);
+        } else if (notif.severity === "high") {
+          toast.warning(`${notif.title} — ${notif.message}`);
+        }
+      }
+
+      // Toast pour les logs d'erreur des bots/workers
+      if (wsEvent.event === "log_entry_created") {
+        const data = wsEvent.data as Record<string, string>;
+        if (data.level === "error") {
+          toast.error(`[${data.bot ?? "systeme"}] ${data.message ?? "Erreur inconnue"}`);
+        } else if (data.level === "warn") {
+          toast.warning(`[${data.bot ?? "systeme"}] ${data.message ?? "Avertissement"}`);
         }
       }
     });
@@ -164,6 +183,55 @@ function eventToNotification(wsEvent: { event: string; data: unknown }): Notific
         title: `${data.action_type ?? "Action"} applique`,
         message: `${data.moderator_name ?? "Moderateur"} → ${data.target_name ?? "user"}: ${data.reason ?? ""}`,
         severity: data.action_type === "ban" ? "high" : "medium",
+        read: false,
+        created_at: now,
+      };
+
+    case "log_entry_created": {
+      if (data.level !== "error" && data.level !== "warn") return null;
+      return {
+        id,
+        notification_type: "log",
+        title: `${data.level === "error" ? "Erreur" : "Avertissement"} — ${data.bot ?? "systeme"}`,
+        message: data.message ?? "Evenement systeme",
+        severity: data.level === "error" ? "high" : "medium",
+        read: false,
+        created_at: now,
+      };
+    }
+
+    case "user_zero_points":
+      return {
+        id,
+        notification_type: "conduct",
+        title: "Points de conduite a zero",
+        message: `${data.username ?? "Utilisateur"} a atteint 0 points (action: ${data.action ?? "inconnue"})`,
+        severity: "high",
+        read: false,
+        created_at: now,
+      };
+
+    case "strike_added": {
+      const escalation = data.escalation_action;
+      if (!escalation) return null;
+      return {
+        id,
+        notification_type: "moderation",
+        title: "Escalade de sanction",
+        message: `${data.user_id ?? "Utilisateur"} — ${data.active_count ?? "?"} strikes actifs → ${escalation}`,
+        severity: "high",
+        read: false,
+        created_at: now,
+      };
+    }
+
+    case "watched_user_added":
+      return {
+        id,
+        notification_type: "surveillance",
+        title: "Utilisateur sous surveillance",
+        message: `${data.username ?? "Utilisateur"} a ete ajoute a la liste de surveillance`,
+        severity: "medium",
         read: false,
         created_at: now,
       };

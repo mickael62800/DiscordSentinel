@@ -75,7 +75,9 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
                 deny: Permissions::empty(),
                 kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
             };
-            let _ = ChannelId::new(text_id).create_permission(&ctx.http, text_overwrite).await;
+            if let Err(e) = ChannelId::new(text_id).create_permission(&ctx.http, text_overwrite).await {
+                tracing::warn!(error = %e, "failed to grant invite permission on text channel");
+            }
         }
     }
 
@@ -86,7 +88,9 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
                 deny: Permissions::empty(),
                 kind: serenity::model::channel::PermissionOverwriteType::Member(target_id),
             };
-            let _ = ChannelId::new(members_id).create_permission(&ctx.http, members_overwrite).await;
+            if let Err(e) = ChannelId::new(members_id).create_permission(&ctx.http, members_overwrite).await {
+                tracing::warn!(error = %e, "failed to grant invite permission on members channel");
+            }
         }
     }
 
@@ -345,7 +349,9 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     let guild_id = component.guild_id.unwrap_or_default();
 
     // Disconnect the user
-    let _ = guild_id.disconnect_member(&ctx.http, target_user_id).await;
+    if let Err(e) = guild_id.disconnect_member(&ctx.http, target_user_id).await {
+        tracing::warn!(error = %e, "failed to disconnect banned member");
+    }
 
     // Deny CONNECT on the voice channel
     let overwrite = serenity::model::channel::PermissionOverwrite {
@@ -353,7 +359,9 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
         deny: Permissions::VIEW_CHANNEL | Permissions::CONNECT,
         kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
     };
-    let _ = voice_channel_id.create_permission(&ctx.http, overwrite).await;
+    if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+        tracing::warn!(error = %e, "failed to set ban permission on voice channel");
+    }
 
     // Ban via API
     let target_name = target_user_id

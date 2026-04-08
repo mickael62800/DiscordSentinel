@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
+use tracing::warn;
 use uuid::Uuid;
 
 // ── Modeles ──
@@ -949,7 +950,9 @@ impl GameDb {
         for result in &results {
             if result.won && result.payout > 0 {
                 if !guild_id.is_empty() {
-                    let _ = self.update_player_coins(&guild_id, &result.bettor_id, result.payout).await;
+                    if let Err(e) = self.update_player_coins(&guild_id, &result.bettor_id, result.payout).await {
+                        warn!(error = %e, "Failed to update bettor coins");
+                    }
                 }
             }
         }
@@ -958,7 +961,9 @@ impl GameDb {
         if let Some(ref bonus) = fighter_bonus {
             if !guild_id.is_empty() {
                 if let Some(winner) = winner_id {
-                    let _ = self.update_player_coins(&guild_id, winner, bonus.winner_bonus).await;
+                    if let Err(e) = self.update_player_coins(&guild_id, winner, bonus.winner_bonus).await {
+                        warn!(error = %e, "Failed to update winner bonus coins");
+                    }
                 }
                 // Trouver le perdant
                 let combat: Option<Combat> = sqlx::query_as(
@@ -974,7 +979,9 @@ impl GameDb {
                     } else {
                         &combat.attacker_id
                     };
-                    let _ = self.update_player_coins(&guild_id, loser_id, bonus.loser_bonus).await;
+                    if let Err(e) = self.update_player_coins(&guild_id, loser_id, bonus.loser_bonus).await {
+                        warn!(error = %e, "Failed to update loser bonus coins");
+                    }
                 }
             }
         }

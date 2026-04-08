@@ -30,4 +30,6 @@ pub trait ManageInfractionsUseCase: Send + Sync {
     async fn find_by_id(&self, id: &str) -> Result<Option<Infraction>, DomainError>;
 
     async fn delete_infraction(&self, id: &str) -> Result<bool, DomainError>;
+
+    async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError>;
 }

@@ -1,14 +1,32 @@
 <script setup lang="ts">
 import { useRules } from "../../composables/useRules";
+import { useToast } from "../../composables/useToast";
 import type { UpdateRuleParams } from "../../types";
 import RuleCard from "../organisms/RuleCard.vue";
 import RuleEditModal from "../organisms/RuleEditModal.vue";
 
+const { success, error: showError } = useToast();
 const { rules, loading, editing, toggleRule, updateRule, openEdit, closeEdit } = useRules();
 
 async function handleSave(params: UpdateRuleParams) {
-  await updateRule(params);
-  closeEdit();
+  try {
+    await updateRule(params);
+    closeEdit();
+    success("Regle mise a jour avec succes");
+  } catch (e) {
+    console.error("Erreur mise a jour regle:", e);
+    showError("Erreur lors de la mise a jour de la regle");
+  }
+}
+
+async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
+  try {
+    await toggleRule(rule);
+    success(rule.enabled ? "Regle desactivee" : "Regle activee");
+  } catch (e) {
+    console.error("Erreur activation/desactivation regle:", e);
+    showError("Erreur lors du changement d'etat de la regle");
+  }
 }
 </script>
 
@@ -23,7 +41,7 @@ async function handleSave(params: UpdateRuleParams) {
         v-for="rule in rules"
         :key="rule.id"
         :rule="rule"
-        @toggle="toggleRule"
+        @toggle="handleToggle"
         @edit="openEdit"
       />
     </div>

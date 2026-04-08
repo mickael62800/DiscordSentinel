@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useSecurity } from "../../composables/useSecurity";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { useSearch } from "../../composables/useSearch";
 import type { SecurityEvent } from "../../types";
 import AppBadge from "../atoms/AppBadge.vue";
@@ -11,6 +12,7 @@ import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { events, loading, error, fetchEvents } = useSecurity();
+useRealtimeRefresh(["security_event"], fetchEvents);
 const { search, filtered: filteredEvents } = useSearch<SecurityEvent>(
   events,
   ["event_type", "severity", "description", "created_at", (e) => e.user_ids?.join(" ")],

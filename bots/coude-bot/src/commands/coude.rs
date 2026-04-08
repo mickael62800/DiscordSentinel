@@ -234,7 +234,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         drop(data);
         super::accepter::resolve_combat_internal(ctx, &combat, command.channel_id).await;
 
-        command
+        if let Err(e) = command
             .create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
@@ -252,21 +252,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 ),
             )
             .await
-            .ok();
+        {
+            tracing::warn!(error = %e, "Echec response Discord");
+        }
         return;
     }
 
     // Bloodbath event : auto-accept
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();
-    let events = db.get_active_events(&guild_id).await.unwrap_or_default();
+    let events = db.get_active_events(&guild_id).await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "Echec DB get_active_events");
+        vec![]
+    });
     let bloodbath = events.iter().any(|e| e.event_type == "bloodbath");
 
     if bloodbath {
         drop(data);
         super::accepter::resolve_combat_internal(ctx, &combat, command.channel_id).await;
 
-        command
+        if let Err(e) = command
             .create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
@@ -284,7 +289,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 ),
             )
             .await
-            .ok();
+        {
+            tracing::warn!(error = %e, "Echec response Discord");
+        }
         return;
     }
 
@@ -352,7 +359,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let row = CreateActionRow::Buttons(vec![accept_btn, item_btn, refuse_btn, cancel_btn]);
 
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -362,7 +369,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 
     // Notifier dans le salon notifications (mention du defenseur)
     if let Some(notif_ch) = config.channel_notifications() {
@@ -379,15 +388,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
                 .timestamp(serenity::model::Timestamp::now());
 
-            let _ = serenity::model::id::ChannelId::new(ch_id)
+            if let Err(e) = serenity::model::id::ChannelId::new(ch_id)
                 .send_message(&ctx.http, CreateMessage::new().embed(notif_embed))
-                .await;
+                .await
+            {
+                tracing::warn!(error = %e, "Echec send_message salon notifications");
+            }
         }
     }
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -397,5 +409,7 @@ async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

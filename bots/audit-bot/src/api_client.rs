@@ -32,49 +32,27 @@ impl ApiClient {
         event_type: Option<&str>,
         limit: u32,
     ) -> Result<Vec<serde_json::Value>, String> {
-        let mut url = format!(
-            "{}/api/audit-logs?guild_id={}&limit={}",
-            self.base.base_url(),
-            guild_id,
-            limit
+        let mut path = format!(
+            "/api/audit-logs?guild_id={}&limit={}",
+            guild_id, limit
         );
         if let Some(tid) = target_id {
-            url.push_str(&format!("&target_id={}", tid));
+            path.push_str(&format!("&target_id={}", tid));
         }
         if let Some(et) = event_type {
-            url.push_str(&format!("&event_type={}", et));
+            path.push_str(&format!("&event_type={}", et));
         }
 
-        let req = self.base.client().get(&url);
-
-        self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("{e}"))?
-            .json()
-            .await
-            .map_err(|e| format!("{e}"))
+        self.base.get_json(&path).await
     }
 
     /// Recupere les IDs de tous les utilisateurs surveilles (batch, tous les serveurs).
     /// Un seul appel API au lieu de N appels par guild.
     pub async fn get_all_watched_user_ids(&self) -> Result<Vec<String>, String> {
-        let url = format!(
-            "{}/api/watched-users?limit=1000",
-            self.base.base_url(),
-        );
-
-        let req = self.base.client().get(&url);
         let users: Vec<serde_json::Value> = self
             .base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("{e}"))?
-            .json()
-            .await
-            .map_err(|e| format!("{e}"))?;
+            .get_json("/api/watched-users?limit=1000")
+            .await?;
 
         Ok(users
             .iter()
@@ -93,48 +71,22 @@ impl ApiClient {
         content: Option<&str>,
         metadata: serde_json::Value,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/user-activity", self.base.base_url()))
-            .json(&serde_json::json!({
-                "guild_id": guild_id,
-                "user_id": user_id,
-                "event_type": event_type,
-                "channel_id": channel_id,
-                "channel_name": channel_name,
-                "content": content,
-                "metadata": metadata,
-            }));
+        let payload = serde_json::json!({
+            "guild_id": guild_id,
+            "user_id": user_id,
+            "event_type": event_type,
+            "channel_id": channel_id,
+            "channel_name": channel_name,
+            "content": content,
+            "metadata": metadata,
+        });
 
-        self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+        self.base.post_fire_and_forget("/api/user-activity", &payload).await;
         Ok(())
     }
 
     pub async fn send_audit_event(&self, event: &AuditEvent) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/audit-logs", self.base.base_url()))
-            .json(event);
-
-        let resp = self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            return Err(format!("API error {}: {}", status, body));
-        }
-
+        let _: serde_json::Value = self.base.post_json("/api/audit-logs", event).await?;
         Ok(())
     }
 }

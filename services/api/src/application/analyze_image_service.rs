@@ -50,7 +50,13 @@ impl AnalyzeImageService {
 impl AnalyzeImageUseCase for AnalyzeImageService {
     async fn analyze_image(&self, cmd: AnalyzeImageCommand) -> Result<ImageAnalysis, DomainError> {
         // 0. Charger la config IA per-guild
-        let ia_config = self.ia_config_repo.get(&cmd.guild_id).await.ok().flatten();
+        let ia_config = match self.ia_config_repo.get(&cmd.guild_id).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec chargement config IA vision, utilisation defauts");
+                None
+            }
+        };
         let vision_enabled = ia_config.as_ref().map(|c| c.vision_enabled).unwrap_or(true);
         let vision_threshold = ia_config.as_ref().map(|c| c.vision_threshold as f32).unwrap_or(DEFAULT_VISION_THRESHOLD);
 
@@ -123,7 +129,9 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
             Some(cached) => cached,
             None => {
                 let from_db = self.rule_repo.find_by_guild(&cmd.guild_id).await?;
-                self.cache.set_rules(&cmd.guild_id, &from_db).await.ok();
+                if let Err(e) = self.cache.set_rules(&cmd.guild_id, &from_db).await {
+                    tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec cache set rules (vision)");
+                }
                 from_db
             }
         };
@@ -188,12 +196,14 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
 
         // 6b. Deduire les points de conduite
         if action.as_str() != "none" {
-            let _ = self.conduct_uc.deduct_points(DeductPointsCommand {
+            if let Err(e) = self.conduct_uc.deduct_points(DeductPointsCommand {
                 guild_id: infraction.guild_id.clone(),
                 user_id: infraction.user_id.clone(),
                 username: infraction.username.clone(),
                 action: action.as_str().to_string(),
-            }).await;
+            }).await {
+                tracing::warn!(error = %e, guild_id = %infraction.guild_id, user_id = %infraction.user_id, "Echec deduction points conduite (analyse image)");
+            }
         }
 
         // 7. Retourner le resultat

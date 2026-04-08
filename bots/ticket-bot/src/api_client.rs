@@ -95,53 +95,16 @@ impl ApiClient {
     }
 
     pub async fn list_tickets(&self) -> Result<Vec<Ticket>, String> {
-        let req = self
-            .base
-            .client()
-            .get(format!("{}/api/tickets", self.base.base_url()));
-
-        self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Vec<Ticket>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
+        self.base.get_json("/api/tickets").await
     }
 
     pub async fn create_ticket(&self, request: &CreateTicketRequest) -> Result<Ticket, String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/tickets", self.base.base_url()))
-            .json(request);
-
-        self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Ticket>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
+        self.base.post_json("/api/tickets", request).await
     }
 
     #[allow(dead_code)]
     pub async fn get_ticket(&self, id: &str) -> Result<TicketDetail, String> {
-        let req = self
-            .base
-            .client()
-            .get(format!("{}/api/tickets/{id}", self.base.base_url()));
-
-        self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<TicketDetail>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
+        self.base.get_json(&format!("/api/tickets/{id}")).await
     }
 
     pub async fn reply_ticket(
@@ -151,76 +114,54 @@ impl ApiClient {
         author_name: &str,
         author_role: &str,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!(
-                "{}/api/tickets/{ticket_id}/messages",
-                self.base.base_url()
-            ))
-            .json(&ReplyPayload {
-                content: content.to_string(),
-                author_name: author_name.to_string(),
-                author_role: author_role.to_string(),
-            });
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget(
+                &format!("/api/tickets/{ticket_id}/messages"),
+                &ReplyPayload {
+                    content: content.to_string(),
+                    author_name: author_name.to_string(),
+                    author_role: author_role.to_string(),
+                },
+            )
+            .await;
         Ok(())
     }
 
     #[allow(dead_code)]
     pub async fn update_status(&self, id: &str, status: &str) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!("{}/api/tickets/{id}/status", self.base.base_url()))
-            .json(&serde_json::json!({ "status": status }));
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .patch_fire_and_forget(
+                &format!("/api/tickets/{id}/status"),
+                &serde_json::json!({ "status": status }),
+            )
+            .await;
         Ok(())
     }
 
     pub async fn close_ticket(&self, id: &str) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!("{}/api/tickets/{id}/close", self.base.base_url()));
-
+        // PATCH without body
+        let req = self.base.client().patch(format!(
+            "{}/api/tickets/{id}/close",
+            self.base.base_url()
+        ));
         self.base
             .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
-
         Ok(())
     }
 
     #[allow(dead_code)]
     pub async fn assign_ticket(&self, id: &str, assignee: &str) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!("{}/api/tickets/{id}/assign", self.base.base_url()))
-            .json(&AssignPayload {
-                assignee: assignee.to_string(),
-            });
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .patch_fire_and_forget(
+                &format!("/api/tickets/{id}/assign"),
+                &AssignPayload {
+                    assignee: assignee.to_string(),
+                },
+            )
+            .await;
         Ok(())
     }
 
@@ -243,28 +184,18 @@ impl ApiClient {
             body.insert("satisfaction_rating".to_string(), serde_json::Value::Number(rating.into()));
         }
 
-        let req = self
-            .base
-            .client()
-            .patch(format!("{}/api/tickets/{id}/sla", self.base.base_url()))
-            .json(&body);
-
-        self.base.auth(req).send().await.ok();
+        self.base
+            .patch_fire_and_forget(&format!("/api/tickets/{id}/sla"), &body)
+            .await;
     }
 
     pub async fn update_ticket_priority(&self, id: &str, priority: &str) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!("{}/api/tickets/{id}/status", self.base.base_url()))
-            .json(&serde_json::json!({ "priority": priority }));
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .patch_fire_and_forget(
+                &format!("/api/tickets/{id}/status"),
+                &serde_json::json!({ "priority": priority }),
+            )
+            .await;
         Ok(())
     }
 
@@ -274,21 +205,15 @@ impl ApiClient {
         voice_channel_id: Option<String>,
         invited_user_id: Option<String>,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!("{}/api/tickets/{id}/channels", self.base.base_url()))
-            .json(&UpdateTicketChannelPayload {
-                voice_channel_id,
-                invited_user_id,
-            });
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .patch_fire_and_forget(
+                &format!("/api/tickets/{id}/channels"),
+                &UpdateTicketChannelPayload {
+                    voice_channel_id,
+                    invited_user_id,
+                },
+            )
+            .await;
         Ok(())
     }
 }

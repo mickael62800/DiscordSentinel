@@ -2,7 +2,7 @@ use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateCommand,
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::discord_helpers::reply_ephemeral;
 use sentinel_shared::heartbeat::ApiClientKey;
@@ -91,7 +91,9 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
                 .content("Impossible de determiner le serveur. Utilisez `/appeal` dans un salon du serveur.")
                 .ephemeral(true),
         );
-        component.create_response(&ctx.http, response).await.ok();
+        if let Err(e) = component.create_response(&ctx.http, response).await {
+            warn!(error = %e, "Failed to send appeal guild-not-found response");
+        }
         return;
     }
 
@@ -116,7 +118,9 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
                     .content("Votre appel a ete enregistre. Un ticket a ete cree et un moderateur senior va l'examiner.")
                     .ephemeral(true),
             );
-            component.create_response(&ctx.http, response).await.ok();
+            if let Err(e) = component.create_response(&ctx.http, response).await {
+                warn!(error = %e, "Failed to send appeal success response");
+            }
             info!(user = %component.user.name, action_id = action_id, "Appel de sanction cree via bouton DM");
         }
         _ => {
@@ -125,7 +129,9 @@ pub async fn handle_appeal_button(ctx: &Context, component: &ComponentInteractio
                     .content("Erreur lors de la creation de l'appel. Utilisez `/appeal` dans le serveur.")
                     .ephemeral(true),
             );
-            component.create_response(&ctx.http, response).await.ok();
+            if let Err(e) = component.create_response(&ctx.http, response).await {
+                warn!(error = %e, "Failed to send appeal error response");
+            }
         }
     }
 }

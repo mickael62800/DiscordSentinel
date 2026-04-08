@@ -1,0 +1,160 @@
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use sqlx::PgPool;
+use uuid::Uuid;
+
+use crate::domain::entities::BlackjackGame;
+use crate::domain::errors::DomainError;
+use crate::ports::outbound::BlackjackRepository;
+
+pub struct PgBlackjackRepository {
+    pool: PgPool,
+}
+
+impl PgBlackjackRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[derive(sqlx::FromRow)]
+struct BlackjackRow {
+    id: Uuid,
+    guild_id: String,
+    user_id: String,
+    username: String,
+    bet: i64,
+    player_hand: serde_json::Value,
+    dealer_hand: serde_json::Value,
+    deck: serde_json::Value,
+    status: String,
+    player_score: i32,
+    dealer_score: i32,
+    doubled: bool,
+    payout: i64,
+    created_at: DateTime<Utc>,
+    finished_at: Option<DateTime<Utc>>,
+}
+
+impl From<BlackjackRow> for BlackjackGame {
+    fn from(r: BlackjackRow) -> Self {
+        Self {
+            id: r.id,
+            guild_id: r.guild_id,
+            user_id: r.user_id,
+            username: r.username,
+            bet: r.bet,
+            player_hand: serde_json::from_value(r.player_hand).unwrap_or_default(),
+            dealer_hand: serde_json::from_value(r.dealer_hand).unwrap_or_default(),
+            deck: serde_json::from_value(r.deck).unwrap_or_default(),
+            status: r.status,
+            player_score: r.player_score,
+            dealer_score: r.dealer_score,
+            doubled: r.doubled,
+            payout: r.payout,
+            created_at: r.created_at,
+            finished_at: r.finished_at,
+        }
+    }
+}
+
+#[async_trait]
+impl BlackjackRepository for PgBlackjackRepository {
+    async fn create(&self, game: &BlackjackGame) -> Result<(), DomainError> {
+        let player_hand = serde_json::to_value(&game.player_hand)
+            .map_err(|e| DomainError::Internal(format!("sérialisation player_hand : {e}")))?;
+        let dealer_hand = serde_json::to_value(&game.dealer_hand)
+            .map_err(|e| DomainError::Internal(format!("sérialisation dealer_hand : {e}")))?;
+        let deck = serde_json::to_value(&game.deck)
+            .map_err(|e| DomainError::Internal(format!("sérialisation deck : {e}")))?;
+
+        sqlx::query(
+            "INSERT INTO blackjack_games (id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)"
+        )
+        .bind(game.id)
+        .bind(&game.guild_id)
+        .bind(&game.user_id)
+        .bind(&game.username)
+        .bind(game.bet)
+        .bind(player_hand)
+        .bind(dealer_hand)
+        .bind(deck)
+        .bind(&game.status)
+        .bind(game.player_score)
+        .bind(game.dealer_score)
+        .bind(game.doubled)
+        .bind(game.payout)
+        .bind(game.created_at)
+        .bind(game.finished_at)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("blackjack create : {e}")))?;
+
+        Ok(())
+    }
+
+    async fn get_active(&self, guild_id: &str, user_id: &str) -> Result<Option<BlackjackGame>, DomainError> {
+        let row = sqlx::query_as::<_, BlackjackRow>(
+            "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
+             FROM blackjack_games
+             WHERE guild_id = $1 AND user_id = $2 AND status IN ('playing', 'player_blackjack')
+             ORDER BY created_at DESC
+             LIMIT 1"
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("blackjack get_active : {e}")))?;
+
+        Ok(row.map(BlackjackGame::from))
+    }
+
+    async fn update(&self, game: &BlackjackGame) -> Result<(), DomainError> {
+        let player_hand = serde_json::to_value(&game.player_hand)
+            .map_err(|e| DomainError::Internal(format!("sérialisation player_hand : {e}")))?;
+        let dealer_hand = serde_json::to_value(&game.dealer_hand)
+            .map_err(|e| DomainError::Internal(format!("sérialisation dealer_hand : {e}")))?;
+        let deck = serde_json::to_value(&game.deck)
+            .map_err(|e| DomainError::Internal(format!("sérialisation deck : {e}")))?;
+
+        sqlx::query(
+            "UPDATE blackjack_games SET
+                player_hand = $1, dealer_hand = $2, deck = $3,
+                status = $4, player_score = $5, dealer_score = $6,
+                doubled = $7, payout = $8, bet = $9, finished_at = $10
+             WHERE id = $11"
+        )
+        .bind(player_hand)
+        .bind(dealer_hand)
+        .bind(deck)
+        .bind(&game.status)
+        .bind(game.player_score)
+        .bind(game.dealer_score)
+        .bind(game.doubled)
+        .bind(game.payout)
+        .bind(game.bet)
+        .bind(game.finished_at)
+        .bind(game.id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("blackjack update : {e}")))?;
+
+        Ok(())
+    }
+
+    async fn get_by_id(&self, id: Uuid) -> Result<Option<BlackjackGame>, DomainError> {
+        let row = sqlx::query_as::<_, BlackjackRow>(
+            "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
+             FROM blackjack_games
+             WHERE id = $1"
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("blackjack get_by_id : {e}")))?;
+
+        Ok(row.map(BlackjackGame::from))
+    }
+}

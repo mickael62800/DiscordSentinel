@@ -61,12 +61,15 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
     }
 
     // Informer dans le salon
-    let _ = channel_id
+    if let Err(e) = channel_id
         .say(
             &ctx.http,
             format!("<@{user_id}> a ete **mute 30 secondes** (anti-flood)."),
         )
-        .await;
+        .await
+    {
+        tracing::warn!(error = %e, "failed to send anti-flood notification");
+    }
 
     // Logger l'action via l'API
     let data = ctx.data.read().await;

@@ -4,6 +4,11 @@ import { useMembers } from "../../composables/useMembers";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { usePagination } from "../../composables/usePagination";
 import { useFormatDate } from "../../composables/useFormatDate";
+import { useToast } from "../../composables/useToast";
+import { useConfirm } from "../../composables/useConfirm";
+
+const { success, error: showError } = useToast();
+const { confirm: confirmDialog } = useConfirm();
 import ErrorState from "../atoms/ErrorState.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
@@ -92,8 +97,10 @@ async function doAdjust(positive: boolean) {
     adjustReason.value = "";
     // Refresh summary too
     await selectMember(selectedMember.value.member.user_id);
+    success("Points de conduite ajustes avec succes");
   } catch (e) {
     console.error("Erreur ajustement:", e);
+    showError("Erreur lors de l'ajustement des points");
   } finally {
     adjusting.value = false;
   }
@@ -106,8 +113,9 @@ async function toggleWatch() {
     // Try to add — if already watched this will error
     await addToWatch(selectedMember.value.member.user_id, selectedMember.value.member.username);
     await fetchDossier(selectedMember.value.member.user_id);
+    success("Membre mis en surveillance");
   } catch {
-    // Already watched or error
+    showError("Impossible de mettre en surveillance (deja surveille ?)");
   } finally {
     watchAction.value = false;
   }
@@ -115,14 +123,17 @@ async function toggleWatch() {
 
 async function unwatch() {
   if (!selectedMember.value) return;
-  if (!confirm(`Retirer ${selectedMember.value.member.username} de la surveillance ?`)) return;
+  const ok = await confirmDialog({ title: "Retirer de la surveillance", message: `Retirer ${selectedMember.value.member.username} de la surveillance ?` });
+  if (!ok) return;
   watchAction.value = true;
   try {
     await removeFromWatch(selectedMember.value.member.user_id);
     dossier.value = null;
     await fetchDossier(selectedMember.value.member.user_id);
+    success("Membre retire de la surveillance");
   } catch (e) {
     console.error("Erreur retrait surveillance:", e);
+    showError("Erreur lors du retrait de la surveillance");
   } finally {
     watchAction.value = false;
   }

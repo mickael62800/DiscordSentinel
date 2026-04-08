@@ -26,7 +26,7 @@ async fn main() {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    let config = Config::from_env();
+    let config = Config::from_env("MODERATION_DISCORD_TOKEN");
 
     info!(api_url = %config.base().api_base_url, "Demarrage du moderation bot");
 

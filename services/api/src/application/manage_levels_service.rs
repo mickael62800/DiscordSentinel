@@ -87,7 +87,19 @@ impl ManageLevelsUseCase for ManageLevelsService {
         user_level.level_voice = level_from_xp(user_level.xp_voice);
 
         // Mettre a jour les niveaux en base
-        self.repo.upsert_user_level(&user_level).await?;
+        // NOTE: fenetre de race entre add_xp_atomic et upsert_user_level —
+        // acceptable car les niveaux sont recalcules depuis l'XP a chaque appel
+        if let Err(e) = self.repo.upsert_user_level(&user_level).await {
+            tracing::error!(
+                error = %e,
+                guild_id = %cmd.guild_id,
+                user_id = %cmd.user_id,
+                xp = user_level.xp,
+                level = user_level.level,
+                "Echec mise a jour niveaux apres ajout XP"
+            );
+            return Err(e);
+        }
 
         // Detecter le level-up de la source specifique
         let (old_source_level, new_source_level) = match cmd.source {

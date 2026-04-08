@@ -2,7 +2,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateEmbed, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::embeds::{info_embed, success_embed};
 
@@ -93,7 +93,9 @@ async fn handle_deploy(ctx: &Context, command: &CommandInteraction, _guild_id: &
     match send_role_panel(ctx, command.channel_id, &panel).await {
         Ok(msg) => {
             // Sauvegarder le message_id dans l'API
-            let _ = api.set_message_id(&panel_id, &msg.id.to_string()).await;
+            if let Err(e) = api.set_message_id(&panel_id, &msg.id.to_string()).await {
+                warn!(error = %e, "Failed to save panel message ID");
+            }
             info!(panel_id = %panel_id, message_id = %msg.id, "Panel de roles deploye");
             respond_embed(
                 ctx,
@@ -149,7 +151,9 @@ async fn respond(ctx: &Context, command: &CommandInteraction, content: &str) {
         .content(content)
         .ephemeral(true);
     let response = CreateInteractionResponse::Message(msg);
-    let _ = command.create_response(&ctx.http, response).await;
+    if let Err(e) = command.create_response(&ctx.http, response).await {
+        warn!(error = %e, "Failed to send command response");
+    }
 }
 
 async fn respond_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
@@ -157,5 +161,7 @@ async fn respond_embed(ctx: &Context, command: &CommandInteraction, embed: Creat
         .embed(embed)
         .ephemeral(true);
     let response = CreateInteractionResponse::Message(msg);
-    let _ = command.create_response(&ctx.http, response).await;
+    if let Err(e) = command.create_response(&ctx.http, response).await {
+        warn!(error = %e, "Failed to send embed response");
+    }
 }

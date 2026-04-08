@@ -281,6 +281,93 @@ impl BaseApiClient {
             .collect())
     }
 
+    // ── HTTP Helpers ──
+    // Eliminent le boilerplate repete dans chaque api_client de bot.
+
+    /// GET JSON vers l'API. Retourne le body deserialise.
+    pub async fn get_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
+        let req = self.client.get(format!("{}{}", self.base_url, path));
+        let resp = self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau GET {path}: {e}"))?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Erreur API {status} GET {path}: {body}"));
+        }
+        resp.json::<T>()
+            .await
+            .map_err(|e| format!("Erreur parsing GET {path}: {e}"))
+    }
+
+    /// POST JSON vers l'API. Retourne le body deserialise.
+    pub async fn post_json<B: serde::Serialize, T: serde::de::DeserializeOwned>(&self, path: &str, body: &B) -> Result<T, String> {
+        let req = self.client.post(format!("{}{}", self.base_url, path)).json(body);
+        let resp = self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau POST {path}: {e}"))?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("Erreur API {status} POST {path}: {text}"));
+        }
+        resp.json::<T>()
+            .await
+            .map_err(|e| format!("Erreur parsing POST {path}: {e}"))
+    }
+
+    /// POST fire-and-forget vers l'API. Log l'erreur mais ne la propage pas.
+    pub async fn post_fire_and_forget<B: serde::Serialize>(&self, path: &str, body: &B) {
+        let req = self.client.post(format!("{}{}", self.base_url, path)).json(body);
+        if let Err(e) = self.auth(req).send().await {
+            tracing::warn!(error = %e, path, "Echec POST fire-and-forget");
+        }
+    }
+
+    /// PATCH JSON vers l'API. Fire-and-forget avec log d'erreur.
+    pub async fn patch_fire_and_forget<B: serde::Serialize>(&self, path: &str, body: &B) {
+        let req = self.client.patch(format!("{}{}", self.base_url, path)).json(body);
+        if let Err(e) = self.auth(req).send().await {
+            tracing::warn!(error = %e, path, "Echec PATCH fire-and-forget");
+        }
+    }
+
+    /// DELETE JSON vers l'API. Retourne le body deserialise.
+    pub async fn delete_json<T: serde::de::DeserializeOwned>(&self, path: &str) -> Result<T, String> {
+        let req = self.client.delete(format!("{}{}", self.base_url, path));
+        let resp = self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau DELETE {path}: {e}"))?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(format!("Erreur API {status} DELETE {path}: {body}"));
+        }
+        resp.json::<T>()
+            .await
+            .map_err(|e| format!("Erreur parsing DELETE {path}: {e}"))
+    }
+
+    /// DELETE JSON avec body vers l'API. Retourne le body deserialise.
+    pub async fn delete_with_body<B: serde::Serialize, T: serde::de::DeserializeOwned>(&self, path: &str, body: &B) -> Result<T, String> {
+        let req = self.client.delete(format!("{}{}", self.base_url, path)).json(body);
+        let resp = self.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau DELETE {path}: {e}"))?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("Erreur API {status} DELETE {path}: {text}"));
+        }
+        resp.json::<T>()
+            .await
+            .map_err(|e| format!("Erreur parsing DELETE {path}: {e}"))
+    }
+
     // ── Config Helpers ──
 
     pub fn config_or(

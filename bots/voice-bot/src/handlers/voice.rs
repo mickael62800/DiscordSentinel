@@ -197,7 +197,9 @@ async fn create_temp_channel(
         Ok(ch) => ch,
         Err(why) => {
             error!(error = %why, "Erreur creation salon vocal");
-            let _ = cat.id.delete(&ctx.http).await;
+            if let Err(e) = cat.id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete category after voice channel creation error");
+            }
             return;
         }
     };
@@ -215,7 +217,9 @@ async fn create_temp_channel(
         deny: Permissions::empty(),
         kind: PermissionOverwriteType::Member(user_id),
     };
-    let _ = voice_channel_id.create_permission(&ctx.http, owner_perm).await;
+    if let Err(e) = voice_channel_id.create_permission(&ctx.http, owner_perm).await {
+        tracing::warn!(error = %e, "failed to set owner permission on voice channel");
+    }
 
     // 3. Panel admin config (prive seulement)
     let admin_channel_id = if kind == "private" {
@@ -278,10 +282,16 @@ async fn create_temp_channel(
         Err(why) => {
             error!(error = %why, "Erreur creation panel membres");
             if let Some(aid) = admin_channel_id {
-                let _ = aid.delete(&ctx.http).await;
+                if let Err(e) = aid.delete(&ctx.http).await {
+                    tracing::warn!(error = %e, "failed to delete admin channel during cleanup");
+                }
             }
-            let _ = voice_channel_id.delete(&ctx.http).await;
-            let _ = cat.id.delete(&ctx.http).await;
+            if let Err(e) = voice_channel_id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete voice channel during cleanup");
+            }
+            if let Err(e) = cat.id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete category during cleanup");
+            }
             return;
         }
     };
@@ -518,7 +528,9 @@ pub async fn grant_members_panel_access(
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(user_id),
         };
-        let _ = mid.create_permission(&ctx.http, perm).await;
+        if let Err(e) = mid.create_permission(&ctx.http, perm).await {
+            tracing::warn!(error = %e, "failed to grant members panel access");
+        }
     }
 }
 
@@ -551,9 +563,12 @@ pub async fn revoke_members_panel_access(
     };
 
     if let Some(mid) = members_channel_id {
-        let _ = mid
+        if let Err(e) = mid
             .delete_permission(&ctx.http, PermissionOverwriteType::Member(user_id))
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "failed to revoke members panel access");
+        }
     }
 }
 
@@ -667,9 +682,13 @@ async fn check_and_delete_empty(
             .unwrap_or_default();
 
         for uid in queue_members {
-            let _ = guild_id.disconnect_member(&ctx.http, uid).await;
+            if let Err(e) = guild_id.disconnect_member(&ctx.http, uid).await {
+                tracing::warn!(error = %e, user = %uid, "failed to disconnect member from queue");
+            }
         }
-        let _ = queue_id.delete(&ctx.http).await;
+        if let Err(e) = queue_id.delete(&ctx.http).await {
+            tracing::warn!(error = %e, "failed to delete queue channel");
+        }
         info!("Salon d'attente supprime: {queue_id}");
     }
 
@@ -815,10 +834,12 @@ async fn check_queue_join(
                     .color(0xFFA500)
                     .timestamp(serenity::model::Timestamp::now());
 
-                let _ = dm.send_message(
+                if let Err(e) = dm.send_message(
                     &ctx.http,
                     CreateMessage::new().embed(dm_embed),
-                ).await;
+                ).await {
+                    tracing::warn!(error = %e, "failed to send queue DM notification to owner");
+                }
             }
         }
     }

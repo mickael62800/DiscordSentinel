@@ -42,7 +42,13 @@ async fn run_afk_sweep(ctx: &Context) {
     drop(data);
 
     for guild_id in ctx.cache.guilds() {
-        let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+        let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                std::collections::HashMap::new()
+            }
+        };
 
         let afk_enabled = BaseApiClient::config_bool(&guild_config, "afk_enabled", false);
         if !afk_enabled {

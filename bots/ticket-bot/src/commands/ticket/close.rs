@@ -34,7 +34,7 @@ pub async fn handle_close_button(ctx: &Context, component: &ComponentInteraction
 
         let row = CreateActionRow::Buttons(vec![confirm_btn, cancel_btn]);
 
-        let _ = component.create_response(
+        if let Err(e) = component.create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
@@ -42,17 +42,21 @@ pub async fn handle_close_button(ctx: &Context, component: &ComponentInteraction
                     .components(vec![row])
                     .ephemeral(true),
             ),
-        ).await;
+        ).await {
+            warn!(error = %e, "Failed to send close confirmation prompt");
+        }
     } else {
         // Utilisateur : reponse ephemeral + message visible sans boutons
-        let _ = component.create_response(
+        if let Err(e) = component.create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
                     .content("Votre demande de fermeture a ete envoyee au staff.")
                     .ephemeral(true),
             ),
-        ).await;
+        ).await {
+            warn!(error = %e, "Failed to send close request acknowledgement");
+        }
 
         let msg = serenity::builder::CreateMessage::new()
             .content(format!(
@@ -61,7 +65,9 @@ pub async fn handle_close_button(ctx: &Context, component: &ComponentInteraction
                 component.user.id
             ));
 
-        let _ = component.channel_id.send_message(&ctx.http, msg).await;
+        if let Err(e) = component.channel_id.send_message(&ctx.http, msg).await {
+            warn!(error = %e, "Failed to send close request message");
+        }
     }
 }
 
@@ -86,14 +92,16 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     };
 
     if !is_staff {
-        let _ = component.create_response(
+        if let Err(e) = component.create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
                     .content("Seuls les administrateurs et moderateurs peuvent valider la fermeture.")
                     .ephemeral(true),
             ),
-        ).await;
+        ).await {
+            warn!(error = %e, "Failed to send staff-only close rejection");
+        }
         return;
     }
 
@@ -109,7 +117,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let ticket_id = get_ticket_id_from_channel(ctx, channel_id).await;
 
     // Repondre
-    let _ = component.create_response(
+    if let Err(e) = component.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
@@ -118,7 +126,9 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                     component.user.id
                 ))
         ),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send ticket close confirmation");
+    }
 
     // Fermer via API
     let data = ctx.data.read().await;
@@ -169,7 +179,13 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let transcript_enabled = {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id.to_string()).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             sentinel_shared::api_client::BaseApiClient::config_bool(&gc, "transcript_dm_enabled", true)
         } else {
             true
@@ -180,7 +196,13 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let close_delay = {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id.to_string()).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             sentinel_shared::api_client::BaseApiClient::config_u64(&gc, "close_delay_secs", 5)
         } else {
             5
@@ -223,7 +245,9 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                         // Discord limite a 2000 caracteres par message
                         for chunk in transcript.as_bytes().chunks(1900) {
                             let text = String::from_utf8_lossy(chunk);
-                            let _ = dm_channel.say(&ctx.http, &*text).await;
+                            if let Err(e) = dm_channel.say(&ctx.http, &*text).await {
+                                warn!(error = %e, "Failed to send transcript DM chunk");
+                            }
                         }
                     }
                 }
@@ -233,7 +257,9 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     } // fin if transcript_enabled
 
     tokio::time::sleep(tokio::time::Duration::from_secs(close_delay)).await;
-    let _ = channel_id.delete(&ctx.http).await;
+    if let Err(e) = channel_id.delete(&ctx.http).await {
+        warn!(error = %e, "Failed to delete ticket channel");
+    }
 }
 
 /// Un admin/modo refuse la fermeture — le ticket reste ouvert
@@ -257,18 +283,20 @@ pub async fn handle_close_cancel(ctx: &Context, component: &ComponentInteraction
     };
 
     if !is_staff {
-        let _ = component.create_response(
+        if let Err(e) = component.create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
                     .content("Seuls les administrateurs et moderateurs peuvent gerer la fermeture.")
                     .ephemeral(true),
             ),
-        ).await;
+        ).await {
+            warn!(error = %e, "Failed to send staff-only cancel rejection");
+        }
         return;
     }
 
-    let _ = component.create_response(
+    if let Err(e) = component.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
@@ -277,7 +305,9 @@ pub async fn handle_close_cancel(ctx: &Context, component: &ComponentInteraction
                     component.user.id
                 ))
         ),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send cancel close response");
+    }
 }
 
 /// Gere le clic sur un bouton de satisfaction (1-5 etoiles).
@@ -327,6 +357,8 @@ pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInter
             .ephemeral(true),
     );
 
-    component.create_response(&ctx.http, response).await.ok();
+    if let Err(e) = component.create_response(&ctx.http, response).await {
+        warn!(error = %e, "Failed to send satisfaction response");
+    }
     info!(user = %component.user.name, rating = rating, "Satisfaction ticket enregistree");
 }

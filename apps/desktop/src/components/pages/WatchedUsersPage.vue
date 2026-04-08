@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useWatchedUsers } from "../../composables/useWatchedUsers";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
@@ -49,6 +50,7 @@ const {
   selectUser,
   fetchUsers,
 } = useWatchedUsers();
+useRealtimeRefresh(["watched_user_added", "infraction_new", "security_event"], fetchUsers);
 
 // Modale ajout surveillance
 const addModalVisible = ref(false);

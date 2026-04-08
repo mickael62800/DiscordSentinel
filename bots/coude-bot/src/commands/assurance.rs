@@ -90,9 +90,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     if let Err(e) = db.buy_insurance(&guild_id, &user_id, is_scam).await {
         // Rembourser
-        let _ = db
+        if let Err(e2) = db
             .update_player_coins(&guild_id, &user_id, insurance_cost)
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e2, "Echec DB update_player_coins remboursement");
+        }
         reply_ephemeral(ctx, command, &format!("Erreur DB : {e}")).await;
         return;
     }
@@ -126,7 +129,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -136,5 +139,7 @@ async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

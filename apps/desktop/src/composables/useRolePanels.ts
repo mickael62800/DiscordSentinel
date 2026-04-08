@@ -2,8 +2,10 @@ import { ref, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { RolePanel, RolePanelDetail, AutoRoleConfig } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 export function useRolePanels() {
+  const { error: showError } = useToast();
   const panels = ref<RolePanel[]>([]);
   const autoRoles = ref<AutoRoleConfig[]>([]);
   const selectedPanel = ref<RolePanelDetail | null>(null);
@@ -27,7 +29,8 @@ export function useRolePanels() {
       panels.value = p;
       autoRoles.value = ar;
     } catch (e) {
-      console.error("Erreur chargement role panels:", e);
+      console.error("Erreur lors du chargement des panneaux de roles :", e);
+      showError("Erreur lors du chargement des panneaux de roles.");
     } finally {
       loading.value = false;
     }
@@ -37,7 +40,8 @@ export function useRolePanels() {
     try {
       selectedPanel.value = await invoke<RolePanelDetail>("get_role_panel_detail", { panelId });
     } catch (e) {
-      console.error("Erreur chargement panel detail:", e);
+      console.error("Erreur lors du chargement du detail du panneau :", e);
+      showError("Erreur lors du chargement du detail du panneau.");
     }
   }
 

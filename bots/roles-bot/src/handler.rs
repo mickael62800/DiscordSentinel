@@ -89,13 +89,17 @@ impl EventHandler for Handler {
                 tokio::spawn(async move {
                     tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
                     if let Ok(member) = guild.member(&ctx_clone.http, user).await {
-                        let _ = member.add_role(&ctx_clone.http, RoleId::new(role_id)).await;
+                        if let Err(e) = member.add_role(&ctx_clone.http, RoleId::new(role_id)).await {
+                            warn!(error = %e, "Failed to add delayed auto-role");
+                        }
                     }
                 });
             } else {
                 if let Ok(role_id) = ar.role_id.parse::<u64>() {
                     if let Ok(member) = guild_id.member(&ctx.http, new_member.user.id).await {
-                        let _ = member.add_role(&ctx.http, RoleId::new(role_id)).await;
+                        if let Err(e) = member.add_role(&ctx.http, RoleId::new(role_id)).await {
+                            warn!(error = %e, "Failed to add auto-role");
+                        }
                     }
                 }
             }
@@ -145,13 +149,17 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
 
     let embed = if has_role {
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
-            let _ = m.remove_role(&ctx.http, role).await;
+            if let Err(e) = m.remove_role(&ctx.http, role).await {
+                warn!(error = %e, "Failed to remove panel role");
+            }
         }
         neutral_embed("\u{21a9}\u{fe0f} Role retire")
             .description(format!("Le role <@&{}> vous a ete retire.", role_id))
     } else {
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
-            let _ = m.add_role(&ctx.http, role).await;
+            if let Err(e) = m.add_role(&ctx.http, role).await {
+                warn!(error = %e, "Failed to add panel role");
+            }
         }
         success_embed("\u{2705} Role attribue")
             .description(format!("Le role <@&{}> vous a ete attribue.", role_id))
@@ -161,7 +169,9 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         .embed(embed)
         .ephemeral(true);
     let response = CreateInteractionResponse::Message(msg);
-    let _ = component.create_response(&ctx.http, response).await;
+    if let Err(e) = component.create_response(&ctx.http, response).await {
+        warn!(error = %e, "Failed to send role toggle response");
+    }
 }
 
 /// Envoie un panel de roles dans un channel avec des boutons.

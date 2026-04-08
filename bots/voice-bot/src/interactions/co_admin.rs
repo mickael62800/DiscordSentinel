@@ -149,9 +149,12 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
                 deny: Permissions::empty(),
                 kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
             };
-            let _ = ChannelId::new(text_id)
+            if let Err(e) = ChannelId::new(text_id)
                 .create_permission(&ctx.http, text_overwrite)
-                .await;
+                .await
+            {
+                tracing::warn!(error = %e, "failed to grant co-admin permission on text channel");
+            }
         }
     }
 

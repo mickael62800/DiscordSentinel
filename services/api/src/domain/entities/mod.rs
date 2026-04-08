@@ -57,3 +57,9 @@ pub use user_activity::UserActivity;
 
 mod guild_member;
 pub use guild_member::{GuildMember, MemberSummary, MemberConduct, MemberInfractions, MemberModeration, MemberStats};
+
+mod blackjack;
+pub use blackjack::{BlackjackGame, Card, calculate_score, create_deck};
+
+mod wallet;
+pub use wallet::{Wallet, WalletTransaction};

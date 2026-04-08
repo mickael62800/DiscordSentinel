@@ -8,4 +8,5 @@ use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
 pub trait AuditLogRepository: Send + Sync {
     async fn save(&self, log: &AuditLog) -> Result<(), DomainError>;
     async fn find_all(&self, guild_id: Option<&str>, filters: &AuditLogFilters) -> Result<Vec<AuditLog>, DomainError>;
+    async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError>;
 }

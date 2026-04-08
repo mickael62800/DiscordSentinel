@@ -6,7 +6,7 @@ use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::heartbeat::{register_guilds, ApiClientKey};
 
@@ -194,8 +194,11 @@ async fn run_daily_chaos(ctx: &Context) {
             .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
             .timestamp(serenity::model::Timestamp::now());
 
-        let _ = announce_channel
+        if let Err(e) = announce_channel
             .send_message(&ctx.http, CreateMessage::new().embed(embed))
-            .await;
+            .await
+        {
+            warn!(error = %e, "Failed to send announcement message");
+        }
     }
 }

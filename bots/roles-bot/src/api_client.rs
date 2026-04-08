@@ -68,61 +68,48 @@ impl ApiClient {
 
     #[allow(dead_code)]
     pub async fn get_panel_by_message(&self, message_id: &str) -> Result<Option<RolePanelDetail>, String> {
+        let path = format!("/api/role-panels/by-message/{message_id}");
         let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/role-panels/by-message/{message_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
+            self.base.client().get(format!("{}{}", self.base.base_url(), path))
+        ).send().await.map_err(|e| format!("{e}"))?;
         if resp.status().as_u16() == 404 { return Ok(None); }
         if !resp.status().is_success() { return Err(format!("API error {}", resp.status())); }
         resp.json::<Option<RolePanelDetail>>().await.map_err(|e| format!("{e}"))
     }
 
     pub async fn get_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, String> {
-        let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/auto-roles/{guild_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
-        if !resp.status().is_success() { return Ok(vec![]); }
-        resp.json::<Vec<AutoRole>>().await.map_err(|e| format!("{e}"))
+        self.base.get_json(&format!("/api/auto-roles/{guild_id}")).await
     }
 
     pub async fn set_message_id(&self, panel_id: &str, message_id: &str) -> Result<(), String> {
         #[derive(Serialize)]
         struct P { panel_id: String, message_id: String }
-        let req = self.base.client().patch(format!("{}/api/role-panels/set-message", self.base.base_url()))
-            .json(&P { panel_id: panel_id.into(), message_id: message_id.into() });
-        self.base.auth(req).send().await.map_err(|e| format!("{e}"))?;
+        self.base.patch_fire_and_forget(
+            "/api/role-panels/set-message",
+            &P { panel_id: panel_id.into(), message_id: message_id.into() },
+        ).await;
         Ok(())
     }
 
     pub async fn list_panels(&self, guild_id: &str) -> Result<Vec<RolePanel>, String> {
-        let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/role-panels/{guild_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
-        if !resp.status().is_success() { return Ok(vec![]); }
-        resp.json::<Vec<RolePanel>>().await.map_err(|e| format!("{e}"))
+        self.base.get_json(&format!("/api/role-panels/{guild_id}")).await
     }
 
     /// Synchronise les roles Discord d'un serveur vers l'API backend.
     pub async fn sync_discord_roles(&self, guild_id: &str, roles: Vec<SyncRole>) -> Result<(), String> {
         #[derive(Serialize)]
         struct Body { roles: Vec<SyncRole> }
-        let req = self.base.client()
-            .post(format!("{}/api/discord-roles/{}/sync", self.base.base_url(), guild_id))
-            .json(&Body { roles });
-        let resp = self.base.auth(req).send().await.map_err(|e| format!("{e}"))?;
-        if !resp.status().is_success() {
-            return Err(format!("Sync roles error: {}", resp.status()));
-        }
+        let _: serde_json::Value = self.base
+            .post_json(&format!("/api/discord-roles/{}/sync", guild_id), &Body { roles })
+            .await?;
         Ok(())
     }
 
     pub async fn get_panel(&self, panel_id: &str) -> Result<Option<RolePanelDetail>, String> {
+        let path = format!("/api/role-panels/detail/{panel_id}");
         let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/role-panels/detail/{panel_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
+            self.base.client().get(format!("{}{}", self.base.base_url(), path))
+        ).send().await.map_err(|e| format!("{e}"))?;
         if resp.status().as_u16() == 404 { return Ok(None); }
         resp.json::<RolePanelDetail>().await.map(Some).map_err(|e| format!("{e}"))
     }

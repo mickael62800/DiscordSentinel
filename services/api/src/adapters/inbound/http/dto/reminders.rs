@@ -33,7 +33,10 @@ impl From<CreateReminderDto> for CreateReminderCommand {
             target_name: dto.target_name,
             action_type: dto.action_type,
             reason: dto.reason,
-            action_id: Uuid::parse_str(&dto.action_id).unwrap_or_default(),
+            action_id: Uuid::parse_str(&dto.action_id).unwrap_or_else(|e| {
+                tracing::warn!(error = %e, action_id = %dto.action_id, "UUID action_id invalide dans reminder, utilisation UUID nil");
+                Uuid::nil()
+            }),
             duration_secs: dto.duration_secs,
             remind_before_secs: dto.remind_before_secs,
         }

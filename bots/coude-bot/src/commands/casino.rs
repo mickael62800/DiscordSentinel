@@ -200,22 +200,33 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Poser le cooldown
     if cooldown_secs > 0 {
-        let _ = db.set_cooldown(&guild_id, &command.user.id.to_string(), "casino", cooldown_secs).await;
+        if let Err(e) = db.set_cooldown(&guild_id, &command.user.id.to_string(), "casino", cooldown_secs).await {
+            tracing::warn!(error = %e, "Echec DB set_cooldown casino");
+        }
     }
 
     // Appliquer le resultat
     if is_faillite {
-        let _ = db
+        if let Err(e) = db
             .record_casino_faillite(&guild_id, &command.user.id.to_string())
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "Echec DB record_casino_faillite");
+        }
     } else if gain >= 0 {
-        let _ = db
+        if let Err(e) = db
             .record_casino_win(&guild_id, &command.user.id.to_string(), gain)
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "Echec DB record_casino_win");
+        }
     } else {
-        let _ = db
+        if let Err(e) = db
             .record_casino_loss(&guild_id, &command.user.id.to_string(), -gain)
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "Echec DB record_casino_loss");
+        }
     }
 
     // XP pour jackpot x10 (roll > 92)
@@ -248,7 +259,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -258,5 +269,7 @@ async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

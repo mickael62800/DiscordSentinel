@@ -5,10 +5,11 @@ use serenity::all::{
     CommandInteraction, ComponentInteraction, Context, CreateEmbed,
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
+use tracing::warn;
 
 /// Reponse ephemere texte a une slash command.
 pub async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -18,12 +19,14 @@ pub async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, conten
             ),
         )
         .await
-        .ok();
+    {
+        warn!(error = %e, command = %command.data.name, "Echec reponse ephemere texte");
+    }
 }
 
 /// Reponse ephemere embed a une slash command.
 pub async fn reply_ephemeral_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -33,12 +36,14 @@ pub async fn reply_ephemeral_embed(ctx: &Context, command: &CommandInteraction, 
             ),
         )
         .await
-        .ok();
+    {
+        warn!(error = %e, command = %command.data.name, "Echec reponse ephemere embed");
+    }
 }
 
 /// Reponse publique embed a une slash command.
 pub async fn reply_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -46,12 +51,14 @@ pub async fn reply_embed(ctx: &Context, command: &CommandInteraction, embed: Cre
             ),
         )
         .await
-        .ok();
+    {
+        warn!(error = %e, command = %command.data.name, "Echec reponse embed");
+    }
 }
 
 /// Reponse ephemere texte a un component interaction (bouton/menu).
 pub async fn component_reply_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -61,12 +68,14 @@ pub async fn component_reply_ephemeral(ctx: &Context, component: &ComponentInter
             ),
         )
         .await
-        .ok();
+    {
+        warn!(error = %e, "Echec reponse composant ephemere texte");
+    }
 }
 
 /// Reponse ephemere embed a un component interaction.
 pub async fn component_reply_embed(ctx: &Context, component: &ComponentInteraction, embed: CreateEmbed) {
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -76,7 +85,9 @@ pub async fn component_reply_embed(ctx: &Context, component: &ComponentInteracti
             ),
         )
         .await
-        .ok();
+    {
+        warn!(error = %e, "Echec reponse composant ephemere embed");
+    }
 }
 
 /// Verifie si le bot est active pour un guild. Charge la config et check "enabled".
@@ -84,6 +95,12 @@ pub async fn is_bot_enabled(
     api: &crate::api_client::BaseApiClient,
     guild_id: &str,
 ) -> bool {
-    let config = api.get_guild_config(guild_id).await.unwrap_or_default();
+    let config = match api.get_guild_config(guild_id).await {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            warn!(guild_id = %guild_id, error = %e, "Impossible de verifier si le bot est active, presume actif");
+            return true;
+        }
+    };
     crate::api_client::BaseApiClient::config_bool(&config, "enabled", true)
 }

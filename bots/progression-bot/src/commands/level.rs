@@ -3,7 +3,7 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::handler::StatsApiKey;
 
@@ -255,5 +255,7 @@ async fn respond(ctx: &Context, command: &CommandInteraction, content: &str) {
         .content(content)
         .ephemeral(true);
     let response = CreateInteractionResponse::Message(msg);
-    let _ = command.create_response(&ctx.http, response).await;
+    if let Err(e) = command.create_response(&ctx.http, response).await {
+        warn!(error = %e, "Failed to send level command response");
+    }
 }

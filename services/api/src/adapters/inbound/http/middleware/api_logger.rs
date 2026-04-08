@@ -5,6 +5,8 @@ use axum::extract::{Request, State};
 use axum::middleware::Next;
 use axum::response::Response;
 
+use tracing::warn;
+
 use crate::domain::entities::LogEntry;
 use crate::ports::outbound::LogRepository;
 
@@ -58,7 +60,9 @@ pub async fn api_logger_middleware(
 
         let repo = log_repo.clone();
         tokio::spawn(async move {
-            let _ = repo.save(&entry).await;
+            if let Err(e) = repo.save(&entry).await {
+                warn!(error = %e, "Echec sauvegarde log API");
+            }
         });
     }
 

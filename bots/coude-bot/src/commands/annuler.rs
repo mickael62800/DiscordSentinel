@@ -75,7 +75,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Rembourser les paris
-    let _ = db.refund_bets(combat_id).await;
+    if let Err(e) = db.refund_bets(combat_id).await {
+        tracing::warn!(error = %e, "Echec DB refund_bets");
+    }
 
     let embed = CreateEmbed::new()
         .title("\u{274c} Combat annule !")
@@ -93,7 +95,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::UpdateMessage(
@@ -103,11 +105,13 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }
 
 async fn respond_ephemeral(ctx: &Context, component: &ComponentInteraction, msg: &str) {
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -117,5 +121,7 @@ async fn respond_ephemeral(ctx: &Context, component: &ComponentInteraction, msg:
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

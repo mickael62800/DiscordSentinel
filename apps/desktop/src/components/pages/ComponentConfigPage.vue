@@ -3,9 +3,14 @@ import { ref, computed, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useToast } from "../../composables/useToast";
+import { useConfirm } from "../../composables/useConfirm";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppToggle from "../atoms/AppToggle.vue";
 import { getApiBaseUrl } from "../../utils/api";
+
+const { success, error: showError } = useToast();
+const { confirm } = useConfirm();
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
@@ -28,6 +33,7 @@ async function fetchModelsStatus() {
     }
   } catch (e) {
     console.error("Erreur chargement statut modeles:", e);
+    showError("Impossible de charger le statut des modeles IA");
   }
 }
 
@@ -81,17 +87,22 @@ async function saveToken(botName: string) {
     setTimeout(() => (tokenSuccess.value = null), 3000);
   } catch (e) {
     console.error("Erreur sauvegarde token:", e);
+    showError("Erreur lors de la sauvegarde du token");
   } finally {
     savingToken.value = null;
   }
 }
 
 async function deleteToken(botName: string) {
+  const ok = await confirm({ title: "Supprimer le token", message: "Voulez-vous vraiment supprimer ce token de bot ?" });
+  if (!ok) return;
   try {
     await invoke("delete_bot_token", { botName });
     tokenMap.value[botName] = false;
+    success("Token supprime avec succes");
   } catch (e) {
     console.error("Erreur suppression token:", e);
+    showError("Erreur lors de la suppression du token");
   }
 }
 
@@ -248,9 +259,11 @@ async function saveConfig() {
     }
     successMessage.value = `${changesCount.value} parametre(s) enregistre(s)`;
     await fetchConfig();
+    success(`${changesCount.value} parametre(s) enregistre(s)`);
     setTimeout(() => (successMessage.value = ""), 3000);
   } catch (e) {
     console.error("Erreur sauvegarde:", e);
+    showError("Erreur lors de la sauvegarde de la configuration");
   } finally {
     saving.value = false;
   }

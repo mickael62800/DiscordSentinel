@@ -118,7 +118,13 @@ impl EventHandler for Handler {
         {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
-                let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                let config = match api.get_guild_config(&guild_id).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(error = %e, "Failed to fetch guild config");
+                        return;
+                    }
+                };
                 if !BaseApiClient::config_bool(&config, "enabled", true) {
                     return;
                 }
@@ -281,7 +287,13 @@ async fn process_image_attachment(
     let guild_config = {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
-            api.get_guild_config(guild_id).await.unwrap_or_default()
+            match api.get_guild_config(guild_id).await {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch guild config for thresholds");
+                    std::collections::HashMap::new()
+                }
+            }
         } else {
             std::collections::HashMap::new()
         }

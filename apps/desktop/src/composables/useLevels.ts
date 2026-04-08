@@ -2,8 +2,10 @@ import { ref, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { LevelConfig, UserLevel, LevelReward, DiscordRole } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 export function useLevels() {
+  const { success, error: showError } = useToast();
   const config = ref<LevelConfig | null>(null);
   const leaderboard = ref<UserLevel[]>([]);
   const rewards = ref<LevelReward[]>([]);
@@ -37,7 +39,8 @@ export function useLevels() {
       roles.value = ro ?? [];
     } catch (e) {
       error.value = "Impossible de charger les niveaux.";
-      console.error("Erreur chargement niveaux:", e);
+      console.error("Erreur lors du chargement des niveaux :", e);
+      showError("Impossible de charger les niveaux.");
     } finally {
       loading.value = false;
     }
@@ -46,16 +49,28 @@ export function useLevels() {
   async function setReward(level: number, roleId: string, source: string) {
     const guildId = selectedGuildId.value;
     if (!guildId) return;
-    await invoke("set_level_reward", { guildId, level, roleId, source });
-    // Rafraichir les rewards
-    rewards.value = await invoke<LevelReward[]>("get_level_rewards", { guildId });
+    try {
+      await invoke("set_level_reward", { guildId, level, roleId, source });
+      // Rafraichir les rewards
+      rewards.value = await invoke<LevelReward[]>("get_level_rewards", { guildId });
+      success("Recompense de niveau enregistree avec succes.");
+    } catch (e) {
+      console.error("Erreur lors de l'enregistrement de la recompense :", e);
+      showError("Erreur lors de l'enregistrement de la recompense.");
+    }
   }
 
   async function deleteReward(level: number, source: string) {
     const guildId = selectedGuildId.value;
     if (!guildId) return;
-    await invoke("delete_level_reward", { guildId, level, source });
-    rewards.value = await invoke<LevelReward[]>("get_level_rewards", { guildId });
+    try {
+      await invoke("delete_level_reward", { guildId, level, source });
+      rewards.value = await invoke<LevelReward[]>("get_level_rewards", { guildId });
+      success("Recompense de niveau supprimee avec succes.");
+    } catch (e) {
+      console.error("Erreur lors de la suppression de la recompense :", e);
+      showError("Erreur lors de la suppression de la recompense.");
+    }
   }
 
   onMounted(fetchAll);

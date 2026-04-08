@@ -14,7 +14,7 @@ import PaginationBar from "../molecules/PaginationBar.vue";
 import { statusVariant, priorityVariant } from "../../utils/variants";
 
 const { filteredTickets, loading, error, filterStatus, filterPriority, openCount, pendingCount, fetchTickets } = useTickets();
-useRealtimeRefresh(["ticket_new", "ticket_message"], fetchTickets);
+useRealtimeRefresh(["ticket_new", "ticket_message", "ticket_closed", "ticket_assigned", "ticket_status_updated", "ticket_channel_updated"], fetchTickets);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedTickets } = usePagination(filteredTickets);
 const { detail, loading: detailLoading, replying, fetchDetail, reply, close } = useTicketDetail();
 

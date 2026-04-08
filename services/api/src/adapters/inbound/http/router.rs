@@ -5,6 +5,7 @@ use axum::Router;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 
@@ -15,8 +16,17 @@ use super::middleware::rate_limit::{rate_limit_middleware, RateLimiter};
 use super::state::AppState;
 
 fn build_cors(allowed_origins: &str) -> CorsLayer {
-    let allow_origin = if allowed_origins.is_empty() || allowed_origins == "*" {
+    let allow_origin = if allowed_origins == "*" {
         AllowOrigin::any()
+    } else if allowed_origins.is_empty() {
+        // Default securise : uniquement les origines Tauri + localhost dev
+        tracing::info!("ALLOWED_ORIGINS non configure — utilisation des origines par defaut (Tauri + localhost)");
+        AllowOrigin::list([
+            "https://tauri.localhost".parse::<HeaderValue>().unwrap(),
+            "http://tauri.localhost".parse::<HeaderValue>().unwrap(),
+            "http://localhost:1420".parse::<HeaderValue>().unwrap(),
+            "http://localhost:3000".parse::<HeaderValue>().unwrap(),
+        ])
     } else {
         let origins: Vec<HeaderValue> = allowed_origins
             .split(',')
@@ -52,6 +62,19 @@ fn bot_routes_standard() -> Router<AppState> {
         .route("/rules/{guild_id}/{rule_id}", delete(handlers::rules::delete_rule))
         .route("/infractions/{guild_id}", get(handlers::infractions::list_infractions))
         .route("/infractions/delete/{id}", delete(handlers::infractions::delete_infraction))
+        // Wallet (shared coin system)
+        .route("/api/wallet/{guild_id}/{user_id}", get(handlers::wallet::get_wallet))
+        .route("/api/wallet/{guild_id}/{user_id}/credit", post(handlers::wallet::credit))
+        .route("/api/wallet/{guild_id}/{user_id}/debit", post(handlers::wallet::debit))
+        .route("/api/wallet/transfer", post(handlers::wallet::transfer))
+        .route("/api/wallet/{guild_id}/leaderboard", get(handlers::wallet::leaderboard))
+        .route("/api/wallet/{guild_id}/{user_id}/transactions", get(handlers::wallet::transactions))
+        // Blackjack
+        .route("/api/blackjack/start", post(handlers::blackjack::start_game))
+        .route("/api/blackjack/{game_id}/hit", post(handlers::blackjack::hit))
+        .route("/api/blackjack/{game_id}/stand", post(handlers::blackjack::stand))
+        .route("/api/blackjack/{game_id}/double", post(handlers::blackjack::double_down))
+        .route("/api/blackjack/{guild_id}/{user_id}/active", get(handlers::blackjack::get_active))
 }
 
 fn ticket_routes() -> Router<AppState> {
@@ -220,6 +243,9 @@ fn dashboard_routes() -> Router<AppState> {
         .route("/bots/config/{guild_id}/{bot_name}", get(handlers::bot_config::get_bot_config))
         .route("/bots/config", post(handlers::bot_config::set_config).delete(handlers::bot_config::delete_config))
         .route("/ia-config/{guild_id}", get(handlers::ia_config::get_ia_config).put(handlers::ia_config::save_ia_config))
+        .route("/purge/infractions", delete(handlers::purge::purge_infractions))
+        .route("/purge/audit-logs", delete(handlers::purge::purge_audit_logs))
+        .route("/purge/logs", delete(handlers::purge::purge_logs))
 }
 
 /// Construit le router sans rate limiter ni ConnectInfo — pour les tests d'integration.
@@ -411,6 +437,31 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .layer(RequestBodyLimitLayer::new(max_body_size))
         .layer(trace_layer)
         .layer(SetRequestIdLayer::x_request_id(MakeRequestUuid))
+        // Security headers
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::HeaderName::from_static("x-xss-protection"),
+            HeaderValue::from_static("1; mode=block"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::HeaderName::from_static("permissions-policy"),
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CACHE_CONTROL,
+            HeaderValue::from_static("no-store"),
+        ))
         .layer(build_cors(allowed_origins))
         .with_state(state)
 }

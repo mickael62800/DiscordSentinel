@@ -10,14 +10,14 @@ use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
     PgMemberRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgAuditLogRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgVoiceChannelRepository, PgWatchedUserRepository,
+    PgAnalyticsRepository, PgAuditLogRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository,
 };
 use sentinel_api::adapters::outbound::job_client::JobClient;
 use sentinel_api::adapters::outbound::redis_cache::RedisCache;
 use sentinel_api::application::{
     AnalyzeImageService, AnalyzeMessageService, ManageConductService, ManageInfractionsService,
     ManageModerationService, ManageRulesService, ManageSecurityService, ManageStatsService,
-    ManageAuditLogsService, ManageLevelsService, ManageMembersService, ManageNotesService, ManageRemindersService, ManageRolePanelsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
+    BlackjackService, ManageAuditLogsService, ManageLevelsService, ManageMembersService, ManageNotesService, ManageRemindersService, ManageRolePanelsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
 };
 use sentinel_api::domain::services::{DiscordApiService, InferenceService, TextTokenizer};
 use sentinel_api::config::AppConfig;
@@ -194,6 +194,9 @@ async fn main() {
     let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo));
     let member_repo = Arc::new(PgMemberRepository::new(pg_pool.clone()));
     let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));
+    let wallet_repo = Arc::new(PgWalletRepository::new(pg_pool.clone()));
+    let blackjack_repo = Arc::new(PgBlackjackRepository::new(pg_pool.clone()));
+    let blackjack_svc = Arc::new(BlackjackService::new(blackjack_repo, wallet_repo.clone()));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),
@@ -246,6 +249,8 @@ async fn main() {
         bot_config_repo,
         ia_config_repo,
         discord_role_repo,
+        wallet_repo,
+        blackjack_svc,
         broadcaster,
         job_client,
         discord_api,
@@ -276,7 +281,9 @@ async fn main() {
             category: "api".into(),
             details: serde_json::json!({"event": "startup", "bind": config.bind_addr()}),
         };
-        let _ = api_log_repo.save(&entry).await;
+        if let Err(e) = api_log_repo.save(&entry).await {
+            tracing::warn!(error = %e, "Echec sauvegarde log API");
+        }
     }
 
     info!("Sentinel API prêt (WebSocket sur /ws)");
@@ -308,7 +315,9 @@ async fn main() {
             category: "api".into(),
             details: serde_json::json!({"event": "shutdown"}),
         };
-        let _ = api_log_repo.save(&entry).await;
+        if let Err(e) = api_log_repo.save(&entry).await {
+            tracing::warn!(error = %e, "Echec sauvegarde log API");
+        }
     }
 
     pg_pool.close().await;

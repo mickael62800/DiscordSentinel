@@ -2,6 +2,7 @@ import { ref, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { DailyActivity, TopUser } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useRealtimeRefresh } from "./useRealtimeRefresh";
 
 export function useDashboardCharts() {
   const activity = ref<DailyActivity[]>([]);
@@ -41,6 +42,13 @@ export function useDashboardCharts() {
 
   onMounted(fetchAll);
   watch([guildIdFilter, days], fetchAll);
+
+  // Refresh automatique quand des stats changent
+  useRealtimeRefresh(
+    ["stats_messages_recorded", "stats_voice_recorded", "infraction_new", "moderation_action"],
+    fetchAll,
+    { debounceMs: 5000 }, // Debounce 5s — les charts n'ont pas besoin d'etre ultra reactifs
+  );
 
   return { activity, topUsers, loading, error, days, fetchAll };
 }

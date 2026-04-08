@@ -2,9 +2,11 @@ import { ref, computed, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { Infraction, ConfirmedBan } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 export function useBans() {
   const { guildIdFilter } = useGuildSelector();
+  const { success, error: showError } = useToast();
   const loading = ref(true);
   const searchQuery = ref("");
 
@@ -30,7 +32,8 @@ export function useBans() {
         return true;
       });
     } catch (e) {
-      console.error("Erreur chargement bans:", e);
+      console.error("Erreur lors du chargement des bans :", e);
+      showError("Erreur lors du chargement des bannissements.");
     } finally {
       loading.value = false;
     }
@@ -68,8 +71,10 @@ export function useBans() {
     try {
       await invoke("execute_ban", { guildId, userId, reason });
       await fetchBans();
+      success("Utilisateur banni avec succes.");
     } catch (e) {
-      console.error("Erreur execution ban:", e);
+      console.error("Erreur lors de l'execution du ban :", e);
+      showError("Erreur lors du bannissement de l'utilisateur.");
       throw e;
     } finally {
       banning.value = false;
@@ -81,8 +86,10 @@ export function useBans() {
     try {
       await invoke("execute_unban", { guildId, userId });
       await fetchBans();
+      success("Utilisateur debanni avec succes.");
     } catch (e) {
-      console.error("Erreur execution unban:", e);
+      console.error("Erreur lors de l'execution du deban :", e);
+      showError("Erreur lors du debannissement de l'utilisateur.");
       throw e;
     } finally {
       banning.value = false;

@@ -3,6 +3,8 @@ use axum::Json;
 use redis::AsyncCommands;
 use serde::Deserialize;
 
+use tracing::warn;
+
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::state::AppState;
@@ -35,7 +37,9 @@ pub async fn list_members(
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&members) {
-            let _: Result<(), _> = conn.set_ex(&cache_key, json, MEMBERS_TTL).await;
+            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, MEMBERS_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set members");
+            }
         }
     }
 

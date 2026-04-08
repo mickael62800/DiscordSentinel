@@ -3,7 +3,7 @@ use serenity::all::{
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     CreateMessage,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{critical_embed, success_embed};
@@ -78,7 +78,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_config = {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
-            api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+            match api.get_guild_config(&guild_id.to_string()).await {
+                Ok(config) => config,
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch guild config for ban");
+                    std::collections::HashMap::new()
+                }
+            }
         } else {
             std::collections::HashMap::new()
         }
@@ -93,10 +99,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         let dm_embed = critical_embed(format!("🔨 Ban ({duration_label}) sur **{guild_name}**"))
             .field("Raison", reason, false);
 
-        dm.send_message(
+        if let Err(e) = dm.send_message(
             &ctx.http,
             CreateMessage::new().embed(dm_embed),
-        ).await.ok();
+        ).await {
+            warn!(error = %e, "Failed to send ban DM to user");
+        }
     }
 
     // Executer le ban Discord (supprime les messages des derniers N jours)
@@ -138,12 +146,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .field("Duree", &duration_label, true)
         .field("Raison", reason, false);
 
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().embed(channel_embed),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send ban response embed");
+    }
 }
 
 pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
@@ -189,26 +199,32 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
         duration: None,
     };
 
-    api.log_action(&action).await.ok();
+    if let Err(e) = api.log_action(&action).await {
+        warn!(error = %e, "Failed to log unban action");
+    }
 
     info!(target_id = user_id_str, "Unban applique");
 
     let unban_embed = success_embed("✅ Unban")
         .field("Utilisateur", format!("`{user_id_str}`"), false);
 
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().embed(unban_embed),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send unban response embed");
+    }
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().content(content).ephemeral(false),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send reply text");
+    }
 }

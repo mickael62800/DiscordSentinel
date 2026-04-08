@@ -98,9 +98,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Creer le joueur cible s'il n'existe pas
-    let _ = db
+    if let Err(e) = db
         .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
-        .await;
+        .await
+    {
+        tracing::warn!(error = %e, "Echec DB get_or_create_player cible prime");
+    }
 
     // Deduire les coins
     if let Err(e) = db
@@ -153,7 +156,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -163,5 +166,7 @@ async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

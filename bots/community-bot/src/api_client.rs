@@ -56,47 +56,39 @@ impl ApiClient {
 
     #[allow(dead_code)]
     pub async fn get_panel_by_message(&self, message_id: &str) -> Result<Option<RolePanelDetail>, String> {
+        let path = format!("/api/role-panels/by-message/{message_id}");
+        // 404 means no panel found — return None
         let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/role-panels/by-message/{message_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
+            self.base.client().get(format!("{}{}", self.base.base_url(), path))
+        ).send().await.map_err(|e| format!("{e}"))?;
         if resp.status().as_u16() == 404 { return Ok(None); }
         if !resp.status().is_success() { return Err(format!("API error {}", resp.status())); }
         resp.json::<Option<RolePanelDetail>>().await.map_err(|e| format!("{e}"))
     }
 
     pub async fn get_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, String> {
-        let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/auto-roles/{guild_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
-        if !resp.status().is_success() { return Ok(vec![]); }
-        resp.json::<Vec<AutoRole>>().await.map_err(|e| format!("{e}"))
+        self.base.get_json(&format!("/api/auto-roles/{guild_id}")).await
     }
 
     pub async fn set_message_id(&self, panel_id: &str, message_id: &str) -> Result<(), String> {
         #[derive(Serialize)]
         struct P { panel_id: String, message_id: String }
-        let req = self.base.client().patch(format!("{}/api/role-panels/set-message", self.base.base_url()))
-            .json(&P { panel_id: panel_id.into(), message_id: message_id.into() });
-        self.base.auth(req).send().await.map_err(|e| format!("{e}"))?;
+        self.base.patch_fire_and_forget(
+            "/api/role-panels/set-message",
+            &P { panel_id: panel_id.into(), message_id: message_id.into() },
+        ).await;
         Ok(())
     }
 
     pub async fn list_panels(&self, guild_id: &str) -> Result<Vec<RolePanel>, String> {
-        let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/role-panels/{guild_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
-        if !resp.status().is_success() { return Ok(vec![]); }
-        resp.json::<Vec<RolePanel>>().await.map_err(|e| format!("{e}"))
+        self.base.get_json(&format!("/api/role-panels/{guild_id}")).await
     }
 
     pub async fn get_panel(&self, panel_id: &str) -> Result<Option<RolePanelDetail>, String> {
+        let path = format!("/api/role-panels/detail/{panel_id}");
         let resp = self.base.auth(
-            self.base.client().get(format!("{}/api/role-panels/detail/{panel_id}", self.base.base_url()))
-        )
-            .send().await.map_err(|e| format!("{e}"))?;
+            self.base.client().get(format!("{}{}", self.base.base_url(), path))
+        ).send().await.map_err(|e| format!("{e}"))?;
         if resp.status().as_u16() == 404 { return Ok(None); }
         resp.json::<RolePanelDetail>().await.map(Some).map_err(|e| format!("{e}"))
     }
@@ -105,35 +97,34 @@ impl ApiClient {
 
     /// Persiste un parrainage.
     pub async fn create_sponsorship(&self, guild_id: &str, sponsor_id: &str, sponsored_id: &str) {
-        let req = self.base.client()
-            .post(format!("{}/api/sponsorships", self.base.base_url()))
-            .json(&serde_json::json!({
-                "guild_id": guild_id,
-                "sponsor_id": sponsor_id,
-                "sponsored_id": sponsored_id,
-            }));
-        self.base.auth(req).send().await.ok();
+        self.base.post_fire_and_forget("/api/sponsorships", &serde_json::json!({
+            "guild_id": guild_id,
+            "sponsor_id": sponsor_id,
+            "sponsored_id": sponsored_id,
+        })).await;
     }
 
     // ── Temp Roles (fire-and-forget) ──
 
     /// Persiste un role temporaire.
     pub async fn create_temp_role(&self, guild_id: &str, user_id: &str, role_id: &str, expires_at: &str) {
-        let req = self.base.client()
-            .post(format!("{}/api/temp-roles", self.base.base_url()))
-            .json(&serde_json::json!({
-                "guild_id": guild_id,
-                "user_id": user_id,
-                "role_id": role_id,
-                "expires_at": expires_at,
-            }));
-        self.base.auth(req).send().await.ok();
+        self.base.post_fire_and_forget("/api/temp-roles", &serde_json::json!({
+            "guild_id": guild_id,
+            "user_id": user_id,
+            "role_id": role_id,
+            "expires_at": expires_at,
+        })).await;
     }
 
     /// Supprime un role temporaire expire.
     pub async fn delete_temp_role(&self, guild_id: &str, user_id: &str, role_id: &str) {
-        let req = self.base.client()
-            .delete(format!("{}/api/temp-roles/{}/{}/{}", self.base.base_url(), guild_id, user_id, role_id));
-        self.base.auth(req).send().await.ok();
+        // DELETE fire-and-forget — no body, no response needed
+        let req = self.base.client().delete(format!(
+            "{}/api/temp-roles/{}/{}/{}",
+            self.base.base_url(), guild_id, user_id, role_id
+        ));
+        if let Err(e) = self.base.auth(req).send().await {
+            tracing::warn!(error = %e, "Failed to delete temp role");
+        }
     }
 }

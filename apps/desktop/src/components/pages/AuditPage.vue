@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useAuditLogs } from "../../composables/useAuditLogs";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
@@ -9,7 +10,8 @@ import { eventVariant, eventLabel, eventIcon } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
-const { filteredLogs, eventTypes, loading, filterEventType, searchQuery } = useAuditLogs();
+const { filteredLogs, eventTypes, loading, filterEventType, searchQuery, fetchLogs } = useAuditLogs();
+useRealtimeRefresh(["log_entry_created"], fetchLogs);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLogs } = usePagination(filteredLogs, 30);
 </script>
 

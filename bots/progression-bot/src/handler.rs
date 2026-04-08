@@ -115,7 +115,13 @@ impl EventHandler for Handler {
 
         // Charger la config guild UNE SEULE FOIS
         let guild_config = if let Some(api) = data.get::<ApiClientKey>() {
-            let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let config = match api.get_guild_config(&guild_id.to_string()).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             if !BaseApiClient::config_bool(&config, "enabled", true) {
                 return;
             }
@@ -245,10 +251,12 @@ impl EventHandler for Handler {
                                 msg.author.id, level
                             ))
                             .thumbnail(msg.author.face());
-                        let _ = msg.channel_id.send_message(
+                        if let Err(e) = msg.channel_id.send_message(
                             &ctx.http,
                             CreateMessage::new().embed(embed),
-                        ).await;
+                        ).await {
+                            warn!(error = %e, "Failed to send text level-up message");
+                        }
                     }
 
                     // Verifier les roles seulement au level-up ou premiere activite (retour d'un membre)
@@ -279,7 +287,13 @@ impl EventHandler for Handler {
         let data = ctx.data.read().await;
 
         if let Some(api) = data.get::<ApiClientKey>() {
-            let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let config = match api.get_guild_config(&guild_id.to_string()).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             if !BaseApiClient::config_bool(&config, "enabled", true) {
                 return;
             }
@@ -365,10 +379,12 @@ impl EventHandler for Handler {
                                                             "<@{}> est maintenant **niveau {} en vocal** !",
                                                             user_id, level
                                                         ));
-                                                    let _ = ch.id.send_message(
+                                                    if let Err(e) = ch.id.send_message(
                                                         &ctx.http,
                                                         CreateMessage::new().embed(embed),
-                                                    ).await;
+                                                    ).await {
+                                                        warn!(error = %e, "Failed to send voice level-up message");
+                                                    }
                                                 }
                                             }
                                         }
@@ -412,7 +428,13 @@ impl EventHandler for Handler {
 
         let data = ctx.data.read().await;
         let default_role_id = if let Some(base) = data.get::<ApiClientKey>() {
-            let config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let config = match base.get_guild_config(&guild_id.to_string()).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             let role_str = BaseApiClient::config_or(&config, "default_role_id", "");
             if role_str.is_empty() { None } else { role_str.parse::<u64>().ok() }
         } else {
@@ -465,7 +487,13 @@ async fn check_and_assign_all_roles(
 
     // Lire le mode de calcul XP depuis la config guild
     let xp_role_mode = if let Some(base) = data.get::<ApiClientKey>() {
-        let config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+        let config = match base.get_guild_config(&guild_id.to_string()).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                std::collections::HashMap::new()
+            }
+        };
         BaseApiClient::config_or(&config, "xp_role_mode", "separate").to_string()
     } else {
         "separate".to_string()
@@ -562,7 +590,9 @@ async fn check_and_assign_all_roles(
                 // Pas qualifie pour aucun role de cette source — retirer tous les roles de cette source
                 for role_id in &all_source_role_ids {
                     if member_roles.contains(role_id) {
-                        let _ = member.remove_role(&ctx.http, serenity::model::id::RoleId::new(*role_id)).await;
+                        if let Err(e) = member.remove_role(&ctx.http, serenity::model::id::RoleId::new(*role_id)).await {
+                            warn!(error = %e, "Failed to remove unqualified role");
+                        }
                     }
                 }
             }

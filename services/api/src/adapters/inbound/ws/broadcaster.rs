@@ -1,4 +1,5 @@
 use serde::Serialize;
+use tracing::warn;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct WsEvent {
@@ -43,14 +44,25 @@ impl EventBroadcaster {
         if let Some(ref client) = self.redis_client {
             let client = client.clone();
             let channel = self.redis_channel.clone();
-            if let Ok(json) = serde_json::to_string(&ws_event) {
-                tokio::spawn(async move {
-                    if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
-                        let _: Result<(), _> =
-                            redis::AsyncCommands::publish(&mut conn, &channel, &json).await;
+            let json = match serde_json::to_string(&ws_event) {
+                Ok(j) => j,
+                Err(e) => {
+                    warn!(error = %e, event = %ws_event.event, "Echec serialisation event broadcast — event perdu");
+                    return;
+                }
+            };
+            tokio::spawn(async move {
+                match client.get_multiplexed_async_connection().await {
+                    Ok(mut conn) => {
+                        if let Err(e) = redis::AsyncCommands::publish::<_, _, ()>(&mut conn, &channel, &json).await {
+                            warn!(error = %e, "Echec Redis publish event broadcast");
+                        }
                     }
-                });
-            }
+                    Err(e) => {
+                        warn!(error = %e, "Echec connexion Redis pour broadcast");
+                    }
+                }
+            });
         }
     }
 }

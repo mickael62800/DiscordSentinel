@@ -137,23 +137,17 @@ impl ApiClient {
         username: &str,
         count: u64,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/stats/messages", self.base.base_url()))
-            .json(&RecordMessagesPayload {
-                guild_id: guild_id.to_string(),
-                user_id: user_id.to_string(),
-                username: username.to_string(),
-                count,
-            });
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget(
+                "/api/stats/messages",
+                &RecordMessagesPayload {
+                    guild_id: guild_id.to_string(),
+                    user_id: user_id.to_string(),
+                    username: username.to_string(),
+                    count,
+                },
+            )
+            .await;
         Ok(())
     }
 
@@ -167,25 +161,19 @@ impl ApiClient {
         channel_id: &str,
         channel_name: &str,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/stats/voice", self.base.base_url()))
-            .json(&RecordVoicePayload {
-                guild_id: guild_id.to_string(),
-                user_id: user_id.to_string(),
-                username: username.to_string(),
-                seconds,
-                channel_id: channel_id.to_string(),
-                channel_name: channel_name.to_string(),
-            });
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget(
+                "/api/stats/voice",
+                &RecordVoicePayload {
+                    guild_id: guild_id.to_string(),
+                    user_id: user_id.to_string(),
+                    username: username.to_string(),
+                    seconds,
+                    channel_id: channel_id.to_string(),
+                    channel_name: channel_name.to_string(),
+                },
+            )
+            .await;
         Ok(())
     }
 
@@ -195,19 +183,9 @@ impl ApiClient {
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<UserStatsResponse>, String> {
-        let req = self.base.client().get(format!(
-            "{}/api/stats/{guild_id}/user/{user_id}",
-            self.base.base_url()
-        ));
-
         self.base
-            .auth(req)
-            .send()
+            .get_json(&format!("/api/stats/{guild_id}/user/{user_id}"))
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Option<UserStatsResponse>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     /// Recupere les stats globales du serveur.
@@ -215,19 +193,9 @@ impl ApiClient {
         &self,
         guild_id: &str,
     ) -> Result<GuildOverviewResponse, String> {
-        let req = self.base.client().get(format!(
-            "{}/api/stats/{guild_id}/overview",
-            self.base.base_url()
-        ));
-
         self.base
-            .auth(req)
-            .send()
+            .get_json(&format!("/api/stats/{guild_id}/overview"))
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<GuildOverviewResponse>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     /// Recupere le classement des membres.
@@ -236,19 +204,9 @@ impl ApiClient {
         guild_id: &str,
         limit: u32,
     ) -> Result<Vec<UserStatsResponse>, String> {
-        let req = self.base.client().get(format!(
-            "{}/api/stats/{guild_id}/leaderboard?limit={limit}",
-            self.base.base_url()
-        ));
-
         self.base
-            .auth(req)
-            .send()
+            .get_json(&format!("/api/stats/{guild_id}/leaderboard?limit={limit}"))
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Vec<UserStatsResponse>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     // ── Levels / XP ──
@@ -271,26 +229,18 @@ impl ApiClient {
             source: String,
         }
 
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/levels/xp", self.base.base_url()))
-            .json(&Payload {
-                guild_id: guild_id.to_string(),
-                user_id: user_id.to_string(),
-                username: username.to_string(),
-                amount,
-                source: source.to_string(),
-            });
-
         self.base
-            .auth(req)
-            .send()
+            .post_json(
+                "/api/levels/xp",
+                &Payload {
+                    guild_id: guild_id.to_string(),
+                    user_id: user_id.to_string(),
+                    username: username.to_string(),
+                    amount,
+                    source: source.to_string(),
+                },
+            )
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<AddXpResponse>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     pub async fn get_user_level(
@@ -298,12 +248,10 @@ impl ApiClient {
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<UserLevelResponse>, String> {
-        let req = self.base.client().get(format!(
-            "{}/api/levels/{guild_id}/{user_id}",
-            self.base.base_url()
-        ));
-
-        let resp = self.base.auth(req).send().await.map_err(|e| format!("Erreur reseau: {e}"))?;
+        let path = format!("/api/levels/{guild_id}/{user_id}");
+        let resp = self.base.auth(
+            self.base.client().get(format!("{}{}", self.base.base_url(), path))
+        ).send().await.map_err(|e| format!("Erreur reseau: {e}"))?;
         if resp.status().as_u16() == 404 {
             return Ok(None);
         }
@@ -320,23 +268,11 @@ impl ApiClient {
         limit: u32,
         source: Option<&str>,
     ) -> Result<Vec<UserLevelResponse>, String> {
-        let mut url = format!(
-            "{}/api/levels/{guild_id}/leaderboard?limit={limit}",
-            self.base.base_url()
-        );
+        let mut path = format!("/api/levels/{guild_id}/leaderboard?limit={limit}");
         if let Some(s) = source {
-            url.push_str(&format!("&source={s}"));
+            path.push_str(&format!("&source={s}"));
         }
-        let req = self.base.client().get(url);
-
-        self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Vec<UserLevelResponse>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
+        self.base.get_json(&path).await
     }
 
     /// Persiste les donnees de streak pour un utilisateur.
@@ -349,22 +285,17 @@ impl ApiClient {
         last_day: u32,
         last_year: i32,
     ) {
-        let req = self
-            .base
-            .client()
-            .patch(format!(
-                "{}/api/levels/{guild_id}/{user_id}/streak",
-                self.base.base_url()
-            ))
-            .json(&serde_json::json!({
-                "streak_current": current,
-                "streak_best": best,
-                "streak_last_day": last_day,
-                "streak_last_year": last_year,
-            }));
-
-        // Fire-and-forget : on ne bloque pas le bot si l'API ne repond pas
-        self.base.auth(req).send().await.ok();
+        self.base
+            .patch_fire_and_forget(
+                &format!("/api/levels/{guild_id}/{user_id}/streak"),
+                &serde_json::json!({
+                    "streak_current": current,
+                    "streak_best": best,
+                    "streak_last_day": last_day,
+                    "streak_last_year": last_year,
+                }),
+            )
+            .await;
     }
 
     /// Recupere tous les rewards (text, voice, days) pour un serveur.
@@ -372,35 +303,15 @@ impl ApiClient {
         &self,
         guild_id: &str,
     ) -> Result<Vec<RewardEntry>, String> {
-        let req = self.base.client().get(format!(
-            "{}/api/levels/rewards/{guild_id}",
-            self.base.base_url()
-        ));
-
         self.base
-            .auth(req)
-            .send()
+            .get_json(&format!("/api/levels/rewards/{guild_id}"))
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Vec<RewardEntry>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     /// Recupere les infractions d'un serveur.
     pub async fn get_infractions(&self, guild_id: &str) -> Result<Vec<Infraction>, String> {
-        let req = self
-            .base
-            .client()
-            .get(format!("{}/infractions/{guild_id}", self.base.base_url()));
-
         self.base
-            .auth(req)
-            .send()
+            .get_json(&format!("/infractions/{guild_id}"))
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Vec<Infraction>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 }

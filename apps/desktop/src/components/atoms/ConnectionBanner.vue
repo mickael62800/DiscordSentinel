@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from "vue";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { getApiBaseUrl } from "../../utils/api";
 
 const apiStatus = ref<"ok" | "down" | "checking">("checking");
-let interval: ReturnType<typeof setInterval> | null = null;
+let unlisten: UnlistenFn | null = null;
+let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 
 async function checkApi() {
   try {
@@ -15,13 +17,29 @@ async function checkApi() {
   }
 }
 
-onMounted(() => {
-  checkApi();
-  interval = setInterval(checkApi, 30000);
+onMounted(async () => {
+  // Check initial au demarrage
+  await checkApi();
+
+  // Ecouter les heartbeats via WebSocket — chaque heartbeat confirme que l'API est up
+  unlisten = await listen<{ event: string }>("ws:event", (e) => {
+    if (e.payload.event === "bot_heartbeat") {
+      apiStatus.value = "ok";
+    }
+  });
+
+  // Fallback : si aucun heartbeat recu en 90s, verifier via HTTP
+  fallbackInterval = setInterval(async () => {
+    if (apiStatus.value === "ok") {
+      // Pas de heartbeat depuis longtemps ? Verifier
+      await checkApi();
+    }
+  }, 90000);
 });
 
 onUnmounted(() => {
-  if (interval) clearInterval(interval);
+  if (unlisten) unlisten();
+  if (fallbackInterval) clearInterval(fallbackInterval);
 });
 </script>
 

@@ -2,8 +2,10 @@ import { ref, computed, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { LogEntry } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 export function useLogs(categoryFilter?: string) {
+  const { error: showError } = useToast();
   const logs = ref<LogEntry[]>([]);
   const loading = ref(true);
   const filterLevel = ref("all");
@@ -56,7 +58,8 @@ export function useLogs(categoryFilter?: string) {
       const guildId = isGuildScoped ? (guildIdFilter.value ?? null) : null;
       logs.value = await invoke<LogEntry[]>("get_logs", { guildId });
     } catch (e) {
-      console.error("Erreur chargement journaux:", e);
+      console.error("Erreur lors du chargement des journaux :", e);
+      showError("Erreur lors du chargement des journaux.");
     } finally {
       loading.value = false;
     }
@@ -73,7 +76,8 @@ export function useLogs(categoryFilter?: string) {
       await invoke("delete_logs_by_category", { category: categoryFilter });
       await fetchLogs();
     } catch (e) {
-      console.error("Erreur suppression logs:", e);
+      console.error("Erreur lors de la suppression des logs :", e);
+      showError("Erreur lors de la suppression des logs.");
     }
   }
 

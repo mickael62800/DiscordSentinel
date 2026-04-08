@@ -2,7 +2,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::embeds::success_embed;
 
@@ -82,12 +82,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Categorie", category, true)
                 .field("Contenu", content, false);
 
-            command.create_response(
+            if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
                 ),
-            ).await.ok();
+            ).await {
+                warn!(error = %e, "Failed to send note response");
+            }
         }
         Err(e) => {
             error!(error = %e, "Erreur ajout note");
@@ -97,10 +99,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().content(content).ephemeral(true),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send reply text");
+    }
 }

@@ -229,7 +229,13 @@ impl EventHandler for Handler {
         };
 
         // Charger la config per-guild depuis l'API (fallback sur env vars)
-        let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+        let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                std::collections::HashMap::new()
+            }
+        };
 
         if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
             return;
@@ -399,13 +405,15 @@ impl EventHandler for Handler {
                         .field("\u{1f465} Joins rapides", join_count.to_string(), true)
                         .field("\u{26a1} Actions", actions, false);
 
-                    channel
+                    if let Err(e) = channel
                         .send_message(
                             &ctx.http,
                             serenity::builder::CreateMessage::new().embed(embed),
                         )
                         .await
-                        .ok();
+                    {
+                        warn!(error = %e, "Failed to send raid alert embed");
+                    }
                 }
             }}
 
@@ -753,7 +761,9 @@ impl EventHandler for Handler {
                                 .embed(embed)
                                 .ephemeral(true),
                         );
-                        component.create_response(&ctx.http, response).await.ok();
+                        if let Err(e) = component.create_response(&ctx.http, response).await {
+                            warn!(error = %e, "Failed to send already-verified response");
+                        }
                         return;
                     }
                 };
@@ -763,7 +773,13 @@ impl EventHandler for Handler {
                         // Bonne reponse — liberer
                         captcha_pending.remove(guild_id, user_id);
 
-                        let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                        let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+                            Ok(cfg) => cfg,
+                            Err(e) => {
+                                tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                                std::collections::HashMap::new()
+                            }
+                        };
                         let role_id = guild_config
                             .get("quarantine_role_id")
                             .and_then(|v| v.parse::<u64>().ok())
@@ -780,7 +796,9 @@ impl EventHandler for Handler {
                             description: format!("Utilisateur {} a passe le captcha math", component.user.name),
                             user_ids: vec![user_id.to_string()],
                         };
-                        sec_api.report_event(&event).await.ok();
+                        if let Err(e) = sec_api.report_event(&event).await {
+                            warn!(error = %e, "Failed to report captcha_verified event");
+                        }
 
                         let embed = success_embed("\u{2705} Verification reussie")
                             .description("Bonne reponse ! Vous avez maintenant acces au serveur.");
@@ -789,7 +807,9 @@ impl EventHandler for Handler {
                                 .embed(embed)
                                 .ephemeral(true),
                         );
-                        component.create_response(&ctx.http, response).await.ok();
+                        if let Err(e) = component.create_response(&ctx.http, response).await {
+                            warn!(error = %e, "Failed to send captcha success response");
+                        }
                     }
                     Some(false) => {
                         // Mauvaise reponse — log pour detection brute-force
@@ -801,7 +821,9 @@ impl EventHandler for Handler {
                                 .embed(embed)
                                 .ephemeral(true),
                         );
-                        component.create_response(&ctx.http, response).await.ok();
+                        if let Err(e) = component.create_response(&ctx.http, response).await {
+                            warn!(error = %e, "Failed to send captcha failure response");
+                        }
                     }
                     None => {
                         let embed = warn_embed("\u{26a0}\u{fe0f} Captcha expire")
@@ -811,7 +833,9 @@ impl EventHandler for Handler {
                                 .embed(embed)
                                 .ephemeral(true),
                         );
-                        component.create_response(&ctx.http, response).await.ok();
+                        if let Err(e) = component.create_response(&ctx.http, response).await {
+                            warn!(error = %e, "Failed to send captcha expired response");
+                        }
                     }
                 }
                 return;
@@ -851,7 +875,9 @@ impl EventHandler for Handler {
                             ),
                             user_ids: vec![user_id.to_string()],
                         };
-                        sec_api.report_event(&event).await.ok();
+                        if let Err(e) = sec_api.report_event(&event).await {
+                            warn!(error = %e, "Failed to report captcha_verified event");
+                        }
 
                         released = true;
                     }
@@ -872,7 +898,9 @@ impl EventHandler for Handler {
                     .ephemeral(true),
             );
 
-            component.create_response(&ctx.http, response).await.ok();
+            if let Err(e) = component.create_response(&ctx.http, response).await {
+                warn!(error = %e, "Failed to send captcha final response");
+            }
             }
             _ => {}
         }

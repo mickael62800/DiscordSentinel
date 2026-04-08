@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { useLogs } from "../../composables/useLogs";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { useConfirm } from "../../composables/useConfirm";
@@ -30,7 +31,8 @@ const props = withDefaults(defineProps<{
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
-const { filteredLogs, sources, loading, filterLevel, filterBot, dateFrom, dateTo, search, clearLogs } = useLogs(props.category);
+const { filteredLogs, sources, loading, filterLevel, filterBot, dateFrom, dateTo, search, fetchLogs, clearLogs } = useLogs(props.category);
+useRealtimeRefresh(["log_entry_created"], fetchLogs, { debounceMs: 2000 });
 
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLogs } = usePagination(filteredLogs, 50);
 

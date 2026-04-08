@@ -79,9 +79,15 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
             .conduct_uc
             .get_points_log(guild_id, user_id, 100)
             .await
-            .unwrap_or_default();
+            .unwrap_or_else(|e| {
+                tracing::warn!(error = %e, guild_id, user_id, "Echec chargement log conduite pour dossier");
+                vec![]
+            });
 
-        let notes = self.notes_uc.get_notes(guild_id, user_id).await.unwrap_or_default();
+        let notes = self.notes_uc.get_notes(guild_id, user_id).await.unwrap_or_else(|e| {
+            tracing::warn!(error = %e, guild_id, user_id, "Echec chargement notes pour dossier");
+            vec![]
+        });
 
         Ok(UserDossier {
             user,

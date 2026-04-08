@@ -3,6 +3,9 @@ import { ref } from "vue";
 import { useBans } from "../../composables/useBans";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { useConfirm } from "../../composables/useConfirm";
+import { useToast } from "../../composables/useToast";
+
+const { success, error: showError } = useToast();
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
@@ -48,6 +51,7 @@ async function onBanConfirm(reason: string) {
   try {
     await executeBan(proposal.server, proposal.user_id, reason);
     closeBanModal();
+    success("Utilisateur banni avec succes");
   } catch (e) {
     banModalRef.value?.setError(String(e));
   }
@@ -59,8 +63,10 @@ async function handleUnban(ban: ConfirmedBan) {
   if (!ok) return;
   try {
     await executeUnban(ban.guild_id, ban.target_id);
+    success("Utilisateur debanni avec succes");
   } catch (e) {
     unbanError.value = String(e);
+    showError("Erreur lors du debannissement");
   }
 }
 </script>

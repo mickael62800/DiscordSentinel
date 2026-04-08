@@ -6,7 +6,7 @@ use serenity::all::{
 use serenity::builder::{CreateChannel, CreateMessage};
 use serenity::model::channel::ChannelType;
 use serenity::model::Permissions;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
@@ -32,14 +32,16 @@ pub async fn handle_invite_button(ctx: &Context, component: &ComponentInteractio
         };
 
         if is_staff {
-            let _ = component.create_response(
+            if let Err(e) = component.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("Seul l'utilisateur du ticket peut inviter des personnes.")
                         .ephemeral(true),
                 ),
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to send staff-only invite rejection");
+            }
             return;
         }
     }
@@ -79,14 +81,16 @@ pub async fn handle_invite_select(ctx: &Context, component: &ComponentInteractio
     // Ne pas inviter un bot
     if let Ok(user) = user_id.to_user(&ctx.http).await {
         if user.bot {
-            let _ = component.create_response(
+            if let Err(e) = component.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("Impossible d'inviter un bot dans le ticket.")
                         .ephemeral(true),
                 ),
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to send bot invite rejection");
+            }
             return;
         }
     }
@@ -100,31 +104,37 @@ pub async fn handle_invite_select(ctx: &Context, component: &ComponentInteractio
 
     if let Err(e) = component.channel_id.create_permission(&ctx.http, overwrite).await {
         error!(error = %e, "Impossible d'inviter l'utilisateur");
-        let _ = component.create_response(
+        if let Err(e) = component.create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
                     .content("Erreur lors de l'invitation.")
                     .ephemeral(true),
             ),
-        ).await;
+        ).await {
+            warn!(error = %e, "Failed to send invite error response");
+        }
         return;
     }
 
     // Message visible dans le salon
-    let _ = component.channel_id.say(
+    if let Err(e) = component.channel_id.say(
         &ctx.http,
         format!("<@{}> a ete invite dans ce ticket.", user_id),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send invite notification in channel");
+    }
 
-    let _ = component.create_response(
+    if let Err(e) = component.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(format!("<@{}> a ete invite avec succes !", user_id))
                 .ephemeral(true),
         ),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send invite success response");
+    }
 
     // Sync invited_user_id vers l'API
     if let Some(ref ticket_id) = get_ticket_id_from_channel(ctx, component.channel_id).await {
@@ -162,14 +172,16 @@ pub async fn handle_vocal_button(ctx: &Context, component: &ComponentInteraction
     };
 
     if !is_staff {
-        let _ = component.create_response(
+        if let Err(e) = component.create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
                     .content("Seuls les administrateurs et moderateurs peuvent proposer un vocal.")
                     .ephemeral(true),
             ),
-        ).await;
+        ).await {
+            warn!(error = %e, "Failed to send vocal staff-only rejection");
+        }
         return;
     }
 
@@ -185,14 +197,16 @@ pub async fn handle_vocal_button(ctx: &Context, component: &ComponentInteraction
     let vocal_name = format!("vocal-{}", channel_name);
     if let Ok(channels) = guild_id.channels(&ctx.http).await {
         if channels.values().any(|c| c.kind == ChannelType::Voice && c.name == vocal_name) {
-            let _ = component.create_response(
+            if let Err(e) = component.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("Un salon vocal existe deja pour ce ticket.")
                         .ephemeral(true),
                 ),
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to send vocal already exists response");
+            }
             return;
         }
     }
@@ -207,27 +221,31 @@ pub async fn handle_vocal_button(ctx: &Context, component: &ComponentInteraction
         });
 
         if pending {
-            let _ = component.create_response(
+            if let Err(e) = component.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("Une proposition de vocal est deja en attente de reponse.")
                         .ephemeral(true),
                 ),
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to send vocal pending response");
+            }
             return;
         }
     }
 
     // Repondre au staff en ephemeral (seul le staff voit ca)
-    let _ = component.create_response(
+    if let Err(e) = component.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content("Proposition de vocal envoyee.")
                 .ephemeral(true),
         ),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send vocal proposal confirmation");
+    }
 
     // Message visible avec boutons pour l'utilisateur
     let accept_btn = CreateButton::new(VOCAL_USER_ACCEPT_ID)
@@ -247,7 +265,9 @@ pub async fn handle_vocal_button(ctx: &Context, component: &ComponentInteraction
         )
         .components(vec![row]);
 
-    let _ = component.channel_id.send_message(&ctx.http, msg).await;
+    if let Err(e) = component.channel_id.send_message(&ctx.http, msg).await {
+        warn!(error = %e, "Failed to send vocal proposal message");
+    }
 }
 
 /// L'utilisateur accepte le passage en vocal — creation du salon
@@ -274,14 +294,16 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
         });
 
         if already_exists {
-            let _ = component.create_response(
+            if let Err(e) = component.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content("Le salon vocal existe deja pour ce ticket.")
                         .ephemeral(true),
                 ),
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to send vocal channel already exists response");
+            }
             return;
         }
     }
@@ -313,7 +335,7 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
     match guild_id.create_channel(&ctx.http, create).await {
         Ok(vc) => {
             // Remplacer le message de proposition par le resultat (supprime les boutons)
-            let _ = component.create_response(
+            if let Err(e) = component.create_response(
                 &ctx.http,
                 CreateInteractionResponse::UpdateMessage(
                     CreateInteractionResponseMessage::new()
@@ -323,7 +345,9 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
                         ))
                         .components(vec![])
                 ),
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to send vocal channel created response");
+            }
 
             info!(vocal = %vc.name, ticket = %channel_name, "Salon vocal cree pour ticket (accepte par l'utilisateur)");
 
@@ -340,14 +364,16 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
         }
         Err(e) => {
             error!(error = %e, "Impossible de creer le salon vocal");
-            let _ = component.create_response(
+            if let Err(e) = component.create_response(
                 &ctx.http,
                 CreateInteractionResponse::UpdateMessage(
                     CreateInteractionResponseMessage::new()
                         .content("Impossible de creer le salon vocal.")
                         .components(vec![])
                 ),
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to send vocal creation error response");
+            }
         }
     }
 }
@@ -355,7 +381,7 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
 /// L'utilisateur refuse le passage en vocal
 pub async fn handle_vocal_user_decline(ctx: &Context, component: &ComponentInteraction) {
     // Remplacer le message de proposition par le refus (supprime les boutons)
-    let _ = component.create_response(
+    if let Err(e) = component.create_response(
         &ctx.http,
         CreateInteractionResponse::UpdateMessage(
             CreateInteractionResponseMessage::new()
@@ -365,7 +391,9 @@ pub async fn handle_vocal_user_decline(ctx: &Context, component: &ComponentInter
                 ))
                 .components(vec![])
         ),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send vocal decline response");
+    }
 }
 
 // ── Templates de reponses rapides ──
@@ -377,7 +405,13 @@ pub async fn handle_template_button(ctx: &Context, component: &ComponentInteract
     let templates_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             sentinel_shared::api_client::BaseApiClient::config_or(&gc, "response_templates", "")
         } else {
             String::new()
@@ -392,7 +426,9 @@ pub async fn handle_template_button(ctx: &Context, component: &ComponentInteract
                 .content("Aucun template de reponse configure pour ce serveur.")
                 .ephemeral(true),
         );
-        component.create_response(&ctx.http, response).await.ok();
+        if let Err(e) = component.create_response(&ctx.http, response).await {
+            warn!(error = %e, "Failed to send empty templates response");
+        }
         return;
     }
 
@@ -429,7 +465,13 @@ pub async fn handle_template_select(ctx: &Context, component: &ComponentInteract
     let templates_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             sentinel_shared::api_client::BaseApiClient::config_or(&gc, "response_templates", "")
         } else {
             String::new()
@@ -440,13 +482,17 @@ pub async fn handle_template_select(ctx: &Context, component: &ComponentInteract
 
     if let Some(template) = templates.get(index) {
         // Envoyer le contenu du template dans le salon
-        let _ = component.channel_id.say(&ctx.http, &template.content).await;
+        if let Err(e) = component.channel_id.say(&ctx.http, &template.content).await {
+            warn!(error = %e, "Failed to send template content in channel");
+        }
 
         let response = CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(format!("Template \"{}\" envoye.", template.label))
                 .ephemeral(true),
         );
-        component.create_response(&ctx.http, response).await.ok();
+        if let Err(e) = component.create_response(&ctx.http, response).await {
+            warn!(error = %e, "Failed to send template applied response");
+        }
     }
 }

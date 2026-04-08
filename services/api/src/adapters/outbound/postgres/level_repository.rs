@@ -184,11 +184,16 @@ impl LevelRepository for PgLevelRepository {
 
     async fn add_xp_atomic(&self, guild_id: &str, user_id: &str, username: &str, amount: i64, source: XpSource) -> Result<UserLevel, DomainError> {
         // Determine quelles colonnes incrementer selon la source
+        // SECURITE : xp_col est strictement controle par le match ci-dessous (jamais d'input utilisateur)
         let (xp_col, _level_col) = match source {
             XpSource::Text => ("xp_text", "level_text"),
             XpSource::Voice => ("xp_voice", "level_voice"),
             XpSource::Days => return Err(DomainError::ValidationError("Days source cannot gain XP".into())),
         };
+        debug_assert!(
+            xp_col == "xp_text" || xp_col == "xp_voice",
+            "xp_col invalide: {xp_col}"
+        );
 
         // INSERT ou UPDATE atomique : XP total + XP source en une seule requete
         let query = format!(

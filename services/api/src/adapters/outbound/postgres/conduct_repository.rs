@@ -222,10 +222,14 @@ impl ConductRepository for PgConductRepository {
     }
 
     async fn find_users_needing_regen(&self, interval: &str) -> Result<Vec<UserConductPoints>, DomainError> {
+        // SECURITE : interval_expr est strictement controle par le match (jamais d'input utilisateur dans le SQL)
         let interval_expr = match interval {
             "weekly" => "7 days",
             "monthly" => "30 days",
-            _ => "7 days",
+            other => {
+                tracing::warn!(interval = %other, "Intervalle de regen inconnu, fallback 7 days");
+                "7 days"
+            }
         };
 
         let query = format!(

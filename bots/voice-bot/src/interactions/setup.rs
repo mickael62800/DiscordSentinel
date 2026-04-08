@@ -149,10 +149,13 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         Ok(c) => c,
         Err(e) => {
             error!(error = %e, "Erreur creation categorie");
-            let _ = component
+            if let Err(e) = component
                 .channel_id
                 .say(&ctx.http, "Erreur lors de la creation de la categorie.")
-                .await;
+                .await
+            {
+                tracing::warn!(error = %e, "failed to send category creation error message");
+            }
             return;
         }
     };
@@ -167,7 +170,9 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         Ok(c) => c,
         Err(e) => {
             error!(error = %e, "Erreur creation salon vocal");
-            let _ = category_id.delete(&ctx.http).await;
+            if let Err(e) = category_id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete category after voice creation error");
+            }
             return;
         }
     };
@@ -185,7 +190,9 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
             deny: deny_perms,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        let _ = voice_channel_id.create_permission(&ctx.http, overwrite).await;
+        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+            tracing::warn!(error = %e, "failed to set hidden permission on voice channel");
+        }
     }
 
     // Owner gets full permissions on voice
@@ -197,7 +204,9 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(user_id),
     };
-    let _ = voice_channel_id.create_permission(&ctx.http, owner_overwrite).await;
+    if let Err(e) = voice_channel_id.create_permission(&ctx.http, owner_overwrite).await {
+        tracing::warn!(error = %e, "failed to set owner permission on voice channel");
+    }
 
     // Create text admin panel inside category
     let admin_text = CreateChannel::new("admin-panel")
@@ -207,8 +216,12 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         Ok(c) => c,
         Err(e) => {
             error!(error = %e, "Erreur creation panel admin");
-            let _ = voice_channel_id.delete(&ctx.http).await;
-            let _ = category_id.delete(&ctx.http).await;
+            if let Err(e) = voice_channel_id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete voice channel after admin panel creation error");
+            }
+            if let Err(e) = category_id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete category after admin panel creation error");
+            }
             return;
         }
     };
@@ -219,14 +232,18 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         deny: Permissions::VIEW_CHANNEL,
         kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
     };
-    let _ = admin_text_channel.id.create_permission(&ctx.http, deny_everyone.clone()).await;
+    if let Err(e) = admin_text_channel.id.create_permission(&ctx.http, deny_everyone.clone()).await {
+        tracing::warn!(error = %e, "failed to deny everyone on admin panel");
+    }
 
     let allow_owner = serenity::model::channel::PermissionOverwrite {
         allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(user_id),
     };
-    let _ = admin_text_channel.id.create_permission(&ctx.http, allow_owner).await;
+    if let Err(e) = admin_text_channel.id.create_permission(&ctx.http, allow_owner).await {
+        tracing::warn!(error = %e, "failed to allow owner on admin panel");
+    }
 
     // Create members text panel inside category
     let members_text = CreateChannel::new("membres")
@@ -236,15 +253,23 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
         Ok(c) => c,
         Err(e) => {
             error!(error = %e, "Erreur creation panel membres");
-            let _ = admin_text_channel.id.delete(&ctx.http).await;
-            let _ = voice_channel_id.delete(&ctx.http).await;
-            let _ = category_id.delete(&ctx.http).await;
+            if let Err(e) = admin_text_channel.id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete admin panel during cleanup");
+            }
+            if let Err(e) = voice_channel_id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete voice channel during cleanup");
+            }
+            if let Err(e) = category_id.delete(&ctx.http).await {
+                tracing::warn!(error = %e, "failed to delete category during cleanup");
+            }
             return;
         }
     };
 
     // Members panel: visible only in voice
-    let _ = members_text_channel.id.create_permission(&ctx.http, deny_everyone).await;
+    if let Err(e) = members_text_channel.id.create_permission(&ctx.http, deny_everyone).await {
+        tracing::warn!(error = %e, "failed to deny everyone on members panel");
+    }
 
     // Send admin panel embed with controls
     send_admin_panel(ctx, admin_text_channel.id, &channel_name).await;
@@ -299,7 +324,9 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Delete the setup text channel (it was the pending config panel)
-    let _ = text_channel_id.delete(&ctx.http).await;
+    if let Err(e) = text_channel_id.delete(&ctx.http).await {
+        tracing::warn!(error = %e, "failed to delete setup text channel");
+    }
 
     // Deplacer le createur dans le salon vocal
     if let Err(e) = guild_id.move_member(&ctx.http, user_id, voice_channel_id).await {
@@ -368,7 +395,9 @@ async fn handle_cancel(ctx: &Context, component: &ComponentInteraction) {
 
     // Delete the text channel after a short delay
     tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-    let _ = text_channel_id.delete(&ctx.http).await;
+    if let Err(e) = text_channel_id.delete(&ctx.http).await {
+        tracing::warn!(error = %e, "failed to delete cancelled setup channel");
+    }
 
     info!(user = %user_id, "Creation salon prive annulee");
 }

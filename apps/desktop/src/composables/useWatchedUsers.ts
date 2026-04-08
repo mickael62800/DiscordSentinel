@@ -2,6 +2,7 @@ import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { WatchedUser, UserDossier } from "../types";
 import { useGuildFetch } from "./useGuildFetch";
+import { useToast } from "./useToast";
 
 export function useWatchedUsers() {
   const { data: users, loading, error, refresh: fetchUsers } = useGuildFetch<WatchedUser[]>(
@@ -9,6 +10,7 @@ export function useWatchedUsers() {
     [],
   );
 
+  const { error: showError } = useToast();
   const selectedUser = ref<WatchedUser | null>(null);
   const dossier = ref<UserDossier | null>(null);
   const dossierLoading = ref(false);
@@ -24,7 +26,8 @@ export function useWatchedUsers() {
         userId,
       });
     } catch (e) {
-      console.error("Erreur chargement dossier:", e);
+      console.error("Erreur lors du chargement du dossier :", e);
+      showError("Erreur lors du chargement du dossier.");
     } finally {
       dossierLoading.value = false;
     }

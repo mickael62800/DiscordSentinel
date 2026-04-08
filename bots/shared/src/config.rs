@@ -38,3 +38,63 @@ pub trait BotConfig {
         &self.base().api_key
     }
 }
+
+// ── Config Helpers ──
+
+/// Charge une variable d'environnement avec un fallback par defaut.
+/// Utile pour les champs numeriques, booleens, etc.
+///
+/// ```ignore
+/// let max: usize = load_env("MAX_SIZE", 100);
+/// let enabled: bool = load_env("FEATURE_ENABLED", false);
+/// ```
+pub fn load_env<T: std::str::FromStr>(key: &str, default: T) -> T {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
+/// Charge une variable d'environnement optionnelle.
+/// Retourne `None` si absente ou non-parseable.
+pub fn load_env_optional<T: std::str::FromStr>(key: &str) -> Option<T> {
+    std::env::var(key).ok().and_then(|v| v.parse().ok())
+}
+
+/// Charge une variable d'environnement string avec un fallback.
+pub fn load_env_string(key: &str, default: &str) -> String {
+    std::env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+/// Charge une variable d'environnement booleenne (accepte "true"/"1").
+pub fn load_env_bool(key: &str, default: bool) -> bool {
+    match std::env::var(key) {
+        Ok(v) => v == "true" || v == "1",
+        Err(_) => default,
+    }
+}
+
+/// Config simple pour les bots sans champs supplementaires.
+/// Evite le boilerplate d'un struct + impl BotConfig dans chaque bot.
+///
+/// ```ignore
+/// let config = SimpleConfig::from_env("MODERATION_DISCORD_TOKEN");
+/// ```
+#[derive(Clone)]
+pub struct SimpleConfig {
+    base: BaseConfig,
+}
+
+impl SimpleConfig {
+    pub fn from_env(token_var: &str) -> Self {
+        Self {
+            base: BaseConfig::from_env(token_var),
+        }
+    }
+}
+
+impl BotConfig for SimpleConfig {
+    fn base(&self) -> &BaseConfig {
+        &self.base
+    }
+}

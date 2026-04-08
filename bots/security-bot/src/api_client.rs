@@ -54,82 +54,42 @@ impl ApiClient {
 
     /// Recupere les derniers evenements de securite depuis le backend.
     pub async fn list_events(&self, guild_id: &str, limit: u32) -> Result<Vec<serde_json::Value>, String> {
-        let req = self
-            .base
-            .client()
-            .get(format!(
-                "{}/api/security/events?guild_id={}&limit={}",
-                self.base.base_url(),
-                guild_id,
-                limit
-            ));
-
         self.base
-            .auth(req)
-            .send()
+            .get_json(&format!("/api/security/events?guild_id={}&limit={}", guild_id, limit))
             .await
-            .map_err(|e| format!("{e}"))?
-            .json()
-            .await
-            .map_err(|e| format!("{e}"))
     }
 
     /// Signale un evenement de securite au backend.
     pub async fn report_event(&self, event: &SecurityEvent) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/security/events", self.base.base_url()))
-            .json(event);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget("/api/security/events", event)
+            .await;
         Ok(())
     }
 
     /// Sync tous les membres d'un serveur vers l'API.
     pub async fn sync_members(&self, payload: &SyncMembersPayload) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/members/sync", self.base.base_url()))
-            .json(payload);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("sync_members: {e}"))?;
+            .post_fire_and_forget("/api/members/sync", payload)
+            .await;
         Ok(())
     }
 
     /// Enregistre un nouveau membre.
     pub async fn register_member(&self, member: &MemberPayload) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/members/register", self.base.base_url()))
-            .json(member);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("register_member: {e}"))?;
+            .post_fire_and_forget("/api/members/register", member)
+            .await;
         Ok(())
     }
 
     /// Supprime un membre (depart du serveur).
     pub async fn remove_member(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .delete(format!("{}/api/members/{}/{}", self.base.base_url(), guild_id, user_id));
-
+        // DELETE without body — use raw client
+        let req = self.base.client().delete(format!(
+            "{}/api/members/{}/{}",
+            self.base.base_url(), guild_id, user_id
+        ));
         self.base
             .auth(req)
             .send()
@@ -140,17 +100,12 @@ impl ApiClient {
 
     /// Met a jour un membre (changement pseudo, avatar, roles).
     pub async fn update_member(&self, guild_id: &str, user_id: &str, payload: &UpdateMemberPayload) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!("{}/api/members/{}/{}", self.base.base_url(), guild_id, user_id))
-            .json(payload);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("update_member: {e}"))?;
+            .patch_fire_and_forget(
+                &format!("/api/members/{}/{}", guild_id, user_id),
+                payload,
+            )
+            .await;
         Ok(())
     }
 }

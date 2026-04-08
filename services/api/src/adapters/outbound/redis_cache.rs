@@ -216,14 +216,29 @@ impl CachePort for RedisCache {
     async fn invalidate_pattern(&self, pattern: &str) -> Result<(), DomainError> {
         let mut conn = self.conn().await?;
 
-        let keys: Vec<String> = redis::cmd("KEYS")
-            .arg(pattern)
-            .query_async(&mut conn)
-            .await
-            .map_err(|e| DomainError::Internal(format!("Redis KEYS {pattern}: {e}")))?;
+        // Utilise SCAN au lieu de KEYS pour ne pas bloquer Redis
+        let mut cursor = 0u64;
+        loop {
+            let (next_cursor, keys): (u64, Vec<String>) = redis::cmd("SCAN")
+                .arg(cursor)
+                .arg("MATCH")
+                .arg(pattern)
+                .arg("COUNT")
+                .arg(100)
+                .query_async(&mut conn)
+                .await
+                .map_err(|e| DomainError::Internal(format!("Redis SCAN {pattern}: {e}")))?;
 
-        for key in keys {
-            conn.del::<_, ()>(&key).await.ok();
+            for key in &keys {
+                if let Err(e) = conn.del::<_, ()>(key).await {
+                    tracing::warn!(error = %e, key = %key, "Echec Redis DEL dans invalidate_pattern");
+                }
+            }
+
+            cursor = next_cursor;
+            if cursor == 0 {
+                break;
+            }
         }
 
         Ok(())

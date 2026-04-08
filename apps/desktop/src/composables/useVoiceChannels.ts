@@ -2,6 +2,7 @@ import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { VoiceChannel, VoiceChannelDetail } from "../types";
 import { useGuildFetch } from "./useGuildFetch";
+import { useToast } from "./useToast";
 
 export function useVoiceChannels() {
   const { data: channels, loading, error, refresh: fetchChannels } = useGuildFetch<VoiceChannel[]>(
@@ -27,6 +28,7 @@ export function useVoiceChannels() {
 }
 
 export function useVoiceChannelDetail() {
+  const { error: showError } = useToast();
   const detail = ref<VoiceChannelDetail | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -38,6 +40,7 @@ export function useVoiceChannelDetail() {
       detail.value = await invoke<VoiceChannelDetail>("get_voice_channel_detail", { channelId });
     } catch (e) {
       error.value = String(e);
+      showError("Erreur lors du chargement du detail du canal vocal.");
     } finally {
       loading.value = false;
     }

@@ -171,22 +171,32 @@ impl ManageConductUseCase for ManageConductService {
         // Mute + proposition de ban si 0 points
         if points_after == 0 {
             self.mute_user(&cmd.guild_id, &cmd.user_id).await;
+            let reason = format!("Points de conduite tombes a 0 (derniere infraction: {})", cmd.action);
+            tracing::warn!(
+                guild_id = %cmd.guild_id,
+                user_id = %cmd.user_id,
+                username = %cmd.username,
+                last_action = %cmd.action,
+                "Utilisateur a 0 points de conduite — proposition de ban"
+            );
             let infraction = Infraction {
                 id: Uuid::new_v4(),
                 guild_id: cmd.guild_id.clone(),
-                channel_id: String::new(),
+                channel_id: "system:conduct".to_string(),
                 user_id: cmd.user_id.clone(),
                 username: cmd.username.clone(),
-                message_id: String::new(),
-                content: String::new(),
+                message_id: "system:zero-points".to_string(),
+                content: format!("[Systeme] {} a atteint 0 points de conduite", cmd.username),
                 flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
                 score: 0.0,
                 action: Action::Ban,
-                reason: format!("Points de conduite tombes a 0 (derniere infraction: {})", cmd.action),
+                reason,
                 duration: None,
                 created_at: Utc::now(),
             };
-            let _ = self.infraction_repo.save(&infraction).await;
+            if let Err(e) = self.infraction_repo.save(&infraction).await {
+                tracing::error!(error = %e, guild_id = %cmd.guild_id, user_id = %cmd.user_id, "CRITIQUE: Echec sauvegarde infraction ban (0 points)");
+            }
 
             self.broadcaster.broadcast(
                 "user_zero_points",

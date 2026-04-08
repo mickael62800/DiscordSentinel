@@ -6,7 +6,7 @@ use serenity::all::{
 use serenity::builder::{CreateActionRow, CreateButton, CreateChannel, CreateMessage};
 use serenity::model::channel::ChannelType;
 use serenity::model::Permissions;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::discord_helpers::reply_ephemeral;
 use sentinel_shared::embeds::info_embed;
@@ -55,7 +55,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let category_id = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id.to_string()).await {
+                Ok(config) => config,
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch guild config for call");
+                    std::collections::HashMap::new()
+                }
+            };
             gc.get("call_category_id").and_then(|v| v.parse::<u64>().ok())
         } else {
             None
@@ -122,10 +128,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Membre", format!("<@{}>", target.id), true);
 
-    let _ = channel.send_message(
+    if let Err(e) = channel.send_message(
         &ctx.http,
         CreateMessage::new().embed(embed).components(vec![row]),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send call welcome message");
+    }
 
     // Log au backend
     {
@@ -146,18 +154,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             gravity: None,
             duration: None,
         };
-        api.log_action(&action).await.ok();
+        if let Err(e) = api.log_action(&action).await {
+            warn!(error = %e, "Failed to log call action");
+        }
     }
 
     // Reponse
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(format!("Convocation creee dans <#{}>", channel.id))
                 .ephemeral(true),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send call response");
+    }
 
     info!(
         moderator = %command.user.name,
@@ -177,7 +189,9 @@ pub async fn handle_close(ctx: &Context, component: &ComponentInteraction) {
             .content("Convocation terminee. Suppression du salon dans 3 secondes...")
             .ephemeral(false),
     );
-    component.create_response(&ctx.http, response).await.ok();
+    if let Err(e) = component.create_response(&ctx.http, response).await {
+        warn!(error = %e, "Failed to send call close response");
+    }
 
     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 

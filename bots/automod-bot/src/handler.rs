@@ -83,7 +83,13 @@ impl EventHandler for Handler {
         let config = {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
-                api.get_guild_config(&guild_id).await.unwrap_or_default()
+                match api.get_guild_config(&guild_id).await {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        warn!(guild_id = %guild_id, error = %e, "Impossible de charger la config guild, utilisation des valeurs par defaut");
+                        std::collections::HashMap::new()
+                    }
+                }
             } else {
                 std::collections::HashMap::new()
             }
@@ -159,8 +165,12 @@ impl EventHandler for Handler {
                     .field("📎 Fichier", &attachment.filename, false)
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
-                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
-                let _ = msg.delete(&ctx.http).await;
+                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                    warn!(error = %e, "Echec envoi notification fichier suspect");
+                }
+                if let Err(e) = msg.delete(&ctx.http).await {
+                    warn!(error = %e, message_id = %msg.id, "Echec suppression message fichier suspect");
+                }
 
                 let log_msg = format!("Fichier suspect supprime — {} : {}", msg.author.name, attachment.filename);
                 let guild_id_str = guild_id.clone();
@@ -210,7 +220,9 @@ impl EventHandler for Handler {
                 .field("📝 Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
-            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
+            if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                warn!(error = %e, "Echec envoi avertissement flood");
+            }
 
             info!(user = %msg.author.name, "Flood detecte");
 
@@ -229,7 +241,9 @@ impl EventHandler for Handler {
                 .field("📝 Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
-            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
+            if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                warn!(error = %e, "Echec envoi avertissement caps");
+            }
             info!(user = %msg.author.name, "Caps detecte, avertissement envoye");
         }
 
@@ -511,8 +525,12 @@ async fn send_to_backend(
                     .field("📝 Raison", reason_text, false)
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
-                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
-                let _ = msg.delete(&ctx.http).await;
+                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                    warn!(error = %e, "Echec envoi notification mode hors-ligne");
+                }
+                if let Err(e) = msg.delete(&ctx.http).await {
+                    warn!(error = %e, message_id = %msg.id, "Echec suppression message mode hors-ligne");
+                }
             }
         }
     }
@@ -548,7 +566,9 @@ async fn execute_action(
                 .field("📄 Contenu original", format!("```{}```", content_preview), false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
-            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
+            if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                warn!(error = %e, "Echec envoi notification suppression");
+            }
             msg.delete(&ctx.http).await?;
             info!(message_id = %msg.id, "Message supprime");
         }
@@ -560,7 +580,9 @@ async fn execute_action(
                 .field("⏱ Duree", format!("{} minutes", mute_minutes), false)
                 .thumbnail(msg.author.face());
             let builder = serenity::builder::CreateMessage::new().embed(embed);
-            let _ = msg.channel_id.send_message(&ctx.http, builder).await;
+            if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                warn!(error = %e, "Echec envoi notification mute");
+            }
             msg.delete(&ctx.http).await?;
             if let (Some(guild_id), Ok(member)) = (msg.guild_id, msg.member(&ctx.http).await) {
                 let mut member = guild_id.member(&ctx.http, member.user.id).await?;
@@ -590,7 +612,9 @@ async fn execute_action(
                     .field("📝 Raison", reason_text, false)
                     .thumbnail(msg.author.face());
                 let builder = serenity::builder::CreateMessage::new().embed(embed);
-                let _ = msg.channel_id.send_message(&ctx.http, builder).await;
+                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                    warn!(error = %e, "Echec envoi notification ban");
+                }
                 msg.delete(&ctx.http).await?;
                 info!(user = %msg.author.name, "Proposition de ban enregistree (ban non execute)");
             }

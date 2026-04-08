@@ -1,6 +1,5 @@
-import { onMounted, onUnmounted } from "vue";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useFetch } from "./useFetch";
+import { useRealtimeRefresh } from "./useRealtimeRefresh";
 import type { ServerStats } from "../types";
 
 export function useDashboard() {
@@ -9,19 +8,12 @@ export function useDashboard() {
     null,
   );
 
-  let unlisten: UnlistenFn | null = null;
-
-  onMounted(async () => {
-    unlisten = await listen<{ event: string }>("ws:event", (e) => {
-      if (e.payload.event === "bot_status") {
-        fetchStats();
-      }
-    });
-  });
-
-  onUnmounted(() => {
-    if (unlisten) unlisten();
-  });
+  // Refresh automatique quand un bot heartbeat arrive ou quand des stats changent
+  useRealtimeRefresh(
+    ["bot_heartbeat", "stats_messages_recorded", "stats_voice_recorded", "infraction_new", "moderation_action"],
+    fetchStats,
+    { debounceMs: 2000 }, // Debounce 2s pour eviter les rafales
+  );
 
   return { stats, loading, error, fetchStats };
 }

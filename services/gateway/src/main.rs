@@ -10,7 +10,6 @@ use std::sync::Arc;
 use axum::http::{header, HeaderValue, Method};
 use axum::routing::get;
 use axum::Router;
-use tokio::signal;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
 use tower_http::trace::TraceLayer;
@@ -132,7 +131,7 @@ async fn main() {
         listener,
         app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal())
+    .with_graceful_shutdown(sentinel_worker_common::shutdown_signal())
     .await
     .expect("Erreur serveur");
 
@@ -174,26 +173,3 @@ fn build_cors(allowed_origins: &str, max_age_secs: u64) -> CorsLayer {
         .max_age(std::time::Duration::from_secs(max_age_secs))
 }
 
-async fn shutdown_signal() {
-    let ctrl_c = async {
-        signal::ctrl_c()
-            .await
-            .expect("Impossible d'ecouter Ctrl+C");
-    };
-
-    #[cfg(unix)]
-    let terminate = async {
-        signal::unix::signal(signal::unix::SignalKind::terminate())
-            .expect("Impossible d'ecouter SIGTERM")
-            .recv()
-            .await;
-    };
-
-    #[cfg(not(unix))]
-    let terminate = std::future::pending::<()>();
-
-    tokio::select! {
-        _ = ctrl_c => info!("Signal Ctrl+C recu"),
-        _ = terminate => info!("Signal SIGTERM recu"),
-    }
-}

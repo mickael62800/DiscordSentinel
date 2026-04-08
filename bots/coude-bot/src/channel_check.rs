@@ -32,7 +32,7 @@ pub async fn check_channel(
 }
 
 async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
-    let _ = command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -41,7 +41,10 @@ async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
                     .ephemeral(true),
             ),
         )
-        .await;
+        .await
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }
 
 /// Poste un embed dans le salon d'activites configure.
@@ -57,28 +60,34 @@ pub async fn post_activity(
         Some(ch_id) => {
             // Poster dans le salon activites
             let channel = serenity::model::id::ChannelId::new(ch_id);
-            let _ = channel.send_message(
+            if let Err(e) = channel.send_message(
                 &ctx.http,
                 CreateMessage::new().embed(embed),
-            ).await;
+            ).await {
+                tracing::warn!(error = %e, "Echec send_message salon activites");
+            }
             // Repondre en ephemere pour confirmer
-            let _ = command.create_response(
+            if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content(format!("Resultat poste dans <#{}>.", ch_id))
                         .ephemeral(true),
                 ),
-            ).await;
+            ).await {
+                tracing::warn!(error = %e, "Echec response Discord");
+            }
         }
         None => {
             // Pas de salon configure → poster ici
-            let _ = command.create_response(
+            if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new().embed(embed),
                 ),
-            ).await;
+            ).await {
+                tracing::warn!(error = %e, "Echec response Discord");
+            }
         }
     }
 }

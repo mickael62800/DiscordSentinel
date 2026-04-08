@@ -2,8 +2,10 @@ import { ref, onMounted, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { ConductConfig, UserConductPoints, ConductPointsLog } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 export function useConduct() {
+  const { error: showError } = useToast();
   const config = ref<ConductConfig | null>(null);
   const leaderboard = ref<UserConductPoints[]>([]);
   const loading = ref(true);
@@ -17,7 +19,8 @@ export function useConduct() {
       config.value = await invoke<ConductConfig>("get_conduct_config", { guildId });
     } catch (e) {
       error.value = "Impossible de charger la configuration de conduite.";
-      console.error("Failed to fetch conduct config:", e);
+      console.error("Echec du chargement de la configuration de conduite :", e);
+      showError("Impossible de charger la configuration de conduite.");
     }
   }
 
@@ -33,7 +36,8 @@ export function useConduct() {
       leaderboard.value = await invoke<UserConductPoints[]>("get_conduct_leaderboard", { guildId });
     } catch (e) {
       error.value = "Impossible de charger le classement de conduite.";
-      console.error("Failed to fetch leaderboard:", e);
+      console.error("Echec du chargement du classement de conduite :", e);
+      showError("Impossible de charger le classement de conduite.");
     } finally {
       loading.value = false;
     }
@@ -53,6 +57,7 @@ export function useConduct() {
 }
 
 export function useConductDetail() {
+  const { error: showError } = useToast();
   const points = ref<UserConductPoints | null>(null);
   const log = ref<ConductPointsLog[]>([]);
   const loading = ref(false);
@@ -63,7 +68,8 @@ export function useConductDetail() {
       points.value = await invoke<UserConductPoints>("get_conduct_points", { guildId, userId });
       log.value = await invoke<ConductPointsLog[]>("get_conduct_log", { guildId, userId });
     } catch (e) {
-      console.error("Failed to fetch conduct detail:", e);
+      console.error("Echec du chargement du detail de conduite :", e);
+      showError("Impossible de charger le detail de conduite.");
     } finally {
       loading.value = false;
     }

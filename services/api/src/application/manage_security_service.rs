@@ -3,6 +3,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use tracing::warn;
+
 use crate::domain::entities::SecurityEvent;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::{ManageSecurityUseCase, ReportSecurityEventCommand};
@@ -40,8 +42,12 @@ impl ManageSecurityUseCase for ManageSecurityService {
         self.repo.save(&event).await?;
 
         // Invalidate events cache
-        self.cache.invalidate("security:all").await.ok();
-        self.cache.invalidate(&format!("security:{}", event.guild_id)).await.ok();
+        if let Err(e) = self.cache.invalidate("security:all").await {
+            warn!(error = %e, "Echec invalidation cache security:all");
+        }
+        if let Err(e) = self.cache.invalidate(&format!("security:{}", event.guild_id)).await {
+            warn!(error = %e, guild_id = %event.guild_id, "Echec invalidation cache security guild");
+        }
 
         Ok(event)
     }
@@ -66,7 +72,9 @@ impl ManageSecurityUseCase for ManageSecurityService {
 
         // Populate cache
         if let Ok(json) = serde_json::to_string(&events) {
-            self.cache.set_json(&cache_key, &json, EVENTS_TTL).await.ok();
+            if let Err(e) = self.cache.set_json(&cache_key, &json, EVENTS_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set security events");
+            }
         }
 
         Ok(events)

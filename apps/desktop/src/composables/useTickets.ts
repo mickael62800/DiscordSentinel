@@ -1,8 +1,10 @@
 import { ref, computed, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { Ticket, TicketDetail } from "../types";
+import { useToast } from "./useToast";
 
 export function useTickets() {
+  const { error: showError } = useToast();
   const tickets = ref<Ticket[]>([]);
   const loading = ref(true);
   const filterStatus = ref("all");
@@ -28,7 +30,8 @@ export function useTickets() {
       tickets.value = await invoke<Ticket[]>("get_tickets");
     } catch (e) {
       error.value = "Impossible de charger les tickets. Verifiez la connexion au serveur.";
-      console.error("Failed to fetch tickets:", e);
+      console.error("Echec du chargement des tickets :", e);
+      showError("Impossible de charger les tickets. Verifiez la connexion au serveur.");
     } finally {
       loading.value = false;
     }
@@ -40,6 +43,7 @@ export function useTickets() {
 }
 
 export function useTicketDetail() {
+  const { success, error: showError } = useToast();
   const detail = ref<TicketDetail | null>(null);
   const loading = ref(false);
   const replying = ref(false);
@@ -52,6 +56,7 @@ export function useTicketDetail() {
       detail.value = await invoke<TicketDetail>("get_ticket_detail", { id });
     } catch (e) {
       error.value = String(e);
+      showError("Erreur lors du chargement du detail du ticket.");
     } finally {
       loading.value = false;
     }
@@ -63,8 +68,10 @@ export function useTicketDetail() {
     try {
       await invoke("reply_ticket", { ticketId, content });
       await fetchDetail(ticketId);
+      success("Reponse envoyee avec succes.");
     } catch (e) {
       error.value = String(e);
+      showError("Erreur lors de l'envoi de la reponse.");
     } finally {
       replying.value = false;
     }
@@ -74,8 +81,10 @@ export function useTicketDetail() {
     try {
       await invoke("close_ticket", { id });
       if (detail.value) detail.value.ticket.status = "closed";
+      success("Ticket ferme avec succes.");
     } catch (e) {
       error.value = String(e);
+      showError("Erreur lors de la fermeture du ticket.");
     }
   }
 
@@ -83,8 +92,10 @@ export function useTicketDetail() {
     try {
       await invoke("assign_ticket", { id, assignee });
       if (detail.value) detail.value.ticket.assigned_to = assignee;
+      success("Ticket assigne avec succes.");
     } catch (e) {
       error.value = String(e);
+      showError("Erreur lors de l'assignation du ticket.");
     }
   }
 

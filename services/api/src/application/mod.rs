@@ -36,3 +36,6 @@ pub use manage_watched_users_service::ManageWatchedUsersService;
 
 mod manage_members_service;
 pub use manage_members_service::ManageMembersService;
+
+mod blackjack_service;
+pub use blackjack_service::BlackjackService;

@@ -20,7 +20,20 @@ impl AppConfig {
                 .expect("DATABASE_URL manquant"),
             redis_url: std::env::var("REDIS_URL")
                 .expect("REDIS_URL manquant"),
-            api_key: std::env::var("API_KEY").unwrap_or_default(),
+            api_key: {
+                let key = std::env::var("API_KEY").unwrap_or_default();
+                let require = std::env::var("REQUIRE_API_KEY")
+                    .map(|v| v != "false" && v != "0")
+                    .unwrap_or(true);
+                if key.is_empty() && require {
+                    tracing::error!("API_KEY non configuree. Definir API_KEY ou REQUIRE_API_KEY=false pour le dev.");
+                    std::process::exit(1);
+                }
+                if !key.is_empty() && key.len() < 16 {
+                    tracing::warn!("API_KEY trop courte ({} chars). Utiliser au moins 32 chars en production.", key.len());
+                }
+                key
+            },
             host: std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".into()),
             port: std::env::var("PORT")
                 .unwrap_or_else(|_| "3000".into())

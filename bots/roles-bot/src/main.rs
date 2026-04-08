@@ -27,7 +27,7 @@ async fn main() {
         )
         .init();
 
-    let config = Config::from_env();
+    let config = Config::from_env("ROLES_DISCORD_TOKEN");
     let base_api = Arc::new(BaseApiClient::new(&config, "roles-bot"));
     let roles_api = ApiClient::new(base_api.clone());
 

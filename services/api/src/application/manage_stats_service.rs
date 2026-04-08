@@ -2,6 +2,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use tracing::warn;
+
 use crate::domain::entities::{DashboardStats, GuildStatsOverview, GuildVoiceStats, UserStats};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_stats::{ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand};
@@ -28,32 +30,48 @@ impl ManageStatsService {
     }
 
     async fn count_services(&self) -> (u32, u32, u32, u32) {
-        if let Ok(mut conn) = self.redis_client.get_multiplexed_async_connection().await {
-            use redis::AsyncCommands;
-            let known: Vec<String> = conn.smembers("bots:known").await.unwrap_or_default();
-
-            let mut bots_online = 0u32;
-            let mut bots_total = 0u32;
-            let mut workers_online = 0u32;
-            let mut workers_total = 0u32;
-
-            for name in &known {
-                let is_worker = name.contains("worker");
-                let exists: bool = conn.exists(format!("bot:online:{}", name)).await.unwrap_or(false);
-
-                if is_worker {
-                    workers_total += 1;
-                    if exists { workers_online += 1; }
-                } else {
-                    bots_total += 1;
-                    if exists { bots_online += 1; }
-                }
+        let mut conn = match self.redis_client.get_multiplexed_async_connection().await {
+            Ok(c) => c,
+            Err(e) => {
+                warn!(error = %e, "Redis indisponible pour count_services — dashboard affichera 0");
+                return (0, 0, 0, 0);
             }
+        };
 
-            (bots_online, bots_total, workers_online, workers_total)
-        } else {
-            (0, 0, 0, 0)
+        use redis::AsyncCommands;
+        let known: Vec<String> = match conn.smembers("bots:known").await {
+            Ok(k) => k,
+            Err(e) => {
+                warn!(error = %e, "Echec Redis SMEMBERS bots:known");
+                return (0, 0, 0, 0);
+            }
+        };
+
+        let mut bots_online = 0u32;
+        let mut bots_total = 0u32;
+        let mut workers_online = 0u32;
+        let mut workers_total = 0u32;
+
+        for name in &known {
+            let is_worker = name.contains("worker");
+            let exists: bool = match conn.exists(format!("bot:online:{}", name)).await {
+                Ok(v) => v,
+                Err(e) => {
+                    warn!(error = %e, bot = %name, "Echec Redis EXISTS bot:online");
+                    false
+                }
+            };
+
+            if is_worker {
+                workers_total += 1;
+                if exists { workers_online += 1; }
+            } else {
+                bots_total += 1;
+                if exists { bots_online += 1; }
+            }
         }
+
+        (bots_online, bots_total, workers_online, workers_total)
     }
 }
 
@@ -66,7 +84,9 @@ impl ManageStatsUseCase for ManageStatsService {
 
         // Invalidate caches
         let overview_key = format!("stats:overview:{}", cmd.guild_id);
-        self.cache.invalidate(&overview_key).await.ok();
+        if let Err(e) = self.cache.invalidate(&overview_key).await {
+            warn!(error = %e, key = %overview_key, "Echec invalidation cache stats overview");
+        }
 
         Ok(())
     }
@@ -88,15 +108,21 @@ impl ManageStatsUseCase for ManageStatsService {
                     cmd.seconds,
                 )
                 .await
+                .inspect_err(|e| warn!(error = %e, guild_id = %cmd.guild_id, "Echec sauvegarde session vocale"))
                 .ok();
         }
 
         let overview_key = format!("stats:overview:{}", cmd.guild_id);
-        self.cache.invalidate(&overview_key).await.ok();
+        if let Err(e) = self.cache.invalidate(&overview_key).await {
+            warn!(error = %e, key = %overview_key, "Echec invalidation cache stats overview");
+        }
 
         // Invalider les caches voice_stats pour les periodes courantes
         for days in [7, 30, 90] {
-            self.cache.invalidate(&format!("voice_stats:{}:{days}:20", cmd.guild_id)).await.ok();
+            let key = format!("voice_stats:{}:{days}:20", cmd.guild_id);
+            if let Err(e) = self.cache.invalidate(&key).await {
+                warn!(error = %e, key = %key, "Echec invalidation cache voice_stats");
+            }
         }
 
         Ok(())
@@ -130,7 +156,10 @@ impl ManageStatsUseCase for ManageStatsService {
             limit: 10000,
             offset: 0,
         };
-        let infractions = self.infraction_repo.find_by_guild(guild_id, &filters).await.unwrap_or_default();
+        let infractions = self.infraction_repo.find_by_guild(guild_id, &filters).await.unwrap_or_else(|e| {
+            warn!(error = %e, guild_id, "Echec chargement infractions pour stats overview");
+            vec![]
+        });
 
         let total_warns = infractions.iter().filter(|i| i.action.as_str() == "warn").count() as u64;
         let total_mutes = infractions.iter().filter(|i| i.action.as_str() == "mute").count() as u64;
@@ -152,7 +181,9 @@ impl ManageStatsUseCase for ManageStatsService {
 
         // Populate cache
         if let Ok(json) = serde_json::to_string(&overview) {
-            self.cache.set_json(&cache_key, &json, OVERVIEW_TTL).await.ok();
+            if let Err(e) = self.cache.set_json(&cache_key, &json, OVERVIEW_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set stats overview");
+            }
         }
 
         Ok(overview)
@@ -173,16 +204,22 @@ impl ManageStatsUseCase for ManageStatsService {
         let postgres_online = self.stats_repo.count_distinct_guilds().await.is_ok();
 
         // Check Redis
-        let redis_online = self.redis_client
-            .get_multiplexed_async_connection()
-            .await
-            .map(|mut conn| {
-                tokio::spawn(async move {
-                    let _: Result<String, _> = redis::AsyncCommands::get(&mut conn, "ping_test").await;
-                });
-                true
-            })
-            .unwrap_or(false);
+        let redis_online = match self.redis_client.get_multiplexed_async_connection().await {
+            Ok(mut conn) => {
+                use redis::AsyncCommands;
+                match conn.get::<_, Option<String>>("ping_test").await {
+                    Ok(_) => true,
+                    Err(e) => {
+                        warn!(error = %e, "Redis ping_test echoue");
+                        false
+                    }
+                }
+            }
+            Err(e) => {
+                warn!(error = %e, "Redis indisponible pour health check");
+                false
+            }
+        };
 
         Ok(DashboardStats {
             total_servers,
@@ -229,7 +266,9 @@ impl ManageStatsUseCase for ManageStatsService {
         };
 
         if let Ok(json) = serde_json::to_string(&stats) {
-            self.cache.set_json(&cache_key, &json, OVERVIEW_TTL).await.ok();
+            if let Err(e) = self.cache.set_json(&cache_key, &json, OVERVIEW_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set voice stats");
+            }
         }
 
         Ok(stats)

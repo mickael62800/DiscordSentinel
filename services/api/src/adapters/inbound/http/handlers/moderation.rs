@@ -5,9 +5,12 @@ use serde::Deserialize;
 use crate::adapters::inbound::http::dto::moderation::{
     BanEntryDto, LogActionDto, ModerationActionResponseDto, UserHistoryDto,
 };
+use tracing::warn;
+
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::{AddStrikeCommand, CreateReminderCommand};
 
 #[derive(Debug, Deserialize)]
@@ -22,6 +25,11 @@ pub async fn log_action(
     State(state): State<AppState>,
     Json(dto): Json<LogActionDto>,
 ) -> Result<Json<ModerationActionResponseDto>, ApiError> {
+    // Validation
+    validation::validate_moderation_action(
+        &dto.guild_id, &dto.moderator_id, &dto.target_id, &dto.reason, &dto.action_type,
+    ).map_err(ApiError)?;
+
     let action_type = dto.action_type.clone();
     let target_name = dto.target_name.clone();
     let moderator_name = dto.moderator_name.clone();
@@ -47,6 +55,7 @@ pub async fn log_action(
             infraction_id: None,
         })
         .await
+        .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, target_id = %target_id, "Echec ajout strike"))
         .ok();
 
     let mut dto = ModerationActionResponseDto::from(action);
@@ -84,11 +93,16 @@ pub async fn log_action(
     }
 
     // Auto-create reminder for temporary sanctions (mute_temp, ban_temp)
-    // Auto-create reminder for temporary sanctions
     if action_type == "mute_temp" || action_type == "ban_temp" {
         if let Some(dur) = duration {
-            let action_uuid = dto.id.parse().unwrap_or_default();
-            let _ = state.reminders_uc.create_reminder(CreateReminderCommand {
+            let action_uuid = match dto.id.parse() {
+                Ok(uuid) => uuid,
+                Err(e) => {
+                    warn!(error = %e, id = %dto.id, "UUID action invalide pour rappel, utilisation UUID nil");
+                    uuid::Uuid::nil()
+                }
+            };
+            if let Err(e) = state.reminders_uc.create_reminder(CreateReminderCommand {
                 guild_id: guild_id.clone(),
                 moderator_id,
                 moderator_name: moderator_name.clone(),
@@ -99,7 +113,9 @@ pub async fn log_action(
                 action_id: action_uuid,
                 duration_secs: dur,
                 remind_before_secs: 3600,
-            }).await;
+            }).await {
+                warn!(error = %e, "Echec creation rappel pour sanction temporaire");
+            }
         }
     }
 
@@ -118,6 +134,11 @@ pub async fn execute_ban(
     State(state): State<AppState>,
     Json(dto): Json<ExecuteBanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Validation
+    validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
+    validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
+    validation::validate_reason(&dto.reason).map_err(ApiError)?;
+
     state
         .discord_api
         .ban_user(&dto.guild_id, &dto.user_id, &dto.reason)
@@ -166,6 +187,9 @@ pub async fn execute_unban(
     State(state): State<AppState>,
     Json(dto): Json<ExecuteUnbanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Validation
+    validation::validate_guild_user_path(&dto.guild_id, &dto.user_id).map_err(ApiError)?;
+
     state
         .discord_api
         .unban_user(&dto.guild_id, &dto.user_id)
@@ -211,6 +235,10 @@ pub async fn list_bans(
     State(state): State<AppState>,
     Query(params): Query<BansQuery>,
 ) -> Result<Json<Vec<BanEntryDto>>, ApiError> {
+    // Validation
+    validation::validate_optional_discord_id("guild_id", &params.guild_id).map_err(ApiError)?;
+    validation::validate_pagination(params.limit, params.offset).map_err(ApiError)?;
+
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500);
     let offset = params.offset.unwrap_or(0).max(0);
     let bans = state
@@ -225,6 +253,9 @@ pub async fn get_history(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<UserHistoryDto>, ApiError> {
+    // Validation
+    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
+
     let history = state
         .moderation_uc
         .get_history(&guild_id, &user_id)

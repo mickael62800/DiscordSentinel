@@ -9,7 +9,8 @@ use crate::ports::inbound::{
     ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
     ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageMembersUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
-use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, IaConfigRepository, LogRepository};
+use crate::application::BlackjackService;
+use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, IaConfigRepository, LogRepository, WalletRepository};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -38,6 +39,8 @@ pub struct AppState {
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
     pub ia_config_repo: Arc<dyn IaConfigRepository>,
     pub discord_role_repo: Arc<dyn DiscordRoleRepository>,
+    pub wallet_repo: Arc<dyn WalletRepository>,
+    pub blackjack_svc: Arc<BlackjackService>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

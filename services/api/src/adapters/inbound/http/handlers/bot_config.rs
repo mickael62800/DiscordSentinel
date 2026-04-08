@@ -3,11 +3,14 @@ use axum::http::StatusCode;
 use axum::Json;
 use redis::AsyncCommands;
 
+use tracing::warn;
+
 use crate::adapters::inbound::http::dto::bot_config::{
     BotDefinitionDto, BotGuildConfigDto, DeleteConfigDto, SetConfigDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 
 const DEFINITIONS_TTL: u64 = 3600; // 1 heure
 const GUILD_CONFIG_TTL: u64 = 900; // 15 minutes
@@ -33,7 +36,9 @@ pub async fn get_definitions(
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&dtos) {
-            let _: Result<(), _> = conn.set_ex("bot:definitions", json, DEFINITIONS_TTL).await;
+            if let Err(e) = conn.set_ex::<_, _, ()>("bot:definitions", json, DEFINITIONS_TTL).await {
+                warn!(error = %e, "Echec cache set bot:definitions");
+            }
         }
     }
 
@@ -45,6 +50,9 @@ pub async fn get_guild_config(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<BotGuildConfigDto>>, ApiError> {
+    // Validation
+    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
+
     let cache_key = format!("bot:config:{guild_id}");
 
     // Cache-first
@@ -64,7 +72,9 @@ pub async fn get_guild_config(
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&dtos) {
-            let _: Result<(), _> = conn.set_ex(&cache_key, json, GUILD_CONFIG_TTL).await;
+            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, GUILD_CONFIG_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set guild config");
+            }
         }
     }
 
@@ -76,6 +86,10 @@ pub async fn get_bot_config(
     State(state): State<AppState>,
     Path((guild_id, bot_name)): Path<(String, String)>,
 ) -> Result<Json<Vec<BotGuildConfigDto>>, ApiError> {
+    // Validation
+    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
+    validation::validate_short("bot_name", &bot_name).map_err(ApiError)?;
+
     let cache_key = format!("bot:config:{guild_id}:{bot_name}");
 
     // Cache-first
@@ -95,7 +109,9 @@ pub async fn get_bot_config(
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&dtos) {
-            let _: Result<(), _> = conn.set_ex(&cache_key, json, GUILD_CONFIG_TTL).await;
+            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, GUILD_CONFIG_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set bot config");
+            }
         }
     }
 
@@ -107,6 +123,11 @@ pub async fn set_config(
     State(state): State<AppState>,
     Json(dto): Json<SetConfigDto>,
 ) -> Result<StatusCode, ApiError> {
+    // Validation
+    validation::validate_bot_config(
+        &dto.guild_id, &dto.bot_name, &dto.config_key, &dto.config_value,
+    ).map_err(ApiError)?;
+
     state
         .bot_config_repo
         .set_config(&dto.guild_id, &dto.bot_name, &dto.config_key, &dto.config_value)
@@ -114,8 +135,12 @@ pub async fn set_config(
 
     // Invalider les caches
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        let _: Result<(), _> = conn.del(format!("bot:config:{}", dto.guild_id)).await;
-        let _: Result<(), _> = conn.del(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name)).await;
+        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}", dto.guild_id)).await {
+            warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config guild");
+        }
+        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name)).await {
+            warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config bot");
+        }
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -126,6 +151,11 @@ pub async fn delete_config(
     State(state): State<AppState>,
     Json(dto): Json<DeleteConfigDto>,
 ) -> Result<StatusCode, ApiError> {
+    // Validation
+    validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
+    validation::validate_short("bot_name", &dto.bot_name).map_err(ApiError)?;
+    validation::validate_short("config_key", &dto.config_key).map_err(ApiError)?;
+
     state
         .bot_config_repo
         .delete_config(&dto.guild_id, &dto.bot_name, &dto.config_key)
@@ -133,8 +163,12 @@ pub async fn delete_config(
 
     // Invalider les caches
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        let _: Result<(), _> = conn.del(format!("bot:config:{}", dto.guild_id)).await;
-        let _: Result<(), _> = conn.del(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name)).await;
+        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}", dto.guild_id)).await {
+            warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config guild");
+        }
+        if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name)).await {
+            warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config bot");
+        }
     }
 
     Ok(StatusCode::NO_CONTENT)

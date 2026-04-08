@@ -32,7 +32,7 @@ async fn main() {
         .with_max_level(tracing::Level::INFO)
         .init();
 
-    let config = Config::from_env();
+    let config = Config::from_env("PROGRESSION_DISCORD_TOKEN");
 
     info!(api_url = %config.api_base_url(), "Demarrage du progression bot");
 

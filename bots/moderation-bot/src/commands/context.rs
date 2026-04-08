@@ -4,6 +4,7 @@ use serenity::all::{
     GetMessages, MessageId,
 };
 use serenity::builder::CreateEmbed;
+use tracing::warn;
 pub fn register() -> CreateCommand {
     CreateCommand::new("context")
         .description("Afficher les messages autour d'un message specifique")
@@ -99,12 +100,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             format!("{} messages avant + cible + {} messages apres", count, count),
         ));
 
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send context response");
+    }
 }
 
 fn format_timestamp(ts: &serenity::model::Timestamp) -> String {

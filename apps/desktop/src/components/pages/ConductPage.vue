@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useConduct, useConductDetail } from "../../composables/useConduct";
+import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
@@ -13,6 +14,7 @@ const { formatShortDateTime: fmt } = useFormatDate();
 
 const { selectedGuildId } = useGuildSelector();
 const { config, leaderboard, loading, error, fetchLeaderboard } = useConduct();
+useRealtimeRefresh(["conduct_points_changed", "user_zero_points"], fetchLeaderboard);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLeaderboard } = usePagination(leaderboard);
 const { points: detailPoints, log: detailLog, loading: detailLoading, fetchDetail } = useConductDetail();
 

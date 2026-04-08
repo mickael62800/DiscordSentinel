@@ -67,7 +67,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     if elapsed > expire_secs {
         let data = ctx.data.read().await;
         let db = data.get::<GameDbKey>().unwrap();
-        let _ = db.expire_combat(combat_id).await;
+        if let Err(e) = db.expire_combat(combat_id).await {
+            tracing::warn!(error = %e, "Echec DB expire_combat");
+        }
         let expire_label = if expire_secs >= 3600 { format!("{}h", expire_secs / 3600) } else { format!("{}min", expire_secs / 60) };
         reply_ephemeral(ctx, component, &format!("Ce defi a expire ! ({})", expire_label)).await;
         return;
@@ -109,7 +111,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::UpdateMessage(
@@ -119,7 +121,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 
     // Notification dans le salon notifications
     if let Some(notif_ch) = config.channel_notifications() {
@@ -138,9 +142,12 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
                 .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
                 .timestamp(serenity::model::Timestamp::now());
 
-            let _ = serenity::model::id::ChannelId::new(ch_id)
+            if let Err(e) = serenity::model::id::ChannelId::new(ch_id)
                 .send_message(&ctx.http, CreateMessage::new().embed(notif_embed))
-                .await;
+                .await
+            {
+                tracing::warn!(error = %e, "Echec send_message salon notifications");
+            }
         }
     }
 }
@@ -175,7 +182,10 @@ pub async fn resolve_combat_internal(
     let events = db
         .get_active_events(&combat_record.guild_id)
         .await
-        .unwrap_or_default();
+        .unwrap_or_else(|e| {
+            tracing::warn!(error = %e, "Echec DB get_active_events");
+            vec![]
+        });
 
     let result = combat::resolve_combat(
         &attacker,
@@ -218,7 +228,9 @@ pub async fn resolve_combat_internal(
                 .await
             {
                 // Consommer l'assurance
-                let _ = db.expire_insurance(insurance.id).await;
+                if let Err(e) = db.expire_insurance(insurance.id).await {
+                    tracing::warn!(error = %e, "Echec DB expire_insurance");
+                }
 
                 if insurance.is_scam {
                     // ARNAQUE : double la perte
@@ -273,19 +285,28 @@ pub async fn resolve_combat_internal(
                 .unwrap_or(0);
 
             if prime_amount > 0 {
-                let _ = db
+                if let Err(e) = db
                     .record_coins_earned(&combat_record.guild_id, winner_id, prime_amount)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB record_coins_earned");
+                }
             }
 
             // Chaos event tracking
             if result.chaos_event.is_some() {
-                let _ = db
+                if let Err(e) = db
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.attacker_id)
-                    .await;
-                let _ = db
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB increment_chaos_events attacker");
+                }
+                if let Err(e) = db
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.defender_id)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB increment_chaos_events defender");
+                }
             }
 
             // XP gains
@@ -341,12 +362,18 @@ pub async fn resolve_combat_internal(
             if combat_record.special_attack.as_deref() == Some("inversion") {
                 let atk_coins = attacker.coins;
                 let def_coins = defender.coins;
-                let _ = db
+                if let Err(e) = db
                     .set_player_coins(&combat_record.guild_id, &attacker.user_id, def_coins)
-                    .await;
-                let _ = db
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB set_player_coins attacker");
+                }
+                if let Err(e) = db
                     .set_player_coins(&combat_record.guild_id, &defender.user_id, atk_coins)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB set_player_coins defender");
+                }
             }
 
             // Resoudre les paris (parieurs + bonus combattants)
@@ -452,26 +479,38 @@ pub async fn resolve_combat_internal(
             // Match nul (accident_debile ou egalite)
             if let Some(ChaosEvent::AccidentDebile) = result.chaos_event {
                 // Les deux perdent la mise
-                let _ = db
+                if let Err(e) = db
                     .record_draw(
                         &combat_record.guild_id,
                         &combat_record.attacker_id,
                         combat_record.mise,
                     )
-                    .await;
-                let _ = db
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB record_draw attacker");
+                }
+                if let Err(e) = db
                     .record_draw(
                         &combat_record.guild_id,
                         &combat_record.defender_id,
                         combat_record.mise,
                     )
-                    .await;
-                let _ = db
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB record_draw defender");
+                }
+                if let Err(e) = db
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.attacker_id)
-                    .await;
-                let _ = db
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB increment_chaos_events attacker");
+                }
+                if let Err(e) = db
                     .increment_chaos_events(&combat_record.guild_id, &combat_record.defender_id)
-                    .await;
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec DB increment_chaos_events defender");
+                }
             }
 
             // Resoudre les paris (egalite/accident = tout le monde perd)
@@ -510,7 +549,7 @@ pub async fn resolve_combat_internal(
 }
 
 async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -520,5 +559,7 @@ async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, conten
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

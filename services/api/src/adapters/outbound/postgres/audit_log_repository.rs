@@ -128,4 +128,14 @@ impl AuditLogRepository for PgAuditLogRepository {
 
         Ok(rows.into_iter().map(AuditLog::from).collect())
     }
+
+    async fn delete_older_than_days(&self, guild_id: &str, days: i32) -> Result<u64, DomainError> {
+        let result = sqlx::query("DELETE FROM audit_logs WHERE guild_id = $1 AND created_at < NOW() - make_interval(days => $2)")
+            .bind(guild_id)
+            .bind(days)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(format!("delete_audit_logs_older: {e}")))?;
+        Ok(result.rows_affected())
+    }
 }

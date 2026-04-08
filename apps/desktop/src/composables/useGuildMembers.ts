@@ -2,6 +2,7 @@ import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { GuildMember } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 const members = ref<GuildMember[]>([]);
 const loading = ref(false);
@@ -9,6 +10,7 @@ const loaded = ref(false);
 
 export function useGuildMembers() {
   const { selectedGuildId } = useGuildSelector();
+  const { error: showError } = useToast();
 
   async function fetchMembers() {
     if (!selectedGuildId.value) return;
@@ -21,7 +23,8 @@ export function useGuildMembers() {
       });
       loaded.value = true;
     } catch (e) {
-      console.error("Erreur chargement membres:", e);
+      console.error("Erreur lors du chargement des membres :", e);
+      showError("Erreur lors du chargement des membres.");
     } finally {
       loading.value = false;
     }

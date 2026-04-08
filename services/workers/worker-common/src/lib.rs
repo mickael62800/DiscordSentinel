@@ -159,6 +159,42 @@ pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str)
 pub const SECS_PER_MINUTE: u64 = 60;
 pub const SECS_PER_HOUR: u64 = 3600;
 
+// ── Config Helpers ──
+
+/// Charge DATABASE_URL depuis l'environnement. Exit si absent.
+pub fn load_database_url() -> String {
+    std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+        error!("DATABASE_URL non defini");
+        std::process::exit(1);
+    })
+}
+
+/// Charge API_URL depuis l'environnement avec fallback localhost.
+pub fn load_api_url() -> String {
+    std::env::var("API_URL").unwrap_or_else(|_| "http://localhost:3000".into())
+}
+
+/// Charge REDIS_URL depuis l'environnement avec fallback localhost.
+pub fn load_redis_url() -> String {
+    std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into())
+}
+
+/// Charge une variable d'environnement avec un fallback par defaut.
+pub fn load_env<T: std::str::FromStr>(key: &str, default: T) -> T {
+    std::env::var(key)
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(default)
+}
+
+/// Charge une variable d'environnement booleenne (accepte "true"/"1").
+pub fn load_env_bool(key: &str, default: bool) -> bool {
+    match std::env::var(key) {
+        Ok(v) => v == "true" || v == "1",
+        Err(_) => default,
+    }
+}
+
 // ── Periodic Scheduler ──
 
 /// Lance une tache periodique avec gestion du shutdown et reporting d'erreurs.

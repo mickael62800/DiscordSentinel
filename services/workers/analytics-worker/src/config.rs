@@ -14,23 +14,14 @@ pub struct WorkerConfig {
 
 impl WorkerConfig {
     pub fn from_env() -> Self {
-        let daily_hours: u64 = std::env::var("DAILY_SNAPSHOT_INTERVAL")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_DAILY_INTERVAL_HOURS);
-        let hourly_minutes: u64 = std::env::var("HOURLY_SNAPSHOT_INTERVAL")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_HOURLY_INTERVAL_MINUTES);
+        use sentinel_worker_common::{load_database_url, load_api_url, load_env};
+
+        let daily_hours: u64 = load_env("DAILY_SNAPSHOT_INTERVAL", DEFAULT_DAILY_INTERVAL_HOURS);
+        let hourly_minutes: u64 = load_env("HOURLY_SNAPSHOT_INTERVAL", DEFAULT_HOURLY_INTERVAL_MINUTES);
 
         Self {
-            database_url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| {
-                    tracing::error!("DATABASE_URL non defini");
-                    std::process::exit(1);
-                }),
-            api_url: std::env::var("API_URL")
-                .unwrap_or_else(|_| "http://localhost:3000".into()),
+            database_url: load_database_url(),
+            api_url: load_api_url(),
             daily_snapshot_interval_secs: daily_hours * SECS_PER_HOUR,
             hourly_snapshot_interval_secs: hourly_minutes * SECS_PER_MINUTE,
         }

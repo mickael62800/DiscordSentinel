@@ -5,6 +5,8 @@ use serenity::prelude::*;
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
+use tracing::warn;
+
 use crate::audit_event;
 use crate::handler::{AnomalyDetectorKey, Handler, WeeklyTrackerKey};
 use crate::weekly_report::StatField;
@@ -205,7 +207,9 @@ pub async fn handle_update(
                     "old_name": old_label,
                     "new_name": new_label,
                 }));
-            base.auth(req).send().await.ok();
+            if let Err(e) = base.auth(req).send().await {
+                warn!(error = %e, "Failed to send name history update");
+            }
         }
     }
 

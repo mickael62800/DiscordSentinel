@@ -43,41 +43,19 @@ impl From<&WorkerConfig> for CleanupConfig {
 
 impl WorkerConfig {
     pub fn from_env() -> Self {
-        let cleanup_hours: u64 = std::env::var("CLEANUP_INTERVAL_HOURS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_CLEANUP_INTERVAL_HOURS);
+        use sentinel_worker_common::{load_database_url, load_api_url, load_env, load_env_bool};
 
-        let vacuum_hours: u64 = std::env::var("VACUUM_INTERVAL_HOURS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_VACUUM_INTERVAL_HOURS);
+        let cleanup_hours: u64 = load_env("CLEANUP_INTERVAL_HOURS", DEFAULT_CLEANUP_INTERVAL_HOURS);
+        let vacuum_hours: u64 = load_env("VACUUM_INTERVAL_HOURS", DEFAULT_VACUUM_INTERVAL_HOURS);
 
         Self {
-            database_url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| {
-                    tracing::error!("DATABASE_URL non defini");
-                    std::process::exit(1);
-                }),
-            api_url: std::env::var("API_URL")
-                .unwrap_or_else(|_| "http://localhost:3000".into()),
-            voice_sessions_retention_days: std::env::var("VOICE_SESSIONS_RETENTION_DAYS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(DEFAULT_VOICE_SESSIONS_RETENTION_DAYS),
-            logs_retention_days: std::env::var("LOGS_RETENTION_DAYS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(DEFAULT_LOGS_RETENTION_DAYS),
-            closed_tickets_retention_days: std::env::var("CLOSED_TICKETS_RETENTION_DAYS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(DEFAULT_CLOSED_TICKETS_RETENTION_DAYS),
+            database_url: load_database_url(),
+            api_url: load_api_url(),
+            voice_sessions_retention_days: load_env("VOICE_SESSIONS_RETENTION_DAYS", DEFAULT_VOICE_SESSIONS_RETENTION_DAYS),
+            logs_retention_days: load_env("LOGS_RETENTION_DAYS", DEFAULT_LOGS_RETENTION_DAYS),
+            closed_tickets_retention_days: load_env("CLOSED_TICKETS_RETENTION_DAYS", DEFAULT_CLOSED_TICKETS_RETENTION_DAYS),
             cleanup_interval_secs: cleanup_hours * SECS_PER_HOUR,
-            vacuum_enabled: std::env::var("VACUUM_ENABLED")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(true),
+            vacuum_enabled: load_env_bool("VACUUM_ENABLED", true),
             vacuum_interval_secs: vacuum_hours * SECS_PER_HOUR,
         }
     }

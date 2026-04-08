@@ -165,12 +165,14 @@ pub async fn cancel_combat(
     }
 
     // Rembourser les paris si existants
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "UPDATE coude_bets SET won = false WHERE combat_id = $1::uuid AND won IS NULL"
     )
     .bind(&combat_id)
     .execute(&state.pg_pool)
-    .await;
+    .await {
+        tracing::warn!(error = %e, combat_id = %combat_id, "Echec remboursement paris apres annulation combat");
+    }
 
     Ok(ok_response())
 }

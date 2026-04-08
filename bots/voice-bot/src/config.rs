@@ -1,5 +1,5 @@
 use serenity::model::id::ChannelId;
-use sentinel_shared::config::{BaseConfig, BotConfig};
+use sentinel_shared::config::{BaseConfig, BotConfig, load_env_optional};
 
 #[derive(Clone)]
 pub struct Config {
@@ -29,9 +29,7 @@ impl Config {
             .parse()
             .expect("VOICE_PRIVATE_CREATOR_CHANNEL_ID doit etre un nombre");
 
-        let log_channel_id: Option<u64> = std::env::var("VOICE_LOG_CHANNEL_ID")
-            .ok()
-            .and_then(|v| v.parse().ok());
+        let log_channel_id: Option<u64> = load_env_optional("VOICE_LOG_CHANNEL_ID");
 
         Self {
             base,

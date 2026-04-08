@@ -11,7 +11,7 @@ import { useFormatDate } from "../../composables/useFormatDate";
 const { formatShortDateTime: fmt } = useFormatDate();
 
 const { filteredChannels, loading, error, filterKind, publicCount, privateCount, totalCount, fetchChannels } = useVoiceChannels();
-useRealtimeRefresh(["voice_channel_created", "voice_channel_closed"], fetchChannels);
+useRealtimeRefresh(["voice_channel_created", "voice_channel_closed", "voice_channel_updated", "voice_invite_created", "voice_invite_used", "voice_invite_revoked"], fetchChannels);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
 const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
 

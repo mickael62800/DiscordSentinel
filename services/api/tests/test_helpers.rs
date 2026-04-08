@@ -60,6 +60,9 @@ impl ManageInfractionsUseCase for StubInfractions {
     async fn list_infractions(&self, _: &str, _: InfractionFilters) -> Result<Vec<Infraction>, DomainError> { unimplemented!() }
     async fn list_all_infractions(&self, _: i64, _: i64) -> Result<Vec<Infraction>, DomainError> { unimplemented!() }
     async fn count_today(&self) -> Result<u64, DomainError> { unimplemented!() }
+    async fn find_by_id(&self, _: &str) -> Result<Option<Infraction>, DomainError> { unimplemented!() }
+    async fn delete_infraction(&self, _: &str) -> Result<bool, DomainError> { unimplemented!() }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { unimplemented!() }
 }
 
 pub struct StubTickets;
@@ -130,6 +133,7 @@ pub struct StubAuditLogs;
 impl ManageAuditLogsUseCase for StubAuditLogs {
     async fn create(&self, _: manage_audit_logs::CreateAuditLogCommand) -> Result<AuditLog, DomainError> { unimplemented!() }
     async fn list(&self, _: Option<&str>, _: manage_audit_logs::AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> { unimplemented!() }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { unimplemented!() }
 }
 
 pub struct StubLevels;
@@ -247,6 +251,7 @@ impl LogRepository for StubLogRepo {
     async fn save(&self, _: &LogEntry) -> Result<(), DomainError> { Ok(()) }
     async fn find_all(&self, _: i64) -> Result<Vec<LogEntry>, DomainError> { Ok(vec![]) }
     async fn delete_by_category(&self, _: &str) -> Result<u64, DomainError> { Ok(0) }
+    async fn delete_older_than_days(&self, _: i32) -> Result<u64, DomainError> { Ok(0) }
 }
 
 pub struct StubGuildRepo;

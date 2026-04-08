@@ -12,9 +12,8 @@ pub async fn auth_middleware(
     request: Request,
     next: Next,
 ) -> Result<Response, StatusCode> {
-    // Pas de clé configurée → tout passe (dev mode)
+    // Pas de clé configurée → tout passe (dev mode uniquement, REQUIRE_API_KEY=false)
     if state.api_key.is_empty() {
-        tracing::warn!("API_KEY non configuree — auth desactivee (dev mode). NE PAS utiliser en production !");
         return Ok(next.run(request).await);
     }
 

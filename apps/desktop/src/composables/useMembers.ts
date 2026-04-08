@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import type { Member, MemberSummary, UserConductPoints, ConductPointsLog, ConductConfig, UserDossier, WatchedUser } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
 import { getApiBaseUrl } from "../utils/api";
+import { useToast } from "./useToast";
 
 const members = ref<Member[]>([]);
 const watchedUsers = ref<WatchedUser[]>([]);
@@ -27,6 +28,7 @@ const dossierLoading = ref(false);
 
 export function useMembers() {
   const { selectedGuildId } = useGuildSelector();
+  const { success, error: showError } = useToast();
 
   const watchedSet = computed(() => new Set(watchedUsers.value.map((u) => u.user_id)));
 
@@ -104,6 +106,7 @@ export function useMembers() {
       });
     } catch (e) {
       error.value = String(e);
+      showError("Erreur lors du chargement du resume du membre.");
     } finally {
       loadingSummary.value = false;
     }
@@ -132,13 +135,19 @@ export function useMembers() {
 
   async function adjustPoints(userId: string, amount: number, reason: string) {
     if (!selectedGuildId.value) return;
-    await invoke("adjust_conduct_points", {
-      guildId: selectedGuildId.value,
-      userId,
-      amount,
-      reason,
-    });
-    await fetchConductDetail(userId);
+    try {
+      await invoke("adjust_conduct_points", {
+        guildId: selectedGuildId.value,
+        userId,
+        amount,
+        reason,
+      });
+      await fetchConductDetail(userId);
+      success("Points de conduite ajustes avec succes.");
+    } catch (e) {
+      console.error("Erreur lors de l'ajustement des points de conduite :", e);
+      showError("Erreur lors de l'ajustement des points de conduite.");
+    }
   }
 
   async function fetchDossier(userId: string) {
@@ -176,12 +185,18 @@ export function useMembers() {
 
   async function removeFromWatch(userId: string) {
     if (!selectedGuildId.value) return;
-    await invoke("remove_watched_user", {
-      guildId: selectedGuildId.value,
-      userId,
-    });
-    // Retirer localement pour mise a jour immediate
-    watchedUsers.value = watchedUsers.value.filter((u) => u.user_id !== userId);
+    try {
+      await invoke("remove_watched_user", {
+        guildId: selectedGuildId.value,
+        userId,
+      });
+      // Retirer localement pour mise a jour immediate
+      watchedUsers.value = watchedUsers.value.filter((u) => u.user_id !== userId);
+      success("Utilisateur retire de la surveillance.");
+    } catch (e) {
+      console.error("Erreur lors du retrait de la surveillance :", e);
+      showError("Erreur lors du retrait de la surveillance.");
+    }
   }
 
   function closeMember() {

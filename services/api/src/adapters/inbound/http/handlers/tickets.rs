@@ -8,6 +8,7 @@ use crate::adapters::inbound::http::dto::tickets::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
 use crate::domain::value_objects::TicketStatus;
 use crate::ports::inbound::{AssignTicketCommand, ReplyTicketCommand, UpdateTicketChannelCommand};
@@ -16,6 +17,10 @@ pub async fn list_tickets(
     State(state): State<AppState>,
     Query(params): Query<ListTicketsQuery>,
 ) -> Result<Json<Vec<TicketResponseDto>>, ApiError> {
+    // Validation
+    validation::validate_pagination(params.limit, params.offset).map_err(ApiError)?;
+    validation::validate_search(&params.search).map_err(ApiError)?;
+
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200);
     let offset = params.offset.unwrap_or(0).max(0);
     let tickets = state.tickets_uc.list_tickets(params.status, params.priority, params.search, params.author_id, limit, offset).await?;
@@ -34,6 +39,9 @@ pub async fn create_ticket(
     State(state): State<AppState>,
     Json(dto): Json<CreateTicketDto>,
 ) -> Result<Json<TicketResponseDto>, ApiError> {
+    // Validation
+    validation::validate_title(&dto.title).map_err(ApiError)?;
+
     let command = dto.into();
     let ticket = state.tickets_uc.create_ticket(command).await?;
 

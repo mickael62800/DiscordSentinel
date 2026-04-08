@@ -9,7 +9,7 @@ import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 
 const { config, leaderboard, rewards, roles, loading, error, fetchAll, setReward, deleteReward } = useLevels();
 const { selectedGuildId } = useGuildSelector();
-useRealtimeRefresh(["level_up", "xp_update"], fetchAll);
+useRealtimeRefresh(["xp_gained"], fetchAll);
 
 type ViewMode = "global" | "text" | "voice";
 type PageTab = "leaderboard" | "rewards";

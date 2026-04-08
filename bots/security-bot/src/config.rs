@@ -1,4 +1,4 @@
-use sentinel_shared::config::{BaseConfig, BotConfig};
+use sentinel_shared::config::{BaseConfig, BotConfig, load_env, load_env_bool, load_env_optional, load_env_string};
 
 #[derive(Clone)]
 pub struct Config {
@@ -30,41 +30,17 @@ impl Config {
     pub fn from_env() -> Self {
         Self {
             base: BaseConfig::from_env("SECURITY_DISCORD_TOKEN"),
-            raid_join_threshold: std::env::var("RAID_JOIN_THRESHOLD")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(10),
-            raid_join_window_secs: std::env::var("RAID_JOIN_WINDOW_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(10),
-            min_account_age_secs: std::env::var("MIN_ACCOUNT_AGE_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(86400),
-            quarantine_role_id: std::env::var("QUARANTINE_ROLE_ID")
-                .ok()
-                .and_then(|v| v.parse().ok()),
-            quarantine_enabled: std::env::var("QUARANTINE_ENABLED")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
-            slowmode_seconds: std::env::var("SLOWMODE_SECONDS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(10),
-            slowmode_duration_secs: std::env::var("SLOWMODE_DURATION_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(300),
-            captcha_enabled: std::env::var("CAPTCHA_ENABLED")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
-            captcha_timeout_secs: std::env::var("CAPTCHA_TIMEOUT_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(300),
+            raid_join_threshold: load_env("RAID_JOIN_THRESHOLD", 10),
+            raid_join_window_secs: load_env("RAID_JOIN_WINDOW_SECS", 10),
+            min_account_age_secs: load_env("MIN_ACCOUNT_AGE_SECS", 86400),
+            quarantine_role_id: load_env_optional("QUARANTINE_ROLE_ID"),
+            quarantine_enabled: load_env_bool("QUARANTINE_ENABLED", false),
+            slowmode_seconds: load_env("SLOWMODE_SECONDS", 10),
+            slowmode_duration_secs: load_env("SLOWMODE_DURATION_SECS", 300),
+            captcha_enabled: load_env_bool("CAPTCHA_ENABLED", false),
+            captcha_timeout_secs: load_env("CAPTCHA_TIMEOUT_SECS", 300),
             captcha_type: {
-                let ct = std::env::var("CAPTCHA_TYPE").unwrap_or_else(|_| "button".to_string());
+                let ct = load_env_string("CAPTCHA_TYPE", "button");
                 if ct != "button" && ct != "math" {
                     tracing::warn!(value=%ct, "CAPTCHA_TYPE invalide, utilisation de 'button' par defaut");
                     "button".to_string()
@@ -72,31 +48,13 @@ impl Config {
                     ct
                 }
             },
-            lockdown_enabled: std::env::var("LOCKDOWN_ENABLED")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
-            lockdown_duration_secs: std::env::var("LOCKDOWN_DURATION_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(300),
-            alt_detection_enabled: std::env::var("ALT_DETECTION_ENABLED")
-                .map(|v| v == "true" || v == "1")
-                .unwrap_or(false),
-            alt_retention_secs: std::env::var("ALT_RETENTION_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(604_800),
-            alt_name_distance: std::env::var("ALT_NAME_DISTANCE")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(2),
-            raid_pattern_enabled: std::env::var("RAID_PATTERN_ENABLED")
-                .map(|v| v != "false" && v != "0")
-                .unwrap_or(true),
-            raid_pattern_score_threshold: std::env::var("RAID_PATTERN_SCORE_THRESHOLD")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(60),
+            lockdown_enabled: load_env_bool("LOCKDOWN_ENABLED", false),
+            lockdown_duration_secs: load_env("LOCKDOWN_DURATION_SECS", 300),
+            alt_detection_enabled: load_env_bool("ALT_DETECTION_ENABLED", false),
+            alt_retention_secs: load_env("ALT_RETENTION_SECS", 604_800),
+            alt_name_distance: load_env("ALT_NAME_DISTANCE", 2),
+            raid_pattern_enabled: load_env_bool("RAID_PATTERN_ENABLED", true),
+            raid_pattern_score_threshold: load_env("RAID_PATTERN_SCORE_THRESHOLD", 60),
         }
     }
 }

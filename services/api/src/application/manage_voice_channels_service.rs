@@ -81,8 +81,12 @@ impl ManageVoiceChannelsService {
     }
 
     async fn invalidate_cache(&self, guild_id: &str, channel_id: &str) {
-        self.cache.invalidate(&format!("voice_channels:{guild_id}")).await.ok();
-        self.cache.invalidate(&format!("voice_channel:{channel_id}")).await.ok();
+        if let Err(e) = self.cache.invalidate(&format!("voice_channels:{guild_id}")).await {
+            tracing::warn!(error = %e, guild_id, "Echec invalidation cache voice_channels");
+        }
+        if let Err(e) = self.cache.invalidate(&format!("voice_channel:{channel_id}")).await {
+            tracing::warn!(error = %e, channel_id, "Echec invalidation cache voice_channel");
+        }
     }
 
     async fn resolve_channel(&self, channel_id: &str) -> Result<VoiceChannel, DomainError> {
@@ -111,7 +115,9 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         let channels = self.repo.find_all_by_guild(guild_id).await?;
 
         if let Ok(json) = serde_json::to_string(&channels) {
-            self.cache.set_json(&cache_key, &json, CHANNELS_LIST_TTL).await.ok();
+            if let Err(e) = self.cache.set_json(&cache_key, &json, CHANNELS_LIST_TTL).await {
+                tracing::warn!(error = %e, cache_key = %cache_key, "Echec cache set voice channels list");
+            }
         }
 
         Ok(channels)
@@ -134,7 +140,9 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         let detail = VoiceChannelDetail { channel, co_admins, bans, invite_links };
 
         if let Ok(json) = serde_json::to_string(&detail) {
-            self.cache.set_json(&cache_key, &json, CHANNEL_DETAIL_TTL).await.ok();
+            if let Err(e) = self.cache.set_json(&cache_key, &json, CHANNEL_DETAIL_TTL).await {
+                tracing::warn!(error = %e, cache_key = %cache_key, "Echec cache set voice channel detail");
+            }
         }
 
         Ok(detail)
@@ -165,7 +173,9 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         };
 
         self.repo.save(&channel).await?;
-        self.cache.invalidate(&format!("voice_channels:{}", channel.guild_id)).await.ok();
+        if let Err(e) = self.cache.invalidate(&format!("voice_channels:{}", channel.guild_id)).await {
+            tracing::warn!(error = %e, guild_id = %channel.guild_id, "Echec invalidation cache voice_channels apres creation");
+        }
 
         Ok(channel)
     }

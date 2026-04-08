@@ -67,7 +67,9 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .signed_duration_since(combat_record.created_at)
         .num_seconds();
     if elapsed > 86400 {
-        let _ = db.expire_combat(combat_id).await;
+        if let Err(e) = db.expire_combat(combat_id).await {
+            tracing::warn!(error = %e, "Echec DB expire_combat");
+        }
         reply_ephemeral(ctx, component, "Ce defi a expire ! (24h)").await;
         return;
     }
@@ -108,9 +110,12 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     }
 
     // Retirer les coins et incrementer la lachete
-    let _ = db
+    if let Err(e) = db
         .update_player_coins(&combat_record.guild_id, &combat_record.defender_id, -penalty)
-        .await;
+        .await
+    {
+        tracing::warn!(error = %e, "Echec DB update_player_coins refus");
+    }
     let cowardice = db
         .increment_cowardice(&combat_record.guild_id, &combat_record.defender_id)
         .await
@@ -134,7 +139,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .timestamp(serenity::model::Timestamp::now());
 
     // Remplacer la card de defi par la card de refus (supprime les boutons)
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::UpdateMessage(
@@ -144,11 +149,13 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }
 
 async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -158,5 +165,7 @@ async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, conten
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

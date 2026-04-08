@@ -136,9 +136,12 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(new_owner_user_id),
     };
-    let _ = voice_channel_id
+    if let Err(e) = voice_channel_id
         .create_permission(&ctx.http, new_owner_overwrite)
-        .await;
+        .await
+    {
+        tracing::warn!(error = %e, "failed to grant new owner permission on voice channel");
+    }
 
     // Remove MANAGE_CHANNELS from old owner (keep basic access)
     let old_owner_overwrite = serenity::model::channel::PermissionOverwrite {
@@ -146,9 +149,12 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(old_owner_id),
     };
-    let _ = voice_channel_id
+    if let Err(e) = voice_channel_id
         .create_permission(&ctx.http, old_owner_overwrite)
-        .await;
+        .await
+    {
+        tracing::warn!(error = %e, "failed to downgrade old owner permission on voice channel");
+    }
 
     // Update admin text panel permissions
     if let Some(ref text_id_str) = ch.text_channel_id {
@@ -163,17 +169,23 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
                 deny: Permissions::empty(),
                 kind: serenity::model::channel::PermissionOverwriteType::Member(new_owner_user_id),
             };
-            let _ = text_channel
+            if let Err(e) = text_channel
                 .create_permission(&ctx.http, new_text_overwrite)
-                .await;
+                .await
+            {
+                tracing::warn!(error = %e, "failed to grant new owner permission on admin text panel");
+            }
 
             // Remove old owner's explicit access to admin panel
-            let _ = text_channel
+            if let Err(e) = text_channel
                 .delete_permission(
                     &ctx.http,
                     serenity::model::channel::PermissionOverwriteType::Member(old_owner_id),
                 )
-                .await;
+                .await
+            {
+                tracing::warn!(error = %e, "failed to remove old owner permission from admin text panel");
+            }
         }
     }
 

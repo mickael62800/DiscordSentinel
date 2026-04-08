@@ -10,6 +10,8 @@ use crate::adapters::inbound::http::dto::dashboard::{
     CreateLogDto, DashboardInfractionDto, DashboardRuleDto, DashboardStatsDto, GuildDto,
     GuildFilterParams, LogEntryDto, RegisterGuildDto,
 };
+use tracing::warn;
+
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::LogEntry;
@@ -72,6 +74,18 @@ pub async fn create_log(
         details: dto.details.unwrap_or(serde_json::json!({})),
     };
     state.log_repo.save(&entry).await?;
+
+    state.broadcaster.broadcast(
+        "log_entry_created",
+        serde_json::json!({
+            "level": &entry.level,
+            "bot": &entry.bot,
+            "message": &entry.message,
+            "category": &entry.category,
+            "server": &entry.server,
+        }),
+    );
+
     Ok(StatusCode::CREATED)
 }
 
@@ -136,9 +150,13 @@ pub async fn bot_heartbeat(
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         use redis::AsyncCommands;
         let key = format!("bot:online:{}", payload.name);
-        let _: () = conn.set_ex(&key, "1", 90).await.unwrap_or(());
+        if let Err(e) = conn.set_ex::<_, _, ()>(&key, "1", 90).await {
+            warn!(error = %e, bot = %payload.name, "Echec Redis set_ex heartbeat");
+        }
         // Enregistrer aussi dans l'ensemble des bots connus
-        let _: () = conn.sadd("bots:known", &payload.name).await.unwrap_or(());
+        if let Err(e) = conn.sadd::<_, _, ()>("bots:known", &payload.name).await {
+            warn!(error = %e, bot = %payload.name, "Echec Redis sadd bots:known");
+        }
     }
 
     state.broadcaster.broadcast(
@@ -172,7 +190,9 @@ pub async fn list_guilds(
 
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&dtos) {
-            let _: Result<(), _> = conn.set_ex("guilds:all", json, 300u64).await;
+            if let Err(e) = conn.set_ex::<_, _, ()>("guilds:all", json, 300u64).await {
+                warn!(error = %e, "Echec cache set guilds:all");
+            }
         }
     }
 
@@ -196,7 +216,9 @@ pub async fn register_guild(
 
     // Invalider le cache guilds
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        let _: Result<(), _> = conn.del("guilds:all").await;
+        if let Err(e) = conn.del::<_, ()>("guilds:all").await {
+            warn!(error = %e, "Echec invalidation cache guilds:all");
+        }
     }
 
     Ok(StatusCode::NO_CONTENT)

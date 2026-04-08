@@ -204,9 +204,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         let lost = (thief.coins as f64 * 0.15) as i64;
         let lost = lost.max(1);
 
-        let _ = db
+        if let Err(e) = db
             .record_coins_lost(&guild_id, &thief_id, lost)
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "Echec DB record_coins_lost vol");
+        }
 
         let fail_msg = {
             let mut rng = rand::thread_rng();
@@ -231,7 +234,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -241,5 +244,7 @@ async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

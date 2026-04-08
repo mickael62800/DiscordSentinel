@@ -66,7 +66,9 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             Some(cached) => cached,
             None => {
                 let from_db = self.rule_repo.find_by_guild(&cmd.guild_id).await?;
-                self.cache.set_rules(&cmd.guild_id, &from_db).await.ok();
+                if let Err(e) = self.cache.set_rules(&cmd.guild_id, &from_db).await {
+                    tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec cache set rules");
+                }
                 from_db
             }
         };
@@ -76,7 +78,13 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 
         // 3. Inference text IA (sentiment : anger, rage, threat, harassment)
         // Charger la config IA per-guild pour le seuil de confiance
-        let ia_config = self.ia_config_repo.get(&cmd.guild_id).await.ok().flatten();
+        let ia_config = match self.ia_config_repo.get(&cmd.guild_id).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec chargement config IA, utilisation defauts");
+                None
+            }
+        };
         let text_enabled = ia_config.as_ref().map(|c| c.text_enabled).unwrap_or(true);
         let text_threshold = ia_config.as_ref().map(|c| c.text_threshold as f32).unwrap_or(DEFAULT_TEXT_THRESHOLD);
 
@@ -170,12 +178,14 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 
         // 4b. Deduire les points de conduite
         if result.action.as_str() != "none" {
-            let _ = self.conduct_uc.deduct_points(DeductPointsCommand {
+            if let Err(e) = self.conduct_uc.deduct_points(DeductPointsCommand {
                 guild_id: infraction.guild_id.clone(),
                 user_id: infraction.user_id.clone(),
                 username: infraction.username.clone(),
                 action: result.action.as_str().to_string(),
-            }).await;
+            }).await {
+                tracing::warn!(error = %e, guild_id = %infraction.guild_id, user_id = %infraction.user_id, "Echec deduction points conduite (analyse message)");
+            }
         }
 
         // 5. Retourner l'analyse
@@ -820,6 +830,9 @@ impl InfractionRepository for MockInfractionRepo {
     async fn find_by_guild(&self, _: &str, _: &crate::ports::inbound::InfractionFilters) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
     async fn find_all(&self, _: i64, _: i64) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
     async fn count_today(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
+    async fn find_by_id(&self, _: &str) -> Result<Option<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn delete_by_id(&self, _: &str) -> Result<bool, crate::domain::errors::DomainError> { Ok(false) }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
 }
 
 #[cfg(test)]

@@ -162,19 +162,27 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     }
 
     // Defer la reponse (ephemeral)
-    let _ = modal.create_response(
+    if let Err(e) = modal.create_response(
         &ctx.http,
         CreateInteractionResponse::Defer(
             CreateInteractionResponseMessage::new()
                 .ephemeral(true),
         ),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to defer modal response");
+    }
 
     // Rate limiting : verifier max_open_per_user
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             let max_open: u64 = sentinel_shared::api_client::BaseApiClient::config_u64(&guild_config, "max_open_per_user", 0);
 
             if max_open > 0 {
@@ -185,14 +193,16 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                     }).count() as u64;
 
                     if open_count >= max_open {
-                        let _ = modal.edit_response(
+                        if let Err(e) = modal.edit_response(
                             &ctx.http,
                             serenity::builder::EditInteractionResponse::new()
                                 .content(format!(
                                     "Vous avez deja {} ticket(s) ouvert(s). Limite : {} par utilisateur.",
                                     open_count, max_open
                                 ))
-                        ).await;
+                        ).await {
+                            warn!(error = %e, "Failed to send rate limit response");
+                        }
                         return;
                     }
                 }
@@ -211,7 +221,9 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     if let Ok(channels) = guild_id.channels(&ctx.http).await {
         let exists = channels.values().any(|c| c.name == channel_name);
         if exists {
-            let _ = modal.delete_response(&ctx.http).await;
+            if let Err(e) = modal.delete_response(&ctx.http).await {
+                warn!(error = %e, "Failed to delete duplicate ticket response");
+            }
             return;
         }
     }
@@ -246,7 +258,13 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
     let api = ApiClient::new(base.clone());
-    let guild_config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+    let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+            std::collections::HashMap::new()
+        }
+    };
 
     let mut all_overwrites = overwrites;
     let is_admin_only = ADMIN_ONLY_TYPES.contains(&ticket_type.as_str());
@@ -473,7 +491,9 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     }
 
     // Supprimer la reponse ephemeral (le "en chargement...") pour ne pas polluer
-    let _ = modal.delete_response(&ctx.http).await;
+    if let Err(e) = modal.delete_response(&ctx.http).await {
+        warn!(error = %e, "Failed to delete loading ephemeral response");
+    }
 
     info!(
         ticket_id = %ticket_id,
@@ -493,7 +513,13 @@ pub async fn handle_panel_click_with_faq(ctx: &Context, component: &ComponentInt
     let faq_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             sentinel_shared::api_client::BaseApiClient::config_or(&gc, "faq_entries", "")
         } else {
             String::new()

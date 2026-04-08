@@ -2,8 +2,10 @@ import { ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { IaConfig, SaveIaConfigParams } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 export function useIaConfig() {
+  const { success, error: showError } = useToast();
   const config = ref<IaConfig | null>(null);
   const loading = ref(false);
   const saving = ref(false);
@@ -23,7 +25,8 @@ export function useIaConfig() {
       config.value = await invoke<IaConfig>("get_ia_config", { guildId });
     } catch (e) {
       error.value = String(e);
-      console.error("Erreur chargement config IA:", e);
+      console.error("Erreur lors du chargement de la configuration IA :", e);
+      showError("Erreur lors du chargement de la configuration IA.");
     } finally {
       loading.value = false;
     }
@@ -43,9 +46,11 @@ export function useIaConfig() {
         visionEnabled: params.vision_enabled,
         visionThreshold: params.vision_threshold,
       });
+      success("Configuration IA sauvegardee avec succes.");
     } catch (e) {
       error.value = String(e);
-      console.error("Erreur sauvegarde config IA:", e);
+      console.error("Erreur lors de la sauvegarde de la configuration IA :", e);
+      showError("Erreur lors de la sauvegarde de la configuration IA.");
     } finally {
       saving.value = false;
     }

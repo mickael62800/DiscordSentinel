@@ -1,6 +1,7 @@
 import { ref, onMounted, watch, type Ref, type WatchSource } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useGuildSelector } from "./useGuildSelector";
+import { useToast } from "./useToast";
 
 export function useGuildFetch<T>(
   command: string,
@@ -17,6 +18,7 @@ export function useGuildFetch<T>(
   error: Ref<string | null>;
   refresh: () => Promise<void>;
 } {
+  const { error: showError } = useToast();
   const data = ref<T>(initialValue) as Ref<T>;
   const loading = ref(true);
   const error = ref<string | null>(null);
@@ -46,7 +48,8 @@ export function useGuildFetch<T>(
       } else {
         error.value = "Erreur lors du chargement des donnees.";
       }
-      console.error(`Failed to invoke ${command}:`, e);
+      console.error(`Echec de l'appel ${command} :`, e);
+      showError(error.value ?? `Echec de l'appel ${command}.`);
     } finally {
       loading.value = false;
     }

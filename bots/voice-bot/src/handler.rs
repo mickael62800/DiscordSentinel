@@ -98,7 +98,13 @@ impl EventHandler for Handler {
         if let Some(guild_id) = guild_id_str {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
-                let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                let config = match api.get_guild_config(&guild_id).await {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                        std::collections::HashMap::new()
+                    }
+                };
                 if !BaseApiClient::config_bool(&config, "enabled", true) {
                     return;
                 }
@@ -120,7 +126,13 @@ impl EventHandler for Handler {
         if let Some(guild_id) = msg.guild_id {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
-                let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                let config = match api.get_guild_config(&guild_id.to_string()).await {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                        std::collections::HashMap::new()
+                    }
+                };
                 if !BaseApiClient::config_bool(&config, "enabled", true) {
                     return;
                 }

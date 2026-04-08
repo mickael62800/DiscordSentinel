@@ -99,10 +99,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Gravite", gravity, true)
                 .field("Raison", reason, false);
 
-                dm.send_message(
+                if let Err(e) = dm.send_message(
                     &ctx.http,
                     CreateMessage::new().embed(dm_embed),
-                ).await.ok();
+                ).await {
+                    warn!(error = %e, "Failed to send warn DM to user");
+                }
             }
 
             let strikes_label = resp.strikes_count.map(|c| format!(" — Strike {c}")).unwrap_or_default();
@@ -115,12 +117,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .field("Gravite", gravity, true)
             .field("Raison", reason, false);
 
-            command.create_response(
+            if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new().embed(channel_embed),
                 ),
-            ).await.ok();
+            ).await {
+                warn!(error = %e, "Failed to send warn response embed");
+            }
 
             // Appliquer l'escalation si le seuil de strikes est atteint
             if let Some(ref esc_action) = resp.escalation_action {
@@ -143,13 +147,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                             let esc_embed = moderate_embed(format!("🔇 Mute auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
                                 .field("Cible", format!("<@{}>", target.id), true)
                                 .field("Duree", format!("{}min", secs / 60), true);
-                            let _ = command.channel_id.send_message(&ctx.http, CreateMessage::new().embed(esc_embed)).await;
+                            if let Err(e) = command.channel_id.send_message(&ctx.http, CreateMessage::new().embed(esc_embed)).await {
+                                warn!(error = %e, "Failed to send mute escalation message");
+                            }
                         }
                     }
                     "ban" => {
                         let esc_embed = danger_embed(format!("🔨 Ban auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
                             .field("Cible", format!("<@{}>", target.id), true);
-                        let _ = command.channel_id.send_message(&ctx.http, CreateMessage::new().embed(esc_embed)).await;
+                        if let Err(e) = command.channel_id.send_message(&ctx.http, CreateMessage::new().embed(esc_embed)).await {
+                            warn!(error = %e, "Failed to send ban escalation message");
+                        }
                         if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, 1, reason).await {
                             warn!(error = %e, "Escalation ban echouee");
                         }
@@ -166,10 +174,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().content(content).ephemeral(false),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send reply text");
+    }
 }

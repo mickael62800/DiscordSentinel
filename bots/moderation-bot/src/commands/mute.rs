@@ -3,7 +3,7 @@ use serenity::all::{
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     CreateMessage,
 };
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{moderate_embed, success_embed};
@@ -76,7 +76,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_config = {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
-            api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+            match api.get_guild_config(&guild_id.to_string()).await {
+                Ok(config) => config,
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch guild config for mute");
+                    std::collections::HashMap::new()
+                }
+            }
         } else {
             std::collections::HashMap::new()
         }
@@ -146,10 +152,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .field("Duree", &duration_label, true)
             .field("Raison", reason, false);
 
-        dm.send_message(
+        if let Err(e) = dm.send_message(
             &ctx.http,
             CreateMessage::new().embed(dm_embed),
-        ).await.ok();
+        ).await {
+            warn!(error = %e, "Failed to send mute DM to user");
+        }
     }
 
     let channel_embed = moderate_embed(format!("🔇 Mute ({duration_label})"))
@@ -158,12 +166,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .field("Duree", &duration_label, true)
         .field("Raison", reason, false);
 
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().embed(channel_embed),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send mute response embed");
+    }
 }
 
 pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
@@ -209,26 +219,32 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
         duration: None,
     };
 
-    api.log_action(&action).await.ok();
+    if let Err(e) = api.log_action(&action).await {
+        warn!(error = %e, "Failed to log unmute action");
+    }
 
     info!(target = %target_name, "Unmute applique");
 
     let unmute_embed = success_embed("🔊 Unmute")
         .field("Cible", format!("<@{target_id}>"), false);
 
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().embed(unmute_embed),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send unmute response embed");
+    }
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().content(content).ephemeral(false),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send reply text");
+    }
 }

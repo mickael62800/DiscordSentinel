@@ -6,6 +6,8 @@ use uuid::Uuid;
 use crate::domain::entities::{ModerationAction, UserModerationHistory};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::{DeductPointsCommand, LogModerationCommand, ManageConductUseCase, ManageModerationUseCase};
+use tracing::warn;
+
 use crate::ports::outbound::{CachePort, ModerationRepository};
 
 const HISTORY_TTL: u64 = 180; // 3 minutes
@@ -44,15 +46,19 @@ impl ManageModerationUseCase for ManageModerationService {
 
         // Invalidate history cache for this user
         let cache_key = format!("modhistory:{}:{}", cmd.guild_id, cmd.target_id);
-        self.cache.invalidate(&cache_key).await.ok();
+        if let Err(e) = self.cache.invalidate(&cache_key).await {
+            warn!(error = %e, cache_key = %cache_key, "Echec invalidation cache mod history");
+        }
 
         // Deduire les points de conduite
-        let _ = self.conduct_uc.deduct_points(DeductPointsCommand {
+        if let Err(e) = self.conduct_uc.deduct_points(DeductPointsCommand {
             guild_id: action.guild_id.clone(),
             user_id: action.target_id.clone(),
             username: action.target_name.clone(),
             action: action.action_type.clone(),
-        }).await;
+        }).await {
+            warn!(error = %e, guild_id = %action.guild_id, target_id = %action.target_id, "Echec deduction points conduite");
+        }
 
         Ok(action)
     }
@@ -85,7 +91,9 @@ impl ManageModerationUseCase for ManageModerationService {
 
         // Populate cache
         if let Ok(json) = serde_json::to_string(&history) {
-            self.cache.set_json(&cache_key, &json, HISTORY_TTL).await.ok();
+            if let Err(e) = self.cache.set_json(&cache_key, &json, HISTORY_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set mod history");
+            }
         }
 
         Ok(history)

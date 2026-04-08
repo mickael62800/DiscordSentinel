@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useGuildMembers } from "../../composables/useGuildMembers";
+import { useToast } from "../../composables/useToast";
 import { getApiBaseUrl } from "../../utils/api";
 import type { GuildMember } from "../../types";
+
+const { success, error: showError } = useToast();
 
 const props = defineProps<{
   visible: boolean;
@@ -65,10 +68,12 @@ async function confirmAddWatch() {
         reason: addReason.value,
       }),
     });
+    success("Membre mis en surveillance avec succes");
     closeModal();
     emit("added");
   } catch (e) {
     console.error("Erreur ajout surveillance:", e);
+    showError("Erreur lors de l'ajout en surveillance");
   } finally {
     addLoading.value = false;
   }

@@ -183,7 +183,9 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
         .embed(embed)
         .components(vec![CreateActionRow::Buttons(buttons)]);
 
-    let _ = members_channel_id.send_message(&ctx.http, msg).await;
+    if let Err(e) = members_channel_id.send_message(&ctx.http, msg).await {
+        tracing::warn!(error = %e, "failed to send vote kick message");
+    }
     respond_ephemeral(ctx, component, "Vote lance !").await;
 
     // Timeout 60s
@@ -203,10 +205,12 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
         if let Some(vote) = vote {
             if vote.majority_reached() {
                 if let Some(gid) = guild_id {
-                    let _ = gid.disconnect_member(&ctx_clone.http, vote.target).await;
+                    if let Err(e) = gid.disconnect_member(&ctx_clone.http, vote.target).await {
+                        tracing::warn!(error = %e, "failed to disconnect vote-kicked member on timeout");
+                    }
                     voice::revoke_members_panel_access(&ctx_clone, vc, vote.target).await;
                 }
-                let _ = mc
+                if let Err(e) = mc
                     .say(
                         &ctx_clone.http,
                         format!(
@@ -214,9 +218,12 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
                             vote.target
                         ),
                     )
-                    .await;
+                    .await
+                {
+                    tracing::warn!(error = %e, "failed to send vote kick expulsion result");
+                }
             } else {
-                let _ = mc
+                if let Err(e) = mc
                     .say(
                         &ctx_clone.http,
                         format!(
@@ -224,7 +231,10 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
                             vote.target
                         ),
                     )
-                    .await;
+                    .await
+                {
+                    tracing::warn!(error = %e, "failed to send vote kick rejection result");
+                }
             }
         }
     });
@@ -265,11 +275,13 @@ pub async fn handle_votekick_cast(
         }
 
         if let Some(gid) = component.guild_id {
-            let _ = gid.disconnect_member(&ctx.http, vote.target).await;
+            if let Err(e) = gid.disconnect_member(&ctx.http, vote.target).await {
+                tracing::warn!(error = %e, "failed to disconnect vote-kicked member");
+            }
             voice::revoke_members_panel_access(ctx, vote.voice_channel_id, vote.target).await;
         }
 
-        let _ = members_channel_id
+        if let Err(e) = members_channel_id
             .say(
                 &ctx.http,
                 format!(
@@ -278,7 +290,10 @@ pub async fn handle_votekick_cast(
                     vote.status_text()
                 ),
             )
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "failed to send vote kick expulsion message");
+        }
     } else if vote.rejected() {
         {
             let data = ctx.data.read().await;
@@ -287,7 +302,7 @@ pub async fn handle_votekick_cast(
             }
         }
 
-        let _ = members_channel_id
+        if let Err(e) = members_channel_id
             .say(
                 &ctx.http,
                 format!(
@@ -296,6 +311,9 @@ pub async fn handle_votekick_cast(
                     vote.status_text()
                 ),
             )
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "failed to send vote kick rejection message");
+        }
     }
 }

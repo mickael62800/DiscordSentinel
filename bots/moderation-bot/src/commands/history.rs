@@ -2,7 +2,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::error;
+use tracing::{error, warn};
 
 use sentinel_shared::embeds::{info_embed, action_emoji};
 
@@ -58,12 +58,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Mutes", history.total_mutes.to_string(), true)
                 .field("Bans", history.total_bans.to_string(), true);
 
-            command.create_response(
+            if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
                 ),
-            ).await.ok();
+            ).await {
+                warn!(error = %e, "Failed to send history response");
+            }
         }
         Err(e) => {
             error!(error = %e, "Erreur recuperation historique");
@@ -73,10 +75,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new().content(content).ephemeral(true),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send reply text");
+    }
 }

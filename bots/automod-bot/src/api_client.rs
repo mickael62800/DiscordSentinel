@@ -57,6 +57,7 @@ impl ApiClient {
 
     /// Envoie un message au backend pour analyse et retourne l'action a effectuer.
     /// Timeout de 5 secondes pour eviter de bloquer le bot.
+    /// Note: uses custom timeout, cannot use BaseApiClient helpers.
     pub async fn analyze(&self, request: &AnalyzeRequest) -> Result<AnalyzeResponse, String> {
         let req = self
             .base

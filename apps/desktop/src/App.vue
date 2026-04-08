@@ -2,6 +2,7 @@
 import { useRoute } from "vue-router";
 import MainLayout from "./components/templates/MainLayout.vue";
 import ConfirmDialog from "./components/molecules/ConfirmDialog.vue";
+import ToastContainer from "./components/molecules/ToastContainer.vue";
 
 const route = useRoute();
 </script>
@@ -16,4 +17,5 @@ const route = useRoute();
   </MainLayout>
 
   <ConfirmDialog />
+  <ToastContainer />
 </template>

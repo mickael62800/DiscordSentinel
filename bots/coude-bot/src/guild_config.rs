@@ -13,7 +13,13 @@ pub struct CoudeConfig {
 impl CoudeConfig {
     /// Charge la config guild depuis l'API.
     pub async fn load(api: &BaseApiClient, guild_id: &str) -> Self {
-        let raw = api.get_guild_config(guild_id).await.unwrap_or_default();
+        let raw = match api.get_guild_config(guild_id).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %guild_id, "Echec get_guild_config");
+                std::collections::HashMap::new()
+            }
+        };
         Self { raw }
     }
 

@@ -80,7 +80,13 @@ impl EventHandler for Handler {
         if let Some(guild_id) = guild_id_str {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
-                let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                let config = match api.get_guild_config(&guild_id).await {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                        std::collections::HashMap::new()
+                    }
+                };
                 if !BaseApiClient::config_bool(&config, "enabled", true) {
                     return;
                 }
@@ -133,7 +139,13 @@ impl EventHandler for Handler {
         if let Some(guild_id) = msg.guild_id {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
-                let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                let config = match api.get_guild_config(&guild_id.to_string()).await {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+                        std::collections::HashMap::new()
+                    }
+                };
                 if !BaseApiClient::config_bool(&config, "enabled", true) {
                     return;
                 }
@@ -239,7 +251,13 @@ async fn deploy_panel_if_needed(ctx: &Context) {
     } else if let Some(base) = data.get::<ApiClientKey>() {
         let mut ids = Vec::new();
         for guild in ctx.cache.guilds() {
-            let guild_config = base.get_guild_config(&guild.to_string()).await.unwrap_or_default();
+            let guild_config = match base.get_guild_config(&guild.to_string()).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %guild, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
             if let Some(ch_id_str) = guild_config.get("assistance_channel_id") {
                 if let Ok(ch_id) = ch_id_str.parse::<u64>() {
                     ids.push(ch_id);
@@ -304,7 +322,13 @@ async fn close_inactive_tickets(ctx: &Context) {
     // Lire le timeout depuis la config de chaque guild (ou defaut 7 jours)
     let mut timeout_days = 7i64;
     for guild in ctx.cache.guilds() {
-        let guild_config = base.get_guild_config(&guild.to_string()).await.unwrap_or_default();
+        let guild_config = match base.get_guild_config(&guild.to_string()).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %guild, "Echec chargement config guild");
+                std::collections::HashMap::new()
+            }
+        };
         let configured = sentinel_shared::api_client::BaseApiClient::config_u64(&guild_config, "inactive_close_days", 7);
         if configured == 0 {
             return; // 0 = desactive
@@ -346,13 +370,17 @@ async fn close_inactive_tickets(ctx: &Context) {
                         "Ce ticket a ete ferme apres {} jours d'inactivite.",
                         timeout_days
                     ));
-                let _ = channel_id.send_message(
+                if let Err(e) = channel_id.send_message(
                     &ctx.http,
                     serenity::builder::CreateMessage::new().embed(embed),
-                ).await;
+                ).await {
+                    warn!(error = %e, "Failed to send auto-close notification");
+                }
 
                 tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-                let _ = channel_id.delete(&ctx.http).await;
+                if let Err(e) = channel_id.delete(&ctx.http).await {
+                    warn!(error = %e, "Failed to delete inactive ticket channel");
+                }
             }
         }
 
@@ -424,10 +452,12 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
                                         .unwrap_or(false);
 
                                     if !already_in_channel {
-                                        let _ = channel.id.say(
+                                        if let Err(e) = channel.id.say(
                                             &ctx.http,
                                             format!("**[staff]** {} :\n> {}", author_name, last_msg.content),
-                                        ).await;
+                                        ).await {
+                                            warn!(error = %e, "Failed to relay staff message from Redis");
+                                        }
                                     }
                                 }
                             }

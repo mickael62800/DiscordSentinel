@@ -115,7 +115,7 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
 
     let row = CreateActionRow::SelectMenu(select);
 
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -126,7 +126,9 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }
 
 /// Gere la selection d'un objet defensif → accepte le combat avec l'objet.
@@ -199,7 +201,9 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
     drop(data);
 
     // Supprimer le select menu ephemeral
-    let _ = component.delete_response(&ctx.http).await;
+    if let Err(e) = component.delete_response(&ctx.http).await {
+        tracing::warn!(error = %e, "Echec delete_response Discord");
+    }
 
     // Resoudre le combat (meme logique que accepter)
     let result_embed =
@@ -207,19 +211,21 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
 
     if let Some(embed) = result_embed {
         // Poster le resultat dans le channel (pas en update car le select etait ephemeral)
-        let _ = component
+        if let Err(e) = component
             .channel_id
             .send_message(
                 &ctx.http,
                 serenity::all::CreateMessage::new().embed(embed),
             )
-            .await;
-
+            .await
+        {
+            tracing::warn!(error = %e, "Echec send_message resultat combat");
+        }
     }
 }
 
 async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
-    component
+    if let Err(e) = component
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -229,5 +235,7 @@ async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, conten
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

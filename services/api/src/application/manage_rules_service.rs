@@ -6,6 +6,8 @@ use uuid::Uuid;
 use crate::domain::entities::Rule;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::{CreateRuleCommand, ManageRulesUseCase};
+use tracing::warn;
+
 use crate::ports::outbound::{CachePort, RuleRepository};
 
 pub struct ManageRulesService {
@@ -34,7 +36,9 @@ impl ManageRulesUseCase for ManageRulesService {
 
         // Invalider le cache — on ne connaît pas le guild_id ici, invalider par pattern
         if let Some(rule) = self.rule_repo.find_by_id(rule_id).await? {
-            self.cache.invalidate_rules(&rule.guild_id).await.ok();
+            if let Err(e) = self.cache.invalidate_rules(&rule.guild_id).await {
+                warn!(error = %e, guild_id = %rule.guild_id, "Echec invalidation cache rules");
+            }
         }
 
         Ok(enabled)
@@ -71,14 +75,18 @@ impl ManageRulesUseCase for ManageRulesService {
         let saved = self.rule_repo.save(&rule).await?;
 
         // Invalider le cache pour ce serveur
-        self.cache.invalidate_rules(&cmd.guild_id).await.ok();
+        if let Err(e) = self.cache.invalidate_rules(&cmd.guild_id).await {
+            warn!(error = %e, guild_id = %cmd.guild_id, "Echec invalidation cache rules");
+        }
 
         Ok(saved)
     }
 
     async fn delete_rule(&self, guild_id: &str, rule_id: Uuid) -> Result<(), DomainError> {
         self.rule_repo.delete(rule_id).await?;
-        self.cache.invalidate_rules(guild_id).await.ok();
+        if let Err(e) = self.cache.invalidate_rules(guild_id).await {
+            warn!(error = %e, guild_id = %guild_id, "Echec invalidation cache rules");
+        }
         Ok(())
     }
 }

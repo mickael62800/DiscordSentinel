@@ -80,10 +80,12 @@ impl Handler {
         }
         if let Some(base) = data.get::<ApiClientKey>() {
             let api = ApiClient::new(base.clone());
-            let _ = api.log_user_activity(
+            if let Err(e) = api.log_user_activity(
                 guild_id, user_id, event_type,
                 channel_id, channel_name, content, metadata,
-            ).await;
+            ).await {
+                warn!(error = %e, "Failed to log user activity");
+            }
         }
     }
 
@@ -189,7 +191,13 @@ impl EventHandler for Handler {
         {
             let data = ctx.data.read().await;
             if let Some(base) = data.get::<ApiClientKey>() {
-                let config = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                let config = match base.get_guild_config(&guild_id.to_string()).await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!(error = %e, "Failed to fetch guild config");
+                        return;
+                    }
+                };
                 if !BaseApiClient::config_bool(&config, "enabled", true) {
                     return;
                 }

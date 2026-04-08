@@ -47,7 +47,10 @@ impl ManageMembersUseCase for ManageMembersService {
             action: None,
             limit: 20,
             offset: 0,
-        }).await.unwrap_or_default();
+        }).await.unwrap_or_else(|e| {
+            tracing::warn!(error = %e, guild_id, user_id, "Echec chargement infractions pour summary");
+            vec![]
+        });
         let infractions_total = infractions_list.len() as i64;
         let infractions_recent: Vec<serde_json::Value> = infractions_list.iter().take(10)
             .map(|i| serde_json::json!({
@@ -61,7 +64,13 @@ impl ManageMembersUseCase for ManageMembersService {
             .collect();
 
         // Moderation
-        let mod_history = self.moderation_uc.get_history(guild_id, user_id).await.ok();
+        let mod_history = match self.moderation_uc.get_history(guild_id, user_id).await {
+            Ok(h) => Some(h),
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id, user_id, "Echec chargement historique moderation pour summary");
+                None
+            }
+        };
         let (total_warns, total_mutes, total_bans, mod_actions) = if let Some(ref h) = mod_history {
             let warns = h.actions.iter().filter(|a| a.action_type == "warn").count() as i64;
             let mutes = h.actions.iter().filter(|a| a.action_type == "mute").count() as i64;
@@ -81,10 +90,23 @@ impl ManageMembersUseCase for ManageMembersService {
         };
 
         // Conduct
-        let conduct_points = self.conduct_uc.get_points(guild_id, user_id).await.ok();
-        let points = conduct_points.as_ref().map(|c| c.points).unwrap_or(12);
-        let max_points = 12; // Default from conduct config
-        let conduct_log_entries = self.conduct_uc.get_points_log(guild_id, user_id, 20).await.unwrap_or_default();
+        let conduct_points = match self.conduct_uc.get_points(guild_id, user_id).await {
+            Ok(p) => Some(p),
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id, user_id, "Echec chargement points conduite pour summary");
+                None
+            }
+        };
+        let conduct_config = match self.conduct_uc.get_config(guild_id).await {
+            Ok(cfg) => cfg,
+            Err(_) => crate::domain::entities::ConductConfig::default_for_guild(guild_id),
+        };
+        let points = conduct_points.as_ref().map(|c| c.points).unwrap_or(conduct_config.max_points);
+        let max_points = conduct_config.max_points;
+        let conduct_log_entries = self.conduct_uc.get_points_log(guild_id, user_id, 20).await.unwrap_or_else(|e| {
+            tracing::warn!(error = %e, guild_id, user_id, "Echec chargement log conduite pour summary");
+            vec![]
+        });
         let conduct_log: Vec<serde_json::Value> = conduct_log_entries.iter().take(20)
             .map(|l| serde_json::json!({
                 "delta": l.delta,

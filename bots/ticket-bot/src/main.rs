@@ -101,7 +101,13 @@ async fn check_escalations(
             continue;
         }
 
-        let guild_config = api.get_guild_config(&ticket.server).await.unwrap_or_default();
+        let guild_config = match api.get_guild_config(&ticket.server).await {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::warn!(error = %e, guild_id = %ticket.server, "Echec chargement config guild");
+                std::collections::HashMap::new()
+            }
+        };
         let escalation_minutes = BaseApiClient::config_u64(&guild_config, "sla_escalation_minutes", 60);
         if escalation_minutes == 0 {
             continue;
@@ -132,7 +138,9 @@ async fn check_escalations(
                     "**\u{26a0}\u{fe0f} Escalade automatique** — Ce ticket n'a pas recu de reponse depuis {}min. La priorite a ete augmentee.",
                     escalation_minutes
                 );
-                let _ = channel.say(http, &msg).await;
+                if let Err(e) = channel.say(http, &msg).await {
+                    warn!(error = %e, "Failed to send escalation message in channel");
+                }
             }
         }
 

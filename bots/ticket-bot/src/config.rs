@@ -1,5 +1,5 @@
 use serenity::prelude::TypeMapKey;
-use sentinel_shared::config::{BaseConfig, BotConfig};
+use sentinel_shared::config::{BaseConfig, BotConfig, load_env_optional};
 
 #[derive(Clone)]
 #[allow(dead_code)]
@@ -13,12 +13,8 @@ impl Config {
     pub fn from_env() -> Self {
         Self {
             base: BaseConfig::from_env("TICKET_DISCORD_TOKEN"),
-            ticket_category_id: std::env::var("TICKET_CATEGORY_ID")
-                .ok()
-                .and_then(|v| v.parse().ok()),
-            ticket_channel_id: std::env::var("TICKET_CHANNEL_ID")
-                .ok()
-                .and_then(|v| v.parse().ok()),
+            ticket_category_id: load_env_optional("TICKET_CATEGORY_ID"),
+            ticket_channel_id: load_env_optional("TICKET_CHANNEL_ID"),
         }
     }
 }

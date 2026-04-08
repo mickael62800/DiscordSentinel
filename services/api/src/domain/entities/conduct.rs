@@ -37,9 +37,12 @@ impl ConductConfig {
         match action {
             "warn" => self.penalty_warn,
             "delete" => self.penalty_delete,
-            "mute" => self.penalty_mute,
-            "ban" => self.penalty_ban,
-            _ => 0,
+            "mute" | "mute_temp" => self.penalty_mute,
+            "ban" | "ban_permanent" | "ban_temp" => self.penalty_ban,
+            other => {
+                tracing::warn!(action = %other, guild_id = %self.guild_id, "Action inconnue pour penalty_for_action, retourne 0");
+                0
+            }
         }
     }
 }

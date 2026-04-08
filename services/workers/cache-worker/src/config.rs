@@ -18,34 +18,15 @@ pub struct WorkerConfig {
 
 impl WorkerConfig {
     pub fn from_env() -> Self {
-        let analytics_refresh_secs: u64 = std::env::var("ANALYTICS_CACHE_REFRESH")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_ANALYTICS_REFRESH_SECS);
-
-        let dashboard_refresh_secs: u64 = std::env::var("DASHBOARD_CACHE_REFRESH")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_DASHBOARD_REFRESH_SECS);
-
-        let voice_stats_refresh_secs: u64 = std::env::var("VOICE_STATS_CACHE_REFRESH")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_VOICE_STATS_REFRESH_SECS);
+        use sentinel_worker_common::{load_database_url, load_api_url, load_redis_url, load_env};
 
         Self {
-            database_url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| {
-                    tracing::error!("DATABASE_URL non defini");
-                    std::process::exit(1);
-                }),
-            redis_url: std::env::var("REDIS_URL")
-                .unwrap_or_else(|_| "redis://127.0.0.1:6379".into()),
-            api_url: std::env::var("API_URL")
-                .unwrap_or_else(|_| "http://localhost:3000".into()),
-            analytics_refresh_secs,
-            dashboard_refresh_secs,
-            voice_stats_refresh_secs,
+            database_url: load_database_url(),
+            redis_url: load_redis_url(),
+            api_url: load_api_url(),
+            analytics_refresh_secs: load_env("ANALYTICS_CACHE_REFRESH", DEFAULT_ANALYTICS_REFRESH_SECS),
+            dashboard_refresh_secs: load_env("DASHBOARD_CACHE_REFRESH", DEFAULT_DASHBOARD_REFRESH_SECS),
+            voice_stats_refresh_secs: load_env("VOICE_STATS_CACHE_REFRESH", DEFAULT_VOICE_STATS_REFRESH_SECS),
         }
     }
 }

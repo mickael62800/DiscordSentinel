@@ -130,53 +130,31 @@ impl ApiClient {
         &self,
         guild_id: &str,
     ) -> Result<Vec<VoiceChannelResponse>, String> {
-        let req = self
-            .base
-            .client()
-            .get(format!("{}/api/voice-channels/{guild_id}", self.base.base_url()));
-
         self.base
-            .auth(req)
-            .send()
+            .get_json(&format!("/api/voice-channels/{guild_id}"))
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<Vec<VoiceChannelResponse>>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     pub async fn create_channel(
         &self,
         request: &CreateVoiceChannelRequest,
     ) -> Result<VoiceChannelResponse, String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/voice-channels", self.base.base_url()))
-            .json(request);
-
         self.base
-            .auth(req)
-            .send()
+            .post_json("/api/voice-channels", request)
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?
-            .json::<VoiceChannelResponse>()
-            .await
-            .map_err(|e| format!("Erreur parsing: {e}"))
     }
 
     pub async fn delete_channel(&self, channel_id: &str) -> Result<(), String> {
+        // DELETE without body — use raw client
         let req = self.base.client().delete(format!(
             "{}/api/voice-channels/by-channel/{channel_id}",
             self.base.base_url()
         ));
-
         self.base
             .auth(req)
             .send()
             .await
             .map_err(|e| format!("Erreur reseau: {e}"))?;
-
         Ok(())
     }
 
@@ -185,21 +163,12 @@ impl ApiClient {
         channel_id: &str,
         request: &UpdateVoiceChannelRequest,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!(
-                "{}/api/voice-channels/by-channel/{channel_id}",
-                self.base.base_url()
-            ))
-            .json(request);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .patch_fire_and_forget(
+                &format!("/api/voice-channels/by-channel/{channel_id}"),
+                request,
+            )
+            .await;
         Ok(())
     }
 
@@ -207,23 +176,16 @@ impl ApiClient {
         &self,
         channel_id: &str,
     ) -> Result<Option<VoiceChannelResponse>, String> {
-        let req = self.base.client().get(format!(
-            "{}/api/voice-channels/by-channel/{channel_id}",
-            self.base.base_url()
-        ));
+        let path = format!("/api/voice-channels/by-channel/{channel_id}");
+        let resp = self.base.auth(
+            self.base.client().get(format!("{}{}", self.base.base_url(), path))
+        ).send().await.map_err(|e| format!("Erreur reseau: {e}"))?;
 
-        let response = self
-            .base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
-        if response.status().as_u16() == 404 {
+        if resp.status().as_u16() == 404 {
             return Ok(None);
         }
 
-        let detail = response
+        let detail = resp
             .json::<VoiceChannelDetailResponse>()
             .await
             .map_err(|e| format!("Erreur parsing: {e}"))?;
@@ -238,21 +200,12 @@ impl ApiClient {
         channel_id: &str,
         request: &TransferOwnershipRequest,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .patch(format!(
-                "{}/api/voice-channels/by-channel/{channel_id}/transfer",
-                self.base.base_url()
-            ))
-            .json(request);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .patch_fire_and_forget(
+                &format!("/api/voice-channels/by-channel/{channel_id}/transfer"),
+                request,
+            )
+            .await;
         Ok(())
     }
 
@@ -263,42 +216,21 @@ impl ApiClient {
         channel_id: &str,
         request: &AddCoAdminRequest,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!(
-                "{}/api/voice-channels/by-channel/{channel_id}/co-admins",
-                self.base.base_url()
-            ))
-            .json(request);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget(
+                &format!("/api/voice-channels/by-channel/{channel_id}/co-admins"),
+                request,
+            )
+            .await;
         Ok(())
     }
 
     // ── Whitelist ──
 
     pub async fn add_to_whitelist(&self, request: &AddWhitelistRequest) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!(
-                "{}/api/voice-channels/whitelist",
-                self.base.base_url()
-            ))
-            .json(request);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget("/api/voice-channels/whitelist", request)
+            .await;
         Ok(())
     }
 
@@ -309,21 +241,12 @@ impl ApiClient {
         channel_id: &str,
         request: &BanFromChannelRequest,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!(
-                "{}/api/voice-channels/by-channel/{channel_id}/bans",
-                self.base.base_url()
-            ))
-            .json(request);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget(
+                &format!("/api/voice-channels/by-channel/{channel_id}/bans"),
+                request,
+            )
+            .await;
         Ok(())
     }
 
@@ -333,18 +256,9 @@ impl ApiClient {
         &self,
         request: &LogModerationActionRequest,
     ) -> Result<(), String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/api/moderation/actions", self.base.base_url()))
-            .json(request);
-
         self.base
-            .auth(req)
-            .send()
-            .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-
+            .post_fire_and_forget("/api/moderation/actions", request)
+            .await;
         Ok(())
     }
 }

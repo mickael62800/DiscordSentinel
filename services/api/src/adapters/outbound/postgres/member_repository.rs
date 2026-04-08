@@ -106,11 +106,50 @@ impl MemberRepository for PgMemberRepository {
     }
 
     async fn upsert_many(&self, members: &[GuildMember]) -> Result<u64, DomainError> {
+        if members.is_empty() {
+            return Ok(0);
+        }
+
+        let total = members.len();
+        tracing::info!(count = total, "Debut sync batch membres");
+
+        let mut tx = self.pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("begin tx upsert_many: {e}")))?;
+
         let mut count = 0u64;
         for member in members {
-            self.upsert(member).await?;
+            sqlx::query(
+                "INSERT INTO guild_members (guild_id, user_id, username, display_name, avatar, roles, joined_at, account_created, is_bot, last_seen_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+                 ON CONFLICT (guild_id, user_id) DO UPDATE SET
+                    username = EXCLUDED.username,
+                    display_name = EXCLUDED.display_name,
+                    avatar = EXCLUDED.avatar,
+                    roles = EXCLUDED.roles,
+                    joined_at = COALESCE(EXCLUDED.joined_at, guild_members.joined_at),
+                    account_created = COALESCE(EXCLUDED.account_created, guild_members.account_created),
+                    is_bot = EXCLUDED.is_bot,
+                    last_seen_at = NOW()"
+            )
+            .bind(&member.guild_id)
+            .bind(&member.user_id)
+            .bind(&member.username)
+            .bind(&member.display_name)
+            .bind(&member.avatar)
+            .bind(&member.roles)
+            .bind(member.joined_at)
+            .bind(member.account_created)
+            .bind(member.is_bot)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| DomainError::Internal(format!("upsert_many member {}: {e}", member.user_id)))?;
             count += 1;
         }
+
+        tx.commit().await
+            .map_err(|e| DomainError::Internal(format!("commit tx upsert_many: {e}")))?;
+
+        tracing::info!(synced = count, "Sync batch membres terminee");
         Ok(count)
     }
 

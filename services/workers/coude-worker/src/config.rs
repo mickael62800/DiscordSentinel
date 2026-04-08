@@ -12,27 +12,14 @@ pub struct WorkerConfig {
 
 impl WorkerConfig {
     pub fn from_env() -> Self {
-        let check_secs: u64 = std::env::var("COMBAT_EXPIRY_CHECK_SECS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(DEFAULT_COMBAT_EXPIRY_CHECK_SECS);
-
-        let betting_secs: u64 = std::env::var("BETTING_CHECK_SECS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(30);
+        use sentinel_worker_common::{load_database_url, load_api_url, load_env};
 
         Self {
-            database_url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| {
-                    tracing::error!("DATABASE_URL non defini");
-                    std::process::exit(1);
-                }),
-            api_url: std::env::var("API_URL")
-                .unwrap_or_else(|_| "http://localhost:3000".into()),
-            combat_expiry_check_secs: check_secs,
+            database_url: load_database_url(),
+            api_url: load_api_url(),
+            combat_expiry_check_secs: load_env("COMBAT_EXPIRY_CHECK_SECS", DEFAULT_COMBAT_EXPIRY_CHECK_SECS),
             discord_bot_token: std::env::var("COUDE_DISCORD_TOKEN").unwrap_or_default(),
-            betting_check_secs: betting_secs,
+            betting_check_secs: load_env("BETTING_CHECK_SECS", 30),
         }
     }
 }

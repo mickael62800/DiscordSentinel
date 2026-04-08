@@ -9,6 +9,8 @@ use crate::ports::inbound::{
     AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
     UpdateTicketChannelCommand,
 };
+use tracing::warn;
+
 use crate::ports::outbound::{CachePort, TicketRepository};
 
 const TICKETS_LIST_TTL: u64 = 60; // 1 minute
@@ -25,8 +27,12 @@ impl ManageTicketsService {
     }
 
     async fn invalidate_tickets_cache(&self) {
-        self.cache.invalidate("tickets:all").await.ok();
-        self.cache.invalidate_pattern("ticket:*").await.ok();
+        if let Err(e) = self.cache.invalidate("tickets:all").await {
+            warn!(error = %e, "Echec invalidation cache tickets:all");
+        }
+        if let Err(e) = self.cache.invalidate_pattern("ticket:*").await {
+            warn!(error = %e, "Echec invalidation cache ticket:*");
+        }
     }
 }
 
@@ -56,7 +62,9 @@ impl ManageTicketsUseCase for ManageTicketsService {
         // Populate cache uniquement si pas de filtres
         if !has_filters {
             if let Ok(json) = serde_json::to_string(&tickets) {
-                self.cache.set_json("tickets:all", &json, TICKETS_LIST_TTL).await.ok();
+                if let Err(e) = self.cache.set_json("tickets:all", &json, TICKETS_LIST_TTL).await {
+                    warn!(error = %e, "Echec cache set tickets:all");
+                }
             }
         }
 
@@ -88,7 +96,9 @@ impl ManageTicketsUseCase for ManageTicketsService {
 
         // Populate cache
         if let Ok(json) = serde_json::to_string(&detail) {
-            self.cache.set_json(&cache_key, &json, TICKET_DETAIL_TTL).await.ok();
+            if let Err(e) = self.cache.set_json(&cache_key, &json, TICKET_DETAIL_TTL).await {
+                warn!(error = %e, cache_key = %cache_key, "Echec cache set ticket detail");
+            }
         }
 
         Ok(detail)
@@ -137,7 +147,9 @@ impl ManageTicketsUseCase for ManageTicketsService {
         };
 
         self.ticket_repo.save_message(&message).await?;
-        self.ticket_repo.update_status(ticket_id, "pending").await.ok();
+        if let Err(e) = self.ticket_repo.update_status(ticket_id, "pending").await {
+            warn!(error = %e, ticket_id = %ticket_id, "Echec update status ticket vers pending");
+        }
         self.invalidate_tickets_cache().await;
 
         Ok(())

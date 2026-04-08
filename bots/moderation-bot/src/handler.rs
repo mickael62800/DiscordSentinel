@@ -7,7 +7,7 @@ use serenity::model::application::Interaction;
 use serenity::model::gateway::Ready;
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
@@ -80,7 +80,13 @@ impl EventHandler for Handler {
                 if !guild_id.is_empty() {
                     let data = ctx.data.read().await;
                     if let Some(api) = data.get::<ApiClientKey>() {
-                        let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
+                        let config = match api.get_guild_config(&guild_id).await {
+                            Ok(config) => config,
+                            Err(e) => {
+                                warn!(error = %e, "Failed to fetch guild config");
+                                std::collections::HashMap::new()
+                            }
+                        };
                         if !BaseApiClient::config_bool(&config, "enabled", true) {
                             return;
                         }
@@ -154,7 +160,13 @@ async fn handle_reason_autocomplete(
     let templates_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id).await {
+                Ok(config) => config,
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch guild config for reason templates");
+                    std::collections::HashMap::new()
+                }
+            };
             BaseApiClient::config_or(&gc, "reason_templates", "")
         } else {
             String::new()
@@ -171,10 +183,12 @@ async fn handle_reason_autocomplete(
 
     let response = serenity::builder::CreateAutocompleteResponse::new().set_choices(choices);
 
-    autocomplete.create_response(
+    if let Err(e) = autocomplete.create_response(
         &ctx.http,
         serenity::all::CreateInteractionResponse::Autocomplete(response),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send autocomplete response");
+    }
 }
 
 /// Gere le clic "Approuver" sur une action en attente (mode apprenti).
@@ -198,7 +212,9 @@ async fn handle_approve(ctx: &Context, component: &serenity::model::application:
                     .content("Cette action n'est plus en attente.")
                     .ephemeral(true),
             );
-            component.create_response(&ctx.http, response).await.ok();
+            if let Err(e) = component.create_response(&ctx.http, response).await {
+                warn!(error = %e, "Failed to send pending-action-not-found response");
+            }
             return;
         }
     };
@@ -238,7 +254,9 @@ async fn handle_approve(ctx: &Context, component: &serenity::model::application:
                         component.user.id, pending.action.action_type, pending.action.target_id
                     )),
             );
-            component.create_response(&ctx.http, response).await.ok();
+            if let Err(e) = component.create_response(&ctx.http, response).await {
+                warn!(error = %e, "Failed to send approve response");
+            }
             info!(
                 approver = %component.user.name,
                 action = %pending.action.action_type,
@@ -278,7 +296,9 @@ async fn handle_reject(ctx: &Context, component: &serenity::model::application::
                     component.user.id, pending.action.action_type, pending.action.target_id
                 )),
         );
-        component.create_response(&ctx.http, response).await.ok();
+        if let Err(e) = component.create_response(&ctx.http, response).await {
+            warn!(error = %e, "Failed to send reject response");
+        }
         info!(
             rejector = %component.user.name,
             action = %pending.action.action_type,
@@ -323,7 +343,13 @@ async fn handle_redis_moderation_event(ctx: &Context, payload: &str) {
     let log_channel_id = {
         let ctx_data = ctx.data.read().await;
         if let Some(base) = ctx_data.get::<ApiClientKey>() {
-            let config = base.get_guild_config(guild_id).await.unwrap_or_default();
+            let config = match base.get_guild_config(guild_id).await {
+                Ok(config) => config,
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch guild config for log channel");
+                    std::collections::HashMap::new()
+                }
+            };
             config.get("log_channel_id")
                 .and_then(|v| v.parse::<u64>().ok())
         } else {

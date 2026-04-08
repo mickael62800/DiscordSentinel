@@ -7,12 +7,17 @@ use crate::adapters::inbound::http::dto::security::{
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
 pub async fn report_event(
     State(state): State<AppState>,
     Json(dto): Json<ReportEventDto>,
 ) -> Result<Json<SecurityEventResponseDto>, ApiError> {
+    // Validation
+    validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
+    validation::validate_reason(&dto.description).map_err(ApiError)?;
+
     let event_type = dto.event_type.clone();
     let severity = dto.severity.clone();
     let description = dto.description.clone();

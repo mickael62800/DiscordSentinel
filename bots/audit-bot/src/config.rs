@@ -1,4 +1,4 @@
-use sentinel_shared::config::{BaseConfig, BotConfig};
+use sentinel_shared::config::{BaseConfig, BotConfig, load_env, load_env_bool};
 
 #[derive(Clone)]
 pub struct Config {
@@ -15,29 +15,12 @@ impl Config {
     pub fn from_env() -> Self {
         Self {
             base: BaseConfig::from_env("AUDIT_DISCORD_TOKEN"),
-            message_cache_size: std::env::var("MESSAGE_CACHE_SIZE")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(10_000),
-            anomaly_window_secs: std::env::var("ANOMALY_WINDOW_SECS")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(60),
-            anomaly_mass_ban_threshold: std::env::var("ANOMALY_MASS_BAN")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(5),
-            anomaly_mass_delete_threshold: std::env::var("ANOMALY_MASS_DELETE")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(20),
-            anomaly_mass_role_threshold: std::env::var("ANOMALY_MASS_ROLE")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(10),
-            weekly_report_enabled: std::env::var("WEEKLY_REPORT_ENABLED")
-                .map(|v| v != "false" && v != "0")
-                .unwrap_or(true),
+            message_cache_size: load_env("MESSAGE_CACHE_SIZE", 10_000),
+            anomaly_window_secs: load_env("ANOMALY_WINDOW_SECS", 60),
+            anomaly_mass_ban_threshold: load_env("ANOMALY_MASS_BAN", 5),
+            anomaly_mass_delete_threshold: load_env("ANOMALY_MASS_DELETE", 20),
+            anomaly_mass_role_threshold: load_env("ANOMALY_MASS_ROLE", 10),
+            weekly_report_enabled: load_env_bool("WEEKLY_REPORT_ENABLED", true),
         }
     }
 }

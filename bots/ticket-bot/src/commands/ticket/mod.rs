@@ -14,7 +14,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
     CreateCommand, CreateCommandOption,
 };
-use tracing::error;
+use tracing::{error, warn};
 
 /// Enregistre la commande /ticket avec ses sous-commandes.
 pub fn register() -> CreateCommand {
@@ -141,7 +141,9 @@ async fn handle_close(
     }
 
     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-    let _ = command.channel_id.delete(&ctx.http).await;
+    if let Err(e) = command.channel_id.delete(&ctx.http).await {
+        warn!(error = %e, "Failed to delete ticket channel");
+    }
 
     Ok(())
 }

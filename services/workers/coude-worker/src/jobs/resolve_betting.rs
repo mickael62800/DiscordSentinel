@@ -181,33 +181,42 @@ async fn resolve_single(
     if bet_results.total_lost_by_bettors > 0 {
         let combat_bonus = bet_results.total_lost_by_bettors / 10; // 10% des paris perdants
         if combat_bonus > 0 {
-            let _ = sqlx::query(
+            if let Err(e) = sqlx::query(
                 "UPDATE coude_players SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
             )
             .bind(&combat.guild_id).bind(&winner_id).bind(combat_bonus)
-            .execute(pool).await;
+            .execute(pool).await {
+                warn!(error = %e, winner = %winner_id, "Echec ajout bonus combat au gagnant");
+            }
         }
     }
 
     // XP
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "UPDATE coude_players SET xp = xp + 15, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
-    ).bind(&combat.guild_id).bind(&winner_id).execute(pool).await;
+    ).bind(&combat.guild_id).bind(&winner_id).execute(pool).await {
+        warn!(error = %e, winner = %winner_id, "Echec ajout XP gagnant");
+    }
 
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "UPDATE coude_players SET xp = xp + 5, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
-    ).bind(&combat.guild_id).bind(&loser_id).execute(pool).await;
+    ).bind(&combat.guild_id).bind(&loser_id).execute(pool).await {
+        warn!(error = %e, loser = %loser_id, "Echec ajout XP perdant");
+    }
 
     // Lire le salon combats configure (fallback: canal du combat)
-    let configured_channel = sqlx::query_scalar::<_, String>(
+    let configured_channel = match sqlx::query_scalar::<_, String>(
         "SELECT config_value FROM bot_guild_configs WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_combats'"
     )
     .bind(&combat.guild_id)
     .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten()
-    .filter(|v| !v.is_empty());
+    .await {
+        Ok(v) => v.filter(|v| !v.is_empty()),
+        Err(e) => {
+            warn!(error = %e, guild_id = %combat.guild_id, "Echec lecture config channel_combats");
+            None
+        }
+    };
 
     let target_channel = configured_channel.as_deref().unwrap_or(&combat.channel_id);
 
@@ -219,15 +228,18 @@ async fn resolve_single(
     post_result_to_discord(bot_token, target_channel, combat.message_id.as_deref(), &embed_msg).await;
 
     // Notifications dans le salon notifications (combattants + parieurs)
-    let notif_channel = sqlx::query_scalar::<_, String>(
+    let notif_channel = match sqlx::query_scalar::<_, String>(
         "SELECT config_value FROM bot_guild_configs WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_notifications'"
     )
     .bind(&combat.guild_id)
     .fetch_optional(pool)
-    .await
-    .ok()
-    .flatten()
-    .filter(|v| !v.is_empty());
+    .await {
+        Ok(v) => v.filter(|v| !v.is_empty()),
+        Err(e) => {
+            warn!(error = %e, guild_id = %combat.guild_id, "Echec lecture config channel_notifications");
+            None
+        }
+    };
 
     if let Some(ref notif_ch) = notif_channel {
         // Notifier les combattants (mention dans le salon)
@@ -301,13 +313,18 @@ async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str, _guild_id
     #[derive(sqlx::FromRow)]
     struct Bet { id: Uuid, guild_id: String, bettor_id: String, backed_id: String, amount: i64 }
 
-    let bets = sqlx::query_as::<_, Bet>(
+    let bets = match sqlx::query_as::<_, Bet>(
         "SELECT id, guild_id, bettor_id, backed_id, amount FROM coude_bets WHERE combat_id = $1"
     )
     .bind(combat_id)
     .fetch_all(pool)
-    .await
-    .unwrap_or_default();
+    .await {
+        Ok(b) => b,
+        Err(e) => {
+            warn!(error = %e, combat_id = %combat_id, "Echec chargement paris pour resolution");
+            vec![]
+        }
+    };
 
     let mut total_lost_by_bettors = 0i64;
     let mut details = Vec::new();
@@ -316,11 +333,15 @@ async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str, _guild_id
         if bet.backed_id == winner_id {
             // Parieur gagnant : recoit x2
             let payout = bet.amount * 2;
-            let _ = sqlx::query("UPDATE coude_players SET coins = coins + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2")
+            if let Err(e) = sqlx::query("UPDATE coude_players SET coins = coins + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2")
                 .bind(&bet.guild_id).bind(&bet.bettor_id).bind(payout)
-                .execute(pool).await;
-            let _ = sqlx::query("UPDATE coude_bets SET won = true, payout = $2 WHERE id = $1")
-                .bind(bet.id).bind(payout).execute(pool).await;
+                .execute(pool).await {
+                warn!(error = %e, bettor = %bet.bettor_id, "Echec paiement pari gagnant");
+            }
+            if let Err(e) = sqlx::query("UPDATE coude_bets SET won = true, payout = $2 WHERE id = $1")
+                .bind(bet.id).bind(payout).execute(pool).await {
+                warn!(error = %e, bet_id = %bet.id, "Echec marquage pari gagnant");
+            }
             details.push(BetDetail {
                 bettor_id: bet.bettor_id.clone(),
                 backed_id: bet.backed_id.clone(),
@@ -331,8 +352,10 @@ async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str, _guild_id
         } else {
             // Parieur perdant : perd sa mise
             total_lost_by_bettors += bet.amount;
-            let _ = sqlx::query("UPDATE coude_bets SET won = false, payout = 0 WHERE id = $1")
-                .bind(bet.id).execute(pool).await;
+            if let Err(e) = sqlx::query("UPDATE coude_bets SET won = false, payout = 0 WHERE id = $1")
+                .bind(bet.id).execute(pool).await {
+                warn!(error = %e, bet_id = %bet.id, "Echec marquage pari perdant");
+            }
             details.push(BetDetail {
                 bettor_id: bet.bettor_id.clone(),
                 backed_id: bet.backed_id.clone(),
@@ -379,7 +402,7 @@ async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: O
 
     // Fallback : poster un nouveau message
     let url = format!("https://discord.com/api/v10/channels/{}/messages", channel_id);
-    let _ = client.post(&url)
+    if let Err(e) = client.post(&url)
         .header("Authorization", format!("Bot {}", bot_token))
         .json(&serde_json::json!({
             "embeds": [{
@@ -389,6 +412,8 @@ async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: O
             }]
         }))
         .send()
-        .await;
+        .await {
+        warn!(error = %e, channel_id, "Echec post resultat combat Discord (fallback)");
+    }
 }
 

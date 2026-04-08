@@ -48,3 +48,9 @@ pub use strike_repository::StrikeRepository;
 
 mod member_repository;
 pub use member_repository::MemberRepository;
+
+mod wallet_repository;
+pub use wallet_repository::WalletRepository;
+
+mod blackjack_repository;
+pub use blackjack_repository::BlackjackRepository;

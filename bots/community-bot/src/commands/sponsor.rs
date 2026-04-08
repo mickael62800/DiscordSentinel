@@ -2,7 +2,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::discord_helpers::reply_ephemeral;
@@ -37,7 +37,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let max_sponsorships = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+            let gc = match base.get_guild_config(&guild_id.to_string()).await {
+                Ok(c) => c,
+                Err(e) => {
+                    warn!(error = %e, "Failed to fetch guild config for sponsorship");
+                    std::collections::HashMap::new()
+                }
+            };
             BaseApiClient::config_u64(&gc, "max_sponsorships", 3) as u32
         } else {
             3
@@ -61,12 +67,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .field("Parrain", format!("<@{}>", command.user.id), true)
                 .field("Filleul", format!("<@{}>", target_id), true);
 
-            command.create_response(
+            if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new().embed(embed),
                 ),
-            ).await.ok();
+            ).await {
+                warn!(error = %e, "Failed to send sponsorship response");
+            }
 
             // Persister le parrainage via l'API
             if let Some(api) = data.get::<crate::handler::RolesApiKey>() {

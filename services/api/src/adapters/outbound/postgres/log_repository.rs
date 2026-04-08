@@ -87,4 +87,13 @@ impl LogRepository for PgLogRepository {
             .map_err(|e| DomainError::Internal(e.to_string()))?;
         Ok(result.rows_affected())
     }
+
+    async fn delete_older_than_days(&self, days: i32) -> Result<u64, DomainError> {
+        let result = sqlx::query("DELETE FROM logs WHERE timestamp < NOW() - make_interval(days => $1)")
+            .bind(days)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(format!("delete_logs_older: {e}")))?;
+        Ok(result.rows_affected())
+    }
 }

@@ -32,11 +32,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let db = data.get::<GameDbKey>().unwrap();
 
-    let richest = db.leaderboard_richest(&guild_id, 5).await.unwrap_or_default();
-    let levels = db.leaderboard_level(&guild_id, 5).await.unwrap_or_default();
-    let thieves = db.leaderboard_thieves(&guild_id, 5).await.unwrap_or_default();
-    let cowards = db.leaderboard_cowards(&guild_id, 5).await.unwrap_or_default();
-    let chaos = db.leaderboard_chaos(&guild_id, 5).await.unwrap_or_default();
+    let richest = db.leaderboard_richest(&guild_id, 5).await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "Echec DB leaderboard_richest");
+        vec![]
+    });
+    let levels = db.leaderboard_level(&guild_id, 5).await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "Echec DB leaderboard_level");
+        vec![]
+    });
+    let thieves = db.leaderboard_thieves(&guild_id, 5).await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "Echec DB leaderboard_thieves");
+        vec![]
+    });
+    let cowards = db.leaderboard_cowards(&guild_id, 5).await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "Echec DB leaderboard_cowards");
+        vec![]
+    });
+    let chaos = db.leaderboard_chaos(&guild_id, 5).await.unwrap_or_else(|e| {
+        tracing::warn!(error = %e, "Echec DB leaderboard_chaos");
+        vec![]
+    });
 
     let embed = CreateEmbed::new()
         .title("\u{1f3c6} Classement Coup de Coude")
@@ -69,7 +84,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -77,7 +92,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }
 
 fn format_leaderboard(entries: &[LeaderboardEntry], unit: &str) -> String {
@@ -99,7 +116,7 @@ fn format_leaderboard(entries: &[LeaderboardEntry], unit: &str) -> String {
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
+    if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
@@ -109,5 +126,7 @@ async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &
             ),
         )
         .await
-        .ok();
+    {
+        tracing::warn!(error = %e, "Echec response Discord");
+    }
 }

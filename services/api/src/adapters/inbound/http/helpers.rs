@@ -8,14 +8,19 @@ pub fn map_to_dtos<T, D: From<T>>(items: Vec<T>) -> Json<Vec<D>> {
 }
 
 /// Normalise un parametre limit optionnel avec une valeur par defaut et un maximum.
-/// Remplace le pattern repete : `params.limit.unwrap_or(default).min(max)`
+/// Garantit que la valeur est >= 0.
 pub fn normalize_limit(limit: Option<i64>, default: i64, max: i64) -> i64 {
-    limit.unwrap_or(default).min(max)
+    limit.unwrap_or(default).max(0).min(max)
 }
 
-/// Normalise un parametre days optionnel (i32).
+/// Normalise un parametre days optionnel (i32). Garantit >= 1.
 pub fn normalize_days(days: Option<i32>, default: i32, max: i32) -> i32 {
-    days.unwrap_or(default).min(max)
+    days.unwrap_or(default).max(1).min(max)
+}
+
+/// Normalise un parametre offset optionnel. Garantit >= 0.
+pub fn normalize_offset(offset: Option<i64>) -> i64 {
+    offset.unwrap_or(0).max(0)
 }
 
 /// Reponse JSON generique pour les operations reussies.

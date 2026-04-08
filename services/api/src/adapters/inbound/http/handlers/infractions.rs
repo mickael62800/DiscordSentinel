@@ -5,6 +5,7 @@ use crate::adapters::inbound::http::dto::infractions::{InfractionQueryParams, In
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, ok_response};
 use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::inbound::http::validation;
 use crate::ports::inbound::InfractionFilters;
 
 pub async fn list_infractions(
@@ -12,6 +13,9 @@ pub async fn list_infractions(
     Path(guild_id): Path<String>,
     Query(params): Query<InfractionQueryParams>,
 ) -> Result<Json<Vec<InfractionResponseDto>>, ApiError> {
+    // Validation
+    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
+
     let filters = InfractionFilters {
         user_id: params.user_id,
         action: params.action,

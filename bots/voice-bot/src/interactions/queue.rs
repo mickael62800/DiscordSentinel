@@ -38,7 +38,9 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
         // Disable queue: delete the queue voice channel
         if let Some(ref queue_id_str) = ch.queue_channel_id {
             if let Ok(queue_id) = queue_id_str.parse::<u64>() {
-                let _ = ChannelId::new(queue_id).delete(&ctx.http).await;
+                if let Err(e) = ChannelId::new(queue_id).delete(&ctx.http).await {
+                    tracing::warn!(error = %e, "failed to delete queue channel");
+                }
             }
         }
 
@@ -98,7 +100,9 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             deny: Permissions::SPEAK,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        let _ = queue_channel_id.create_permission(&ctx.http, overwrite).await;
+        if let Err(e) = queue_channel_id.create_permission(&ctx.http, overwrite).await {
+            tracing::warn!(error = %e, "failed to set queue channel permissions");
+        }
 
         // Update API
         let update = UpdateVoiceChannelRequest {
@@ -181,7 +185,9 @@ async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
         deny: Permissions::empty(),
         kind: serenity::model::channel::PermissionOverwriteType::Member(target_user_id),
     };
-    let _ = voice_channel_id.create_permission(&ctx.http, overwrite).await;
+    if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+        tracing::warn!(error = %e, "failed to grant accepted user permission on voice channel");
+    }
 
     super::respond_ephemeral(
         ctx,
@@ -233,10 +239,12 @@ async fn handle_queue_refuse(ctx: &Context, component: &ComponentInteraction) {
                 .color(0xED4245)
                 .timestamp(serenity::model::Timestamp::now());
 
-            let _ = dm.send_message(
+            if let Err(e) = dm.send_message(
                 &ctx.http,
                 serenity::builder::CreateMessage::new().embed(embed),
-            ).await;
+            ).await {
+                tracing::warn!(error = %e, "failed to send queue refusal DM");
+            }
         }
     }
 

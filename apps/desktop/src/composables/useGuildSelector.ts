@@ -1,12 +1,14 @@
 import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { Guild } from "../types";
+import { useToast } from "./useToast";
 
 const guilds = ref<Guild[]>([]);
 const selectedGuildId = ref<string | null>(null);
 const loading = ref(false);
 
 export function useGuildSelector() {
+  const { error: showError } = useToast();
   const selectedGuild = computed(() =>
     guilds.value.find((g) => g.guild_id === selectedGuildId.value) ?? null
   );
@@ -23,7 +25,8 @@ export function useGuildSelector() {
         selectedGuildId.value = saved;
       }
     } catch (e) {
-      console.error("Erreur chargement des serveurs:", e);
+      console.error("Erreur lors du chargement des serveurs :", e);
+      showError("Erreur lors du chargement des serveurs.");
     } finally {
       loading.value = false;
     }

@@ -3,7 +3,7 @@ use serenity::all::{
     CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::api_client::ModerationActionResponse;
 use crate::handler::ModerationApiKey;
@@ -56,14 +56,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             };
 
             // Repondre d'abord (ephemere)
-            command.create_response(
+            if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .content(format!("Historique de <@{}> ({} actions) — fichier en cours d'envoi...", target_id, history.actions.len()))
                         .ephemeral(true),
                 ),
-            ).await.ok();
+            ).await {
+                warn!(error = %e, "Failed to send export initial response");
+            }
 
             // Envoyer le fichier en followup
             let attachment = CreateAttachment::bytes(content.into_bytes(), filename);
@@ -71,7 +73,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .content(format!("Export de {} actions :", history.actions.len()))
                 .add_file(attachment)
                 .ephemeral(true);
-            command.create_followup(&ctx.http, followup).await.ok();
+            if let Err(e) = command.create_followup(&ctx.http, followup).await {
+                warn!(error = %e, "Failed to send export followup with file");
+            }
         }
         Err(e) => {
             error!(error = %e, "Erreur export historique");

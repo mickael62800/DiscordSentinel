@@ -59,9 +59,12 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
     // Toggle Discord permissions
     if currently_hidden {
         // Make visible: remove the deny on VIEW_CHANNEL for @everyone
-        let _ = voice_channel_id
+        if let Err(e) = voice_channel_id
             .delete_permission(&ctx.http, serenity::model::channel::PermissionOverwriteType::Role(everyone_role))
-            .await;
+            .await
+        {
+            tracing::warn!(error = %e, "failed to delete permission when making channel visible");
+        }
     } else {
         // Hide: deny VIEW_CHANNEL for @everyone
         let overwrite = serenity::model::channel::PermissionOverwrite {
@@ -69,7 +72,9 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
             deny: Permissions::VIEW_CHANNEL,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        let _ = voice_channel_id.create_permission(&ctx.http, overwrite).await;
+        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+            tracing::warn!(error = %e, "failed to set permission when hiding channel");
+        }
     }
 
     // Update API
@@ -129,7 +134,9 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
             deny: Permissions::empty(),
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        let _ = voice_channel_id.create_permission(&ctx.http, overwrite).await;
+        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+            tracing::warn!(error = %e, "failed to set permission when unlocking channel");
+        }
     } else {
         // Lock: deny CONNECT for @everyone
         let overwrite = serenity::model::channel::PermissionOverwrite {
@@ -137,7 +144,9 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
             deny: Permissions::CONNECT,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        let _ = voice_channel_id.create_permission(&ctx.http, overwrite).await;
+        if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+            tracing::warn!(error = %e, "failed to set permission when locking channel");
+        }
     }
 
     // Update API
@@ -415,7 +424,9 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
             if let Some(cat_id_str) = &ch.category_id {
                 if let Ok(cat_id) = cat_id_str.parse::<u64>() {
                     let cat_edit = EditChannel::new().name(&new_name);
-                    let _ = ChannelId::new(cat_id).edit(&ctx.http, cat_edit).await;
+                    if let Err(e) = ChannelId::new(cat_id).edit(&ctx.http, cat_edit).await {
+                        tracing::warn!(error = %e, "failed to rename category");
+                    }
                 }
             }
         }

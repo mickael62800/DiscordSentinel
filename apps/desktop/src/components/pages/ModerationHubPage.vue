@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from "vue";
+import { useToast } from "../../composables/useToast";
+
+const { success, error: showError } = useToast();
 
 // --- Tab state ---
 const activeTab = ref<"journal" | "bans" | "actions">("journal");
@@ -23,7 +26,7 @@ import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { infractions, loading: infractionsLoading, error: infractionsError, fetchInfractions, deleting, deleteInfraction } = useInfractions();
-useRealtimeRefresh(["infraction_new"], fetchInfractions);
+useRealtimeRefresh(["infraction_new", "strike_added", "conduct_points_changed"], fetchInfractions);
 const { search: infractionsSearch, filtered: filteredInfractions } = useSearch<Infraction>(
   infractions,
   ["username", "user_id", "reason", "infraction_type", "moderator", "server", "created_at"],
@@ -41,7 +44,13 @@ const infractionsColumns: TableColumn[] = [
 async function onDeleteInfraction(id: string) {
   const ok = await confirm({ message: "Annuler cette infraction ? Cette action est irreversible." });
   if (ok) {
-    await deleteInfraction(id);
+    try {
+      await deleteInfraction(id);
+      success("Infraction supprimee avec succes");
+    } catch (e) {
+      console.error("Erreur suppression infraction:", e);
+      showError("Erreur lors de la suppression de l'infraction");
+    }
   }
 }
 
@@ -86,6 +95,7 @@ async function onBanConfirm(reason: string) {
   try {
     await executeBan(proposal.server, proposal.user_id, reason);
     closeBanModal();
+    success("Utilisateur banni avec succes");
   } catch (e) {
     banModalRef.value?.setError(String(e));
   }

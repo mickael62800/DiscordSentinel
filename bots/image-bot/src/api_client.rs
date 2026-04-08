@@ -90,6 +90,7 @@ impl ApiClient {
     }
 
     /// Envoie une image au backend pour analyse (NSFW / produits illicites).
+    /// Note: returns reqwest::Error and uses raw client — cannot use BaseApiClient helpers.
     pub async fn analyze_image(
         &self,
         request: &AnalyzeImageRequest,

@@ -7,8 +7,11 @@ import AppInput from "../atoms/AppInput.vue";
 import AppToggle from "../atoms/AppToggle.vue";
 import AppButton from "../atoms/AppButton.vue";
 import { useAuth } from "../../composables/useAuth";
+import { useToast } from "../../composables/useToast";
 import { resetApiBaseUrlCache } from "../../utils/api";
 import type { ApiConfig } from "../../types";
+
+const { success, error: showError } = useToast();
 
 const router = useRouter();
 const { clearConfig, logout } = useAuth();
@@ -30,7 +33,8 @@ onMounted(async () => {
       apiKey.value = config.api_key;
     }
   } catch (e) {
-    console.error("Failed to load API config:", e);
+    console.error("Echec du chargement de la configuration API:", e);
+    showError("Impossible de charger la configuration API");
   }
 });
 
@@ -49,11 +53,13 @@ async function saveApiConfig() {
     });
     resetApiBaseUrlCache();
     apiSaved.value = true;
+    success("Configuration API enregistree");
     if (savedTimer) clearTimeout(savedTimer);
     savedTimer = setTimeout(() => { apiSaved.value = false; }, 2000);
   } catch (e) {
     apiError.value = String(e);
-    console.error("Failed to save API config:", e);
+    console.error("Echec de la sauvegarde de la configuration API:", e);
+    showError("Erreur lors de la sauvegarde de la configuration API");
   } finally {
     apiSaving.value = false;
   }
@@ -65,7 +71,8 @@ async function resetDiscordConfig() {
     await clearConfig();
     router.push("/setup");
   } catch (e) {
-    console.error("Failed to reset config:", e);
+    console.error("Echec de la reinitialisation de la configuration:", e);
+    showError("Erreur lors de la reinitialisation de la configuration");
   }
 }
 </script>

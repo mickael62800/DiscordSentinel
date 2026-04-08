@@ -2,7 +2,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::info;
+use tracing::{info, warn};
 
 use sentinel_shared::embeds::danger_embed;
 
@@ -69,13 +69,15 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Repondre immediatement (defer)
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(format!("Mute en cours de {} utilisateurs...", user_ids.len())),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send massmute initial response");
+    }
 
     let duration_secs = duration_min * 60;
     let mut success = 0u32;
@@ -100,7 +102,7 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
 
                 if member.disable_communication_until_datetime(&ctx.http, timeout).await.is_ok() {
                     success += 1;
-                    api.log_action(&ModerationAction {
+                    if let Err(e) = api.log_action(&ModerationAction {
                         guild_id: guild_id.to_string(),
                         channel_id: command.channel_id.to_string(),
                         moderator_id: command.user.id.to_string(),
@@ -111,7 +113,9 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
                         reason: reason.to_string(),
                         gravity: None,
                         duration: Some(duration_secs),
-                    }).await.ok();
+                    }).await {
+                        warn!(error = %e, uid = %uid, "Failed to log massmute action");
+                    }
                 } else {
                     failures += 1;
                 }
@@ -126,10 +130,12 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         .field("Duree", format!("{}min", duration_min), true)
         .field("Raison", reason, false);
 
-    let _ = command.channel_id.send_message(
+    if let Err(e) = command.channel_id.send_message(
         &ctx.http,
         serenity::builder::CreateMessage::new().embed(embed),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send mass mute summary");
+    }
 
     info!(
         moderator = %command.user.name,
@@ -163,13 +169,15 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(format!("Ban en cours de {} utilisateurs...", user_ids.len())),
         ),
-    ).await.ok();
+    ).await {
+        warn!(error = %e, "Failed to send massban initial response");
+    }
 
     let mut success = 0u32;
     let mut failures = 0u32;
@@ -188,7 +196,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
 
         if guild_id.ban_with_reason(&ctx.http, user_id, 1, reason).await.is_ok() {
             success += 1;
-            api.log_action(&ModerationAction {
+            if let Err(e) = api.log_action(&ModerationAction {
                 guild_id: guild_id.to_string(),
                 channel_id: command.channel_id.to_string(),
                 moderator_id: command.user.id.to_string(),
@@ -199,7 +207,9 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
                 reason: reason.to_string(),
                 gravity: None,
                 duration: None,
-            }).await.ok();
+            }).await {
+                warn!(error = %e, uid = %uid, "Failed to log massban action");
+            }
         } else {
             failures += 1;
         }
@@ -210,10 +220,12 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         .field("Echoue", failures.to_string(), true)
         .field("Raison", reason, false);
 
-    let _ = command.channel_id.send_message(
+    if let Err(e) = command.channel_id.send_message(
         &ctx.http,
         serenity::builder::CreateMessage::new().embed(embed),
-    ).await;
+    ).await {
+        warn!(error = %e, "Failed to send mass ban summary");
+    }
 
     info!(
         moderator = %command.user.name,

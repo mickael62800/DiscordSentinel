@@ -29,3 +29,6 @@ dotenvy = "0.15"
 futures-util = "0.3"
 uuid = { version = "1", features = ["v4"] }
 dashmap = "6"
+
+# Shared worker infra (shutdown_signal)
+sentinel-worker-common = { path = "../workers/worker-common" }
