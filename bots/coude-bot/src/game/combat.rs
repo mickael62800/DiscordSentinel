@@ -56,6 +56,7 @@ const COMBAT_DRAW: &[&str] = &[
 // ══════════════════════════════════════════════════════════════════════
 
 /// Result of a single round.
+#[allow(dead_code)]
 pub struct RoundResult {
     pub round_number: i32,
     pub attacker_roll: i32,
@@ -71,6 +72,7 @@ pub struct RoundResult {
 }
 
 /// Full combat result.
+#[allow(dead_code)]
 pub struct CombatResult {
     pub winner_id: Option<String>,
     pub loser_id: Option<String>,

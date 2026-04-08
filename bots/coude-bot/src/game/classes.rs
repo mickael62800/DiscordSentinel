@@ -1,4 +1,5 @@
 /// Statistiques d'une classe de joueur.
+#[allow(dead_code)]
 pub struct ClassStats {
     pub name: &'static str,
     pub emoji: &'static str,

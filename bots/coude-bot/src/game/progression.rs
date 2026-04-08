@@ -67,6 +67,7 @@ pub fn calculate_regen(hp_current: i32, hp_max: i32, hours_elapsed: f64) -> i32 
 }
 
 /// Nombre de rounds max selon les HP combines des deux joueurs.
+#[allow(dead_code)]
 pub fn max_rounds(combined_hp: i32) -> i32 {
     if combined_hp < 250 {
         3
