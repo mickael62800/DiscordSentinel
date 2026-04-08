@@ -68,7 +68,9 @@ impl SlowmodeTracker {
         let now = Instant::now();
         let max_age = self.window * 2;
         self.counters.retain(|_, ts| {
-            !ts.is_empty() && now.duration_since(*ts.last().unwrap()) < max_age
+            ts.last()
+                .map(|t| now.duration_since(*t) < max_age)
+                .unwrap_or(false)
         });
     }
 

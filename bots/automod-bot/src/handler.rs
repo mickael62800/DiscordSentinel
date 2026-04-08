@@ -199,7 +199,9 @@ impl EventHandler for Handler {
                 // Cleanup periodique : supprimer les utilisateurs inactifs > 10 min
                 if tracker.len() > 5000 {
                     tracker.retain(|_, ts| {
-                        !ts.is_empty() && now.duration_since(*ts.last().unwrap()).as_secs() < 600
+                        ts.last()
+                            .map(|t| now.duration_since(*t).as_secs() < 600)
+                            .unwrap_or(false)
                     });
                 }
                 flood
@@ -580,11 +582,15 @@ async fn execute_action(
             msg.delete(&ctx.http).await?;
             if let (Some(guild_id), Ok(member)) = (msg.guild_id, msg.member(&ctx.http).await) {
                 let mut member = guild_id.member(&ctx.http, member.user.id).await?;
-                let secs = std::time::SystemTime::now()
+                let secs = match std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_secs() as i64
-                    + mute_duration_secs as i64;
+                {
+                    Ok(d) => d.as_secs() as i64 + mute_duration_secs as i64,
+                    Err(e) => {
+                        error!(error = %e, "Erreur horloge systeme pour le calcul du mute");
+                        return Ok(());
+                    }
+                };
                 let datetime = match time::OffsetDateTime::from_unix_timestamp(secs) {
                     Ok(dt) => dt,
                     Err(e) => {

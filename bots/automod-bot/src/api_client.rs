@@ -73,7 +73,10 @@ impl ApiClient {
 
         if !resp.status().is_success() {
             let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
+            let body = resp.text().await.unwrap_or_else(|e| {
+                tracing::warn!(error = %e, "Echec lecture body de la reponse API");
+                String::new()
+            });
             return Err(format!("API error {}: {}", status, body));
         }
 
