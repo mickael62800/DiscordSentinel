@@ -1259,4 +1259,32 @@ impl ApiClient {
         }
         Ok(())
     }
+
+    // ── HP ──
+
+    pub async fn update_hp(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        hp_current: i32,
+        hp_max: i32,
+    ) -> Result<(), String> {
+        self.base
+            .post_fire_and_forget(
+                &format!("/api/coude/{guild_id}/players/{user_id}/hp"),
+                &serde_json::json!({ "hp_current": hp_current, "hp_max": hp_max }),
+            )
+            .await;
+        Ok(())
+    }
+
+    pub async fn repos(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
+        self.base
+            .post_fire_and_forget(
+                &format!("/api/coude/{guild_id}/players/{user_id}/repos"),
+                &serde_json::json!({}),
+            )
+            .await;
+        Ok(())
+    }
 }

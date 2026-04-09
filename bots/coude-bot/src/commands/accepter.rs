@@ -184,12 +184,15 @@ pub async fn resolve_combat_internal(
 
     let atk_hp_max = combat::calculate_hp_max(&attacker);
     let def_hp_max = combat::calculate_hp_max(&defender);
+    // Lire les HP actuels depuis la base (ou hp_max si jamais initialises)
+    let atk_hp_current = attacker.hp_current.unwrap_or(atk_hp_max).min(atk_hp_max);
+    let def_hp_current = defender.hp_current.unwrap_or(def_hp_max).min(def_hp_max);
 
     let result = combat::resolve_combat(
         &attacker,
         &defender,
-        atk_hp_max,
-        def_hp_max,
+        atk_hp_current,
+        def_hp_current,
         combat_record.mise,
         combat_record.special_attack.as_deref(),
         combat_record.defender_special.as_deref(),
@@ -220,6 +223,30 @@ pub async fn resolve_combat_internal(
     {
         error!(error = %e, "Erreur resolution combat API");
         return None;
+    }
+
+    // Sauvegarder les HP apres le combat
+    if let Err(e) = api
+        .update_hp(
+            &combat_record.guild_id,
+            &combat_record.attacker_id,
+            result.attacker_hp_final.max(0),
+            result.attacker_hp_max,
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec sauvegarde HP attaquant");
+    }
+    if let Err(e) = api
+        .update_hp(
+            &combat_record.guild_id,
+            &combat_record.defender_id,
+            result.defender_hp_final.max(0),
+            result.defender_hp_max,
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec sauvegarde HP defenseur");
     }
 
     // Gestion des gains/pertes selon le resultat

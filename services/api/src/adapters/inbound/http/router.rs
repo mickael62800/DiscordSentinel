@@ -275,6 +275,9 @@ fn coude_routes() -> Router<AppState> {
         .route("/{guild_id}/inventory/{user_id}/add", post(handlers::coude::add_item))
         .route("/{guild_id}/inventory/{user_id}/use", post(handlers::coude::use_item))
         .route("/{guild_id}/inventory/{user_id}/has/{item_key}", get(handlers::coude::has_item))
+        // HP
+        .route("/{guild_id}/players/{user_id}/hp", post(handlers::coude::update_hp))
+        .route("/{guild_id}/players/{user_id}/repos", post(handlers::coude::repos))
 }
 
 fn game_routes() -> Router<AppState> {

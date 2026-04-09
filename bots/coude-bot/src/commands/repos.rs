@@ -79,14 +79,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let healed = hp_max - hp_current;
 
-    // TODO: Appeler un endpoint API pour mettre a jour hp_current = hp_max
-    // et repos_last_used = now(). L'endpoint sera cree quand les HP seront
-    // pleinement integres dans l'API. En attendant on affiche le resultat.
-    // Exemple futur :
-    //   api.base.patch_fire_and_forget(
-    //       &format!("/api/coude/{guild_id}/players/{user_id}/repos"),
-    //       &serde_json::json!({ "hp_current": hp_max }),
-    //   ).await;
+    // Appeler l'API pour full heal + poser le cooldown repos_last_used
+    if let Err(e) = api.repos(&guild_id, &user_id).await {
+        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        return;
+    }
 
     let embed = CreateEmbed::new()
         .title("\u{1f6cf}\u{fe0f} Repos complet !")

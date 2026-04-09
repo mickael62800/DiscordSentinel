@@ -83,6 +83,12 @@ pub struct FullPlayerDto {
     pub def: i32,
     pub class: Option<String>,
     pub title: Option<String>,
+    pub hp_current: i32,
+    pub hp_max: i32,
+    pub hp_last_regen: Option<String>,
+    pub class_changed_at: Option<String>,
+    pub repos_last_used: Option<String>,
+    pub season: i32,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -563,6 +569,7 @@ pub async fn get_or_create_player(
             total_earned, total_lost, total_stolen,
             cowardice_count, chaos_events, casino_wins, casino_losses,
             level, xp, stat_points, atk, def, class, title,
+            hp_current, hp_max, hp_last_regen::text, class_changed_at::text, repos_last_used::text, season,
             created_at::text, updated_at::text"#,
     )
     .bind(&guild_id)
@@ -586,6 +593,7 @@ pub async fn get_player(
             total_earned, total_lost, total_stolen,
             cowardice_count, chaos_events, casino_wins, casino_losses,
             level, xp, stat_points, atk, def, class, title,
+            hp_current, hp_max, hp_last_regen::text, class_changed_at::text, repos_last_used::text, season,
             created_at::text, updated_at::text
         FROM coude_players WHERE guild_id = $1 AND user_id = $2"#,
     )
@@ -712,6 +720,7 @@ pub async fn spend_stat_point(
             total_earned, total_lost, total_stolen,
             cowardice_count, chaos_events, casino_wins, casino_losses,
             level, xp, stat_points, atk, def, class, title,
+            hp_current, hp_max, hp_last_regen::text, class_changed_at::text, repos_last_used::text, season,
             created_at::text, updated_at::text"#,
         stat = stat_col
     );
@@ -2104,6 +2113,7 @@ pub async fn get_random_players(
             total_earned, total_lost, total_stolen,
             cowardice_count, chaos_events, casino_wins, casino_losses,
             level, xp, stat_points, atk, def, class, title,
+            hp_current, hp_max, hp_last_regen::text, class_changed_at::text, repos_last_used::text, season,
             created_at::text, updated_at::text
         FROM coude_players WHERE guild_id = $1 AND coins > 50
         ORDER BY RANDOM() LIMIT $2"#,
@@ -2239,4 +2249,51 @@ pub async fn has_item(
     .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
 
     Ok(Json(serde_json::json!({ "has_item": row.0 > 0 })))
+}
+
+// ── 50. Update HP ──
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateHpDto {
+    pub hp_current: i32,
+    pub hp_max: i32,
+}
+
+/// POST /api/coude/{guild_id}/players/{user_id}/hp
+pub async fn update_hp(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(dto): Json<UpdateHpDto>,
+) -> Result<StatusCode, ApiError> {
+    sqlx::query(
+        "UPDATE coude_players SET hp_current = $3, hp_max = $4, hp_last_regen = NOW(), updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .bind(dto.hp_current)
+    .bind(dto.hp_max)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// ── 51. Repos (full heal) ──
+
+/// POST /api/coude/{guild_id}/players/{user_id}/repos
+pub async fn repos(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<StatusCode, ApiError> {
+    sqlx::query(
+        "UPDATE coude_players SET hp_current = hp_max, repos_last_used = NOW(), hp_last_regen = NOW(), updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    Ok(StatusCode::NO_CONTENT)
 }
