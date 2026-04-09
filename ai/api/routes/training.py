@@ -524,11 +524,19 @@ def _train_text(req: TrainingRequest) -> None:
         val_set = Subset(dataset, val_indices)
         test_set = Subset(dataset, test_indices)
 
-        train_loader = DataLoader(train_set, batch_size=req.batch_size, shuffle=True)
-        val_loader = DataLoader(val_set, batch_size=req.batch_size, shuffle=False)
-        test_loader = DataLoader(test_set, batch_size=req.batch_size, shuffle=False)
+        # num_workers + pin_memory pour utiliser le GPU efficacement
+        text_loader_kwargs = {
+            "num_workers": min(4, len(train_indices) // req.batch_size),
+            "pin_memory": device.type == "cuda",
+            "persistent_workers": True if min(4, len(train_indices) // req.batch_size) > 0 else False,
+        }
+        train_loader = DataLoader(train_set, batch_size=req.batch_size, shuffle=True, **text_loader_kwargs)
+        val_loader = DataLoader(val_set, batch_size=req.batch_size, shuffle=False, **text_loader_kwargs)
+        test_loader = DataLoader(test_set, batch_size=req.batch_size, shuffle=False, **text_loader_kwargs)
 
-        logger.info("Text splits: train=%d, val=%d, test=%d", len(train_indices), len(val_indices), len(test_indices))
+        logger.info("Text splits: train=%d, val=%d, test=%d (num_workers=%d, pin_memory=%s)",
+                     len(train_indices), len(val_indices), len(test_indices),
+                     text_loader_kwargs["num_workers"], text_loader_kwargs["pin_memory"])
 
         # Class weights
         loss_fn = None
@@ -701,11 +709,19 @@ def _train_vision(req: TrainingRequest) -> None:
         val_set = Subset(val_dataset, val_indices)
         test_set = Subset(val_dataset, test_indices)
 
-        train_loader = DataLoader(train_set, batch_size=req.batch_size, shuffle=True)
-        val_loader = DataLoader(val_set, batch_size=req.batch_size, shuffle=False)
-        test_loader = DataLoader(test_set, batch_size=req.batch_size, shuffle=False)
+        # num_workers + pin_memory pour utiliser le GPU efficacement
+        loader_kwargs = {
+            "num_workers": min(4, len(train_indices) // req.batch_size),
+            "pin_memory": device.type == "cuda",
+            "persistent_workers": True if min(4, len(train_indices) // req.batch_size) > 0 else False,
+        }
+        train_loader = DataLoader(train_set, batch_size=req.batch_size, shuffle=True, **loader_kwargs)
+        val_loader = DataLoader(val_set, batch_size=req.batch_size, shuffle=False, **loader_kwargs)
+        test_loader = DataLoader(test_set, batch_size=req.batch_size, shuffle=False, **loader_kwargs)
 
-        logger.info("Vision splits: train=%d, val=%d, test=%d", len(train_indices), len(val_indices), len(test_indices))
+        logger.info("Vision splits: train=%d, val=%d, test=%d (num_workers=%d, pin_memory=%s)",
+                     len(train_indices), len(val_indices), len(test_indices),
+                     loader_kwargs["num_workers"], loader_kwargs["pin_memory"])
 
         model = models.efficientnet_v2_s(weights=models.EfficientNet_V2_S_Weights.DEFAULT)
         model.classifier[1] = nn.Linear(model.classifier[1].in_features, num_classes)
