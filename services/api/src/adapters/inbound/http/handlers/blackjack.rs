@@ -280,20 +280,34 @@ pub struct JoinTableDto {
     pub user_name: String,
 }
 
-/// POST /api/blackjack/tables — creer une table multijoueur
+/// POST /api/blackjack/tables — creer une table multijoueur avec sabot de 6 decks
 pub async fn create_table(
     State(state): State<AppState>,
     Json(dto): Json<CreateTableDto>,
 ) -> Result<Json<TableDto>, ApiError> {
+    // Creer un sabot de 6 decks melanges (312 cartes)
+    use crate::domain::entities::create_deck;
+    let mut shoe: Vec<crate::domain::entities::Card> = Vec::with_capacity(312);
+    for _ in 0..6 {
+        shoe.extend(create_deck());
+    }
+    // Melanger le sabot entier
+    use rand::seq::SliceRandom;
+    shoe.shuffle(&mut rand::thread_rng());
+
+    let shoe_json = serde_json::to_value(&shoe)
+        .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
     let table = sqlx::query_as::<_, TableDto>(
-        r#"INSERT INTO blackjack_tables (guild_id, channel_id, owner_id, owner_name)
-           VALUES ($1, $2, $3, $4)
+        r#"INSERT INTO blackjack_tables (guild_id, channel_id, owner_id, owner_name, deck)
+           VALUES ($1, $2, $3, $4, $5)
            RETURNING id::text, guild_id, channel_id, owner_id, owner_name, status, created_at::text"#,
     )
     .bind(&dto.guild_id)
     .bind(&dto.channel_id)
     .bind(&dto.owner_id)
     .bind(&dto.owner_name)
+    .bind(&shoe_json)
     .fetch_one(&state.pg_pool)
     .await
     .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
@@ -318,19 +332,45 @@ pub async fn join_table(
     Path(table_id): Path<String>,
     Json(dto): Json<JoinTableDto>,
 ) -> Result<axum::http::StatusCode, ApiError> {
-    // Verifier que la table est ouverte
-    let status = sqlx::query_as::<_, (String,)>(
-        "SELECT status FROM blackjack_tables WHERE id = $1::uuid",
+    // Verifier que la table est ouverte + recuperer le guild_id
+    let table_info = sqlx::query_as::<_, (String, String)>(
+        "SELECT status, guild_id FROM blackjack_tables WHERE id = $1::uuid",
     )
     .bind(&table_id)
     .fetch_optional(&state.pg_pool)
     .await
     .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
 
-    match status {
-        Some((s,)) if s == "open" => {}
+    match &table_info {
+        Some((s, _)) if s == "open" => {}
         Some(_) => return Err(crate::domain::errors::DomainError::Conflict("Table fermee".into()).into()),
         None => return Err(crate::domain::errors::DomainError::NotFound("Table introuvable".into()).into()),
+    }
+
+    let guild_id = table_info.unwrap().1;
+
+    // Verifier la limite de joueurs
+    let current_count = sqlx::query_as::<_, (i64,)>(
+        "SELECT COUNT(*) FROM blackjack_table_players WHERE table_id = $1::uuid",
+    )
+    .bind(&table_id)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?
+    .0;
+
+    let max_players: i64 = {
+        let config = state.bot_config_repo.get_config(&guild_id, "blackjack-bot").await.unwrap_or_default();
+        config.iter()
+            .find(|c| c.config_key == "max_players_per_table")
+            .and_then(|c| c.config_value.parse().ok())
+            .unwrap_or(7)
+    };
+
+    if current_count >= max_players {
+        return Err(crate::domain::errors::DomainError::ValidationError(
+            format!("Table pleine ({}/{} joueurs)", current_count, max_players),
+        ).into());
     }
 
     sqlx::query(
