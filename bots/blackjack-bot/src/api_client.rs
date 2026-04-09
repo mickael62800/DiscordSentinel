@@ -41,6 +41,24 @@ pub struct WalletDto {
     pub total_spent: i64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct TableDto {
+    pub id: String,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct TablePlayerDto {
+    pub user_id: String,
+    pub user_name: String,
+}
+
 // ── Request DTOs ──
 
 #[derive(Serialize)]
@@ -110,6 +128,36 @@ impl ApiClient {
         self.base
             .get_json(&format!("/api/blackjack/{guild_id}/{user_id}/active"))
             .await
+    }
+
+    // ── Tables (multijoueur) ──
+
+    pub async fn create_table(&self, guild_id: &str, channel_id: &str, owner_id: &str, owner_name: &str) -> Result<TableDto, String> {
+        self.base.post_json("/api/blackjack/tables", &serde_json::json!({
+            "guild_id": guild_id, "channel_id": channel_id, "owner_id": owner_id, "owner_name": owner_name,
+        })).await
+    }
+
+    pub async fn join_table(&self, table_id: &str, user_id: &str, user_name: &str) -> Result<(), String> {
+        self.base.post_fire_and_forget(
+            &format!("/api/blackjack/tables/{table_id}/join"),
+            &serde_json::json!({ "user_id": user_id, "user_name": user_name }),
+        ).await;
+        Ok(())
+    }
+
+    pub async fn get_table_by_channel(&self, channel_id: &str) -> Result<Option<TableDto>, String> {
+        self.base.get_json(&format!("/api/blackjack/tables/by-channel/{channel_id}")).await
+    }
+
+    pub async fn list_table_players(&self, table_id: &str) -> Result<Vec<TablePlayerDto>, String> {
+        self.base.get_json(&format!("/api/blackjack/tables/{table_id}/players")).await
+    }
+
+    pub async fn close_table(&self, table_id: &str) -> Result<(), String> {
+        let req = self.base.client().delete(format!("{}/api/blackjack/tables/{}", self.base.base_url(), table_id));
+        let _ = self.base.auth(req).send().await;
+        Ok(())
     }
 
     // ── Wallet ──

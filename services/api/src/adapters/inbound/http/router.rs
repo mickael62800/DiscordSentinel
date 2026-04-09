@@ -75,6 +75,13 @@ fn bot_routes_standard() -> Router<AppState> {
         .route("/api/blackjack/{game_id}/stand", post(handlers::blackjack::stand))
         .route("/api/blackjack/{game_id}/double", post(handlers::blackjack::double_down))
         .route("/api/blackjack/{guild_id}/{user_id}/active", get(handlers::blackjack::get_active))
+        // Blackjack tables (multijoueur)
+        .route("/api/blackjack/tables", post(handlers::blackjack::create_table))
+        .route("/api/blackjack/tables/{table_id}/join", post(handlers::blackjack::join_table))
+        .route("/api/blackjack/tables/{table_id}/players", get(handlers::blackjack::list_table_players))
+        .route("/api/blackjack/tables/{table_id}/games", get(handlers::blackjack::list_table_games))
+        .route("/api/blackjack/tables/{table_id}", delete(handlers::blackjack::close_table))
+        .route("/api/blackjack/tables/by-channel/{channel_id}", get(handlers::blackjack::get_table_by_channel))
 }
 
 fn ticket_routes() -> Router<AppState> {

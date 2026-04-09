@@ -30,6 +30,8 @@ const AFK_TIMEOUT_SECS: u64 = 1800;
 /// Custom IDs pour les boutons de mise.
 const BET_PREFIX: &str = "bj_bet:";
 const CLOSE_TABLE_ID: &str = "bj_close_table";
+const INVITE_BUTTON_ID: &str = "bj_invite";
+const JOIN_BUTTON_ID: &str = "bj_join_table";
 
 pub struct Handler;
 
@@ -114,6 +116,10 @@ impl EventHandler for Handler {
                     handle_bet_select(&ctx, &component).await;
                 } else if custom_id == CLOSE_TABLE_ID {
                     handle_close_table(&ctx, &component).await;
+                } else if custom_id == INVITE_BUTTON_ID {
+                    handle_invite(&ctx, &component).await;
+                } else if custom_id == JOIN_BUTTON_ID {
+                    handle_join(&ctx, &component).await;
                 } else if custom_id.starts_with("bj_hit:")
                     || custom_id.starts_with("bj_stand:")
                     || custom_id.starts_with("bj_double:")
@@ -201,7 +207,7 @@ async fn handle_panel_click(ctx: &Context, component: &serenity::model::applicat
         }
     };
 
-    // Enregistrer
+    // Enregistrer dans le channel manager
     {
         let data = ctx.data.read().await;
         if let Some(mgr) = data.get::<ChannelManagerKey>() {
@@ -209,29 +215,55 @@ async fn handle_panel_click(ctx: &Context, component: &serenity::model::applicat
         }
     }
 
-    // Menu de mise
+    // Creer la table en DB via l'API
+    {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<crate::GameApiKey>() {
+            if let Err(e) = api.create_table(
+                &guild_id.to_string(), &channel.id.to_string(),
+                &user_id.to_string(), &component.user.name,
+            ).await {
+                warn!(error = %e, "Echec creation table API (continue quand meme)");
+            }
+        }
+    }
+
+    // Accueil : mise + invite
     let embed = CreateEmbed::new()
-        .title("\u{1f0cf} Bienvenue a ta table de Blackjack !")
+        .title("\u{1f0cf} Table de Blackjack")
         .description(format!(
-            "Salut <@{}> ! Choisis ta mise pour commencer.\n\n\
-             *La table se ferme apres 30min d'inactivite.*",
+            "Bienvenue <@{}> !\n\n\
+             \u{1f3b0} **Mise** — Choisis ton montant pour jouer\n\
+             \u{1f465} **Inviter** — Ajoute des amis a la table\n\n\
+             _Chaque joueur joue sa main contre le croupier.\n\
+             La table ferme apres 30min d'inactivite._",
             user_id
         ))
         .color(0xF1C40F)
-        .footer(CreateEmbedFooter::new("Blackjack | Sentinel"));
+        .footer(CreateEmbedFooter::new("Blackjack | Sentinel — Table multijoueur"));
 
-    let buttons = vec![
+    let bet_buttons = vec![
         CreateButton::new(format!("{BET_PREFIX}50")).label("50 \u{1fa99}").style(ButtonStyle::Secondary),
         CreateButton::new(format!("{BET_PREFIX}100")).label("100 \u{1fa99}").style(ButtonStyle::Primary),
         CreateButton::new(format!("{BET_PREFIX}250")).label("250 \u{1fa99}").style(ButtonStyle::Primary),
         CreateButton::new(format!("{BET_PREFIX}500")).label("500 \u{1fa99}").style(ButtonStyle::Danger),
-        CreateButton::new(format!("{BET_PREFIX}1000")).label("1000 \u{1fa99}").style(ButtonStyle::Danger),
     ];
-    let row = CreateActionRow::Buttons(buttons);
+    let invite_button = CreateButton::new(INVITE_BUTTON_ID)
+        .label("Inviter un joueur")
+        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f465}".into()))
+        .style(ButtonStyle::Success);
 
-    let _ = channel.id.send_message(&ctx.http, CreateMessage::new().embed(embed).components(vec![row])).await;
+    let row1 = CreateActionRow::Buttons(bet_buttons);
+    let row2 = CreateActionRow::Buttons(vec![invite_button,
+        CreateButton::new(CLOSE_TABLE_ID)
+            .label("Fermer la table")
+            .emoji(serenity::model::channel::ReactionType::Unicode("\u{274c}".into()))
+            .style(ButtonStyle::Danger),
+    ]);
 
-    info!(user = %component.user.name, channel = %channel.id, "Table blackjack ouverte");
+    let _ = channel.id.send_message(&ctx.http, CreateMessage::new().embed(embed).components(vec![row1, row2])).await;
+
+    info!(user = %component.user.name, channel = %channel.id, "Table blackjack multijoueur ouverte");
 }
 
 /// Selection de mise → demarre la partie.
@@ -340,6 +372,150 @@ async fn send_replay_buttons(ctx: &Context, channel_id: serenity::model::id::Cha
     let row = CreateActionRow::Buttons(buttons);
 
     let _ = channel_id.send_message(ctx, CreateMessage::new().embed(embed).components(vec![row])).await;
+}
+
+/// Invite : le createur mentionne un joueur → le bot lui donne acces au channel.
+async fn handle_invite(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    let guild_id = match component.guild_id {
+        Some(g) => g,
+        None => return,
+    };
+
+    // Repondre avec un message demandant de mentionner quelqu'un
+    let embed = CreateEmbed::new()
+        .title("\u{1f465} Inviter un joueur")
+        .description("Mentionne le joueur a inviter dans ce salon.\nExemple : `@MonAmi`")
+        .color(0x3498db);
+
+    let resp = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+    );
+    let _ = component.create_response(&ctx.http, resp).await;
+
+    // Attendre un message avec une mention dans ce channel (timeout 30s)
+    let channel_id = component.channel_id;
+    let author_id = component.user.id;
+
+    let ctx_clone = ctx.clone();
+    tokio::spawn(async move {
+        let timeout = tokio::time::Duration::from_secs(30);
+        let start = tokio::time::Instant::now();
+
+        loop {
+            if start.elapsed() > timeout {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+            // Lire les derniers messages
+            let messages = match channel_id
+                .messages(&ctx_clone.http, serenity::builder::GetMessages::new().limit(5))
+                .await
+            {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            for msg in &messages {
+                if msg.author.id != author_id || msg.mentions.is_empty() {
+                    continue;
+                }
+                let now_ts = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64;
+                if msg.timestamp.unix_timestamp() < (now_ts - 30) {
+                    continue;
+                }
+
+                for mentioned in &msg.mentions {
+                    if mentioned.bot || mentioned.id == author_id {
+                        continue;
+                    }
+
+                    // Donner acces au channel
+                    let overwrite = PermissionOverwrite {
+                        allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES | Permissions::READ_MESSAGE_HISTORY,
+                        deny: Permissions::empty(),
+                        kind: PermissionOverwriteType::Member(mentioned.id),
+                    };
+                    let _ = channel_id.create_permission(&ctx_clone.http, overwrite).await;
+
+                    // Enregistrer dans l'API
+                    {
+                        let data = ctx_clone.data.read().await;
+                        if let Some(api) = data.get::<crate::GameApiKey>() {
+                            if let Ok(Some(table)) = api.get_table_by_channel(&channel_id.to_string()).await {
+                                let _ = api.join_table(&table.id, &mentioned.id.to_string(), &mentioned.name).await;
+                            }
+                        }
+                    }
+
+                    // Notifier
+                    let join_btn = CreateButton::new(JOIN_BUTTON_ID)
+                        .label("Rejoindre la partie")
+                        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f3b0}".into()))
+                        .style(ButtonStyle::Success);
+
+                    let embed = CreateEmbed::new()
+                        .description(format!(
+                            "\u{1f465} <@{}> a ete invite a la table par <@{}> !\n\nClique sur **Rejoindre** pour miser et jouer.",
+                            mentioned.id, author_id
+                        ))
+                        .color(0x2ecc71);
+
+                    let _ = channel_id.send_message(
+                        &ctx_clone.http,
+                        CreateMessage::new().embed(embed).components(vec![
+                            CreateActionRow::Buttons(vec![join_btn]),
+                        ]),
+                    ).await;
+
+                    info!(invited = %mentioned.name, by = %author_id, "Joueur invite a la table blackjack");
+                }
+
+                // Supprimer le message de mention
+                let _ = msg.delete(&ctx_clone.http).await;
+                return;
+            }
+        }
+    });
+}
+
+/// Un joueur invite clique "Rejoindre" → affiche les boutons de mise.
+async fn handle_join(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    // Touch activity
+    {
+        let data = ctx.data.read().await;
+        if let Some(mgr) = data.get::<ChannelManagerKey>() {
+            // On ne register pas le joueur invite dans le channel manager (seul le owner y est)
+            // Mais on touch le timer du owner pour eviter le AFK
+            if let Some((owner_id, _)) = mgr.find_by_channel(component.channel_id) {
+                mgr.touch(owner_id);
+            }
+        }
+    }
+
+    let embed = CreateEmbed::new()
+        .title(format!("\u{1f0cf} {} rejoint la table !", component.user.name))
+        .description("Choisis ta mise pour cette manche :")
+        .color(0xF1C40F);
+
+    let buttons = vec![
+        CreateButton::new(format!("{BET_PREFIX}50")).label("50 \u{1fa99}").style(ButtonStyle::Secondary),
+        CreateButton::new(format!("{BET_PREFIX}100")).label("100 \u{1fa99}").style(ButtonStyle::Primary),
+        CreateButton::new(format!("{BET_PREFIX}250")).label("250 \u{1fa99}").style(ButtonStyle::Primary),
+        CreateButton::new(format!("{BET_PREFIX}500")).label("500 \u{1fa99}").style(ButtonStyle::Danger),
+    ];
+
+    component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new().embed(embed).components(vec![
+                    CreateActionRow::Buttons(buttons),
+                ]).ephemeral(true),
+            ),
+        )
+        .await
+        .ok();
 }
 
 /// Ferme la table (supprime le channel).

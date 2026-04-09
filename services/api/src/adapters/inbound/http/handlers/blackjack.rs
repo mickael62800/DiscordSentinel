@@ -243,3 +243,185 @@ fn parse_uuid(s: &str) -> Result<Uuid, ApiError> {
         ))
     })
 }
+
+// ══════════════════════════════════════════════════════════
+//  Multiplayer — Tables
+// ══════════════════════════════════════════════════════════
+
+#[derive(Debug, Deserialize)]
+pub struct CreateTableDto {
+    pub guild_id: String,
+    pub channel_id: String,
+    pub owner_id: String,
+    pub owner_name: String,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct TableDto {
+    pub id: String,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub owner_id: String,
+    pub owner_name: String,
+    pub status: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Serialize, sqlx::FromRow)]
+pub struct TablePlayerDto {
+    pub user_id: String,
+    pub user_name: String,
+    pub joined_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct JoinTableDto {
+    pub user_id: String,
+    pub user_name: String,
+}
+
+/// POST /api/blackjack/tables — creer une table multijoueur
+pub async fn create_table(
+    State(state): State<AppState>,
+    Json(dto): Json<CreateTableDto>,
+) -> Result<Json<TableDto>, ApiError> {
+    let table = sqlx::query_as::<_, TableDto>(
+        r#"INSERT INTO blackjack_tables (guild_id, channel_id, owner_id, owner_name)
+           VALUES ($1, $2, $3, $4)
+           RETURNING id::text, guild_id, channel_id, owner_id, owner_name, status, created_at::text"#,
+    )
+    .bind(&dto.guild_id)
+    .bind(&dto.channel_id)
+    .bind(&dto.owner_id)
+    .bind(&dto.owner_name)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
+    // Le owner est automatiquement joueur
+    sqlx::query(
+        "INSERT INTO blackjack_table_players (table_id, user_id, user_name) VALUES ($1::uuid, $2, $3) ON CONFLICT DO NOTHING",
+    )
+    .bind(&table.id)
+    .bind(&dto.owner_id)
+    .bind(&dto.owner_name)
+    .execute(&state.pg_pool)
+    .await
+    .ok();
+
+    Ok(Json(table))
+}
+
+/// POST /api/blackjack/tables/{table_id}/join — rejoindre une table
+pub async fn join_table(
+    State(state): State<AppState>,
+    Path(table_id): Path<String>,
+    Json(dto): Json<JoinTableDto>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    // Verifier que la table est ouverte
+    let status = sqlx::query_as::<_, (String,)>(
+        "SELECT status FROM blackjack_tables WHERE id = $1::uuid",
+    )
+    .bind(&table_id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
+    match status {
+        Some((s,)) if s == "open" => {}
+        Some(_) => return Err(crate::domain::errors::DomainError::Conflict("Table fermee".into()).into()),
+        None => return Err(crate::domain::errors::DomainError::NotFound("Table introuvable".into()).into()),
+    }
+
+    sqlx::query(
+        "INSERT INTO blackjack_table_players (table_id, user_id, user_name) VALUES ($1::uuid, $2, $3) ON CONFLICT DO NOTHING",
+    )
+    .bind(&table_id)
+    .bind(&dto.user_id)
+    .bind(&dto.user_name)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
+    // Mettre a jour last_activity
+    sqlx::query("UPDATE blackjack_tables SET last_activity = NOW() WHERE id = $1::uuid")
+        .bind(&table_id)
+        .execute(&state.pg_pool)
+        .await
+        .ok();
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// GET /api/blackjack/tables/{table_id}/players — lister les joueurs d'une table
+pub async fn list_table_players(
+    State(state): State<AppState>,
+    Path(table_id): Path<String>,
+) -> Result<Json<Vec<TablePlayerDto>>, ApiError> {
+    let players = sqlx::query_as::<_, TablePlayerDto>(
+        "SELECT user_id, user_name, joined_at::text FROM blackjack_table_players WHERE table_id = $1::uuid ORDER BY joined_at",
+    )
+    .bind(&table_id)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
+    Ok(Json(players))
+}
+
+/// GET /api/blackjack/tables/by-channel/{channel_id} — trouver la table par channel
+pub async fn get_table_by_channel(
+    State(state): State<AppState>,
+    Path(channel_id): Path<String>,
+) -> Result<Json<Option<TableDto>>, ApiError> {
+    let table = sqlx::query_as::<_, TableDto>(
+        r#"SELECT id::text, guild_id, channel_id, owner_id, owner_name, status, created_at::text
+           FROM blackjack_tables WHERE channel_id = $1 AND status = 'open'"#,
+    )
+    .bind(&channel_id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
+    Ok(Json(table))
+}
+
+/// DELETE /api/blackjack/tables/{table_id} — fermer une table
+pub async fn close_table(
+    State(state): State<AppState>,
+    Path(table_id): Path<String>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    sqlx::query(
+        "UPDATE blackjack_tables SET status = 'closed' WHERE id = $1::uuid AND status = 'open'",
+    )
+    .bind(&table_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+/// GET /api/blackjack/tables/{table_id}/games — parties d'une table (resume)
+pub async fn list_table_games(
+    State(state): State<AppState>,
+    Path(table_id): Path<String>,
+) -> Result<Json<Vec<serde_json::Value>>, ApiError> {
+    let rows = sqlx::query_as::<_, (String, String, String, String, i64, i64)>(
+        r#"SELECT id::text, user_id, username, status, bet, payout
+           FROM blackjack_games WHERE table_id = $1::uuid ORDER BY created_at DESC"#,
+    )
+    .bind(&table_id)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(crate::domain::errors::DomainError::Internal(e.to_string())))?;
+
+    let result: Vec<serde_json::Value> = rows.iter().map(|(id, uid, name, status, bet, payout)| {
+        serde_json::json!({
+            "id": id, "user_id": uid, "username": name,
+            "status": status, "bet": bet, "payout": payout,
+        })
+    }).collect();
+
+    Ok(Json(result))
+}
