@@ -241,6 +241,7 @@ fn get_string_option(cmd: &CommandInteraction, name: &str) -> Option<String> {
 async fn has_manage_guild(ctx: &Context, cmd: &CommandInteraction) -> bool {
     if let Some(guild_id) = cmd.guild_id {
         if let Ok(member) = guild_id.member(&ctx.http, cmd.user.id).await {
+            #[allow(deprecated)]
             if let Ok(perms) = member.permissions(&ctx.cache) {
                 return perms.manage_guild();
             }

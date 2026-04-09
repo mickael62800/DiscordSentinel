@@ -9,8 +9,9 @@ use serenity::all::{
 use crate::api_client::{BlackjackGameDto, CardDto};
 use crate::GameApiKey;
 
-// ── Slash command registration ──
+// ── Slash command registration (legacy solo — conserve pour reference) ──
 
+#[allow(dead_code)]
 pub fn register() -> CreateCommand {
     CreateCommand::new("blackjack")
         .description("Joue au Blackjack ! Tente d'atteindre 21 sans depasser.")
@@ -21,8 +22,9 @@ pub fn register() -> CreateCommand {
         )
 }
 
-// ── Slash command handler ──
+// ── Slash command handler (legacy solo) ──
 
+#[allow(dead_code)]
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id.to_string(),
@@ -394,6 +396,7 @@ const BJ_LOSE: &[&str] = &[
 
 // ── Reply helpers ──
 
+#[allow(dead_code)]
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
     command
         .create_response(

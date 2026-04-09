@@ -207,6 +207,7 @@ async fn handle_approve(ctx: &Context, component: &serenity::model::application:
     // Verifier que l'approbateur a la permission MODERATE_MEMBERS
     if let Some(guild_id) = component.guild_id {
         if let Ok(member) = guild_id.member(&ctx.http, component.user.id).await {
+            #[allow(deprecated)]
             if let Ok(perms) = member.permissions(&ctx.cache) {
                 if !perms.moderate_members() {
                     let response = serenity::all::CreateInteractionResponse::Message(

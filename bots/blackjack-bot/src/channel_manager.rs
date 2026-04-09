@@ -11,6 +11,7 @@ pub struct ChannelManager {
 }
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub struct ActiveTable {
     pub channel_id: ChannelId,
     pub guild_id: GuildId,
@@ -18,6 +19,7 @@ pub struct ActiveTable {
     pub last_activity: Instant,
 }
 
+#[allow(dead_code)]
 impl ChannelManager {
     pub fn new() -> Self {
         Self {

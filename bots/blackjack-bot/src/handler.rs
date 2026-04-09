@@ -376,7 +376,7 @@ async fn send_replay_buttons(ctx: &Context, channel_id: serenity::model::id::Cha
 
 /// Invite : le createur mentionne un joueur → le bot lui donne acces au channel.
 async fn handle_invite(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
-    let guild_id = match component.guild_id {
+    let _guild_id = match component.guild_id {
         Some(g) => g,
         None => return,
     };

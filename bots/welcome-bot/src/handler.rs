@@ -296,7 +296,8 @@ async fn handle_rules_accept(
 }
 
 /// Cree le message de reglement avec le bouton d'acceptation.
-/// Appele par la commande /welcome rules-post.
+/// Sera appele par la commande /welcome rules-post (a implementer).
+#[allow(dead_code)]
 pub async fn post_rules_message(
     ctx: &Context,
     channel_id: ChannelId,
