@@ -269,17 +269,17 @@ impl EventHandler for Handler {
                             ))
                             .thumbnail(msg.author.face());
 
-                        // Envoyer dans le canal dedie si configure, sinon dans le canal courant
-                        let target_channel = crate::level_channel::resolve_level_up_channel(&guild_config)
-                            .map(serenity::model::id::ChannelId::new)
-                            .unwrap_or(msg.channel_id);
-
-                        if let Err(e) = target_channel.send_message(
-                            &ctx.http,
-                            CreateMessage::new().embed(embed),
-                        ).await {
-                            warn!(error = %e, "Failed to send text level-up message");
+                        // Envoyer dans le canal dedie si configure
+                        if let Some(ch_id) = crate::level_channel::resolve_level_up_channel(&guild_config) {
+                            let target = serenity::model::id::ChannelId::new(ch_id);
+                            if let Err(e) = target.send_message(
+                                &ctx.http,
+                                CreateMessage::new().embed(embed),
+                            ).await {
+                                warn!(error = %e, "Failed to send text level-up message");
+                            }
                         }
+                        // Si pas configure, on n'envoie pas (evite de polluer tous les salons)
                     }
 
                     // Verifier les roles seulement au level-up ou premiere activite (retour d'un membre)
@@ -413,16 +413,8 @@ impl EventHandler for Handler {
                                                 if let Err(e) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
                                                     warn!(error = %e, "Failed to send voice level-up message");
                                                 }
-                                            } else {
-                                                // Fallback : premier canal texte
-                                                if let Ok(channels) = guild_id.channels(&ctx.http).await {
-                                                    if let Some(ch) = channels.values().find(|c| c.kind == serenity::model::channel::ChannelType::Text) {
-                                                        if let Err(e) = ch.id.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
-                                                            warn!(error = %e, "Failed to send voice level-up message");
-                                                        }
-                                                    }
-                                                }
                                             }
+                                            // Si pas configure, on n'envoie pas (evite de polluer les salons)
                                         }
 
                                         // Verifier les roles seulement au level-up ou premiere activite
