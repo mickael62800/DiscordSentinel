@@ -275,7 +275,6 @@ function selectComponent(name: string) {
 
 onMounted(() => {
   fetchDefinitions();
-  fetchModelsStatus();
   fetchTokens();
   if (selectedGuildId.value) fetchConfig();
 });
@@ -368,27 +367,6 @@ watch(selectedComponent, loadFormValues);
             <span v-if="tokenSuccess === def.bot_name" class="token-saved-msg">Token chiffre et sauvegarde !</span>
           </div>
         </div>
-      </div>
-
-      <!-- Statut des modeles IA -->
-      <div v-if="modelsStatus.length > 0" class="models-status">
-        <h3>Modeles IA</h3>
-        <div class="models-grid">
-          <div v-for="model in modelsStatus" :key="model.model_type" class="model-card" :class="{ loaded: model.loaded }">
-            <div class="model-indicator" :class="model.loaded ? 'indicator-green' : 'indicator-red'"></div>
-            <div class="model-info">
-              <span class="model-name">{{ model.name }}</span>
-              <span class="model-status">{{ model.loaded ? 'Charge et operationnel' : 'Non charge — fichier ONNX manquant' }}</span>
-            </div>
-            <span class="model-badge" :class="model.loaded ? 'badge-ok' : 'badge-ko'">
-              {{ model.loaded ? 'OK' : 'MANQUANT' }}
-            </span>
-          </div>
-        </div>
-      </div>
-      <div v-else class="models-status models-unavailable">
-        <h3>Modeles IA</h3>
-        <p class="models-empty">Impossible de charger le statut des modeles IA. Verifiez que l'API est accessible.</p>
       </div>
 
       <!-- Config form -->
