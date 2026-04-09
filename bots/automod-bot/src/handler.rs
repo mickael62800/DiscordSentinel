@@ -230,7 +230,9 @@ impl EventHandler for Handler {
 
             let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
             let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
-            send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id, &colors).await;
+            let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
+            let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
+            send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars).await;
             return;
         }
 
@@ -310,12 +312,14 @@ impl EventHandler for Handler {
         }
 
         let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
+        let context_max_messages = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
+        let context_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
 
         // Spawn en background pour ne pas bloquer le bot
         let ctx_clone = ctx.clone();
         let msg_clone = msg.clone();
         tokio::spawn(async move {
-            send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors).await;
+            send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, context_max_messages, context_max_chars).await;
         });
     }
 
@@ -435,7 +439,39 @@ async fn send_to_backend(
     mute_duration_secs: u64,
     log_channel_id: u64,
     colors: &EmbedColors,
+    context_max_messages: u8,
+    context_max_chars: usize,
 ) {
+    // Recuperer les N derniers messages du canal pour le contexte conversationnel
+    let context_messages = if context_max_messages == 0 {
+        Vec::new()
+    } else {
+        match msg
+            .channel_id
+            .messages(
+                &ctx.http,
+                serenity::builder::GetMessages::new()
+                    .before(msg.id)
+                    .limit(context_max_messages),
+            )
+            .await
+        {
+            Ok(messages) => messages
+                .into_iter()
+                .rev() // ordre chronologique
+                .filter(|m| !m.author.bot)
+                .map(|m| crate::api_client::ContextMessage {
+                    username: m.author.name.clone(),
+                    content: m.content.chars().take(context_max_chars).collect(),
+                })
+                .collect(),
+            Err(e) => {
+                tracing::warn!(error = %e, "Echec recuperation contexte canal");
+                Vec::new()
+            }
+        }
+    };
+
     let request = AnalyzeRequest {
         guild_id: msg.guild_id.map(|id| id.to_string()).unwrap_or_default(),
         channel_id: msg.channel_id.to_string(),
@@ -447,6 +483,7 @@ async fn send_to_backend(
             message_id: msg.id.to_string(),
             timestamp: msg.timestamp.to_string(),
         },
+        context_messages,
     };
 
     let data = ctx.data.read().await;

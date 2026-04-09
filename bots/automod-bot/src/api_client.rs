@@ -16,6 +16,15 @@ pub struct AnalyzeRequest {
     pub content: String,
     pub flags: DetectionFlags,
     pub metadata: MessageMetadata,
+    /// Messages recents du canal pour contextualiser le sentiment.
+    pub context_messages: Vec<ContextMessage>,
+}
+
+/// Message de contexte conversationnel (messages precedents dans le canal).
+#[derive(Debug, Serialize)]
+pub struct ContextMessage {
+    pub username: String,
+    pub content: String,
 }
 
 #[derive(Debug, Serialize)]

@@ -17,7 +17,7 @@ pub mod manage_reminders;
 pub mod manage_strikes;
 
 pub use analyze_image::{AnalyzeImageCommand, AnalyzeImageUseCase};
-pub use analyze_message::{AnalyzeMessageCommand, AnalyzeMessageUseCase};
+pub use analyze_message::{AnalyzeMessageCommand, AnalyzeMessageUseCase, ContextMessageEntry};
 pub use manage_conduct::{
     AddPointsCommand, DeductPointsCommand, ManageConductUseCase, SaveConductConfigCommand,
 };

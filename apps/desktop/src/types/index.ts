@@ -462,6 +462,10 @@ export interface IaConfig {
   text_threshold: number;
   vision_enabled: boolean;
   vision_threshold: number;
+  context_dampening: number;
+  context_format: string;
+  context_max_messages: number;
+  context_max_chars: number;
 }
 
 export interface SaveIaConfigParams {
@@ -469,6 +473,10 @@ export interface SaveIaConfigParams {
   text_threshold: number;
   vision_enabled: boolean;
   vision_threshold: number;
+  context_dampening: number;
+  context_format: string;
+  context_max_messages: number;
+  context_max_chars: number;
 }
 
 // ── Analytics ──

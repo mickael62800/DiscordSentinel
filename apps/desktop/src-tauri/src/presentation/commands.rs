@@ -134,7 +134,7 @@ tauri_passthrough!(adjust_conduct_points, ConductService, adjust_points -> UserC
 
 // IA Config
 tauri_passthrough!(get_ia_config, IaConfigService, get_config -> IaConfig, guild_id: String);
-tauri_passthrough!(save_ia_config, IaConfigService, save_config -> IaConfig, guild_id: String, text_enabled: bool, text_threshold: f64, vision_enabled: bool, vision_threshold: f64);
+tauri_passthrough!(save_ia_config, IaConfigService, save_config -> IaConfig, guild_id: String, text_enabled: bool, text_threshold: f64, vision_enabled: bool, vision_threshold: f64, context_dampening: f64, context_format: String, context_max_messages: i32, context_max_chars: i32);
 
 // Analytics
 tauri_passthrough!(get_full_analytics, AnalyticsService, get_full_analytics -> FullAnalytics, guild_id: Option<String>, days: Option<i32>);

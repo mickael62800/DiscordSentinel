@@ -87,6 +87,8 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         };
         let text_enabled = ia_config.as_ref().map(|c| c.text_enabled).unwrap_or(true);
         let text_threshold = ia_config.as_ref().map(|c| c.text_threshold as f32).unwrap_or(DEFAULT_TEXT_THRESHOLD);
+        let context_dampening = ia_config.as_ref().map(|c| c.context_dampening).unwrap_or(0.65);
+        let context_format = ia_config.as_ref().map(|c| c.context_format.clone()).unwrap_or_else(|| "natural".to_string());
 
         debug!(
             has_inference = self.inference.is_some(),
@@ -107,8 +109,26 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 let _permit = self.inference_limiter.acquire().await?;
 
                 debug!("Lancement inference text...");
-                match self.run_text_inference(inference, tokenizer, &cmd.content, &rules, text_threshold) {
+                // Construire le contenu contextualise pour l'inference
+                let contextual_content = build_contextual_content(&cmd.content, &cmd.context_messages, &context_format);
+                let has_context = !cmd.context_messages.is_empty();
+                match self.run_text_inference(inference, tokenizer, &contextual_content, &rules, text_threshold) {
                     Ok(Some((ia_score, _ia_flags, ia_reason))) => {
+                        // Attenuer le score IA si du contexte conversationnel est disponible
+                        // (reduit les faux positifs sur les blagues entre amis, etc.)
+                        let ia_score = if has_context && context_dampening < 1.0 {
+                            let dampened = ia_score * context_dampening;
+                            debug!(
+                                original_ia_score = ia_score,
+                                dampened_ia_score = dampened,
+                                context_dampening,
+                                "Score IA attenue grace au contexte conversationnel"
+                            );
+                            dampened
+                        } else {
+                            ia_score
+                        };
+
                         // Combiner : prendre le score le plus eleve
                         let combined_score = result.score + ia_score;
 
@@ -273,6 +293,29 @@ pub fn score_classifications(
 
     let reason = format!("IA sentiment : {}", triggered.join(", "));
     Some((ia_score, detected.into_iter().map(|(f, _)| f).collect(), reason))
+}
+
+/// Construit un contenu enrichi avec le contexte conversationnel pour l'inference IA.
+/// Le message analyse est place en premier (safe si le tokenizer tronque la fin).
+/// - "natural" : conversation brute separee par des retours a la ligne
+/// - "tagged"  : balises [message]/[context] pour structurer l'input
+fn build_contextual_content(
+    content: &str,
+    context: &[crate::ports::inbound::ContextMessageEntry],
+    format: &str,
+) -> String {
+    if context.is_empty() {
+        return content.to_string();
+    }
+    let ctx_str: String = context
+        .iter()
+        .map(|m| format!("{}: {}", m.username, m.content))
+        .collect::<Vec<_>>()
+        .join("\n");
+    match format {
+        "tagged" => format!("[message] {} [/message] [context] {} [/context]", content, ctx_str),
+        _ => format!("{}\n---\n{}", ctx_str, content),
+    }
 }
 
 /// Seuils par defaut (replique du ScoringService pour le scoring combine).

@@ -31,11 +31,14 @@ impl IaConfigRepository for PgIaConfigRepository {
 
     async fn save(&self, config: &IaConfig) -> Result<IaConfig, DomainError> {
         let row = sqlx::query_as::<_, IaConfig>(
-            "INSERT INTO ia_config (guild_id, text_enabled, text_threshold, vision_enabled, vision_threshold, created_at, updated_at) \
-             VALUES ($1, $2, $3, $4, $5, NOW(), NOW()) \
+            "INSERT INTO ia_config (guild_id, text_enabled, text_threshold, vision_enabled, vision_threshold, \
+               context_dampening, context_format, context_max_messages, context_max_chars, created_at, updated_at) \
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) \
              ON CONFLICT (guild_id) DO UPDATE SET \
                text_enabled = $2, text_threshold = $3, \
                vision_enabled = $4, vision_threshold = $5, \
+               context_dampening = $6, context_format = $7, \
+               context_max_messages = $8, context_max_chars = $9, \
                updated_at = NOW() \
              RETURNING *",
         )
@@ -44,6 +47,10 @@ impl IaConfigRepository for PgIaConfigRepository {
         .bind(config.text_threshold)
         .bind(config.vision_enabled)
         .bind(config.vision_threshold)
+        .bind(config.context_dampening)
+        .bind(&config.context_format)
+        .bind(config.context_max_messages)
+        .bind(config.context_max_chars)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;

@@ -45,6 +45,10 @@ export function useIaConfig() {
         textThreshold: params.text_threshold,
         visionEnabled: params.vision_enabled,
         visionThreshold: params.vision_threshold,
+        contextDampening: params.context_dampening,
+        contextFormat: params.context_format,
+        contextMaxMessages: params.context_max_messages,
+        contextMaxChars: params.context_max_chars,
       });
       success("Configuration IA sauvegardee avec succes.");
     } catch (e) {

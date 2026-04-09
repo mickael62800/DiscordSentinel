@@ -7,6 +7,10 @@ pub struct IaConfig {
     pub text_threshold: f64,
     pub vision_enabled: bool,
     pub vision_threshold: f64,
+    pub context_dampening: f64,
+    pub context_format: String,
+    pub context_max_messages: i32,
+    pub context_max_chars: i32,
 }
 
 pub struct IaConfigService {
@@ -50,12 +54,20 @@ impl IaConfigService {
         text_threshold: f64,
         vision_enabled: bool,
         vision_threshold: f64,
+        context_dampening: f64,
+        context_format: String,
+        context_max_messages: i32,
+        context_max_chars: i32,
     ) -> Result<IaConfig, String> {
         let body = serde_json::json!({
             "text_enabled": text_enabled,
             "text_threshold": text_threshold,
             "vision_enabled": vision_enabled,
             "vision_threshold": vision_threshold,
+            "context_dampening": context_dampening,
+            "context_format": context_format,
+            "context_max_messages": context_max_messages,
+            "context_max_chars": context_max_chars,
         });
 
         let req = self.auth(

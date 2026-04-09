@@ -119,7 +119,7 @@ async fn main() {
     let text_max_length: usize = std::env::var("TEXT_MAX_LENGTH")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(256);
+        .unwrap_or(512);
 
     let inference = Arc::new(InferenceService::new(
         vision_model_path.as_deref(),

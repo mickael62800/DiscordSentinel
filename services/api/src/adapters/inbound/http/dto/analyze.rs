@@ -14,12 +14,21 @@ pub struct AnalyzeRequestDto {
     pub content: String,
     pub flags: DetectionFlags,
     pub metadata: MetadataDto,
+    /// Messages de contexte conversationnel pour l'analyse de sentiment.
+    pub context_messages: Vec<ContextMessageDto>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MetadataDto {
     pub message_id: String,
     pub timestamp: String,
+}
+
+/// Message de contexte envoye par le bot pour l'analyse de sentiment.
+#[derive(Debug, Deserialize)]
+pub struct ContextMessageDto {
+    pub username: String,
+    pub content: String,
 }
 
 /// DTO de la réponse renvoyée au bot.
@@ -40,6 +49,15 @@ impl From<AnalyzeRequestDto> for AnalyzeMessageCommand {
         } else {
             dto.content
         };
+        let context_messages = dto
+            .context_messages
+            .into_iter()
+            .map(|m| crate::ports::inbound::ContextMessageEntry {
+                username: m.username,
+                content: m.content,
+            })
+            .collect();
+
         Self {
             guild_id: dto.guild_id,
             channel_id: dto.channel_id,
@@ -49,6 +67,7 @@ impl From<AnalyzeRequestDto> for AnalyzeMessageCommand {
             flags: dto.flags,
             message_id: dto.metadata.message_id,
             timestamp: dto.metadata.timestamp,
+            context_messages,
         }
     }
 }

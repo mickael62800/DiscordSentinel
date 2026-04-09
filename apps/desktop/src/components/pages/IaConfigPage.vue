@@ -10,6 +10,10 @@ const textEnabled = ref(true);
 const textThreshold = ref(0.5);
 const visionEnabled = ref(true);
 const visionThreshold = ref(0.5);
+const contextDampening = ref(0.65);
+const contextFormat = ref("natural");
+const contextMaxMessages = ref(3);
+const contextMaxChars = ref(200);
 
 watch(config, (c) => {
   if (c) {
@@ -17,6 +21,10 @@ watch(config, (c) => {
     textThreshold.value = c.text_threshold;
     visionEnabled.value = c.vision_enabled;
     visionThreshold.value = c.vision_threshold;
+    contextDampening.value = c.context_dampening;
+    contextFormat.value = c.context_format;
+    contextMaxMessages.value = c.context_max_messages;
+    contextMaxChars.value = c.context_max_chars;
   }
 });
 
@@ -26,6 +34,10 @@ async function handleSave() {
     text_threshold: textThreshold.value,
     vision_enabled: visionEnabled.value,
     vision_threshold: visionThreshold.value,
+    context_dampening: contextDampening.value,
+    context_format: contextFormat.value,
+    context_max_messages: contextMaxMessages.value,
+    context_max_chars: contextMaxChars.value,
   });
 }
 </script>
@@ -109,6 +121,54 @@ async function handleSave() {
             <span>10% (sensible)</span>
             <span>50% (defaut)</span>
             <span>95% (strict)</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Contexte conversationnel -->
+      <section class="config-section">
+        <div class="section-header">
+          <h2>Contexte conversationnel</h2>
+        </div>
+        <p class="description">
+          Envoie les messages precedents du canal au modele IA pour reduire les faux positifs
+          (blagues entre amis, contexte de conversation).
+        </p>
+
+        <div class="field-group">
+          <label>
+            Attenuation du score IA : <strong>{{ (contextDampening * 100).toFixed(0) }}%</strong>
+          </label>
+          <input
+            type="range"
+            min="0.1"
+            max="1.0"
+            step="0.05"
+            v-model.number="contextDampening"
+          />
+          <div class="range-labels">
+            <span>10% (fort dampening)</span>
+            <span>65% (defaut)</span>
+            <span>100% (aucun dampening)</span>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Format du contexte</label>
+          <select v-model="contextFormat" class="select-field">
+            <option value="natural">Naturel (conversation brute)</option>
+            <option value="tagged">Tagged (balises [message]/[context])</option>
+          </select>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label>Messages de contexte</label>
+            <input type="number" min="0" max="10" v-model.number="contextMaxMessages" class="number-field" />
+          </div>
+          <div class="field-group">
+            <label>Caracteres max / message</label>
+            <input type="number" min="50" max="500" step="50" v-model.number="contextMaxChars" class="number-field" />
           </div>
         </div>
       </section>
@@ -230,6 +290,40 @@ async function handleSave() {
 
 .save-btn:hover:not(:disabled) {
   opacity: 0.9;
+}
+
+.field-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.field-group label {
+  font-size: 0.9rem;
+}
+
+.field-row {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.field-row .field-group {
+  flex: 1;
+}
+
+.select-field, .number-field {
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-primary, #111);
+  color: var(--text-primary, #eee);
+  border: 1px solid var(--border, #333);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+
+.select-field:focus, .number-field:focus {
+  outline: none;
+  border-color: var(--accent, #7c3aed);
 }
 
 /* Cross-link */
