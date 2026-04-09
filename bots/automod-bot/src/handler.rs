@@ -63,7 +63,7 @@ const FEATURE_SUSPICIOUS_FILES: bool = false;   // Desactive pour debug
 const FEATURE_FLOOD_DETECTION: bool = false;     // Desactive pour debug
 const FEATURE_CAPS_DETECTION: bool = false;      // Desactive pour debug
 const FEATURE_ADAPTIVE_SLOWMODE: bool = false;   // Desactive pour debug
-const FEATURE_LOCAL_ANALYSIS: bool = false;      // Desactive pour debug
+const FEATURE_LOCAL_ANALYSIS: bool = true;       // ACTIVE — test 1
 const FEATURE_API_ANALYSIS: bool = false;        // Desactive pour debug
 // ══════════════════════════════════════════════════════════════════════
 
