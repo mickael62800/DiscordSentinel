@@ -38,7 +38,7 @@ pub fn calculate_score(hand: &[Card]) -> i32 {
 
 /// Crée un deck standard de 52 cartes, mélangé.
 pub fn create_deck() -> Vec<Card> {
-    let suits = ["heart", "diamond", "club", "spade"];
+    let suits = ["hearts", "diamonds", "clubs", "spades"];
     let ranks = [
         "2", "3", "4", "5", "6", "7", "8", "9", "10",
         "Jack", "Queen", "King", "As",

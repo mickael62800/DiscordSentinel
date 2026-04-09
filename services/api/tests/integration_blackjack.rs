@@ -36,7 +36,7 @@ async fn blackjack_start_game_debits_wallet() {
     wallet_repo.get_or_create(&gid, "player1", "Alice", 500).await.unwrap();
 
     let svc = build_service(pool.clone());
-    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 100, 10, 10000, 500).await.unwrap();
+    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 100, 10, 10000, 500, 1.5).await.unwrap();
     assert!(game.player_score > 0);
 
     // Wallet debite de 100 (sauf si blackjack naturel ou le payout est deja credite)
@@ -57,13 +57,13 @@ async fn blackjack_cannot_start_two_games() {
     wallet_repo.get_or_create(&gid, "player1", "Alice", 1000).await.unwrap();
 
     let svc = build_service(pool.clone());
-    let game1 = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 1000).await;
+    let game1 = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await;
     assert!(game1.is_ok());
 
     // Si le premier jeu est encore en cours, le second doit echouer
     let game1 = game1.unwrap();
     if game1.status == "playing" {
-        let game2 = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 1000).await;
+        let game2 = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await;
         assert!(game2.is_err(), "Devrait refuser une deuxieme partie active");
     }
 }
@@ -76,7 +76,7 @@ async fn blackjack_hit_and_stand() {
     wallet_repo.get_or_create(&gid, "player1", "Alice", 500).await.unwrap();
 
     let svc = build_service(pool.clone());
-    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 500).await.unwrap();
+    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 500, 1.5).await.unwrap();
 
     if game.status != "playing" {
         return; // Blackjack naturel, pas de hit possible
@@ -102,7 +102,7 @@ async fn blackjack_wallet_balance_conserved() {
     wallet_repo.get_or_create(&gid, "player1", "Alice", 500).await.unwrap();
 
     let svc = build_service(pool.clone());
-    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 100, 10, 10000, 500).await.unwrap();
+    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 100, 10, 10000, 500, 1.5).await.unwrap();
 
     // Terminer la partie
     let final_game = if game.status == "playing" {

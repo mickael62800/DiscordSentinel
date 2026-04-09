@@ -21,6 +21,7 @@ impl BlackjackService {
     }
 
     /// Démarre une nouvelle partie de blackjack.
+    /// `blackjack_payout` = multiplicateur du gain pour un blackjack naturel (defaut 1.5 → payout total = mise * 2.5).
     pub async fn start_game(
         &self,
         guild_id: String,
@@ -30,6 +31,7 @@ impl BlackjackService {
         min_bet: i64,
         max_bet: i64,
         starting_coins: i64,
+        blackjack_payout: f64,
     ) -> Result<BlackjackGame, DomainError> {
         // Validation de la mise
         if bet < min_bet {
@@ -69,7 +71,7 @@ impl BlackjackService {
         // Vérifier le blackjack naturel
         let (status, payout, finished_at) = if player_score == 21 {
             // Blackjack naturel du joueur
-            let payout = (bet as f64 * 2.5) as i64;
+            let payout = (bet as f64 * (1.0 + blackjack_payout)) as i64;
             ("player_blackjack".to_string(), payout, Some(Utc::now()))
         } else {
             ("playing".to_string(), 0, None)

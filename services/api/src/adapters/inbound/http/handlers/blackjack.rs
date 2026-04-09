@@ -115,6 +115,13 @@ pub async fn start_game(
     State(state): State<AppState>,
     Json(dto): Json<StartGameDto>,
 ) -> Result<Json<BlackjackGameDto>, ApiError> {
+    // Lire la config depuis bot_guild_config
+    let config = state.bot_config_repo.get_config(&dto.guild_id, "blackjack-bot").await.unwrap_or_default();
+    let min_bet = config.iter().find(|c| c.config_key == "min_bet").and_then(|c| c.config_value.parse().ok()).unwrap_or(10);
+    let max_bet = config.iter().find(|c| c.config_key == "max_bet").and_then(|c| c.config_value.parse().ok()).unwrap_or(1000);
+    let starting_coins = config.iter().find(|c| c.config_key == "starting_coins").and_then(|c| c.config_value.parse().ok()).unwrap_or(200);
+    let blackjack_payout: f64 = config.iter().find(|c| c.config_key == "blackjack_payout").and_then(|c| c.config_value.parse().ok()).unwrap_or(1.5);
+
     let game = state
         .blackjack_svc
         .start_game(
@@ -122,9 +129,10 @@ pub async fn start_game(
             dto.user_id,
             dto.username,
             dto.bet,
-            10,   // min_bet
-            10000, // max_bet
-            1000,  // starting_coins
+            min_bet,
+            max_bet,
+            starting_coins,
+            blackjack_payout,
         )
         .await?;
 
