@@ -178,7 +178,7 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
 
 // ── Helpers ──
 
-fn is_game_over(status: &str) -> bool {
+pub fn is_game_over(status: &str) -> bool {
     matches!(
         status,
         "player_bust" | "player_win" | "dealer_win" | "dealer_bust" | "push" | "player_blackjack"
@@ -216,7 +216,7 @@ fn hand_to_string(hand: &[CardDto]) -> String {
         .join("  ")
 }
 
-fn build_game_embed(game: &BlackjackGameDto) -> CreateEmbed {
+pub fn build_game_embed(game: &BlackjackGameDto) -> CreateEmbed {
     let over = is_game_over(&game.status);
 
     let player_hand_str = hand_to_string(&game.player_hand);
@@ -320,7 +320,7 @@ fn build_game_embed(game: &BlackjackGameDto) -> CreateEmbed {
     embed
 }
 
-fn build_buttons(game: &BlackjackGameDto) -> Vec<CreateActionRow> {
+pub fn build_buttons(game: &BlackjackGameDto) -> Vec<CreateActionRow> {
     let game_id = &game.id;
 
     let hit_btn = CreateButton::new(format!("bj_hit:{game_id}"))

@@ -1,4 +1,5 @@
 mod api_client;
+mod channel_manager;
 mod commands;
 mod config;
 mod handler;
@@ -13,8 +14,9 @@ use sentinel_shared::config::BotConfig;
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
+use crate::channel_manager::ChannelManager;
 use crate::config::Config;
-use crate::handler::Handler;
+use crate::handler::{ChannelManagerKey, Handler};
 
 /// TypeMap key for the blackjack ApiClient.
 pub struct GameApiKey;
@@ -37,7 +39,6 @@ async fn main() {
     let intents = GatewayIntents::GUILDS;
 
     let base_api = Arc::new(BaseApiClient::new(&config, "blackjack-bot"));
-
     let api_client = ApiClient::new(Arc::clone(&base_api));
 
     let mut client = Client::builder(config.discord_token(), intents)
@@ -49,6 +50,7 @@ async fn main() {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<GameApiKey>(api_client);
+        data.insert::<ChannelManagerKey>(Arc::new(ChannelManager::new()));
     }
 
     spawn_heartbeat(Arc::clone(&base_api));
