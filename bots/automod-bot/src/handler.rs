@@ -60,7 +60,7 @@ pub struct Handler;
 const FEATURE_DEDUPLICATION: bool = true;
 const FEATURE_CONFIG_LOADING: bool = true;
 const FEATURE_SUSPICIOUS_FILES: bool = false;   // Desactive pour debug
-const FEATURE_FLOOD_DETECTION: bool = true;      // ACTIVE — test 3
+const FEATURE_FLOOD_DETECTION: bool = true;      // REACTIVE — fix deadlock
 const FEATURE_CAPS_DETECTION: bool = false;      // Desactive pour debug
 const FEATURE_ADAPTIVE_SLOWMODE: bool = false;   // Desactive pour debug
 const FEATURE_LOCAL_ANALYSIS: bool = true;       // ACTIVE — test 1
@@ -210,36 +210,40 @@ impl EventHandler for Handler {
 
         // ── Feature 4 : Flood detection ──
         if FEATURE_FLOOD_DETECTION {
-            let is_flood = {
+            // Cloner le tracker pour liberer le RwLock immediatement
+            let flood_tracker = {
                 let data = ctx.data.read().await;
-                if let Some(tracker) = data.get::<FloodTrackerKey>() {
-                    let key = (msg.channel_id, msg.author.id);
-                    let now = Instant::now();
-                    let mut entry = tracker.entry(key).or_default();
-                    let timestamps = entry.value_mut();
-                    timestamps.retain(|t| now.duration_since(*t).as_secs() < flood_window_secs);
-                    timestamps.push(now);
-                    let flood = timestamps.len() >= flood_max_messages;
-                    if tracker.len() > 5000 {
-                        tracker.retain(|_, ts| {
-                            ts.last()
-                                .map(|t| now.duration_since(*t).as_secs() < 600)
-                                .unwrap_or(false)
-                        });
-                    }
-                    flood
-                } else {
-                    false
+                data.get::<FloodTrackerKey>().cloned()
+            };
+            // Le lock ctx.data est libere ici
+
+            let is_flood = if let Some(tracker) = &flood_tracker {
+                let key = (msg.channel_id, msg.author.id);
+                let now = Instant::now();
+                let mut entry = tracker.entry(key).or_default();
+                let timestamps = entry.value_mut();
+                timestamps.retain(|t| now.duration_since(*t).as_secs() < flood_window_secs);
+                timestamps.push(now);
+                let flood = timestamps.len() >= flood_max_messages;
+                // Drop le entry pour eviter le deadlock avec retain
+                drop(entry);
+                if tracker.len() > 5000 {
+                    tracker.retain(|_, ts| {
+                        ts.last()
+                            .map(|t| now.duration_since(*t).as_secs() < 600)
+                            .unwrap_or(false)
+                    });
                 }
+                flood
+            } else {
+                false
             };
 
             if is_flood {
                 info!(user = %msg.author.name, ">> FEATURE: Flood detecte");
-                let data = ctx.data.read().await;
-                if let Some(tracker) = data.get::<FloodTrackerKey>() {
+                if let Some(tracker) = &flood_tracker {
                     tracker.remove(&(msg.channel_id, msg.author.id));
                 }
-                drop(data);
 
                 let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
                     .color(colors.warn)
