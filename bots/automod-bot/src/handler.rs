@@ -62,7 +62,7 @@ const FEATURE_CONFIG_LOADING: bool = true;
 const FEATURE_SUSPICIOUS_FILES: bool = true;    // ACTIVE — test 5
 const FEATURE_FLOOD_DETECTION: bool = true;      // REACTIVE — fix deadlock
 const FEATURE_CAPS_DETECTION: bool = true;       // ACTIVE — test 4
-const FEATURE_ADAPTIVE_SLOWMODE: bool = false;   // Desactive pour debug
+const FEATURE_ADAPTIVE_SLOWMODE: bool = true;    // ACTIVE — test 6
 const FEATURE_LOCAL_ANALYSIS: bool = true;       // ACTIVE — test 1
 const FEATURE_API_ANALYSIS: bool = true;         // ACTIVE — test 2
 // ══════════════════════════════════════════════════════════════════════
