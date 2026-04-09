@@ -348,7 +348,16 @@ pub async fn ws_status(
 // ─────────────────────────────────────────────────────────────
 
 fn ai_base_url(adapter: &crate::infrastructure::api_adapter::ApiAdapter) -> String {
-    adapter.base_url()
+    // L'API ML Python tourne sur le meme hote que l'API Rust, mais sur le port 8000.
+    // On derive l'URL depuis la base_url configuree (ex: http://192.168.1.15:3000 -> http://192.168.1.15:8000)
+    let base = adapter.base_url();
+    if let Some(pos) = base.rfind(':') {
+        // Remplacer le port par 8000
+        format!("{}:8000", &base[..pos])
+    } else {
+        // Pas de port dans l'URL, ajouter :8000
+        format!("{}:8000", base)
+    }
 }
 
 #[tauri::command]
