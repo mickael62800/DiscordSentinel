@@ -22,6 +22,12 @@ impl WorkerConfig {
             betting_check_secs: load_env("BETTING_CHECK_SECS", 30),
         }
     }
+
+    pub fn apply_db_config(&mut self, db: &std::collections::HashMap<String, String>) {
+        use sentinel_worker_common::config_or_env;
+        self.combat_expiry_check_secs = config_or_env(db, "combat_expiry_check_secs", "COMBAT_EXPIRY_CHECK_SECS", 86400);
+        self.betting_check_secs = config_or_env(db, "betting_check_secs", "BETTING_CHECK_SECS", 30);
+    }
 }
 
 #[cfg(test)]

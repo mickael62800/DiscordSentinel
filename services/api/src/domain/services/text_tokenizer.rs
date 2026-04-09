@@ -124,6 +124,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Necessite le fichier tokenizer sur le disque"]
     fn real_tokenizer_loads_successfully() {
         let tok = load_real_tokenizer();
         assert!(tok.is_some(), "Tokenizer introuvable a {TOKENIZER_PATH}");

@@ -338,6 +338,27 @@ impl EventHandler for Handler {
         } else {
             info!("Slash commands enregistrees : automod");
         }
+
+        // Background task : desactiver le slowmode adaptatif quand l'activite retombe
+        let ctx_clone = ctx.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                let data = ctx_clone.data.read().await;
+                if let Some(tracker) = data.get::<SlowmodeTrackerKey>() {
+                    let to_deactivate = tracker.channels_to_deactivate(15);
+                    drop(data);
+                    for channel_id in to_deactivate {
+                        let edit = serenity::builder::EditChannel::new().rate_limit_per_user(0);
+                        if let Err(e) = channel_id.edit(&ctx_clone.http, edit).await {
+                            warn!(error = %e, channel_id = %channel_id, "Echec desactivation slowmode adaptatif");
+                        } else {
+                            info!(channel_id = %channel_id, "Slowmode adaptatif desactive (activite retombee)");
+                        }
+                    }
+                }
+            }
+        });
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {

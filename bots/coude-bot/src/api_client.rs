@@ -514,13 +514,42 @@ impl ApiClient {
         Ok(res.count)
     }
 
-    /// Stub: returns 0 (no casino_history table yet).
+    /// Somme des gains casino dans les dernieres 24h via wallet_transactions.
     pub async fn sum_casino_gains_today(
         &self,
-        _guild_id: &str,
-        _user_id: &str,
+        guild_id: &str,
+        user_id: &str,
     ) -> Result<i64, String> {
-        Ok(0)
+        #[derive(serde::Deserialize)]
+        struct Resp {
+            total: i64,
+        }
+        let res: Resp = self
+            .base
+            .get_json(&format!(
+                "/api/coude/{guild_id}/players/{user_id}/casino-gains-today"
+            ))
+            .await?;
+        Ok(res.total)
+    }
+
+    /// Nombre de vols effectues dans les dernieres 24h.
+    pub async fn count_steal_today(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<u64, String> {
+        #[derive(serde::Deserialize)]
+        struct Resp {
+            count: u64,
+        }
+        let res: Resp = self
+            .base
+            .get_json(&format!(
+                "/api/coude/{guild_id}/players/{user_id}/steal-today"
+            ))
+            .await?;
+        Ok(res.count)
     }
 
     // ── Combat lifecycle ──

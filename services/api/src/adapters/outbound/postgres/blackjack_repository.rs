@@ -119,12 +119,14 @@ impl BlackjackRepository for PgBlackjackRepository {
         let deck = serde_json::to_value(&game.deck)
             .map_err(|e| DomainError::Internal(format!("sérialisation deck : {e}")))?;
 
-        sqlx::query(
+        // Guard : ne mettre a jour que si la partie est encore en cours
+        // Empeche les race conditions (deux hit simultanes, hit+stand, etc.)
+        let result = sqlx::query(
             "UPDATE blackjack_games SET
                 player_hand = $1, dealer_hand = $2, deck = $3,
                 status = $4, player_score = $5, dealer_score = $6,
                 doubled = $7, payout = $8, bet = $9, finished_at = $10
-             WHERE id = $11"
+             WHERE id = $11 AND status = 'playing'"
         )
         .bind(player_hand)
         .bind(dealer_hand)
@@ -140,6 +142,10 @@ impl BlackjackRepository for PgBlackjackRepository {
         .execute(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(format!("blackjack update : {e}")))?;
+
+        if result.rows_affected() == 0 {
+            return Err(DomainError::Conflict("Partie deja terminee ou action concurrente".into()));
+        }
 
         Ok(())
     }

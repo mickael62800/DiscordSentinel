@@ -204,6 +204,23 @@ async fn handle_approve(ctx: &Context, component: &serenity::model::application:
         None => return,
     };
 
+    // Verifier que l'approbateur a la permission MODERATE_MEMBERS
+    if let Some(guild_id) = component.guild_id {
+        if let Ok(member) = guild_id.member(&ctx.http, component.user.id).await {
+            if let Ok(perms) = member.permissions(&ctx.cache) {
+                if !perms.moderate_members() {
+                    let response = serenity::all::CreateInteractionResponse::Message(
+                        serenity::all::CreateInteractionResponseMessage::new()
+                            .content("Tu n'as pas la permission d'approuver des actions.")
+                            .ephemeral(true),
+                    );
+                    let _ = component.create_response(&ctx.http, response).await;
+                    return;
+                }
+            }
+        }
+    }
+
     let pending = match pending_actions.remove(&pending_id) {
         Some((_, p)) => p,
         None => {

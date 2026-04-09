@@ -170,6 +170,23 @@ impl EventHandler for Handler {
             let streak_enabled = BaseApiClient::config_bool(&guild_config, "streak_enabled", true);
             let streak_mult = if streak_enabled {
                 if let Some(streak_tracker) = data.get::<StreakTrackerKey>() {
+                    // Si l'utilisateur n'est pas en cache (premier message apres restart),
+                    // charger son streak depuis l'API
+                    if !streak_tracker.has(guild_id.get(), msg.author.id.get()) {
+                        if let Some(api) = data.get::<StatsApiKey>() {
+                            if let Ok(streak_data) = api.get_streak(&guild_id.to_string(), &msg.author.id.to_string()).await {
+                                streak_tracker.seed(
+                                    guild_id.get(),
+                                    msg.author.id.get(),
+                                    streak_data.streak_current,
+                                    streak_data.streak_best,
+                                    streak_data.streak_last_day,
+                                    streak_data.streak_last_year,
+                                );
+                            }
+                        }
+                    }
+
                     let now = time::OffsetDateTime::now_utc();
                     let update = streak_tracker.record_activity(
                         guild_id.get(),
@@ -251,7 +268,13 @@ impl EventHandler for Handler {
                                 msg.author.id, level
                             ))
                             .thumbnail(msg.author.face());
-                        if let Err(e) = msg.channel_id.send_message(
+
+                        // Envoyer dans le canal dedie si configure, sinon dans le canal courant
+                        let target_channel = crate::level_channel::resolve_level_up_channel(&guild_config)
+                            .map(serenity::model::id::ChannelId::new)
+                            .unwrap_or(msg.channel_id);
+
+                        if let Err(e) = target_channel.send_message(
                             &ctx.http,
                             CreateMessage::new().embed(embed),
                         ).await {
@@ -372,18 +395,31 @@ impl EventHandler for Handler {
                                     Ok(result) => {
                                         if result.leveled_up {
                                             let level = result.user.level_voice;
-                                            if let Ok(channels) = guild_id.channels(&ctx.http).await {
-                                                if let Some(ch) = channels.values().find(|c| c.kind == serenity::model::channel::ChannelType::Text) {
-                                                    let embed = success_embed("\u{1f3a4} LEVEL UP Vocal !")
-                                                        .description(format!(
-                                                            "<@{}> est maintenant **niveau {} en vocal** !",
-                                                            user_id, level
-                                                        ));
-                                                    if let Err(e) = ch.id.send_message(
-                                                        &ctx.http,
-                                                        CreateMessage::new().embed(embed),
-                                                    ).await {
-                                                        warn!(error = %e, "Failed to send voice level-up message");
+                                            let embed = success_embed("\u{1f3a4} LEVEL UP Vocal !")
+                                                .description(format!(
+                                                    "<@{}> est maintenant **niveau {} en vocal** !",
+                                                    user_id, level
+                                                ));
+
+                                            // Utiliser le canal dedie si configure
+                                            let voice_guild_config = if let Some(base) = data.get::<ApiClientKey>() {
+                                                base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+                                            } else {
+                                                std::collections::HashMap::new()
+                                            };
+
+                                            if let Some(ch_id) = crate::level_channel::resolve_level_up_channel(&voice_guild_config) {
+                                                let ch = serenity::model::id::ChannelId::new(ch_id);
+                                                if let Err(e) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
+                                                    warn!(error = %e, "Failed to send voice level-up message");
+                                                }
+                                            } else {
+                                                // Fallback : premier canal texte
+                                                if let Ok(channels) = guild_id.channels(&ctx.http).await {
+                                                    if let Some(ch) = channels.values().find(|c| c.kind == serenity::model::channel::ChannelType::Text) {
+                                                        if let Err(e) = ch.id.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
+                                                            warn!(error = %e, "Failed to send voice level-up message");
+                                                        }
                                                     }
                                                 }
                                             }
@@ -395,7 +431,10 @@ impl EventHandler for Handler {
                                             let lt = result.user.level_text;
                                             let lv = result.user.level_voice;
                                             let lg = result.user.level;
+                                            // Drop le read lock AVANT check_and_assign (evite deadlock)
+                                            drop(data);
                                             check_and_assign_all_roles(&ctx, guild_id, user_id, lt, lv, lg).await;
+                                            return; // data droppee, on ne peut plus l'utiliser
                                         }
                                     }
                                     Err(e) => {

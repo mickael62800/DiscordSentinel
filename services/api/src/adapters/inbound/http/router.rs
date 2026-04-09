@@ -224,6 +224,8 @@ fn coude_routes() -> Router<AppState> {
         .route("/{guild_id}/players/{user_id}/casino-loss", post(handlers::coude::record_casino_loss))
         .route("/{guild_id}/players/{user_id}/casino-faillite", post(handlers::coude::record_casino_faillite))
         .route("/{guild_id}/players/{user_id}/casino-today", get(handlers::coude::count_casino_today))
+        .route("/{guild_id}/players/{user_id}/casino-gains-today", get(handlers::coude::sum_casino_gains_today))
+        .route("/{guild_id}/players/{user_id}/steal-today", get(handlers::coude::count_steal_today))
         // Combat lifecycle
         .route("/{guild_id}/combats/create", post(handlers::coude::create_combat))
         .route("/combats/{combat_id}/detail", get(handlers::coude::get_combat))
@@ -266,6 +268,18 @@ fn coude_routes() -> Router<AppState> {
         .route("/{guild_id}/inventory/{user_id}/add", post(handlers::coude::add_item))
         .route("/{guild_id}/inventory/{user_id}/use", post(handlers::coude::use_item))
         .route("/{guild_id}/inventory/{user_id}/has/{item_key}", get(handlers::coude::has_item))
+}
+
+fn game_routes() -> Router<AppState> {
+    Router::new()
+        .route("/{guild_id}", get(handlers::games::list_games))
+        .route("/", post(handlers::games::create_game))
+        .route("/{guild_id}/{game_id}", delete(handlers::games::delete_game))
+        .route("/{guild_id}/{game_id}/subscribe", post(handlers::games::subscribe))
+        .route("/{guild_id}/{game_id}/subscribe/{user_id}", delete(handlers::games::unsubscribe))
+        .route("/{guild_id}/{game_id}/subscribers", get(handlers::games::get_subscribers))
+        .route("/{guild_id}/by-name/{game_name}", get(handlers::games::get_game_by_name))
+        .route("/{guild_id}/user/{user_id}", get(handlers::games::get_user_games))
 }
 
 fn member_routes() -> Router<AppState> {
@@ -351,6 +365,8 @@ pub fn build_for_test(state: AppState) -> Router {
         .route("/api/discord-roles/{guild_id}/{role_id}", patch(handlers::discord_roles::edit_role).delete(handlers::discord_roles::delete_role))
         .nest("/api/members", member_routes())
         .nest("/api/coude", coude_routes())
+        .nest("/api/games", game_routes())
+        .route("/api/welcome/{guild_id}", get(handlers::welcome::get_config).put(handlers::welcome::save_config))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,

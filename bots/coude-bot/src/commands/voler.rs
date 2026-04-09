@@ -98,6 +98,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
+    // Verifier la limite quotidienne de vols
+    let max_daily = config.steal_max_daily();
+    if max_daily > 0 {
+        let today_count = api.count_steal_today(&guild_id, &thief_id).await.unwrap_or(0);
+        if today_count >= max_daily {
+            reply_ephemeral(
+                ctx,
+                command,
+                &format!("Tu as atteint la limite de {} vols par jour !", max_daily),
+            )
+            .await;
+            return;
+        }
+    }
+
     // Verifier le cooldown (30 min)
     match api.check_cooldown(&guild_id, &thief_id, "voler").await {
         Ok(Some(expires_at_str)) => {

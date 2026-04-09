@@ -365,6 +365,15 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
 
+    // Enregistrer la creation dans le SLA tracker
+    if ticket_id != "???" {
+        let data = ctx.data.read().await;
+        if let Some(sla) = data.get::<crate::handler::SlaTrackerKey>() {
+            sla.record_creation(&ticket_id);
+        }
+        drop(data);
+    }
+
     // Mettre a jour le topic du salon avec l'UUID du ticket
     if ticket_id != "???" {
         let new_topic = format!("[ticket:{}] {} — {}", ticket_id, type_label, author.name);

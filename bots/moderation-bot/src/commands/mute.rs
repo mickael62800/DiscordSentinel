@@ -15,6 +15,7 @@ use crate::handler::ModerationApiKey;
 pub fn register() -> CreateCommand {
     CreateCommand::new("mute")
         .description("Mute un utilisateur (permanent ou temporaire)")
+        .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a mute")
                 .required(true),
@@ -35,6 +36,7 @@ pub fn register() -> CreateCommand {
 pub fn register_unmute() -> CreateCommand {
     CreateCommand::new("unmute")
         .description("Retirer le mute d'un utilisateur")
+        .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a unmute")
                 .required(true),

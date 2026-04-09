@@ -11,6 +11,7 @@ use crate::handler::ModerationApiKey;
 pub fn register() -> CreateCommand {
     CreateCommand::new("history")
         .description("Voir l'historique des sanctions d'un utilisateur")
+        .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a verifier")
                 .required(true),

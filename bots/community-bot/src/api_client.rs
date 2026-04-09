@@ -3,6 +3,15 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use sentinel_shared::api_client::BaseApiClient;
 
+/// Entree de role temporaire retournee par l'API.
+#[derive(Debug, Deserialize)]
+pub struct TempRoleApiEntry {
+    pub guild_id: String,
+    pub user_id: String,
+    pub role_id: String,
+    pub expires_at: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct RolePanelDetail {
     pub panel: RolePanel,
@@ -114,6 +123,11 @@ impl ApiClient {
             "role_id": role_id,
             "expires_at": expires_at,
         })).await;
+    }
+
+    /// Charge les roles temporaires actifs depuis l'API pour une guild.
+    pub async fn list_temp_roles(&self, guild_id: &str) -> Result<Vec<TempRoleApiEntry>, String> {
+        self.base.get_json(&format!("/api/temp-roles/{}", guild_id)).await
     }
 
     /// Supprime un role temporaire expire.

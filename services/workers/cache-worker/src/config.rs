@@ -29,6 +29,13 @@ impl WorkerConfig {
             voice_stats_refresh_secs: load_env("VOICE_STATS_CACHE_REFRESH", DEFAULT_VOICE_STATS_REFRESH_SECS),
         }
     }
+
+    pub fn apply_db_config(&mut self, db: &std::collections::HashMap<String, String>) {
+        use sentinel_worker_common::config_or_env;
+        self.analytics_refresh_secs = config_or_env(db, "analytics_cache_refresh", "ANALYTICS_CACHE_REFRESH", DEFAULT_ANALYTICS_REFRESH_SECS);
+        self.dashboard_refresh_secs = config_or_env(db, "dashboard_cache_refresh", "DASHBOARD_CACHE_REFRESH", DEFAULT_DASHBOARD_REFRESH_SECS);
+        self.voice_stats_refresh_secs = config_or_env(db, "voice_stats_cache_refresh", "VOICE_STATS_CACHE_REFRESH", DEFAULT_VOICE_STATS_REFRESH_SECS);
+    }
 }
 
 #[cfg(test)]

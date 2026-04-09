@@ -144,9 +144,11 @@ impl ManageLevelsUseCase for StubLevels {
     async fn add_xp(&self, _: manage_levels::AddXpCommand) -> Result<manage_levels::AddXpResult, DomainError> { unimplemented!() }
     async fn get_user_level(&self, _: &str, _: &str) -> Result<UserLevel, DomainError> { unimplemented!() }
     async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserLevel>, DomainError> { unimplemented!() }
+    async fn get_leaderboard_by_source(&self, _: &str, _: XpSource, _: i64) -> Result<Vec<UserLevel>, DomainError> { unimplemented!() }
     async fn get_rewards(&self, _: &str) -> Result<Vec<LevelReward>, DomainError> { unimplemented!() }
-    async fn set_reward(&self, _: &str, _: i32, _: &str) -> Result<LevelReward, DomainError> { unimplemented!() }
-    async fn delete_reward(&self, _: &str, _: i32) -> Result<(), DomainError> { unimplemented!() }
+    async fn get_rewards_by_source(&self, _: &str, _: XpSource) -> Result<Vec<LevelReward>, DomainError> { unimplemented!() }
+    async fn set_reward(&self, _: &str, _: i32, _: &str, _: XpSource) -> Result<LevelReward, DomainError> { unimplemented!() }
+    async fn delete_reward(&self, _: &str, _: i32, _: XpSource) -> Result<(), DomainError> { unimplemented!() }
 }
 
 pub struct StubRolePanels;
@@ -287,6 +289,39 @@ impl DiscordRoleRepository for StubDiscordRoleRepo {
     async fn find_by_id(&self, _: &str, _: &str) -> Result<Option<DiscordRole>, DomainError> { unimplemented!() }
 }
 
+pub struct StubMembers;
+#[async_trait]
+impl ManageMembersUseCase for StubMembers {
+    async fn list_members(&self, _: &str) -> Result<Vec<GuildMember>, DomainError> { unimplemented!() }
+    async fn get_member(&self, _: &str, _: &str) -> Result<GuildMember, DomainError> { unimplemented!() }
+    async fn get_member_summary(&self, _: &str, _: &str) -> Result<MemberSummary, DomainError> { unimplemented!() }
+    async fn sync_members(&self, _: manage_members::SyncMembersCommand) -> Result<u64, DomainError> { unimplemented!() }
+    async fn register_member(&self, _: manage_members::RegisterMemberCommand) -> Result<(), DomainError> { unimplemented!() }
+    async fn remove_member(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn update_member(&self, _: manage_members::UpdateMemberCommand) -> Result<(), DomainError> { unimplemented!() }
+}
+
+pub struct StubWalletRepo;
+#[async_trait]
+impl WalletRepository for StubWalletRepo {
+    async fn get_or_create(&self, _: &str, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> { unimplemented!() }
+    async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Wallet, DomainError> { unimplemented!() }
+    async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Wallet, DomainError> { unimplemented!() }
+    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> { unimplemented!() }
+    async fn get_transactions(&self, _: &str, _: &str, _: i64) -> Result<Vec<WalletTransaction>, DomainError> { unimplemented!() }
+}
+
+pub struct StubBlackjackRepo;
+#[async_trait]
+impl BlackjackRepository for StubBlackjackRepo {
+    async fn create(&self, _: &BlackjackGame) -> Result<(), DomainError> { unimplemented!() }
+    async fn get_active(&self, _: &str, _: &str) -> Result<Option<BlackjackGame>, DomainError> { unimplemented!() }
+    async fn update(&self, _: &BlackjackGame) -> Result<(), DomainError> { unimplemented!() }
+    async fn get_by_id(&self, _: Uuid) -> Result<Option<BlackjackGame>, DomainError> { unimplemented!() }
+}
+
 // ══════════════════════════════════════════════════════════
 // TestAppState builder
 // ══════════════════════════════════════════════════════════
@@ -321,6 +356,12 @@ fn base_state() -> AppState {
         bot_config_repo: Arc::new(StubBotConfigRepo),
         ia_config_repo: Arc::new(StubIaConfigRepo),
         discord_role_repo: Arc::new(StubDiscordRoleRepo),
+        members_uc: Arc::new(StubMembers),
+        wallet_repo: Arc::new(StubWalletRepo),
+        blackjack_svc: Arc::new(sentinel_api::application::BlackjackService::new(
+            Arc::new(StubBlackjackRepo),
+            Arc::new(StubWalletRepo),
+        )),
         broadcaster: Arc::new(EventBroadcaster::new()),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
         discord_api: Arc::new(DiscordApiService::new(String::new())),

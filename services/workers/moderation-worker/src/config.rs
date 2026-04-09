@@ -36,6 +36,18 @@ impl WorkerConfig {
             send_reminders_interval_secs: reminders_secs,
         }
     }
+
+    pub fn apply_db_config(&mut self, db: &std::collections::HashMap<String, String>) {
+        use sentinel_worker_common::config_or_env;
+        let regen_h: u64 = config_or_env(db, "conduct_regen_interval", "CONDUCT_REGEN_INTERVAL", 1);
+        let cleanup_m: u64 = config_or_env(db, "ban_cleanup_interval", "BAN_CLEANUP_INTERVAL", 1);
+        let sync_m: u64 = config_or_env(db, "sync_ban_proposals_interval", "SYNC_BAN_PROPOSALS_INTERVAL", 2);
+        let reminders_s: u64 = config_or_env(db, "send_reminders_interval", "SEND_REMINDERS_INTERVAL", 30);
+        self.conduct_regen_interval_secs = regen_h * SECS_PER_HOUR;
+        self.ban_cleanup_interval_secs = cleanup_m * SECS_PER_MINUTE;
+        self.sync_ban_proposals_interval_secs = sync_m * SECS_PER_MINUTE;
+        self.send_reminders_interval_secs = reminders_s;
+    }
 }
 
 #[cfg(test)]

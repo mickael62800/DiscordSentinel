@@ -3,6 +3,7 @@ mod badges;
 mod commands;
 mod config;
 mod handler;
+mod level_channel;
 mod multipliers;
 mod streaks;
 mod tracker;

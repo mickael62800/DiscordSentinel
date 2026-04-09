@@ -102,8 +102,9 @@ async fn handle_test(ctx: &Context, command: &CommandInteraction) {
 
     let flags = detectors::analyze(&message, &DetectorConfig::default());
 
-    let preview = if message.len() > 100 {
-        format!("{}...", &message[..100])
+    let preview = if message.chars().count() > 100 {
+        let truncated: String = message.chars().take(100).collect();
+        format!("{}...", truncated)
     } else {
         message.clone()
     };

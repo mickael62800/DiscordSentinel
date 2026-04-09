@@ -18,6 +18,11 @@ impl MonitorConfig {
             check_interval_secs: load_env("MONITOR_CHECK_INTERVAL", DEFAULT_CHECK_INTERVAL_SECS),
         }
     }
+
+    pub fn apply_db_config(&mut self, db: &std::collections::HashMap<String, String>) {
+        use sentinel_worker_common::config_or_env;
+        self.check_interval_secs = config_or_env(db, "monitor_check_interval", "MONITOR_CHECK_INTERVAL", DEFAULT_CHECK_INTERVAL_SECS);
+    }
 }
 
 #[cfg(test)]

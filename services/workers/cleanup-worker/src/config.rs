@@ -59,6 +59,18 @@ impl WorkerConfig {
             vacuum_interval_secs: vacuum_hours * SECS_PER_HOUR,
         }
     }
+
+    pub fn apply_db_config(&mut self, db: &std::collections::HashMap<String, String>) {
+        use sentinel_worker_common::{config_or_env, config_or_env_bool};
+        self.voice_sessions_retention_days = config_or_env(db, "voice_sessions_retention_days", "VOICE_SESSIONS_RETENTION_DAYS", 90);
+        self.logs_retention_days = config_or_env(db, "logs_retention_days", "LOGS_RETENTION_DAYS", 30);
+        self.closed_tickets_retention_days = config_or_env(db, "closed_tickets_retention_days", "CLOSED_TICKETS_RETENTION_DAYS", 180);
+        let cleanup_h: u64 = config_or_env(db, "cleanup_interval_hours", "CLEANUP_INTERVAL_HOURS", 1);
+        self.cleanup_interval_secs = cleanup_h * SECS_PER_HOUR;
+        self.vacuum_enabled = config_or_env_bool(db, "vacuum_enabled", "VACUUM_ENABLED", true);
+        let vacuum_h: u64 = config_or_env(db, "vacuum_interval_hours", "VACUUM_INTERVAL_HOURS", 24);
+        self.vacuum_interval_secs = vacuum_h * SECS_PER_HOUR;
+    }
 }
 
 #[cfg(test)]

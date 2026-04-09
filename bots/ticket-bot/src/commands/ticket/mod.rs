@@ -96,6 +96,23 @@ async fn handle_close(
         return reply(ctx, command, "Cette commande ne fonctionne que dans un salon de ticket.").await;
     }
 
+    // Verifier que l'utilisateur est staff ou l'auteur du ticket
+    if let Some(guild_id) = command.guild_id {
+        let is_staff = crate::commands::ticket::helpers::is_staff_member(ctx, guild_id, command.user.id).await;
+        if !is_staff {
+            // Verifier si c'est l'auteur du ticket (dans le topic)
+            let topic = command.channel_id
+                .to_channel(&ctx.http).await.ok()
+                .and_then(|c| c.guild())
+                .and_then(|c| c.topic)
+                .unwrap_or_default();
+            let is_author = topic.contains(&command.user.id.to_string());
+            if !is_author {
+                return reply(ctx, command, "Seul le staff ou l'auteur du ticket peut le fermer.").await;
+            }
+        }
+    }
+
     // Recuperer l'UUID du ticket depuis le topic du salon
     let ticket_id = get_ticket_id_from_channel(ctx, command.channel_id).await;
 
@@ -168,6 +185,14 @@ async fn handle_invite(
 
     if !channel_name.starts_with("ticket-") {
         return reply(ctx, command, "Cette commande ne fonctionne que dans un salon de ticket.").await;
+    }
+
+    // Seul le staff peut inviter des membres dans un ticket
+    if let Some(guild_id) = command.guild_id {
+        let is_staff = crate::commands::ticket::helpers::is_staff_member(ctx, guild_id, command.user.id).await;
+        if !is_staff {
+            return reply(ctx, command, "Seul le staff peut inviter des membres dans un ticket.").await;
+        }
     }
 
     let options = get_sub_options(command);

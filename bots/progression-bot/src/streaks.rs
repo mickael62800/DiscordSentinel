@@ -27,6 +27,17 @@ pub struct StreakTracker {
 }
 
 impl StreakTracker {
+    /// Precharge un streak depuis les donnees API (au premier message apres restart).
+    pub fn seed(&self, guild_id: u64, user_id: u64, current: u32, best: u32, last_day: u32, last_year: i32) {
+        // Ne pas ecraser si deja present (activite en cours)
+        self.streaks.entry((guild_id, user_id)).or_insert(StreakData {
+            last_active_day: last_day,
+            last_active_year: last_year,
+            current_streak: current,
+            best_streak: best,
+        });
+    }
+
     pub fn new() -> Self {
         Self {
             streaks: DashMap::new(),
@@ -81,6 +92,11 @@ impl StreakTracker {
     }
 
     /// Recupere le streak actuel d'un utilisateur.
+    /// Verifie si un utilisateur est dans le cache de streaks.
+    pub fn has(&self, guild_id: u64, user_id: u64) -> bool {
+        self.streaks.contains_key(&(guild_id, user_id))
+    }
+
     pub fn get_streak(&self, guild_id: u64, user_id: u64) -> (u32, u32) {
         self.streaks
             .get(&(guild_id, user_id))
@@ -200,5 +216,54 @@ mod tests {
         let (s2, _) = tracker.get_streak(1, 200);
         assert_eq!(s1, 2);
         assert_eq!(s2, 1);
+    }
+
+    // ── Tests pour seed() et has() (reload depuis API) ──
+
+    #[test]
+    fn seed_loads_existing_streak() {
+        let tracker = StreakTracker::new();
+        tracker.seed(1, 100, 15, 20, 100, 2025);
+        assert!(tracker.has(1, 100));
+        let (current, best) = tracker.get_streak(1, 100);
+        assert_eq!(current, 15);
+        assert_eq!(best, 20);
+    }
+
+    #[test]
+    fn seed_does_not_overwrite_active() {
+        let tracker = StreakTracker::new();
+        tracker.record_activity(1, 100, 42, 2025);
+        // Seed avec des valeurs differentes — ne doit PAS ecraser
+        tracker.seed(1, 100, 99, 99, 1, 2020);
+        let (current, _) = tracker.get_streak(1, 100);
+        assert_eq!(current, 1); // valeur du record_activity, pas du seed
+    }
+
+    #[test]
+    fn has_returns_false_for_unknown() {
+        let tracker = StreakTracker::new();
+        assert!(!tracker.has(1, 999));
+    }
+
+    #[test]
+    fn seed_then_record_continues_streak() {
+        let tracker = StreakTracker::new();
+        // Simuler un reload : dernier jour actif = 100, streak = 5
+        tracker.seed(1, 100, 5, 10, 100, 2025);
+        // Le jour suivant (101)
+        let update = tracker.record_activity(1, 100, 101, 2025);
+        assert!(update.new_day);
+        assert_eq!(update.current_streak, 6);
+    }
+
+    #[test]
+    fn seed_then_record_breaks_streak_if_gap() {
+        let tracker = StreakTracker::new();
+        tracker.seed(1, 100, 5, 10, 100, 2025);
+        // Jour 103 — gap de 2 jours
+        let update = tracker.record_activity(1, 100, 103, 2025);
+        assert!(update.new_day);
+        assert_eq!(update.current_streak, 1); // streak cassee
     }
 }

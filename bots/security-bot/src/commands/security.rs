@@ -143,8 +143,9 @@ async fn handle_history(ctx: &Context, command: &CommandInteraction) {
                             .get("description")
                             .and_then(|v| v.as_str())
                             .unwrap_or("");
-                        let desc_preview = if description.len() > 80 {
-                            format!("{}...", &description[..80])
+                        let desc_preview = if description.chars().count() > 80 {
+                            let truncated: String = description.chars().take(80).collect();
+                            format!("{}...", truncated)
                         } else {
                             description.to_string()
                         };

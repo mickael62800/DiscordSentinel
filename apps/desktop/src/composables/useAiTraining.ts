@@ -179,7 +179,7 @@ async function pollStatus() {
       hasSeenRunning = true;
     }
 
-    if (!result.running && pollTimer && (hasSeenRunning || pollCount > 20)) {
+    if (!trainingResult.running && pollTimer && (hasSeenRunning || pollCount > 20)) {
       stopPolling();
       stopping.value = false;
     }

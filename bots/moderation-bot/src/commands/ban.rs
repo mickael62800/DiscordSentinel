@@ -15,6 +15,7 @@ use crate::handler::ModerationApiKey;
 pub fn register() -> CreateCommand {
     CreateCommand::new("ban")
         .description("Bannir un utilisateur (permanent ou temporaire)")
+        .default_member_permissions(serenity::all::Permissions::BAN_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur a bannir")
                 .required(true),
@@ -35,6 +36,7 @@ pub fn register() -> CreateCommand {
 pub fn register_unban() -> CreateCommand {
     CreateCommand::new("unban")
         .description("Debannir un utilisateur")
+        .default_member_permissions(serenity::all::Permissions::BAN_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "user_id", "ID de l'utilisateur a debannir")
                 .required(true),

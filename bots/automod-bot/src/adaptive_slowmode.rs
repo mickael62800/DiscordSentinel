@@ -79,6 +79,26 @@ impl SlowmodeTracker {
         self.counters.len()
     }
 
+    /// Retourne les channels dont le slowmode a ete active mais dont l'activite
+    /// est retombee sous le seuil (aucun message dans la fenetre).
+    /// Ces channels devraient avoir leur slowmode desactive.
+    pub fn channels_to_deactivate(&self, threshold: usize) -> Vec<ChannelId> {
+        let now = Instant::now();
+        self.counters
+            .iter()
+            .filter(|entry| {
+                let active_count = entry
+                    .value()
+                    .iter()
+                    .filter(|t| now.duration_since(**t) < self.window)
+                    .count();
+                // Si l'activite est retombee sous la moitie du seuil, desactiver
+                active_count < threshold / 2
+            })
+            .map(|entry| *entry.key())
+            .collect()
+    }
+
     /// Retourne le nombre de messages dans la fenetre pour un channel.
     #[allow(dead_code)]
     pub fn count(&self, channel_id: ChannelId) -> usize {
@@ -126,6 +146,53 @@ mod tests {
     }
 
     #[test]
+    fn try_start_activation_returns_true_first_time() {
+        let tracker = SlowmodeTracker::new(60);
+        let ch = ChannelId::new(1);
+        assert!(tracker.try_start_activation(ch));
+    }
+
+    #[test]
+    fn try_start_activation_returns_false_if_already_activating() {
+        let tracker = SlowmodeTracker::new(60);
+        let ch = ChannelId::new(1);
+        assert!(tracker.try_start_activation(ch));
+        assert!(!tracker.try_start_activation(ch)); // deja en cours
+    }
+
+    #[test]
+    fn finish_activation_allows_reactivation() {
+        let tracker = SlowmodeTracker::new(60);
+        let ch = ChannelId::new(1);
+        tracker.try_start_activation(ch);
+        tracker.finish_activation(ch);
+        assert!(tracker.try_start_activation(ch)); // de nouveau possible
+    }
+
+    #[test]
+    fn tracked_channels_count() {
+        let tracker = SlowmodeTracker::new(60);
+        assert_eq!(tracker.tracked_channels(), 0);
+        tracker.record_message(ChannelId::new(1));
+        tracker.record_message(ChannelId::new(2));
+        assert_eq!(tracker.tracked_channels(), 2);
+    }
+
+    #[test]
+    fn cleanup_removes_old_channels() {
+        let tracker = SlowmodeTracker::new(1); // window 1s
+        let ch = ChannelId::new(1);
+        tracker.record_message(ch);
+        // Forcer l'entree a etre vieille (on insere directement)
+        tracker.counters.entry(ch).and_modify(|ts| {
+            ts.clear();
+            ts.push(Instant::now() - Duration::from_secs(10));
+        });
+        tracker.cleanup();
+        assert_eq!(tracker.tracked_channels(), 0, "Le channel inactif doit etre nettoye");
+    }
+
+    #[test]
     fn should_activate_below_threshold() {
         let tracker = SlowmodeTracker::new(60);
         let ch = ChannelId::new(1);
@@ -161,5 +228,50 @@ mod tests {
         tracker.record_message(ch);
         tracker.reset(ch);
         assert_eq!(tracker.count(ch), 0);
+    }
+
+    // ── Tests pour channels_to_deactivate ──
+
+    #[test]
+    fn deactivate_empty_tracker() {
+        let tracker = SlowmodeTracker::new(60);
+        assert!(tracker.channels_to_deactivate(10).is_empty());
+    }
+
+    #[test]
+    fn deactivate_returns_quiet_channels() {
+        let tracker = SlowmodeTracker::new(60);
+        let ch = ChannelId::new(1);
+        // 2 messages = sous la moitie de 10 (seuil/2 = 5)
+        tracker.record_message(ch);
+        tracker.record_message(ch);
+        let to_deactivate = tracker.channels_to_deactivate(10);
+        assert_eq!(to_deactivate.len(), 1);
+        assert_eq!(to_deactivate[0], ch);
+    }
+
+    #[test]
+    fn deactivate_ignores_active_channels() {
+        let tracker = SlowmodeTracker::new(60);
+        let ch = ChannelId::new(1);
+        // 8 messages = au-dessus de seuil/2 = 5
+        for _ in 0..8 {
+            tracker.record_message(ch);
+        }
+        assert!(tracker.channels_to_deactivate(10).is_empty());
+    }
+
+    #[test]
+    fn deactivate_mixed_channels() {
+        let tracker = SlowmodeTracker::new(60);
+        let quiet = ChannelId::new(1);
+        let active = ChannelId::new(2);
+        tracker.record_message(quiet);
+        for _ in 0..8 {
+            tracker.record_message(active);
+        }
+        let to_deactivate = tracker.channels_to_deactivate(10);
+        assert_eq!(to_deactivate.len(), 1);
+        assert_eq!(to_deactivate[0], quiet);
     }
 }

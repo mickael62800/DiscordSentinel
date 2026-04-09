@@ -49,8 +49,8 @@ fn make_action(
     ModerationAction {
         id,
         guild_id: guild_id.into(),
-        channel_id: "chan1".into(),
-        moderator_id: "mod1".into(),
+        channel_id: "555555555555555555".into(),
+        moderator_id: "333333333333333333".into(),
         moderator_name: "ModeratorBob".into(),
         target_id: target_id.into(),
         target_name: target_name.into(),
@@ -175,11 +175,11 @@ async fn post_json(app: axum::Router, uri: &str, body: serde_json::Value) -> (St
 async fn log_action_warn_success() {
     let app = build_app(MockModerationUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "channel_id": "chan1",
-        "moderator_id": "mod1",
+        "guild_id": "111111111111111111",
+        "channel_id": "555555555555555555",
+        "moderator_id": "333333333333333333",
         "moderator_name": "Bob",
-        "target_id": "user1",
+        "target_id": "444444444444444444",
         "target_name": "Alice",
         "action_type": "warn",
         "reason": "Spam dans #general",
@@ -197,11 +197,11 @@ async fn log_action_warn_success() {
 async fn log_action_mute_temp_success() {
     let app = build_app(MockModerationUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "channel_id": "chan1",
-        "moderator_id": "mod1",
+        "guild_id": "111111111111111111",
+        "channel_id": "555555555555555555",
+        "moderator_id": "333333333333333333",
         "moderator_name": "Bob",
-        "target_id": "user1",
+        "target_id": "444444444444444444",
         "target_name": "Alice",
         "action_type": "mute_temp",
         "reason": "Flood de mentions",
@@ -216,11 +216,11 @@ async fn log_action_mute_temp_success() {
 async fn log_action_ban_permanent_success() {
     let app = build_app(MockModerationUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "channel_id": "chan1",
-        "moderator_id": "mod1",
+        "guild_id": "111111111111111111",
+        "channel_id": "555555555555555555",
+        "moderator_id": "333333333333333333",
         "moderator_name": "Bob",
-        "target_id": "user1",
+        "target_id": "444444444444444444",
         "target_name": "Alice",
         "action_type": "ban_permanent",
         "reason": "Harcelement repete"
@@ -234,11 +234,11 @@ async fn log_action_ban_permanent_success() {
 async fn log_action_unmute_success() {
     let app = build_app(MockModerationUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "channel_id": "chan1",
-        "moderator_id": "mod1",
+        "guild_id": "111111111111111111",
+        "channel_id": "555555555555555555",
+        "moderator_id": "333333333333333333",
         "moderator_name": "Bob",
-        "target_id": "user1",
+        "target_id": "444444444444444444",
         "target_name": "Alice",
         "action_type": "unmute",
         "reason": "Fin du mute"
@@ -252,11 +252,11 @@ async fn log_action_unmute_success() {
 async fn log_action_unban_success() {
     let app = build_app(MockModerationUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "channel_id": "chan1",
-        "moderator_id": "mod1",
+        "guild_id": "111111111111111111",
+        "channel_id": "555555555555555555",
+        "moderator_id": "333333333333333333",
         "moderator_name": "Bob",
-        "target_id": "user1",
+        "target_id": "444444444444444444",
         "target_name": "Alice",
         "action_type": "unban",
         "reason": "Pardon"
@@ -270,7 +270,7 @@ async fn log_action_unban_success() {
 async fn log_action_missing_fields_returns_422() {
     let app = build_app(MockModerationUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
+        "guild_id": "111111111111111111",
         "action_type": "warn"
     });
     let (status, _) = post_json(app, "/api/moderation/actions", body).await;
@@ -284,9 +284,9 @@ async fn log_action_missing_fields_returns_422() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_history_empty() {
     let app = build_app(MockModerationUC::new());
-    let (status, json) = get(app, "/api/moderation/history/guild1/user1").await;
+    let (status, json) = get(app, "/api/moderation/history/111111111111111111/444444444444444444").await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["target_id"], "user1");
+    assert_eq!(json["target_id"], "444444444444444444");
     assert_eq!(json["total_warns"], 0);
     assert_eq!(json["total_mutes"], 0);
     assert_eq!(json["total_bans"], 0);
@@ -296,11 +296,11 @@ async fn get_history_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_history_with_actions() {
     let uc = MockModerationUC::new()
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "warn", "Spam", Some("low"), None))
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "warn", "Insulte", Some("medium"), None))
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "mute_temp", "Flood", None, Some(600)));
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "warn", "Spam", Some("low"), None))
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "warn", "Insulte", Some("medium"), None))
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "mute_temp", "Flood", None, Some(600)));
     let app = build_app(uc);
-    let (status, json) = get(app, "/api/moderation/history/guild1/user1").await;
+    let (status, json) = get(app, "/api/moderation/history/111111111111111111/444444444444444444").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["target_name"], "Alice");
     assert_eq!(json["total_warns"], 2);
@@ -312,10 +312,10 @@ async fn get_history_with_actions() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_history_counts_ban_types() {
     let uc = MockModerationUC::new()
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "ban_temp", "Raid", None, Some(3600)))
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "ban_permanent", "Recidive", None, None));
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "ban_temp", "Raid", None, Some(3600)))
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "ban_permanent", "Recidive", None, None));
     let app = build_app(uc);
-    let (status, json) = get(app, "/api/moderation/history/guild1/user1").await;
+    let (status, json) = get(app, "/api/moderation/history/111111111111111111/444444444444444444").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["total_bans"], 2);
 }
@@ -323,9 +323,9 @@ async fn get_history_counts_ban_types() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_history_different_guild_returns_empty() {
     let uc = MockModerationUC::new()
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "warn", "Spam", Some("low"), None));
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "warn", "Spam", Some("low"), None));
     let app = build_app(uc);
-    let (status, json) = get(app, "/api/moderation/history/guild2/user1").await;
+    let (status, json) = get(app, "/api/moderation/history/222222222222222222/444444444444444444").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["total_warns"], 0);
 }
@@ -345,9 +345,9 @@ async fn list_bans_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_bans_returns_only_bans() {
     let uc = MockModerationUC::new()
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "warn", "Spam", Some("low"), None))
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user2", "Bob", "ban_permanent", "Harcelement", None, None))
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user3", "Charlie", "ban_temp", "Raid", None, Some(7200)));
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "warn", "Spam", Some("low"), None))
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "user2", "Bob", "ban_permanent", "Harcelement", None, None))
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "user3", "Charlie", "ban_temp", "Raid", None, Some(7200)));
     let app = build_app(uc);
     let (status, json) = get(app, "/api/moderation/bans").await;
     assert_eq!(status, StatusCode::OK);
@@ -359,21 +359,21 @@ async fn list_bans_returns_only_bans() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_bans_filter_by_guild() {
     let uc = MockModerationUC::new()
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "ban_permanent", "Raid", None, None))
-        .with_action(make_action(Uuid::new_v4(), "guild2", "user2", "Bob", "ban_permanent", "Spam", None, None));
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "ban_permanent", "Raid", None, None))
+        .with_action(make_action(Uuid::new_v4(), "222222222222222222", "user2", "Bob", "ban_permanent", "Spam", None, None));
     let app = build_app(uc);
-    let (status, json) = get(app, "/api/moderation/bans?guild_id=guild1").await;
+    let (status, json) = get(app, "/api/moderation/bans?guild_id=111111111111111111").await;
     assert_eq!(status, StatusCode::OK);
     let bans = json.as_array().unwrap();
     assert_eq!(bans.len(), 1);
-    assert_eq!(bans[0]["guild_id"], "guild1");
+    assert_eq!(bans[0]["guild_id"], "111111111111111111");
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_bans_no_filter_returns_all() {
     let uc = MockModerationUC::new()
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "ban_permanent", "Raid", None, None))
-        .with_action(make_action(Uuid::new_v4(), "guild2", "user2", "Bob", "ban_temp", "Spam", None, Some(3600)));
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "ban_permanent", "Raid", None, None))
+        .with_action(make_action(Uuid::new_v4(), "222222222222222222", "user2", "Bob", "ban_temp", "Spam", None, Some(3600)));
     let app = build_app(uc);
     let (status, json) = get(app, "/api/moderation/bans").await;
     assert_eq!(status, StatusCode::OK);
@@ -387,14 +387,14 @@ async fn list_bans_no_filter_returns_all() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn ban_dto_has_all_fields() {
     let uc = MockModerationUC::new()
-        .with_action(make_action(Uuid::new_v4(), "guild1", "user1", "Alice", "ban_permanent", "Harcelement", None, None));
+        .with_action(make_action(Uuid::new_v4(), "111111111111111111", "444444444444444444", "Alice", "ban_permanent", "Harcelement", None, None));
     let app = build_app(uc);
     let (status, json) = get(app, "/api/moderation/bans").await;
     assert_eq!(status, StatusCode::OK);
     let ban = &json[0];
     assert!(ban["id"].as_str().is_some());
-    assert_eq!(ban["guild_id"], "guild1");
-    assert_eq!(ban["target_id"], "user1");
+    assert_eq!(ban["guild_id"], "111111111111111111");
+    assert_eq!(ban["target_id"], "444444444444444444");
     assert_eq!(ban["target_name"], "Alice");
     assert_eq!(ban["moderator_name"], "ModeratorBob");
     assert_eq!(ban["action_type"], "ban_permanent");

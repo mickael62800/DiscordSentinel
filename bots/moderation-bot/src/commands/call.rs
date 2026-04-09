@@ -20,6 +20,7 @@ pub const CALL_CLOSE_ID: &str = "sentinel_mod_call_close";
 pub fn register() -> CreateCommand {
     CreateCommand::new("call")
         .description("Convoquer un membre dans un salon prive")
+        .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "user", "Membre a convoquer")
                 .required(true),

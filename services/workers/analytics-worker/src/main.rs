@@ -14,12 +14,19 @@ const WORKER_NAME: &str = "analytics-worker";
 async fn main() {
     common::init_tracing("sentinel_analytics_worker=info");
 
-    let config = WorkerConfig::from_env();
+    let mut config = WorkerConfig::from_env();
 
     info!("Demarrage de Sentinel Analytics Worker");
 
     let pg_pool = common::create_pg_pool(&config.database_url).await;
     info!("PostgreSQL connecte");
+
+    // Charger la config depuis la DB (prioritaire sur env)
+    let db_config = common::load_worker_config(&pg_pool, WORKER_NAME).await;
+    if !db_config.is_empty() {
+        config.apply_db_config(&db_config);
+        info!(keys = db_config.len(), "Config DB chargee");
+    }
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 

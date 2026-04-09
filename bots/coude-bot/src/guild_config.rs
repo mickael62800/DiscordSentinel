@@ -101,6 +101,11 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "steal_cooldown_secs", 1800) as i64
     }
 
+    /// Nombre max de vols par jour (defaut: 5, 0 = illimite).
+    pub fn steal_max_daily(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "steal_max_daily", 5)
+    }
+
     // ── Assurance ──
 
     pub fn insurance_cost(&self) -> i64 {

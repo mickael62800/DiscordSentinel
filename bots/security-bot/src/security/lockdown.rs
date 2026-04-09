@@ -51,13 +51,20 @@ impl LockdownManager {
                 .find(|ow| ow.kind == PermissionOverwriteType::Role(everyone_role))
                 .cloned();
 
-            saved_states.push((channel_id.get(), existing));
+            saved_states.push((channel_id.get(), existing.clone()));
 
-            // Appliquer le deny SEND_MESSAGES
-            let overwrite = PermissionOverwrite {
-                allow: Permissions::empty(),
-                deny: Permissions::SEND_MESSAGES,
-                kind: PermissionOverwriteType::Role(everyone_role),
+            // Merger SEND_MESSAGES dans les deny existants (ne pas ecraser)
+            let overwrite = match &existing {
+                Some(ow) => PermissionOverwrite {
+                    allow: ow.allow - Permissions::SEND_MESSAGES,
+                    deny: ow.deny | Permissions::SEND_MESSAGES,
+                    kind: PermissionOverwriteType::Role(everyone_role),
+                },
+                None => PermissionOverwrite {
+                    allow: Permissions::empty(),
+                    deny: Permissions::SEND_MESSAGES,
+                    kind: PermissionOverwriteType::Role(everyone_role),
+                },
             };
 
             if let Err(e) = channel_id.create_permission(&ctx.http, overwrite).await {

@@ -324,4 +324,27 @@ mod tests {
         let expired = pending.expired(300);
         assert!(expired.is_empty());
     }
+
+    // ── generate_code ──
+
+    #[test]
+    fn code_has_6_chars() {
+        let code = generate_code();
+        assert_eq!(code.len(), 6);
+    }
+
+    #[test]
+    fn code_is_alphanumeric_uppercase() {
+        let code = generate_code();
+        assert!(code.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()),
+            "Code doit etre alphanumerique majuscule, got: {}", code);
+    }
+
+    #[test]
+    fn code_generates_different_values() {
+        let codes: Vec<String> = (0..10).map(|_| generate_code()).collect();
+        // Au moins 2 codes differents sur 10
+        let unique: std::collections::HashSet<&String> = codes.iter().collect();
+        assert!(unique.len() >= 2, "generate_code doit produire des valeurs variees");
+    }
 }

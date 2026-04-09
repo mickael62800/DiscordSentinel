@@ -55,6 +55,19 @@ impl TypeMapKey for WatchedUserIdsKey {
 pub struct Handler;
 
 impl Handler {
+    /// Verifie si le bot est active pour une guild donnee.
+    async fn is_guild_enabled(ctx: &Context, guild_id: &str) -> bool {
+        let data = ctx.data.read().await;
+        if let Some(base) = data.get::<ApiClientKey>() {
+            let config = match base.get_guild_config(guild_id).await {
+                Ok(c) => c,
+                Err(_) => return true,
+            };
+            return BaseApiClient::config_bool(&config, "enabled", true);
+        }
+        true
+    }
+
     /// Verifie si un utilisateur est surveille
     pub fn is_watched(ctx_data: &TypeMap, user_id: &str) -> bool {
         ctx_data
@@ -244,6 +257,9 @@ impl EventHandler for Handler {
         message_id: MessageId,
         guild_id: Option<GuildId>,
     ) {
+        if let Some(gid) = guild_id {
+            if !Self::is_guild_enabled(&ctx, &gid.to_string()).await { return; }
+        }
         handlers::message::handle_delete(&ctx, channel_id, message_id, guild_id).await;
     }
 
@@ -264,10 +280,14 @@ impl EventHandler for Handler {
         multiple_deleted: Vec<MessageId>,
         guild_id: Option<GuildId>,
     ) {
+        if let Some(gid) = guild_id {
+            if !Self::is_guild_enabled(&ctx, &gid.to_string()).await { return; }
+        }
         handlers::message::handle_delete_bulk(&ctx, channel_id, multiple_deleted, guild_id).await;
     }
 
     async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
+        if !Self::is_guild_enabled(&ctx, &new_member.guild_id.to_string()).await { return; }
         handlers::member::handle_addition(&ctx, &new_member).await;
     }
 
@@ -278,14 +298,17 @@ impl EventHandler for Handler {
         user: User,
         _member: Option<Member>,
     ) {
+        if !Self::is_guild_enabled(&ctx, &guild_id.to_string()).await { return; }
         handlers::member::handle_removal(&ctx, guild_id, &user).await;
     }
 
     async fn guild_ban_addition(&self, ctx: Context, guild_id: GuildId, banned_user: User) {
+        if !Self::is_guild_enabled(&ctx, &guild_id.to_string()).await { return; }
         handlers::member::handle_ban_addition(&ctx, guild_id, &banned_user).await;
     }
 
     async fn guild_ban_removal(&self, ctx: Context, guild_id: GuildId, unbanned_user: User) {
+        if !Self::is_guild_enabled(&ctx, &guild_id.to_string()).await { return; }
         handlers::member::handle_ban_removal(&ctx, guild_id, &unbanned_user).await;
     }
 

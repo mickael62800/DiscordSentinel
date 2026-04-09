@@ -1,7 +1,6 @@
 use std::time::Instant;
 
 use dashmap::DashMap;
-use serenity::all::EditMember;
 use serenity::model::id::{GuildId, RoleId, UserId};
 use serenity::prelude::*;
 use tracing::{error, info, warn};
@@ -9,9 +8,10 @@ use tracing::{error, info, warn};
 /// Gère la quarantaine des utilisateurs suspects.
 /// Les utilisateurs en quarantaine reçoivent un rôle restrictif
 /// et doivent passer un captcha pour être libérés.
+/// Les rôles originaux sont sauvegardés pour être restaurés à la libération.
 pub struct QuarantineManager {
-    /// (guild_id, user_id) → timestamp de mise en quarantaine
-    quarantined: DashMap<(GuildId, UserId), Instant>,
+    /// (guild_id, user_id) → (timestamp, roles originaux)
+    quarantined: DashMap<(GuildId, UserId), (Instant, Vec<RoleId>)>,
 }
 
 impl QuarantineManager {
@@ -22,6 +22,7 @@ impl QuarantineManager {
     }
 
     /// Met un utilisateur en quarantaine en lui assignant le rôle.
+    /// Sauvegarde les rôles originaux pour les restaurer à la libération.
     pub async fn quarantine_user(
         &self,
         ctx: &Context,
@@ -29,15 +30,23 @@ impl QuarantineManager {
         user_id: UserId,
         role_id: RoleId,
     ) -> bool {
-        // Assigner le rôle quarantaine
-        let edit = EditMember::new().roles(vec![role_id]);
-        match guild_id.edit_member(&ctx.http, user_id, edit).await {
+        // Sauvegarder les roles actuels du membre
+        let original_roles = match guild_id.member(&ctx.http, user_id).await {
+            Ok(member) => member.roles.clone(),
+            Err(e) => {
+                warn!(error = %e, "Impossible de lire les roles du membre, quarantaine sans sauvegarde");
+                Vec::new()
+            }
+        };
+
+        // Ajouter le role quarantaine sans supprimer les autres
+        match ctx.http.add_member_role(guild_id, user_id, role_id, Some("Quarantaine Sentinel")).await {
             Ok(_) => {
-                self.quarantined.insert((guild_id, user_id), Instant::now());
+                self.quarantined.insert((guild_id, user_id), (Instant::now(), original_roles));
                 info!(
                     guild_id = %guild_id,
                     user_id = %user_id,
-                    "Utilisateur mis en quarantaine"
+                    "Utilisateur mis en quarantaine (roles sauvegardes)"
                 );
                 true
             }
@@ -87,7 +96,7 @@ impl QuarantineManager {
 
         self.quarantined
             .iter()
-            .filter(|entry| now.duration_since(*entry.value()) >= timeout)
+            .filter(|entry| now.duration_since(entry.value().0) >= timeout)
             .map(|entry| *entry.key())
             .collect()
     }
@@ -115,7 +124,7 @@ mod tests {
 
         assert!(!manager.is_quarantined(guild, user));
 
-        manager.quarantined.insert((guild, user), Instant::now());
+        manager.quarantined.insert((guild, user), (Instant::now(), Vec::new()));
         assert!(manager.is_quarantined(guild, user));
 
         manager.remove_tracking(guild, user);
@@ -131,7 +140,7 @@ mod tests {
         // Insérer avec un timestamp dans le passé
         manager
             .quarantined
-            .insert((guild, user), Instant::now() - std::time::Duration::from_secs(600));
+            .insert((guild, user), (Instant::now() - std::time::Duration::from_secs(600), Vec::new()));
 
         let expired = manager.expired_users(300); // timeout 5min
         assert_eq!(expired.len(), 1);

@@ -127,8 +127,8 @@ async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Va
 async fn add_note_success() {
     let app = build_app(MockNotesUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "user_id": "user1",
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
         "author_id": "mod1",
         "author_name": "Bob",
         "content": "Comportement suspect a surveiller",
@@ -136,8 +136,8 @@ async fn add_note_success() {
     });
     let (status, json) = post_json(app, "/api/notes", body).await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(json["guild_id"], "guild1");
-    assert_eq!(json["user_id"], "user1");
+    assert_eq!(json["guild_id"], "111111111111111111");
+    assert_eq!(json["user_id"], "444444444444444444");
     assert_eq!(json["content"], "Comportement suspect a surveiller");
     assert_eq!(json["category"], "warning");
     assert!(json["id"].as_str().is_some());
@@ -147,8 +147,8 @@ async fn add_note_success() {
 async fn add_note_default_category() {
     let app = build_app(MockNotesUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "user_id": "user1",
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
         "author_id": "mod1",
         "author_name": "Bob",
         "content": "Note simple"
@@ -162,8 +162,8 @@ async fn add_note_default_category() {
 async fn add_note_invalid_category_returns_422() {
     let app = build_app(MockNotesUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1",
-        "user_id": "user1",
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
         "author_id": "mod1",
         "author_name": "Bob",
         "content": "Test",
@@ -177,7 +177,7 @@ async fn add_note_invalid_category_returns_422() {
 async fn add_note_missing_fields_returns_422() {
     let app = build_app(MockNotesUC::new());
     let body = serde_json::json!({
-        "guild_id": "guild1"
+        "guild_id": "111111111111111111"
     });
     let (status, _) = post_json(app, "/api/notes", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
@@ -190,7 +190,7 @@ async fn add_note_missing_fields_returns_422() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_notes_empty() {
     let app = build_app(MockNotesUC::new());
-    let (status, json) = get(app, "/api/notes/guild1/user1").await;
+    let (status, json) = get(app, "/api/notes/111111111111111111/444444444444444444").await;
     assert_eq!(status, StatusCode::OK);
     assert!(json.as_array().unwrap().is_empty());
 }
@@ -198,10 +198,10 @@ async fn get_notes_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_notes_with_data() {
     let uc = MockNotesUC::new()
-        .with_note(make_note("guild1", "user1", "Note 1", "general"))
-        .with_note(make_note("guild1", "user1", "Note 2", "warning"));
+        .with_note(make_note("111111111111111111", "444444444444444444", "Note 1", "general"))
+        .with_note(make_note("111111111111111111", "444444444444444444", "Note 2", "warning"));
     let app = build_app(uc);
-    let (status, json) = get(app, "/api/notes/guild1/user1").await;
+    let (status, json) = get(app, "/api/notes/111111111111111111/444444444444444444").await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json.as_array().unwrap().len(), 2);
 }

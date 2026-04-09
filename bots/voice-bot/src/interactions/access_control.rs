@@ -170,6 +170,11 @@ async fn handle_kick_menu(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
+    // Verifier que l'utilisateur est owner ou co-admin
+    let Some((_voice_channel_id_check, _ch)) = super::require_admin(ctx, component).await else {
+        return;
+    };
+
     let text_channel_id = component.channel_id;
 
     let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
@@ -317,6 +322,11 @@ async fn handle_ban_select(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
+    // Verifier que l'utilisateur est owner ou co-admin
+    let Some((_voice_channel_id_check, _ch)) = super::require_admin(ctx, component).await else {
+        return;
+    };
+
     let custom_id = component.data.custom_id.as_str();
 
     // Parse: ban_duration_{user_id}_{duration_secs}

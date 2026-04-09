@@ -835,6 +835,48 @@ mod tests {
         // rage: 6.0*0.55=3.3 + harassment: 7.0*0.30=2.1 → 5.4
         assert!((score - 5.4).abs() < 0.01);
     }
+
+    // ══════════════════════════════════════════════════════════
+    //  Tests build_contextual_content
+    // ══════════════════════════════════════════════════════════
+
+    fn ctx_msg(username: &str, content: &str) -> crate::ports::inbound::ContextMessageEntry {
+        crate::ports::inbound::ContextMessageEntry {
+            username: username.to_string(),
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn context_empty_returns_content_only() {
+        let result = build_contextual_content("hello", &[], "natural");
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn context_natural_format() {
+        let ctx = vec![ctx_msg("Alice", "salut"), ctx_msg("Bob", "ca va ?")];
+        let result = build_contextual_content("oui bien", &ctx, "natural");
+        assert!(result.contains("Alice: salut"));
+        assert!(result.contains("Bob: ca va ?"));
+        assert!(result.contains("---"));
+        assert!(result.ends_with("oui bien"));
+    }
+
+    #[test]
+    fn context_tagged_format() {
+        let ctx = vec![ctx_msg("Alice", "salut")];
+        let result = build_contextual_content("oui", &ctx, "tagged");
+        assert!(result.starts_with("[message] oui [/message]"));
+        assert!(result.contains("[context] Alice: salut [/context]"));
+    }
+
+    #[test]
+    fn context_unknown_format_defaults_to_natural() {
+        let ctx = vec![ctx_msg("X", "y")];
+        let result = build_contextual_content("z", &ctx, "unknown");
+        assert!(result.contains("---")); // natural format
+    }
 }
 
 // ── Mocks minimaux pour les tests ──

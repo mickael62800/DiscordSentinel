@@ -503,8 +503,9 @@ pub async fn adjust_coins(
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<AdjustCoinsDto>,
 ) -> Result<StatusCode, ApiError> {
+    // Empecher le solde de devenir negatif
     let result = sqlx::query(
-        "UPDATE coude_players SET coins = coins + $1 WHERE guild_id = $2 AND user_id = $3"
+        "UPDATE coude_players SET coins = GREATEST(0, coins + $1), updated_at = NOW() WHERE guild_id = $2 AND user_id = $3"
     )
     .bind(dto.amount)
     .bind(&guild_id)
@@ -738,6 +739,9 @@ pub async fn record_win(
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<RecordWinDto>,
 ) -> Result<StatusCode, ApiError> {
+    if dto.earned < 0 || dto.stolen < 0 {
+        return Err(DomainError::ValidationError("Les montants ne peuvent pas etre negatifs".into()).into());
+    }
     let result = sqlx::query(
         r#"UPDATE coude_players SET total_wins = total_wins + 1, coins = coins + $3,
         total_earned = total_earned + $3, total_stolen = total_stolen + $4, updated_at = NOW()
@@ -764,9 +768,11 @@ pub async fn record_loss(
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<RecordLossDto>,
 ) -> Result<StatusCode, ApiError> {
+    // Utiliser LEAST pour ne perdre que ce qu'on a (pas de dette)
     let result = sqlx::query(
-        r#"UPDATE coude_players SET total_losses = total_losses + 1, coins = GREATEST(0, coins - $3),
-        total_lost = total_lost + $3, updated_at = NOW()
+        r#"UPDATE coude_players SET total_losses = total_losses + 1,
+        coins = coins - LEAST(coins, $3),
+        total_lost = total_lost + LEAST(coins, $3), updated_at = NOW()
         WHERE guild_id = $1 AND user_id = $2"#,
     )
     .bind(&guild_id)
@@ -857,6 +863,9 @@ pub async fn record_coins_earned(
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<AmountDto>,
 ) -> Result<StatusCode, ApiError> {
+    if dto.amount <= 0 {
+        return Err(DomainError::ValidationError("Le montant doit etre positif".into()).into());
+    }
     let result = sqlx::query(
         r#"UPDATE coude_players SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
         WHERE guild_id = $1 AND user_id = $2"#,
@@ -923,6 +932,17 @@ pub async fn record_casino_win(
         return Err(DomainError::NotFound("Joueur introuvable".into()).into());
     }
 
+    // Log du gain pour le tracking quotidien
+    sqlx::query(
+        "INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)",
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .bind(dto.gain)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -932,6 +952,17 @@ pub async fn record_casino_loss(
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<LostDto>,
 ) -> Result<StatusCode, ApiError> {
+    // Log de la perte pour le tracking quotidien (montant negatif)
+    sqlx::query(
+        "INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)",
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .bind(-dto.lost)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
     let result = sqlx::query(
         r#"UPDATE coude_players SET casino_losses = casino_losses + 1, coins = GREATEST(0, coins - $3),
         total_lost = total_lost + $3, updated_at = NOW()
@@ -956,6 +987,19 @@ pub async fn record_casino_faillite(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Lire les coins actuels avant la faillite
+    let coins_before = sqlx::query_as::<_, (i64,)>(
+        "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?
+    .ok_or_else(|| ApiError::from(DomainError::NotFound("Joueur introuvable".into())))?
+    .0;
+
+    // Mettre a 0
     let row = sqlx::query_as::<_, (i64,)>(
         r#"UPDATE coude_players SET casino_losses = casino_losses + 1, total_lost = total_lost + coins,
         coins = 0, updated_at = NOW()
@@ -964,10 +1008,22 @@ pub async fn record_casino_faillite(
     )
     .bind(&guild_id)
     .bind(&user_id)
-    .fetch_optional(&state.pg_pool)
+    .fetch_one(&state.pg_pool)
     .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?
-    .ok_or_else(|| ApiError::from(DomainError::NotFound("Joueur introuvable".into())))?;
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    // Log de la faillite pour le tracking quotidien
+    if coins_before > 0 {
+        sqlx::query(
+            "INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)",
+        )
+        .bind(&guild_id)
+        .bind(&user_id)
+        .bind(-coins_before)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+    }
 
     Ok(Json(serde_json::json!({ "total_lost": row.0 })))
 }
@@ -980,6 +1036,46 @@ pub async fn count_casino_today(
     let row = sqlx::query_as::<_, (i64,)>(
         r#"SELECT COUNT(*) FROM coude_cooldowns
         WHERE guild_id = $1 AND user_id = $2 AND action = 'casino' AND expires_at > NOW() - INTERVAL '24 hours'"#,
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    Ok(Json(serde_json::json!({ "count": row.0 })))
+}
+
+/// GET /api/coude/{guild_id}/players/{user_id}/casino-gains-today
+/// Calcule la somme des gains nets au casino dans les dernieres 24h
+/// via la table coude_casino_log (gains positifs uniquement)
+pub async fn sum_casino_gains_today(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let row = sqlx::query_as::<_, (i64,)>(
+        r#"SELECT COALESCE(SUM(amount), 0)::bigint FROM coude_casino_log
+        WHERE guild_id = $1 AND user_id = $2
+        AND amount > 0 AND created_at > NOW() - INTERVAL '24 hours'"#,
+    )
+    .bind(&guild_id)
+    .bind(&user_id)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    Ok(Json(serde_json::json!({ "total": row.0 })))
+}
+
+/// GET /api/coude/{guild_id}/players/{user_id}/steal-today
+/// Compte le nombre de vols effectues dans les dernieres 24h
+pub async fn count_steal_today(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let row = sqlx::query_as::<_, (i64,)>(
+        r#"SELECT COUNT(*) FROM coude_cooldowns
+        WHERE guild_id = $1 AND user_id = $2 AND action = 'voler' AND expires_at > NOW() - INTERVAL '24 hours'"#,
     )
     .bind(&guild_id)
     .bind(&user_id)
@@ -1092,10 +1188,12 @@ pub async fn resolve_combat(
     Path(combat_id): Path<String>,
     Json(dto): Json<ResolveCombatDto>,
 ) -> Result<StatusCode, ApiError> {
+    // Guard : ne resoudre que les combats en cours (pending, accepted, betting)
+    // Empeche la double resolution par race condition bot/worker
     let result = sqlx::query(
         r#"UPDATE coude_combats SET status = $2, winner_id = $3, attacker_roll = $4, defender_roll = $5,
         chaos_event = $6, result_message = $7, coins_transferred = $8, resolved_at = NOW()
-        WHERE id = $1::uuid"#,
+        WHERE id = $1::uuid AND status IN ('pending', 'accepted', 'betting')"#,
     )
     .bind(&combat_id)
     .bind(&dto.status)
@@ -1110,7 +1208,7 @@ pub async fn resolve_combat(
     .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
 
     if result.rows_affected() == 0 {
-        return Err(DomainError::NotFound("Combat introuvable".into()).into());
+        return Err(DomainError::Conflict("Combat deja resolu ou introuvable".into()).into());
     }
 
     Ok(StatusCode::NO_CONTENT)
@@ -1204,6 +1302,69 @@ pub async fn place_bet(
     Path(guild_id): Path<String>,
     Json(dto): Json<PlaceBetDto>,
 ) -> Result<StatusCode, ApiError> {
+    // Validation du montant
+    if dto.amount <= 0 {
+        return Err(DomainError::ValidationError("Le montant du pari doit etre positif".into()).into());
+    }
+
+    let mut tx = state
+        .pg_pool
+        .begin()
+        .await
+        .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    // Verifier que le combat existe et est en phase de paris
+    let combat_status = sqlx::query_as::<_, (String, String, String)>(
+        "SELECT status, attacker_id, defender_id FROM coude_combats WHERE id = $1::uuid",
+    )
+    .bind(&dto.combat_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    let (status, attacker_id, defender_id) = combat_status
+        .ok_or_else(|| ApiError::from(DomainError::NotFound("Combat introuvable".into())))?;
+
+    if status != "betting" {
+        return Err(DomainError::ValidationError("Les paris ne sont pas ouverts pour ce combat".into()).into());
+    }
+
+    // Empecher les participants de parier sur leur propre combat
+    if dto.bettor_id == attacker_id || dto.bettor_id == defender_id {
+        return Err(DomainError::ValidationError("Un participant ne peut pas parier sur son propre combat".into()).into());
+    }
+
+    // Verifier le solde du parieur
+    let bettor = sqlx::query_as::<_, (i64,)>(
+        "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+    )
+    .bind(&guild_id)
+    .bind(&dto.bettor_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    let (bettor_coins,) = bettor
+        .ok_or_else(|| ApiError::from(DomainError::NotFound("Parieur introuvable".into())))?;
+
+    if bettor_coins < dto.amount {
+        return Err(DomainError::ValidationError(
+            format!("Solde insuffisant ({} coins, {} requis)", bettor_coins, dto.amount),
+        ).into());
+    }
+
+    // Debiter le parieur
+    sqlx::query(
+        "UPDATE coude_players SET coins = coins - $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&guild_id)
+    .bind(&dto.bettor_id)
+    .bind(dto.amount)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    // Enregistrer le pari
     sqlx::query(
         r#"INSERT INTO coude_bets (guild_id, combat_id, bettor_id, bettor_name, backed_id, amount)
         VALUES ($1, $2::uuid, $3, $4, $5, $6)"#,
@@ -1214,9 +1375,13 @@ pub async fn place_bet(
     .bind(&dto.bettor_name)
     .bind(&dto.backed_id)
     .bind(dto.amount)
-    .execute(&state.pg_pool)
+    .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    tx.commit()
+        .await
+        .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -1600,15 +1765,37 @@ pub async fn transfer_coins(
     Path(guild_id): Path<String>,
     Json(dto): Json<TransferCoinsDto>,
 ) -> Result<StatusCode, ApiError> {
+    if dto.amount <= 0 {
+        return Err(DomainError::ValidationError("Le montant doit etre positif".into()).into());
+    }
+
     let mut tx = state
         .pg_pool
         .begin()
         .await
         .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
 
-    // Debit sender
-    let result = sqlx::query(
-        "UPDATE coude_players SET coins = GREATEST(0, coins - $3), updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+    // Lock + verifier le solde de l'expediteur
+    let sender = sqlx::query_as::<_, (i64,)>(
+        "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+    )
+    .bind(&guild_id)
+    .bind(&dto.from_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    let (sender_coins,) = sender.ok_or_else(|| ApiError::from(DomainError::NotFound("Expediteur introuvable".into())))?;
+
+    if sender_coins < dto.amount {
+        return Err(DomainError::ValidationError(
+            format!("Solde insuffisant ({} coins, {} requis)", sender_coins, dto.amount),
+        ).into());
+    }
+
+    // Debit sender (solde verifie)
+    sqlx::query(
+        "UPDATE coude_players SET coins = coins - $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&guild_id)
     .bind(&dto.from_id)
@@ -1616,10 +1803,6 @@ pub async fn transfer_coins(
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
-    if result.rows_affected() == 0 {
-        return Err(DomainError::NotFound("Expediteur introuvable".into()).into());
-    }
 
     // Credit receiver
     let result = sqlx::query(
@@ -1649,25 +1832,48 @@ pub async fn record_steal(
     Path(guild_id): Path<String>,
     Json(dto): Json<StealDto>,
 ) -> Result<StatusCode, ApiError> {
+    if dto.amount <= 0 {
+        return Err(DomainError::ValidationError("Le montant doit etre positif".into()).into());
+    }
+
     let mut tx = state
         .pg_pool
         .begin()
         .await
         .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
 
-    // Debit victim
+    // Lock + lire le solde de la victime pour ne voler que ce qu'elle a
+    let victim = sqlx::query_as::<_, (i64,)>(
+        "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+    )
+    .bind(&guild_id)
+    .bind(&dto.victim_id)
+    .fetch_optional(&mut *tx)
+    .await
+    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+
+    let (victim_coins,) = victim.ok_or_else(|| ApiError::from(DomainError::NotFound("Victime introuvable".into())))?;
+
+    // Ne voler que le minimum entre le montant demande et le solde reel
+    let actual_stolen = dto.amount.min(victim_coins);
+
+    if actual_stolen <= 0 {
+        return Err(DomainError::ValidationError("La victime n'a pas de coins a voler".into()).into());
+    }
+
+    // Debit victim (montant reel)
     sqlx::query(
-        r#"UPDATE coude_players SET coins = GREATEST(0, coins - $3), total_lost = total_lost + $3, updated_at = NOW()
+        r#"UPDATE coude_players SET coins = coins - $3, total_lost = total_lost + $3, updated_at = NOW()
         WHERE guild_id = $1 AND user_id = $2"#,
     )
     .bind(&guild_id)
     .bind(&dto.victim_id)
-    .bind(dto.amount)
+    .bind(actual_stolen)
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
 
-    // Credit thief
+    // Credit thief (meme montant reel — pas de creation de coins)
     sqlx::query(
         r#"UPDATE coude_players SET coins = coins + $3, total_stolen = total_stolen + $3,
         total_earned = total_earned + $3, updated_at = NOW()
@@ -1675,7 +1881,7 @@ pub async fn record_steal(
     )
     .bind(&guild_id)
     .bind(&dto.thief_id)
-    .bind(dto.amount)
+    .bind(actual_stolen)
     .execute(&mut *tx)
     .await
     .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;

@@ -11,6 +11,7 @@ use crate::handler::ModerationApiKey;
 pub fn register() -> CreateCommand {
     CreateCommand::new("note")
         .description("Ajouter une note interne sur un utilisateur")
+        .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "user", "Utilisateur concerne")
                 .required(true),

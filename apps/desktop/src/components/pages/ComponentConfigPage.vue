@@ -129,7 +129,6 @@ const configFields = computed<ConfigField[]>(() => {
 });
 
 const booleanFields = computed(() => configFields.value.filter((f) => f.type === "boolean"));
-const otherFields = computed(() => configFields.value.filter((f) => f.type !== "boolean"));
 const numberFields = computed(() => configFields.value.filter((f) => f.type === "number"));
 const channelFields = computed(() => configFields.value.filter((f) => f.type === "channel"));
 const roleFields = computed(() => configFields.value.filter((f) => f.type === "role"));

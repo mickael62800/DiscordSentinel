@@ -57,7 +57,35 @@ impl EventHandler for Handler {
             }
         }
 
-        // Note: la sync des roles est geree par roles-bot (pas de duplication)
+        // Charger les roles temporaires actifs depuis l'API
+        {
+            let data = ctx.data.read().await;
+            if let (Some(api), Some(tracker)) = (data.get::<RolesApiKey>(), data.get::<TempRoleKey>()) {
+                for guild_status in &ready.guilds {
+                    let gid = guild_status.id.to_string();
+                    match api.list_temp_roles(&gid).await {
+                        Ok(entries) => {
+                            let mut loaded = 0u32;
+                            for entry in entries {
+                                let g = entry.guild_id.parse::<u64>().unwrap_or(0);
+                                let u = entry.user_id.parse::<u64>().unwrap_or(0);
+                                let r = entry.role_id.parse::<u64>().unwrap_or(0);
+                                if g > 0 && u > 0 && r > 0 {
+                                    tracker.add_with_expiry_timestamp(g, u, r, &entry.expires_at);
+                                    loaded += 1;
+                                }
+                            }
+                            if loaded > 0 {
+                                info!(guild = %gid, count = loaded, "Roles temporaires recharges depuis l'API");
+                            }
+                        }
+                        Err(e) => {
+                            warn!(error = %e, guild = %gid, "Echec chargement roles temporaires");
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // -- Auto-role quand un membre rejoint --
@@ -307,10 +335,7 @@ pub async fn send_role_panel(
         .map(|chunk| CreateActionRow::Buttons(chunk.to_vec()))
         .collect();
 
-    let mut message = CreateMessage::new().embed(embed);
-    for row in rows {
-        message = message.components(vec![row]);
-    }
+    let message = CreateMessage::new().embed(embed).components(rows);
 
     channel_id.send_message(&ctx.http, message).await
 }

@@ -8,6 +8,7 @@ use tracing::warn;
 pub fn register() -> CreateCommand {
     CreateCommand::new("context")
         .description("Afficher les messages autour d'un message specifique")
+        .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "message_id", "ID du message cible")
                 .required(true),
@@ -91,7 +92,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let embed = CreateEmbed::new()
         .title(format!("Contexte autour du message {}", message_id_str))
         .description(if description.len() > 4000 {
-            format!("{}...", &description[..3997])
+            let truncated: String = description.chars().take(3997).collect();
+            format!("{}...", truncated)
         } else {
             description
         })
@@ -118,8 +120,9 @@ fn format_timestamp(ts: &serenity::model::Timestamp) -> String {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() > max {
-        format!("{}...", &s[..max.min(s.len())])
+    if s.chars().count() > max {
+        let truncated: String = s.chars().take(max).collect();
+        format!("{}...", truncated)
     } else {
         s.to_string()
     }

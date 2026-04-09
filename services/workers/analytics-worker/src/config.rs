@@ -26,6 +26,15 @@ impl WorkerConfig {
             hourly_snapshot_interval_secs: hourly_minutes * SECS_PER_MINUTE,
         }
     }
+
+    /// Recharge les intervalles depuis la config DB (prioritaire sur env/defaut).
+    pub fn apply_db_config(&mut self, db: &std::collections::HashMap<String, String>) {
+        use sentinel_worker_common::config_or_env;
+        let daily_h: u64 = config_or_env(db, "daily_snapshot_interval", "DAILY_SNAPSHOT_INTERVAL", DEFAULT_DAILY_INTERVAL_HOURS);
+        let hourly_m: u64 = config_or_env(db, "hourly_snapshot_interval", "HOURLY_SNAPSHOT_INTERVAL", DEFAULT_HOURLY_INTERVAL_MINUTES);
+        self.daily_snapshot_interval_secs = daily_h * SECS_PER_HOUR;
+        self.hourly_snapshot_interval_secs = hourly_m * SECS_PER_MINUTE;
+    }
 }
 
 #[cfg(test)]

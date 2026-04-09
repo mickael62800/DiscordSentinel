@@ -29,6 +29,18 @@ impl TempRoleTracker {
         self.roles.insert((guild_id, user_id, role_id), expiry);
     }
 
+    /// Ajoute un role temporaire avec un timestamp d'expiration absolu (pour le reload depuis l'API).
+    pub fn add_with_expiry_timestamp(&self, guild_id: u64, user_id: u64, role_id: u64, expires_at: &str) {
+        if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(expires_at) {
+            let now = chrono::Utc::now();
+            let remaining = dt.signed_duration_since(now);
+            if remaining.num_seconds() > 0 {
+                let expiry = Instant::now() + Duration::from_secs(remaining.num_seconds() as u64);
+                self.roles.insert((guild_id, user_id, role_id), expiry);
+            }
+        }
+    }
+
     /// Retourne les roles expires.
     pub fn expired(&self) -> Vec<TempRole> {
         let now = Instant::now();
@@ -114,6 +126,30 @@ mod tests {
     #[test]
     fn parse_temp_roles_empty() {
         assert!(parse_temp_roles("").is_empty());
+    }
+
+    #[test]
+    fn add_with_expiry_timestamp_future() {
+        let tracker = TempRoleTracker::new();
+        let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        tracker.add_with_expiry_timestamp(1, 100, 200, &future);
+        assert!(tracker.is_temp(1, 100, 200));
+        assert!(tracker.expired().is_empty()); // pas encore expire
+    }
+
+    #[test]
+    fn add_with_expiry_timestamp_past_ignored() {
+        let tracker = TempRoleTracker::new();
+        let past = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        tracker.add_with_expiry_timestamp(1, 100, 200, &past);
+        assert!(!tracker.is_temp(1, 100, 200)); // pas insere car deja expire
+    }
+
+    #[test]
+    fn add_with_expiry_timestamp_invalid_format() {
+        let tracker = TempRoleTracker::new();
+        tracker.add_with_expiry_timestamp(1, 100, 200, "not-a-date");
+        assert!(!tracker.is_temp(1, 100, 200)); // pas insere
     }
 
     #[test]

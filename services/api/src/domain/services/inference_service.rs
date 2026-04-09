@@ -302,6 +302,7 @@ mod tests {
     // ── Chargement ──
 
     #[test]
+    #[ignore = "Necessite le fichier ONNX sur le disque"]
     fn real_model_loads_successfully() {
         let service = InferenceService::new(None, Some(ONNX_PATH));
         assert!(service.text_available(), "Modele ONNX introuvable a {ONNX_PATH}");

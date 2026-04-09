@@ -14,12 +14,18 @@ const WORKER_NAME: &str = "cleanup-worker";
 async fn main() {
     common::init_tracing("sentinel_cleanup_worker=info");
 
-    let config = WorkerConfig::from_env();
+    let mut config = WorkerConfig::from_env();
 
     info!("Demarrage de Sentinel Cleanup Worker");
 
     let pg_pool = common::create_pg_pool(&config.database_url).await;
     info!("PostgreSQL connecte");
+
+    let db_config = common::load_worker_config(&pg_pool, WORKER_NAME).await;
+    if !db_config.is_empty() {
+        config.apply_db_config(&db_config);
+        info!(keys = db_config.len(), "Config DB chargee");
+    }
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 

@@ -179,6 +179,67 @@ pub fn load_redis_url() -> String {
     std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into())
 }
 
+// ── DB Config Loading ──
+
+/// Charge toute la config d'un worker depuis la table bot_guild_config.
+/// Retourne un HashMap<config_key, config_value> (toutes les guilds mergees, global).
+/// Les workers n'ont pas de guild_id specifique — on charge la config "globale"
+/// (premiere valeur trouvee pour chaque cle).
+pub async fn load_worker_config(pool: &PgPool, worker_name: &str) -> std::collections::HashMap<String, String> {
+    let rows: Vec<(String, String)> = sqlx::query_as(
+        "SELECT config_key, config_value FROM bot_guild_config WHERE bot_name = $1 ORDER BY updated_at DESC",
+    )
+    .bind(worker_name)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    let mut map = std::collections::HashMap::new();
+    for (key, value) in rows {
+        map.entry(key).or_insert(value);
+    }
+    map
+}
+
+/// Lit une valeur depuis la config DB, sinon env var, sinon defaut.
+pub fn config_or_env<T: std::str::FromStr>(
+    db_config: &std::collections::HashMap<String, String>,
+    db_key: &str,
+    env_key: &str,
+    default: T,
+) -> T {
+    // Priorite 1 : config DB
+    if let Some(val) = db_config.get(db_key) {
+        if let Ok(parsed) = val.parse() {
+            return parsed;
+        }
+    }
+    // Priorite 2 : env var
+    if let Ok(val) = std::env::var(env_key) {
+        if let Ok(parsed) = val.parse() {
+            return parsed;
+        }
+    }
+    // Priorite 3 : defaut
+    default
+}
+
+/// Version bool de config_or_env.
+pub fn config_or_env_bool(
+    db_config: &std::collections::HashMap<String, String>,
+    db_key: &str,
+    env_key: &str,
+    default: bool,
+) -> bool {
+    if let Some(val) = db_config.get(db_key) {
+        return val == "true" || val == "1";
+    }
+    match std::env::var(env_key) {
+        Ok(v) => v == "true" || v == "1",
+        Err(_) => default,
+    }
+}
+
 /// Charge une variable d'environnement avec un fallback par defaut.
 pub fn load_env<T: std::str::FromStr>(key: &str, default: T) -> T {
     std::env::var(key)
@@ -262,5 +323,58 @@ mod tests {
     #[test]
     fn time_constants_coherent() {
         assert_eq!(SECS_PER_HOUR, SECS_PER_MINUTE * 60);
+    }
+
+    // ── config_or_env tests ──
+
+    #[test]
+    fn config_or_env_db_takes_priority() {
+        let mut db = std::collections::HashMap::new();
+        db.insert("my_key".into(), "42".into());
+        let result: u64 = config_or_env(&db, "my_key", "NONEXISTENT_ENV_VAR_XYZ", 99);
+        assert_eq!(result, 42);
+    }
+
+    #[test]
+    fn config_or_env_falls_back_to_default() {
+        let db = std::collections::HashMap::new();
+        let result: u64 = config_or_env(&db, "missing", "NONEXISTENT_ENV_VAR_XYZ", 99);
+        assert_eq!(result, 99);
+    }
+
+    #[test]
+    fn config_or_env_invalid_db_value_falls_back() {
+        let mut db = std::collections::HashMap::new();
+        db.insert("key".into(), "not_a_number".into());
+        let result: u64 = config_or_env(&db, "key", "NONEXISTENT_ENV_VAR_XYZ", 50);
+        assert_eq!(result, 50);
+    }
+
+    #[test]
+    fn config_or_env_bool_db_true() {
+        let mut db = std::collections::HashMap::new();
+        db.insert("flag".into(), "true".into());
+        assert!(config_or_env_bool(&db, "flag", "NONEXISTENT_ENV_VAR_XYZ", false));
+    }
+
+    #[test]
+    fn config_or_env_bool_db_false() {
+        let mut db = std::collections::HashMap::new();
+        db.insert("flag".into(), "false".into());
+        assert!(!config_or_env_bool(&db, "flag", "NONEXISTENT_ENV_VAR_XYZ", true));
+    }
+
+    #[test]
+    fn config_or_env_bool_db_one() {
+        let mut db = std::collections::HashMap::new();
+        db.insert("flag".into(), "1".into());
+        assert!(config_or_env_bool(&db, "flag", "NONEXISTENT_ENV_VAR_XYZ", false));
+    }
+
+    #[test]
+    fn config_or_env_bool_missing_uses_default() {
+        let db = std::collections::HashMap::new();
+        assert!(config_or_env_bool(&db, "missing", "NONEXISTENT_ENV_VAR_XYZ", true));
+        assert!(!config_or_env_bool(&db, "missing", "NONEXISTENT_ENV_VAR_XYZ", false));
     }
 }

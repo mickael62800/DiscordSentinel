@@ -12,6 +12,7 @@ use crate::handler::ModerationApiKey;
 pub fn register_massmute() -> CreateCommand {
     CreateCommand::new("massmute")
         .description("Mute plusieurs utilisateurs en une seule commande")
+        .default_member_permissions(serenity::all::Permissions::MODERATE_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "users", "IDs des utilisateurs (separes par des espaces ou virgules)")
                 .required(true),
@@ -30,6 +31,7 @@ pub fn register_massmute() -> CreateCommand {
 pub fn register_massban() -> CreateCommand {
     CreateCommand::new("massban")
         .description("Bannir plusieurs utilisateurs en une seule commande")
+        .default_member_permissions(serenity::all::Permissions::BAN_MEMBERS)
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "users", "IDs des utilisateurs (separes par des espaces ou virgules)")
                 .required(true),

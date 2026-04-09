@@ -20,6 +20,19 @@ pub struct Infraction {
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
+pub struct StreakResponse {
+    #[serde(default)]
+    pub streak_current: u32,
+    #[serde(default)]
+    pub streak_best: u32,
+    #[serde(default)]
+    pub streak_last_day: u32,
+    #[serde(default)]
+    pub streak_last_year: i32,
+}
+
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct UserStatsResponse {
     pub guild_id: String,
     pub user_id: String,
@@ -273,6 +286,17 @@ impl ApiClient {
             path.push_str(&format!("&source={s}"));
         }
         self.base.get_json(&path).await
+    }
+
+    /// Charge les donnees de streak d'un utilisateur.
+    pub async fn get_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<StreakResponse, String> {
+        self.base
+            .get_json(&format!("/api/levels/{guild_id}/{user_id}/streak"))
+            .await
     }
 
     /// Persiste les donnees de streak pour un utilisateur.

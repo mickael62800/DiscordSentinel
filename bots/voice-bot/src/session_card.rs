@@ -87,8 +87,13 @@ impl SessionCard {
 
         // Tronquer si trop long (limite embed description 4096)
         if history.len() > 3500 {
-            let keep = history.len() - 3000;
-            history = format!("_... {} evenements precedents ..._\n{}", self.events.len() / 2, &history[keep..]);
+            // Utiliser char_indices pour couper sur une frontiere UTF-8 valide
+            let target_keep = history.len() - 3000;
+            let safe_keep = history.char_indices()
+                .map(|(i, _)| i)
+                .find(|&i| i >= target_keep)
+                .unwrap_or(target_keep);
+            history = format!("_... {} evenements precedents ..._\n{}", self.events.len() / 2, &history[safe_keep..]);
         }
 
         // Footer

@@ -125,23 +125,37 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
     let currently_locked = ch.locked;
     let new_locked = !currently_locked;
 
-    // Toggle Discord permissions
+    // Lire les permissions existantes pour @everyone et merger
+    let existing_overwrite = voice_channel_id
+        .to_channel(&ctx.http).await.ok()
+        .and_then(|c| c.guild())
+        .and_then(|c| {
+            c.permission_overwrites.iter()
+                .find(|ow| ow.kind == serenity::model::channel::PermissionOverwriteType::Role(everyone_role))
+                .cloned()
+        });
+
+    let (base_allow, base_deny) = match &existing_overwrite {
+        Some(ow) => (ow.allow, ow.deny),
+        None => (Permissions::empty(), Permissions::empty()),
+    };
+
+    // Toggle Discord permissions (merger, pas ecraser)
     if currently_locked {
-        // Unlock: remove the deny on CONNECT for @everyone
-        // We need to keep other overwrites, so we set CONNECT deny to false
+        // Unlock: retirer CONNECT des deny, ajouter aux allow
         let overwrite = serenity::model::channel::PermissionOverwrite {
-            allow: Permissions::CONNECT,
-            deny: Permissions::empty(),
+            allow: base_allow | Permissions::CONNECT,
+            deny: base_deny - Permissions::CONNECT,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
         if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
             tracing::warn!(error = %e, "failed to set permission when unlocking channel");
         }
     } else {
-        // Lock: deny CONNECT for @everyone
+        // Lock: ajouter CONNECT aux deny, retirer des allow
         let overwrite = serenity::model::channel::PermissionOverwrite {
-            allow: Permissions::empty(),
-            deny: Permissions::CONNECT,
+            allow: base_allow - Permissions::CONNECT,
+            deny: base_deny | Permissions::CONNECT,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
         if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
