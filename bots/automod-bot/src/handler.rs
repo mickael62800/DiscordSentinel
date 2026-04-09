@@ -54,6 +54,19 @@ const DEFAULT_MUTE_DURATION_SECS: u64 = 600;
 
 pub struct Handler;
 
+// ══════════════════════════════════════════════════════════════════════
+// ── FEATURE FLAGS — Decommente une par une pour tester ──
+// ══════════════════════════════════════════════════════════════════════
+const FEATURE_DEDUPLICATION: bool = true;
+const FEATURE_CONFIG_LOADING: bool = true;
+const FEATURE_SUSPICIOUS_FILES: bool = false;   // Desactive pour debug
+const FEATURE_FLOOD_DETECTION: bool = false;     // Desactive pour debug
+const FEATURE_CAPS_DETECTION: bool = false;      // Desactive pour debug
+const FEATURE_ADAPTIVE_SLOWMODE: bool = false;   // Desactive pour debug
+const FEATURE_LOCAL_ANALYSIS: bool = false;      // Desactive pour debug
+const FEATURE_API_ANALYSIS: bool = false;        // Desactive pour debug
+// ══════════════════════════════════════════════════════════════════════
+
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
@@ -62,40 +75,54 @@ impl EventHandler for Handler {
             return;
         }
 
-        // Deduplication : ignorer si deja traite
-        {
+        info!(
+            user = %msg.author.name,
+            content_len = msg.content.len(),
+            channel = %msg.channel_id,
+            "Message recu"
+        );
+
+        // ── Feature 1 : Deduplication ──
+        if FEATURE_DEDUPLICATION {
             let data = ctx.data.read().await;
             if let Some(processed) = data.get::<ProcessedMessagesKey>() {
                 let now = Instant::now();
                 if processed.contains_key(&msg.id) {
+                    info!("Message deja traite (dedup), skip");
                     return;
                 }
                 processed.insert(msg.id, now);
-                // Cleanup : supprimer les entrees > 5 minutes
                 if processed.len() > 2000 {
                     processed.retain(|_, ts| now.duration_since(*ts).as_secs() < 300);
                 }
             }
         }
 
-        // Charger la config depuis l'API pour ce guild (une seule fois par message)
+        // ── Feature 2 : Config loading ──
         let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
-        let config = {
+        let config = if FEATURE_CONFIG_LOADING {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
                 match api.get_guild_config(&guild_id).await {
-                    Ok(cfg) => cfg,
+                    Ok(cfg) => {
+                        info!(guild_id = %guild_id, keys = cfg.len(), "Config guild chargee");
+                        cfg
+                    }
                     Err(e) => {
                         warn!(guild_id = %guild_id, error = %e, "Impossible de charger la config guild, utilisation des valeurs par defaut");
                         std::collections::HashMap::new()
                     }
                 }
             } else {
+                warn!("ApiClientKey introuvable dans le contexte");
                 std::collections::HashMap::new()
             }
+        } else {
+            std::collections::HashMap::new()
         };
 
         if !BaseApiClient::config_bool(&config, "enabled", true) {
+            info!("Automod desactive pour cette guild");
             return;
         }
 
@@ -103,10 +130,8 @@ impl EventHandler for Handler {
         let flood_window_secs = BaseApiClient::config_u64(&config, "flood_window_secs", DEFAULT_FLOOD_WINDOW_SECS);
         let mute_duration_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
 
-        // Construire la config des detecteurs depuis la guild config
         let mut detector_config = build_detector_config(&config);
 
-        // Night mode : seuils plus stricts pendant les heures configurees
         let night_mode_enabled = BaseApiClient::config_bool(&config, "night_mode_enabled", false);
         if night_mode_enabled {
             let start = BaseApiClient::config_u64(&config, "night_start_hour", 22) as u8;
@@ -116,7 +141,6 @@ impl EventHandler for Handler {
             }
         }
 
-        // Construire les couleurs des embeds depuis la guild config
         let colors = build_embed_colors(&config);
 
         // Verifier les salons exclus
@@ -144,8 +168,10 @@ impl EventHandler for Handler {
             }
         }
 
-        // 0. Detection pieces jointes suspectes
-        if detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
+        let content = &msg.content;
+
+        // ── Feature 3 : Fichiers suspects ──
+        if FEATURE_SUSPICIOUS_FILES && detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
             const DANGEROUS_EXTENSIONS: &[&str] = &[
                 "exe", "bat", "cmd", "scr", "ps1", "vbs", "js",
                 "jar", "com", "pif", "msi", "dll", "reg", "hta",
@@ -159,6 +185,7 @@ impl EventHandler for Handler {
             });
 
             if let Some(attachment) = suspicious {
+                info!(user = %msg.author.name, filename = %attachment.filename, ">> FEATURE: Fichier suspect detecte");
                 let embed = moderate_embed("🗑\u{fe0f} Fichier suspect supprime")
                     .color(colors.delete)
                     .field("📝 Raison", "Piece jointe avec extension dangereuse.", false)
@@ -173,78 +200,75 @@ impl EventHandler for Handler {
                 }
 
                 let log_msg = format!("Fichier suspect supprime — {} : {}", msg.author.name, attachment.filename);
-                let guild_id_str = guild_id.clone();
                 let data = ctx.data.read().await;
                 if let Some(base) = data.get::<ApiClientKey>() {
-                    base.send_log("warn", &guild_id_str, &log_msg);
+                    base.send_log("warn", &guild_id, &log_msg);
                 }
-                info!(user = %msg.author.name, filename = %attachment.filename, "Fichier suspect supprime");
                 return;
             }
         }
 
-        let content = &msg.content;
-
-        // 1. Detection flood
-        let is_flood = {
-            let data = ctx.data.read().await;
-            if let Some(tracker) = data.get::<FloodTrackerKey>() {
-                let key = (msg.channel_id, msg.author.id);
-                let now = Instant::now();
-                let mut entry = tracker.entry(key).or_default();
-                let timestamps = entry.value_mut();
-                timestamps.retain(|t| now.duration_since(*t).as_secs() < flood_window_secs);
-                timestamps.push(now);
-                let flood = timestamps.len() >= flood_max_messages;
-                // Cleanup periodique : supprimer les utilisateurs inactifs > 10 min
-                if tracker.len() > 5000 {
-                    tracker.retain(|_, ts| {
-                        ts.last()
-                            .map(|t| now.duration_since(*t).as_secs() < 600)
-                            .unwrap_or(false)
-                    });
+        // ── Feature 4 : Flood detection ──
+        if FEATURE_FLOOD_DETECTION {
+            let is_flood = {
+                let data = ctx.data.read().await;
+                if let Some(tracker) = data.get::<FloodTrackerKey>() {
+                    let key = (msg.channel_id, msg.author.id);
+                    let now = Instant::now();
+                    let mut entry = tracker.entry(key).or_default();
+                    let timestamps = entry.value_mut();
+                    timestamps.retain(|t| now.duration_since(*t).as_secs() < flood_window_secs);
+                    timestamps.push(now);
+                    let flood = timestamps.len() >= flood_max_messages;
+                    if tracker.len() > 5000 {
+                        tracker.retain(|_, ts| {
+                            ts.last()
+                                .map(|t| now.duration_since(*t).as_secs() < 600)
+                                .unwrap_or(false)
+                        });
+                    }
+                    flood
+                } else {
+                    false
                 }
-                flood
-            } else {
-                false
+            };
+
+            if is_flood {
+                info!(user = %msg.author.name, ">> FEATURE: Flood detecte");
+                let data = ctx.data.read().await;
+                if let Some(tracker) = data.get::<FloodTrackerKey>() {
+                    tracker.remove(&(msg.channel_id, msg.author.id));
+                }
+                drop(data);
+
+                let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                    .color(colors.warn)
+                    .field("📝 Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
+                    .thumbnail(msg.author.face());
+                let builder = serenity::builder::CreateMessage::new().embed(embed);
+                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                    warn!(error = %e, "Echec envoi avertissement flood");
+                }
+
+                let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
+                let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
+                let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
+                let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
+                let ctx_clone = ctx.clone();
+                let msg_clone = msg.clone();
+                tokio::spawn(async move {
+                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars).await;
+                });
+                return;
             }
-        };
-
-        if is_flood {
-            let data = ctx.data.read().await;
-            if let Some(tracker) = data.get::<FloodTrackerKey>() {
-                tracker.remove(&(msg.channel_id, msg.author.id));
-            }
-            drop(data);
-
-            let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
-                .color(colors.warn)
-                .field("📝 Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
-                .thumbnail(msg.author.face());
-            let builder = serenity::builder::CreateMessage::new().embed(embed);
-            if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
-                warn!(error = %e, "Echec envoi avertissement flood");
-            }
-
-            info!(user = %msg.author.name, "Flood detecte");
-
-            let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
-            let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
-            let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
-            let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
-            // Spawn en background pour ne pas bloquer le handler Discord
-            let ctx_clone = ctx.clone();
-            let msg_clone = msg.clone();
-            tokio::spawn(async move {
-                send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars).await;
-            });
-            return;
         }
 
-        // 2. Detection caps (avertissement seulement, pas d'infraction)
-        if detector_config.caps_enabled
+        // ── Feature 5 : Caps detection ──
+        if FEATURE_CAPS_DETECTION
+            && detector_config.caps_enabled
             && detectors::spam::detect_caps(content, detector_config.caps_threshold_chars)
         {
+            info!(user = %msg.author.name, ">> FEATURE: Caps detecte");
             let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
                 .color(colors.warn)
                 .field("📝 Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
@@ -253,11 +277,10 @@ impl EventHandler for Handler {
             if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
                 warn!(error = %e, "Echec envoi avertissement caps");
             }
-            info!(user = %msg.author.name, "Caps detecte, avertissement envoye");
         }
 
-        // 3. Slowmode adaptatif — tracker le volume de messages
-        {
+        // ── Feature 6 : Slowmode adaptatif ──
+        if FEATURE_ADAPTIVE_SLOWMODE {
             let adaptive_enabled = BaseApiClient::config_bool(&config, "adaptive_slowmode_enabled", false);
             if adaptive_enabled {
                 let threshold = BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15) as usize;
@@ -269,21 +292,16 @@ impl EventHandler for Handler {
                     if tracker.should_activate(msg.channel_id, threshold)
                         && tracker.try_start_activation(msg.channel_id)
                     {
+                        info!(channel_id = %msg.channel_id, ">> FEATURE: Slowmode adaptatif declenchement");
                         let edit = serenity::builder::EditChannel::new().rate_limit_per_user(slowmode_secs);
                         if let Err(e) = msg.channel_id.edit(&ctx.http, edit).await {
                             warn!(error = %e, "Impossible d'activer le slowmode adaptatif");
                         } else {
-                            info!(
-                                channel_id = %msg.channel_id,
-                                slowmode_secs,
-                                "Slowmode adaptatif active ({}msg/30s)",
-                                threshold
-                            );
+                            info!(channel_id = %msg.channel_id, slowmode_secs, "Slowmode adaptatif active");
                             tracker.reset(msg.channel_id);
                         }
                         tracker.finish_activation(msg.channel_id);
                     }
-                    // Cleanup periodique
                     if tracker.tracked_channels() > 500 {
                         tracker.cleanup();
                     }
@@ -291,36 +309,39 @@ impl EventHandler for Handler {
             }
         }
 
-        // 4. Analyse locale (spam, insulte, lien, phishing, unicode)
-        let flags = detectors::analyze(content, &detector_config);
+        // ── Feature 7 : Analyse locale ──
+        let flags = if FEATURE_LOCAL_ANALYSIS {
+            let f = detectors::analyze(content, &detector_config);
+            if f.spam || f.insult || f.link || f.phishing {
+                info!(
+                    user = %msg.author.name,
+                    spam = f.spam, insult = f.insult, link = f.link, phishing = f.phishing,
+                    ">> FEATURE: Flags locaux detectes"
+                );
+            }
+            f
+        } else {
+            detectors::DetectionFlags { spam: false, insult: false, link: false, phishing: false }
+        };
 
-        // Verifier si l'IA texte est activee pour cette guild
+        // ── Feature 8 : Envoi API ──
+        if !FEATURE_API_ANALYSIS {
+            return;
+        }
+
         let ia_text_enabled = BaseApiClient::config_bool(&config, "text_enabled", true);
-
-        // Envoyer a l'API si flags locaux detectes OU si l'IA est activee
         let should_analyze = flags.spam || flags.insult || flags.link || flags.phishing || ia_text_enabled;
 
         if !should_analyze {
             return;
         }
 
-        if flags.spam || flags.insult || flags.link || flags.phishing {
-            info!(
-                guild_id = ?msg.guild_id,
-                user = %msg.author.name,
-                flags.spam = flags.spam,
-                flags.insult = flags.insult,
-                flags.link = flags.link,
-                flags.phishing = flags.phishing,
-                "Message flagge localement"
-            );
-        }
+        info!(user = %msg.author.name, ">> FEATURE: Envoi a l'API pour analyse");
 
         let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
         let context_max_messages = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
         let context_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
 
-        // Spawn en background pour ne pas bloquer le bot
         let ctx_clone = ctx.clone();
         let msg_clone = msg.clone();
         tokio::spawn(async move {
