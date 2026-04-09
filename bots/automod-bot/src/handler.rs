@@ -54,19 +54,6 @@ const DEFAULT_MUTE_DURATION_SECS: u64 = 600;
 
 pub struct Handler;
 
-// ══════════════════════════════════════════════════════════════════════
-// ── FEATURE FLAGS — Decommente une par une pour tester ──
-// ══════════════════════════════════════════════════════════════════════
-const FEATURE_DEDUPLICATION: bool = true;
-const FEATURE_CONFIG_LOADING: bool = true;
-const FEATURE_SUSPICIOUS_FILES: bool = true;    // ACTIVE — test 5
-const FEATURE_FLOOD_DETECTION: bool = true;      // REACTIVE — fix deadlock
-const FEATURE_CAPS_DETECTION: bool = true;       // ACTIVE — test 4
-const FEATURE_ADAPTIVE_SLOWMODE: bool = true;    // ACTIVE — test 6
-const FEATURE_LOCAL_ANALYSIS: bool = true;       // ACTIVE — test 1
-const FEATURE_API_ANALYSIS: bool = true;         // ACTIVE — test 2
-// ══════════════════════════════════════════════════════════════════════
-
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
@@ -75,20 +62,12 @@ impl EventHandler for Handler {
             return;
         }
 
-        info!(
-            user = %msg.author.name,
-            content_len = msg.content.len(),
-            channel = %msg.channel_id,
-            "Message recu"
-        );
-
-        // ── Feature 1 : Deduplication ──
-        if FEATURE_DEDUPLICATION {
+        // Deduplication : ignorer si deja traite
+        {
             let data = ctx.data.read().await;
             if let Some(processed) = data.get::<ProcessedMessagesKey>() {
                 let now = Instant::now();
                 if processed.contains_key(&msg.id) {
-                    info!("Message deja traite (dedup), skip");
                     return;
                 }
                 processed.insert(msg.id, now);
@@ -98,31 +77,24 @@ impl EventHandler for Handler {
             }
         }
 
-        // ── Feature 2 : Config loading ──
+        // Charger la config depuis l'API pour ce guild
         let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
-        let config = if FEATURE_CONFIG_LOADING {
+        let config = {
             let data = ctx.data.read().await;
             if let Some(api) = data.get::<ApiClientKey>() {
                 match api.get_guild_config(&guild_id).await {
-                    Ok(cfg) => {
-                        info!(guild_id = %guild_id, keys = cfg.len(), "Config guild chargee");
-                        cfg
-                    }
+                    Ok(cfg) => cfg,
                     Err(e) => {
                         warn!(guild_id = %guild_id, error = %e, "Impossible de charger la config guild, utilisation des valeurs par defaut");
                         std::collections::HashMap::new()
                     }
                 }
             } else {
-                warn!("ApiClientKey introuvable dans le contexte");
                 std::collections::HashMap::new()
             }
-        } else {
-            std::collections::HashMap::new()
         };
 
         if !BaseApiClient::config_bool(&config, "enabled", true) {
-            info!("Automod desactive pour cette guild");
             return;
         }
 
@@ -170,8 +142,8 @@ impl EventHandler for Handler {
 
         let content = &msg.content;
 
-        // ── Feature 3 : Fichiers suspects ──
-        if FEATURE_SUSPICIOUS_FILES && detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
+        // Detection pieces jointes suspectes
+        if detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
             const DANGEROUS_EXTENSIONS: &[&str] = &[
                 "exe", "bat", "cmd", "scr", "ps1", "vbs", "js",
                 "jar", "com", "pif", "msi", "dll", "reg", "hta",
@@ -185,7 +157,7 @@ impl EventHandler for Handler {
             });
 
             if let Some(attachment) = suspicious {
-                info!(user = %msg.author.name, filename = %attachment.filename, ">> FEATURE: Fichier suspect detecte");
+                info!(user = %msg.author.name, filename = %attachment.filename, "Fichier suspect detecte");
                 let embed = moderate_embed("🗑\u{fe0f} Fichier suspect supprime")
                     .color(colors.delete)
                     .field("📝 Raison", "Piece jointe avec extension dangereuse.", false)
@@ -208,9 +180,8 @@ impl EventHandler for Handler {
             }
         }
 
-        // ── Feature 4 : Flood detection ──
-        if FEATURE_FLOOD_DETECTION {
-            // Cloner le tracker pour liberer le RwLock immediatement
+        // Detection flood (clone le tracker pour eviter deadlock sur le RwLock)
+        {
             let flood_tracker = {
                 let data = ctx.data.read().await;
                 data.get::<FloodTrackerKey>().cloned()
@@ -240,7 +211,7 @@ impl EventHandler for Handler {
             };
 
             if is_flood {
-                info!(user = %msg.author.name, ">> FEATURE: Flood detecte");
+                info!(user = %msg.author.name, "Flood detecte");
                 if let Some(tracker) = &flood_tracker {
                     tracker.remove(&(msg.channel_id, msg.author.id));
                 }
@@ -267,12 +238,11 @@ impl EventHandler for Handler {
             }
         }
 
-        // ── Feature 5 : Caps detection ──
-        if FEATURE_CAPS_DETECTION
-            && detector_config.caps_enabled
+        // Detection caps
+        if detector_config.caps_enabled
             && detectors::spam::detect_caps(content, detector_config.caps_threshold_chars)
         {
-            info!(user = %msg.author.name, ">> FEATURE: Caps detecte");
+            info!(user = %msg.author.name, "Caps detecte");
             let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
                 .color(colors.warn)
                 .field("📝 Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
@@ -283,8 +253,8 @@ impl EventHandler for Handler {
             }
         }
 
-        // ── Feature 6 : Slowmode adaptatif ──
-        if FEATURE_ADAPTIVE_SLOWMODE {
+        // Slowmode adaptatif
+        {
             let adaptive_enabled = BaseApiClient::config_bool(&config, "adaptive_slowmode_enabled", false);
             if adaptive_enabled {
                 let threshold = BaseApiClient::config_u64(&config, "adaptive_slowmode_threshold", 15) as usize;
@@ -296,7 +266,6 @@ impl EventHandler for Handler {
                     if tracker.should_activate(msg.channel_id, threshold)
                         && tracker.try_start_activation(msg.channel_id)
                     {
-                        info!(channel_id = %msg.channel_id, ">> FEATURE: Slowmode adaptatif declenchement");
                         let edit = serenity::builder::EditChannel::new().rate_limit_per_user(slowmode_secs);
                         if let Err(e) = msg.channel_id.edit(&ctx.http, edit).await {
                             warn!(error = %e, "Impossible d'activer le slowmode adaptatif");
@@ -313,24 +282,15 @@ impl EventHandler for Handler {
             }
         }
 
-        // ── Feature 7 : Analyse locale ──
-        let flags = if FEATURE_LOCAL_ANALYSIS {
-            let f = detectors::analyze(content, &detector_config);
-            if f.spam || f.insult || f.link || f.phishing {
-                info!(
-                    user = %msg.author.name,
-                    spam = f.spam, insult = f.insult, link = f.link, phishing = f.phishing,
-                    ">> FEATURE: Flags locaux detectes"
-                );
-            }
-            f
-        } else {
-            detectors::DetectionFlags { spam: false, insult: false, link: false, phishing: false }
-        };
+        // Analyse locale (spam, insulte, lien, phishing)
+        let flags = detectors::analyze(content, &detector_config);
 
-        // ── Feature 8 : Envoi API ──
-        if !FEATURE_API_ANALYSIS {
-            return;
+        if flags.spam || flags.insult || flags.link || flags.phishing {
+            info!(
+                user = %msg.author.name,
+                spam = flags.spam, insult = flags.insult, link = flags.link, phishing = flags.phishing,
+                "Message flagge localement"
+            );
         }
 
         let ia_text_enabled = BaseApiClient::config_bool(&config, "text_enabled", true);
@@ -339,8 +299,6 @@ impl EventHandler for Handler {
         if !should_analyze {
             return;
         }
-
-        info!(user = %msg.author.name, ">> FEATURE: Envoi a l'API pour analyse");
 
         let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
         let context_max_messages = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
