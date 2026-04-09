@@ -60,7 +60,7 @@ pub struct Handler;
 const FEATURE_DEDUPLICATION: bool = true;
 const FEATURE_CONFIG_LOADING: bool = true;
 const FEATURE_SUSPICIOUS_FILES: bool = false;   // Desactive pour debug
-const FEATURE_FLOOD_DETECTION: bool = false;     // Desactive pour debug
+const FEATURE_FLOOD_DETECTION: bool = true;      // ACTIVE — test 3
 const FEATURE_CAPS_DETECTION: bool = false;      // Desactive pour debug
 const FEATURE_ADAPTIVE_SLOWMODE: bool = false;   // Desactive pour debug
 const FEATURE_LOCAL_ANALYSIS: bool = true;       // ACTIVE — test 1
