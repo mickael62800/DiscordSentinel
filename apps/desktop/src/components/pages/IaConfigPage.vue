@@ -2,6 +2,7 @@
 import { ref, watch } from "vue";
 import { useIaConfig } from "../../composables/useIaConfig";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import AppToggle from "../atoms/AppToggle.vue";
 
 const { config, loading, saving, error, saveConfig } = useIaConfig();
 const { guildIdFilter } = useGuildSelector();
@@ -63,10 +64,7 @@ async function handleSave() {
       <section class="config-section">
         <div class="section-header">
           <h2>Analyse de texte (sentiments)</h2>
-          <label class="toggle">
-            <input type="checkbox" v-model="textEnabled" />
-            <span>{{ textEnabled ? "Active" : "Desactive" }}</span>
-          </label>
+          <AppToggle :modelValue="textEnabled" @update:modelValue="textEnabled = $event" />
         </div>
         <p class="description">
           Detection de colere, rage, menaces et harcelement via DistilBERT.
@@ -96,10 +94,7 @@ async function handleSave() {
       <section class="config-section">
         <div class="section-header">
           <h2>Analyse d'images (vision)</h2>
-          <label class="toggle">
-            <input type="checkbox" v-model="visionEnabled" />
-            <span>{{ visionEnabled ? "Active" : "Desactive" }}</span>
-          </label>
+          <AppToggle :modelValue="visionEnabled" @update:modelValue="visionEnabled = $event" />
         </div>
         <p class="description">
           Detection NSFW et contenus illicites via EfficientNetV2.
