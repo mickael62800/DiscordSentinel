@@ -232,7 +232,12 @@ impl EventHandler for Handler {
             let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
             let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
             let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
-            send_to_backend(&ctx, &msg, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars).await;
+            // Spawn en background pour ne pas bloquer le handler Discord
+            let ctx_clone = ctx.clone();
+            let msg_clone = msg.clone();
+            tokio::spawn(async move {
+                send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars).await;
+            });
             return;
         }
 
