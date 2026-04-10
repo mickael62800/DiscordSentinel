@@ -159,7 +159,7 @@ async fn log_action_saves_to_repo() {
     let actions = repo.actions.lock().await;
     assert_eq!(actions.len(), 1);
     assert_eq!(actions[0].action_type, "warn");
-    assert_eq!(actions[0].gravity.as_deref(), Some("medium"));
+    assert_eq!(actions[0].gravity.map(|g| g.as_str()), Some("medium"));
 }
 
 #[tokio::test]
@@ -215,7 +215,7 @@ async fn log_action_preserves_all_fields() {
     assert_eq!(action.target_id, "t1");
     assert_eq!(action.action_type, "ban_temp");
     assert_eq!(action.reason, "Raison ici");
-    assert_eq!(action.gravity.as_deref(), Some("high"));
+    assert_eq!(action.gravity.map(|g| g.as_str()), Some("high"));
     assert_eq!(action.duration, Some(7200));
 }
 
@@ -351,7 +351,7 @@ async fn delete_bans_removes_ban_entries() {
 
 #[tokio::test]
 async fn delete_bans_only_for_specific_user() {
-    let (svc, repo, _) = build_service();
+    let (svc, _repo, _) = build_service();
     svc.log_action(make_command("ban_permanent", None, None)).await.unwrap();
     svc.log_action(LogModerationCommand {
         guild_id: "guild1".into(),

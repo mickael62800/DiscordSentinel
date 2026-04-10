@@ -1,3 +1,11 @@
+// Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS).
+// Sur Windows MSVC, on retombe sur l'allocateur système (jemalloc ne compile
+// pas dans ce target). Gain typique : -15 % RAM résidente sur les processus
+// long-running grâce à une meilleure gestion de la fragmentation mémoire.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -8,14 +16,14 @@ use tracing::{error, info};
 use sentinel_api::adapters::inbound::http::{router, state::AppState};
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::postgres::{
-    PgBotConfigRepository, PgConductRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
+    PgBotConfigRepository, PgConductRepository, PgCoudeBetRepository, PgCoudeCombatRepository, PgCoudeEconomyRepository, PgCoudeInventoryRepository, PgCoudePlayerRepository, PgCoudeSocialRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
     PgMemberRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
     PgAnalyticsRepository, PgAuditLogRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository,
 };
 use sentinel_api::adapters::outbound::job_client::JobClient;
 use sentinel_api::adapters::outbound::redis_cache::RedisCache;
 use sentinel_api::application::{
-    AnalyzeImageService, AnalyzeMessageService, ManageConductService, ManageInfractionsService,
+    AnalyzeImageService, AnalyzeMessageService, ManageConductService, ManageCoudeBetsService, ManageCoudeCombatsService, ManageCoudeEconomyService, ManageCoudeInventoryService, ManageCoudePlayersService, ManageCoudeSocialService, ManageInfractionsService,
     ManageModerationService, ManageRulesService, ManageSecurityService, ManageStatsService,
     BlackjackService, ManageAuditLogsService, ManageLevelsService, ManageMembersService, ManageNotesService, ManageRemindersService, ManageRolePanelsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService, ManageWatchedUsersService,
 };
@@ -47,6 +55,14 @@ async fn main() {
             .with_env_filter(env_filter)
             .init();
     }
+
+    // Phase 0 — Observabilité : installe le recorder Prometheus AVANT toute
+    // émission de métriques. Doit être appelé avant `Router::build`.
+    sentinel_api::adapters::inbound::http::metrics::init_prometheus();
+
+    // Échantillonnage du runtime tokio toutes les 10s → gauges Prometheus
+    // (workers_count, busy_ratio, queue_depth, ...).
+    sentinel_api::adapters::inbound::http::metrics::spawn_tokio_runtime_sampler();
 
     let config = AppConfig::from_env();
 
@@ -197,6 +213,19 @@ async fn main() {
     let wallet_repo = Arc::new(PgWalletRepository::new(pg_pool.clone()));
     let blackjack_repo = Arc::new(PgBlackjackRepository::new(pg_pool.clone()));
     let blackjack_svc = Arc::new(BlackjackService::new(blackjack_repo, wallet_repo.clone()));
+    let coude_player_repo = Arc::new(PgCoudePlayerRepository::new(pg_pool.clone()));
+    let coude_players_uc = Arc::new(ManageCoudePlayersService::new(coude_player_repo));
+    let coude_combat_repo = Arc::new(PgCoudeCombatRepository::new(pg_pool.clone()));
+    let coude_combats_uc: Arc<dyn sentinel_api::ports::inbound::ManageCoudeCombatsUseCase> =
+        Arc::new(ManageCoudeCombatsService::new(coude_combat_repo));
+    let coude_bet_repo = Arc::new(PgCoudeBetRepository::new(pg_pool.clone()));
+    let coude_bets_uc = Arc::new(ManageCoudeBetsService::new(coude_bet_repo, coude_combats_uc.clone()));
+    let coude_economy_repo = Arc::new(PgCoudeEconomyRepository::new(pg_pool.clone()));
+    let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(coude_economy_repo));
+    let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
+    let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));
+    let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
+    let coude_social_uc = Arc::new(ManageCoudeSocialService::new(coude_social_repo));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),
@@ -251,6 +280,12 @@ async fn main() {
         discord_role_repo,
         wallet_repo,
         blackjack_svc,
+        coude_players_uc,
+        coude_combats_uc,
+        coude_bets_uc,
+        coude_economy_uc,
+        coude_inventory_uc,
+        coude_social_uc,
         broadcaster,
         job_client,
         discord_api,

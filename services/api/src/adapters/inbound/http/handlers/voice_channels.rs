@@ -69,7 +69,7 @@ pub async fn create_channel(
             "id": channel.id.to_string(),
             "channel_name": &channel.channel_name,
             "owner_name": &channel.owner_name,
-            "kind": &channel.kind,
+            "kind": channel.kind.as_str(),
         }),
     );
 

@@ -171,6 +171,15 @@ pub struct XpResult {
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
+pub struct CurrentSeason {
+    pub season_number: i32,
+    pub started_at: String,
+    pub ends_at: String,
+    pub days_remaining: i64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct CooldownResponse {
     pub expires_at: Option<String>,
 }
@@ -330,6 +339,34 @@ impl ApiClient {
                 &format!("/api/coude/{guild_id}/players/{user_id}/spend-stat"),
                 &serde_json::json!({ "stat": stat }),
             )
+            .await
+    }
+
+    /// POST /api/coude/{guild_id}/players/{user_id}/reset-stats
+    ///
+    /// Reset atomique : remet ATK/DEF a 0, restitue les points et deduit `cost` coins.
+    /// Retourne le joueur mis a jour.
+    pub async fn reset_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        cost: i64,
+    ) -> Result<Player, String> {
+        self.base
+            .post_json(
+                &format!("/api/coude/{guild_id}/players/{user_id}/reset-stats"),
+                &serde_json::json!({ "cost": cost }),
+            )
+            .await
+    }
+
+    /// GET /api/coude/{guild_id}/season/current
+    ///
+    /// Retourne la saison active (numero, debut, fin, jours restants).
+    /// Si aucune saison n'existe, l'API en cree une automatiquement.
+    pub async fn get_current_season(&self, guild_id: &str) -> Result<CurrentSeason, String> {
+        self.base
+            .get_json(&format!("/api/coude/{guild_id}/season/current"))
             .await
     }
 

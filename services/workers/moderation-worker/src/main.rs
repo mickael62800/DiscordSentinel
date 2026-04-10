@@ -1,3 +1,9 @@
+// Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS).
+// Sur Windows MSVC, on retombe sur l'allocateur système.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 mod config;
 mod jobs;
 mod scheduler;
@@ -13,6 +19,7 @@ const WORKER_NAME: &str = "moderation-worker";
 #[tokio::main]
 async fn main() {
     common::init_tracing("sentinel_moderation_worker=info");
+    common::metrics::init_observability(WORKER_NAME);
 
     let mut config = WorkerConfig::from_env();
 
@@ -27,9 +34,14 @@ async fn main() {
         info!(keys = db_config.len(), "Config DB chargee");
     }
 
+    let redis_client = redis::Client::open(config.redis_url.as_str()).unwrap_or_else(|e| {
+        tracing::error!(error = %e, "Impossible de creer le client Redis");
+        std::process::exit(1);
+    });
+
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    scheduler::start(&config, pg_pool.clone(), shutdown_rx);
+    scheduler::start(&config, pg_pool.clone(), redis_client, shutdown_rx);
     common::start_heartbeat(config.api_url.clone(), WORKER_NAME);
 
     common::send_lifecycle_log(&config.api_url, WORKER_NAME, "info", "Moderation Worker demarre").await;

@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::domain::value_objects::VoiceChannelKind;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannel {
     pub id: Uuid,
@@ -14,7 +16,7 @@ pub struct VoiceChannel {
     pub queue_channel_id: Option<String>,
     pub category_id: Option<String>,
     pub channel_name: String,
-    pub kind: String,
+    pub kind: VoiceChannelKind,
     pub visibility: String,
     pub queue_enabled: bool,
     pub locked: bool,

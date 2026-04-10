@@ -2,6 +2,7 @@ use axum::http::{header, HeaderValue, Method};
 use axum::middleware;
 use axum::routing::{delete, get, patch, post};
 use axum::Router;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tower_http::limit::RequestBodyLimitLayer;
 use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
@@ -10,6 +11,7 @@ use tower_http::trace::TraceLayer;
 use tracing::Span;
 
 use super::handlers;
+use super::metrics::{metrics_handler, metrics_middleware};
 use super::middleware::api_logger::api_logger_middleware;
 use super::middleware::auth::auth_middleware;
 use super::middleware::rate_limit::{rate_limit_middleware, RateLimiter};
@@ -218,6 +220,9 @@ fn coude_routes() -> Router<AppState> {
         .route("/{guild_id}/players/{user_id}/class", patch(handlers::coude::update_player_class))
         .route("/{guild_id}/players/{user_id}/xp", post(handlers::coude::add_xp))
         .route("/{guild_id}/players/{user_id}/spend-stat", post(handlers::coude::spend_stat_point))
+        .route("/{guild_id}/players/{user_id}/reset-stats", post(handlers::coude::reset_stats))
+        // Seasons
+        .route("/{guild_id}/season/current", get(handlers::coude::get_current_season))
         // Stats recording
         .route("/{guild_id}/players/{user_id}/record-win", post(handlers::coude::record_win))
         .route("/{guild_id}/players/{user_id}/record-loss", post(handlers::coude::record_loss))
@@ -483,6 +488,17 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/cache/stats", get(handlers::cache_stats::get_cache_stats))
         // Coup de coude
         .nest("/api/coude", coude_routes())
+        // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)
+        .route("/api/ai/jobs", post(handlers::ai_jobs::create_ai_job))
+        .route("/api/ai/jobs/{id}", get(handlers::ai_jobs::get_ai_job))
+        // Phase 2 B — Multi-tenant : filtre les requetes par appartenance
+        // Discord du user appelant (header X-Discord-Token). Pass-through si
+        // header absent (appel bot/internal). Doit etre apres auth_middleware
+        // pour beneficier de la validation API key d'abord.
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::adapters::inbound::http::middleware::guild_auth::guild_auth_middleware,
+        ))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth_middleware,
@@ -492,8 +508,14 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
             rate_limit_middleware,
         ));
 
-    // Routes publiques
-    let public = Router::new().route("/health", get(handlers::health::health));
+    // Routes publiques (health + métriques Prometheus pour scraping)
+    //
+    // ⚠️ `/metrics` est volontairement public — Prometheus scrape sans auth.
+    // Pour restreindre en prod, faire un firewall sur l'IP du Prometheus ou
+    // ajouter une couche basic auth via reverse proxy.
+    let public = Router::new()
+        .route("/health", get(handlers::health::health))
+        .route("/metrics", get(metrics_handler));
 
     // TraceLayer configure pour inclure le request_id dans chaque span
     let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
@@ -523,6 +545,15 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .merge(protected)
         .merge(public)
         .layer(middleware::from_fn_with_state(log_repo, api_logger_middleware))
+        // Métriques Prometheus : enregistre count + latency par (route, method, status).
+        // Doit s'appliquer APRÈS le matching de route pour récupérer le `MatchedPath`.
+        .layer(middleware::from_fn(metrics_middleware))
+        // Phase 1 — Quick wins : compression HTTP (zstd préféré, gzip fallback).
+        // S'applique sur toutes les réponses dont le client envoie un Accept-Encoding
+        // compatible. Gain typique : -60 % de bande passante sur les payloads JSON
+        // (la plupart de nos endpoints retournent du JSON très répétitif). Le coût
+        // CPU côté serveur est négligeable à zstd niveau 3.
+        .layer(CompressionLayer::new().zstd(true).gzip(true))
         .layer(PropagateRequestIdLayer::x_request_id())
         .layer(RequestBodyLimitLayer::new(max_body_size))
         .layer(trace_layer)

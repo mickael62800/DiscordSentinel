@@ -12,3 +12,10 @@ serde_json = "1"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 dotenvy = "0.15"
+
+# Phase 0 — Observabilité : tokio-metrics + Prometheus exporter pour exposer
+# les métriques runtime des workers (saturation, busy ratio, IO drivers, etc.).
+metrics = "0.24"
+metrics-exporter-prometheus = { version = "0.16", default-features = false }
+tokio-metrics = { version = "0.4", default-features = false, features = ["rt"] }
+axum = "0.8"

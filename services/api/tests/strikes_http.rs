@@ -45,6 +45,7 @@ impl MockStrikesUC {
         self
     }
 
+    #[allow(dead_code)]
     fn with_config(mut self, c: StrikeConfig) -> Self {
         self.config = Some(c);
         self

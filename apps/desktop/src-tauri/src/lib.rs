@@ -49,7 +49,7 @@ pub fn run() {
     };
     let adapter: Arc<dyn AppAdapter> = api_adapter.clone();
 
-    let auth_svc = Arc::new(AuthService::new(config_store));
+    let auth_svc = Arc::new(AuthService::new(config_store, api_adapter.clone()));
     let realtime_svc = Arc::new(RealtimeService::new());
     let dashboard_svc = Arc::new(DashboardService::new(adapter.clone()));
     let logs_svc = Arc::new(LogsService::new(adapter.clone()));

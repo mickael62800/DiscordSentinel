@@ -1,3 +1,9 @@
+// Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS).
+// Sur Windows MSVC, on retombe sur l'allocateur système.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 mod anomaly;
 mod api_client;
 mod audit_event;
@@ -50,6 +56,7 @@ async fn main() {
 
     let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
+        .cache_settings(sentinel_shared::cache_settings::medium())
         .await
         .expect("Erreur creation client Discord");
 

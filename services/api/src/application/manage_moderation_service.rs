@@ -37,7 +37,7 @@ impl ManageModerationUseCase for ManageModerationService {
             target_name: cmd.target_name,
             action_type: cmd.action_type,
             reason: cmd.reason,
-            gravity: cmd.gravity,
+            gravity: cmd.gravity.as_deref().and_then(crate::domain::value_objects::ModerationGravity::from_str_lossy),
             duration: cmd.duration,
             created_at: chrono::Utc::now(),
         };

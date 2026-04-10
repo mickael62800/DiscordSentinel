@@ -17,6 +17,3 @@ export async function getApiBaseUrl(): Promise<string> {
 export function resetApiBaseUrlCache() {
   cachedUrl = null;
 }
-
-/** @deprecated Utiliser getApiBaseUrl() a la place */
-export const API_BASE_URL = "http://localhost:3000";

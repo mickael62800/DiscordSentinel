@@ -54,3 +54,21 @@ pub use wallet_repository::WalletRepository;
 
 mod blackjack_repository;
 pub use blackjack_repository::BlackjackRepository;
+
+mod coude_player_repository;
+pub use coude_player_repository::CoudePlayerRepository;
+
+mod coude_combat_repository;
+pub use coude_combat_repository::CoudeCombatRepository;
+
+mod coude_bet_repository;
+pub use coude_bet_repository::CoudeBetRepository;
+
+mod coude_economy_repository;
+pub use coude_economy_repository::CoudeEconomyRepository;
+
+mod coude_inventory_repository;
+pub use coude_inventory_repository::CoudeInventoryRepository;
+
+mod coude_social_repository;
+pub use coude_social_repository::CoudeSocialRepository;

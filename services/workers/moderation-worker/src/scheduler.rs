@@ -5,7 +5,12 @@ use crate::config::WorkerConfig;
 use crate::jobs;
 use sentinel_worker_common::spawn_periodic;
 
-pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool>) {
+pub fn start(
+    config: &WorkerConfig,
+    pool: PgPool,
+    redis_client: redis::Client,
+    shutdown: watch::Receiver<bool>,
+) {
     let api_url = config.api_url.clone();
 
     spawn_periodic(
@@ -38,6 +43,7 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
         |pool| Box::pin(async move { jobs::sync_ban_proposals::run(&pool).await }),
     );
 
+    let redis_for_reminders = redis_client.clone();
     spawn_periodic(
         "send_reminders",
         config.send_reminders_interval_secs,
@@ -45,6 +51,9 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
         shutdown,
         api_url,
         "moderation-worker",
-        |pool| Box::pin(async move { jobs::send_reminders::run(&pool).await }),
+        move |pool| {
+            let redis = redis_for_reminders.clone();
+            Box::pin(async move { jobs::send_reminders::run(&pool, &redis).await })
+        },
     );
 }

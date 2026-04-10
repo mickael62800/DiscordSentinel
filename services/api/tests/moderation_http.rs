@@ -56,7 +56,7 @@ fn make_action(
         target_name: target_name.into(),
         action_type: action_type.into(),
         reason: reason.into(),
-        gravity: gravity.map(String::from),
+        gravity: gravity.and_then(sentinel_api::domain::value_objects::ModerationGravity::from_str_lossy),
         duration,
         created_at: Utc::now(),
     }
@@ -75,7 +75,7 @@ impl ManageModerationUseCase for MockModerationUC {
             target_name: cmd.target_name,
             action_type: cmd.action_type,
             reason: cmd.reason,
-            gravity: cmd.gravity,
+            gravity: cmd.gravity.as_deref().and_then(sentinel_api::domain::value_objects::ModerationGravity::from_str_lossy),
             duration: cmd.duration,
             created_at: Utc::now(),
         })

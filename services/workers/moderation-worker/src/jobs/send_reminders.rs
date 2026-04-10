@@ -1,12 +1,14 @@
-use sqlx::PgPool;
-use tracing::{debug, info};
 use chrono::{DateTime, Utc};
+use redis::AsyncCommands;
+use sqlx::PgPool;
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use sentinel_worker_common::is_worker_enabled;
 
+const REDIS_CHANNEL: &str = "sentinel:events";
+
 #[derive(sqlx::FromRow)]
-#[allow(dead_code)]
 struct PendingReminder {
     id: Uuid,
     guild_id: String,
@@ -19,9 +21,18 @@ struct PendingReminder {
     expires_at: DateTime<Utc>,
 }
 
-/// Envoie les rappels de sanctions temporaires aux moderateurs.
-/// Publie un event Redis pour chaque rappel pending dont remind_at <= NOW().
-pub async fn run(pool: &PgPool) -> Result<(), String> {
+/// Phase 4 B (sanction-expiry) — Envoie les rappels de sanctions temporaires.
+///
+/// Pour chaque rappel `pending` dont `remind_at <= NOW()` :
+///   1. Marque `status = 'sent'` AVANT le broadcast pour eviter les doublons.
+///   2. Publie un event Redis `sanction_expiry_reminder` sur `sentinel:events`
+///      que le `moderation-bot` ecoute via `sentinel_shared::redis_listener`.
+///   3. Le moderation-bot envoie alors un DM Discord au moderator (acces gateway).
+///
+/// On ne fait PAS de notification Discord directe ici car le worker n'a pas
+/// de connexion gateway. Le pattern publish→bot listener est le meme que pour
+/// `temp-roles-worker`.
+pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let reminders = sqlx::query_as::<_, PendingReminder>(
         "SELECT id, guild_id, moderator_id, moderator_name, target_id, target_name, action_type, reason, expires_at
          FROM sanction_reminders
@@ -38,6 +49,11 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         return Ok(());
     }
 
+    let mut conn = redis
+        .get_multiplexed_async_connection()
+        .await
+        .map_err(|e| format!("redis connect: {e}"))?;
+
     for reminder in &reminders {
         if !is_worker_enabled(pool, &reminder.guild_id, "moderation-worker").await {
             continue;
@@ -53,13 +69,39 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         let time_left = reminder.expires_at.signed_duration_since(Utc::now());
         let minutes_left = time_left.num_minutes().max(0);
 
+        // Publier l'event pour que moderation-bot envoie un DM au moderateur
+        let payload = serde_json::json!({
+            "event": "sanction_expiry_reminder",
+            "data": {
+                "reminder_id": reminder.id.to_string(),
+                "guild_id": reminder.guild_id,
+                "moderator_id": reminder.moderator_id,
+                "moderator_name": reminder.moderator_name,
+                "target_id": reminder.target_id,
+                "target_name": reminder.target_name,
+                "action_type": reminder.action_type,
+                "reason": reminder.reason,
+                "expires_at": reminder.expires_at.to_rfc3339(),
+                "minutes_left": minutes_left,
+            }
+        });
+
+        match serde_json::to_string(&payload) {
+            Ok(serialized) => {
+                if let Err(e) = conn.publish::<_, _, ()>(REDIS_CHANNEL, &serialized).await {
+                    warn!(reminder_id = %reminder.id, error = %e, "publish reminder failed");
+                }
+            }
+            Err(e) => warn!(error = %e, "serialize reminder payload"),
+        }
+
         info!(
             reminder_id = %reminder.id,
             moderator = %reminder.moderator_name,
             target = %reminder.target_name,
             action = %reminder.action_type,
             minutes_left = minutes_left,
-            "Rappel de sanction temporaire envoye"
+            "Rappel de sanction temporaire envoye (Redis)"
         );
     }
 

@@ -149,8 +149,9 @@ mod tests {
         let result = tracker.record_close("t1");
         assert!(result.is_some());
 
-        let (resolution, first_response) = result.unwrap();
-        assert!(resolution.as_millis() >= 0);
+        let (_resolution, first_response) = result.unwrap();
+        // `Duration::as_millis()` retourne un `u128`, donc toujours >= 0 — on se
+        // contente de vérifier que le tuple a été correctement déstructuré.
         assert!(first_response.is_some());
     }
 

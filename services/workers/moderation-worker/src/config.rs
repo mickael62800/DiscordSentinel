@@ -11,6 +11,7 @@ const DEFAULT_SEND_REMINDERS_SECS: u64 = 30;
 
 pub struct WorkerConfig {
     pub database_url: String,
+    pub redis_url: String,
     pub api_url: String,
     pub conduct_regen_interval_secs: u64,
     pub ban_cleanup_interval_secs: u64,
@@ -20,7 +21,7 @@ pub struct WorkerConfig {
 
 impl WorkerConfig {
     pub fn from_env() -> Self {
-        use sentinel_worker_common::{load_database_url, load_api_url, load_env};
+        use sentinel_worker_common::{load_database_url, load_api_url, load_env, load_redis_url};
 
         let regen_hours: u64 = load_env("CONDUCT_REGEN_INTERVAL", DEFAULT_CONDUCT_REGEN_HOURS);
         let cleanup_minutes: u64 = load_env("BAN_CLEANUP_INTERVAL", DEFAULT_BAN_CLEANUP_MINUTES);
@@ -29,6 +30,7 @@ impl WorkerConfig {
 
         Self {
             database_url: load_database_url(),
+            redis_url: load_redis_url(),
             api_url: load_api_url(),
             conduct_regen_interval_secs: regen_hours * SECS_PER_HOUR,
             ban_cleanup_interval_secs: cleanup_minutes * SECS_PER_MINUTE,

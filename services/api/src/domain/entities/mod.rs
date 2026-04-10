@@ -63,3 +63,28 @@ pub use blackjack::{BlackjackGame, Card, calculate_score, create_deck};
 
 mod wallet;
 pub use wallet::{Wallet, WalletTransaction};
+
+mod coude_player;
+pub use coude_player::{
+    title_for_level as coude_title_for_level, xp_for_level as coude_xp_for_level, CombatStat,
+    CoudePlayer, XpProgress, COUDE_MAX_LEVEL,
+};
+
+mod coude_combat;
+pub use coude_combat::{CombatResolution, CoudeCombat, NewCoudeCombat};
+
+mod coude_bet;
+pub use coude_bet::{
+    calculate_bet_resolution, BetPayout, BetResolutionPlan, CoudeBet,
+    FighterBetBonus as CoudeFighterBetBonus, NewCoudeBet, RefundSummary,
+};
+
+mod coude_inventory;
+pub use coude_inventory::{
+    CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
+};
+
+mod coude_social;
+pub use coude_social::{
+    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, LeaderboardCategory, NewDailyChaos,
+};

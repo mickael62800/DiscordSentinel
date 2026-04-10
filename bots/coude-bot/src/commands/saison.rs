@@ -31,6 +31,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => return,
     };
 
+    // Recuperer la saison en cours (l'API la cree automatiquement si elle n'existe pas)
+    let season = api.get_current_season(&guild_id).await.ok();
+
     // Recuperer les top joueurs pour le classement saisonnier
     let top_coins = api.leaderboard_richest(&guild_id, 3).await.unwrap_or_default();
     let top_level = api.leaderboard_level(&guild_id, 3).await.unwrap_or_default();
@@ -50,12 +53,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .map(|(i, e)| format!("{} **{}** — {} coins voles", medals.get(i).unwrap_or(&""), e.username, e.value))
         .collect::<Vec<_>>().join("\n");
 
-    // TODO: Recuperer la saison en cours depuis l'API (numero, date de debut, temps restant)
-    // Pour l'instant on affiche un placeholder
+    let (title, description) = match &season {
+        Some(s) => {
+            // started_at est au format ISO ('2026-04-10 12:34:56+00'), on garde la date
+            let started_date = s.started_at.split(&[' ', 'T'][..]).next().unwrap_or(&s.started_at);
+            let title = format!("\u{1f3c6} Saison {}", s.season_number);
+            let description = format!(
+                "Saison demarree le **{}**\n\u{23f3} Temps restant : **{} jours**\n\nLa saison dure 90 jours. Le joueur le plus riche a la fin sera couronne **Champion** !",
+                started_date, s.days_remaining
+            );
+            (title, description)
+        }
+        None => (
+            "\u{1f3c6} Saison en cours".to_string(),
+            "La saison se termine tous les 3 mois. Le joueur le plus riche sera couronne **Champion** !".to_string(),
+        ),
+    };
 
     let embed = CreateEmbed::new()
-        .title("\u{1f3c6} Saison en cours")
-        .description("La saison se termine tous les 3 mois. Le joueur le plus riche sera couronne **Champion** !")
+        .title(title)
+        .description(description)
         .field(
             "\u{1f4b0} Plus riches",
             if coins_ranking.is_empty() { "Aucun joueur".to_string() } else { coins_ranking },

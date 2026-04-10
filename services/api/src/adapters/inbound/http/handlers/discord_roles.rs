@@ -30,7 +30,10 @@ impl From<DiscordRole> for DiscordRoleDto {
             name: r.name,
             color: r.color,
             position: r.position,
-            permissions: r.permissions,
+            // Phase 2 A.3 — `permissions` est BIGINT en base. On le serialise
+            // en String pour le wire JSON (les bitfields Discord peuvent depasser
+            // Number.MAX_SAFE_INTEGER cote JS).
+            permissions: r.permissions.to_string(),
             mentionable: r.mentionable,
             managed: r.managed,
             icon: r.icon,
@@ -131,7 +134,8 @@ pub async fn sync_roles(
             name: r.name,
             color: r.color,
             position: r.position,
-            permissions: r.permissions,
+            // Phase 2 A.3 — parse string -> i64 (fallback 0 si invalide)
+            permissions: r.permissions.parse::<i64>().unwrap_or(0),
             mentionable: r.mentionable,
             managed: r.managed,
             icon: r.icon,

@@ -1,0 +1,133 @@
+use async_trait::async_trait;
+
+use crate::domain::entities::{CombatStat, CoudePlayer, XpProgress};
+use crate::domain::errors::DomainError;
+
+/// Use case "gérer les joueurs Coup de Coude".
+///
+/// Englobe le cycle de vie d'un joueur (CRUD), la progression (XP/level/stats),
+/// les compteurs de combats (wins/losses/draws/cowardice/chaos), les mouvements
+/// de coins liés au joueur, et les HP.
+///
+/// Note : les opérations purement économiques inter-joueurs (transferts, vols,
+/// casino) ainsi que les combats relèvent d'autres use cases dédiés.
+#[async_trait]
+pub trait ManageCoudePlayersUseCase: Send + Sync {
+    // ── CRUD ──
+
+    async fn get_or_create(
+        &self,
+        guild_id: String,
+        user_id: String,
+        username: String,
+    ) -> Result<CoudePlayer, DomainError>;
+
+    async fn get(&self, guild_id: &str, user_id: &str) -> Result<CoudePlayer, DomainError>;
+
+    async fn list(&self, guild_id: &str) -> Result<Vec<CoudePlayer>, DomainError>;
+
+    async fn random_active(
+        &self,
+        guild_id: &str,
+        count: i64,
+    ) -> Result<Vec<CoudePlayer>, DomainError>;
+
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError>;
+
+    // ── Progression ──
+
+    async fn update_class(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        class: &str,
+    ) -> Result<(), DomainError>;
+
+    async fn add_xp(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<XpProgress, DomainError>;
+
+    async fn spend_stat_point(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        stat: CombatStat,
+    ) -> Result<CoudePlayer, DomainError>;
+
+    async fn reset_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        cost: i64,
+    ) -> Result<CoudePlayer, DomainError>;
+
+    // ── Compteurs combat ──
+
+    async fn record_win(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        earned: i64,
+        stolen: i64,
+    ) -> Result<(), DomainError>;
+
+    async fn record_loss(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        lost: i64,
+    ) -> Result<(), DomainError>;
+
+    async fn record_draw(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        lost: i64,
+    ) -> Result<(), DomainError>;
+
+    async fn increment_cowardice(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<i32, DomainError>;
+
+    async fn increment_chaos(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+
+    // ── Coins ──
+
+    async fn adjust_coins(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        delta: i64,
+    ) -> Result<(), DomainError>;
+
+    async fn record_coins_earned(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<(), DomainError>;
+
+    async fn record_coins_lost(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<(), DomainError>;
+
+    // ── HP ──
+
+    async fn update_hp(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        hp_current: i32,
+        hp_max: i32,
+    ) -> Result<(), DomainError>;
+
+    async fn full_heal(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+}

@@ -12,6 +12,7 @@ async fn pool() -> PgPool {
 
 fn ugid() -> String { format!("test_{}", uuid::Uuid::new_v4().simple()) }
 
+#[allow(dead_code)]
 fn short_gid() -> String {
     use rand::Rng;
     format!("{}", rand::thread_rng().gen_range(10000000000000000u64..99999999999999999u64))

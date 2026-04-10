@@ -9,6 +9,12 @@ use crate::ports::inbound::{
     ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
     ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageMembersUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
+use crate::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::manage_coude_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::manage_coude_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::manage_coude_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
 use crate::application::BlackjackService;
 use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, IaConfigRepository, LogRepository, WalletRepository};
 
@@ -41,6 +47,12 @@ pub struct AppState {
     pub discord_role_repo: Arc<dyn DiscordRoleRepository>,
     pub wallet_repo: Arc<dyn WalletRepository>,
     pub blackjack_svc: Arc<BlackjackService>,
+    pub coude_players_uc: Arc<dyn ManageCoudePlayersUseCase>,
+    pub coude_combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
+    pub coude_bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
+    pub coude_economy_uc: Arc<dyn ManageCoudeEconomyUseCase>,
+    pub coude_inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
+    pub coude_social_uc: Arc<dyn ManageCoudeSocialUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

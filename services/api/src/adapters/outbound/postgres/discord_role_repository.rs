@@ -38,7 +38,7 @@ impl DiscordRoleRepository for PgDiscordRoleRepository {
             .bind(&role.name)
             .bind(role.color)
             .bind(role.position)
-            .bind(&role.permissions)
+            .bind(role.permissions)
             .bind(role.mentionable)
             .bind(role.managed)
             .bind(&role.icon)

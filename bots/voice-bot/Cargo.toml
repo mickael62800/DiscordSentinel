@@ -16,3 +16,21 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 dashmap = "6"
 chrono = "0.4"
+
+# Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS uniquement,
+# pas supporte sur MSVC Windows). Gain typique : -15 % RAM residente sur les
+# processus long-running grace a une meilleure gestion de la fragmentation.
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.6"
+
+# Phase 1 — Quick wins : profil release optimise pour la production.
+# - lto = "fat" : optimisation cross-crate complete (-10 % binaire, -5/10 % CPU)
+# - codegen-units = 1 : permet a LTO d'etre maximalement efficace
+# - strip = true : retire les symboles de debug du binaire final
+#
+# On garde panic = "unwind" (defaut) pour isoler les paniques par tache tokio
+# et eviter qu'une seule tache panique fasse crasher tout le process.
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true

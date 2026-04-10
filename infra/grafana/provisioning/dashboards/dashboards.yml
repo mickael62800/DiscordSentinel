@@ -1,0 +1,16 @@
+# Provisioning automatique des dashboards Grafana.
+# Tous les fichiers .json sous /var/lib/grafana/dashboards sont importés au démarrage.
+
+apiVersion: 1
+
+providers:
+  - name: 'sentinel-baseline'
+    orgId: 1
+    folder: 'DiscordSentinel'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false

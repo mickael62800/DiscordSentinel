@@ -10,7 +10,7 @@ pub struct MonitorConfig {
 
 impl MonitorConfig {
     pub fn from_env() -> Self {
-        use sentinel_worker_common::{load_api_url, load_redis_url, load_env};
+        use sentinel_worker_common::{load_api_url, load_env, load_redis_url};
 
         Self {
             redis_url: load_redis_url(),
@@ -19,10 +19,11 @@ impl MonitorConfig {
         }
     }
 
-    pub fn apply_db_config(&mut self, db: &std::collections::HashMap<String, String>) {
-        use sentinel_worker_common::config_or_env;
-        self.check_interval_secs = config_or_env(db, "monitor_check_interval", "MONITOR_CHECK_INTERVAL", DEFAULT_CHECK_INTERVAL_SECS);
-    }
+    // NOTE : contrairement aux autres workers, monitoring-worker ne se connecte
+    // pas à PostgreSQL et n'a donc pas de `apply_db_config`. Si un futur besoin
+    // de configuration dynamique apparaît, ajouter un `database_url` à
+    // `MonitorConfig::from_env` et appeler `load_worker_config` depuis `main.rs`
+    // comme les autres workers (cf. `moderation-worker/src/main.rs`).
 }
 
 #[cfg(test)]

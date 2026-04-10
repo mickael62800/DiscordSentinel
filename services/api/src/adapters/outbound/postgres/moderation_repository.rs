@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::ModerationAction;
 use crate::domain::errors::DomainError;
+use crate::domain::value_objects::ModerationGravity;
 use crate::ports::outbound::ModerationRepository;
 
 pub struct PgModerationRepository {
@@ -27,7 +28,7 @@ struct ActionRow {
     target_name: String,
     action_type: String,
     reason: String,
-    gravity: Option<String>,
+    gravity: Option<ModerationGravity>,
     duration: Option<i64>,
     created_at: chrono::DateTime<chrono::Utc>,
 }

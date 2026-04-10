@@ -1,10 +1,11 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use reqwest::Client;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::TcpListener;
 
 use crate::domain::entities::{ApiConfig, AuthSession, AuthToken, DiscordConfig, DiscordUser};
+use crate::infrastructure::api_adapter::ApiAdapter;
 use crate::infrastructure::config_store::ConfigStore;
 
 const DISCORD_AUTH_URL: &str = "https://discord.com/api/oauth2/authorize";
@@ -16,14 +17,18 @@ pub struct AuthService {
     client: Client,
     config_store: ConfigStore,
     session: Mutex<Option<AuthSession>>,
+    /// Phase 2 B — propage le token Discord OAuth2 du user vers ApiAdapter
+    /// pour activer le filtrage multi-tenant cote backend.
+    api_adapter: Arc<ApiAdapter>,
 }
 
 impl AuthService {
-    pub fn new(config_store: ConfigStore) -> Self {
+    pub fn new(config_store: ConfigStore, api_adapter: Arc<ApiAdapter>) -> Self {
         Self {
             client: Client::new(),
             config_store,
             session: Mutex::new(None),
+            api_adapter,
         }
     }
 
@@ -37,6 +42,9 @@ impl AuthService {
 
     pub fn logout(&self) {
         *self.session.lock().unwrap_or_else(|p| p.into_inner()) = None;
+        // Phase 2 B — vider le token cote ApiAdapter pour que les requetes
+        // ulterieures repartent en mode non-multi-tenant.
+        self.api_adapter.clear_discord_token();
     }
 
     pub fn get_discord_config(&self) -> Result<Option<DiscordConfig>, String> {
@@ -132,6 +140,11 @@ impl AuthService {
 
         // Fetch user info
         let user = self.fetch_user(&token.access_token).await?;
+
+        // Phase 2 B — propager le token au ApiAdapter pour le filtrage
+        // multi-tenant cote backend (header X-Discord-Token sur toutes les
+        // requetes API ulterieures).
+        self.api_adapter.set_discord_token(token.access_token.clone());
 
         // Store session
         *self.session.lock().unwrap_or_else(|p| p.into_inner()) = Some(AuthSession {

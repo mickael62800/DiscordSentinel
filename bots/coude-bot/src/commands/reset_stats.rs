@@ -58,14 +58,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Deduire le cout
-    if let Err(e) = api.update_player_coins(&guild_id, &command.user.id.to_string(), -RESET_COST).await {
+    // Reset atomique cote API : deduit le cout, remet ATK/DEF a 0,
+    // et restitue les points dans stat_points en une seule UPDATE.
+    if let Err(e) = api
+        .reset_stats(&guild_id, &command.user.id.to_string(), RESET_COST)
+        .await
+    {
         reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
-
-    // TODO: Appeler un endpoint API pour reset ATK/DEF a 0 et redonner les stat_points
-    // Pour l'instant on affiche le resultat. L'endpoint sera cree quand necessaire.
 
     let class = classes::get_class(player.class.as_deref().unwrap_or("bourrin"));
 

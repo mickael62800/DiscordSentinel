@@ -226,8 +226,10 @@ impl LevelRepository for PgLevelRepository {
     }
 
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+        // Phase 2 A.2 — Lit depuis `mv_level_leaderboard` (5 min staleness max).
+        // Voir wallet_repository::leaderboard pour la rationale complete.
         let rows = sqlx::query_as::<_, UserLevelRow>(
-            "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM user_levels WHERE guild_id = $1 ORDER BY xp DESC LIMIT $2",
+            "SELECT id, guild_id, user_id, username, xp, level, xp_text, level_text, xp_voice, level_voice, last_xp_at, created_at, updated_at FROM mv_level_leaderboard WHERE guild_id = $1 ORDER BY rank LIMIT $2",
         )
         .bind(guild_id)
         .bind(limit)

@@ -4,6 +4,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::{VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry};
 use crate::domain::errors::DomainError;
+use crate::domain::value_objects::VoiceChannelKind;
 use crate::ports::outbound::VoiceChannelRepository;
 
 pub struct PgVoiceChannelRepository {
@@ -28,7 +29,7 @@ struct VoiceChannelRow {
     queue_channel_id: Option<String>,
     category_id: Option<String>,
     channel_name: String,
-    kind: String,
+    kind: VoiceChannelKind,
     visibility: String,
     queue_enabled: bool,
     locked: bool,
@@ -269,7 +270,7 @@ impl VoiceChannelRepository for PgVoiceChannelRepository {
         sqlx::query(
             r#"
             INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, text_channel_id, members_channel_id, queue_channel_id, category_id, channel_name, kind, visibility, queue_enabled, locked, stage_enabled, member_limit, status, channel_status, created_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::voice_channel_kind, $12, $13, $14, $15, $16, $17, $18, $19)
             "#,
         )
         .bind(channel.id)

@@ -45,13 +45,52 @@ pub fn start(
     spawn_periodic(
         "warm_voice_stats",
         config.voice_stats_refresh_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "cache-worker",
+        move |pool| {
+            let redis = redis_voice.clone();
+            Box::pin(async move { jobs::warm_voice_stats::run(&pool, &redis).await })
+        },
+    );
+
+    // Phase 2 A.2 — Refresh des vues materialisees leaderboards.
+    spawn_periodic(
+        "refresh_leaderboards",
+        config.leaderboards_refresh_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "cache-worker",
+        move |pool| {
+            Box::pin(async move { jobs::refresh_leaderboards::run(&pool).await })
+        },
+    );
+
+    // Phase 2 A.2 — Sync de la table user_cache (source de verite usernames).
+    spawn_periodic(
+        "sync_user_cache",
+        config.user_cache_sync_secs,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "cache-worker",
+        move |pool| {
+            Box::pin(async move { jobs::sync_user_cache::run(&pool).await })
+        },
+    );
+
+    // Phase 2 A.4 — Partition manager : cree les partitions M+1 et M+2.
+    spawn_periodic(
+        "manage_partitions",
+        config.partition_manager_secs,
         pool,
         shutdown,
         api_url,
         "cache-worker",
         move |pool| {
-            let redis = redis_voice.clone();
-            Box::pin(async move { jobs::warm_voice_stats::run(&pool, &redis).await })
+            Box::pin(async move { jobs::manage_partitions::run(&pool).await })
         },
     );
 }

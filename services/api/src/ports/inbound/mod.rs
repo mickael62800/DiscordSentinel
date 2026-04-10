@@ -40,6 +40,24 @@ pub use manage_strikes::{AddStrikeCommand, ManageStrikesUseCase, SaveStrikeConfi
 pub mod manage_members;
 pub use manage_members::{ManageMembersUseCase, SyncMembersCommand, RegisterMemberCommand, UpdateMemberCommand};
 
+pub mod manage_coude_players;
+pub use manage_coude_players::ManageCoudePlayersUseCase;
+
+pub mod manage_coude_combats;
+pub use manage_coude_combats::ManageCoudeCombatsUseCase;
+
+pub mod manage_coude_bets;
+pub use manage_coude_bets::ManageCoudeBetsUseCase;
+
+pub mod manage_coude_economy;
+pub use manage_coude_economy::ManageCoudeEconomyUseCase;
+
+pub mod manage_coude_inventory;
+pub use manage_coude_inventory::ManageCoudeInventoryUseCase;
+
+pub mod manage_coude_social;
+pub use manage_coude_social::ManageCoudeSocialUseCase;
+
 pub use manage_voice_channels::{
     BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
     ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,

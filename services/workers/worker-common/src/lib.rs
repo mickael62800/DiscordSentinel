@@ -1,7 +1,9 @@
 //! Infrastructure partagee entre les workers DiscordSentinel.
 //!
 //! Elimine la duplication de : shutdown signal, lifecycle logging,
-//! heartbeat, scheduler, pool creation.
+//! heartbeat, scheduler, pool creation, observabilité Prometheus.
+
+pub mod metrics;
 
 use std::time::Duration;
 

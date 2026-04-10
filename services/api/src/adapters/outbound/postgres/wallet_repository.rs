@@ -293,10 +293,15 @@ impl WalletRepository for PgWalletRepository {
     }
 
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError> {
+        // Phase 2 A.2 — Lit depuis la vue materialisee `mv_wallet_leaderboard`
+        // refreshee toutes les 5 min par le cache-worker. Le rang est precalcule
+        // donc l'ORDER BY est un index scan O(N) sur (guild_id, rank). Gain
+        // typique : 100-1000x sur les hits hot. La staleness max de 5 min est
+        // acceptable pour une UI de leaderboard.
         let rows = sqlx::query_as::<_, WalletRow>(
             "SELECT id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at
-             FROM user_wallets WHERE guild_id = $1
-             ORDER BY coins DESC
+             FROM mv_wallet_leaderboard WHERE guild_id = $1
+             ORDER BY rank
              LIMIT $2",
         )
         .bind(guild_id)

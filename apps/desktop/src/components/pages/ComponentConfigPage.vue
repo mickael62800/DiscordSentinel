@@ -4,38 +4,13 @@ import { invoke } from "@tauri-apps/api/core";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useToast } from "../../composables/useToast";
-import { useConfirm } from "../../composables/useConfirm";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppToggle from "../atoms/AppToggle.vue";
-import { getApiBaseUrl } from "../../utils/api";
+import BotTokenManager from "../molecules/BotTokenManager.vue";
 
 const { success, error: showError } = useToast();
-const { confirm } = useConfirm();
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
-
-// Statut des modeles IA
-interface ModelInfo {
-  name: string;
-  model_type: string;
-  loaded: boolean;
-}
-
-const modelsStatus = ref<ModelInfo[]>([]);
-
-async function fetchModelsStatus() {
-  try {
-    const baseUrl = await getApiBaseUrl();
-    const resp = await fetch(`${baseUrl}/api/models/status`);
-    if (resp.ok) {
-      const data = await resp.json();
-      modelsStatus.value = data.models || [];
-    }
-  } catch (e) {
-    console.error("Erreur chargement statut modeles:", e);
-    showError("Impossible de charger le statut des modeles IA");
-  }
-}
 
 const workerNames = ["moderation-worker", "analytics-worker", "cache-worker", "cleanup-worker", "coude-worker", "monitoring-worker"];
 
@@ -55,12 +30,8 @@ const formValues = ref<Record<string, string>>({});
 const savedValues = ref<Record<string, string>>({});
 const successMessage = ref("");
 
-// ── Token management ──
+// ── Token status (map utilisée pour le badge ; la gestion CRUD vit dans BotTokenManager) ──
 const tokenMap = ref<Record<string, boolean>>({});
-const tokenInputs = ref<Record<string, string>>({});
-const tokenVisible = ref<Record<string, boolean>>({});
-const savingToken = ref<string | null>(null);
-const tokenSuccess = ref<string | null>(null);
 
 async function fetchTokens() {
   try {
@@ -73,41 +44,6 @@ async function fetchTokens() {
   } catch (e) {
     console.error("Erreur chargement tokens:", e);
   }
-}
-
-async function saveToken(botName: string) {
-  const token = tokenInputs.value[botName];
-  if (!token) return;
-  savingToken.value = botName;
-  try {
-    await invoke("save_bot_token", { botName, token });
-    tokenMap.value[botName] = true;
-    tokenInputs.value[botName] = "";
-    tokenSuccess.value = botName;
-    setTimeout(() => (tokenSuccess.value = null), 3000);
-  } catch (e) {
-    console.error("Erreur sauvegarde token:", e);
-    showError("Erreur lors de la sauvegarde du token");
-  } finally {
-    savingToken.value = null;
-  }
-}
-
-async function deleteToken(botName: string) {
-  const ok = await confirm({ title: "Supprimer le token", message: "Voulez-vous vraiment supprimer ce token de bot ?" });
-  if (!ok) return;
-  try {
-    await invoke("delete_bot_token", { botName });
-    tokenMap.value[botName] = false;
-    success("Token supprime avec succes");
-  } catch (e) {
-    console.error("Erreur suppression token:", e);
-    showError("Erreur lors de la suppression du token");
-  }
-}
-
-function toggleTokenVisibility(botName: string) {
-  tokenVisible.value[botName] = !tokenVisible.value[botName];
 }
 
 function isWorker(botName: string): boolean {
@@ -339,33 +275,13 @@ watch(selectedComponent, loadFormValues);
             {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
           </div>
 
-          <!-- Token inline (seulement pour les composants qui en ont besoin) -->
-          <div v-if="needsToken(def.bot_name)" class="token-section" @click.stop>
-            <div v-if="tokenMap[def.bot_name]" class="token-configured">
-              <span class="token-status-text">Token chiffre enregistre</span>
-              <button class="btn-token-delete" @click.stop="deleteToken(def.bot_name)">Supprimer</button>
-            </div>
-            <div v-else class="token-input-row">
-              <input
-                v-model="tokenInputs[def.bot_name]"
-                :type="tokenVisible[def.bot_name] ? 'text' : 'password'"
-                class="token-input"
-                placeholder="Coller le token Discord..."
-                @click.stop
-              />
-              <button class="btn-token-eye" @click.stop="toggleTokenVisibility(def.bot_name)">
-                {{ tokenVisible[def.bot_name] ? 'Masquer' : 'Voir' }}
-              </button>
-              <button
-                class="btn-token-save"
-                :disabled="!tokenInputs[def.bot_name] || savingToken === def.bot_name"
-                @click.stop="saveToken(def.bot_name)"
-              >
-                {{ savingToken === def.bot_name ? '...' : 'Sauver' }}
-              </button>
-            </div>
-            <span v-if="tokenSuccess === def.bot_name" class="token-saved-msg">Token chiffre et sauvegarde !</span>
-          </div>
+          <!-- Gestion du token (composant dédié) -->
+          <BotTokenManager
+            v-if="needsToken(def.bot_name)"
+            :bot-name="def.bot_name"
+            :has-token="!!tokenMap[def.bot_name]"
+            @updated="fetchTokens"
+          />
         </div>
       </div>
 
@@ -1165,21 +1081,8 @@ watch(selectedComponent, loadFormValues);
 }
 
 /* ── Token styles ── */
+/* Badge visible dans l'en-tête de la carte composant (la gestion CRUD est dans BotTokenManager.vue). */
 .token-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap; }
 .token-ok { color: #22c55e; background: rgba(34, 197, 94, 0.12); }
 .token-missing { color: var(--text-secondary); background: rgba(255, 255, 255, 0.06); }
-.token-section { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
-.token-configured { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.token-status-text { font-size: 11px; color: #22c55e; font-weight: 500; }
-.btn-token-delete { font-size: 11px; padding: 3px 10px; background: transparent; color: var(--danger); border: 1px solid var(--danger); border-radius: 6px; cursor: pointer; opacity: 0.7; transition: opacity 0.15s; }
-.btn-token-delete:hover { opacity: 1; }
-.token-input-row { display: flex; align-items: center; gap: 6px; }
-.token-input { flex: 1; padding: 6px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 12px; font-family: monospace; min-width: 0; }
-.token-input:focus { outline: none; border-color: var(--accent); }
-.token-input::placeholder { color: var(--text-secondary); opacity: 0.5; }
-.btn-token-eye { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 11px; padding: 4px 8px; flex-shrink: 0; color: var(--text-secondary); transition: color 0.15s; }
-.btn-token-eye:hover { color: var(--text-primary); border-color: var(--accent); }
-.btn-token-save { padding: 5px 12px; background: var(--accent); color: white; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
-.btn-token-save:disabled { opacity: 0.4; cursor: not-allowed; }
-.token-saved-msg { display: block; font-size: 11px; color: #22c55e; margin-top: 4px; font-weight: 500; }
 </style>

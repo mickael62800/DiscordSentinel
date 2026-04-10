@@ -2,6 +2,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::domain::value_objects::ModerationGravity;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModerationAction {
     pub id: Uuid,
@@ -13,7 +15,7 @@ pub struct ModerationAction {
     pub target_name: String,
     pub action_type: String,
     pub reason: String,
-    pub gravity: Option<String>,
+    pub gravity: Option<ModerationGravity>,
     pub duration: Option<u64>,
     pub created_at: DateTime<Utc>,
 }

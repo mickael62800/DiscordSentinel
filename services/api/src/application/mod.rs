@@ -39,3 +39,21 @@ pub use manage_members_service::ManageMembersService;
 
 mod blackjack_service;
 pub use blackjack_service::BlackjackService;
+
+mod manage_coude_players_service;
+pub use manage_coude_players_service::ManageCoudePlayersService;
+
+mod manage_coude_combats_service;
+pub use manage_coude_combats_service::ManageCoudeCombatsService;
+
+mod manage_coude_bets_service;
+pub use manage_coude_bets_service::ManageCoudeBetsService;
+
+mod manage_coude_economy_service;
+pub use manage_coude_economy_service::ManageCoudeEconomyService;
+
+mod manage_coude_inventory_service;
+pub use manage_coude_inventory_service::ManageCoudeInventoryService;
+
+mod manage_coude_social_service;
+pub use manage_coude_social_service::ManageCoudeSocialService;

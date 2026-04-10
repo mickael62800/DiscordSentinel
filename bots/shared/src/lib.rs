@@ -1,4 +1,5 @@
 pub mod api_client;
+pub mod cache_settings;
 pub mod config;
 pub mod discord_helpers;
 pub mod embeds;

@@ -11,6 +11,10 @@ pub struct ApiAdapter {
     client: Client,
     base_url: RwLock<String>,
     api_key: RwLock<String>,
+    /// Phase 2 B — access_token Discord OAuth2 du user connecte. Envoye au
+    /// backend dans le header `X-Discord-Token` pour activer le filtrage
+    /// multi-tenant cote API. Vide tant que l'utilisateur n'a pas fait OAuth.
+    discord_token: RwLock<String>,
 }
 
 impl ApiAdapter {
@@ -22,12 +26,23 @@ impl ApiAdapter {
                 .unwrap_or_else(|_| Client::new()),
             base_url: RwLock::new(base_url),
             api_key: RwLock::new(api_key),
+            discord_token: RwLock::new(String::new()),
         }
     }
 
     pub fn update_config(&self, base_url: String, api_key: String) {
         *self.base_url.write().unwrap() = base_url;
         *self.api_key.write().unwrap() = api_key;
+    }
+
+    /// Phase 2 B — A appeler depuis `AuthService` apres OAuth2 reussi pour
+    /// que toutes les requetes API embarquent le token Discord du user.
+    pub fn set_discord_token(&self, token: String) {
+        *self.discord_token.write().unwrap() = token;
+    }
+
+    pub fn clear_discord_token(&self) {
+        self.discord_token.write().unwrap().clear();
     }
 
     pub fn base_url(&self) -> String {
@@ -38,13 +53,23 @@ impl ApiAdapter {
         self.api_key.read().unwrap().clone()
     }
 
+    fn discord_token(&self) -> String {
+        self.discord_token.read().unwrap().clone()
+    }
+
     fn auth(&self, req: RequestBuilder) -> RequestBuilder {
         let key = self.api_key();
-        if key.is_empty() {
+        let mut req = if key.is_empty() {
             req
         } else {
             req.bearer_auth(&key)
+        };
+        // Phase 2 B — embarquer le token Discord du user si present
+        let token = self.discord_token();
+        if !token.is_empty() {
+            req = req.header("X-Discord-Token", &token);
         }
+        req
     }
 
     fn url_with_guild(&self, path: &str, guild_id: &Option<String>) -> String {

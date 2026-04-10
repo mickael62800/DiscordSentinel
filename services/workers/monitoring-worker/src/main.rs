@@ -1,3 +1,9 @@
+// Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS).
+// Sur Windows MSVC, on retombe sur l'allocateur système.
+#[cfg(not(target_env = "msvc"))]
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
+
 mod config;
 mod monitor;
 
@@ -11,6 +17,7 @@ const WORKER_NAME: &str = "monitoring-worker";
 #[tokio::main]
 async fn main() {
     common::init_tracing("sentinel_monitoring_worker=info");
+    common::metrics::init_observability(WORKER_NAME);
 
     let config = MonitorConfig::from_env();
 

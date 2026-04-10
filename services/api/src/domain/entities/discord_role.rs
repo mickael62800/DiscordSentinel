@@ -8,7 +8,7 @@ pub struct DiscordRole {
     pub name: String,
     pub color: i32,
     pub position: i32,
-    pub permissions: String,
+    pub permissions: i64,
     pub mentionable: bool,
     pub managed: bool,
     pub icon: Option<String>,

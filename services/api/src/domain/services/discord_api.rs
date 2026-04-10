@@ -10,6 +10,14 @@ pub struct DiscordMember {
     pub avatar_url: Option<String>,
 }
 
+/// Phase 2 B — Subset des champs Discord renvoyes par GET /users/@me/guilds
+/// dont on a besoin pour l'auth multi-tenant. On capture juste l'id pour
+/// minimiser la deserialization (Discord renvoie name/icon/permissions etc.).
+#[derive(Debug, Clone, Deserialize)]
+pub struct UserGuild {
+    pub id: String,
+}
+
 /// Service pour les appels a l'API Discord.
 /// Centralise la logique d'interaction avec Discord (ban, unban, etc.)
 pub struct DiscordApiService {
@@ -339,5 +347,34 @@ impl DiscordApiService {
         }
 
         Ok(())
+    }
+
+    /// Phase 2 B — Recupere la liste des guilds auxquelles un user appartient.
+    /// Utilise le `access_token` OAuth2 (Bearer) du user, PAS le bot token.
+    /// Endpoint Discord : `GET /users/@me/guilds` (scope `identify` ou `guilds`).
+    pub async fn get_user_guilds(
+        &self,
+        access_token: &str,
+    ) -> Result<Vec<UserGuild>, DomainError> {
+        let url = "https://discord.com/api/v10/users/@me/guilds";
+        let resp = self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {access_token}"))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord guilds fetch failed: {e}")))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord get_user_guilds non-success ({status}): {body}"
+            )));
+        }
+
+        resp.json::<Vec<UserGuild>>()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord guilds parse: {e}")))
     }
 }

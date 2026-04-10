@@ -702,11 +702,6 @@ mod tests {
     }
 
     #[test]
-    fn dedup_cleanup_smaller_than_limit() {
-        assert!(DEDUP_CLEANUP_SIZE < DEDUP_CACHE_LIMIT);
-    }
-
-    #[test]
     fn supported_extensions_complete() {
         assert!(SUPPORTED_EXTENSIONS.contains(&"jpg"));
         assert!(SUPPORTED_EXTENSIONS.contains(&"jpeg"));

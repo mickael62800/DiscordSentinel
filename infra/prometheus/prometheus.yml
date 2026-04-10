@@ -1,0 +1,62 @@
+###############################################################################
+# Phase 0 — Observabilité : configuration Prometheus minimale
+#
+# Scrape l'API DiscordSentinel + les 6 workers Rust + cAdvisor (si présent).
+# Chaque cible expose `/metrics` au format texte Prometheus :
+#   - API           : http://api:3000/metrics  (route Axum publique)
+#   - Workers       : http://{worker-name}:9100/metrics (serveur dédié,
+#                     cf. `services/workers/worker-common/src/metrics.rs`)
+#
+# Démarrage local :
+#   docker compose --profile monitoring up -d prometheus grafana
+#
+# Recharger cette config sans redémarrer :
+#   curl -X POST http://localhost:9090/-/reload
+###############################################################################
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'sentinel-local'
+
+scrape_configs:
+  # ── API ──
+  - job_name: 'sentinel-api'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets: ['api:3000']
+        labels:
+          service: 'api'
+          component: 'backend'
+
+  # ── Workers ──
+  # Tous les workers exposent /metrics sur le port 9100 (cf. METRICS_PORT env var).
+  - job_name: 'sentinel-workers'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'moderation-worker:9100'
+          - 'analytics-worker:9100'
+          - 'cache-worker:9100'
+          - 'cleanup-worker:9100'
+          - 'coude-worker:9100'
+          - 'monitoring-worker:9100'
+        labels:
+          component: 'worker'
+    relabel_configs:
+      # Extrait le nom du service depuis l'instance pour avoir un label propre
+      - source_labels: [__address__]
+        regex: '([^:]+):.*'
+        target_label: service
+        replacement: '$1'
+
+  # ── Postgres exporter (à ajouter en Phase 2 si besoin) ──
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+  # ── Prometheus self-scrape (utile pour suivre la santé du scraper) ──
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
