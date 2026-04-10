@@ -332,6 +332,25 @@ services:
       redis:
         condition: service_healthy
 
+  # Phase 6A — Reconciliation audit_logs avec l'API Discord audit-logs
+  discord-audit-sync-worker:
+    build:
+      context: .
+      dockerfile: services/workers/discord-audit-sync-worker/Dockerfile
+    container_name: sentinel-discord-audit-sync-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
+      API_URL: http://api:3000
+      # Reutilise le token moderation-bot (doit avoir VIEW_AUDIT_LOG sur toutes
+      # les guilds a sync)
+      MODERATION_DISCORD_TOKEN: ${MODERATION_DISCORD_TOKEN:-}
+      AUDIT_SYNC_INTERVAL: ${AUDIT_SYNC_INTERVAL:-300}
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   cleanup-worker:
     build:
       context: .

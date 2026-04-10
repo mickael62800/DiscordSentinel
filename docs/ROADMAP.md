@@ -41,7 +41,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **3** Refactor god files | ✅ TERMINÉE | Intégralité du scope | — |
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
 | **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
-| **6** Features moderation + workers 2 | 🟡 **8/8 features, 5/6 workers** | 6A appeal-sla + export + audit-cache + blackjack-cleanup ✅, 6B 8/8 features ✅ | voice-afk (non extractible archi), discord-audit-sync (scope) |
+| **6** Features moderation + workers 2 | 🟢 **8/8 features, 6/6 workers** (voice-afk non extractible archi) | 6A appeal-sla + export + audit-cache + blackjack-cleanup + discord-audit-sync ✅, 6B 8/8 features ✅ | — |
 | **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC ✅ **clôturé à 100%** (23 handlers + superadmin /purge/logs) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
@@ -814,9 +814,9 @@ Sous charge réelle : **10-50× throughput** sur les tables concernées. La char
 >   appelle `move_member()` qui nécessite Gateway+Http, et utilise
 >   `ctx.cache` + `voice_owner_map` in-memory. Un worker externe n'a pas
 >   accès à ces ressources. Le design local reste le bon choix ici.
-> - **discord-audit-sync-worker** : nouveau scope business plus important
->   (intégration Discord audit log + réconciliation), mieux adressé en
->   session dédiée.
+> - **discord-audit-sync-worker** : ✅ **livré** (migration 111 + nouveau crate
+>   + Discord REST audit-logs API + mapping action_types + dedup via curseur
+>   `last_entry_id` par guild).
 > - **export-worker** : ✅ **livré** (voir récapitulatif plus bas).
 
 #### Récapitulatif `appeal-sla-worker`
