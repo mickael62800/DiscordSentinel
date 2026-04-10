@@ -1,10 +1,12 @@
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 
 use crate::adapters::inbound::http::dto::role_panels::*;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::errors::DomainError;
 
 pub async fn create_panel(
     State(state): State<AppState>,
@@ -72,8 +74,14 @@ pub async fn add_auto_role(
 
 pub async fn delete_auto_role(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, role_id)): Path<(String, String)>,
 ) -> Result<Json<()>, ApiError> {
+    // Phase 7 B — Gate RBAC : admin+ pour toucher aux auto-roles.
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Admin)
+            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer un auto-role".into())))?;
+    }
     state.role_panels_uc.delete_auto_role(&guild_id, &role_id).await?;
     Ok(Json(()))
 }

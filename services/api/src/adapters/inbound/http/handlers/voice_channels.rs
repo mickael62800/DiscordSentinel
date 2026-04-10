@@ -1,5 +1,5 @@
 use axum::extract::{Path, Query, State};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::dto::voice_channels::{
@@ -10,7 +10,9 @@ use crate::adapters::inbound::http::dto::voice_channels::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::errors::DomainError;
 use crate::ports::inbound::{
     BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, ManageCoAdminCommand,
     ManageWhitelistCommand, TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
@@ -221,8 +223,14 @@ pub async fn add_to_whitelist(
 
 pub async fn remove_from_whitelist(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, owner_id, target_id)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Phase 7 B — Gate RBAC : moderator+ pour toucher aux permissions voice.
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Moderator)
+            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour la whitelist voice".into())))?;
+    }
     state
         .voice_channels_uc
         .remove_from_whitelist(&guild_id, &owner_id, &target_id)
@@ -385,8 +393,14 @@ pub async fn update_theme(
 
 pub async fn delete_theme(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, theme_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Phase 7 B — Gate RBAC : admin+ requis pour modifier la config themes voice.
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Admin)
+            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer un theme voice".into())))?;
+    }
     state.voice_channels_uc.delete_theme(&guild_id, &theme_id).await?;
     Ok(ok_response())
 }

@@ -6,15 +6,17 @@
 //! car ces endpoints sont simples et fire-and-forget cote bot.
 
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::Deserialize;
 
 use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use crate::domain::errors::DomainError;
 
 // ═══════════════════════════════════════════════════
 // Name History (Audit Bot)
@@ -290,12 +292,21 @@ pub async fn list_temp_roles(
 /// DELETE /api/temp-roles/{guild_id}/{user_id}/{role_id}
 pub async fn delete_temp_role(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id, role_id)): Path<(String, String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
     validation::validate_discord_id("role_id", &role_id).map_err(ApiError)?;
+
+    // Phase 7 B — Gate RBAC : moderator+ requis depuis le desktop. Les bots
+    // (community-bot qui consume l'event temp_role_expire) appellent sans
+    // X-Discord-Token → pass-through non-breaking.
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Moderator)
+            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour supprimer un temp role".into())))?;
+    }
 
     sqlx::query(
         "DELETE FROM temp_roles WHERE guild_id = $1 AND user_id = $2 AND role_id = $3",

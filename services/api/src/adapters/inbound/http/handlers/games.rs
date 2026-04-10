@@ -1,9 +1,10 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
+use axum::{Extension, Json};
 use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 
@@ -91,8 +92,14 @@ pub async fn create_game(
 /// DELETE /api/games/{guild_id}/{game_id}
 pub async fn delete_game(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, game_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
+    // Phase 7 B — Gate RBAC : admin+ pour supprimer une game configuree.
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Admin)
+            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer une game".into())))?;
+    }
     let result = sqlx::query("DELETE FROM games WHERE guild_id = $1 AND id = $2::uuid")
         .bind(&guild_id)
         .bind(&game_id)

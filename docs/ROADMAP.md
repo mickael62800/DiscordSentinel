@@ -1122,23 +1122,51 @@ Premier batch de handlers destructifs gatés via `require_role` avec le pattern
 
 **Cas spécial `purge::purge_logs`** : endpoint **global** (pas scoped par guild). Documenté comme nécessitant un concept "superadmin" futur. Pour l'instant : le `rbac: Option<Extension>` est récupéré mais pas checké — si desktop (token présent), l'appel passe car le middleware guild_auth/rbac l'a déjà validé comme user legit ; si bot (pas de token), pass-through comme les autres handlers.
 
+#### Gates progressifs wave 3 ✅ (livré)
+
+5 handlers path-based supplémentaires gatés :
+
+| Handler | Gate | Path |
+|---|---|---|
+| `voice_channels::delete_theme` | Admin | `DELETE /themes/{guild_id}/{theme_id}` |
+| `voice_channels::remove_from_whitelist` | Moderator | `DELETE /whitelist/{guild_id}/{owner_id}/{target_id}` |
+| `role_panels::delete_auto_role` | Admin | `DELETE /role-panels/auto-roles/{guild_id}/{role_id}` |
+| `games::delete_game` | Admin | `DELETE /games/{guild_id}/{game_id}` |
+| `bot_persistence::delete_temp_role` | Moderator | `DELETE /api/temp-roles/{guild_id}/{user_id}/{role_id}` |
+
+**Note sur `delete_temp_role`** : cet endpoint est appelé à la fois depuis le desktop ET depuis `community-bot` (qui consume l'event `temp_role_expire` de Phase 4 B). Le pattern `Option<Extension<RoleContext>>` garantit que le bot (pas de `X-Discord-Token`) continue en pass-through, tandis que les appels desktop sont gatés à Moderator+.
+
 #### État de la couverture RBAC
 
-**Handlers gatés (9 au total)** :
-- Admin+ : `rules::delete_rule`, `discord_roles::delete_role`, `levels::delete_reward`, `bot_config::set_config`, `bot_config::delete_config`
-- Owner+ : `purge::purge_infractions`, `purge::purge_audit_logs`
-- Moderator+ : `watched_users::remove_watched_user`, `strikes::reset_strikes`, `guild_members::remove_member`
+**Handlers gatés (14 au total)** :
 
-**Handlers destructifs encore non gatés (migration progressive)** :
-- `/infractions/{id}` (delete_infraction, `id` sans guild → nécessite `require_role_for_resource`)
-- `/notes/{id}` (delete_note, idem)
-- `/blackjack/tables/{table_id}` (close_table, idem)
-- `/bot-persistence/temp-roles/*` (delete_temp_role, path `/api/temp-roles/{guild_id}/{user_id}/{role_id}` — path-based, juste à faire)
-- `/role-panels/*` (delete_panel, delete_auto_role)
-- `/voice-channels/*` (delete_channel, delete_theme, remove_co_admin, etc.)
-- `/games/*` (delete_game, unsubscribe)
-- `/coude/combats/{combat_id}` (cancel_combat)
-- Divers autres
+*Admin+* (8) :
+- `rules::delete_rule`
+- `discord_roles::delete_role`
+- `levels::delete_reward`
+- `bot_config::set_config`
+- `bot_config::delete_config`
+- `voice_channels::delete_theme`
+- `role_panels::delete_auto_role`
+- `games::delete_game`
+
+*Owner+* (2) :
+- `purge::purge_infractions`
+- `purge::purge_audit_logs`
+
+*Moderator+* (5) :
+- `watched_users::remove_watched_user`
+- `strikes::reset_strikes`
+- `guild_members::remove_member`
+- `voice_channels::remove_from_whitelist`
+- `bot_persistence::delete_temp_role`
+
+**Handlers destructifs encore non gatés** (à traiter en waves ultérieures) :
+- `/infractions/{id}`, `/notes/{id}`, `/blackjack/tables/{table_id}` : nécessitent un helper `require_role_for_resource` qui fetch d'abord la ressource pour récupérer son `guild_id`
+- `/voice-channels/by-channel/{channel_id}/*` : mêmes paths `channel_id` sans `guild_id` — nécessitent `require_role_for_resource`
+- `/role-panels/detail/{panel_id}` : idem
+- `/coude/combats/{combat_id}` : idem
+- `/purge/logs` : endpoint global non scoped par guild — nécessite concept "superadmin" futur
 
 #### Différés restants
 
