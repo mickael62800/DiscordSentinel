@@ -1066,11 +1066,29 @@ VALUES ('123456789012345678', '987654321098765432', 'owner');
   - `extract_guild_id_from_path` avec / sans snowflake
 - Total API : **227/227** (216 + 11 RBAC, hors ML ONNX non-gated)
 
-#### Différés
+#### Endpoints CRUD RBAC ✅ **livrés** (follow-up immédiat)
 
-- **UI desktop de gestion RBAC** : pages pour `owner`/`admin` permettant de lister les users par guild, attribuer/révoquer des rôles. Scope frontend (Vue/Tauri), session dédiée.
-- **Endpoints REST CRUD RBAC** : `POST/PATCH/DELETE /api/rbac/users/{user_id}/guilds/{guild_id}`. Pas encore implémentés — le provisioning initial reste manuel SQL. À faire en même temps que l'UI desktop.
-- **Gates sur handlers existants** : aucun handler n'appelle encore `require_role`. Migration progressive recommandée : d'abord `DELETE *`, `bot_config` writes, RBAC writes. Les reads restent ouverts aux `viewer` (comportement actuel).
+Nouveau handler `handlers/rbac.rs` avec 5 endpoints direct-sqlx, tous gated via `require_role` :
+
+| Endpoint | Gate | Description |
+|---|---|---|
+| `POST /api/rbac/guilds/{guild_id}/users/{user_id}` | `Owner` | Grant un rôle (body: `{role, display_name?}`) — upsert `api_users` + insert `api_user_guilds`, 409 si doublon |
+| `PATCH /api/rbac/guilds/{guild_id}/users/{user_id}` | `Owner` | Update le rôle (body: `{role}`) — **garde-fou lockout** : un owner ne peut pas se rétrograder lui-même |
+| `DELETE /api/rbac/guilds/{guild_id}/users/{user_id}` | `Owner` | Revoke — **garde-fou dernier owner** : refus si le target est le dernier owner de la guild |
+| `GET /api/rbac/guilds/{guild_id}/users` | `Admin+` | Liste JOIN avec `api_users`, triée par rôle (owner → viewer) puis nom |
+| `GET /api/rbac/me/{guild_id}` | aucun (tout rôle) | Retourne le rôle effectif du caller — utilisé par le desktop pour savoir quoi afficher/masquer |
+
+**Ajouts infrastructure** :
+- `DomainError::Forbidden(String)` → mapping HTTP 403 dans `errors.rs`
+- `require_role` maintenant utilisé pour la première fois en production (gate les 4 endpoints d'écriture RBAC)
+- Pattern validé : le helper retourne `StatusCode::FORBIDDEN`, converti en `DomainError::Forbidden` via `status_to_err`
+
+**Bootstrap initial toujours manuel SQL** (un owner doit exister pour que les endpoints soient utilisables), mais le flow suivant est automatisé via les endpoints.
+
+#### Différés restants
+
+- **UI desktop RBAC** : pages pour `owner`/`admin` qui consomment les 5 endpoints ci-dessus (lister, grant, update, revoke). Scope frontend Vue/Tauri, session dédiée.
+- **Gates progressifs sur handlers existants** : aucun handler métier n'appelle encore `require_role`. Migration progressive recommandée : d'abord `DELETE *`, `bot_config` writes. Les reads restent ouverts aux `viewer`.
 
 ### Partie C — Sharding Discord (uniquement si besoin)
 

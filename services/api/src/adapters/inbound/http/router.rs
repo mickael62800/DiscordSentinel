@@ -497,6 +497,15 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)
         .route("/api/ai/jobs", post(handlers::ai_jobs::create_ai_job))
         .route("/api/ai/jobs/{id}", get(handlers::ai_jobs::get_ai_job))
+        // Phase 7 B — Endpoints RBAC CRUD (gated via require_role dans les handlers)
+        .route("/api/rbac/guilds/{guild_id}/users", get(handlers::rbac::list_guild_users))
+        .route(
+            "/api/rbac/guilds/{guild_id}/users/{user_id}",
+            post(handlers::rbac::grant_role)
+                .patch(handlers::rbac::update_role)
+                .delete(handlers::rbac::revoke_role),
+        )
+        .route("/api/rbac/me/{guild_id}", get(handlers::rbac::get_my_role))
         // Phase 7 B — RBAC fin : enrichit la requete avec le role du user
         // sur la guild courante (extension RoleContext). Doit tourner apres
         // guild_auth pour reutiliser le meme flow de token.

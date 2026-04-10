@@ -24,6 +24,9 @@ impl IntoResponse for ApiError {
                 (StatusCode::UNPROCESSABLE_ENTITY, self.0.to_string())
             }
 
+            // 403
+            DomainError::Forbidden(_) => (StatusCode::FORBIDDEN, self.0.to_string()),
+
             // 409
             DomainError::Conflict(_) => (StatusCode::CONFLICT, self.0.to_string()),
 

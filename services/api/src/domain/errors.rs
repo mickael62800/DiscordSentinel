@@ -29,6 +29,10 @@ pub enum DomainError {
     #[error("Conflit : {0}")]
     Conflict(String),
 
+    // 403
+    #[error("Accès refusé : {0}")]
+    Forbidden(String),
+
     // 429
     #[error("Rate limited : {0}")]
     RateLimited(String),

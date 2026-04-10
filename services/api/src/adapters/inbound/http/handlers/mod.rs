@@ -30,6 +30,7 @@ pub mod bot_persistence;
 pub mod cache_stats;
 pub mod coude;
 pub mod purge;
+pub mod rbac;
 pub mod wallet;
 pub mod blackjack;
 pub mod games;
