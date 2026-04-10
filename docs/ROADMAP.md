@@ -1085,10 +1085,28 @@ Nouveau handler `handlers/rbac.rs` avec 5 endpoints direct-sqlx, tous gated via 
 
 **Bootstrap initial toujours manuel SQL** (un owner doit exister pour que les endpoints soient utilisables), mais le flow suivant est automatisé via les endpoints.
 
+#### Gates progressifs wave 1 ✅ (livré)
+
+Premier batch de handlers destructifs gatés via `require_role` avec le pattern
+`Option<Extension<RoleContext>>` pour préserver le pass-through bot/internal :
+
+| Handler | Gate | Path |
+|---|---|---|
+| `rules::delete_rule` | Admin | `DELETE /rules/{guild_id}/{rule_id}` |
+| `discord_roles::delete_role` | Admin | `DELETE /api/discord-roles/{guild_id}/{role_id}` |
+| `levels::delete_reward` | Admin | `DELETE /rewards/{guild_id}/{level}` |
+| `watched_users::remove_watched_user` | Moderator | `DELETE /api/watched-users/{guild_id}/{user_id}` |
+
+**Pattern clé** : `rbac: Option<Extension<RoleContext>>`
+- **Présent** (appel desktop avec `X-Discord-Token`) → check `require_role` enforcé
+- **Absent** (appel bot/worker/internal avec API key uniquement) → pass-through non-breaking
+- Retour 403 `Forbidden` si rôle insuffisant
+
 #### Différés restants
 
-- **UI desktop RBAC** : pages pour `owner`/`admin` qui consomment les 5 endpoints ci-dessus (lister, grant, update, revoke). Scope frontend Vue/Tauri, session dédiée.
-- **Gates progressifs sur handlers existants** : aucun handler métier n'appelle encore `require_role`. Migration progressive recommandée : d'abord `DELETE *`, `bot_config` writes. Les reads restent ouverts aux `viewer`.
+- **UI desktop RBAC** : pages pour `owner`/`admin` qui consomment les 5 endpoints CRUD (lister, grant, update, revoke). Scope frontend Vue/Tauri, session dédiée.
+- **Gates wave 2** : `bot_config` writes, `purge/*`, `strikes::reset_strikes`, `guild_members::remove_member`, `role_panels::delete_panel`, `games::delete_game`, `bot_persistence::delete_temp_role`, `blackjack::close_table`. **Contrainte** : les endpoints qui lisent `guild_id` depuis le **body** (`bot_config`, `purge/*`) nécessitent un helper `require_role_for_guild(state, ctx, guild_id, role)` qui fait un lookup DB explicite (le middleware ne voit pas les bodies). À ajouter avant de gater ce groupe.
+- **Handlers avec `id` mais sans `guild_id` dans le path** (`/infractions/{id}`, `/notes/{id}`, `/blackjack/tables/{table_id}`) : même contrainte — soit restructurer l'URL pour inclure `guild_id`, soit fetch d'abord la ressource pour récupérer son guild, soit ajouter un helper `require_role_for_resource(state, ctx, resource_id, role)`.
 
 ### Partie C — Sharding Discord (uniquement si besoin)
 
