@@ -4,7 +4,9 @@ use serde::Deserialize;
 use tracing::info;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, require_superadmin, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{
+    check_role_for_guild, require_superadmin, Role, RoleContext,
+};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
@@ -32,11 +34,14 @@ pub async fn purge_infractions(
     }
 
     // Phase 7 B — Gate RBAC : owner requis pour une purge massive.
-    if let Some(Extension(ctx)) = rbac {
-        require_role_for_guild(&state, &ctx, &dto.guild_id, Role::Owner)
-            .await
-            .map_err(|_| ApiError(DomainError::Forbidden("owner requis pour purger des infractions".into())))?;
-    }
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Owner,
+        "owner requis pour purger des infractions",
+    )
+    .await?;
 
     let count = state.infractions_uc.delete_older_than_days(&dto.guild_id, dto.days).await?;
     info!(guild_id = %dto.guild_id, days = dto.days, deleted = count, "Purge infractions");
@@ -63,11 +68,14 @@ pub async fn purge_audit_logs(
     }
 
     // Phase 7 B — Gate RBAC : owner requis pour purger l'audit log.
-    if let Some(Extension(ctx)) = rbac {
-        require_role_for_guild(&state, &ctx, &dto.guild_id, Role::Owner)
-            .await
-            .map_err(|_| ApiError(DomainError::Forbidden("owner requis pour purger les audit logs".into())))?;
-    }
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Owner,
+        "owner requis pour purger les audit logs",
+    )
+    .await?;
 
     let count = state.audit_logs_uc.delete_older_than_days(&dto.guild_id, dto.days).await?;
     info!(guild_id = %dto.guild_id, days = dto.days, deleted = count, "Purge audit logs");

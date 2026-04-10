@@ -12,7 +12,7 @@ use super::dto::{
 use super::parse_combat_id;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::{CombatResolution, NewCoudeCombat};
@@ -110,7 +110,7 @@ pub async fn cancel_combat(
 
     // Phase 7 B — Gate RBAC : moderator+ requis pour annuler un combat coude.
     // Fetch le guild_id du combat via sqlx direct (ressource-id-based).
-    if let Some(Extension(ctx)) = rbac {
+    if rbac.is_some() {
         let row: Option<(String,)> = sqlx::query_as(
             "SELECT guild_id FROM coude_combats WHERE id = $1",
         )
@@ -120,9 +120,14 @@ pub async fn cancel_combat(
         .map_err(|e| ApiError(DomainError::Internal(format!("fetch combat guild_id: {e}"))))?;
 
         if let Some((guild_id,)) = row {
-            require_role_for_guild(&state, &ctx, &guild_id, Role::Moderator)
-                .await
-                .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour annuler un combat".into())))?;
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Moderator,
+                "moderator+ requis pour annuler un combat",
+            )
+            .await?;
         }
     }
 

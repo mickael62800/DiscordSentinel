@@ -4,10 +4,9 @@ use axum::{Extension, Json};
 use crate::adapters::inbound::http::dto::infractions::{InfractionQueryParams, InfractionResponseDto};
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, ok_response};
-use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::domain::errors::DomainError;
 use crate::ports::inbound::InfractionFilters;
 
 pub async fn list_infractions(
@@ -39,11 +38,16 @@ pub async fn delete_infraction(
 
     // Phase 7 B — Gate RBAC : moderator+ requis. L'infraction porte son
     // propre guild_id, donc on fetch d'abord puis on verifie le role
-    // via require_role_for_guild (pattern "ressource-id-based").
-    if let (Some(Extension(ctx)), Some(ref inf)) = (rbac.as_ref(), infraction.as_ref()) {
-        require_role_for_guild(&state, ctx, &inf.guild_id, Role::Moderator)
-            .await
-            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour supprimer une infraction".into())))?;
+    // via check_role_for_guild (pattern "ressource-id-based").
+    if let Some(ref inf) = infraction {
+        check_role_for_guild(
+            &state,
+            &rbac,
+            &inf.guild_id,
+            Role::Moderator,
+            "moderator+ requis pour supprimer une infraction",
+        )
+        .await?;
     }
 
     let deleted = state.infractions_uc.delete_infraction(&id).await?;

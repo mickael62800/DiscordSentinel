@@ -6,7 +6,7 @@ use axum::{Extension, Json};
 
 use super::dto::{CreateTableDto, JoinTableDto, TableDto, TablePlayerDto};
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 
@@ -178,7 +178,7 @@ pub async fn close_table(
 ) -> Result<StatusCode, ApiError> {
     // Phase 7 B — Gate RBAC : moderator+ pour fermer une table blackjack.
     // Fetch le guild_id via sqlx direct (ressource-id-based).
-    if let Some(Extension(ctx)) = rbac {
+    if rbac.is_some() {
         let row: Option<(String,)> = sqlx::query_as(
             "SELECT guild_id FROM blackjack_tables WHERE id = $1::uuid",
         )
@@ -188,9 +188,14 @@ pub async fn close_table(
         .map_err(pg_err)?;
 
         if let Some((guild_id,)) = row {
-            require_role_for_guild(&state, &ctx, &guild_id, Role::Moderator)
-                .await
-                .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour fermer une table blackjack".into())))?;
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Moderator,
+                "moderator+ requis pour fermer une table blackjack",
+            )
+            .await?;
         }
     }
 

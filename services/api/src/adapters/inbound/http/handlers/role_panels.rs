@@ -4,7 +4,9 @@ use axum::{Extension, Json};
 use crate::adapters::inbound::http::dto::role_panels::*;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{require_role, require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{
+    check_role_for_guild, require_role, Role, RoleContext,
+};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 
@@ -55,7 +57,7 @@ pub async fn delete_panel(
 ) -> Result<Json<()>, ApiError> {
     // Phase 7 B — Gate RBAC : admin+ pour supprimer un panel. Fetch le
     // guild_id via sqlx direct (ressource-id-based).
-    if let Some(Extension(ctx)) = rbac {
+    if rbac.is_some() {
         let panel_uuid = uuid::Uuid::parse_str(&panel_id).map_err(|_| {
             ApiError(DomainError::ValidationError("panel_id invalide".into()))
         })?;
@@ -68,9 +70,14 @@ pub async fn delete_panel(
         .map_err(|e| ApiError(DomainError::Internal(format!("fetch panel guild: {e}"))))?;
 
         if let Some((guild_id,)) = row {
-            require_role_for_guild(&state, &ctx, &guild_id, Role::Admin)
-                .await
-                .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer un panel".into())))?;
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Admin,
+                "admin+ requis pour supprimer un panel",
+            )
+            .await?;
         }
     }
     state.role_panels_uc.delete_panel(&panel_id).await?;

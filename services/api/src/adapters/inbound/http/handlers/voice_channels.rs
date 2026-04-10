@@ -10,12 +10,19 @@ use crate::adapters::inbound::http::dto::voice_channels::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{require_role, require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{
+    check_role_for_guild, require_role, Role, RoleContext,
+};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 
 /// Helper Phase 7 B — fetch le `guild_id` associe a un `channel_id` voice
-/// et gate via `require_role_for_guild`. Pass-through si `rbac` absent.
+/// et gate via `check_role_for_guild`. Pass-through si `rbac` absent.
+///
+/// Post-fix P0.C : on utilise le helper `check_role_for_guild` qui distingue
+/// les erreurs DB (503 Internal) des refus de role (403 Forbidden), au lieu
+/// de mapper tout en Forbidden (ce qui cachait les vraies erreurs DB
+/// derriere un message trompeur "role requis").
 async fn gate_by_channel_id(
     state: &AppState,
     rbac: &Option<Extension<RoleContext>>,
@@ -23,9 +30,9 @@ async fn gate_by_channel_id(
     required: Role,
     label: &'static str,
 ) -> Result<(), ApiError> {
-    let Some(Extension(ctx)) = rbac else {
+    if rbac.is_none() {
         return Ok(());
-    };
+    }
     let row: Option<(String,)> = sqlx::query_as(
         "SELECT guild_id FROM voice_channels WHERE channel_id = $1",
     )
@@ -35,9 +42,7 @@ async fn gate_by_channel_id(
     .map_err(|e| ApiError(DomainError::Internal(format!("fetch voice channel guild: {e}"))))?;
 
     if let Some((guild_id,)) = row {
-        require_role_for_guild(state, ctx, &guild_id, required)
-            .await
-            .map_err(|_| ApiError(DomainError::Forbidden(format!("{label} requis"))))?;
+        check_role_for_guild(state, rbac, &guild_id, required, label).await?;
     }
     Ok(())
 }

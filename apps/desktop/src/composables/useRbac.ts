@@ -1,4 +1,4 @@
-import { ref, watch, type Ref } from "vue";
+import { onMounted, ref, watch, type Ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { GuildUserRole, MyRole, RbacRole } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
@@ -102,6 +102,13 @@ export function useRbac() {
       return false;
     }
   }
+
+  // Initial fetch au mount : le watch ne se declenche PAS si selectedGuildId
+  // a deja une valeur (depuis localStorage) au moment du mount. Sans ce
+  // onMounted, la page RBAC reste vide jusqu'a ce que l'user change de guild.
+  onMounted(() => {
+    void refresh();
+  });
 
   // Refresh auto a chaque changement de guild
   watch(selectedGuildId, () => {

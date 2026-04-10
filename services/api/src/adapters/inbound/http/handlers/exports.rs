@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
@@ -84,15 +84,14 @@ pub async fn create_export_job(
     }
 
     // Phase 7 B — Gate RBAC : moderator+ pour lancer un export
-    if let Some(Extension(ctx)) = rbac {
-        require_role_for_guild(&state, &ctx, &dto.guild_id, Role::Moderator)
-            .await
-            .map_err(|_| {
-                ApiError(DomainError::Forbidden(
-                    "moderator+ requis pour lancer un export".into(),
-                ))
-            })?;
-    }
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour lancer un export",
+    )
+    .await?;
 
     let id: Uuid = sqlx::query_scalar(
         "INSERT INTO export_jobs (guild_id, requested_by, job_type, format, filters) \

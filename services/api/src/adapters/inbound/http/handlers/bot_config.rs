@@ -9,10 +9,9 @@ use crate::adapters::inbound::http::dto::bot_config::{
     BotDefinitionDto, BotGuildConfigDto, DeleteConfigDto, SetConfigDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::domain::errors::DomainError;
 
 const DEFINITIONS_TTL: u64 = 3600; // 1 heure
 const GUILD_CONFIG_TTL: u64 = 900; // 15 minutes
@@ -132,12 +131,16 @@ pub async fn set_config(
     ).map_err(ApiError)?;
 
     // Phase 7 B — Gate RBAC : admin+ requis pour modifier la config bot.
-    // Body-based -> require_role_for_guild (lookup DB explicite).
-    if let Some(Extension(ctx)) = rbac {
-        require_role_for_guild(&state, &ctx, &dto.guild_id, Role::Admin)
-            .await
-            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour modifier la config bot".into())))?;
-    }
+    // Body-based -> check_role_for_guild (lookup DB explicite + distingue
+    // les vraies erreurs DB des refus de role, post-fix P0.C).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour modifier la config bot",
+    )
+    .await?;
 
     state
         .bot_config_repo
@@ -169,11 +172,14 @@ pub async fn delete_config(
     validation::validate_short("config_key", &dto.config_key).map_err(ApiError)?;
 
     // Phase 7 B — Gate RBAC : admin+ requis pour supprimer une cle de config.
-    if let Some(Extension(ctx)) = rbac {
-        require_role_for_guild(&state, &ctx, &dto.guild_id, Role::Admin)
-            .await
-            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer une config".into())))?;
-    }
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Admin,
+        "admin+ requis pour supprimer une config",
+    )
+    .await?;
 
     state
         .bot_config_repo
