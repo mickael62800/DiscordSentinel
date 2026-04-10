@@ -7,10 +7,9 @@ use crate::adapters::inbound::http::dto::levels::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::XpSource;
-use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_levels::AddXpCommand;
 
 pub async fn get_config(
@@ -110,11 +109,7 @@ pub async fn delete_reward(
     Path((guild_id, level)): Path<(String, i32)>,
     Query(params): Query<DeleteRewardParams>,
 ) -> Result<Json<()>, ApiError> {
-    // Phase 7 B — Gate RBAC : admin+ requis pour modifier la config XP.
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Admin)
-            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer une recompense".into())))?;
-    }
+    check_role(&rbac, Role::Admin, "admin+ requis pour supprimer une recompense")?;
     let source = XpSource::from_str(params.source.as_deref().unwrap_or("text"));
     state.levels_uc.delete_reward(&guild_id, level, source).await?;
     Ok(Json(()))

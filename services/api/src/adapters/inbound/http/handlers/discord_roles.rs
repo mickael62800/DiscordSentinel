@@ -4,10 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::DiscordRole;
-use crate::domain::errors::DomainError;
 
 #[derive(Debug, Serialize)]
 pub struct DiscordRoleDto {
@@ -102,11 +101,7 @@ pub async fn delete_role(
     rbac: Option<Extension<RoleContext>>,
     Path((guild_id, role_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : admin+ requis pour supprimer un role Discord.
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Admin)
-            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer un role".into())))?;
-    }
+    check_role(&rbac, Role::Admin, "admin+ requis pour supprimer un role")?;
     state.discord_api.delete_role(&guild_id, &role_id).await?;
     Ok(Json(serde_json::json!({ "deleted": true })))
 }

@@ -238,6 +238,69 @@ pub async fn require_role_for_guild(
     }
 }
 
+/// Phase 7 B — Helper handler-friendly : wrap `require_role` pour les handlers
+/// path-based qui utilisent `Option<Extension<RoleContext>>`.
+///
+/// Elimine la duplication du pattern :
+/// ```ignore
+/// if let Some(Extension(ctx)) = rbac {
+///     require_role(&ctx, Role::Admin)
+///         .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour X".into())))?;
+/// }
+/// ```
+///
+/// Devient :
+/// ```ignore
+/// check_role(&rbac, Role::Admin, "admin+ requis pour X")?;
+/// ```
+///
+/// Sémantique :
+/// - `rbac` absent → pass-through (appel bot/internal non gated)
+/// - `rbac` présent et `role.satisfies(required)` → `Ok(())`
+/// - Sinon → `Err(ApiError(DomainError::Forbidden(...)))`
+#[allow(dead_code)]
+pub fn check_role(
+    rbac: &Option<axum::Extension<RoleContext>>,
+    required: Role,
+    forbidden_msg: &str,
+) -> Result<(), crate::adapters::inbound::http::errors::ApiError> {
+    use crate::adapters::inbound::http::errors::ApiError;
+    use crate::domain::errors::DomainError;
+
+    let Some(axum::Extension(ctx)) = rbac else {
+        return Ok(());
+    };
+    match require_role(ctx, required) {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ApiError(DomainError::Forbidden(forbidden_msg.to_string()))),
+    }
+}
+
+/// Phase 7 B — Helper handler-friendly pour les endpoints body-based ou
+/// resource-id-based (guild_id pas dans le path).
+///
+/// Wrap `require_role_for_guild` avec le même pattern de pass-through.
+/// Async car il doit faire un lookup DB (contrairement à `check_role`).
+#[allow(dead_code)]
+pub async fn check_role_for_guild(
+    state: &AppState,
+    rbac: &Option<axum::Extension<RoleContext>>,
+    guild_id: &str,
+    required: Role,
+    forbidden_msg: &str,
+) -> Result<(), crate::adapters::inbound::http::errors::ApiError> {
+    use crate::adapters::inbound::http::errors::ApiError;
+    use crate::domain::errors::DomainError;
+
+    let Some(axum::Extension(ctx)) = rbac else {
+        return Ok(());
+    };
+    match require_role_for_guild(state, ctx, guild_id, required).await {
+        Ok(()) => Ok(()),
+        Err(_) => Err(ApiError(DomainError::Forbidden(forbidden_msg.to_string()))),
+    }
+}
+
 async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<String, String> {
     let cache_key = format!("user_id:{}", short_hash(access_token));
 
@@ -414,5 +477,56 @@ mod tests {
     #[test]
     fn extract_guild_id_no_match() {
         assert_eq!(extract_guild_id_from_path("/api/health"), None);
+    }
+
+    // ── Tests des helpers check_role (Phase 7 B refactor) ────────────
+
+    #[test]
+    fn check_role_passes_through_when_none() {
+        // Aucun RoleContext → l'appel passe sans erreur (cas bot/internal)
+        let result = check_role(&None, Role::Owner, "msg");
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn check_role_ok_when_sufficient() {
+        use axum::Extension;
+        let ctx = RoleContext {
+            discord_user_id: "1".into(),
+            role: Some(Role::Admin),
+            guild_id: Some("42".into()),
+        };
+        let rbac = Some(Extension(ctx));
+        assert!(check_role(&rbac, Role::Moderator, "msg").is_ok());
+        assert!(check_role(&rbac, Role::Admin, "msg").is_ok());
+    }
+
+    #[test]
+    fn check_role_forbidden_when_insufficient() {
+        use axum::Extension;
+        let ctx = RoleContext {
+            discord_user_id: "1".into(),
+            role: Some(Role::Moderator),
+            guild_id: Some("42".into()),
+        };
+        let rbac = Some(Extension(ctx));
+        let result = check_role(&rbac, Role::Admin, "admin requis");
+        assert!(result.is_err());
+        // On ne peut pas facilement assert sur le message car ApiError ne
+        // derive pas PartialEq, mais la presence de l'erreur est suffisante.
+    }
+
+    #[test]
+    fn check_role_forbidden_when_role_is_none() {
+        // RoleContext present mais role = None (endpoint sans guild_id)
+        use axum::Extension;
+        let ctx = RoleContext {
+            discord_user_id: "1".into(),
+            role: None,
+            guild_id: None,
+        };
+        let rbac = Some(Extension(ctx));
+        let result = check_role(&rbac, Role::Viewer, "msg");
+        assert!(result.is_err());
     }
 }

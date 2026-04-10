@@ -7,9 +7,8 @@ use crate::adapters::inbound::http::dto::watched_users::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
 pub struct WatchedUsersQueryParams {
@@ -79,11 +78,11 @@ pub async fn remove_watched_user(
     rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Phase 7 B — Gate RBAC : moderator+ requis pour toucher aux watched users.
-    if let Some(Extension(ctx)) = rbac {
-        require_role(&ctx, Role::Moderator)
-            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour retirer un watched user".into())))?;
-    }
+    check_role(
+        &rbac,
+        Role::Moderator,
+        "moderator+ requis pour retirer un watched user",
+    )?;
     state
         .watched_users_uc
         .remove_manual_watch(&guild_id, &user_id)
