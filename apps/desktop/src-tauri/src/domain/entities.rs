@@ -617,3 +617,29 @@ pub struct CoudePlayer {
     pub class: Option<String>,
     pub title: Option<String>,
 }
+
+// ═══════════════════════════════════════════════════
+// Phase 7 B — RBAC fin
+// ═══════════════════════════════════════════════════
+
+/// Une ligne de la liste RBAC d'une guild — user + role + metadonnees.
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GuildUserRole {
+    pub discord_user_id: String,
+    pub display_name: String,
+    #[serde(default)]
+    pub avatar_url: Option<String>,
+    pub role: String,
+    pub granted_at: String,
+    #[serde(default)]
+    pub granted_by: Option<String>,
+}
+
+/// Role effectif du user desktop courant sur une guild (pour afficher/masquer
+/// les elements d'UI sensibles).
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct MyRole {
+    pub discord_user_id: String,
+    pub guild_id: String,
+    pub role: String,
+}

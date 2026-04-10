@@ -1398,11 +1398,41 @@ Premier batch de handlers destructifs gatés via `require_role` avec le pattern
 2. **Body-based** (guild_id dans le JSON body) → `require_role_for_guild(&state, &ctx, &dto.guild_id, Role::X)` — lookup DB explicite
 3. **Ressource-id-based** (id de ressource sans guild_id) → fetch `SELECT guild_id FROM {table}` puis `require_role_for_guild` (inline, 3-5 lignes)
 
-**Phase 7 B définitivement terminée.** Reste uniquement l'UI desktop RBAC (scope frontend) pour clore le cycle complet de gestion RBAC par un owner.
+**Phase 7 B définitivement terminée**, **UI desktop RBAC incluse**.
+
+#### UI desktop RBAC ✅ (livré)
+
+Page `/rbac` dans l'app desktop (Tauri + Vue 3) qui consomme les 5 endpoints CRUD RBAC livrés précédemment.
+
+**Backend Tauri** (hexagonal) :
+- `domain/entities.rs` : `GuildUserRole`, `MyRole`
+- `domain/ports.rs` : nouveau trait `RbacRepository` (5 méthodes) + ajouté aux bounds `AppAdapter`
+- `infrastructure/api_adapter.rs` : impl `RbacRepository` (pattern `reqwest::Client` + `X-Discord-Token` auto-envoyé via `auth()` helper Phase 2B)
+- `application/rbac_service.rs` : service léger wrappant le repo
+- `presentation/commands.rs` : 5 `tauri_passthrough!` (`rbac_list_guild_users`, `rbac_get_my_role`, `rbac_grant_role`, `rbac_update_role`, `rbac_revoke_role`)
+- `lib.rs` : `.manage(rbac_svc)` + handlers enregistrés
+
+**Frontend Vue** :
+- `types/index.ts` : `RbacRole` enum TS + `GuildUserRole` + `MyRole`
+- `composables/useRbac.ts` : wrap les 5 `invoke()`, expose `users`/`myRole`/`refresh`/`grantRole`/`updateRole`/`revokeRole`, re-fetch automatique sur changement de guild
+- `components/pages/RbacPage.vue` : page complète avec
+  - Header + badge du rôle effectif (via `myRole`)
+  - Gate d'affichage : si pas `admin+` → `EmptyState` "Accès refusé"
+  - Gate d'édition : seul un `owner` peut voir le formulaire d'ajout + dropdown éditable
+  - Formulaire inline collapsible pour ajouter un user (Discord ID + display name optionnel + rôle)
+  - Table avec avatar, ID, rôle (dropdown direct pour owner, `AppBadge` sinon), granted_at, granted_by, bouton Révoquer
+  - Toasts succès/erreur via `useToast`
+  - Confirmation via `useConfirm` avant revoke
+- `router/index.ts` : route `/rbac`
+- `components/organisms/SidebarNav.vue` : entrée "Accès RBAC" dans `configItems` (section Configuration)
+
+**Validation** :
+- `cargo check` clean sur `apps/desktop/src-tauri`
+- `vue-tsc --noEmit` clean sur `apps/desktop` (0 erreur TypeScript)
+- Pattern suivi à 100% des conventions existantes (hexagonal Tauri + atomic design Vue + composables ref/reactive + `tauri_passthrough!` macro)
 
 #### Différés restants
 
-- **UI desktop RBAC** : pages pour `owner`/`admin` qui consomment les 5 endpoints CRUD (lister, grant, update, revoke). Scope frontend Vue/Tauri, session dédiée.
 - **Gates wave 2** : `bot_config` writes, `purge/*`, `strikes::reset_strikes`, `guild_members::remove_member`, `role_panels::delete_panel`, `games::delete_game`, `bot_persistence::delete_temp_role`, `blackjack::close_table`. **Contrainte** : les endpoints qui lisent `guild_id` depuis le **body** (`bot_config`, `purge/*`) nécessitent un helper `require_role_for_guild(state, ctx, guild_id, role)` qui fait un lookup DB explicite (le middleware ne voit pas les bodies). À ajouter avant de gater ce groupe.
 - **Handlers avec `id` mais sans `guild_id` dans le path** (`/infractions/{id}`, `/notes/{id}`, `/blackjack/tables/{table_id}`) : même contrainte — soit restructurer l'URL pour inclure `guild_id`, soit fetch d'abord la ressource pour récupérer son guild, soit ajouter un helper `require_role_for_resource(state, ctx, resource_id, role)`.
 

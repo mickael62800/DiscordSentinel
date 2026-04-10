@@ -25,11 +25,12 @@ use crate::application::watched_users_service::WatchedUsersService;
 use crate::application::members_service::MembersService;
 use crate::application::ia_config_service::{IaConfigService, IaConfig};
 use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
+use crate::application::rbac_service::RbacService;
 use crate::domain::entities::{
     ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity,
     LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog,
-    DiscordConfig, DiscordUser, Guild, GuildMember, Infraction, LogEntry, Member, MemberSummary,
-    ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail,
+    DiscordConfig, DiscordUser, Guild, GuildMember, GuildUserRole, Infraction, LogEntry, Member, MemberSummary,
+    ModerationActionRequest, ModerationActionResponse, ModerationRule, MyRole, RolePanel, RolePanelDetail,
     SecurityEvent, ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
     UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail,
     WatchedUser, DiscordRole, CoudeCombat, CoudePlayer,
@@ -64,6 +65,13 @@ tauri_passthrough!(get_coude_combats, CoudeService, get_combats -> Vec<CoudeComb
 tauri_passthrough!(get_coude_players, CoudeService, get_players -> Vec<CoudePlayer>, guild_id: String);
 tauri_passthrough!(cancel_coude_combat, CoudeService, cancel_combat -> (), combat_id: String);
 tauri_passthrough!(adjust_coude_coins, CoudeService, adjust_coins -> (), guild_id: String, user_id: String, amount: i64);
+
+// Phase 7 B — RBAC fin
+tauri_passthrough!(rbac_list_guild_users, RbacService, list_guild_users -> Vec<GuildUserRole>, guild_id: String);
+tauri_passthrough!(rbac_get_my_role, RbacService, get_my_role -> MyRole, guild_id: String);
+tauri_passthrough!(rbac_grant_role, RbacService, grant_role -> (), guild_id: String, user_id: String, role: String, display_name: Option<String>);
+tauri_passthrough!(rbac_update_role, RbacService, update_role -> (), guild_id: String, user_id: String, role: String);
+tauri_passthrough!(rbac_revoke_role, RbacService, revoke_role -> (), guild_id: String, user_id: String);
 
 // Rules
 tauri_passthrough!(get_rules, RulesService, get_rules -> Vec<ModerationRule>, guild_id: Option<String>);

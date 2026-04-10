@@ -126,6 +126,29 @@ pub trait CoudeRepository: Send + Sync + 'static {
     fn adjust_coins(&self, guild_id: String, user_id: String, amount: i64) -> BoxFut<()>;
 }
 
+/// Phase 7 B — Gestion RBAC fin des users d'une guild (backed par les
+/// endpoints `/api/rbac/*` cote API).
+pub trait RbacRepository: Send + Sync + 'static {
+    fn list_guild_users(
+        &self,
+        guild_id: String,
+    ) -> BoxFut<Vec<super::entities::GuildUserRole>>;
+
+    fn get_my_role(&self, guild_id: String) -> BoxFut<super::entities::MyRole>;
+
+    fn grant_role(
+        &self,
+        guild_id: String,
+        user_id: String,
+        role: String,
+        display_name: Option<String>,
+    ) -> BoxFut<()>;
+
+    fn update_role(&self, guild_id: String, user_id: String, role: String) -> BoxFut<()>;
+
+    fn revoke_role(&self, guild_id: String, user_id: String) -> BoxFut<()>;
+}
+
 pub trait AppAdapter:
     GuildRepository
     + BotConfigRepository
@@ -146,5 +169,6 @@ pub trait AppAdapter:
     + DiscordRolesRepository
     + MembersRepository
     + CoudeRepository
+    + RbacRepository
 {
 }

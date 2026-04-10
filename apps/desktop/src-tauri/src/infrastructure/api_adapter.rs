@@ -482,4 +482,84 @@ impl CoudeRepository for ApiAdapter {
     }
 }
 
+// ═══════════════════════════════════════════════════
+// Phase 7 B — RBAC fin
+// ═══════════════════════════════════════════════════
+
+impl crate::domain::ports::RbacRepository for ApiAdapter {
+    fn list_guild_users(
+        &self,
+        guild_id: String,
+    ) -> Pin<Box<dyn Future<Output = Result<Vec<crate::domain::entities::GuildUserRole>, String>> + Send>>
+    {
+        self.get_json(
+            self.client
+                .get(format!("{}/api/rbac/guilds/{}/users", self.base_url(), guild_id)),
+        )
+    }
+
+    fn get_my_role(
+        &self,
+        guild_id: String,
+    ) -> Pin<Box<dyn Future<Output = Result<crate::domain::entities::MyRole, String>> + Send>> {
+        self.get_json(
+            self.client
+                .get(format!("{}/api/rbac/me/{}", self.base_url(), guild_id)),
+        )
+    }
+
+    fn grant_role(
+        &self,
+        guild_id: String,
+        user_id: String,
+        role: String,
+        display_name: Option<String>,
+    ) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(
+            self.client
+                .post(format!(
+                    "{}/api/rbac/guilds/{}/users/{}",
+                    self.base_url(),
+                    guild_id,
+                    user_id
+                ))
+                .json(&serde_json::json!({
+                    "role": role,
+                    "display_name": display_name,
+                })),
+        )
+    }
+
+    fn update_role(
+        &self,
+        guild_id: String,
+        user_id: String,
+        role: String,
+    ) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(
+            self.client
+                .patch(format!(
+                    "{}/api/rbac/guilds/{}/users/{}",
+                    self.base_url(),
+                    guild_id,
+                    user_id
+                ))
+                .json(&serde_json::json!({ "role": role })),
+        )
+    }
+
+    fn revoke_role(
+        &self,
+        guild_id: String,
+        user_id: String,
+    ) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.delete(format!(
+            "{}/api/rbac/guilds/{}/users/{}",
+            self.base_url(),
+            guild_id,
+            user_id
+        )))
+    }
+}
+
 impl AppAdapter for ApiAdapter {}

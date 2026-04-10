@@ -632,3 +632,24 @@ export interface CoudePlayer {
   class?: string;
   title?: string;
 }
+
+// ═══════════════════════════════════════════════════
+// Phase 7 B — RBAC fin
+// ═══════════════════════════════════════════════════
+
+export type RbacRole = "owner" | "admin" | "moderator" | "viewer";
+
+export interface GuildUserRole {
+  discord_user_id: string;
+  display_name: string;
+  avatar_url?: string;
+  role: RbacRole;
+  granted_at: string;
+  granted_by?: string;
+}
+
+export interface MyRole {
+  discord_user_id: string;
+  guild_id: string;
+  role: RbacRole;
+}

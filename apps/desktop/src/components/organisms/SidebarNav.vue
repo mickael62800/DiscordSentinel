@@ -54,6 +54,7 @@ const aiItems = [
 
 const configItems = [
   { path: "/component-config", label: "Composants", icon: "cpu" },
+  { path: "/rbac", label: "Acces RBAC", icon: "shield" },
   { path: "/settings", label: "Parametres", icon: "settings" },
 ];
 
