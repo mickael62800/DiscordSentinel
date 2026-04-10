@@ -313,6 +313,25 @@ services:
       redis:
         condition: service_healthy
 
+  # Phase 6A — Cleanup des tables blackjack inactives (scaling horizontal)
+  blackjack-cleanup-worker:
+    build:
+      context: .
+      dockerfile: services/workers/blackjack-cleanup-worker/Dockerfile
+    container_name: sentinel-blackjack-cleanup-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
+      API_URL: http://api:3000
+      BLACKJACK_CLEANUP_SCAN_INTERVAL: ${BLACKJACK_CLEANUP_SCAN_INTERVAL:-60}
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
   cleanup-worker:
     build:
       context: .
