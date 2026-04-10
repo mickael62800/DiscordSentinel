@@ -1,11 +1,13 @@
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 
 use crate::adapters::inbound::http::dto::notes::{AddNoteDto, UserNoteDto};
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use crate::domain::errors::DomainError;
 
 /// POST /api/notes
 pub async fn add_note(
@@ -37,8 +39,33 @@ pub async fn get_notes(
 /// DELETE /api/notes/{id}
 pub async fn delete_note(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Phase 7 B — Gate RBAC : moderator+ requis. L'`id` de la note ne contient
+    // pas le guild_id, donc on fetch d'abord en direct sqlx (pattern
+    // "ressource-id-based" — plus simple qu'ajouter une methode au repo).
+    if let Some(Extension(ctx)) = rbac {
+        let note_uuid = uuid::Uuid::parse_str(&id).map_err(|_| {
+            ApiError(DomainError::ValidationError("id note invalide".into()))
+        })?;
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM user_notes WHERE id = $1",
+        )
+        .bind(note_uuid)
+        .fetch_optional(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("fetch note guild_id: {e}"))))?;
+
+        if let Some((guild_id,)) = row {
+            require_role_for_guild(&state, &ctx, &guild_id, Role::Moderator)
+                .await
+                .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour supprimer une note".into())))?;
+        }
+        // Si la note n'existe pas, on laisse `delete_note` retourner sa propre
+        // 404/NotFound plutot que de masquer avec un 403.
+    }
+
     state.notes_uc.delete_note(&id).await?;
     Ok(ok_response())
 }

@@ -3,7 +3,7 @@
 
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use axum::Json;
+use axum::{Extension, Json};
 
 use super::dto::{
     CombatDto, CombatQueryParams, CreateCombatDto, DefenderSpecialDto, FullCombatDto,
@@ -12,7 +12,9 @@ use super::dto::{
 use super::parse_combat_id;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::errors::DomainError;
 use crate::domain::entities::{CombatResolution, NewCoudeCombat};
 
 // ── Lecture ──
@@ -101,9 +103,29 @@ pub async fn create_combat(
 /// (effet de bord : marque les paris non résolus comme perdus).
 pub async fn cancel_combat(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(combat_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let id = parse_combat_id(&combat_id)?;
+
+    // Phase 7 B — Gate RBAC : moderator+ requis pour annuler un combat coude.
+    // Fetch le guild_id du combat via sqlx direct (ressource-id-based).
+    if let Some(Extension(ctx)) = rbac {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM coude_combats WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("fetch combat guild_id: {e}"))))?;
+
+        if let Some((guild_id,)) = row {
+            require_role_for_guild(&state, &ctx, &guild_id, Role::Moderator)
+                .await
+                .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour annuler un combat".into())))?;
+        }
+    }
+
     state.coude_combats_uc.cancel(id).await?;
     Ok(ok_response())
 }

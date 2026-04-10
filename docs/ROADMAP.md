@@ -1161,11 +1161,43 @@ Premier batch de handlers destructifs gatés via `require_role` avec le pattern
 - `voice_channels::remove_from_whitelist`
 - `bot_persistence::delete_temp_role`
 
-**Handlers destructifs encore non gatés** (à traiter en waves ultérieures) :
-- `/infractions/{id}`, `/notes/{id}`, `/blackjack/tables/{table_id}` : nécessitent un helper `require_role_for_resource` qui fetch d'abord la ressource pour récupérer son `guild_id`
-- `/voice-channels/by-channel/{channel_id}/*` : mêmes paths `channel_id` sans `guild_id` — nécessitent `require_role_for_resource`
-- `/role-panels/detail/{panel_id}` : idem
-- `/coude/combats/{combat_id}` : idem
+#### Gates progressifs wave 4 ✅ (livré)
+
+**Pattern "ressource-id-based"** : pour les handlers dont le path n'a que l'ID de ressource (pas le `guild_id`), on fetch d'abord le `guild_id` via sqlx direct, puis on appelle `require_role_for_guild`. Pas de nouveau helper — le pattern est suffisamment simple pour rester inline (3-5 lignes par handler).
+
+3 handlers gatés :
+
+| Handler | Gate | Fetch source |
+|---|---|---|
+| `infractions::delete_infraction` | Moderator | `find_by_id` (use-case existant) |
+| `notes::delete_note` | Moderator | `SELECT guild_id FROM user_notes WHERE id = $1` (sqlx direct) |
+| `coude::cancel_combat` | Moderator | `SELECT guild_id FROM coude_combats WHERE id = $1` (sqlx direct) |
+
+**Note design** : pour `infractions::delete_infraction`, l'appel `find_by_id` existait déjà (utilisé pour envoyer le DM après suppression). On en profite pour extraire le `guild_id` sans double round-trip DB. Pour `notes` et `coude`, un round-trip supplémentaire est acceptable (opération destructive peu fréquente).
+
+**Fail-open safe** : si la ressource n'existe pas (fetch retourne None), on laisse le handler delegate à son use-case qui retournera 404 NotFound — on ne masque pas l'erreur avec un 403 Forbidden trompeur.
+
+#### État final de la couverture RBAC
+
+**17 handlers gatés** au total :
+
+*Admin+* (8) :
+- `rules::delete_rule`, `discord_roles::delete_role`, `levels::delete_reward`
+- `bot_config::set_config`, `bot_config::delete_config` (body-based)
+- `voice_channels::delete_theme`, `role_panels::delete_auto_role`, `games::delete_game`
+
+*Owner+* (2) :
+- `purge::purge_infractions`, `purge::purge_audit_logs` (body-based)
+
+*Moderator+* (7) :
+- `watched_users::remove_watched_user`, `strikes::reset_strikes`, `guild_members::remove_member`
+- `voice_channels::remove_from_whitelist`, `bot_persistence::delete_temp_role`
+- `infractions::delete_infraction`, `notes::delete_note`, `coude::cancel_combat` (resource-id-based)
+
+**Handlers destructifs encore non gatés** :
+- `/blackjack/tables/{table_id}` (close_table) : idem pattern ressource-id (5 min à faire)
+- `/voice-channels/by-channel/{channel_id}/*` (4 handlers : delete_channel, remove_co_admin, unban_from_channel, revoke_invite_link) : mêmes paths `channel_id` sans `guild_id` → fetch via `voice_channels` table
+- `/role-panels/detail/{panel_id}` (delete_panel) : idem
 - `/purge/logs` : endpoint global non scoped par guild — nécessite concept "superadmin" futur
 
 #### Différés restants
