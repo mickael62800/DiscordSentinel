@@ -89,29 +89,55 @@ pub async fn check_target_risk(ctx: &Context, guild_id: GuildId, target: &User) 
 
     // 3. Membre de l'equipe de moderation (role avec MODERATE_MEMBERS)
     // On charge le membre du guild puis on verifie les permissions de ses roles.
+    //
+    // **Fail-SAFE** : si on n'arrive pas a determiner les roles du membre
+    // (cache miss sur le guild, impossible de fetch le member), on considere
+    // que c'est potentiellement une cible a risque et on demande la
+    // confirmation. Le fail-open silencieux precedent pouvait laisser
+    // sanctionner un moderateur sans confirmation quand le cache Serenity
+    // etait vide au demarrage du bot.
     match guild_id.member(&ctx.http, target.id).await {
         Ok(member) => {
-            if let Some(guild) = guild_id.to_guild_cached(&ctx.cache).map(|g| g.clone()) {
-                let is_moderator = member.roles.iter().any(|role_id| {
-                    guild
-                        .roles
-                        .get(role_id)
-                        .map(|r| {
-                            r.permissions.moderate_members()
-                                || r.permissions.ban_members()
-                                || r.permissions.kick_members()
-                                || r.permissions.administrator()
-                        })
-                        .unwrap_or(false)
-                });
-                if is_moderator {
-                    return Some("cible fait partie de l'equipe de moderation".to_string());
+            match guild_id.to_guild_cached(&ctx.cache).map(|g| g.clone()) {
+                Some(guild) => {
+                    let is_moderator = member.roles.iter().any(|role_id| {
+                        guild
+                            .roles
+                            .get(role_id)
+                            .map(|r| {
+                                r.permissions.moderate_members()
+                                    || r.permissions.ban_members()
+                                    || r.permissions.kick_members()
+                                    || r.permissions.administrator()
+                            })
+                            .unwrap_or(false)
+                    });
+                    if is_moderator {
+                        return Some(
+                            "cible fait partie de l'equipe de moderation".to_string(),
+                        );
+                    }
+                }
+                None => {
+                    // Cache Serenity vide (demarrage du bot ou cache invalide).
+                    // On ne peut pas verifier les permissions -> fail-safe :
+                    // demander la confirmation car le membre EXISTE (le fetch
+                    // a reussi) et pourrait etre un moderateur.
+                    warn!(
+                        guild_id = %guild_id,
+                        target_id = %target.id,
+                        "risk check: guild cache miss, forcing confirmation (fail-safe)"
+                    );
+                    return Some(
+                        "impossible de verifier les permissions (cache manquant)".to_string(),
+                    );
                 }
             }
         }
         Err(e) => {
-            // Si on ne peut pas fetch le membre, on ne bloque pas la sanction —
-            // c'est probablement qu'il n'est plus dans le serveur (ban via ID externe)
+            // Membre absent de la guild (ban via ID externe). Ce cas est
+            // acceptable car on ne peut pas sanctionner un non-membre par
+            // les permissions — on laisse passer.
             warn!(error = %e, target_id = %target.id, "risk check: member fetch failed");
         }
     }

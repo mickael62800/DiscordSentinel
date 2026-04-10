@@ -121,14 +121,29 @@ pub async fn rbac_middleware(
     let guild_id = extract_guild_id_from_path(&path);
 
     // 4. Role pour cette (user, guild). Si pas de guild, on passe sans role.
+    //
+    // **Fail-CLOSED** sur erreur DB : on retourne 503 au caller au lieu de
+    // degrader silencieusement a `Viewer`. Un fail-open serait dangereux
+    // car un user qui devrait etre `Owner` pourrait soudain lire des data
+    // auxquelles il n'a pas droit (le fallback `Viewer` ignore `api_user_guilds`
+    // completement, donnant un acces read-only a TOUS les users Discord
+    // authentifies sur la guild, meme ceux pas dans `api_user_guilds`).
+    //
+    // Note : `lookup_role` retourne deja Ok(Role::Viewer) quand la row
+    // n'existe pas (principe du moindre privilege pour un user legitime
+    // de la guild Discord). L'Err ici est reserve aux VRAIES erreurs DB
+    // (pool sature, connexion timeout, query malformee).
     let role = if let Some(ref gid) = guild_id {
         match lookup_role(&state, &user_id, gid).await {
             Ok(r) => Some(r),
             Err(e) => {
-                tracing::warn!(error = %e, user_id = %user_id, guild_id = %gid, "rbac: lookup role failed");
-                // Fail-safe : on degrade en viewer (read-only) pour ne pas casser
-                // l'app sur un probleme DB transitoire.
-                Some(Role::Viewer)
+                tracing::error!(
+                    error = %e,
+                    user_id = %user_id,
+                    guild_id = %gid,
+                    "rbac: lookup role DB error, returning 503 (fail-closed)"
+                );
+                return Err(StatusCode::SERVICE_UNAVAILABLE);
             }
         }
     } else {
@@ -222,12 +237,19 @@ pub async fn require_role_for_guild(
     guild_id: &str,
     required: Role,
 ) -> Result<(), StatusCode> {
+    // **Fail-CLOSED** sur erreur DB : cf. rbac_middleware. Retourne 503
+    // SERVICE_UNAVAILABLE plutot que degrader silencieusement a `Viewer`
+    // (fail-open dangereux). Le handler remontera l'erreur au caller.
     let role = match lookup_role(state, &ctx.discord_user_id, guild_id).await {
         Ok(r) => r,
         Err(e) => {
-            tracing::warn!(error = %e, user_id = %ctx.discord_user_id, guild_id, "require_role_for_guild: lookup failed");
-            // Fail-safe : degradation en viewer comme le middleware
-            Role::Viewer
+            tracing::error!(
+                error = %e,
+                user_id = %ctx.discord_user_id,
+                guild_id,
+                "require_role_for_guild: DB error, returning 503 (fail-closed)"
+            );
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
         }
     };
 
@@ -281,6 +303,11 @@ pub fn check_role(
 ///
 /// Wrap `require_role_for_guild` avec le même pattern de pass-through.
 /// Async car il doit faire un lookup DB (contrairement à `check_role`).
+///
+/// **Distingue** les 2 cas d'erreur de `require_role_for_guild` :
+/// - `FORBIDDEN` (role insuffisant) -> `DomainError::Forbidden` = HTTP 403
+/// - `SERVICE_UNAVAILABLE` (erreur DB, fail-closed) -> `DomainError::Internal`
+///   = HTTP 500 (le handler remonte l'erreur au caller, qui retry)
 #[allow(dead_code)]
 pub async fn check_role_for_guild(
     state: &AppState,
@@ -297,6 +324,9 @@ pub async fn check_role_for_guild(
     };
     match require_role_for_guild(state, ctx, guild_id, required).await {
         Ok(()) => Ok(()),
+        Err(StatusCode::SERVICE_UNAVAILABLE) => Err(ApiError(DomainError::Internal(
+            "RBAC lookup DB error (fail-closed)".to_string(),
+        ))),
         Err(_) => Err(ApiError(DomainError::Forbidden(forbidden_msg.to_string()))),
     }
 }

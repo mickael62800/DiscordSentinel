@@ -135,12 +135,15 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
 struct InfractionRow {
     id: Uuid,
     guild_id: String,
+    channel_id: String,
     user_id: String,
-    user_name: Option<String>,
+    username: String,
+    message_id: String,
+    content: String,
+    score: f64,
     action: String,
-    reason: Option<String>,
-    moderator_id: Option<String>,
-    moderator_name: Option<String>,
+    reason: String,
+    duration: Option<i64>,
     created_at: DateTime<Utc>,
 }
 
@@ -150,8 +153,13 @@ async fn export_infractions(
     format: &str,
     _filters: &serde_json::Value,
 ) -> Result<(String, usize), String> {
+    // NOTE : la table `infractions` contient les detections automod (pas
+    // d'action moderateur humain). Colonnes reelles : id, guild_id, channel_id,
+    // user_id, username, message_id, content, flags, score, action, reason,
+    // duration, created_at (voir migration 002_create_infractions.sql).
     let rows: Vec<InfractionRow> = sqlx::query_as::<_, InfractionRow>(
-        "SELECT id, guild_id, user_id, user_name, action, reason, moderator_id, moderator_name, created_at \
+        "SELECT id, guild_id, channel_id, user_id, username, message_id, content, \
+                score, action, reason, duration, created_at \
          FROM infractions \
          WHERE guild_id = $1 \
          ORDER BY created_at DESC \
@@ -163,21 +171,38 @@ async fn export_infractions(
     .await
     .map_err(|e| format!("query infractions: {e}"))?;
 
-    serialize_rows(&rows, format, |r| {
-        vec![
-            r.id.to_string(),
-            r.user_id.clone(),
-            r.user_name.clone().unwrap_or_default(),
-            r.action.clone(),
-            r.reason.clone().unwrap_or_default(),
-            r.moderator_id.clone().unwrap_or_default(),
-            r.moderator_name.clone().unwrap_or_default(),
-            r.created_at.to_rfc3339(),
-        ]
-    }, &[
-        "id", "user_id", "user_name", "action", "reason",
-        "moderator_id", "moderator_name", "created_at",
-    ])
+    serialize_rows(
+        &rows,
+        format,
+        |r| {
+            vec![
+                r.id.to_string(),
+                r.channel_id.clone(),
+                r.user_id.clone(),
+                r.username.clone(),
+                r.message_id.clone(),
+                r.content.clone(),
+                format!("{:.3}", r.score),
+                r.action.clone(),
+                r.reason.clone(),
+                r.duration.map(|d| d.to_string()).unwrap_or_default(),
+                r.created_at.to_rfc3339(),
+            ]
+        },
+        &[
+            "id",
+            "channel_id",
+            "user_id",
+            "username",
+            "message_id",
+            "content",
+            "score",
+            "action",
+            "reason",
+            "duration_secs",
+            "created_at",
+        ],
+    )
 }
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]

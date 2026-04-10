@@ -190,7 +190,7 @@ async fn sync_guild(
         let Some(event_type) = map_action_type(entry.action_type) else {
             // Type d'action non couvert par le MVP — on skip mais on
             // avance quand meme le curseur.
-            if newest_id.as_deref().map(|s| s < entry.id.as_str()).unwrap_or(true) {
+            if is_newer_snowflake(newest_id.as_deref(), &entry.id) {
                 newest_id = Some(entry.id.clone());
             }
             continue;
@@ -232,7 +232,7 @@ async fn sync_guild(
             ),
         }
 
-        if newest_id.as_deref().map(|s| s < entry.id.as_str()).unwrap_or(true) {
+        if is_newer_snowflake(newest_id.as_deref(), &entry.id) {
             newest_id = Some(entry.id.clone());
         }
     }
@@ -254,6 +254,29 @@ async fn sync_guild(
     .map_err(|e| format!("update sync state: {e}"))?;
 
     Ok(inserted)
+}
+
+/// Compare deux snowflakes Discord (stockes en String dans le JSON) par leur
+/// valeur u64. Retourne true si `candidate` est plus recent que `current`.
+///
+/// Historiquement le code faisait une comparaison de Strings, ce qui
+/// fonctionne tant que les deux snowflakes ont la **meme longueur** (cas
+/// habituel en 2024+ : ~19 digits). Mais c'est un bug latent : si les
+/// longueurs different (ex : vieux snowflake 17 digits vs nouveau 19 digits),
+/// la comparaison ASCII renvoie un ordre faux et le curseur `last_entry_id`
+/// peut se retrouver bloque ou rater des entries.
+fn is_newer_snowflake(current: Option<&str>, candidate: &str) -> bool {
+    let candidate_id: u64 = match candidate.parse() {
+        Ok(v) => v,
+        Err(_) => return false, // candidate invalide : ne pas avancer le curseur
+    };
+    match current {
+        None => true,
+        Some(s) => match s.parse::<u64>() {
+            Ok(curr) => candidate_id > curr,
+            Err(_) => true, // current invalide : accepter le candidate
+        },
+    }
 }
 
 /// Mapping des action_types Discord numeriques vers des `event_type` lisibles
@@ -359,5 +382,63 @@ mod tests {
         assert_eq!(map_action_type(1), None);
         assert_eq!(map_action_type(72), None); // MESSAGE_DELETE pas couvert MVP
         assert_eq!(map_action_type(999), None);
+    }
+
+    // ── Tests du helper is_newer_snowflake ────────────────
+
+    #[test]
+    fn snowflake_none_current_accepts_anything() {
+        assert!(is_newer_snowflake(None, "1234567890123456789"));
+    }
+
+    #[test]
+    fn snowflake_strictly_greater() {
+        assert!(is_newer_snowflake(
+            Some("1234567890123456789"),
+            "1234567890123456790"
+        ));
+    }
+
+    #[test]
+    fn snowflake_equal_is_not_newer() {
+        assert!(!is_newer_snowflake(
+            Some("1234567890123456789"),
+            "1234567890123456789"
+        ));
+    }
+
+    #[test]
+    fn snowflake_strictly_smaller() {
+        assert!(!is_newer_snowflake(
+            Some("1234567890123456790"),
+            "1234567890123456789"
+        ));
+    }
+
+    /// Regression test pour le bug P0 : comparaison string vs u64.
+    /// En string, "2" < "10" serait false car '2' > '1' en ASCII.
+    /// En u64, 2 < 10 est vrai.
+    #[test]
+    fn snowflake_different_lengths_compared_numerically() {
+        // "2" (1 digit) < "10" (2 digits) en u64 -> 10 doit etre newer que 2
+        assert!(is_newer_snowflake(Some("2"), "10"));
+
+        // "99" (2 digits) < "100" (3 digits) en u64 mais "99" > "100" en string
+        assert!(is_newer_snowflake(Some("99"), "100"));
+
+        // Sens inverse : "1000" > "999" en u64
+        assert!(!is_newer_snowflake(Some("1000"), "999"));
+    }
+
+    #[test]
+    fn snowflake_invalid_candidate_ignored() {
+        assert!(!is_newer_snowflake(Some("1234"), "not-a-number"));
+    }
+
+    #[test]
+    fn snowflake_invalid_current_accepts_candidate() {
+        // Si le curseur en base est corrompu (pas un u64), on accepte le
+        // candidate pour se re-synchroniser.
+        assert!(is_newer_snowflake(Some("corrupted"), "1234567890123456789"));
     }
 }
