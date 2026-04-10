@@ -1102,6 +1102,44 @@ Premier batch de handlers destructifs gatés via `require_role` avec le pattern
 - **Absent** (appel bot/worker/internal avec API key uniquement) → pass-through non-breaking
 - Retour 403 `Forbidden` si rôle insuffisant
 
+#### Gates progressifs wave 2 ✅ (livré)
+
+**Nouveau helper `require_role_for_guild`** dans `rbac.rs` :
+- Signature async, prend `state` + `ctx` + `guild_id` explicite + `required`
+- Fait un `lookup_role` DB direct (le middleware ne peut pas extraire le guild du body)
+- Fallback `Viewer` identique au middleware si erreur DB (fail-safe)
+
+**5 handlers gatés** (mix path-based et body-based) :
+
+| Handler | Gate | Helper utilisé | Raison |
+|---|---|---|---|
+| `bot_config::set_config` | Admin | `require_role_for_guild` (body) | Config bot = policy |
+| `bot_config::delete_config` | Admin | `require_role_for_guild` (body) | Idem |
+| `purge::purge_infractions` | **Owner** | `require_role_for_guild` (body) | Bulk delete = danger max |
+| `purge::purge_audit_logs` | **Owner** | `require_role_for_guild` (body) | Idem |
+| `strikes::reset_strikes` | Moderator | `require_role` (path) | Reset user strikes |
+| `guild_members::remove_member` | Moderator | `require_role` (path) | Cache local removal |
+
+**Cas spécial `purge::purge_logs`** : endpoint **global** (pas scoped par guild). Documenté comme nécessitant un concept "superadmin" futur. Pour l'instant : le `rbac: Option<Extension>` est récupéré mais pas checké — si desktop (token présent), l'appel passe car le middleware guild_auth/rbac l'a déjà validé comme user legit ; si bot (pas de token), pass-through comme les autres handlers.
+
+#### État de la couverture RBAC
+
+**Handlers gatés (9 au total)** :
+- Admin+ : `rules::delete_rule`, `discord_roles::delete_role`, `levels::delete_reward`, `bot_config::set_config`, `bot_config::delete_config`
+- Owner+ : `purge::purge_infractions`, `purge::purge_audit_logs`
+- Moderator+ : `watched_users::remove_watched_user`, `strikes::reset_strikes`, `guild_members::remove_member`
+
+**Handlers destructifs encore non gatés (migration progressive)** :
+- `/infractions/{id}` (delete_infraction, `id` sans guild → nécessite `require_role_for_resource`)
+- `/notes/{id}` (delete_note, idem)
+- `/blackjack/tables/{table_id}` (close_table, idem)
+- `/bot-persistence/temp-roles/*` (delete_temp_role, path `/api/temp-roles/{guild_id}/{user_id}/{role_id}` — path-based, juste à faire)
+- `/role-panels/*` (delete_panel, delete_auto_role)
+- `/voice-channels/*` (delete_channel, delete_theme, remove_co_admin, etc.)
+- `/games/*` (delete_game, unsubscribe)
+- `/coude/combats/{combat_id}` (cancel_combat)
+- Divers autres
+
 #### Différés restants
 
 - **UI desktop RBAC** : pages pour `owner`/`admin` qui consomment les 5 endpoints CRUD (lister, grant, update, revoke). Scope frontend Vue/Tauri, session dédiée.

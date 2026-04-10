@@ -1,6 +1,6 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
+use axum::{Extension, Json};
 use redis::AsyncCommands;
 
 use tracing::warn;
@@ -9,8 +9,10 @@ use crate::adapters::inbound::http::dto::bot_config::{
     BotDefinitionDto, BotGuildConfigDto, DeleteConfigDto, SetConfigDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use crate::domain::errors::DomainError;
 
 const DEFINITIONS_TTL: u64 = 3600; // 1 heure
 const GUILD_CONFIG_TTL: u64 = 900; // 15 minutes
@@ -121,12 +123,21 @@ pub async fn get_bot_config(
 /// POST /api/bots/config — sauvegarder un parametre + invalider le cache
 pub async fn set_config(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<SetConfigDto>,
 ) -> Result<StatusCode, ApiError> {
     // Validation
     validation::validate_bot_config(
         &dto.guild_id, &dto.bot_name, &dto.config_key, &dto.config_value,
     ).map_err(ApiError)?;
+
+    // Phase 7 B — Gate RBAC : admin+ requis pour modifier la config bot.
+    // Body-based -> require_role_for_guild (lookup DB explicite).
+    if let Some(Extension(ctx)) = rbac {
+        require_role_for_guild(&state, &ctx, &dto.guild_id, Role::Admin)
+            .await
+            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour modifier la config bot".into())))?;
+    }
 
     state
         .bot_config_repo
@@ -149,12 +160,20 @@ pub async fn set_config(
 /// DELETE /api/bots/config — supprimer un parametre + invalider le cache
 pub async fn delete_config(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<DeleteConfigDto>,
 ) -> Result<StatusCode, ApiError> {
     // Validation
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_short("bot_name", &dto.bot_name).map_err(ApiError)?;
     validation::validate_short("config_key", &dto.config_key).map_err(ApiError)?;
+
+    // Phase 7 B — Gate RBAC : admin+ requis pour supprimer une cle de config.
+    if let Some(Extension(ctx)) = rbac {
+        require_role_for_guild(&state, &ctx, &dto.guild_id, Role::Admin)
+            .await
+            .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer une config".into())))?;
+    }
 
     state
         .bot_config_repo

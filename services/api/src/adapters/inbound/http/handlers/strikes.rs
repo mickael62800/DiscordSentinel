@@ -1,12 +1,14 @@
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 
 use crate::adapters::inbound::http::dto::strikes::{
     AddStrikeDto, SaveStrikeConfigDto, StrikeConfigDto, StrikeResultDto, UserStrikeDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::errors::DomainError;
 
 /// GET /api/strikes/config/{guild_id}
 pub async fn get_config(
@@ -69,8 +71,14 @@ pub async fn add_strike(
 /// DELETE /api/strikes/{guild_id}/{user_id}
 pub async fn reset_strikes(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Phase 7 B — Gate RBAC : moderator+ requis pour reset les strikes d'un user.
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Moderator)
+            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour reset les strikes".into())))?;
+    }
     state.strikes_uc.reset_strikes(&guild_id, &user_id).await?;
     Ok(ok_response())
 }

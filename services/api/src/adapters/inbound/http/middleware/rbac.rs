@@ -172,6 +172,43 @@ pub fn require_role(ctx: &RoleContext, required: Role) -> Result<(), StatusCode>
     }
 }
 
+/// Variante pour les handlers dont le `guild_id` n'est PAS dans le path
+/// (body-based comme `bot_config`, `purge`, ou ressource-id-based comme
+/// `/infractions/{id}`). Le middleware n'a pas pu resoudre le role car
+/// l'heuristique d'extraction snowflake ne trouve rien dans l'URL — on
+/// fait un lookup DB explicite ici.
+///
+/// Semantique identique a `require_role` :
+/// - Si le caller n'a pas de `RoleContext` → `Err(FORBIDDEN)` (pas d'auth desktop)
+/// - Si le role effectif est suffisant → `Ok(())`
+/// - Sinon → `Err(FORBIDDEN)`
+///
+/// Note : si la row `api_user_guilds` n'existe pas pour ce (user, guild),
+/// on retombe sur `Role::Viewer` (principe du moindre privilege) — identique
+/// au comportement du middleware.
+#[allow(dead_code)]
+pub async fn require_role_for_guild(
+    state: &AppState,
+    ctx: &RoleContext,
+    guild_id: &str,
+    required: Role,
+) -> Result<(), StatusCode> {
+    let role = match lookup_role(state, &ctx.discord_user_id, guild_id).await {
+        Ok(r) => r,
+        Err(e) => {
+            tracing::warn!(error = %e, user_id = %ctx.discord_user_id, guild_id, "require_role_for_guild: lookup failed");
+            // Fail-safe : degradation en viewer comme le middleware
+            Role::Viewer
+        }
+    };
+
+    if role.satisfies(required) {
+        Ok(())
+    } else {
+        Err(StatusCode::FORBIDDEN)
+    }
+}
+
 async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<String, String> {
     let cache_key = format!("user_id:{}", short_hash(access_token));
 

@@ -1,5 +1,5 @@
 use axum::extract::{Path, State};
-use axum::Json;
+use axum::{Extension, Json};
 use redis::AsyncCommands;
 use serde::Deserialize;
 
@@ -7,8 +7,10 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::{GuildMember, MemberSummary};
+use crate::domain::errors::DomainError;
 use crate::domain::services::DiscordMember;
 use crate::ports::inbound::{RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand};
 
@@ -97,8 +99,14 @@ pub async fn register_member(
 /// DELETE /api/members/{guild_id}/{user_id} — supprime un membre
 pub async fn remove_member(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Phase 7 B — Gate RBAC : moderator+ requis pour retirer un membre du cache local.
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Moderator)
+            .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour retirer un membre".into())))?;
+    }
     state.members_uc.remove_member(&guild_id, &user_id).await?;
     Ok(ok_response())
 }
