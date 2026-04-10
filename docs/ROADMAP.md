@@ -31,7 +31,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 
 ---
 
-## 📊 État d'avancement (au 2026-04-10)
+## 📊 État d'avancement (au 2026-04-11)
 
 | Phase | Status | Scope livré | Différés |
 |---|---|---|---|
@@ -46,7 +46,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
 
-**Validation humaine en attente** : capturer la baseline en prod via `docs/BASELINE_METRICS.md` **avant** d'attaquer la Phase 5. Plusieurs items différés (notamment le cache moka in-memory) deviennent pertinents ou inutiles selon les chiffres observés.
+**Validation humaine en attente** : capturer la baseline en prod via `docs/BASELINE_METRICS.md` pour débloquer les items restants (**Phase 5A cache-aside Redis** et **Phase 7A gRPC interne**). 5B, 5C et toutes les autres phases sont livrées. Plusieurs items différés (notamment le cache moka in-memory) deviennent pertinents ou inutiles selon les chiffres observés.
 
 ---
 
