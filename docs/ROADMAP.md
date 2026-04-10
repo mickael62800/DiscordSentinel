@@ -15,6 +15,8 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | [`MULTI_TENANT_AUTH.md`](./MULTI_TENANT_AUTH.md)                                  | Isolation par guild (OAuth2 + RBAC)    |
 | [`ESTIMATION_RAM_PROD.md`](./ESTIMATION_RAM_PROD.md)                              | Tuning build + jemalloc                |
 | [`bots/moderation-bot/AMELIORATIONS.md`](../bots/moderation-bot/AMELIORATIONS.md) | 8 ajouts fonctionnels moderation-bot   |
+| [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md)                              | **Ce qui a été reporté** pendant les Phases 0-2 (avec justification) |
+| [`BASELINE_METRICS.md`](./BASELINE_METRICS.md)                                    | Template baseline + requêtes PromQL/SQL (Phase 0) |
 
 ---
 
@@ -26,6 +28,25 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 4. **Refactor avant ajout** — découper les god files avant d'y ajouter des features
 5. **Scaling en dernier** — sharding uniquement quand les limites arrivent
 6. **Quick wins en parallèle** — jemalloc, compression, pool HTTP = gratuits, à faire tout de suite
+
+---
+
+## 📊 État d'avancement (au 2026-04-10)
+
+| Phase | Status | Scope livré | Différés |
+|---|---|---|---|
+| **0** Observabilité | ✅ TERMINÉE | Intégralité du scope | — |
+| **1** Quick wins | ✅ TERMINÉE | 5/5 optims | Compression Redis (reportée à Phase 5) |
+| **2** Fondations DB + multi-tenant | ✅ **partielle** | A.1, A.2, A.3(2/4), A.4(4/9), A.5(8/10), A.6, B | JSONB config, NOT NULL, cache moka, 5 tables non partitionnées |
+| **3** Refactor god files | ✅ TERMINÉE | Intégralité du scope | — |
+| **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
+| **5** Cache + Streams + Batch | ⏸️ à faire | — | — |
+| **6** Features moderation + workers 2 | ⏸️ à faire | — | — |
+| **7** gRPC + scaling | ⏸️ à faire | — | — |
+
+> 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
+
+**Validation humaine en attente** : capturer la baseline en prod via `docs/BASELINE_METRICS.md` **avant** d'attaquer la Phase 5. Plusieurs items différés (notamment le cache moka in-memory) deviennent pertinents ou inutiles selon les chiffres observés.
 
 ---
 
