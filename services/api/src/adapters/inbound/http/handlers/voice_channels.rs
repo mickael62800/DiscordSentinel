@@ -10,9 +10,37 @@ use crate::adapters::inbound::http::dto::voice_channels::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{require_role, require_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
+
+/// Helper Phase 7 B — fetch le `guild_id` associe a un `channel_id` voice
+/// et gate via `require_role_for_guild`. Pass-through si `rbac` absent.
+async fn gate_by_channel_id(
+    state: &AppState,
+    rbac: &Option<Extension<RoleContext>>,
+    channel_id: &str,
+    required: Role,
+    label: &'static str,
+) -> Result<(), ApiError> {
+    let Some(Extension(ctx)) = rbac else {
+        return Ok(());
+    };
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT guild_id FROM voice_channels WHERE channel_id = $1",
+    )
+    .bind(channel_id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("fetch voice channel guild: {e}"))))?;
+
+    if let Some((guild_id,)) = row {
+        require_role_for_guild(state, ctx, &guild_id, required)
+            .await
+            .map_err(|_| ApiError(DomainError::Forbidden(format!("{label} requis"))))?;
+    }
+    Ok(())
+}
 use crate::ports::inbound::{
     BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, ManageCoAdminCommand,
     ManageWhitelistCommand, TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
@@ -94,8 +122,11 @@ pub async fn close_channel(
 
 pub async fn delete_channel(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // Phase 7 B — Gate RBAC : moderator+ pour fermer un voice channel.
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour fermer un voice channel").await?;
     // DELETE fait un soft-delete (close)
     state.voice_channels_uc.delete_channel(&channel_id).await?;
 
@@ -184,8 +215,10 @@ pub async fn add_co_admin(
 
 pub async fn remove_co_admin(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour retirer un co-admin voice").await?;
     state
         .voice_channels_uc
         .remove_co_admin(&channel_id, &user_id)
@@ -263,8 +296,10 @@ pub async fn ban_from_channel(
 
 pub async fn unban_from_channel(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((channel_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour unban voice channel").await?;
     state
         .voice_channels_uc
         .unban_from_channel(&channel_id, &user_id)
@@ -345,8 +380,10 @@ pub async fn use_invite_link(
 
 pub async fn revoke_invite_link(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((channel_id, link_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour revoquer un invite voice").await?;
     state.voice_channels_uc.revoke_invite_link(&channel_id, &link_id).await?;
 
     state.broadcaster.broadcast(

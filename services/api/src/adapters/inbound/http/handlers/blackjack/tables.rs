@@ -2,10 +2,11 @@
 
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
-use axum::Json;
+use axum::{Extension, Json};
 
 use super::dto::{CreateTableDto, JoinTableDto, TableDto, TablePlayerDto};
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 
@@ -172,8 +173,27 @@ pub async fn get_table_by_channel(
 /// DELETE /api/blackjack/tables/{table_id} — fermer une table.
 pub async fn close_table(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(table_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
+    // Phase 7 B — Gate RBAC : moderator+ pour fermer une table blackjack.
+    // Fetch le guild_id via sqlx direct (ressource-id-based).
+    if let Some(Extension(ctx)) = rbac {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM blackjack_tables WHERE id = $1::uuid",
+        )
+        .bind(&table_id)
+        .fetch_optional(&state.pg_pool)
+        .await
+        .map_err(pg_err)?;
+
+        if let Some((guild_id,)) = row {
+            require_role_for_guild(&state, &ctx, &guild_id, Role::Moderator)
+                .await
+                .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour fermer une table blackjack".into())))?;
+        }
+    }
+
     sqlx::query(
         "UPDATE blackjack_tables SET status = 'closed' WHERE id = $1::uuid AND status = 'open'",
     )

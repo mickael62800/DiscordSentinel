@@ -42,7 +42,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
 | **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
 | **6** Features moderation + workers 2 | 🟡 **partielle** | 6A appeal-sla-worker ✅, 6B waves 1+2+3 (MOD #1, #2, #3, #4, #5, #7) ✅ | 4 autres workers 6A, MOD #8 |
-| **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC fin ✅ | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
+| **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC fin ✅ **clôturé** (23 handlers gatés) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
 
@@ -1194,11 +1194,50 @@ Premier batch de handlers destructifs gatés via `require_role` avec le pattern
 - `voice_channels::remove_from_whitelist`, `bot_persistence::delete_temp_role`
 - `infractions::delete_infraction`, `notes::delete_note`, `coude::cancel_combat` (resource-id-based)
 
-**Handlers destructifs encore non gatés** :
-- `/blackjack/tables/{table_id}` (close_table) : idem pattern ressource-id (5 min à faire)
-- `/voice-channels/by-channel/{channel_id}/*` (4 handlers : delete_channel, remove_co_admin, unban_from_channel, revoke_invite_link) : mêmes paths `channel_id` sans `guild_id` → fetch via `voice_channels` table
-- `/role-panels/detail/{panel_id}` (delete_panel) : idem
-- `/purge/logs` : endpoint global non scoped par guild — nécessite concept "superadmin" futur
+#### Gates progressifs wave 5 ✅ (livré — clôture de la couverture RBAC)
+
+**6 handlers** gatés, tous pattern ressource-id-based :
+
+| Handler | Gate | Fetch source |
+|---|---|---|
+| `blackjack::close_table` | Moderator | `SELECT guild_id FROM blackjack_tables WHERE id = $1::uuid` |
+| `voice_channels::delete_channel` | Moderator | `SELECT guild_id FROM voice_channels WHERE channel_id = $1` |
+| `voice_channels::remove_co_admin` | Moderator | idem |
+| `voice_channels::unban_from_channel` | Moderator | idem |
+| `voice_channels::revoke_invite_link` | Moderator | idem |
+| `role_panels::delete_panel` | Admin | `SELECT guild_id FROM role_panels WHERE id = $1` |
+
+**Nouveau helper privé `gate_by_channel_id`** dans `voice_channels.rs` : wrap le fetch + `require_role_for_guild` pour les 4 handlers voice qui partagent le même pattern (voice channel → fetch guild → check). Pas exporté — spécifique au module, réduit la duplication inline sans créer une abstraction publique prématurée.
+
+#### État final de la couverture RBAC (clôturée)
+
+**23 handlers destructifs gatés** — couverture complète des endpoints path-based et ressource-id-based :
+
+*Admin+* (9) :
+- `rules::delete_rule`, `discord_roles::delete_role`, `levels::delete_reward`
+- `bot_config::set_config`, `bot_config::delete_config` (body)
+- `voice_channels::delete_theme`, `role_panels::delete_auto_role`, `games::delete_game`
+- `role_panels::delete_panel` (resource-id)
+
+*Owner+* (2) :
+- `purge::purge_infractions`, `purge::purge_audit_logs` (body)
+
+*Moderator+* (12) :
+- `watched_users::remove_watched_user`, `strikes::reset_strikes`, `guild_members::remove_member`
+- `voice_channels::remove_from_whitelist`, `bot_persistence::delete_temp_role`
+- `infractions::delete_infraction`, `notes::delete_note`, `coude::cancel_combat`
+- `blackjack::close_table`
+- `voice_channels::delete_channel`, `remove_co_admin`, `unban_from_channel`, `revoke_invite_link`
+
+**Seul endpoint destructif encore non gaté** :
+- `/purge/logs` : endpoint **global** non scoped par guild. Documenté comme nécessitant un concept "superadmin" / system-admin futur pour un gate approprié.
+
+**3 patterns RBAC établis et documentés** :
+1. **Path-based** (guild_id dans l'URL) → `require_role(&ctx, Role::X)` — extraction automatique par middleware
+2. **Body-based** (guild_id dans le JSON body) → `require_role_for_guild(&state, &ctx, &dto.guild_id, Role::X)` — lookup DB explicite
+3. **Ressource-id-based** (id de ressource sans guild_id) → fetch `SELECT guild_id FROM {table}` puis `require_role_for_guild` (inline, 3-5 lignes)
+
+**Phase 7 B définitivement terminée.** Reste uniquement l'UI desktop RBAC (scope frontend) pour clore le cycle complet de gestion RBAC par un owner.
 
 #### Différés restants
 
