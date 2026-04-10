@@ -29,6 +29,7 @@ pub mod user_activity;
 pub mod bot_persistence;
 pub mod cache_stats;
 pub mod coude;
+pub mod exports;
 pub mod purge;
 pub mod rbac;
 pub mod wallet;

@@ -497,6 +497,9 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)
         .route("/api/ai/jobs", post(handlers::ai_jobs::create_ai_job))
         .route("/api/ai/jobs/{id}", get(handlers::ai_jobs::get_ai_job))
+        // Phase 6 A — File d'attente exports async (infractions/audit_logs/moderation_actions, CSV/JSON)
+        .route("/api/exports/jobs", post(handlers::exports::create_export_job))
+        .route("/api/exports/jobs/{id}", get(handlers::exports::get_export_job))
         // Phase 7 B — Endpoints RBAC CRUD (gated via require_role dans les handlers)
         .route("/api/rbac/guilds/{guild_id}/users", get(handlers::rbac::list_guild_users))
         .route(

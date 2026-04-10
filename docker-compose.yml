@@ -278,6 +278,22 @@ services:
       redis:
         condition: service_healthy
 
+  # Phase 6A — Exports asynchrones (CSV/JSON) infractions/audit_logs/moderation_actions
+  export-worker:
+    build:
+      context: .
+      dockerfile: services/workers/export-worker/Dockerfile
+    container_name: sentinel-export-worker
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
+      API_URL: http://api:3000
+      EXPORT_SCAN_INTERVAL: ${EXPORT_SCAN_INTERVAL:-5}
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   cleanup-worker:
     build:
       context: .

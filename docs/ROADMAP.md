@@ -41,7 +41,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **3** Refactor god files | ✅ TERMINÉE | Intégralité du scope | — |
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
 | **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
-| **6** Features moderation + workers 2 | 🟡 **7/8** | 6A appeal-sla-worker ✅, 6B waves 1+2+3 + MOD #6 `/template` ✅ | 4 autres workers 6A, MOD #8 |
+| **6** Features moderation + workers 2 | 🟡 **7/8** | 6A appeal-sla-worker ✅ + export-worker ✅, 6B waves 1+2+3 + MOD #6 `/template` ✅ | 3 workers 6A in-memory, MOD #8 (maintenant débloquable via export-worker) |
 | **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC ✅ **clôturé à 100%** (23 handlers + superadmin /purge/logs) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
@@ -806,9 +806,10 @@ Sous charge réelle : **10-50× throughput** sur les tables concernées. La char
 >   `ChannelManager` local au bot). Le worker ne peut pas lire/écrire ce
 >   cache sans passer par Redis. Même blocage que `voice-afk-worker`
 >   (différé en Phase 4). À reconsidérer si on migre ces caches vers Redis.
-> - **discord-audit-sync-worker** et **export-worker** : nouveau scope
->   business plus important (intégration Discord audit log + jobs d'export
->   CSV/JSON), mieux adressés en session dédiée.
+> - **discord-audit-sync-worker** : nouveau scope business plus important
+>   (intégration Discord audit log + réconciliation), mieux adressé en
+>   session dédiée.
+> - **export-worker** : ✅ **livré** (voir récapitulatif plus bas).
 
 #### Récapitulatif `appeal-sla-worker`
 
@@ -839,6 +840,58 @@ Sous charge réelle : **10-50× throughput** sur les tables concernées. La char
   `pgbouncer` + `redis`, env `APPEAL_SLA_SCAN_INTERVAL=120`.
 - **Validation** : `cargo check` clean, worker suit exactement le pattern
   `temp-roles-worker` (Phase 4 B.1).
+
+#### Récapitulatif `export-worker`
+
+Exports asynchrones de moderation data (infractions, audit_logs,
+moderation_actions) en CSV/JSON pour éviter de bloquer l'API sur des
+queries massives.
+
+- **Migration `110_create_export_jobs.sql`** : table `export_jobs` similaire
+  à `ai_jobs` (Phase 4 A). Colonnes `id`, `guild_id`, `requested_by`,
+  `job_type` (CHECK in `infractions|audit_logs|moderation_actions`),
+  `format` (CHECK in `csv|json`), `filters JSONB`, `status`, `result TEXT`,
+  `result_rows`, `error_message`, `retries`, `max_retries`, timestamps.
+  Index partiels `idx_export_jobs_pending WHERE status='pending'` et
+  `idx_export_jobs_processing WHERE status='processing'` (timeout detector).
+
+- **API endpoints** (`handlers/exports.rs`, direct sqlx) :
+  - `POST /api/exports/jobs` — enqueue + 202 Accepted immédiat,
+    **gated `Moderator+`** via `require_role_for_guild` (body-based),
+    validation du `job_type` et `format`
+  - `GET /api/exports/jobs/{id}` — status + `result` (si done)
+
+- **Crate `services/workers/export-worker/`** (full crate avec Dockerfile) :
+  - Scan toutes les 5s (configurable `EXPORT_SCAN_INTERVAL`)
+  - Reset automatique des jobs `processing` zombies (> 300s)
+  - **Claim atomique** via `UPDATE ... WHERE id = (SELECT ... FOR UPDATE
+    SKIP LOCKED LIMIT 1) RETURNING` — scale horizontal possible sans
+    collision
+  - Exporters par type : `export_infractions`, `export_audit_logs`,
+    `export_moderation_actions` (queries paramétrées avec `LIMIT 50000`
+    garde-fou)
+  - **Serialization CSV** avec escaping propre (`,`, `"`, `\n`) ou JSON
+    via `serde_json`
+  - **Retry exponentiel** : `retries++` jusqu'à `max_retries` (3), au-delà
+    → status `'dead'` (DLQ logique) + `error_message` persisté
+
+- **docker-compose** : service `export-worker` wired sur `pgbouncer`,
+  env `EXPORT_SCAN_INTERVAL=5`. Pas de Redis (pas d'events émis).
+
+- **Tests** : 5 tests unitaires sur `csv_escape` + `to_csv` (simple,
+  comma, quote, newline, roundtrip).
+
+- **Stockage inline volontaire** : résultat dans `export_jobs.result` TEXT.
+  Pas de disk/S3 pour éviter la complexité. Limite pratique : 50k lignes
+  par export (garde-fou `MAX_ROWS_PER_EXPORT`). Pour de gros exports (>25 MB
+  = limite Discord attachment), un design ultérieur avec storage externe
+  sera nécessaire.
+
+- **Débloque MOD #8** : le pattern (enqueue + poll + inline result) est
+  directement réutilisable pour le transcript des call rooms — ajouter un
+  `job_type = 'call_transcript'` avec filters `{channel_id, time_range}`
+  + l'exporter correspondant qui query `messages` ou le `channel history`
+  Discord.
 
 ### Partie B — Améliorations fonctionnelles moderation-bot 🟡 **wave 1 livrée**
 
