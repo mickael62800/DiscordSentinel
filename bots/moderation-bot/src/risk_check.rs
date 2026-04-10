@@ -146,9 +146,16 @@ pub async fn check_target_risk(ctx: &Context, guild_id: GuildId, target: &User) 
 }
 
 fn account_age_days(user: &User) -> i64 {
-    let created = user.created_at();
-    let now = chrono::Utc::now().timestamp();
-    ((now - created.unix_timestamp()) / 86_400).max(0)
+    account_age_days_from_ts(
+        user.created_at().unix_timestamp(),
+        chrono::Utc::now().timestamp(),
+    )
+}
+
+/// Logique pure extraite pour permettre les tests unitaires sans avoir a
+/// construire un `serenity::User` (type complexe avec beaucoup de champs).
+fn account_age_days_from_ts(created_ts: i64, now_ts: i64) -> i64 {
+    ((now_ts - created_ts) / 86_400).max(0)
 }
 
 /// Purge les pending confirmations expirees. Appele apres chaque access.
@@ -204,5 +211,55 @@ mod tests {
         purge_expired(&store);
         assert!(store.get("old").is_none() || store.len() == 1);
         assert!(store.get("fresh").is_some());
+    }
+
+    // ── Tests account_age_days_from_ts ────────────────────
+
+    const DAY_SECS: i64 = 86_400;
+
+    #[test]
+    fn account_age_zero_if_created_now() {
+        let now = 1_700_000_000_i64;
+        assert_eq!(account_age_days_from_ts(now, now), 0);
+    }
+
+    #[test]
+    fn account_age_one_day() {
+        let now = 1_700_000_000_i64;
+        let created = now - DAY_SECS;
+        assert_eq!(account_age_days_from_ts(created, now), 1);
+    }
+
+    #[test]
+    fn account_age_exactly_recent_threshold() {
+        // Un compte cree EXACTEMENT 7 jours avant = pile a la limite
+        let now = 1_700_000_000_i64;
+        let created = now - (RECENT_ACCOUNT_DAYS * DAY_SECS);
+        assert_eq!(account_age_days_from_ts(created, now), RECENT_ACCOUNT_DAYS);
+    }
+
+    #[test]
+    fn account_age_fractional_day_truncates_down() {
+        // 1.5 jour = 36h -> doit retourner 1 (truncation entiere)
+        let now = 1_700_000_000_i64;
+        let created = now - (DAY_SECS + DAY_SECS / 2);
+        assert_eq!(account_age_days_from_ts(created, now), 1);
+    }
+
+    #[test]
+    fn account_age_future_timestamp_returns_zero() {
+        // Clock skew : created > now (ex: serveur avec NTP decale).
+        // Le .max(0) protege contre des valeurs negatives.
+        let now = 1_700_000_000_i64;
+        let created = now + DAY_SECS;
+        assert_eq!(account_age_days_from_ts(created, now), 0);
+    }
+
+    #[test]
+    fn account_age_very_old_account() {
+        // Compte Discord cree il y a 5 ans (Discord launch 2015)
+        let now = 1_700_000_000_i64;
+        let created = now - (5 * 365 * DAY_SECS);
+        assert_eq!(account_age_days_from_ts(created, now), 5 * 365);
     }
 }

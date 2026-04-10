@@ -355,4 +355,85 @@ mod tests {
         let payload = extract_payload(&entries[0].map).unwrap();
         assert_eq!(payload, "{\"event\":\"test\"}");
     }
+
+    // ── Tests extract_payload edge cases ─────────────────
+
+    fn build_map(entries: Vec<(&str, redis::Value)>) -> std::collections::HashMap<String, redis::Value> {
+        entries.into_iter().map(|(k, v)| (k.to_string(), v)).collect()
+    }
+
+    #[test]
+    fn extract_payload_missing_field_returns_none() {
+        // Map vide → champ payload absent
+        let map = std::collections::HashMap::<String, redis::Value>::new();
+        assert_eq!(extract_payload(&map), None);
+
+        // Map avec un autre champ, mais pas "payload"
+        let map = build_map(vec![(
+            "other_field",
+            redis::Value::BulkString(b"value".to_vec()),
+        )]);
+        assert_eq!(extract_payload(&map), None);
+    }
+
+    #[test]
+    fn extract_payload_bulk_string_utf8() {
+        let map = build_map(vec![(
+            "payload",
+            redis::Value::BulkString(b"{\"event\":\"test\"}".to_vec()),
+        )]);
+        assert_eq!(
+            extract_payload(&map),
+            Some("{\"event\":\"test\"}".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_payload_bulk_string_with_unicode() {
+        // Accents et emojis dans le payload
+        let payload = "{\"event\":\"sanction\",\"reason\":\"caractères spéciaux \u{1f6a8}\"}";
+        let map = build_map(vec![(
+            "payload",
+            redis::Value::BulkString(payload.as_bytes().to_vec()),
+        )]);
+        assert_eq!(extract_payload(&map), Some(payload.to_string()));
+    }
+
+    #[test]
+    fn extract_payload_bulk_string_invalid_utf8_lossy() {
+        // Bytes invalides UTF-8 → from_utf8_lossy remplace par replacement char U+FFFD
+        let map = build_map(vec![(
+            "payload",
+            redis::Value::BulkString(vec![0xFF, 0xFE, b'x']),
+        )]);
+        let result = extract_payload(&map);
+        assert!(result.is_some());
+        // Le "x" final doit toujours être la, les bytes invalides sont remplaces
+        assert!(result.unwrap().contains('x'));
+    }
+
+    #[test]
+    fn extract_payload_simple_string() {
+        let map = build_map(vec![(
+            "payload",
+            redis::Value::SimpleString("inline-string".to_string()),
+        )]);
+        assert_eq!(extract_payload(&map), Some("inline-string".to_string()));
+    }
+
+    #[test]
+    fn extract_payload_unsupported_variants_return_none() {
+        // Integer, Nil, Array, etc. ne sont pas des payloads valides
+        let map = build_map(vec![("payload", redis::Value::Int(42))]);
+        assert_eq!(extract_payload(&map), None);
+
+        let map = build_map(vec![("payload", redis::Value::Nil)]);
+        assert_eq!(extract_payload(&map), None);
+
+        let map = build_map(vec![(
+            "payload",
+            redis::Value::Array(vec![redis::Value::Int(1)]),
+        )]);
+        assert_eq!(extract_payload(&map), None);
+    }
 }
