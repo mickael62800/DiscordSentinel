@@ -6,3 +6,4 @@ pub mod embeds;
 pub mod event_bus;
 pub mod heartbeat;
 pub mod parsers;
+pub mod shard_launcher;

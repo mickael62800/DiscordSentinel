@@ -65,7 +65,7 @@ async fn main() {
     // Heartbeat task
     spawn_heartbeat(Arc::clone(&base_api));
 
-    if let Err(e) = client.start().await {
+    if let Err(e) = sentinel_shared::shard_launcher::start_bot(&mut client).await {
         eprintln!("Erreur fatale : {e}");
     }
 }

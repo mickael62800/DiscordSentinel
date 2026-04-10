@@ -108,7 +108,7 @@ async fn main() {
 
     info!("Demarrage community-bot...");
 
-    if let Err(e) = client.start().await {
+    if let Err(e) = sentinel_shared::shard_launcher::start_bot(&mut client).await {
         tracing::error!(error = %e, "Erreur client Discord");
     }
 }

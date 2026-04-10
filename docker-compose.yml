@@ -393,6 +393,29 @@ services:
   # ──────────────────────────────────────────────
   # Bots
   # ──────────────────────────────────────────────
+  #
+  # Phase 7 C — Sharding Discord
+  # ─────────────────────────────
+  # Par defaut chaque bot utilise SHARD_MODE=single (non defini), ce qui
+  # correspond a `client.start()` historique. Trois modes disponibles via
+  # env var `SHARD_MODE` :
+  #
+  #   single  (defaut) : un seul shard (shard 0/1). OK jusqu'a ~2500 guilds.
+  #
+  #   auto             : Serenity appelle /gateway/bot Discord pour recuperer
+  #                      le nombre de shards recommande et spawn tous les
+  #                      shards dans le process courant.
+  #                      -> Recommande pour single-process a gros volume.
+  #
+  #   manual           : `client.start_shard(SHARD_ID, SHARD_TOTAL)` — spawn
+  #                      UN seul shard avec les id/total explicites.
+  #                      -> Requis pour multi-process (replicas).
+  #                      -> Chaque replica doit avoir SHARD_ID different.
+  #
+  # Exemple manual pour scaler moderation-bot en 4 replicas (docker-compose
+  # n'a pas de primitive "replicas with env override", mais on peut faire
+  # 4 services moderation-bot-0..3 qui partagent le meme Dockerfile et
+  # juste differencient SHARD_ID).
 
   automod-bot:
     build:

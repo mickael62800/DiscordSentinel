@@ -60,7 +60,7 @@ async fn main() {
     // Heartbeat via shared
     spawn_heartbeat(base_api);
 
-    if let Err(e) = client.start().await {
+    if let Err(e) = sentinel_shared::shard_launcher::start_bot(&mut client).await {
         eprintln!("Erreur fatale : {e}");
     }
 }

@@ -42,7 +42,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
 | **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
 | **6** Features moderation + workers 2 | 🟢 **8/8 features, 6/6 workers** (voice-afk non extractible archi) | 6A appeal-sla + export + audit-cache + blackjack-cleanup + discord-audit-sync ✅, 6B 8/8 features ✅ | — |
-| **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC ✅ **clôturé à 100%** (23 handlers + superadmin /purge/logs) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
+| **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC ✅ 100%, 7C Sharding ✅ (helper + 15 bots migrés) | 7A gRPC (bloqué baseline) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
 
@@ -1436,17 +1436,69 @@ Page `/rbac` dans l'app desktop (Tauri + Vue 3) qui consomme les 5 endpoints CRU
 - **Gates wave 2** : `bot_config` writes, `purge/*`, `strikes::reset_strikes`, `guild_members::remove_member`, `role_panels::delete_panel`, `games::delete_game`, `bot_persistence::delete_temp_role`, `blackjack::close_table`. **Contrainte** : les endpoints qui lisent `guild_id` depuis le **body** (`bot_config`, `purge/*`) nécessitent un helper `require_role_for_guild(state, ctx, guild_id, role)` qui fait un lookup DB explicite (le middleware ne voit pas les bodies). À ajouter avant de gater ce groupe.
 - **Handlers avec `id` mais sans `guild_id` dans le path** (`/infractions/{id}`, `/notes/{id}`, `/blackjack/tables/{table_id}`) : même contrainte — soit restructurer l'URL pour inclure `guild_id`, soit fetch d'abord la ressource pour récupérer son guild, soit ajouter un helper `require_role_for_resource(state, ctx, resource_id, role)`.
 
-### Partie C — Sharding Discord (uniquement si besoin)
+### Partie C — Sharding Discord ✅ **TERMINÉE**
 
-À déclencher **seulement** quand :
+> ✅ **Livré** : helper `sentinel_shared::shard_launcher::start_bot` + migration
+> des 15 bots. Par défaut (`SHARD_MODE` absent), le comportement reste strictement
+> identique à l'ancien `client.start()` — aucun changement en prod jusqu'à ce
+> qu'on active explicitement un mode shard.
 
-- Le nombre de guilds dépasse 2500
-- Les gateways Discord commencent à ramer
-- On vise un déploiement multi-serveurs
+#### Helper livré
 
-- [ ] **[OPT #5]** `ShardManager` Serenity configuré dynamiquement
-- [ ] Chaque shard dans son propre process
-- [ ] État distribué via Redis (cache-worker)
+Nouveau module `bots/shared/src/shard_launcher.rs` qui wrap les 3 modes Serenity :
+
+| `SHARD_MODE` | Comportement | Cas d'usage |
+|---|---|---|
+| `single` (défaut) | `Client::start()` — shard 0/1, backward compat | Petits déploiements (< 2500 guilds), dev, tests |
+| `auto` | `Client::start_autosharded()` — Serenity appelle Discord `/gateway/bot` pour récupérer le nb de shards recommandé et les spawn tous dans le process courant | Single-process qui veut scale automatiquement |
+| `manual` | `Client::start_shard(SHARD_ID, SHARD_TOTAL)` — spawn UN seul shard avec id/total explicites | Multi-process (K8s StatefulSet, docker-compose replicas). Chaque replica a un `SHARD_ID` différent. |
+
+**Validations inline** :
+- `SHARD_TOTAL=0` → fallback `single` + warn
+- `SHARD_ID >= SHARD_TOTAL` → fallback `single` + warn
+- `SHARD_MODE` inconnu → fallback `single` + warn
+
+**Enum `ShardMode`** avec méthode `from_env()` exposée pour diagnostics (endpoint /health, logs startup, etc.).
+
+#### Migration des 15 bots
+
+Chaque `main.rs` remplace `client.start()` par
+`sentinel_shared::shard_launcher::start_bot(&mut client)`. Changement mécanique,
+1 ligne par bot. Le `client` est déjà `mut` (requis par `Client::start`).
+
+Bots migrés : `audit-bot`, `automod-bot`, `blackjack-bot`, `cleanup-bot`,
+`community-bot`, `coude-bot`, `game-bot`, `image-bot`, `moderation-bot`,
+`progression-bot`, `roles-bot`, `security-bot`, `ticket-bot`, `voice-bot`,
+`welcome-bot`.
+
+#### docker-compose documentation
+
+Commentaire pédagogique ajouté juste avant la section `# Bots` expliquant
+les 3 modes + exemples d'activation. Pas de changement par défaut des
+services existants — tout reste `single` sauf override explicite.
+
+#### État distribué via Redis
+
+Non implémenté pour l'instant (roadmap initiale disait "cache-worker").
+Justification : le mode `manual` multi-process n'a pas besoin d'état partagé
+tant que chaque shard gère son propre subset de guilds indépendamment
+(pattern Discord-native). Un état distribué ne devient nécessaire que pour
+des use-cases cross-shard (ex: compter les membres globalement) — à
+réévaluer si un tel besoin émerge.
+
+#### Tests
+
+- 8 tests unitaires sur `parse_shard_mode` :
+  - Default (None) → Single
+  - "single" / "SINGLE" / "" → Single
+  - "auto" / "AUTO" → Auto
+  - "manual" valid (0/4, 3/4) → Manual { 0, 4 }, Manual { 3, 4 }
+  - "manual" avec total=0 → Single fallback
+  - "manual" avec id >= total → Single fallback
+  - "manual" sans id/total → Manual { 0, 1 } (valide par défaut)
+  - "cluster" / nonsense → Single fallback
+- sentinel-shared : **24/24** tests (16 existants + 8 nouveaux)
+- 15/15 bots : `cargo check` clean
 
 ### Stats-digest-worker (si pas déjà fait)
 
