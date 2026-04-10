@@ -172,6 +172,35 @@ pub fn require_role(ctx: &RoleContext, required: Role) -> Result<(), StatusCode>
     }
 }
 
+/// Phase 7 B — Helper pour les endpoints **globaux** (non scoped par guild).
+///
+/// Exemple : `/purge/logs` purge les logs systeme de TOUTES les guilds, donc
+/// `require_role_for_guild` n'a aucun sens ici. On check contre une liste
+/// statique de "superadmin" definis par env var `SUPERADMIN_USER_IDS`.
+///
+/// Retourne `Err(FORBIDDEN)` si :
+/// - le caller n'a pas de `RoleContext` (pas d'auth desktop), OU
+/// - son `discord_user_id` n'est pas dans la liste superadmin.
+///
+/// Bootstrap : definir `SUPERADMIN_USER_IDS=123,456,789` au deploiement.
+/// Si la liste est vide (pas configuree), TOUS les appels sont refuses par
+/// securite — c'est volontaire : mieux vaut bloquer que laisser passer.
+#[allow(dead_code)]
+pub fn require_superadmin(
+    state: &AppState,
+    ctx: &RoleContext,
+) -> Result<(), StatusCode> {
+    if state.superadmin_user_ids.iter().any(|id| id == &ctx.discord_user_id) {
+        Ok(())
+    } else {
+        tracing::warn!(
+            user_id = %ctx.discord_user_id,
+            "rbac: acces superadmin refuse (user non liste dans SUPERADMIN_USER_IDS)"
+        );
+        Err(StatusCode::FORBIDDEN)
+    }
+}
+
 /// Variante pour les handlers dont le `guild_id` n'est PAS dans le path
 /// (body-based comme `bot_config`, `purge`, ou ressource-id-based comme
 /// `/infractions/{id}`). Le middleware n'a pas pu resoudre le role car

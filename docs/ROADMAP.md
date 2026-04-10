@@ -41,8 +41,8 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **3** Refactor god files | ✅ TERMINÉE | Intégralité du scope | — |
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
 | **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
-| **6** Features moderation + workers 2 | 🟡 **partielle** | 6A appeal-sla-worker ✅, 6B waves 1+2+3 (MOD #1, #2, #3, #4, #5, #7) ✅ | 4 autres workers 6A, MOD #8 |
-| **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC fin ✅ **clôturé** (23 handlers gatés) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
+| **6** Features moderation + workers 2 | 🟡 **7/8** | 6A appeal-sla-worker ✅, 6B waves 1+2+3 + MOD #6 `/template` ✅ | 4 autres workers 6A, MOD #8 |
+| **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC ✅ **clôturé à 100%** (23 handlers + superadmin /purge/logs) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
 
@@ -920,9 +920,23 @@ pour éviter un scope ingérable.
 | MOD #7 `/modstats` | ✅ | 2 |
 | MOD #8 Transcript call rooms | ⏸️ bloqué (dépend export-worker) | — |
 
+#### MOD #6 polish ✅ (livré)
+
+**Commande `/template`** — gestion des reason templates depuis Discord (plus besoin de passer par la GUI desktop) :
+
+- `/template list` — affiche les templates actuels (embed ephemeral)
+- `/template add <label> <reason>` — ajoute un template (empêche les doublons par label, rejette `|` et `\n` dans les inputs)
+- `/template remove <label>` — supprime par label exact (case-insensitive)
+
+**Architecture** :
+- `commands/template.rs` (nouveau fichier, 3 sub-commands + helpers `load_templates`/`save_templates`/`serialize_templates`)
+- Nouvelle méthode `ApiClient::set_bot_config` dans `moderation-bot/api_client.rs` — fire-and-forget sur `POST /api/bots/config`
+- Format serialization identique à `reason_templates::parse_templates` : `label|reason\n...`
+- `default_member_permissions(Administrator)` côté Discord pour gater l'accès — le bot appelle l'API sans `X-Discord-Token` donc pass-through RBAC
+- 3 tests unitaires sur `serialize_templates` (empty, single, roundtrip avec `parse_templates`)
+
 #### Différés
 
-- **[MOD #6]** Templates de sanction : déjà mostly done (`reason_templates.rs` + autocomplete `/warn`, `/mute`, `/ban`). Manque juste une commande `/template` pour gérer via Discord — polish de faible ROI (déjà gérable via GUI desktop).
 - **[MOD #8]** Transcript auto call rooms : dépend de `export-worker` différé en Phase 6A.
 
 #### Validation wave 1
@@ -1229,8 +1243,12 @@ Premier batch de handlers destructifs gatés via `require_role` avec le pattern
 - `blackjack::close_table`
 - `voice_channels::delete_channel`, `remove_co_admin`, `unban_from_channel`, `revoke_invite_link`
 
-**Seul endpoint destructif encore non gaté** :
-- `/purge/logs` : endpoint **global** non scoped par guild. Documenté comme nécessitant un concept "superadmin" / system-admin futur pour un gate approprié.
+**Concept superadmin ✅ livré** — `/purge/logs` est maintenant gaté :
+- Nouvelle variable env `SUPERADMIN_USER_IDS` (liste comma-separated de Discord user IDs)
+- Exposée via `AppConfig::superadmin_user_ids` → `AppState::superadmin_user_ids: Arc<Vec<String>>`
+- Nouveau helper `require_superadmin(state, ctx)` dans `rbac.rs` — check contre la liste statique
+- Si la liste est vide, TOUS les appels sont refusés par sécurité (fail-closed volontaire)
+- Gate appliqué sur `purge::purge_logs` — les appels bot/internal sans token restent en pass-through, les appels desktop avec token doivent être dans la liste superadmin
 
 **3 patterns RBAC établis et documentés** :
 1. **Path-based** (guild_id dans l'URL) → `require_role(&ctx, Role::X)` — extraction automatique par middleware

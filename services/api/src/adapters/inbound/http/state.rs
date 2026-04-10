@@ -64,4 +64,7 @@ pub struct AppState {
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,
+    /// Phase 7 B — Liste des Discord user_ids superadmin (env SUPERADMIN_USER_IDS).
+    /// Utilisee pour gater les endpoints globaux non scoped par guild (ex: /purge/logs).
+    pub superadmin_user_ids: Arc<Vec<String>>,
 }

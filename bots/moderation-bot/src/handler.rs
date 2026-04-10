@@ -116,6 +116,7 @@ impl EventHandler for Handler {
                     "modstats" => commands::modstats::handle(&ctx, &command).await,
                     "evidence" => commands::evidence::handle(&ctx, &command).await,
                     "review" => commands::review::handle(&ctx, &command).await,
+                    "template" => commands::template::handle(&ctx, &command).await,
                     "export" => commands::export::handle(&ctx, &command).await,
                     "massmute" => commands::mass::handle_massmute(&ctx, &command).await,
                     "massban" => commands::mass::handle_massban(&ctx, &command).await,

@@ -11,6 +11,10 @@ pub struct AppConfig {
     pub allowed_origins: String,
     /// Discord bot token pour executer des bans (optionnel).
     pub discord_bot_token: String,
+    /// Phase 7 B — Liste de Discord user IDs "superadmin" autorises sur les
+    /// endpoints globaux (non scoped par guild). Format : comma-separated.
+    /// Ex: `SUPERADMIN_USER_IDS=123456789012345678,234567890123456789`
+    pub superadmin_user_ids: Vec<String>,
 }
 
 impl AppConfig {
@@ -55,6 +59,12 @@ impl AppConfig {
             discord_bot_token: std::env::var("AUTOMOD_DISCORD_TOKEN")
                 .or_else(|_| std::env::var("MODERATION_DISCORD_TOKEN"))
                 .unwrap_or_default(),
+            superadmin_user_ids: std::env::var("SUPERADMIN_USER_IDS")
+                .unwrap_or_default()
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect(),
         }
     }
 

@@ -307,6 +307,7 @@ async fn main() {
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),
+        superadmin_user_ids: Arc::new(config.superadmin_user_ids.clone()),
     };
 
     let api_log_repo = state.log_repo.clone();

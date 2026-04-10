@@ -458,6 +458,7 @@ fn base_state() -> AppState {
         pg_pool,
         redis_client,
         cache: None,
+        superadmin_user_ids: Arc::new(Vec::new()),
     }
 }
 

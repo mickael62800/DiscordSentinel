@@ -210,6 +210,29 @@ impl ApiClient {
             .await
     }
 
+    /// MOD #6 — Ecrit une cle de config bot (moderateurs seniors uniquement
+    /// via default_member_permissions Administrator cote commande Discord).
+    /// Fire-and-forget cote bot (l'API confirme avec 204 No Content).
+    pub async fn set_bot_config(
+        &self,
+        guild_id: &str,
+        bot_name: &str,
+        config_key: &str,
+        config_value: &str,
+    ) {
+        self.base
+            .post_fire_and_forget(
+                "/api/bots/config",
+                &serde_json::json!({
+                    "guild_id": guild_id,
+                    "bot_name": bot_name,
+                    "config_key": config_key,
+                    "config_value": config_value,
+                }),
+            )
+            .await;
+    }
+
     /// MOD #3 — Resout une review en fire-and-forget.
     pub async fn resolve_review(
         &self,

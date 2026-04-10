@@ -4,7 +4,7 @@ use serde::Deserialize;
 use tracing::info;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{require_role_for_guild, require_superadmin, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
@@ -84,13 +84,11 @@ pub async fn purge_audit_logs(
 
 /// DELETE /api/purge/logs — purge system logs older than X days (global, not guild-scoped)
 ///
-/// **Phase 7 B — Note RBAC** : cet endpoint est GLOBAL (pas scope par guild)
-/// donc `require_role_for_guild` ne s'applique pas. Pour l'instant on exige
-/// simplement que le caller soit authentifie via token Discord (desktop) —
-/// c'est-a-dire que `RoleContext` soit present, ce qui implique qu'il a
-/// deja passe `guild_auth` et donc est dans au moins une guild autorisee.
-/// Un concept "superadmin" / systeme admin sera necessaire a terme pour
-/// gater ces operations globales plus strictement.
+/// **Phase 7 B — Gate superadmin** : cet endpoint est GLOBAL (purge les logs
+/// de TOUTES les guilds), donc `require_role_for_guild` n'a aucun sens ici.
+/// On utilise `require_superadmin` qui check contre la liste statique
+/// `SUPERADMIN_USER_IDS` (env var). Les appels bot/internal (pas de
+/// `X-Discord-Token`) restent en pass-through.
 pub async fn purge_logs(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -100,9 +98,11 @@ pub async fn purge_logs(
         return Err(ApiError(DomainError::ValidationError("days doit etre >= 1".into())));
     }
 
-    // Phase 7 B — Si X-Discord-Token present, RoleContext doit l'etre aussi.
-    // Les appels bot/internal (sans token) passent a travers.
-    let _ = rbac;
+    // Phase 7 B — Gate superadmin pour les appels desktop.
+    if let Some(Extension(ctx)) = rbac {
+        require_superadmin(&state, &ctx)
+            .map_err(|_| ApiError(DomainError::Forbidden("superadmin requis pour purger les logs systeme".into())))?;
+    }
 
     let count = state.log_repo.delete_older_than_days(dto.days).await?;
     info!(days = dto.days, deleted = count, "Purge logs systeme");
