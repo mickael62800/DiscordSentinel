@@ -41,7 +41,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **3** Refactor god files | ✅ TERMINÉE | Intégralité du scope | — |
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
 | **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
-| **6** Features moderation + workers 2 | 🟡 **7/8** | 6A appeal-sla-worker ✅ + export-worker ✅, 6B waves 1+2+3 + MOD #6 `/template` ✅ | 3 workers 6A in-memory, MOD #8 (maintenant débloquable via export-worker) |
+| **6** Features moderation + workers 2 | 🟡 **8/8 features** | 6A appeal-sla-worker ✅ + export-worker ✅, 6B 8/8 features ✅ (MOD #1-8) | 3 workers 6A in-memory (cache→Redis) |
 | **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC ✅ **clôturé à 100%** (23 handlers + superadmin /purge/logs) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
@@ -988,9 +988,41 @@ pour éviter un scope ingérable.
 - `default_member_permissions(Administrator)` côté Discord pour gater l'accès — le bot appelle l'API sans `X-Discord-Token` donc pass-through RBAC
 - 3 tests unitaires sur `serialize_templates` (empty, single, roundtrip avec `parse_templates`)
 
+#### MOD #8 transcript ✅ (livré)
+
+Commande `/transcript channel:<salon>` dans moderation-bot — génère un
+transcript texte des 100 derniers messages d'un salon et l'envoie en
+pièce jointe ephemeral.
+
+**Décision de scope** : implémenté **bot-side direct** via serenity, pas
+via export-worker. Justification :
+- Le bot a déjà accès Discord Gateway+HTTP, fetch en 1 appel
+- Passer par export-worker = round-trip inutile (DB insert + poll + DB fetch)
+- Le pattern export-worker reste dispo pour exports massifs DB-based
+- Si besoin ultérieur (full channel history avec pagination, auto-capture
+  post-call), migration possible vers le worker sans breaking change
+  cote bot (juste ajouter `job_type='call_transcript'` dans la migration
+  110 via ALTER CHECK)
+
+**Architecture** :
+- `commands/transcript.rs` — fetch via `channel_id.messages(http, GetMessages::limit(100))`
+- Format texte simple : `[YYYY-MM-DD HH:MM:SS] Auteur: contenu`
+- Annotations `[+N piece(s) jointe(s)]` et `[+N embed(s)]` si applicable
+- `CreateAttachment::bytes(..., "transcript-{channel_id}-{timestamp}.txt")`
+- **Defer immédiat** (Discord timeout 3s) avant fetch puis `create_followup`
+- Gated `MODERATE_MEMBERS` Discord-side
+- 3 tests unitaires sur `count_lines_hint`
+
+**Limites volontaires MVP** :
+- Max 100 messages (1 appel, pas de pagination — suffisant pour la
+  plupart des call rooms < 50 messages)
+- Attachments/embeds Discord ignorés (juste le placeholder)
+- Taille max : 10 MB Discord free / 25 MB boost 2 (100 messages texte
+  font typiquement < 50 KB, largement OK)
+
 #### Différés
 
-- **[MOD #8]** Transcript auto call rooms : dépend de `export-worker` différé en Phase 6A.
+**Plus aucun différé sur Phase 6B features moderation** — 8/8 livrées.
 
 #### Validation wave 1
 

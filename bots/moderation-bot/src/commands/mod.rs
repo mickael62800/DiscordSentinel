@@ -13,6 +13,7 @@ pub mod mute;
 pub mod notes;
 pub mod review;
 pub mod template;
+pub mod transcript;
 pub mod warn;
 
 use serenity::builder::CreateCommand;
@@ -36,6 +37,7 @@ pub fn all() -> Vec<CreateCommand> {
         evidence::register(),
         review::register(),
         template::register(),
+        transcript::register(),
         mass::register_massmute(),
         mass::register_massban(),
     ]
