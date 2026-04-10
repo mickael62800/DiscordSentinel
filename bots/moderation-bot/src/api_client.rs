@@ -45,6 +45,72 @@ pub struct UserHistory {
     pub actions: Vec<ModerationActionResponse>,
 }
 
+/// MOD #2 — Preuve attachee a une action de moderation.
+#[derive(Debug, Deserialize, Serialize)]
+#[allow(dead_code)]
+pub struct EvidenceEntry {
+    pub id: String,
+    pub action_id: String,
+    pub url: String,
+    pub description: Option<String>,
+    pub uploaded_by: String,
+    pub uploaded_by_name: String,
+    pub uploaded_at: String,
+}
+
+/// MOD #3 — Entree de la file de relecture.
+#[derive(Debug, Deserialize, Serialize)]
+#[allow(dead_code)]
+pub struct ReviewQueueEntry {
+    pub id: String,
+    pub action_id: String,
+    pub guild_id: String,
+    pub added_by: String,
+    pub added_by_name: String,
+    pub reason: Option<String>,
+    pub status: String,
+    pub reviewer_id: Option<String>,
+    pub reviewer_name: Option<String>,
+    pub reviewer_notes: Option<String>,
+    pub added_at: String,
+    pub resolved_at: Option<String>,
+    pub action_type: Option<String>,
+    pub target_name: Option<String>,
+    pub action_reason: Option<String>,
+}
+
+/// MOD #7 — Agregation d'actions de moderation par moderateur.
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct ModStatsEntry {
+    pub moderator_id: String,
+    pub moderator_name: String,
+    pub total: i64,
+    pub warns: i64,
+    pub mutes: i64,
+    pub bans: i64,
+    pub kicks: i64,
+}
+
+/// Sanction temporaire active (reminder pending).
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+pub struct SanctionReminder {
+    pub id: String,
+    pub guild_id: String,
+    pub moderator_id: String,
+    pub moderator_name: String,
+    pub target_id: String,
+    pub target_name: String,
+    pub action_type: String,
+    pub reason: String,
+    pub action_id: String,
+    pub remind_at: String,
+    pub expires_at: String,
+    pub status: String,
+    pub created_at: String,
+}
+
 /// Client API specifique a la moderation. Delegue les appels generiques au BaseApiClient.
 pub struct ApiClient {
     base: BaseApiClient,
@@ -64,6 +130,105 @@ impl ApiClient {
     pub async fn get_history(&self, guild_id: &str, user_id: &str) -> Result<UserHistory, String> {
         self.base
             .get_json(&format!("/api/moderation/history/{}/{}", guild_id, user_id))
+            .await
+    }
+
+    /// MOD #1 — Liste les sanctions temporaires actives (reminders pending) d'une guild.
+    pub async fn get_active_reminders(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, String> {
+        self.base
+            .get_json(&format!("/api/reminders/{}", guild_id))
+            .await
+    }
+
+    /// MOD #7 — Top 20 des moderateurs par nombre d'actions sur les 30 derniers jours.
+    pub async fn get_modstats(&self, guild_id: &str) -> Result<Vec<ModStatsEntry>, String> {
+        self.base
+            .get_json(&format!("/api/moderation/modstats/{}", guild_id))
+            .await
+    }
+
+    /// MOD #2 — Attache une preuve a une action de moderation existante.
+    pub async fn add_evidence(
+        &self,
+        action_id: &str,
+        url: &str,
+        description: Option<&str>,
+        uploaded_by: &str,
+        uploaded_by_name: &str,
+    ) -> Result<EvidenceEntry, String> {
+        self.base
+            .post_json(
+                "/api/moderation/evidence",
+                &serde_json::json!({
+                    "action_id": action_id,
+                    "url": url,
+                    "description": description,
+                    "uploaded_by": uploaded_by,
+                    "uploaded_by_name": uploaded_by_name,
+                }),
+            )
+            .await
+    }
+
+    /// MOD #2 — Liste les preuves attachees a une action.
+    pub async fn list_evidence(&self, action_id: &str) -> Result<Vec<EvidenceEntry>, String> {
+        self.base
+            .get_json(&format!("/api/moderation/evidence/{}", action_id))
+            .await
+    }
+
+    /// MOD #3 — Ajoute une action a la file de relecture.
+    pub async fn add_review(
+        &self,
+        action_id: &str,
+        guild_id: &str,
+        added_by: &str,
+        added_by_name: &str,
+        reason: Option<&str>,
+    ) -> Result<ReviewQueueEntry, String> {
+        self.base
+            .post_json(
+                "/api/moderation/review",
+                &serde_json::json!({
+                    "action_id": action_id,
+                    "guild_id": guild_id,
+                    "added_by": added_by,
+                    "added_by_name": added_by_name,
+                    "reason": reason,
+                }),
+            )
+            .await
+    }
+
+    /// MOD #3 — Liste les reviews en attente d'une guild.
+    pub async fn list_pending_reviews(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<ReviewQueueEntry>, String> {
+        self.base
+            .get_json(&format!("/api/moderation/review/{}/pending", guild_id))
+            .await
+    }
+
+    /// MOD #3 — Resout une review en fire-and-forget.
+    pub async fn resolve_review(
+        &self,
+        review_id: &str,
+        status: &str,
+        reviewer_id: &str,
+        reviewer_name: &str,
+        notes: Option<&str>,
+    ) {
+        self.base
+            .patch_fire_and_forget(
+                &format!("/api/moderation/review/{}/resolve", review_id),
+                &serde_json::json!({
+                    "status": status,
+                    "reviewer_id": reviewer_id,
+                    "reviewer_name": reviewer_name,
+                    "reviewer_notes": notes,
+                }),
+            )
             .await
     }
 

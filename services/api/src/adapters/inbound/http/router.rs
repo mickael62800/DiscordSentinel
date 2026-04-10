@@ -130,6 +130,12 @@ fn moderation_routes() -> Router<AppState> {
         .route("/execute-ban", post(handlers::moderation::execute_ban))
         .route("/execute-unban", post(handlers::moderation::execute_unban))
         .route("/history/{guild_id}/{user_id}", get(handlers::moderation::get_history))
+        .route("/modstats/{guild_id}", get(handlers::moderation::get_modstats))
+        .route("/evidence", post(handlers::moderation::add_evidence))
+        .route("/evidence/{action_id}", get(handlers::moderation::list_evidence))
+        .route("/review", post(handlers::moderation::add_review))
+        .route("/review/{guild_id}/pending", get(handlers::moderation::list_pending_reviews))
+        .route("/review/{id}/resolve", patch(handlers::moderation::resolve_review))
 }
 
 fn voice_channel_routes() -> Router<AppState> {
@@ -491,6 +497,13 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)
         .route("/api/ai/jobs", post(handlers::ai_jobs::create_ai_job))
         .route("/api/ai/jobs/{id}", get(handlers::ai_jobs::get_ai_job))
+        // Phase 7 B — RBAC fin : enrichit la requete avec le role du user
+        // sur la guild courante (extension RoleContext). Doit tourner apres
+        // guild_auth pour reutiliser le meme flow de token.
+        .route_layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::adapters::inbound::http::middleware::rbac::rbac_middleware,
+        ))
         // Phase 2 B — Multi-tenant : filtre les requetes par appartenance
         // Discord du user appelant (header X-Discord-Token). Pass-through si
         // header absent (appel bot/internal). Doit etre apres auth_middleware

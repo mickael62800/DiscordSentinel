@@ -9,6 +9,7 @@ mod commands;
 mod config;
 mod handler;
 mod reason_templates;
+mod risk_check;
 
 use std::sync::Arc;
 
@@ -23,6 +24,7 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::{Handler, ModerationApiKey, PendingActionsKey};
+use crate::risk_check::RiskyPendingKey;
 
 #[tokio::main]
 async fn main() {
@@ -52,6 +54,7 @@ async fn main() {
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<ModerationApiKey>(mod_api);
         data.insert::<PendingActionsKey>(DashMap::new());
+        data.insert::<RiskyPendingKey>(DashMap::new());
     }
 
     // Heartbeat via shared

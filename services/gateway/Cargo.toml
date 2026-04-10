@@ -10,8 +10,8 @@ axum = { version = "0.8", features = ["ws"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "propagate-header"] }
 
-# Redis pub/sub
-redis = { version = "0.27", features = ["tokio-comp"] }
+# Redis Streams (Phase 5B : XREAD live tail remplace pub/sub)
+redis = { version = "0.27", features = ["tokio-comp", "streams"] }
 
 # HTTP Client
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }

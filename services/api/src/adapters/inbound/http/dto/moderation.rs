@@ -41,6 +41,18 @@ pub struct UserHistoryDto {
     pub actions: Vec<ModerationActionResponseDto>,
 }
 
+/// MOD #7 — Entree d'agregation par moderateur sur une fenetre glissante.
+#[derive(Debug, Serialize)]
+pub struct ModStatsEntryDto {
+    pub moderator_id: String,
+    pub moderator_name: String,
+    pub total: i64,
+    pub warns: i64,
+    pub mutes: i64,
+    pub bans: i64,
+    pub kicks: i64,
+}
+
 impl From<LogActionDto> for LogModerationCommand {
     fn from(dto: LogActionDto) -> Self {
         Self {

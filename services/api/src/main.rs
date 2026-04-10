@@ -16,9 +16,12 @@ use tracing::{error, info};
 use sentinel_api::adapters::inbound::http::{router, state::AppState};
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::postgres::{
-    PgBotConfigRepository, PgConductRepository, PgCoudeBetRepository, PgCoudeCombatRepository, PgCoudeEconomyRepository, PgCoudeInventoryRepository, PgCoudePlayerRepository, PgCoudeSocialRepository, PgGuildRepository, PgInfractionRepository, PgLogRepository,
+    PgBotConfigRepository, PgConductRepository, PgCoudeBetRepository, PgCoudeCombatRepository, PgCoudeEconomyRepository, PgCoudeInventoryRepository, PgCoudePlayerRepository, PgCoudeSocialRepository, PgGuildRepository, PgInfractionRepository,
     PgMemberRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgAuditLogRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository,
+    PgAnalyticsRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository,
+};
+use sentinel_api::adapters::outbound::batching::{
+    BatchWriterConfig, BatchedPgAuditLogRepository, BatchedPgLogRepository,
 };
 use sentinel_api::adapters::outbound::job_client::JobClient;
 use sentinel_api::adapters::outbound::redis_cache::RedisCache;
@@ -109,7 +112,12 @@ async fn main() {
     let bot_config_repo = Arc::new(PgBotConfigRepository::new(pg_pool.clone()));
     let conduct_repo = Arc::new(PgConductRepository::new(pg_pool.clone()));
     let guild_repo = Arc::new(PgGuildRepository::new(pg_pool.clone()));
-    let log_repo = Arc::new(PgLogRepository::new(pg_pool.clone()));
+    // Phase 5C — Batch writes : BatchedPgLogRepository bufferise les inserts et
+    // flush via multi-row INSERT toutes les 500ms ou 100 entries.
+    let log_repo = Arc::new(BatchedPgLogRepository::new(
+        pg_pool.clone(),
+        BatchWriterConfig::default(),
+    ));
     let ia_config_repo = Arc::new(PgIaConfigRepository::new(pg_pool.clone()));
     let notes_repo = Arc::new(PgNotesRepository::new(pg_pool.clone()));
     let reminder_repo = Arc::new(PgReminderRepository::new(pg_pool.clone()));
@@ -196,7 +204,11 @@ async fn main() {
     let moderation_uc = Arc::new(ManageModerationService::new(moderation_repo.clone(), cache.clone(), conduct_uc.clone()));
     let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone(), redis_client.clone()));
     let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone()));
-    let audit_log_repo = Arc::new(PgAuditLogRepository::new(pg_pool.clone()));
+    // Phase 5C — Batch writes : idem que log_repo, pour les audit events.
+    let audit_log_repo = Arc::new(BatchedPgAuditLogRepository::new(
+        pg_pool.clone(),
+        BatchWriterConfig::default(),
+    ));
     let audit_logs_uc = Arc::new(ManageAuditLogsService::new(audit_log_repo));
     let role_panel_repo = Arc::new(PgRolePanelRepository::new(pg_pool.clone()));
     let role_panels_uc = Arc::new(ManageRolePanelsService::new(role_panel_repo));

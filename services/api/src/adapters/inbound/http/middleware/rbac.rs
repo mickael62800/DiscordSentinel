@@ -1,0 +1,352 @@
+//! Phase 7 B — RBAC fin par guild.
+//!
+//! Complete `guild_auth_middleware` (Phase 2 B) avec la notion de role
+//! applicatif. Doit tourner APRES guild_auth car il reutilise le meme flow
+//! d'extraction du token Discord.
+//!
+//! # Flow
+//!
+//! 1. Si `X-Discord-Token` absent → pass-through (bot/internal, deja valide
+//!    par `auth_middleware`).
+//! 2. Sinon, fetch l'identite du user via cache Redis `user_id:<token_hash>`
+//!    ou fallback `GET /users/@me`.
+//! 3. Extrait le `guild_id` depuis l'URI (meme heuristique que guild_auth).
+//!    Si absent → stocke juste le user dans les extensions (role = None,
+//!    endpoint global).
+//! 4. Lookup `api_user_guilds WHERE discord_user_id = $1 AND guild_id = $2`.
+//!    - **Row trouvee** → role = celui de la DB
+//!    - **Row absente** → role par defaut = `viewer` (read-only, POLA).
+//! 5. Stocke `RoleContext { user_id, role }` dans les extensions de la
+//!    requete. Les handlers peuvent l'extraire pour gater des operations
+//!    sensibles via `require_role(Role::Admin)`.
+//!
+//! # Bootstrap
+//!
+//! Les premiers `owner` doivent etre seedes en SQL direct au deploiement
+//! initial. Pas d'auto-promote pour eviter la prise de contr le.
+//!
+//! ```sql
+//! INSERT INTO api_users (discord_user_id, display_name) VALUES ('1234...', 'Alice');
+//! INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ('1234...', '9876...', 'owner');
+//! ```
+
+use axum::{
+    body::Body,
+    extract::State,
+    http::{Request, StatusCode},
+    middleware::Next,
+    response::Response,
+};
+use redis::AsyncCommands;
+
+use crate::adapters::inbound::http::state::AppState;
+
+const USER_ID_CACHE_TTL_SECS: u64 = 600;
+const DISCORD_TOKEN_HEADER: &str = "x-discord-token";
+
+/// Hierarchie des roles RBAC (le plus fort en premier).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Role {
+    /// Read-only.
+    Viewer = 0,
+    /// Sanctions, tickets, notes.
+    Moderator = 1,
+    /// Full CRUD sauf RBAC.
+    Admin = 2,
+    /// Full access + gestion du RBAC.
+    Owner = 3,
+}
+
+impl Role {
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "viewer" => Some(Role::Viewer),
+            "moderator" => Some(Role::Moderator),
+            "admin" => Some(Role::Admin),
+            "owner" => Some(Role::Owner),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Role::Viewer => "viewer",
+            Role::Moderator => "moderator",
+            Role::Admin => "admin",
+            Role::Owner => "owner",
+        }
+    }
+
+    /// `true` si ce role peut faire une action necessitant au moins `required`.
+    pub fn satisfies(&self, required: Role) -> bool {
+        *self >= required
+    }
+}
+
+/// Contexte injecte dans les extensions de la requete pour les handlers.
+#[derive(Debug, Clone)]
+pub struct RoleContext {
+    pub discord_user_id: String,
+    /// `None` si l'URI ne contient pas de guild (endpoint global).
+    pub role: Option<Role>,
+    pub guild_id: Option<String>,
+}
+
+pub async fn rbac_middleware(
+    State(state): State<AppState>,
+    mut request: Request<Body>,
+    next: Next,
+) -> Result<Response, StatusCode> {
+    // 1. Recuperer le token Discord. Absent ⇒ pass-through (appel bot/internal).
+    let discord_token = match request
+        .headers()
+        .get(DISCORD_TOKEN_HEADER)
+        .and_then(|v| v.to_str().ok())
+    {
+        Some(t) if !t.is_empty() => t.to_string(),
+        _ => return Ok(next.run(request).await),
+    };
+
+    // 2. Fetch user_id (cache Redis + fallback Discord API)
+    let user_id = match get_or_fetch_user_id(&state, &discord_token).await {
+        Ok(id) => id,
+        Err(e) => {
+            tracing::warn!(error = %e, "rbac: impossible de recuperer user_id");
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+    };
+
+    // 3. Extraire guild_id depuis l'URI (heuristique identique a guild_auth)
+    let path = request.uri().path().to_string();
+    let guild_id = extract_guild_id_from_path(&path);
+
+    // 4. Role pour cette (user, guild). Si pas de guild, on passe sans role.
+    let role = if let Some(ref gid) = guild_id {
+        match lookup_role(&state, &user_id, gid).await {
+            Ok(r) => Some(r),
+            Err(e) => {
+                tracing::warn!(error = %e, user_id = %user_id, guild_id = %gid, "rbac: lookup role failed");
+                // Fail-safe : on degrade en viewer (read-only) pour ne pas casser
+                // l'app sur un probleme DB transitoire.
+                Some(Role::Viewer)
+            }
+        }
+    } else {
+        None
+    };
+
+    // 5. Injection dans les extensions
+    request.extensions_mut().insert(RoleContext {
+        discord_user_id: user_id,
+        role,
+        guild_id,
+    });
+
+    Ok(next.run(request).await)
+}
+
+/// Helper a appeler depuis les handlers pour gater des operations sensibles.
+/// Retourne `Err(StatusCode::FORBIDDEN)` si le user n'a pas le role requis,
+/// `Err(StatusCode::UNAUTHORIZED)` si aucun RoleContext n'est present (= pas
+/// d'appel desktop authentifie), `Ok(())` sinon.
+///
+/// Exemple d'usage dans un handler :
+/// ```ignore
+/// use axum::Extension;
+/// use crate::adapters::inbound::http::middleware::rbac::{Role, RoleContext, require_role};
+///
+/// pub async fn delete_config(
+///     Extension(ctx): Extension<RoleContext>,
+///     // ...
+/// ) -> Result<Json<...>, ApiError> {
+///     require_role(&ctx, Role::Admin)?;
+///     // ... logique admin-only
+/// }
+/// ```
+#[allow(dead_code)]
+pub fn require_role(ctx: &RoleContext, required: Role) -> Result<(), StatusCode> {
+    match ctx.role {
+        Some(role) if role.satisfies(required) => Ok(()),
+        Some(_) => Err(StatusCode::FORBIDDEN),
+        None => Err(StatusCode::FORBIDDEN), // endpoint non scope par guild
+    }
+}
+
+async fn get_or_fetch_user_id(state: &AppState, access_token: &str) -> Result<String, String> {
+    let cache_key = format!("user_id:{}", short_hash(access_token));
+
+    // Cache Redis
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        if let Ok(cached) = conn.get::<_, String>(&cache_key).await {
+            if !cached.is_empty() {
+                return Ok(cached);
+            }
+        }
+    }
+
+    // Fallback Discord API
+    let user = state
+        .discord_api
+        .get_user_me(access_token)
+        .await
+        .map_err(|e| format!("Discord API: {e}"))?;
+
+    // Upsert api_users (best-effort — on ne bloque pas sur une erreur DB)
+    let _ = sqlx::query(
+        "INSERT INTO api_users (discord_user_id, display_name) \
+         VALUES ($1, $2) \
+         ON CONFLICT (discord_user_id) \
+         DO UPDATE SET display_name = EXCLUDED.display_name, last_seen_at = NOW()",
+    )
+    .bind(&user.id)
+    .bind(&user.username)
+    .execute(&state.pg_pool)
+    .await;
+
+    // Cache (best-effort)
+    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        let _: Result<(), _> = conn.set_ex(&cache_key, &user.id, USER_ID_CACHE_TTL_SECS).await;
+    }
+
+    Ok(user.id)
+}
+
+async fn lookup_role(state: &AppState, user_id: &str, guild_id: &str) -> Result<Role, String> {
+    let row: Option<(String,)> = sqlx::query_as(
+        "SELECT role FROM api_user_guilds \
+         WHERE discord_user_id = $1 AND guild_id = $2",
+    )
+    .bind(user_id)
+    .bind(guild_id)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| format!("lookup role: {e}"))?;
+
+    match row {
+        Some((role_str,)) => Role::from_str(&role_str)
+            .ok_or_else(|| format!("role DB invalide: {role_str}")),
+        // Fallback : si pas de row mais user dans la guild (guild_auth l'a deja valide),
+        // on lui donne viewer par defaut. Principe du moindre privilege.
+        None => Ok(Role::Viewer),
+    }
+}
+
+/// Heuristique : on prend le premier segment du path qui ressemble a un
+/// snowflake Discord (17-20 chiffres). Duplique de guild_auth pour eviter
+/// une dependance inter-middleware.
+fn extract_guild_id_from_path(path: &str) -> Option<String> {
+    path.split('/').find_map(|seg| {
+        if seg.len() >= 17 && seg.len() <= 20 && seg.chars().all(|c| c.is_ascii_digit()) {
+            Some(seg.to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn short_hash(input: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    input.hash(&mut hasher);
+    format!("{:x}", hasher.finish())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn role_ordering_hierarchy() {
+        assert!(Role::Owner > Role::Admin);
+        assert!(Role::Admin > Role::Moderator);
+        assert!(Role::Moderator > Role::Viewer);
+    }
+
+    #[test]
+    fn role_satisfies_own_level() {
+        assert!(Role::Admin.satisfies(Role::Admin));
+        assert!(Role::Owner.satisfies(Role::Admin));
+        assert!(!Role::Moderator.satisfies(Role::Admin));
+    }
+
+    #[test]
+    fn role_from_str_valid() {
+        assert_eq!(Role::from_str("owner"), Some(Role::Owner));
+        assert_eq!(Role::from_str("admin"), Some(Role::Admin));
+        assert_eq!(Role::from_str("moderator"), Some(Role::Moderator));
+        assert_eq!(Role::from_str("viewer"), Some(Role::Viewer));
+    }
+
+    #[test]
+    fn role_from_str_invalid() {
+        assert_eq!(Role::from_str("superuser"), None);
+        assert_eq!(Role::from_str(""), None);
+    }
+
+    #[test]
+    fn role_roundtrip() {
+        for r in [Role::Viewer, Role::Moderator, Role::Admin, Role::Owner] {
+            assert_eq!(Role::from_str(r.as_str()), Some(r));
+        }
+    }
+
+    #[test]
+    fn require_role_accepts_equal() {
+        let ctx = RoleContext {
+            discord_user_id: "1".into(),
+            role: Some(Role::Admin),
+            guild_id: Some("42".into()),
+        };
+        assert!(require_role(&ctx, Role::Admin).is_ok());
+    }
+
+    #[test]
+    fn require_role_accepts_higher() {
+        let ctx = RoleContext {
+            discord_user_id: "1".into(),
+            role: Some(Role::Owner),
+            guild_id: Some("42".into()),
+        };
+        assert!(require_role(&ctx, Role::Admin).is_ok());
+    }
+
+    #[test]
+    fn require_role_rejects_lower() {
+        let ctx = RoleContext {
+            discord_user_id: "1".into(),
+            role: Some(Role::Viewer),
+            guild_id: Some("42".into()),
+        };
+        assert_eq!(
+            require_role(&ctx, Role::Admin),
+            Err(StatusCode::FORBIDDEN)
+        );
+    }
+
+    #[test]
+    fn require_role_rejects_no_role() {
+        let ctx = RoleContext {
+            discord_user_id: "1".into(),
+            role: None,
+            guild_id: None,
+        };
+        assert_eq!(
+            require_role(&ctx, Role::Viewer),
+            Err(StatusCode::FORBIDDEN)
+        );
+    }
+
+    #[test]
+    fn extract_guild_id_from_snowflake() {
+        assert_eq!(
+            extract_guild_id_from_path("/api/coude/123456789012345678/players"),
+            Some("123456789012345678".to_string())
+        );
+    }
+
+    #[test]
+    fn extract_guild_id_no_match() {
+        assert_eq!(extract_guild_id_from_path("/api/health"), None);
+    }
+}

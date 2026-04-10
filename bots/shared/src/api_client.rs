@@ -9,34 +9,24 @@ use tokio::sync::Mutex;
 use crate::config::BotConfig;
 
 /// Publisher Redis pour les events temps reel.
-/// Publie sur `sentinel:events` — le Gateway relay vers le desktop.
+/// Phase 5B : XADD sur la stream `sentinel:events` (au lieu de PUBLISH pub/sub).
+/// Les consumers durables (moderation-bot, ticket-bot) consomment via XREADGROUP ;
+/// le Gateway lit en live-tail pour le relay WebSocket desktop.
 pub struct EventPublisher {
     client: Mutex<Option<redis::aio::MultiplexedConnection>>,
     redis_url: String,
-    channel: String,
 }
 
 impl EventPublisher {
-    pub fn new(redis_url: &str, channel: &str) -> Self {
+    pub fn new(redis_url: &str) -> Self {
         Self {
             client: Mutex::new(None),
             redis_url: redis_url.to_string(),
-            channel: channel.to_string(),
         }
     }
 
-    /// Publie un event sur Redis (lazy-connect au premier appel).
+    /// Publie un event sur la stream (lazy-connect au premier appel).
     pub async fn publish(&self, event: &str, data: serde_json::Value) {
-        let payload = serde_json::json!({
-            "event": event,
-            "data": data,
-        });
-
-        let payload_str = match serde_json::to_string(&payload) {
-            Ok(s) => s,
-            Err(_) => return,
-        };
-
         let mut guard = self.client.lock().await;
 
         if guard.is_none() {
@@ -56,9 +46,8 @@ impl EventPublisher {
         }
 
         if let Some(ref mut conn) = *guard {
-            use redis::AsyncCommands;
-            if let Err(e) = conn.publish::<_, _, ()>(&self.channel, &payload_str).await {
-                tracing::warn!(error = %e, "Redis publish failed");
+            if let Err(e) = crate::event_bus::publish(conn, event, data).await {
+                tracing::warn!(error = %e, "Redis XADD failed");
                 *guard = None;
             }
         }
@@ -77,12 +66,10 @@ pub struct BaseApiClient {
 
 impl BaseApiClient {
     pub fn new<C: BotConfig>(config: &C, bot_name: &str) -> Self {
-        // Initialiser le publisher Redis si REDIS_URL est defini
-        let publisher = std::env::var("REDIS_URL").ok().map(|url| {
-            let channel = std::env::var("REDIS_CHANNEL")
-                .unwrap_or_else(|_| "sentinel:events".to_string());
-            Arc::new(EventPublisher::new(&url, &channel))
-        });
+        // Initialiser le publisher Redis si REDIS_URL est defini (Phase 5B : XADD stream)
+        let publisher = std::env::var("REDIS_URL")
+            .ok()
+            .map(|url| Arc::new(EventPublisher::new(&url)));
 
         // Phase 1 — Quick wins : pool keep-alive tuné pour les bots qui font
         // beaucoup d'aller-retours vers l'API interne. Le `Client` reqwest est

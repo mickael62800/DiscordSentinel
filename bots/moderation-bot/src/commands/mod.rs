@@ -1,12 +1,17 @@
 pub mod appeal;
 pub mod ban;
 pub mod call;
+pub mod compare;
 pub mod context;
+pub mod evidence;
+pub mod expirations;
 pub mod export;
 pub mod history;
 pub mod mass;
+pub mod modstats;
 pub mod mute;
 pub mod notes;
+pub mod review;
 pub mod warn;
 
 use serenity::builder::CreateCommand;
@@ -24,6 +29,11 @@ pub fn all() -> Vec<CreateCommand> {
         context::register(),
         appeal::register(),
         export::register(),
+        expirations::register(),
+        compare::register(),
+        modstats::register(),
+        evidence::register(),
+        review::register(),
         mass::register_massmute(),
         mass::register_massban(),
     ]

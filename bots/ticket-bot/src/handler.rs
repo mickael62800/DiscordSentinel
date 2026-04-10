@@ -57,15 +57,22 @@ impl EventHandler for Handler {
             }
         });
 
-        // Lancer le listener Redis pour la communication bidirectionnelle
+        // Phase 5B : consumer durable Redis Streams avec XREADGROUP + XACK.
+        // Replay au redemarrage des events emis pendant que le bot etait down.
         let ctx_clone3 = ctx.clone();
         tokio::spawn(async move {
-            sentinel_shared::redis_listener::listen_redis(move |payload| {
-                let ctx = ctx_clone3.clone();
-                async move {
-                    handle_redis_event(&ctx, &payload).await;
-                }
-            }).await;
+            let consumer = sentinel_shared::event_bus::default_consumer_name();
+            sentinel_shared::event_bus::listen_stream_group(
+                "ticket-bot".to_string(),
+                consumer,
+                move |payload| {
+                    let ctx = ctx_clone3.clone();
+                    async move {
+                        handle_redis_event(&ctx, &payload).await;
+                    }
+                },
+            )
+            .await;
         });
     }
 

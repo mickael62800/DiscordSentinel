@@ -1,7 +1,7 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    CreateMessage,
+    ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
+    CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateMessage, User,
 };
 use tracing::{error, info, warn};
 
@@ -11,6 +11,9 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use crate::api_client::ModerationAction;
 use crate::handler::ModerationApiKey;
+use crate::risk_check::{
+    self, PendingKind, RiskyPending, RiskyPendingKey, CANCEL_PREFIX, CONFIRM_PREFIX,
+};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("ban")
@@ -93,26 +96,174 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
     let ban_delete_message_days = BaseApiClient::config_u64(&guild_config, "ban_delete_message_days", 1) as u8;
 
-    let guild_name = guild_id.to_partial_guild(&ctx.http).await
-        .map(|g| g.name).unwrap_or_else(|_| "le serveur".into());
+    // MOD #4 — Detection cible a risque avant execution
+    if let Some(risk_reason) = risk_check::check_target_risk(ctx, guild_id, &target).await {
+        defer_with_confirmation(
+            ctx,
+            command,
+            &target,
+            reason,
+            duration_secs,
+            &duration_label,
+            is_permanent,
+            ban_delete_message_days,
+            &risk_reason,
+        )
+        .await;
+        return;
+    }
+
+    execute_ban(
+        ctx,
+        command.channel_id.to_string(),
+        command.user.id.to_string(),
+        command.user.name.clone(),
+        guild_id,
+        &target,
+        reason,
+        duration_secs,
+        &duration_label,
+        is_permanent,
+        ban_delete_message_days,
+        Some(command),
+    )
+    .await;
+}
+
+/// Defere l'execution du ban : stocke l'action dans RiskyPendingKey et poste
+/// un message avec deux boutons Confirmer/Annuler.
+#[allow(clippy::too_many_arguments)]
+async fn defer_with_confirmation(
+    ctx: &Context,
+    command: &CommandInteraction,
+    target: &User,
+    reason: &str,
+    duration_secs: Option<u64>,
+    duration_label: &str,
+    is_permanent: bool,
+    ban_delete_message_days: u8,
+    risk_reason: &str,
+) {
+    let guild_id = match command.guild_id {
+        Some(id) => id,
+        None => return,
+    };
+
+    let pending_id = uuid::Uuid::new_v4().to_string();
+
+    let pending = RiskyPending {
+        kind: PendingKind::Ban {
+            delete_message_days: ban_delete_message_days,
+            is_permanent,
+        },
+        guild_id: guild_id.to_string(),
+        channel_id: command.channel_id.to_string(),
+        target_id: target.id.to_string(),
+        target_name: target.name.clone(),
+        moderator_id: command.user.id.to_string(),
+        moderator_name: command.user.name.clone(),
+        reason: reason.to_string(),
+        duration_secs,
+        duration_label: duration_label.to_string(),
+        created_at: std::time::Instant::now(),
+    };
+
+    {
+        let data = ctx.data.read().await;
+        if let Some(store) = data.get::<RiskyPendingKey>() {
+            risk_check::purge_expired(store);
+            store.insert(pending_id.clone(), pending);
+        }
+    }
+
+    let embed = critical_embed("\u{26a0}\u{fe0f} Confirmation requise — cible a risque")
+        .description(format!(
+            "La cible <@{}> (`{}`) presente un risque : **{}**.\n\n\
+             Action demandee : **Ban ({})**\n\
+             Raison : {}\n\n\
+             Confirmer l'execution ?",
+            target.id, target.name, risk_reason, duration_label, reason
+        ));
+
+    let row = CreateActionRow::Buttons(vec![
+        CreateButton::new(format!("{CONFIRM_PREFIX}{pending_id}"))
+            .label("Confirmer")
+            .style(ButtonStyle::Danger),
+        CreateButton::new(format!("{CANCEL_PREFIX}{pending_id}"))
+            .label("Annuler")
+            .style(ButtonStyle::Secondary),
+    ]);
+
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .embed(embed)
+                    .components(vec![row])
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to send risky confirmation prompt");
+    }
+
+    info!(
+        moderator = %command.user.name,
+        target = %target.name,
+        risk = %risk_reason,
+        "Ban deferred pending confirmation"
+    );
+}
+
+/// Execute un ban apres verification ou apres confirmation utilisateur.
+///
+/// Si `command` est fourni, on repond via l'interaction. Sinon (cas post-confirmation
+/// boutton), on poste dans le channel via `ChannelId::say`.
+#[allow(clippy::too_many_arguments)]
+pub async fn execute_ban(
+    ctx: &Context,
+    channel_id: String,
+    moderator_id: String,
+    moderator_name: String,
+    guild_id: serenity::model::id::GuildId,
+    target: &User,
+    reason: &str,
+    duration_secs: Option<u64>,
+    duration_label: &str,
+    is_permanent: bool,
+    ban_delete_message_days: u8,
+    command: Option<&CommandInteraction>,
+) {
+    let guild_name = guild_id
+        .to_partial_guild(&ctx.http)
+        .await
+        .map(|g| g.name)
+        .unwrap_or_else(|_| "le serveur".into());
 
     // DM avant le ban (apres le ban on ne peut plus DM)
     if let Ok(dm) = target.create_dm_channel(&ctx.http).await {
         let dm_embed = critical_embed(format!("🔨 Ban ({duration_label}) sur **{guild_name}**"))
             .field("Raison", reason, false);
 
-        if let Err(e) = dm.send_message(
-            &ctx.http,
-            CreateMessage::new().embed(dm_embed),
-        ).await {
+        if let Err(e) = dm
+            .send_message(&ctx.http, CreateMessage::new().embed(dm_embed))
+            .await
+        {
             warn!(error = %e, "Failed to send ban DM to user");
         }
     }
 
-    // Executer le ban Discord (supprime les messages des derniers N jours)
-    if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, ban_delete_message_days, reason).await {
+    // Executer le ban Discord
+    if let Err(e) = guild_id
+        .ban_with_reason(&ctx.http, target.id, ban_delete_message_days, reason)
+        .await
+    {
         error!(error = %e, "Impossible de bannir");
-        reply_text(ctx, command, &format!("Erreur Discord : {e}")).await;
+        if let Some(cmd) = command {
+            reply_text(ctx, cmd, &format!("Erreur Discord : {e}")).await;
+        }
         return;
     }
 
@@ -120,17 +271,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
-        None => { tracing::error!("ModerationApiKey manquant"); return; }
+        None => {
+            tracing::error!("ModerationApiKey manquant");
+            return;
+        }
     };
 
     let action = ModerationAction {
         guild_id: guild_id.to_string(),
-        channel_id: command.channel_id.to_string(),
-        moderator_id: command.user.id.to_string(),
-        moderator_name: command.user.name.clone(),
+        channel_id,
+        moderator_id: moderator_id.clone(),
+        moderator_name: moderator_name.clone(),
         target_id: target.id.to_string(),
         target_name: target.name.clone(),
-        action_type: if is_permanent { "ban_permanent".to_string() } else { "ban_temp".to_string() },
+        action_type: if is_permanent {
+            "ban_permanent".to_string()
+        } else {
+            "ban_temp".to_string()
+        },
         reason: reason.to_string(),
         gravity: None,
         duration: duration_secs,
@@ -144,17 +302,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let channel_embed = critical_embed(format!("🔨 Ban ({duration_label})"))
         .field("Cible", format!("<@{}>", target.id), true)
-        .field("Moderateur", format!("<@{}>", command.user.id), true)
-        .field("Duree", &duration_label, true)
+        .field("Moderateur", format!("<@{}>", moderator_id), true)
+        .field("Duree", duration_label, true)
         .field("Raison", reason, false);
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().embed(channel_embed),
-        ),
-    ).await {
-        warn!(error = %e, "Failed to send ban response embed");
+    if let Some(cmd) = command {
+        if let Err(e) = cmd
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().embed(channel_embed),
+                ),
+            )
+            .await
+        {
+            warn!(error = %e, "Failed to send ban response embed");
+        }
     }
 }
 

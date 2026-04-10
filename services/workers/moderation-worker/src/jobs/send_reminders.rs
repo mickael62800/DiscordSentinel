@@ -1,12 +1,15 @@
 use chrono::{DateTime, Utc};
-use redis::AsyncCommands;
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use sentinel_worker_common::is_worker_enabled;
 
-const REDIS_CHANNEL: &str = "sentinel:events";
+/// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
+/// Doit rester synchronise avec `bots/shared/src/event_bus.rs`.
+const STREAM_KEY: &str = "sentinel:events";
+const STREAM_MAXLEN: usize = 10_000;
+const PAYLOAD_FIELD: &str = "payload";
 
 #[derive(sqlx::FromRow)]
 struct PendingReminder {
@@ -25,12 +28,13 @@ struct PendingReminder {
 ///
 /// Pour chaque rappel `pending` dont `remind_at <= NOW()` :
 ///   1. Marque `status = 'sent'` AVANT le broadcast pour eviter les doublons.
-///   2. Publie un event Redis `sanction_expiry_reminder` sur `sentinel:events`
-///      que le `moderation-bot` ecoute via `sentinel_shared::redis_listener`.
+///   2. Publie un event `sanction_expiry_reminder` via XADD sur la stream
+///      `sentinel:events` que le `moderation-bot` consomme via XREADGROUP
+///      (Phase 5B — `sentinel_shared::event_bus::listen_stream_group`).
 ///   3. Le moderation-bot envoie alors un DM Discord au moderator (acces gateway).
 ///
 /// On ne fait PAS de notification Discord directe ici car le worker n'a pas
-/// de connexion gateway. Le pattern publish→bot listener est le meme que pour
+/// de connexion gateway. Le pattern XADD→bot consumer est le meme que pour
 /// `temp-roles-worker`.
 pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let reminders = sqlx::query_as::<_, PendingReminder>(
@@ -88,8 +92,18 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
 
         match serde_json::to_string(&payload) {
             Ok(serialized) => {
-                if let Err(e) = conn.publish::<_, _, ()>(REDIS_CHANNEL, &serialized).await {
-                    warn!(reminder_id = %reminder.id, error = %e, "publish reminder failed");
+                let res: redis::RedisResult<String> = redis::cmd("XADD")
+                    .arg(STREAM_KEY)
+                    .arg("MAXLEN")
+                    .arg("~")
+                    .arg(STREAM_MAXLEN)
+                    .arg("*")
+                    .arg(PAYLOAD_FIELD)
+                    .arg(&serialized)
+                    .query_async(&mut conn)
+                    .await;
+                if let Err(e) = res {
+                    warn!(reminder_id = %reminder.id, error = %e, "XADD reminder failed");
                 }
             }
             Err(e) => warn!(error = %e, "serialize reminder payload"),

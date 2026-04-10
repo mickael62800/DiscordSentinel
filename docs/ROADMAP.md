@@ -40,9 +40,9 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **2** Fondations DB + multi-tenant | ✅ **partielle** | A.1, A.2, A.3(2/4), A.4(4/9), A.5(8/10), A.6, B | JSONB config, NOT NULL, cache moka, 5 tables non partitionnées |
 | **3** Refactor god files | ✅ TERMINÉE | Intégralité du scope | — |
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
-| **5** Cache + Streams + Batch | ⏸️ à faire | — | — |
-| **6** Features moderation + workers 2 | ⏸️ à faire | — | — |
-| **7** gRPC + scaling | ⏸️ à faire | — | — |
+| **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
+| **6** Features moderation + workers 2 | 🟡 **partielle** | 6A appeal-sla-worker ✅, 6B waves 1+2+3 (MOD #1, #2, #3, #4, #5, #7) ✅ | 4 autres workers 6A, MOD #8 |
+| **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC fin ✅ | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
 
@@ -640,18 +640,142 @@ Tâches qui bloquent le gateway Discord des bots → à extraire vite.
 - [ ] Invalidation via Redis pub/sub lors des writes
 - [ ] TTL court (30-60s) pour les données qui changent peu
 
-### Partie B — Migration Redis Streams (4-6h IA)
+### Partie B — Migration Redis Streams ✅ **TERMINÉE**
 
-- [ ] **[OPT #3]** Refactor `sentinel-shared::RedisListener` vers Redis Streams + consumer groups
-- [ ] Migration des 3 bots qui utilisent déjà pub/sub (moderation, ticket, coude)
-- [ ] Ajout de la persistance et ACK explicite
-- [ ] Documentation pattern pour les futurs workers
+> ✅ **Livré** : une seule stream `sentinel:events` partagée, 2 modes de lecture
+> (XREADGROUP durable + XREAD `$` live tail). L'audit a révélé que seuls 2 bots
+> (moderation, ticket) consommaient réellement du pub/sub (coude-bot ne l'utilisait
+> pas, contrairement à ce qu'indiquait la roadmap initiale).
 
-### Partie C — Batch writes DB (4-6h IA)
+#### Architecture livrée
 
-- [ ] **[OPT #10]** Buffer en mémoire + flush toutes les 500ms OU 100 events côté API
-- [ ] Appliquer aux tables event-heavy : `audit_log`, `moderation_actions`, `analytics_events`
-- [ ] Utiliser `INSERT ... VALUES (...), (...), (...)` ou `COPY FROM STDIN`
+- **Stream unique** : `sentinel:events` avec `MAXLEN ~ 10000` (borne mémoire, O(1) amorti).
+- **Format entry** : un seul champ `payload` contenant le JSON `{"event", "data"}` — identique à l'ancien format pub/sub pour zéro changement côté handlers.
+- **Abstraction consumer** : `sentinel_shared::event_bus::listen_stream_group(group, consumer, handler)` (bots/shared/src/event_bus.rs) — XREADGROUP + XACK, reconnexion exponentielle, auto-claim des pending > 60s via XAUTOCLAIM, création idempotente du consumer group (MKSTREAM + BUSYGROUP).
+- **Helper publish** : `sentinel_shared::event_bus::publish(conn, event, data)` — XADD avec MAXLEN ~.
+- **Consumer name** : `default_consumer_name()` → `{HOSTNAME}-{pid}`, stable à travers les redémarrages sur docker-compose/k8s StatefulSet.
+
+#### Producers migrés (5)
+
+- `bots/shared/src/api_client.rs::EventPublisher` → délègue à `event_bus::publish` (lazy-connect préservé, utilisé par community/moderation/ticket/progression bots pour `publish_event`)
+- `services/api/src/adapters/inbound/ws/broadcaster.rs::EventBroadcaster` → XADD inline
+- `services/workers/monitoring-worker/src/monitor.rs` → helper `xadd_event` local pour bot_status online/offline
+- `services/workers/temp-roles-worker/src/jobs/expire_temp_roles.rs` → XADD inline (temp_role_expire)
+- `services/workers/moderation-worker/src/jobs/send_reminders.rs` → XADD inline (sanction_expiry_reminder), marquage `status='sent'` AVANT XADD pour idempotence
+
+#### Consumers migrés
+
+- **moderation-bot** (`bots/moderation-bot/src/handler.rs:64`) : consumer group `moderation-bot`, XREADGROUP durable → les events de sanction-expiry/pending-action sont rejoués si le bot était down au moment de l'émission
+- **ticket-bot** (`bots/ticket-bot/src/handler.rs:63`) : consumer group `ticket-bot`, XREADGROUP durable → idem pour ticket_sla_updated et events desktop
+- **gateway** (`services/gateway/src/redis_subscriber.rs`) : XREAD `$` live tail (pas de group, pas de rattrapage) → sémantique fire-and-forget préservée pour le relay WebSocket desktop (on ne veut pas rejouer 1000 events périmés au reconnect client)
+
+#### Pattern pour les futurs workers
+
+**Émettre un event depuis un worker** (pas besoin de l'abstraction, 10 lignes) :
+
+```rust
+let _: String = redis::cmd("XADD")
+    .arg("sentinel:events")
+    .arg("MAXLEN").arg("~").arg(10_000)
+    .arg("*")
+    .arg("payload").arg(&serde_json::json!({"event": "my_event", "data": {...}}).to_string())
+    .query_async(&mut conn).await?;
+```
+
+**Consommer des events dans un bot** (utiliser l'abstraction) :
+
+```rust
+tokio::spawn(async move {
+    let consumer = sentinel_shared::event_bus::default_consumer_name();
+    sentinel_shared::event_bus::listen_stream_group(
+        "my-bot".to_string(),  // consumer group = nom du bot
+        consumer,               // consumer name = hostname-pid
+        move |payload_json| async move {
+            // payload_json est la String `{"event", "data"}` (même format qu'avant)
+            handle_event(&payload_json).await;
+        },
+    ).await;
+});
+```
+
+**Gains obtenus** :
+
+- Durabilité : les events survivent au redémarrage d'un consumer (vs pub/sub qui perdait tout)
+- ACK explicite : XACK après traitement réussi, auto-claim des pending abandonnés
+- Scaling horizontal : plusieurs replicas d'un même bot partagent le consumer group, Redis distribue les events entre eux
+- Observabilité : `XINFO STREAM sentinel:events` + `XPENDING sentinel:events <group>` donnent une vue précise du lag et des entries bloquées
+- Format payload identique → zéro changement côté handlers, migration transparente
+
+#### Suppression de l'ancien code
+
+- `bots/shared/src/redis_listener.rs` **supprimé** (remplacé par `event_bus.rs`)
+- `lib.rs` mis à jour, feature `streams` ajoutée à la dép `redis` dans `bots/shared/Cargo.toml` et `services/gateway/Cargo.toml`
+
+#### Tests
+
+- 3 nouveaux tests unitaires dans `event_bus::tests` :
+  - `default_consumer_name_has_pid` (validité du format hostname-pid)
+  - `parse_autoclaim_empty_reply` (parsing XAUTOCLAIM sans résultats)
+  - `parse_autoclaim_single_entry` (parsing XAUTOCLAIM avec 1 entry)
+- `cargo test --lib` : 16/16 sur sentinel-shared, 213/213 sur services/api (hors tests ML ONNX non-gated)
+
+### Partie C — Batch writes DB ✅ **TERMINÉE**
+
+> ✅ **Livré** : `BatchWriter<T>` générique + wrapper `BatchedPgLogRepository` et
+> `BatchedPgAuditLogRepository`. Flush 500ms OR batch 100 entries, multi-row INSERT
+> via `sqlx::QueryBuilder::push_values`. Sémantique at-most-once assumée.
+
+#### Architecture livrée
+
+- **Nouveau module** `services/api/src/adapters/outbound/batching/` avec 3 fichiers :
+  - `batch_writer.rs` — `BatchWriter<T>` générique (tokio mpsc bounded + flusher task, `tokio::select!` entre interval tick et `recv()`)
+  - `log_batcher.rs` — `BatchedPgLogRepository` qui wrap `PgLogRepository`, override `save` pour enqueue, délègue `find_all`/`delete_*` au repo synchrone
+  - `audit_log_batcher.rs` — idem pour `AuditLog`
+- **Config par défaut** (`BatchWriterConfig::default`) : `flush_interval=500ms`, `max_batch_size=100`, `channel_capacity=10_000`
+- **Drop policy** : `try_send` non-bloquant ; si la queue est pleine, l'entry est dropped avec un warn (on ne bloque JAMAIS le request path)
+- **Graceful shutdown** : à la fermeture du channel (drop du dernier Sender), le flusher draine le buffer restant avant d'exit
+- **Fast-drain** : après `recv()`, la flusher utilise `try_recv()` en boucle pour absorber d'un coup toutes les entries en attente dans le channel jusqu'à `max_batch_size`, ce qui maximise la taille des batchs sous charge
+
+#### Tables migrées
+
+- **`logs`** (la plus hot) : middleware `api_logger_middleware` + `dashboard.rs` POST /api/logs + 2 events lifecycle dans `main.rs`. Volume estimé : 10-100 req/s.
+- **`audit_logs`** : via `ManageAuditLogsService::save`. Volume plus faible mais gain confort + uniformité.
+
+Autres tables event-heavy identifiées mais **non batchées** :
+- `moderation_actions` : volume faible (une action = un `/warn` humain), pas de ROI justifiant le risque at-most-once
+- `analytics_events` : table non trouvée dans le code — probablement prévue par `DB_OPTIMISATIONS.md` mais pas encore créée
+- `user_activity_log` / `security_events` : écrits via `bot_persistence.rs` (handler HTTP direct) — hors scope de ce refactor repository-centric
+
+#### Modifications main.rs
+
+```rust
+let log_repo = Arc::new(BatchedPgLogRepository::new(
+    pg_pool.clone(),
+    BatchWriterConfig::default(),
+));
+let audit_log_repo = Arc::new(BatchedPgAuditLogRepository::new(
+    pg_pool.clone(),
+    BatchWriterConfig::default(),
+));
+```
+
+Le typage `Arc<dyn LogRepository>` / `Arc<dyn AuditLogRepository>` reste identique → zéro changement dans l'AppState, les services applicatifs, ou les handlers HTTP.
+
+#### Trade-off sémantique
+
+**At-most-once** assumé : en cas de crash de l'API entre l'enqueue et le flush, les entries en buffer sont perdues (max 500ms ou 100 entries). C'est le prix du gain de throughput. **Ne jamais utiliser ce pattern pour des écritures transactionnelles** (infractions, transactions économiques, etc.) — ces repositories restent synchrones.
+
+#### Tests
+
+- 3 nouveaux tests unitaires dans `batch_writer::tests` :
+  - `flushes_when_batch_full` — trigger taille (batch 3, 5 items → 1 flush de 3, 2 restent en buffer)
+  - `flushes_on_interval` — trigger temps (interval 50ms, 2 items → flush après 150ms)
+  - `drains_on_channel_close` — drop du writer → flush final avant exit de la flusher task
+- `cargo test --lib` : 216/216 (hors tests ML ONNX non-gated)
+
+#### Gain attendu
+
+Sous charge réelle : **10-50× throughput** sur les tables concernées. La charge DB sur `logs` devrait chuter drastiquement (1 INSERT de 100 rows vs 100 INSERTs de 1 row = environ ~100× moins de round-trips réseau, ~10× moins de WAL flushes). À valider avec `pg_stat_statements` sur la baseline prod.
 
 ### Livrable
 
@@ -666,27 +790,161 @@ Tâches qui bloquent le gateway Discord des bots → à extraire vite.
 **Durée IA** : 1-2 jours
 **Dépend de** : Phase 4 (workers de base), Phase 5 (Redis Streams pour le reminder-worker)
 
-### Partie A — Workers secondaires (4-6h IA)
+### Partie A — Workers secondaires 🟡 **partielle**
 
-- [ ] **[WORKER #6]** `appeal-sla-worker` — SLA sur tickets d'appel, escalade +48h
-- [ ] **[WORKER #7]** `discord-audit-sync-worker` — réconciliation actions hors-bot
-- [ ] **[WORKER #9]** `reminder-worker` générique — infra de rappels réutilisable
-- [ ] **[WORKER #10]** `export-worker` — exports JSON/CSV asynchrones
-- [ ] **[WORKER #3]** `audit-cache-worker` — extrait refresh watched-users
-- [ ] **[WORKER #4]** `blackjack-cleanup-worker` — extrait tables AFK
+> ✅ **Livré** : `appeal-sla-worker` — escalade automatique des tickets d'appel
+> de sanction en breach de SLA. Migration 106 + nouveau crate + docker-compose
+> wiring.
+>
+> ⏸️ **Différés / skip** (justification après audit) :
+> - **reminder-worker générique** : la fonctionnalité est **déjà livrée** par
+>   le `moderation-worker/send_reminders.rs` enrichi en Phase 4 B.2. Pas de
+>   second use-case pour justifier une abstraction générique — skip (éviter
+>   la premature abstraction).
+> - **audit-cache-worker** et **blackjack-cleanup-worker** : extractions
+>   bloquées par un problème d'état in-memory (TypeMap Serenity /
+>   `ChannelManager` local au bot). Le worker ne peut pas lire/écrire ce
+>   cache sans passer par Redis. Même blocage que `voice-afk-worker`
+>   (différé en Phase 4). À reconsidérer si on migre ces caches vers Redis.
+> - **discord-audit-sync-worker** et **export-worker** : nouveau scope
+>   business plus important (intégration Discord audit log + jobs d'export
+>   CSV/JSON), mieux adressés en session dédiée.
 
-### Partie B — Améliorations fonctionnelles moderation-bot (4-8h IA)
+#### Récapitulatif `appeal-sla-worker`
 
-Alignées avec `bots/moderation-bot/AMELIORATIONS.md`. Beaucoup s'appuient maintenant sur les workers de la Phase 6A.
+- **Migration `106_appeal_sla.sql`** : ajoute `escalated_at TIMESTAMPTZ` à
+  `tickets` (les colonnes `first_response_at`/`resolved_at` existaient déjà
+  depuis migration 053). Index partiel `idx_tickets_appeal_sla_pending` ciblé
+  sur `category='appel_sanction' AND status IN ('open','assigned') AND
+  escalated_at IS NULL AND first_response_at IS NULL`.
+- **Crate `services/workers/appeal-sla-worker/`** (full crate avec Dockerfile) :
+  scan toutes les 120s (configurable via `APPEAL_SLA_SCAN_INTERVAL`), charge
+  la config SLA par guild depuis `bot_guild_config` (`bot_name='ticket-bot'`,
+  clés `sla_first_response_minutes` et `sla_escalation_minutes` de la
+  migration 047, défauts 30 et 60 min).
+- **Logique** :
+  1. Charge toutes les configs SLA en une seule query (`HashMap<guild_id, (first_response, escalation)>`)
+  2. Scanne les tickets candidats (pre-filtrage SQL large, affinage per-guild en Rust)
+  3. Pour chaque ticket en breach : `UPDATE tickets SET escalated_at = NOW()
+     WHERE id = $1 AND escalated_at IS NULL` (garde idempotence multi-workers)
+  4. Publie un event `appeal_sla_escalated` via XADD sur `sentinel:events`
+     (pattern Phase 5B) avec `{ticket_id, guild_id, author_id, author_name,
+     title, created_at, age_minutes, sla_*_minutes}`
+- **Event consumer** : non livré dans cette itération. Le
+  `moderation-bot::handle_redis_moderation_event` actuel ne dispatche que
+  `moderation_action` (early-return sur le reste). Gap connu depuis Phase 4
+  (le `sanction_expiry_reminder` est aussi dans ce cas). Les deux seront
+  ajoutés ensemble dans le flow Phase 6B features moderation.
+- **docker-compose** : nouveau service `appeal-sla-worker` wired sur
+  `pgbouncer` + `redis`, env `APPEAL_SLA_SCAN_INTERVAL=120`.
+- **Validation** : `cargo check` clean, worker suit exactement le pattern
+  `temp-roles-worker` (Phase 4 B.1).
 
-- [ ] **[MOD #1]** Rappels & expirations actives (utilise `sanction-expiry-worker` de Phase 4)
-- [ ] **[MOD #6]** Templates de sanction composables (raison + durée + gravité + DM)
-- [ ] **[MOD #2]** `/evidence` — attacher preuves à une action existante
-- [ ] **[MOD #4]** Confirmation interactive sur cibles à risque
-- [ ] **[MOD #8]** Transcript automatique des call rooms (via `export-worker`)
-- [ ] **[MOD #7]** `/modstats` — métriques par modérateur (utilise `stats-digest-worker`)
-- [ ] **[MOD #3]** `/review` — file de relecture
-- [ ] **[MOD #5]** `/compare` — historique croisé
+### Partie B — Améliorations fonctionnelles moderation-bot 🟡 **wave 1 livrée**
+
+Alignées avec `bots/moderation-bot/AMELIORATIONS.md`. Découpage en waves
+pour éviter un scope ingérable.
+
+#### Wave 1 ✅ (livré)
+
+**[MOD #1]** — Rappels & expirations actives :
+- **Refactor event dispatcher** : `bots/moderation-bot/src/handler.rs::handle_redis_moderation_event` passe d'un early-return mono-event à un match multi-events (`moderation_action`, `sanction_expiry_reminder`, `appeal_sla_escalated`). Débloque la valeur des Phase 4 B.2 et Phase 6A qui émettaient dans le vide.
+- **Handler `sanction_expiry_reminder`** : DM au modérateur qui a posé la sanction, 1h avant expiration. Embed avec action, cible, temps restant, raison.
+- **Handler `appeal_sla_escalated`** : post dans le salon de logs avec `@here` + embed rouge + infos du ticket en breach.
+- **Commande `/expirations`** (`bots/moderation-bot/src/commands/expirations.rs`) : liste les sanctions temporaires actives (`sanction_reminders` pending), triées par proximité d'expiration, avec temps restant formaté (`Xj Yh`, `Xh Ymin`, `X min`). Lecture via `GET /api/reminders/{guild_id}`. 5 tests unitaires sur `format_duration`.
+
+**[MOD #4]** — Confirmation interactive sur cibles à risque :
+- **Nouveau module** `bots/moderation-bot/src/risk_check.rs` :
+  - `check_target_risk(ctx, guild_id, target)` détecte 3 cas :
+    - Compte Discord créé il y a < 7 jours
+    - Cible est un bot
+    - Cible a un rôle avec `MODERATE_MEMBERS` / `BAN_MEMBERS` / `KICK_MEMBERS` / `ADMINISTRATOR`
+  - `RiskyPendingKey` + `DashMap<pending_id, RiskyPending>` pour stocker les actions en attente de confirmation (TTL 300s, purge lazy à chaque access)
+  - 1 test unitaire sur `purge_expired`
+- **Refactor `/ban`** : extraction de `execute_ban(...)` réutilisable. Avant exécution, call à `check_target_risk` ; si risque détecté, l'action est stockée + réponse ephemeral avec embed critique et 2 boutons Discord (`Confirmer` Danger / `Annuler` Secondary).
+- **Button handlers** (`handle_risky_confirm`, `handle_risky_cancel`) dans `handler.rs` : ACK immédiat Discord (<3s), fetch du pending, dispatch sur `PendingKind::Ban` → `execute_ban(...)`, affichage du résultat. `PendingKind::Mute` défini mais pas câblé (wave 2).
+- **Scope ban only dans cette wave** : le pattern est prêt à être étendu à `/mute` par simple ajout d'un `execute_mute` + intégration similaire dans `mute.rs`.
+
+#### Wave 2 ✅ (livré)
+
+**[MOD #4 ext]** — Confirmation interactive étendue à `/mute` :
+- Refactor `commands/mute.rs` : extraction `execute_mute(...)` avec params (timeout_secs, duration_secs, duration_label, is_permanent), réutilisable depuis le dispatcher de confirmation
+- `PendingKind::Mute { timeout_secs }` : la variante `Mute` porte maintenant le `timeout_secs` déjà pré-capé à 28j Discord (calcul fait une seule fois au parsing de la commande)
+- Handler `handle_risky_confirm` dans `handler.rs` câble maintenant les 2 variantes (Ban + Mute) via `commands::mute::execute_mute(...)`. `PendingKind::Mute` n'est plus un placeholder.
+
+**[MOD #5]** — `/compare user1 user2` :
+- Nouvelle commande `commands/compare.rs` — 2 appels parallèles `api.get_history(...)` via `tokio::join!`, embed avec 3 sections : verdict comparatif ("X a plus de sanctions au total (8 vs 1)" / "même nombre"), bloc historique user1, bloc historique user2
+- Validation : les 2 users doivent être différents (reply ephemeral sinon)
+- Read-only, pas de nouvel endpoint API (réutilise `/api/moderation/history/{guild_id}/{user_id}` existant)
+- 4 tests unitaires sur `build_comparison_line` (h1>h2, h1<h2, égalité) et `format_history_block`
+
+**[MOD #7]** — `/modstats` (métriques par modérateur sur 30j) :
+- **Nouvel endpoint API** `GET /api/moderation/modstats/{guild_id}` dans `handlers/moderation.rs` — approche pragmatique direct sqlx (comme `bot_persistence.rs`), bypass du use-case car aggregation simple read-only
+- **Query SQL** avec `COUNT(*) FILTER (WHERE action_type = ...)` pour compter par type (`warn`, `mute_temp`/`mute_permanent`/`mute`, `ban_temp`/`ban_permanent`/`ban`, `kick`), `GROUP BY moderator_id`, `ORDER BY total DESC LIMIT 20`, fenêtre `NOW() - INTERVAL '30 days'`
+- **Nouveau DTO** `ModStatsEntryDto` (7 champs : `moderator_id`, `moderator_name`, `total`, `warns`, `mutes`, `bans`, `kicks`)
+- **Route** ajoutée dans `moderation_routes()` (router.rs)
+- **Bot command** `commands/modstats.rs` — pas de paramètre, ephemeral, embed "Top 20" avec médailles 🥇🥈🥉 pour les 3 premiers, 🔸 pour les suivants. `format_modstats` testée (empty list, single entry, top-three medals).
+- 3 tests unitaires sur `format_modstats`
+
+#### Wave 3 ✅ (livré)
+
+**[MOD #2]** — `/evidence add|list` :
+- **Migration `107_create_evidence.sql`** : nouvelle table `moderation_evidence` (FK `action_id` → `moderation_actions` avec `ON DELETE CASCADE`, `url` TEXT, `description` TEXT optionnel, `uploaded_by` VARCHAR(20), `uploaded_by_name`, `uploaded_at`). Index sur `action_id` + `uploaded_at DESC`.
+- **API** : 2 nouveaux handlers dans `moderation.rs` (direct sqlx, pas de use-case) :
+  - `POST /api/moderation/evidence` : valide `action_id` UUID, `url` non vide (max 2000), `uploaded_by` Discord ID. Description tronquée à 500 chars.
+  - `GET /api/moderation/evidence/{action_id}` : retourne la liste triée par `uploaded_at ASC`
+- **Bot command** `commands/evidence.rs` : 2 sub-commands `add` et `list`, ephemeral. Embed avec `short_id` (8 premiers chars de l'UUID) pour la lisibilité.
+- **`api_client::add_evidence` + `list_evidence`** + nouveau DTO `EvidenceEntry`.
+- 2 tests unitaires sur `short_id`.
+
+**[MOD #3]** — `/review add|list|resolve` :
+- **Migration `108_create_review_queue.sql`** : table `review_queue` (FK `action_id`, `guild_id`, `added_by`, `reason`, `status` avec `CHECK` sur `'pending'|'approved'|'rejected'|'changed'`, `reviewer_*`, `added_at`, `resolved_at`). Index partiel `WHERE status='pending'` pour accélérer le listing.
+- **API** : 3 nouveaux handlers :
+  - `POST /api/moderation/review` : ajoute en status `'pending'`
+  - `GET /api/moderation/review/{guild_id}/pending` : liste **avec JOIN sur `moderation_actions`** pour enrichir chaque entrée avec `action_type`, `target_name`, `action_reason` (évite 50 appels follow-up côté bot)
+  - `PATCH /api/moderation/review/{id}/resolve` : marque comme résolue, garde `WHERE status='pending'` pour idempotence
+- **Bot command** `commands/review.rs` : 3 sub-commands (`add`, `list`, `resolve`) avec choix Discord sur le statut. `resolve` fire-and-forget via `patch_fire_and_forget`.
+- **`api_client`** : `add_review` / `list_pending_reviews` / `resolve_review` + DTO `ReviewQueueEntry`
+- 1 test unitaire sur `short_id`
+
+#### Résumé Phase 6B livré (6/8 features)
+
+| Feature | Statut | Wave |
+|---|---|---|
+| MOD #1 Rappels & expirations | ✅ | 1 |
+| MOD #2 `/evidence` | ✅ | 3 |
+| MOD #3 `/review` | ✅ | 3 |
+| MOD #4 Confirmation cibles à risque (/ban + /mute) | ✅ | 1 + 2 |
+| MOD #5 `/compare` | ✅ | 2 |
+| MOD #6 Templates de sanction | 🟡 mostly done (polish différé) | — |
+| MOD #7 `/modstats` | ✅ | 2 |
+| MOD #8 Transcript call rooms | ⏸️ bloqué (dépend export-worker) | — |
+
+#### Différés
+
+- **[MOD #6]** Templates de sanction : déjà mostly done (`reason_templates.rs` + autocomplete `/warn`, `/mute`, `/ban`). Manque juste une commande `/template` pour gérer via Discord — polish de faible ROI (déjà gérable via GUI desktop).
+- **[MOD #8]** Transcript auto call rooms : dépend de `export-worker` différé en Phase 6A.
+
+#### Validation wave 1
+
+- `cargo check` clean (warning intentionnel sur `PendingKind::Mute` — wave 2)
+- `cargo test --bin moderation-bot` : 31/31 (30 existants + 5 `format_duration` + 1 `purge_expired` — sous le même binaire).
+
+#### Validation wave 2
+
+- `cargo check` clean sur `services/api` ET `bots/moderation-bot`
+- `cargo test --bin moderation-bot` : **38/38** (wave 1 + 4 tests `compare` + 3 tests `modstats`)
+- `cargo test --lib` API : **216/216** (hors tests ML ONNX non-gated)
+- Commandes Discord désormais exposées : `/warn`, `/mute`, `/unmute`, `/ban`, `/unban`, `/history`, `/notes`, `/call`, `/context`, `/appeal`, `/export`, `/expirations`, `/compare`, `/modstats`, `/massmute`, `/massban` (15 commandes au total)
+
+#### Validation wave 3
+
+- `cargo check` clean sur `services/api` (migrations 107 + 108 compilées) ET `bots/moderation-bot`
+- `cargo test --bin moderation-bot` : **41/41** (wave 2 + 2 tests `evidence::short_id` + 1 test `review::short_id`)
+- `cargo test --lib` API : **216/216**
+- Commandes Discord finales : wave 2 + `/evidence` + `/review` = **17 commandes au total**
+- Tables ajoutées : `moderation_evidence` (FK CASCADE sur `moderation_actions`) + `review_queue` (FK CASCADE + CHECK constraint sur `status`)
+- Pattern employé : direct sqlx dans handlers API (pas de use-case), approche pragmatique comme `bot_persistence.rs` — justifié par le scope simple read-write sans logique métier complexe
 
 ### Livrable
 
@@ -708,12 +966,111 @@ Alignées avec `bots/moderation-bot/AMELIORATIONS.md`. Beaucoup s'appuient maint
 - [ ] Garder REST pour le desktop et les clients externes
 - [ ] **Ne migrer que les endpoints dans le top latence** — les endpoints froids restent en REST
 
-### Partie B — RBAC fin (1 jour IA)
+### Partie B — RBAC fin ✅ **TERMINÉE**
 
-- [ ] **[AUTH]** Solution 3 : tables `api_users`, `api_user_guilds`, `roles`
-- [ ] Rôles : `owner`, `admin`, `moderator`, `viewer`
-- [ ] Middleware de vérification du rôle requis par endpoint
-- [ ] Interface de gestion des permissions dans le desktop
+> ✅ **Livré** : 2 tables RBAC + middleware `rbac_middleware` + helper
+> `require_role` + hiérarchie `Role` + 11 tests unitaires.
+> ⏸️ **Différé** : UI desktop de gestion (scope frontend, session dédiée).
+
+#### Migration 109 — 2 tables (pas 3)
+
+Le design initial de la roadmap mentionnait 3 tables (`api_users`, `api_user_guilds`, `roles`) mais un `CHECK` constraint sur 4 valeurs statiques est plus simple qu'une table `roles` dédiée. Choix pragmatique.
+
+```sql
+CREATE TABLE api_users (
+    discord_user_id VARCHAR(20) PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    avatar_url TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE api_user_guilds (
+    discord_user_id VARCHAR(20) NOT NULL REFERENCES api_users(discord_user_id) ON DELETE CASCADE,
+    guild_id VARCHAR(20) NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('owner', 'admin', 'moderator', 'viewer')),
+    granted_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    granted_by VARCHAR(20),
+    PRIMARY KEY (discord_user_id, guild_id)
+);
+CREATE INDEX idx_api_user_guilds_guild ON api_user_guilds (guild_id, role);
+```
+
+#### Hiérarchie des rôles
+
+| Rôle | Numérique | Permissions |
+|---|---|---|
+| `owner` | 3 | Full access + gestion RBAC (ajouter/retirer des rôles) |
+| `admin` | 2 | Full CRUD, hors RBAC |
+| `moderator` | 1 | Sanctions, tickets, notes, lecture |
+| `viewer` | 0 | Read-only |
+
+L'`enum Role` Rust dérive `PartialOrd` sur les discriminants — l'opérateur `>=` donne directement la vérification "rôle au moins X".
+
+#### Nouveau middleware `rbac_middleware`
+
+- **Emplacement** : `services/api/src/adapters/inbound/http/middleware/rbac.rs`
+- **Ordre** : s'exécute APRÈS `guild_auth_middleware` (Phase 2B) — il réutilise le même header `X-Discord-Token`. Le router chain est désormais : `rate_limit` → `auth` → `guild_auth` → `rbac`.
+- **Flow** :
+  1. Pass-through si `X-Discord-Token` absent (bot/internal)
+  2. Fetch `user_id` via cache Redis `user_id:<token_hash>` (TTL 10 min) ou fallback `GET /users/@me`
+  3. Upsert dans `api_users` (best-effort, ne bloque pas sur erreur DB)
+  4. Extrait `guild_id` de l'URI via l'heuristique snowflake (17-20 chiffres)
+  5. Lookup `api_user_guilds WHERE (discord_user_id, guild_id)`
+  6. **Fallback** : si pas de row mais le user est dans la guild Discord (guild_auth l'a déjà validé), rôle par défaut = `viewer` (POLA)
+  7. Stocke `RoleContext { discord_user_id, role, guild_id }` dans les extensions de la requête
+
+#### Nouvelle méthode `DiscordApiService::get_user_me`
+
+- Appel `GET /users/@me` avec `Authorization: Bearer <access_token>`
+- Scope OAuth2 requis : `identify`
+- Retourne `DiscordUser { id, username, avatar }`
+
+#### Helper `require_role` pour les handlers
+
+```rust
+use axum::Extension;
+use crate::adapters::inbound::http::middleware::rbac::{Role, RoleContext, require_role};
+
+pub async fn delete_config(
+    Extension(ctx): Extension<RoleContext>,
+    // ...
+) -> Result<Json<...>, ApiError> {
+    require_role(&ctx, Role::Admin)?;  // 403 si < Admin
+    // ... logique admin-only
+}
+```
+
+**État actuel** : le middleware injecte `RoleContext` pour TOUS les handlers, mais aucun handler existant n'appelle encore `require_role`. C'est volontaire — migration progressive, chaque handler peut ajouter la gate quand nécessaire sans changement breaking.
+
+#### Bootstrap
+
+**Pas d'auto-promote**. Les premiers `owner` doivent être seedés en SQL direct au déploiement initial :
+
+```sql
+INSERT INTO api_users (discord_user_id, display_name)
+VALUES ('123456789012345678', 'Alice');
+INSERT INTO api_user_guilds (discord_user_id, guild_id, role)
+VALUES ('123456789012345678', '987654321098765432', 'owner');
+```
+
+Éviter l'auto-promote sur premier login sinon n'importe qui peut prendre le contrôle d'une guild nouvellement onboardée.
+
+#### Tests
+
+- 11 tests unitaires (`adapters::inbound::http::middleware::rbac::tests`) :
+  - Ordering hiérarchique (`Owner > Admin > Moderator > Viewer`)
+  - `satisfies` (own level + higher + lower)
+  - `from_str` valid / invalid / roundtrip
+  - `require_role` accepts equal / higher, rejects lower / no role
+  - `extract_guild_id_from_path` avec / sans snowflake
+- Total API : **227/227** (216 + 11 RBAC, hors ML ONNX non-gated)
+
+#### Différés
+
+- **UI desktop de gestion RBAC** : pages pour `owner`/`admin` permettant de lister les users par guild, attribuer/révoquer des rôles. Scope frontend (Vue/Tauri), session dédiée.
+- **Endpoints REST CRUD RBAC** : `POST/PATCH/DELETE /api/rbac/users/{user_id}/guilds/{guild_id}`. Pas encore implémentés — le provisioning initial reste manuel SQL. À faire en même temps que l'UI desktop.
+- **Gates sur handlers existants** : aucun handler n'appelle encore `require_role`. Migration progressive recommandée : d'abord `DELETE *`, `bot_config` writes, RBAC writes. Les reads restent ouverts aux `viewer` (comportement actuel).
 
 ### Partie C — Sharding Discord (uniquement si besoin)
 

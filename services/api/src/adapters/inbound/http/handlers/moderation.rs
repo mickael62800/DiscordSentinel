@@ -262,3 +262,409 @@ pub async fn get_history(
         .await?;
     Ok(single_dto(history))
 }
+
+/// MOD #2 — POST /api/moderation/evidence
+///
+/// Attache une preuve (URL + description optionnelle) a une action de moderation
+/// existante. La FK assure qu'on ne peut pas attacher a une action inconnue.
+#[derive(Debug, serde::Deserialize)]
+pub struct AddEvidenceDto {
+    pub action_id: String,
+    pub url: String,
+    #[serde(default)]
+    pub description: Option<String>,
+    pub uploaded_by: String,
+    pub uploaded_by_name: String,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct EvidenceEntryDto {
+    pub id: String,
+    pub action_id: String,
+    pub url: String,
+    pub description: Option<String>,
+    pub uploaded_by: String,
+    pub uploaded_by_name: String,
+    pub uploaded_at: String,
+}
+
+pub async fn add_evidence(
+    State(state): State<AppState>,
+    Json(dto): Json<AddEvidenceDto>,
+) -> Result<Json<EvidenceEntryDto>, ApiError> {
+    // Validation minimale — l'URL n'est pas verifiee, le moderateur est responsable
+    if dto.url.trim().is_empty() || dto.url.len() > 2000 {
+        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
+            "url vide ou trop longue (max 2000)".into(),
+        )));
+    }
+    let action_uuid = uuid::Uuid::parse_str(&dto.action_id).map_err(|_| {
+        ApiError(crate::domain::errors::DomainError::ValidationError(
+            "action_id invalide".into(),
+        ))
+    })?;
+    validation::validate_discord_id("uploaded_by", &dto.uploaded_by).map_err(ApiError)?;
+    let description = dto.description.as_ref().map(|d| d.chars().take(500).collect::<String>());
+
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: uuid::Uuid,
+        uploaded_at: chrono::DateTime<chrono::Utc>,
+    }
+
+    let row: Row = sqlx::query_as::<_, Row>(
+        "INSERT INTO moderation_evidence (action_id, url, description, uploaded_by, uploaded_by_name) \
+         VALUES ($1, $2, $3, $4, $5) \
+         RETURNING id, uploaded_at",
+    )
+    .bind(action_uuid)
+    .bind(&dto.url)
+    .bind(&description)
+    .bind(&dto.uploaded_by)
+    .bind(&dto.uploaded_by_name)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        ApiError(crate::domain::errors::DomainError::Internal(format!(
+            "insert evidence: {e}"
+        )))
+    })?;
+
+    Ok(Json(EvidenceEntryDto {
+        id: row.id.to_string(),
+        action_id: dto.action_id,
+        url: dto.url,
+        description,
+        uploaded_by: dto.uploaded_by,
+        uploaded_by_name: dto.uploaded_by_name,
+        uploaded_at: row.uploaded_at.to_rfc3339(),
+    }))
+}
+
+/// MOD #2 — GET /api/moderation/evidence/{action_id}
+///
+/// Liste les preuves attachees a une action.
+pub async fn list_evidence(
+    State(state): State<AppState>,
+    Path(action_id): Path<String>,
+) -> Result<Json<Vec<EvidenceEntryDto>>, ApiError> {
+    let action_uuid = uuid::Uuid::parse_str(&action_id).map_err(|_| {
+        ApiError(crate::domain::errors::DomainError::ValidationError(
+            "action_id invalide".into(),
+        ))
+    })?;
+
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: uuid::Uuid,
+        url: String,
+        description: Option<String>,
+        uploaded_by: String,
+        uploaded_by_name: String,
+        uploaded_at: chrono::DateTime<chrono::Utc>,
+    }
+
+    let rows: Vec<Row> = sqlx::query_as::<_, Row>(
+        "SELECT id, url, description, uploaded_by, uploaded_by_name, uploaded_at \
+         FROM moderation_evidence \
+         WHERE action_id = $1 \
+         ORDER BY uploaded_at ASC",
+    )
+    .bind(action_uuid)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        ApiError(crate::domain::errors::DomainError::Internal(format!(
+            "list evidence: {e}"
+        )))
+    })?;
+
+    let dtos = rows
+        .into_iter()
+        .map(|r| EvidenceEntryDto {
+            id: r.id.to_string(),
+            action_id: action_id.clone(),
+            url: r.url,
+            description: r.description,
+            uploaded_by: r.uploaded_by,
+            uploaded_by_name: r.uploaded_by_name,
+            uploaded_at: r.uploaded_at.to_rfc3339(),
+        })
+        .collect();
+
+    Ok(Json(dtos))
+}
+
+/// MOD #3 — POST /api/moderation/review
+#[derive(Debug, serde::Deserialize)]
+pub struct AddReviewDto {
+    pub action_id: String,
+    pub guild_id: String,
+    pub added_by: String,
+    pub added_by_name: String,
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct ReviewQueueEntryDto {
+    pub id: String,
+    pub action_id: String,
+    pub guild_id: String,
+    pub added_by: String,
+    pub added_by_name: String,
+    pub reason: Option<String>,
+    pub status: String,
+    pub reviewer_id: Option<String>,
+    pub reviewer_name: Option<String>,
+    pub reviewer_notes: Option<String>,
+    pub added_at: String,
+    pub resolved_at: Option<String>,
+    // Enrichissement : infos de l'action liee
+    pub action_type: Option<String>,
+    pub target_name: Option<String>,
+    pub action_reason: Option<String>,
+}
+
+pub async fn add_review(
+    State(state): State<AppState>,
+    Json(dto): Json<AddReviewDto>,
+) -> Result<Json<ReviewQueueEntryDto>, ApiError> {
+    let action_uuid = uuid::Uuid::parse_str(&dto.action_id).map_err(|_| {
+        ApiError(crate::domain::errors::DomainError::ValidationError(
+            "action_id invalide".into(),
+        ))
+    })?;
+    validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
+    validation::validate_discord_id("added_by", &dto.added_by).map_err(ApiError)?;
+    let reason = dto.reason.as_ref().map(|r| r.chars().take(500).collect::<String>());
+
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: uuid::Uuid,
+        added_at: chrono::DateTime<chrono::Utc>,
+    }
+
+    let row: Row = sqlx::query_as::<_, Row>(
+        "INSERT INTO review_queue (action_id, guild_id, added_by, added_by_name, reason) \
+         VALUES ($1, $2, $3, $4, $5) \
+         RETURNING id, added_at",
+    )
+    .bind(action_uuid)
+    .bind(&dto.guild_id)
+    .bind(&dto.added_by)
+    .bind(&dto.added_by_name)
+    .bind(&reason)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        ApiError(crate::domain::errors::DomainError::Internal(format!(
+            "insert review: {e}"
+        )))
+    })?;
+
+    Ok(Json(ReviewQueueEntryDto {
+        id: row.id.to_string(),
+        action_id: dto.action_id,
+        guild_id: dto.guild_id,
+        added_by: dto.added_by,
+        added_by_name: dto.added_by_name,
+        reason,
+        status: "pending".into(),
+        reviewer_id: None,
+        reviewer_name: None,
+        reviewer_notes: None,
+        added_at: row.added_at.to_rfc3339(),
+        resolved_at: None,
+        action_type: None,
+        target_name: None,
+        action_reason: None,
+    }))
+}
+
+/// MOD #3 — GET /api/moderation/review/{guild_id}/pending
+///
+/// Liste les reviews en attente pour une guild, enrichies avec les infos de
+/// l'action de moderation liee (JOIN avec moderation_actions).
+pub async fn list_pending_reviews(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
+    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
+
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: uuid::Uuid,
+        action_id: uuid::Uuid,
+        added_by: String,
+        added_by_name: String,
+        reason: Option<String>,
+        added_at: chrono::DateTime<chrono::Utc>,
+        action_type: String,
+        target_name: String,
+        action_reason: String,
+    }
+
+    let rows: Vec<Row> = sqlx::query_as::<_, Row>(
+        "SELECT r.id, r.action_id, r.added_by, r.added_by_name, r.reason, r.added_at, \
+                a.action_type, a.target_name, a.reason AS action_reason \
+         FROM review_queue r \
+         INNER JOIN moderation_actions a ON a.id = r.action_id \
+         WHERE r.guild_id = $1 AND r.status = 'pending' \
+         ORDER BY r.added_at ASC \
+         LIMIT 50",
+    )
+    .bind(&guild_id)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        ApiError(crate::domain::errors::DomainError::Internal(format!(
+            "list pending reviews: {e}"
+        )))
+    })?;
+
+    let dtos = rows
+        .into_iter()
+        .map(|r| ReviewQueueEntryDto {
+            id: r.id.to_string(),
+            action_id: r.action_id.to_string(),
+            guild_id: guild_id.clone(),
+            added_by: r.added_by,
+            added_by_name: r.added_by_name,
+            reason: r.reason,
+            status: "pending".into(),
+            reviewer_id: None,
+            reviewer_name: None,
+            reviewer_notes: None,
+            added_at: r.added_at.to_rfc3339(),
+            resolved_at: None,
+            action_type: Some(r.action_type),
+            target_name: Some(r.target_name),
+            action_reason: Some(r.action_reason),
+        })
+        .collect();
+
+    Ok(Json(dtos))
+}
+
+/// MOD #3 — PATCH /api/moderation/review/{id}/resolve
+#[derive(Debug, serde::Deserialize)]
+pub struct ResolveReviewDto {
+    pub status: String,
+    pub reviewer_id: String,
+    pub reviewer_name: String,
+    #[serde(default)]
+    pub reviewer_notes: Option<String>,
+}
+
+pub async fn resolve_review(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+    Json(dto): Json<ResolveReviewDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let review_uuid = uuid::Uuid::parse_str(&id).map_err(|_| {
+        ApiError(crate::domain::errors::DomainError::ValidationError(
+            "id invalide".into(),
+        ))
+    })?;
+
+    if !matches!(dto.status.as_str(), "approved" | "rejected" | "changed") {
+        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
+            "status doit etre approved/rejected/changed".into(),
+        )));
+    }
+    validation::validate_discord_id("reviewer_id", &dto.reviewer_id).map_err(ApiError)?;
+    let notes = dto.reviewer_notes.as_ref().map(|n| n.chars().take(500).collect::<String>());
+
+    let res = sqlx::query(
+        "UPDATE review_queue SET \
+            status = $1, \
+            reviewer_id = $2, \
+            reviewer_name = $3, \
+            reviewer_notes = $4, \
+            resolved_at = NOW() \
+         WHERE id = $5 AND status = 'pending'",
+    )
+    .bind(&dto.status)
+    .bind(&dto.reviewer_id)
+    .bind(&dto.reviewer_name)
+    .bind(&notes)
+    .bind(review_uuid)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| {
+        ApiError(crate::domain::errors::DomainError::Internal(format!(
+            "resolve review: {e}"
+        )))
+    })?;
+
+    if res.rows_affected() == 0 {
+        return Err(ApiError(crate::domain::errors::DomainError::NotFound(
+            "review introuvable ou deja resolue".into(),
+        )));
+    }
+
+    Ok(Json(serde_json::json!({ "ok": true })))
+}
+
+/// MOD #7 — GET /api/moderation/modstats/{guild_id}
+///
+/// Agrege les actions de moderation par moderateur sur les 30 derniers jours.
+/// Retourne le top 20 classe par nombre total d'actions decroissant.
+///
+/// Approche pragmatique : sqlx direct (pas de use-case), read-only, aggregation simple.
+pub async fn get_modstats(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::ModStatsEntryDto>>, ApiError> {
+    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
+
+    #[derive(sqlx::FromRow)]
+    struct StatsRow {
+        moderator_id: String,
+        moderator_name: String,
+        total: i64,
+        warns: i64,
+        mutes: i64,
+        bans: i64,
+        kicks: i64,
+    }
+
+    let rows: Vec<StatsRow> = sqlx::query_as::<_, StatsRow>(
+        "SELECT \
+            moderator_id, \
+            MAX(moderator_name) AS moderator_name, \
+            COUNT(*) AS total, \
+            COUNT(*) FILTER (WHERE action_type = 'warn') AS warns, \
+            COUNT(*) FILTER (WHERE action_type IN ('mute_temp','mute_permanent','mute')) AS mutes, \
+            COUNT(*) FILTER (WHERE action_type IN ('ban_temp','ban_permanent','ban')) AS bans, \
+            COUNT(*) FILTER (WHERE action_type = 'kick') AS kicks \
+         FROM moderation_actions \
+         WHERE guild_id = $1 \
+           AND created_at >= NOW() - INTERVAL '30 days' \
+         GROUP BY moderator_id \
+         ORDER BY total DESC \
+         LIMIT 20",
+    )
+    .bind(&guild_id)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(crate::domain::errors::DomainError::Internal(format!("modstats query: {e}"))))?;
+
+    let dtos = rows
+        .into_iter()
+        .map(
+            |r| crate::adapters::inbound::http::dto::moderation::ModStatsEntryDto {
+                moderator_id: r.moderator_id,
+                moderator_name: r.moderator_name,
+                total: r.total,
+                warns: r.warns,
+                mutes: r.mutes,
+                bans: r.bans,
+                kicks: r.kicks,
+            },
+        )
+        .collect();
+
+    Ok(Json(dtos))
+}

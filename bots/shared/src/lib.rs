@@ -3,6 +3,6 @@ pub mod cache_settings;
 pub mod config;
 pub mod discord_helpers;
 pub mod embeds;
+pub mod event_bus;
 pub mod heartbeat;
 pub mod parsers;
-pub mod redis_listener;

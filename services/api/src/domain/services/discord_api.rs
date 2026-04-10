@@ -18,6 +18,15 @@ pub struct UserGuild {
     pub id: String,
 }
 
+/// Phase 7 B — Info minimal d'un user Discord recupere via `/users/@me`.
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+pub struct DiscordUser {
+    pub id: String,
+    pub username: String,
+    #[serde(default)]
+    pub avatar: Option<String>,
+}
+
 /// Service pour les appels a l'API Discord.
 /// Centralise la logique d'interaction avec Discord (ban, unban, etc.)
 pub struct DiscordApiService {
@@ -376,5 +385,30 @@ impl DiscordApiService {
         resp.json::<Vec<UserGuild>>()
             .await
             .map_err(|e| DomainError::Internal(format!("Discord guilds parse: {e}")))
+    }
+
+    /// Phase 7 B — Recupere l'identite du user associe a un `access_token`.
+    /// Endpoint Discord : `GET /users/@me` (scope `identify`).
+    pub async fn get_user_me(&self, access_token: &str) -> Result<DiscordUser, DomainError> {
+        let url = "https://discord.com/api/v10/users/@me";
+        let resp = self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {access_token}"))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord /users/@me fetch: {e}")))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord get_user_me non-success ({status}): {body}"
+            )));
+        }
+
+        resp.json::<DiscordUser>()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord /users/@me parse: {e}")))
     }
 }

@@ -1,9 +1,12 @@
-use redis::AsyncCommands;
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-const REDIS_CHANNEL: &str = "sentinel:events";
+/// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
+/// Doit rester synchronise avec `bots/shared/src/event_bus.rs`.
+const STREAM_KEY: &str = "sentinel:events";
+const STREAM_MAXLEN: usize = 10_000;
+const PAYLOAD_FIELD: &str = "payload";
 
 #[derive(sqlx::FromRow)]
 struct ExpiredRole {
@@ -16,9 +19,9 @@ struct ExpiredRole {
 /// Phase 4 B — Scan + emission Redis des roles temporaires expires.
 ///
 /// Le worker ne peut PAS appeler `member.remove_role()` directement (pas de
-/// connexion gateway Discord). Il publie un event sur `sentinel:events` que le
-/// `community-bot` ecoute via `sentinel_shared::redis_listener` et execute le
-/// retrait Discord local + DELETE de la ligne en DB.
+/// connexion gateway Discord). Il emet un event via XADD sur la stream
+/// `sentinel:events` (Phase 5B) que le `community-bot` consomme pour executer
+/// le retrait Discord local + DELETE de la ligne en DB.
 ///
 /// Pour eviter les doublons, on peut soit :
 ///   - laisser le bot DELETE la ligne apres remove_role reussi (pattern actuel)
@@ -65,9 +68,19 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             }
         };
 
-        match conn.publish::<_, _, ()>(REDIS_CHANNEL, &serialized).await {
+        let res: redis::RedisResult<String> = redis::cmd("XADD")
+            .arg(STREAM_KEY)
+            .arg("MAXLEN")
+            .arg("~")
+            .arg(STREAM_MAXLEN)
+            .arg("*")
+            .arg(PAYLOAD_FIELD)
+            .arg(&serialized)
+            .query_async(&mut conn)
+            .await;
+        match res {
             Ok(_) => published += 1,
-            Err(e) => warn!(role_id = %role.id, error = %e, "publish failed"),
+            Err(e) => warn!(role_id = %role.id, error = %e, "XADD failed"),
         }
     }
 
