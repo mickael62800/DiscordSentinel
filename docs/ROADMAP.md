@@ -41,7 +41,7 @@ Roadmap unifiée consolidant **tous les chantiers** identifiés dans la document
 | **3** Refactor god files | ✅ TERMINÉE | Intégralité du scope | — |
 | **4** ai-worker + workers prio | ✅ **partielle** | A ai-worker complet, B.1 temp-roles, B.2 sanction-expiry | voice-afk-worker (sweep in-memory) |
 | **5** Cache + Streams + Batch | 🟡 **2/3** | 5B Streams ✅, 5C Batch writes ✅ | 5A Cache-aside (bloqué baseline) |
-| **6** Features moderation + workers 2 | 🟡 **8/8 features** | 6A appeal-sla-worker ✅ + export-worker ✅, 6B 8/8 features ✅ (MOD #1-8) | 3 workers 6A in-memory (cache→Redis) |
+| **6** Features moderation + workers 2 | 🟡 **8/8 features, 3/6 workers** | 6A appeal-sla + export + audit-cache ✅, 6B 8/8 features ✅ | 2 workers in-memory (voice-afk, blackjack-cleanup) |
 | **7** gRPC + scaling | 🟡 **partielle** | 7B RBAC ✅ **clôturé à 100%** (23 handlers + superadmin /purge/logs) | 7A gRPC (bloqué baseline), 7C sharding (pas requis) |
 
 > 👉 Pour le détail exhaustif de **ce qui n'a pas été fait dans les phases 0-2** (et pourquoi), voir [`PHASES_0_2_DIFFERES.md`](./PHASES_0_2_DIFFERES.md).
@@ -801,11 +801,12 @@ Sous charge réelle : **10-50× throughput** sur les tables concernées. La char
 >   le `moderation-worker/send_reminders.rs` enrichi en Phase 4 B.2. Pas de
 >   second use-case pour justifier une abstraction générique — skip (éviter
 >   la premature abstraction).
-> - **audit-cache-worker** et **blackjack-cleanup-worker** : extractions
->   bloquées par un problème d'état in-memory (TypeMap Serenity /
->   `ChannelManager` local au bot). Le worker ne peut pas lire/écrire ce
->   cache sans passer par Redis. Même blocage que `voice-afk-worker`
->   (différé en Phase 4). À reconsidérer si on migre ces caches vers Redis.
+> - **audit-cache-worker** : ✅ **livré** (voir récapitulatif plus bas). Cache
+>   migré vers Redis + event stream pour refresh.
+> - **blackjack-cleanup-worker** : extraction toujours bloquée par l'état
+>   in-memory (`ChannelManager` local au blackjack-bot). Même blocage que
+>   `voice-afk-worker` (différé en Phase 4). À reconsidérer si on migre ces
+>   caches vers Redis.
 > - **discord-audit-sync-worker** : nouveau scope business plus important
 >   (intégration Discord audit log + réconciliation), mieux adressé en
 >   session dédiée.
@@ -892,6 +893,56 @@ queries massives.
   `job_type = 'call_transcript'` avec filters `{channel_id, time_range}`
   + l'exporter correspondant qui query `messages` ou le `channel history`
   Discord.
+
+#### Récapitulatif `audit-cache-worker`
+
+Refresh périodique du cache `watched_users` pour audit-bot. Avant Phase 6A,
+audit-bot faisait une boucle interne `sleep(60s) + API call` dans `ready()`.
+Ce pattern ne scale pas horizontalement (N replicas = N appels API dupliqués).
+
+**Design cache→Redis** :
+
+- **Worker** (`services/workers/audit-cache-worker/`) : toutes les 60s,
+  query Postgres direct (`SELECT DISTINCT user_id FROM infractions UNION
+  manual_watched_users`), push dans Redis key `audit:watched_users` (TTL
+  300s fail-safe), puis publie un event `watched_users_refreshed` sur
+  la stream `sentinel:events` (pattern Phase 5B).
+
+- **Bot** (`audit-bot/handler/watched_users.rs`) : 2 nouvelles fonctions
+  helper exportées vers `handler/mod.rs` :
+  - `bootstrap_watched_users(ctx)` : appelé au startup. Lit Redis en
+    priorité, fallback API une seule fois si Redis vide (premier deploy,
+    worker pas encore démarré).
+  - `handle_watched_refresh_event(ctx, payload)` : consume le stream
+    event `watched_users_refreshed`, re-read le snapshot depuis Redis,
+    rafraîchit le `DashSet<String>` local.
+  - Consumer durable via `sentinel_shared::event_bus::listen_stream_group`
+    avec group `audit-bot-watched-cache` (pattern Phase 5B).
+
+- **Ancienne boucle supprimée** : le `tokio::spawn { loop { sleep(60s) +
+  api.get_all_watched_user_ids() } }` dans `handler/mod.rs::ready()` est
+  remplacé par `bootstrap + listen_stream_group`. Hot path (`is_watched()`)
+  inchangé : toujours une lecture in-memory `DashSet::contains()`.
+
+- **Scaling horizontal** : si audit-bot est déployé en N replicas, le
+  consumer group `audit-bot-watched-cache` garantit qu'UN seul replica
+  re-fetch par event (les autres sont idle sur le XREADGROUP). Pas de
+  duplication d'appels API/DB.
+
+- **docker-compose** : service `audit-cache-worker` wired sur `pgbouncer`
+  + `redis`, env `AUDIT_CACHE_REFRESH_INTERVAL=60`.
+
+**Gains** :
+1. Extraction d'une responsabilité du bot → worker dédié
+2. Scaling horizontal d'audit-bot devient possible sans N appels API
+3. Hot path `is_watched()` inchangé (perf identique)
+4. Fail-safe : TTL Redis 300s + fallback API au bootstrap
+
+**Pattern cache→Redis validé** : peut être réutilisé pour
+`voice-afk-worker` et `blackjack-cleanup-worker` qui étaient bloqués par
+le même pattern in-memory. Le template est maintenant établi :
+worker périodique → push Redis snapshot + stream event → bot consume +
+update cache local.
 
 ### Partie B — Améliorations fonctionnelles moderation-bot 🟡 **wave 1 livrée**
 

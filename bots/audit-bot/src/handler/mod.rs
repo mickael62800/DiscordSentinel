@@ -36,6 +36,7 @@ mod watched_users;
 pub use type_keys::{
     AnomalyDetectorKey, ConfigKey, MessageCacheKey, WatchedUserIdsKey, WeeklyTrackerKey,
 };
+use watched_users::{bootstrap_watched_users, handle_watched_refresh_event};
 
 pub struct Handler;
 
@@ -90,37 +91,39 @@ impl EventHandler for Handler {
             info!("Slash commands enregistrees : audit");
         }
 
-        // Rafraichir la liste des utilisateurs surveilles toutes les 60s
-        // Un seul appel batch au lieu de N appels par guild
-        let ctx_clone = ctx.clone();
+        // Phase 6A — bootstrap + consumer stream Redis.
+        //
+        // Le refresh periodique est desormais delegue a `audit-cache-worker`
+        // (permet le scaling horizontal d'audit-bot sans N appels API
+        // dupliques). Le worker :
+        //   1. query Postgres toutes les 60s
+        //   2. push dans Redis cle `audit:watched_users` (TTL 5 min)
+        //   3. publie un event `watched_users_refreshed` sur `sentinel:events`
+        //
+        // Le bot :
+        //   - bootstrap son DashSet depuis Redis au startup (fallback API si
+        //     Redis vide, par exemple si le worker n'a pas encore tourne)
+        //   - consume le stream + refresh depuis Redis a chaque event
+        let ctx_bootstrap = ctx.clone();
         tokio::spawn(async move {
-            loop {
-                let data = ctx_clone.data.read().await;
-                if let (Some(base), Some(watched_set)) =
-                    (data.get::<ApiClientKey>(), data.get::<WatchedUserIdsKey>())
-                {
-                    let api = ApiClient::new(base.clone());
-                    let watched_set = watched_set.clone();
-                    drop(data);
+            bootstrap_watched_users(&ctx_bootstrap).await;
 
-                    // Batch : 1 seul appel pour tous les serveurs
-                    match api.get_all_watched_user_ids().await {
-                        Ok(ids) => {
-                            watched_set.clear();
-                            for id in ids {
-                                watched_set.insert(id);
-                            }
-                        }
-                        Err(e) => {
-                            tracing::warn!(error = %e, "Erreur rafraichissement watched users");
-                        }
+            // Consumer durable Phase 5B — XREADGROUP + XACK. Le group
+            // "audit-bot-watched-cache" est partage si multi-replicas, ce qui
+            // fait qu'un seul replica re-fetch par event (les autres sont en
+            // idle). Pattern Phase 5B identique a ticket-bot / moderation-bot.
+            let consumer = sentinel_shared::event_bus::default_consumer_name();
+            sentinel_shared::event_bus::listen_stream_group(
+                "audit-bot-watched-cache".to_string(),
+                consumer,
+                move |payload_json| {
+                    let ctx = ctx_bootstrap.clone();
+                    async move {
+                        handle_watched_refresh_event(&ctx, &payload_json).await;
                     }
-                } else {
-                    drop(data);
-                }
-
-                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-            }
+                },
+            )
+            .await;
         });
     }
 
