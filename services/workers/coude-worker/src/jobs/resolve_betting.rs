@@ -1,7 +1,8 @@
-use rand::Rng;
 use sqlx::PgPool;
-use tracing::{info, warn, error};
+use tracing::{error, info, warn};
 use uuid::Uuid;
+
+use crate::combat_engine::{self, PlayerLite, ServerEventLite};
 
 /// Combat en phase de paris dont le delai est depasse.
 #[derive(Debug, sqlx::FromRow)]
@@ -20,23 +21,39 @@ struct BettingCombat {
     pub defender_special: Option<String>,
 }
 
+/// Rangee coude_players necessaire au moteur de combat.
 #[derive(Debug, sqlx::FromRow)]
-#[allow(dead_code)]
-struct PlayerStats {
+struct PlayerRow {
     pub user_id: String,
-    pub coins: i64,
+    pub class: Option<String>,
     pub level: i32,
     pub atk: i32,
     pub def: i32,
+    pub cowardice_count: i32,
+    pub hp_current: Option<i32>,
+}
+
+impl From<PlayerRow> for PlayerLite {
+    fn from(row: PlayerRow) -> Self {
+        Self {
+            user_id: row.user_id,
+            class: row.class,
+            level: row.level,
+            atk: row.atk,
+            def: row.def,
+            cowardice_count: row.cowardice_count,
+            hp_current: row.hp_current,
+        }
+    }
 }
 
 /// Verifie et resout les combats "betting" dont le delai de paris est ecoule.
-/// Le delai est lu depuis la config guild (bet_delay_secs, defaut 300s).
-pub async fn run(pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), String> {
-    // Recuperer les combats en phase de paris dont le delai est depasse
-    // On utilise un delai par defaut de 300s, la config guild sera lue par combat si besoin
+/// Le combat passe par le moteur multi-rounds complet (HP, classes, chaos,
+/// items) au lieu du vieux random simple.
+pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), String> {
     // Verrouiller atomiquement : passer les combats de "betting" a "resolving"
-    // pour eviter qu'un autre worker les traite en parallele
+    // pour eviter qu'un autre worker les traite en parallele. 5 minutes =
+    // bet_delay_secs par defaut cote bot.
     let combats = sqlx::query_as::<_, BettingCombat>(
         r#"UPDATE coude_combats SET status = 'resolving'
         WHERE id IN (
@@ -57,10 +74,10 @@ pub async fn run(pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), St
         return Ok(());
     }
 
-    info!(count = combats.len(), "Combats betting a resoudre");
+    info!(count = combats.len(), "Combats betting a resoudre (multi-round)");
 
     for combat in &combats {
-        if let Err(e) = resolve_single(pool, combat, api_url, bot_token).await {
+        if let Err(e) = resolve_single(pool, combat, bot_token).await {
             error!(combat_id = %combat.id, error = %e, "Erreur resolution combat betting");
         }
     }
@@ -71,12 +88,12 @@ pub async fn run(pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), St
 async fn resolve_single(
     pool: &PgPool,
     combat: &BettingCombat,
-    _api_url: &str,
     bot_token: &str,
 ) -> Result<(), String> {
-    // Charger les stats des joueurs
-    let attacker = sqlx::query_as::<_, PlayerStats>(
-        "SELECT user_id, coins, level, atk, def FROM coude_players WHERE guild_id = $1 AND user_id = $2"
+    // ── Charger les joueurs complets ──
+    let attacker_row = sqlx::query_as::<_, PlayerRow>(
+        "SELECT user_id, class, level, atk, def, cowardice_count, hp_current
+         FROM coude_players WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id)
     .bind(&combat.attacker_id)
@@ -85,8 +102,9 @@ async fn resolve_single(
     .map_err(|e| format!("get attacker: {e}"))?
     .ok_or("Attaquant introuvable")?;
 
-    let defender = sqlx::query_as::<_, PlayerStats>(
-        "SELECT user_id, coins, level, atk, def FROM coude_players WHERE guild_id = $1 AND user_id = $2"
+    let defender_row = sqlx::query_as::<_, PlayerRow>(
+        "SELECT user_id, class, level, atk, def, cowardice_count, hp_current
+         FROM coude_players WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id)
     .bind(&combat.defender_id)
@@ -95,281 +113,333 @@ async fn resolve_single(
     .map_err(|e| format!("get defender: {e}"))?
     .ok_or("Defenseur introuvable")?;
 
-    // Simuler le combat (rolls simples)
-    let (atk_roll, def_roll) = {
-        let mut rng = rand::thread_rng();
-        (rng.gen_range(1..=20) + attacker.atk, rng.gen_range(1..=20) + defender.def)
+    let attacker: PlayerLite = attacker_row.into();
+    let defender: PlayerLite = defender_row.into();
+
+    // ── Charger les events actifs (happy_hour, bloodbath...) ──
+    let events = match sqlx::query_as::<_, (String,)>(
+        "SELECT event_type FROM coude_events
+         WHERE guild_id = $1 AND active = true AND expires_at > NOW()",
+    )
+    .bind(&combat.guild_id)
+    .fetch_all(pool)
+    .await
+    {
+        Ok(rows) => rows
+            .into_iter()
+            .map(|(event_type,)| ServerEventLite { event_type })
+            .collect(),
+        Err(e) => {
+            warn!(error = %e, guild_id = %combat.guild_id, "Echec fetch events actifs");
+            Vec::new()
+        }
     };
 
-    let (winner_id, loser_id, coins_transferred, result_msg) = if atk_roll > def_roll {
-        (
-            combat.attacker_id.clone(),
-            combat.defender_id.clone(),
-            combat.mise,
-            format!(
-                "**{}** remporte le combat contre **{}** !\nRolls : {} vs {}\nGain : +{} coins",
-                combat.attacker_name, combat.defender_name, atk_roll, def_roll, combat.mise
-            ),
-        )
-    } else if def_roll > atk_roll {
-        (
-            combat.defender_id.clone(),
-            combat.attacker_id.clone(),
-            combat.mise,
-            format!(
-                "**{}** remporte le combat contre **{}** !\nRolls : {} vs {}\nGain : +{} coins",
-                combat.defender_name, combat.attacker_name, def_roll, atk_roll, combat.mise
-            ),
-        )
-    } else {
-        // Egalite
-        let msg = format!(
-            "Egalite entre **{}** et **{}** !\nRolls : {} vs {}",
-            combat.attacker_name, combat.defender_name, atk_roll, def_roll
-        );
-        // Resoudre en egalite
+    // HP courants (defaut = HP max calcule par le moteur)
+    let atk_hp_max = combat_engine::combat::calculate_hp_max(&attacker);
+    let def_hp_max = combat_engine::combat::calculate_hp_max(&defender);
+    let atk_hp_current = attacker.hp_current.unwrap_or(atk_hp_max).min(atk_hp_max);
+    let def_hp_current = defender.hp_current.unwrap_or(def_hp_max).min(def_hp_max);
+
+    // ── Appel du moteur de combat multi-rounds ──
+    let result = combat_engine::resolve_combat(
+        &attacker,
+        &defender,
+        atk_hp_current,
+        def_hp_current,
+        combat.mise,
+        combat.special_attack.as_deref(),
+        combat.defender_special.as_deref(),
+        &events,
+    );
+
+    // Extract du premier round pour compat DB (ancien schema avec 1 roll)
+    let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);
+    let first_def_roll = result.rounds.first().map(|r| r.defender_roll).unwrap_or(0);
+    let chaos_event_key = result
+        .rounds
+        .iter()
+        .find_map(|r| r.chaos_event)
+        .map(|ce| ce.key().to_string());
+
+    // ── Draw path ──
+    if result.winner_id.is_none() {
         sqlx::query(
-            "UPDATE coude_combats SET status = 'accepted', winner_id = NULL, attacker_roll = $2, defender_roll = $3, result_message = $4, resolved_at = NOW() WHERE id = $1"
+            r#"UPDATE coude_combats
+               SET status = 'accepted', winner_id = NULL,
+                   attacker_roll = $2, defender_roll = $3,
+                   chaos_event = $4, result_message = $5, resolved_at = NOW()
+               WHERE id = $1"#,
         )
         .bind(combat.id)
-        .bind(atk_roll)
-        .bind(def_roll)
-        .bind(&msg)
+        .bind(first_atk_roll)
+        .bind(first_def_roll)
+        .bind(chaos_event_key.as_deref())
+        .bind(&result.message)
         .execute(pool)
         .await
         .map_err(|e| format!("resolve draw: {e}"))?;
 
-        post_result_to_discord(bot_token, &combat.channel_id, combat.message_id.as_deref(), &msg).await;
-        info!(combat_id = %combat.id, "Combat resolu: egalite");
-        return Ok(());
-    };
+        // Update HP des 2 joueurs (important : HP ont pu baisser pendant les rounds)
+        update_player_hp(pool, &combat.guild_id, &combat.attacker_id, result.attacker_hp_final.max(0), result.attacker_hp_max).await;
+        update_player_hp(pool, &combat.guild_id, &combat.defender_id, result.defender_hp_final.max(0), result.defender_hp_max).await;
 
-    // Mettre a jour le combat
+        post_result_to_discord(
+            bot_token,
+            &combat.channel_id,
+            combat.message_id.as_deref(),
+            &result.message,
+        )
+        .await;
+
+        info!(combat_id = %combat.id, rounds = result.total_rounds, "Combat resolu: egalite");
+        return Ok(());
+    }
+
+    // ── Winner path ──
+    let winner_id = result.winner_id.clone().unwrap();
+    let loser_id = result.loser_id.clone().unwrap();
+    let coins_transferred = result.coins_won;
+    let coins_lost = result.coins_lost_by_loser;
+
     sqlx::query(
-        r#"UPDATE coude_combats SET status = 'accepted', winner_id = $2,
-           attacker_roll = $3, defender_roll = $4, coins_transferred = $5,
-           result_message = $6, resolved_at = NOW()
-           WHERE id = $1"#
+        r#"UPDATE coude_combats
+           SET status = 'accepted', winner_id = $2,
+               attacker_roll = $3, defender_roll = $4,
+               coins_transferred = $5, chaos_event = $6,
+               result_message = $7, resolved_at = NOW()
+           WHERE id = $1"#,
     )
     .bind(combat.id)
     .bind(&winner_id)
-    .bind(atk_roll)
-    .bind(def_roll)
+    .bind(first_atk_roll)
+    .bind(first_def_roll)
     .bind(coins_transferred)
-    .bind(&result_msg)
+    .bind(chaos_event_key.as_deref())
+    .bind(&result.message)
     .execute(pool)
     .await
     .map_err(|e| format!("resolve combat: {e}"))?;
 
-    // Transferer les coins
-    sqlx::query(
-        "UPDATE coude_players SET coins = coins + $3, total_wins = total_wins + 1, total_earned = total_earned + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
+    // ── Transferer les coins ──
+    if let Err(e) = sqlx::query(
+        "UPDATE coude_players SET coins = coins + $3, total_wins = total_wins + 1,
+         total_earned = total_earned + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
     )
-    .bind(&combat.guild_id).bind(&winner_id).bind(coins_transferred)
-    .execute(pool).await.map_err(|e| format!("winner coins: {e}"))?;
+    .bind(&combat.guild_id)
+    .bind(&winner_id)
+    .bind(coins_transferred)
+    .execute(pool)
+    .await
+    {
+        warn!(error = %e, "Echec credit coins gagnant");
+    }
 
-    sqlx::query(
-        "UPDATE coude_players SET coins = GREATEST(0, coins - $3), total_losses = total_losses + 1, total_lost = total_lost + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
+    if let Err(e) = sqlx::query(
+        "UPDATE coude_players SET coins = GREATEST(0, coins - $3), total_losses = total_losses + 1,
+         total_lost = total_lost + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
     )
-    .bind(&combat.guild_id).bind(&loser_id).bind(coins_transferred)
-    .execute(pool).await.map_err(|e| format!("loser coins: {e}"))?;
+    .bind(&combat.guild_id)
+    .bind(&loser_id)
+    .bind(coins_lost)
+    .execute(pool)
+    .await
+    {
+        warn!(error = %e, "Echec debit coins perdant");
+    }
 
-    // Resoudre les paris — retourne (total gagne par parieurs gagnants, total perdu par parieurs perdants, details)
-    let bet_results = resolve_bets(pool, combat.id, &winner_id, &combat.guild_id).await;
+    // ── Update HP apres le combat ──
+    update_player_hp(pool, &combat.guild_id, &combat.attacker_id, result.attacker_hp_final.max(0), result.attacker_hp_max).await;
+    update_player_hp(pool, &combat.guild_id, &combat.defender_id, result.defender_hp_final.max(0), result.defender_hp_max).await;
 
-    // Bonus combat : le gagnant du combat recoit 10% des paris perdants
+    // ── Vol bonus chaos "Vol" ──
+    if result.vol_coins > 0 {
+        let _ = sqlx::query(
+            "UPDATE coude_players SET coins = coins + $3, total_stolen = total_stolen + $3,
+             updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(&combat.guild_id)
+        .bind(&winner_id)
+        .bind(result.vol_coins)
+        .execute(pool)
+        .await;
+    }
+
+    // ── Chaos events count ──
+    if result.chaos_events_count > 0 {
+        let _ = sqlx::query(
+            "UPDATE coude_players SET chaos_events = chaos_events + 1, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(&combat.guild_id)
+        .bind(&combat.attacker_id)
+        .execute(pool)
+        .await;
+        let _ = sqlx::query(
+            "UPDATE coude_players SET chaos_events = chaos_events + 1, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(&combat.guild_id)
+        .bind(&combat.defender_id)
+        .execute(pool)
+        .await;
+    }
+
+    // ── XP ──
+    let xp_winner: i64 = if result.is_giant_killer { 30 } else { 15 };
+    let _ = sqlx::query(
+        "UPDATE coude_players SET xp = xp + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&combat.guild_id)
+    .bind(&winner_id)
+    .bind(xp_winner)
+    .execute(pool)
+    .await;
+    let _ = sqlx::query(
+        "UPDATE coude_players SET xp = xp + 5, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&combat.guild_id)
+    .bind(&loser_id)
+    .execute(pool)
+    .await;
+
+    // ── Resoudre les paris (parieurs gagnants/perdants) ──
+    let bet_results = resolve_bets(pool, combat.id, &winner_id).await;
+
+    // Bonus combat : gagnant recoit 10% des paris perdants
     if bet_results.total_lost_by_bettors > 0 {
-        let combat_bonus = bet_results.total_lost_by_bettors / 10; // 10% des paris perdants
+        let combat_bonus = bet_results.total_lost_by_bettors / 10;
         if combat_bonus > 0 {
-            if let Err(e) = sqlx::query(
-                "UPDATE coude_players SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
+            let _ = sqlx::query(
+                "UPDATE coude_players SET coins = coins + $3, total_earned = total_earned + $3,
+                 updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
             )
-            .bind(&combat.guild_id).bind(&winner_id).bind(combat_bonus)
-            .execute(pool).await {
-                warn!(error = %e, winner = %winner_id, "Echec ajout bonus combat au gagnant");
-            }
+            .bind(&combat.guild_id)
+            .bind(&winner_id)
+            .bind(combat_bonus)
+            .execute(pool)
+            .await;
         }
     }
 
-    // XP
-    if let Err(e) = sqlx::query(
-        "UPDATE coude_players SET xp = xp + 15, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
-    ).bind(&combat.guild_id).bind(&winner_id).execute(pool).await {
-        warn!(error = %e, winner = %winner_id, "Echec ajout XP gagnant");
-    }
-
-    if let Err(e) = sqlx::query(
-        "UPDATE coude_players SET xp = xp + 5, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2"
-    ).bind(&combat.guild_id).bind(&loser_id).execute(pool).await {
-        warn!(error = %e, loser = %loser_id, "Echec ajout XP perdant");
-    }
-
-    // Lire le salon combats configure (fallback: canal du combat)
-    let configured_channel = match sqlx::query_scalar::<_, String>(
-        "SELECT config_value FROM bot_guild_configs WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_combats'"
+    // ── Poster le resultat sur Discord ──
+    let configured_channel = sqlx::query_scalar::<_, String>(
+        "SELECT config_value FROM bot_guild_configs
+         WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_combats'",
     )
     .bind(&combat.guild_id)
     .fetch_optional(pool)
-    .await {
-        Ok(v) => v.filter(|v| !v.is_empty()),
-        Err(e) => {
-            warn!(error = %e, guild_id = %combat.guild_id, "Echec lecture config channel_combats");
-            None
-        }
-    };
+    .await
+    .ok()
+    .flatten()
+    .filter(|v| !v.is_empty());
 
     let target_channel = configured_channel.as_deref().unwrap_or(&combat.channel_id);
 
-    // Poster le resultat sur Discord
-    let embed_msg = format!(
-        "**Resultat du Coup de Coude !**\n\n{}\n\n<@{}> vs <@{}>\nMise : {} coins",
-        result_msg, combat.attacker_id, combat.defender_id, combat.mise
-    );
-    post_result_to_discord(bot_token, target_channel, combat.message_id.as_deref(), &embed_msg).await;
-
-    // Notifications dans le salon notifications (combattants + parieurs)
-    let notif_channel = match sqlx::query_scalar::<_, String>(
-        "SELECT config_value FROM bot_guild_configs WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_notifications'"
+    post_result_to_discord(
+        bot_token,
+        target_channel,
+        combat.message_id.as_deref(),
+        &result.message,
     )
-    .bind(&combat.guild_id)
-    .fetch_optional(pool)
-    .await {
-        Ok(v) => v.filter(|v| !v.is_empty()),
-        Err(e) => {
-            warn!(error = %e, guild_id = %combat.guild_id, "Echec lecture config channel_notifications");
-            None
-        }
-    };
+    .await;
 
-    if let Some(ref notif_ch) = notif_channel {
-        // Notifier les combattants (mention dans le salon)
-        let special_info = match (&combat.special_attack, &combat.defender_special) {
-            (Some(atk), Some(def)) => format!("\nItems : **{}** vs **{}**", atk, def),
-            (Some(atk), None) => format!("\nItem : **{}**", atk),
-            (None, Some(def)) => format!("\nItem defenseur : **{}**", def),
-            (None, None) => String::new(),
-        };
-
-        let combat_bonus_info = if bet_results.total_lost_by_bettors > 0 {
-            let bonus = bet_results.total_lost_by_bettors / 10;
-            format!("\nBonus paris : **+{} coins** (10% des paris perdants)", bonus)
-        } else {
-            String::new()
-        };
-
-        let winner_name = if winner_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name };
-        let combat_notif = format!(
-            "<@{}> <@{}> — Combat termine !\n\n\
-            Gagnant : **{}**\n\
-            Mise : **{} coins** | Rolls : {} vs {}\n\
-            Gain combat : **+{} coins**{}{}\n",
-            combat.attacker_id, combat.defender_id,
-            winner_name,
-            combat.mise, atk_roll, def_roll,
-            coins_transferred, combat_bonus_info, special_info,
-        );
-        post_result_to_discord(bot_token, notif_ch, None, &combat_notif).await;
-
-        // Notifier chaque parieur
-        for detail in &bet_results.details {
-            let pari_notif = if detail.won {
-                format!(
-                    "<@{}> Tu as **gagne** ton pari ! Tu avais mise **{} coins** sur **{}** — gain : **+{} coins**",
-                    detail.bettor_id, detail.amount,
-                    if detail.backed_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name },
-                    detail.payout,
-                )
-            } else {
-                format!(
-                    "<@{}> Tu as **perdu** ton pari. Tu avais mise **{} coins** sur **{}** — perte : **-{} coins**",
-                    detail.bettor_id, detail.amount,
-                    if detail.backed_id == combat.attacker_id { &combat.attacker_name } else { &combat.defender_name },
-                    detail.amount,
-                )
-            };
-            post_result_to_discord(bot_token, notif_ch, None, &pari_notif).await;
-        }
-    }
-
-    info!(combat_id = %combat.id, winner = %winner_id, "Combat betting resolu par le worker");
+    info!(
+        combat_id = %combat.id,
+        winner = %winner_id,
+        rounds = result.total_rounds,
+        chaos = result.chaos_events_count,
+        "Combat betting resolu par le moteur multi-rounds"
+    );
 
     Ok(())
 }
 
+async fn update_player_hp(pool: &PgPool, guild_id: &str, user_id: &str, hp: i32, hp_max: i32) {
+    if let Err(e) = sqlx::query(
+        "UPDATE coude_players SET hp_current = $3, hp_max = $4, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(hp)
+    .bind(hp_max)
+    .execute(pool)
+    .await
+    {
+        warn!(error = %e, user_id, hp, hp_max, "Echec update HP");
+    }
+}
+
 struct BetResult {
     total_lost_by_bettors: i64,
-    details: Vec<BetDetail>,
 }
 
-struct BetDetail {
-    bettor_id: String,
-    backed_id: String,
-    amount: i64,
-    won: bool,
-    payout: i64,
-}
-
-async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str, _guild_id: &str) -> BetResult {
+async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str) -> BetResult {
     #[derive(sqlx::FromRow)]
-    struct Bet { id: Uuid, guild_id: String, bettor_id: String, backed_id: String, amount: i64 }
+    struct Bet {
+        id: Uuid,
+        guild_id: String,
+        bettor_id: String,
+        backed_id: String,
+        amount: i64,
+    }
 
     let bets = match sqlx::query_as::<_, Bet>(
-        "SELECT id, guild_id, bettor_id, backed_id, amount FROM coude_bets WHERE combat_id = $1"
+        "SELECT id, guild_id, bettor_id, backed_id, amount FROM coude_bets WHERE combat_id = $1",
     )
     .bind(combat_id)
     .fetch_all(pool)
-    .await {
+    .await
+    {
         Ok(b) => b,
         Err(e) => {
-            warn!(error = %e, combat_id = %combat_id, "Echec chargement paris pour resolution");
-            vec![]
+            warn!(error = %e, combat_id = %combat_id, "Echec chargement paris");
+            return BetResult { total_lost_by_bettors: 0 };
         }
     };
 
     let mut total_lost_by_bettors = 0i64;
-    let mut details = Vec::new();
 
     for bet in &bets {
         if bet.backed_id == winner_id {
-            // Parieur gagnant : recoit x2
             let payout = bet.amount * 2;
-            if let Err(e) = sqlx::query("UPDATE coude_players SET coins = coins + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2")
-                .bind(&bet.guild_id).bind(&bet.bettor_id).bind(payout)
-                .execute(pool).await {
-                warn!(error = %e, bettor = %bet.bettor_id, "Echec paiement pari gagnant");
-            }
-            if let Err(e) = sqlx::query("UPDATE coude_bets SET won = true, payout = $2 WHERE id = $1")
-                .bind(bet.id).bind(payout).execute(pool).await {
-                warn!(error = %e, bet_id = %bet.id, "Echec marquage pari gagnant");
-            }
-            details.push(BetDetail {
-                bettor_id: bet.bettor_id.clone(),
-                backed_id: bet.backed_id.clone(),
-                amount: bet.amount,
-                won: true,
-                payout,
-            });
+            let _ = sqlx::query(
+                "UPDATE coude_players SET coins = coins + $3, updated_at = NOW()
+                 WHERE guild_id = $1 AND user_id = $2",
+            )
+            .bind(&bet.guild_id)
+            .bind(&bet.bettor_id)
+            .bind(payout)
+            .execute(pool)
+            .await;
+            let _ = sqlx::query("UPDATE coude_bets SET won = true, payout = $2 WHERE id = $1")
+                .bind(bet.id)
+                .bind(payout)
+                .execute(pool)
+                .await;
         } else {
-            // Parieur perdant : perd sa mise
             total_lost_by_bettors += bet.amount;
-            if let Err(e) = sqlx::query("UPDATE coude_bets SET won = false, payout = 0 WHERE id = $1")
-                .bind(bet.id).execute(pool).await {
-                warn!(error = %e, bet_id = %bet.id, "Echec marquage pari perdant");
-            }
-            details.push(BetDetail {
-                bettor_id: bet.bettor_id.clone(),
-                backed_id: bet.backed_id.clone(),
-                amount: bet.amount,
-                won: false,
-                payout: 0,
-            });
+            let _ = sqlx::query("UPDATE coude_bets SET won = false, payout = 0 WHERE id = $1")
+                .bind(bet.id)
+                .execute(pool)
+                .await;
         }
     }
 
-    BetResult { total_lost_by_bettors, details }
+    BetResult { total_lost_by_bettors }
 }
 
-async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: Option<&str>, content: &str) {
+async fn post_result_to_discord(
+    bot_token: &str,
+    channel_id: &str,
+    message_id: Option<&str>,
+    content: &str,
+) {
     if bot_token.is_empty() {
         warn!("Pas de token Discord pour poster le resultat");
         return;
@@ -380,11 +450,12 @@ async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: O
     // Editer le message existant si on a le message_id
     if let Some(mid) = message_id {
         let url = format!("https://discord.com/api/v10/channels/{}/messages/{}", channel_id, mid);
-        let resp = client.patch(&url)
+        let resp = client
+            .patch(&url)
             .header("Authorization", format!("Bot {}", bot_token))
             .json(&serde_json::json!({
                 "embeds": [{
-                    "title": "Resultat du Coup de Coude !",
+                    "title": "⚔️ Résultat du Coup de Coude !",
                     "description": content,
                     "color": 0x57F287
                 }],
@@ -402,18 +473,19 @@ async fn post_result_to_discord(bot_token: &str, channel_id: &str, message_id: O
 
     // Fallback : poster un nouveau message
     let url = format!("https://discord.com/api/v10/channels/{}/messages", channel_id);
-    if let Err(e) = client.post(&url)
+    if let Err(e) = client
+        .post(&url)
         .header("Authorization", format!("Bot {}", bot_token))
         .json(&serde_json::json!({
             "embeds": [{
-                "title": "Resultat du Coup de Coude !",
+                "title": "⚔️ Résultat du Coup de Coude !",
                 "description": content,
                 "color": 0x57F287
             }]
         }))
         .send()
-        .await {
+        .await
+    {
         warn!(error = %e, channel_id, "Echec post resultat combat Discord (fallback)");
     }
 }
-
