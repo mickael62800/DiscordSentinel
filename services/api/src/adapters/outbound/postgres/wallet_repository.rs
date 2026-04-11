@@ -168,7 +168,12 @@ impl WalletRepository for PgWalletRepository {
         .ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
 
         if current.coins < amount {
-            return Err(DomainError::ValidationError("Solde insuffisant".into()));
+            return Err(DomainError::ValidationError(format!(
+                "Solde insuffisant : tu as {} coins, il en faut {} (manque {}). Reduis ta mise ou gagne des coins avant de rejouer.",
+                current.coins,
+                amount,
+                amount - current.coins
+            )));
         }
 
         let row = sqlx::query_as::<_, WalletRow>(
@@ -225,7 +230,12 @@ impl WalletRepository for PgWalletRepository {
         .ok_or_else(|| DomainError::NotFound("Portefeuille expediteur introuvable".into()))?;
 
         if sender.coins < amount {
-            return Err(DomainError::ValidationError("Solde insuffisant".into()));
+            return Err(DomainError::ValidationError(format!(
+                "Solde insuffisant pour ce transfert : {} coins disponibles, {} requis (manque {}).",
+                sender.coins,
+                amount,
+                amount - sender.coins
+            )));
         }
 
         // Debiter l'expediteur

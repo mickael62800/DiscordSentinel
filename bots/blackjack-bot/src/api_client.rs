@@ -314,9 +314,32 @@ fn proto_game_to_dto(g: proto::BlackjackGame) -> BlackjackGameDto {
 
 fn grpc_err_to_string(e: GrpcCallError) -> String {
     match e {
-        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
-        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
-        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
+        GrpcCallError::Unavailable => {
+            "API indisponible, reessaie dans quelques instants.".to_string()
+        }
+        GrpcCallError::Status(s) => {
+            // On nettoie les prefixes techniques cote domaine API pour que
+            // le message affiche au joueur soit directement lisible.
+            let raw = s.message();
+            let clean = raw
+                .trim_start_matches("Données invalides : ")
+                .trim_start_matches("Donnees invalides : ")
+                .trim_start_matches("Conflit : ")
+                .trim_start_matches("Introuvable : ");
+            match s.code() {
+                tonic::Code::InvalidArgument | tonic::Code::AlreadyExists | tonic::Code::NotFound => {
+                    clean.to_string()
+                }
+                tonic::Code::Unauthenticated | tonic::Code::PermissionDenied => {
+                    format!("Accès refusé : {clean}")
+                }
+                tonic::Code::Unavailable | tonic::Code::DeadlineExceeded => {
+                    "API temporairement indisponible, reessaie.".to_string()
+                }
+                _ => format!("Erreur API : {clean}"),
+            }
+        }
+        GrpcCallError::Transport(_) => "Erreur de connexion à l'API, reessaie.".to_string(),
     }
 }
 
