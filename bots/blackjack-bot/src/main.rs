@@ -5,6 +5,7 @@
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 mod api_client;
+mod card_image;
 mod channel_manager;
 mod commands;
 mod config;

@@ -1,9 +1,13 @@
 //! Construction des embeds Discord pour une partie de blackjack.
 
-use serenity::all::{CreateEmbed, CreateEmbedFooter};
+use serenity::all::{CreateAttachment, CreateEmbed, CreateEmbedFooter};
 
 use super::messages::{pick_random, BJ_BUST, BJ_LOSE, BJ_NATURAL, BJ_WIN};
 use crate::api_client::{BlackjackGameDto, CardDto};
+use crate::card_image;
+
+/// Nom du fichier attachment pour l'image composee player+dealer.
+pub const TABLE_IMAGE_NAME: &str = "table.png";
 
 /// `true` si la partie est dans un état final (plus d'action possible).
 pub fn is_game_over(status: &str) -> bool {
@@ -43,6 +47,24 @@ fn hand_to_string(hand: &[CardDto]) -> String {
         .map(card_to_unicode)
         .collect::<Vec<_>>()
         .join("  ")
+}
+
+/// Construit l'embed complet + l'attachment image de la table pour une
+/// partie en cours ou terminee. Retourne `(embed, Some(attachment))` si
+/// l'image a pu etre composee, sinon `(embed, None)` et l'embed retombe
+/// sur une representation texte.
+pub fn build_game_message(
+    game: &BlackjackGameDto,
+) -> (CreateEmbed, Option<CreateAttachment>) {
+    let embed = build_game_embed(game);
+    match card_image::render_table(&game.player_hand, &game.dealer_hand) {
+        Some(bytes) => {
+            let embed_with_image = embed.image(format!("attachment://{}", TABLE_IMAGE_NAME));
+            let attachment = CreateAttachment::bytes(bytes, TABLE_IMAGE_NAME);
+            (embed_with_image, Some(attachment))
+        }
+        None => (embed, None),
+    }
 }
 
 /// Embed principal d'une partie — en cours ou terminée (victoire / bust / push / ...).

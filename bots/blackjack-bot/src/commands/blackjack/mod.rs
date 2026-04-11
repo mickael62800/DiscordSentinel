@@ -10,7 +10,7 @@ mod embeds;
 mod messages;
 
 pub use buttons::build_buttons;
-pub use embeds::{build_game_embed, is_game_over};
+pub use embeds::{build_game_message, is_game_over};
 
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, ComponentInteraction, Context,
@@ -72,17 +72,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     match api.get_active(&guild_id, &user_id).await {
         Ok(Some(game)) if game.status == "playing" => {
             // Reprendre la partie en cours
-            let embed = build_game_embed(&game);
+            let (embed, attachment) = build_game_message(&game);
             let components = build_buttons(&game);
+            let mut msg = CreateInteractionResponseMessage::new()
+                .embed(embed)
+                .components(components);
+            if let Some(a) = attachment {
+                msg = msg.add_file(a);
+            }
             command
-                .create_response(
-                    &ctx.http,
-                    CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new()
-                            .embed(embed)
-                            .components(components),
-                    ),
-                )
+                .create_response(&ctx.http, CreateInteractionResponse::Message(msg))
                 .await
                 .ok();
             return;
@@ -99,22 +98,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let embed = build_game_embed(&game);
+    let (embed, attachment) = build_game_message(&game);
     let components = if is_game_over(&game.status) {
         vec![]
     } else {
         build_buttons(&game)
     };
 
+    let mut msg = CreateInteractionResponseMessage::new()
+        .embed(embed)
+        .components(components);
+    if let Some(a) = attachment {
+        msg = msg.add_file(a);
+    }
     command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(components),
-            ),
-        )
+        .create_response(&ctx.http, CreateInteractionResponse::Message(msg))
         .await
         .ok();
 }
@@ -169,22 +167,21 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    let embed = build_game_embed(&game);
+    let (embed, attachment) = build_game_message(&game);
     let components = if is_game_over(&game.status) {
         vec![]
     } else {
         build_buttons(&game)
     };
 
+    let mut msg = CreateInteractionResponseMessage::new()
+        .embed(embed)
+        .components(components);
+    if let Some(a) = attachment {
+        msg = msg.add_file(a);
+    }
     component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::UpdateMessage(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(components),
-            ),
-        )
+        .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(msg))
         .await
         .ok();
 }

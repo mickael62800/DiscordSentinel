@@ -69,22 +69,21 @@ pub(super) async fn handle_bet_select(ctx: &Context, component: &ComponentIntera
     }
     drop(data);
 
-    let embed = commands::blackjack::build_game_embed(&game);
+    let (embed, attachment) = commands::blackjack::build_game_message(&game);
     let components = if commands::blackjack::is_game_over(&game.status) {
         vec![]
     } else {
         commands::blackjack::build_buttons(&game)
     };
 
+    let mut msg = CreateInteractionResponseMessage::new()
+        .embed(embed)
+        .components(components);
+    if let Some(a) = attachment {
+        msg = msg.add_file(a);
+    }
     component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::UpdateMessage(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(components),
-            ),
-        )
+        .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(msg))
         .await
         .ok();
 

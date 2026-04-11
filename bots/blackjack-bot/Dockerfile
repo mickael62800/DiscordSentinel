@@ -20,4 +20,8 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mou
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
 COPY --from=builder /tmp/blackjack-bot /usr/local/bin/blackjack-bot
+# Phase 8 — embarquer les assets JPG des cartes pour le rendu des mains.
+COPY bots/blackjack-bot/assets /app/assets
+ENV BJ_ASSETS_DIR=/app/assets/cards
+WORKDIR /app
 ENTRYPOINT ["blackjack-bot"]
