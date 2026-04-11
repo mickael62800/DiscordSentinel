@@ -28,8 +28,16 @@ use tonic::metadata::MetadataValue;
 use tonic::transport::{Channel, Endpoint};
 use tonic::Request;
 
+use sentinel_proto::blackjack::v1 as bj_proto;
+use sentinel_proto::blackjack::v1::blackjack_service_client::BlackjackServiceClient;
+use sentinel_proto::community::v1 as com_proto;
+use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_player_service_client::CoudePlayerServiceClient;
+use sentinel_proto::tickets::v1 as tickets_proto;
+use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
+use sentinel_proto::welcome::v1 as welcome_proto;
+use sentinel_proto::welcome::v1::welcome_service_client::WelcomeServiceClient;
 
 const DEFAULT_API_URL: &str = "http://127.0.0.1:50051";
 const DEFAULT_API_KEY: &str = "PHWHQOHDQFNHEGQHDEYFUWFHKUGTFKBY";
@@ -200,4 +208,89 @@ async fn live_missing_auth_token_is_unauthenticated() {
     });
     let err = client.get_player(req).await.expect_err("doit echouer");
     assert_eq!(err.code(), tonic::Code::Unauthenticated);
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Tests LIVE pour services dependants de la DB (Tickets/Welcome/
+// Community/Blackjack). Ils ne sont pas testables in-process via mocks
+// car les handlers utilisent sqlx::PgPool ou des structs concretes.
+// ══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
+async fn live_tickets_list_smoke() {
+    let channel = connect().await;
+    let mut client = TicketsServiceClient::new(channel);
+
+    let req = auth(Request::new(tickets_proto::ListTicketsRequest {
+        status: None,
+        priority: None,
+        search: None,
+        author_id: None,
+        limit: 5,
+        offset: 0,
+    }));
+    // Smoke : on attend juste un Ok (pas de panic, pas de status d'erreur).
+    let resp = client.list_tickets(req).await.expect("list_tickets reussi");
+    let list = resp.into_inner();
+    // La DB peut etre vide en environnement de test — on valide juste le type.
+    assert!(list.tickets.len() <= 5);
+}
+
+#[tokio::test]
+#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
+async fn live_welcome_get_config_returns_default_or_existing() {
+    let channel = connect().await;
+    let mut client = WelcomeServiceClient::new(channel);
+
+    let req = auth(Request::new(welcome_proto::GetConfigRequest {
+        guild_id: unique_id(),
+    }));
+    // GetConfig doit toujours reussir (renvoie une config par defaut si
+    // pas en DB).
+    let cfg = client.get_config(req).await.expect("get_config reussi").into_inner();
+    // La config existe forcement (champ welcome_enabled doit etre lisible).
+    let _ = cfg.welcome_enabled;
+}
+
+#[tokio::test]
+#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
+async fn live_community_list_sponsorships_and_temp_roles() {
+    let channel = connect().await;
+    let mut client = CommunityServiceClient::new(channel);
+
+    let guild = unique_id();
+
+    let sponsors = client
+        .list_sponsorships(auth(Request::new(com_proto::ListSponsorshipsRequest {
+            guild_id: guild.clone(),
+        })))
+        .await
+        .expect("list_sponsorships reussi")
+        .into_inner();
+    assert!(sponsors.sponsorships.is_empty(), "guild aleatoire = vide");
+
+    let temp_roles = client
+        .list_temp_roles(auth(Request::new(com_proto::ListTempRolesRequest {
+            guild_id: guild,
+        })))
+        .await
+        .expect("list_temp_roles reussi")
+        .into_inner();
+    assert!(temp_roles.roles.is_empty(), "guild aleatoire = vide");
+}
+
+#[tokio::test]
+#[ignore = "necessite la stack Docker (api + postgres) — lancer avec --ignored"]
+async fn live_blackjack_get_active_returns_none_for_new_user() {
+    let channel = connect().await;
+    let mut client = BlackjackServiceClient::new(channel);
+
+    // Nouveau user -> pas de partie active.
+    let req = auth(Request::new(bj_proto::GetActiveRequest {
+        guild_id: unique_id(),
+        user_id: unique_id(),
+    }));
+    let resp = client.get_active(req).await.expect("get_active reussi").into_inner();
+    assert!(resp.game.is_none(), "nouveau user n'a pas de partie active");
 }

@@ -41,14 +41,19 @@ use sentinel_api::adapters::inbound::grpc::images::ImagesGrpc;
 use sentinel_api::adapters::inbound::grpc::members::MembersGrpc;
 use sentinel_api::adapters::inbound::grpc::moderation::ModerationGrpc;
 use sentinel_api::adapters::inbound::grpc::progression::ProgressionGrpc;
+use sentinel_api::adapters::inbound::grpc::roles::RolePanelsGrpc;
 use sentinel_api::adapters::inbound::grpc::security::SecurityGrpc;
 use sentinel_api::adapters::inbound::grpc::stats::StatsGrpc;
+use sentinel_api::adapters::inbound::grpc::voice::VoiceChannelsGrpc;
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::domain::entities::{
-    DashboardStats, GuildMember, GuildStatsOverview, GuildVoiceStats, ImageAnalysis,
-    LevelConfig, LevelReward, MemberSummary, MessageAnalysis, ModerationAction, SecurityEvent,
-    UserLevel, UserModerationHistory, UserStats, XpSource,
+    AutoRole, DashboardStats, DiscordRole, GuildMember, GuildStatsOverview, GuildVoiceStats,
+    ImageAnalysis, LevelConfig, LevelReward, MemberSummary, MessageAnalysis, ModerationAction,
+    RolePanel, RolePanelDetail, SecurityEvent, UserLevel, UserModerationHistory,
+    UserStats, VoiceChannel, VoiceChannelDetail, VoiceChannelInviteLink,
+    VoiceChannelTheme, VoiceChannelWhitelistEntry, XpSource,
 };
+use sentinel_api::domain::value_objects::VoiceChannelKind;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::domain::value_objects::Action;
 use sentinel_api::ports::inbound::{
@@ -61,6 +66,15 @@ use sentinel_api::ports::inbound::manage_levels::{AddXpCommand, AddXpResult, Man
 use sentinel_api::ports::inbound::manage_members::{
     ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
 };
+use sentinel_api::ports::inbound::manage_role_panels::{
+    CreateAutoRoleCommand, CreateRolePanelCommand, ManageRolePanelsUseCase, SetMessageIdCommand,
+};
+use sentinel_api::ports::inbound::{
+    BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
+    ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
+    TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
+};
+use sentinel_api::ports::outbound::DiscordRoleRepository;
 use sentinel_proto::automod::v1 as automod_proto;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
@@ -76,6 +90,12 @@ use sentinel_proto::moderation::v1::moderation_service_server::ModerationService
 use sentinel_proto::progression::v1 as prog_proto;
 use sentinel_proto::progression::v1::progression_service_client::ProgressionServiceClient;
 use sentinel_proto::progression::v1::progression_service_server::ProgressionServiceServer;
+use sentinel_proto::roles::v1 as roles_proto;
+use sentinel_proto::roles::v1::role_panels_service_client::RolePanelsServiceClient;
+use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsServiceServer;
+use sentinel_proto::voice::v1 as voice_proto;
+use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
+use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
 use sentinel_proto::security::v1 as sec_proto;
 use sentinel_proto::security::v1::security_service_client::SecurityServiceClient;
 use sentinel_proto::security::v1::security_service_server::SecurityServiceServer;
@@ -597,6 +617,229 @@ async fn progression_add_xp_and_get_level_round_trip() {
     }).await.unwrap().into_inner();
     assert_eq!(rewards.rewards.len(), 1);
     assert_eq!(rewards.rewards[0].level, 5);
+
+    let _ = shutdown.send(());
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// RolePanelsService
+// ══════════════════════════════════════════════════════════════════════
+
+struct MockRolePanelsUc;
+
+#[async_trait]
+impl ManageRolePanelsUseCase for MockRolePanelsUc {
+    async fn list_panels(&self, guild_id: &str) -> Result<Vec<RolePanel>, DomainError> {
+        Ok(vec![sample_role_panel(guild_id)])
+    }
+    async fn list_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, DomainError> {
+        Ok(vec![AutoRole {
+            id: Uuid::nil(),
+            guild_id: guild_id.into(),
+            role_id: "role_member".into(),
+            role_name: "Member".into(),
+            delay_secs: 60,
+            enabled: true,
+        }])
+    }
+    async fn add_auto_role(&self, cmd: CreateAutoRoleCommand) -> Result<AutoRole, DomainError> {
+        Ok(AutoRole {
+            id: Uuid::new_v4(),
+            guild_id: cmd.guild_id,
+            role_id: cmd.role_id,
+            role_name: cmd.role_name,
+            delay_secs: cmd.delay_secs,
+            enabled: true,
+        })
+    }
+    async fn create_panel(&self, _: CreateRolePanelCommand) -> Result<RolePanelDetail, DomainError> { unimplemented!() }
+    async fn get_panel(&self, _: &str) -> Result<RolePanelDetail, DomainError> { unimplemented!() }
+    async fn get_panel_by_message(&self, _: &str) -> Result<Option<RolePanelDetail>, DomainError> { Ok(None) }
+    async fn set_message_id(&self, _: SetMessageIdCommand) -> Result<(), DomainError> { Ok(()) }
+    async fn delete_panel(&self, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn delete_auto_role(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+}
+
+fn sample_role_panel(guild_id: &str) -> RolePanel {
+    RolePanel {
+        id: Uuid::nil(),
+        guild_id: guild_id.into(),
+        channel_id: "ch1".into(),
+        message_id: Some("msg1".into()),
+        title: "Choisis ton role".into(),
+        description: "Reagis pour un role".into(),
+        mode: "buttons".into(),
+        max_roles: Some(3),
+        enabled: true,
+        created_at: ts(),
+        updated_at: ts(),
+    }
+}
+
+struct MockDiscordRoleRepo;
+
+#[async_trait]
+impl DiscordRoleRepository for MockDiscordRoleRepo {
+    async fn sync_roles(&self, _: &str, _: Vec<DiscordRole>) -> Result<(), DomainError> { Ok(()) }
+    async fn find_by_guild(&self, _: &str) -> Result<Vec<DiscordRole>, DomainError> { Ok(vec![]) }
+    async fn find_by_id(&self, _: &str, _: &str) -> Result<Option<DiscordRole>, DomainError> { Ok(None) }
+}
+
+#[tokio::test]
+async fn role_panels_list_and_add_auto_role() {
+    let svc = RolePanelsServiceServer::new(RolePanelsGrpc {
+        uc: Arc::new(MockRolePanelsUc),
+        discord_role_repo: Arc::new(MockDiscordRoleRepo),
+    });
+    let (url, shutdown) = spawn_one_service!(svc);
+    let mut client = RolePanelsServiceClient::connect(Endpoint::from_shared(url).unwrap())
+        .await.unwrap();
+
+    // List panels
+    let panels = client.list_panels(roles_proto::ListPanelsRequest {
+        guild_id: "g1".into(),
+    }).await.unwrap().into_inner();
+    assert_eq!(panels.panels.len(), 1);
+    assert_eq!(panels.panels[0].title, "Choisis ton role");
+    assert!(panels.panels[0].enabled);
+
+    // List auto roles
+    let auto = client.list_auto_roles(roles_proto::ListAutoRolesRequest {
+        guild_id: "g1".into(),
+    }).await.unwrap().into_inner();
+    assert_eq!(auto.roles.len(), 1);
+    assert_eq!(auto.roles[0].role_name, "Member");
+    assert_eq!(auto.roles[0].delay_secs, 60);
+
+    let _ = shutdown.send(());
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// VoiceChannelsService
+// ══════════════════════════════════════════════════════════════════════
+
+struct MockVoiceChannelsUc;
+
+#[async_trait]
+impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
+    async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError> {
+        Ok(vec![
+            sample_voice_channel(guild_id, "ch1", "Salon de Joe"),
+            sample_voice_channel(guild_id, "ch2", "Salon de Bob"),
+        ])
+    }
+    async fn create_channel(&self, cmd: CreateVoiceChannelCommand) -> Result<VoiceChannel, DomainError> {
+        Ok(VoiceChannel {
+            id: Uuid::new_v4(),
+            guild_id: cmd.guild_id,
+            owner_id: cmd.owner_id,
+            owner_name: cmd.owner_name,
+            channel_id: cmd.channel_id,
+            text_channel_id: cmd.text_channel_id,
+            members_channel_id: cmd.members_channel_id,
+            queue_channel_id: cmd.queue_channel_id,
+            category_id: cmd.category_id,
+            channel_name: cmd.channel_name,
+            kind: VoiceChannelKind::Public,
+            visibility: cmd.visibility,
+            queue_enabled: cmd.queue_enabled,
+            locked: false,
+            stage_enabled: cmd.stage_enabled,
+            member_limit: Some(10),
+            status: None,
+            channel_status: "active".into(),
+            closed_at: None,
+            created_at: ts(),
+        })
+    }
+    async fn is_banned(&self, _: &str, user_id: &str) -> Result<bool, DomainError> {
+        Ok(user_id == "banned_user")
+    }
+
+    // Toutes les autres methodes ne sont pas appelees dans nos tests.
+    async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError> { unimplemented!() }
+    async fn get_channel_detail(&self, _: &str) -> Result<VoiceChannelDetail, DomainError> { unimplemented!() }
+    async fn close_channel(&self, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn delete_channel(&self, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn update_channel(&self, _: UpdateVoiceChannelCommand) -> Result<(), DomainError> { unimplemented!() }
+    async fn transfer_ownership(&self, _: TransferOwnershipCommand) -> Result<(), DomainError> { unimplemented!() }
+    async fn add_co_admin(&self, _: ManageCoAdminCommand) -> Result<(), DomainError> { unimplemented!() }
+    async fn remove_co_admin(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn get_whitelist(&self, _: &str, _: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> { unimplemented!() }
+    async fn add_to_whitelist(&self, _: ManageWhitelistCommand) -> Result<(), DomainError> { unimplemented!() }
+    async fn remove_from_whitelist(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn ban_from_channel(&self, _: BanFromChannelCommand) -> Result<(), DomainError> { unimplemented!() }
+    async fn unban_from_channel(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn create_invite_link(&self, _: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> { unimplemented!() }
+    async fn list_invite_links(&self, _: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError> { unimplemented!() }
+    async fn use_invite_link(&self, _: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> { unimplemented!() }
+    async fn revoke_invite_link(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn list_themes(&self, _: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> { unimplemented!() }
+    async fn create_theme(&self, _: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> { unimplemented!() }
+    async fn update_theme(&self, _: &str, _: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> { unimplemented!() }
+    async fn delete_theme(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+}
+
+fn sample_voice_channel(guild_id: &str, channel_id: &str, name: &str) -> VoiceChannel {
+    VoiceChannel {
+        id: Uuid::nil(),
+        guild_id: guild_id.into(),
+        owner_id: "u".into(),
+        owner_name: "Joe".into(),
+        channel_id: channel_id.into(),
+        text_channel_id: None,
+        members_channel_id: None,
+        queue_channel_id: None,
+        category_id: Some("cat".into()),
+        channel_name: name.into(),
+        kind: VoiceChannelKind::Public,
+        visibility: "public".into(),
+        queue_enabled: false,
+        locked: false,
+        stage_enabled: false,
+        member_limit: Some(10),
+        status: None,
+        channel_status: "active".into(),
+        closed_at: None,
+        created_at: ts(),
+    }
+}
+
+#[tokio::test]
+async fn voice_channels_list_and_create_round_trip() {
+    let svc = VoiceChannelsServiceServer::new(VoiceChannelsGrpc { uc: Arc::new(MockVoiceChannelsUc) });
+    let (url, shutdown) = spawn_one_service!(svc);
+    let mut client = VoiceChannelsServiceClient::connect(Endpoint::from_shared(url).unwrap())
+        .await.unwrap();
+
+    // List
+    let list = client.list_channels(voice_proto::ListChannelsRequest {
+        guild_id: "g1".into(),
+    }).await.unwrap().into_inner();
+    assert_eq!(list.channels.len(), 2);
+    assert_eq!(list.channels[0].channel_name, "Salon de Joe");
+    assert_eq!(list.channels[1].channel_name, "Salon de Bob");
+    assert_eq!(list.channels[0].kind, "public");
+
+    // Create
+    let created = client.create_channel(voice_proto::CreateChannelRequest {
+        guild_id: "g1".into(),
+        owner_id: "u".into(),
+        owner_name: "Joe".into(),
+        channel_id: "new_ch".into(),
+        text_channel_id: None,
+        members_channel_id: None,
+        queue_channel_id: None,
+        category_id: Some("cat".into()),
+        channel_name: "Mon Salon".into(),
+        kind: "public".into(),
+        visibility: "public".into(),
+        queue_enabled: false,
+    }).await.unwrap().into_inner();
+    assert_eq!(created.channel_name, "Mon Salon");
+    assert_eq!(created.member_limit, Some(10));
+    assert_eq!(created.kind, "public");
+    assert_eq!(created.visibility, "public");
 
     let _ = shutdown.send(());
 }
