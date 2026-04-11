@@ -9,6 +9,7 @@
 
 pub mod automod;
 pub mod blackjack;
+pub mod community;
 pub mod coude;
 pub mod errors;
 pub mod images;
@@ -21,5 +22,6 @@ pub mod server;
 pub mod stats;
 pub mod tickets;
 pub mod voice;
+pub mod welcome;
 
 pub use server::serve_grpc;

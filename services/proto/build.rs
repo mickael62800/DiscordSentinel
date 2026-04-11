@@ -25,6 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/automod.proto",
                 "proto/blackjack.proto",
                 "proto/common.proto",
+                "proto/community.proto",
                 "proto/coude.proto",
                 "proto/images.proto",
                 "proto/members.proto",
@@ -35,6 +36,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/stats.proto",
                 "proto/tickets.proto",
                 "proto/voice.proto",
+                "proto/welcome.proto",
             ],
             &["proto"],
         )?;

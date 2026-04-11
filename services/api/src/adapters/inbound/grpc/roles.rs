@@ -9,12 +9,15 @@ use sentinel_proto::roles::v1 as proto;
 use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
+use crate::domain::entities::{AutoRole, DiscordRole, RolePanel, RolePanelDetail, RolePanelEntry};
 use crate::ports::inbound::manage_role_panels::SetMessageIdCommand;
 use crate::ports::inbound::ManageRolePanelsUseCase;
+use crate::ports::outbound::DiscordRoleRepository;
 
 pub struct RolePanelsGrpc {
     pub uc: Arc<dyn ManageRolePanelsUseCase>,
+    /// Phase 7A.opt F.5 — pour SyncDiscordRoles (pas de use case unifie).
+    pub discord_role_repo: Arc<dyn DiscordRoleRepository>,
 }
 
 #[tonic::async_trait]
@@ -96,6 +99,38 @@ impl RolePanelsService for RolePanelsGrpc {
         Ok(Response::new(proto::AutoRoleList {
             roles: roles.into_iter().map(auto_role_to_proto).collect(),
         }))
+    }
+
+    // Phase 7A.opt F.5 — sync batch des roles Discord vers l'API.
+    async fn sync_discord_roles(
+        &self,
+        request: Request<proto::SyncDiscordRolesRequest>,
+    ) -> Result<Response<proto::SyncDiscordRolesResponse>, Status> {
+        let req = request.into_inner();
+        let count = req.roles.len() as u64;
+        let roles: Vec<DiscordRole> = req
+            .roles
+            .into_iter()
+            .map(|r| DiscordRole {
+                id: r.id,
+                guild_id: req.guild_id.clone(),
+                name: r.name,
+                color: r.color,
+                position: r.position,
+                // Parse String -> i64 (bitfield Discord, fallback 0).
+                permissions: r.permissions.parse::<i64>().unwrap_or(0),
+                mentionable: r.mentionable,
+                managed: r.managed,
+                icon: r.icon,
+                member_count: r.member_count,
+                synced_at: chrono::Utc::now(),
+            })
+            .collect();
+        self.discord_role_repo
+            .sync_roles(&req.guild_id, roles)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::SyncDiscordRolesResponse { synced: count }))
     }
 }
 

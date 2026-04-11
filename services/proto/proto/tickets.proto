@@ -13,6 +13,9 @@ service TicketsService {
   rpc UpdateStatus(UpdateStatusRequest) returns (Empty);
   rpc AssignTicket(AssignTicketRequest) returns (Empty);
   rpc UpdateTicketChannel(UpdateTicketChannelRequest) returns (Empty);
+  // Phase 7A.opt F.6 — priority et SLA precedemment sur HTTP.
+  rpc UpdatePriority(UpdatePriorityRequest) returns (Empty);
+  rpc UpdateSla(UpdateSlaRequest) returns (Empty);
 }
 
 message Empty {}
@@ -66,6 +69,20 @@ message UpdateTicketChannelRequest {
   string ticket_id = 1;
   optional string voice_channel_id = 2;
   optional string invited_user_id = 3;
+}
+
+// Phase 7A.opt F.6 — priority et SLA.
+message UpdatePriorityRequest {
+  string id = 1;
+  string priority = 2;
+}
+
+message UpdateSlaRequest {
+  string id = 1;
+  // RFC3339 optionnels — tri-state via optional.
+  optional string first_response_at = 2;
+  optional string resolved_at = 3;
+  optional int32 satisfaction_rating = 4;
 }
 
 message Ticket {

@@ -17,6 +17,9 @@ use crate::ports::inbound::{
 
 pub struct TicketsGrpc {
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
+    /// Phase 7A.opt F.6 — acces sqlx direct pour UpdateSla (pas de use case
+    /// unifie cote API, copie du pattern du handler HTTP bot_persistence.rs).
+    pub pg_pool: sqlx::PgPool,
 }
 
 #[tonic::async_trait]
@@ -140,6 +143,59 @@ impl TicketsService for TicketsGrpc {
             })
             .await
             .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    // Phase 7A.opt F.6 — priority (reutilise update_status avec payload custom
+    // cote HTTP, ici on appelle juste le use case update_status car il wrappe
+    // deja la meme logique — on n'a pas de champ priority dedie).
+    async fn update_priority(
+        &self,
+        request: Request<proto::UpdatePriorityRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        // Note : cote HTTP l'endpoint etait /api/tickets/{id}/status avec
+        // body {priority}. On fait la query sqlx directe pour preserver le
+        // comportement exact (UPDATE priority sans toucher status).
+        sqlx::query("UPDATE tickets SET priority = $1, updated_at = NOW() WHERE id = $2::uuid")
+            .bind(&req.priority)
+            .bind(&req.id)
+            .execute(&self.pg_pool)
+            .await
+            .map_err(|e| Status::internal(format!("UPDATE priority: {e}")))?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    // Phase 7A.opt F.6 — SLA update (query dynamique selon les champs presents).
+    async fn update_sla(
+        &self,
+        request: Request<proto::UpdateSlaRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        if let Some(fr) = req.first_response_at.as_deref() {
+            sqlx::query("UPDATE tickets SET first_response_at = $1::timestamptz, updated_at = NOW() WHERE id = $2::uuid")
+                .bind(fr)
+                .bind(&req.id)
+                .execute(&self.pg_pool)
+                .await
+                .map_err(|e| Status::internal(format!("UPDATE first_response_at: {e}")))?;
+        }
+        if let Some(ra) = req.resolved_at.as_deref() {
+            sqlx::query("UPDATE tickets SET resolved_at = $1::timestamptz, updated_at = NOW() WHERE id = $2::uuid")
+                .bind(ra)
+                .bind(&req.id)
+                .execute(&self.pg_pool)
+                .await
+                .map_err(|e| Status::internal(format!("UPDATE resolved_at: {e}")))?;
+        }
+        if let Some(rating) = req.satisfaction_rating {
+            sqlx::query("UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() WHERE id = $2::uuid")
+                .bind(rating)
+                .bind(&req.id)
+                .execute(&self.pg_pool)
+                .await
+                .map_err(|e| Status::internal(format!("UPDATE rating: {e}")))?;
+        }
         Ok(Response::new(proto::Empty {}))
     }
 }

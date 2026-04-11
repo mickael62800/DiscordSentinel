@@ -81,3 +81,15 @@ pub mod images {
         tonic::include_proto!("sentinel.images.v1");
     }
 }
+
+pub mod welcome {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.welcome.v1");
+    }
+}
+
+pub mod community {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.community.v1");
+    }
+}

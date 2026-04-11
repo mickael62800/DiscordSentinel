@@ -48,8 +48,10 @@ use sentinel_proto::roles::v1::role_panels_service_client::RolePanelsServiceClie
 use sentinel_proto::security::v1::security_service_client::SecurityServiceClient;
 use sentinel_proto::stats::v1::stats_service_client::StatsServiceClient;
 use sentinel_proto::tickets::v1::tickets_service_client::TicketsServiceClient;
+use sentinel_proto::community::v1::community_service_client::CommunityServiceClient;
 use sentinel_proto::images::v1::images_service_client::ImagesServiceClient;
 use sentinel_proto::voice::v1::voice_channels_service_client::VoiceChannelsServiceClient;
+use sentinel_proto::welcome::v1::welcome_service_client::WelcomeServiceClient;
 
 use crate::circuit_breaker::CircuitBreaker;
 
@@ -216,6 +218,24 @@ impl SentinelGrpcClient {
         &self,
     ) -> ImagesServiceClient<InterceptedService<Channel, AuthInterceptor>> {
         ImagesServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Phase 7A.opt F.4 — Retourne un client `WelcomeService`.
+    pub fn welcome(
+        &self,
+    ) -> WelcomeServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        WelcomeServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
+            .send_compressed(CompressionEncoding::Gzip)
+            .accept_compressed(CompressionEncoding::Gzip)
+    }
+
+    /// Phase 7A.opt F.3 — Retourne un client `CommunityService`.
+    pub fn community(
+        &self,
+    ) -> CommunityServiceClient<InterceptedService<Channel, AuthInterceptor>> {
+        CommunityServiceClient::with_interceptor(self.channel.clone(), self.interceptor.clone())
             .send_compressed(CompressionEncoding::Gzip)
             .accept_compressed(CompressionEncoding::Gzip)
     }

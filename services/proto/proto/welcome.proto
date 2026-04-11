@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package sentinel.welcome.v1;
+
+// Phase 7A.opt F.4 — Welcome config en gRPC.
+// Wrappe le handler HTTP sqlx direct (welcome_config table, pas de use case
+// unifie cote API). Appele par welcome-bot au demarrage pour charger la
+// config d'une guild.
+service WelcomeService {
+  rpc GetConfig(GetConfigRequest) returns (WelcomeConfig);
+}
+
+message GetConfigRequest {
+  string guild_id = 1;
+}
+
+message WelcomeConfig {
+  string guild_id = 1;
+  bool welcome_enabled = 2;
+  optional string welcome_channel_id = 3;
+  string welcome_message = 4;
+  string welcome_embed_color = 5;
+  bool welcome_dm_enabled = 6;
+  string welcome_dm_message = 7;
+  bool leave_enabled = 8;
+  optional string leave_channel_id = 9;
+  string leave_message = 10;
+  bool rules_enabled = 11;
+  optional string rules_channel_id = 12;
+  string rules_message = 13;
+  optional string rules_role_id = 14;
+  string rules_button_label = 15;
+  bool counter_enabled = 16;
+  optional string counter_channel_id = 17;
+  string counter_format = 18;
+  bool anniversary_enabled = 19;
+  optional string anniversary_channel_id = 20;
+  string anniversary_message = 21;
+  string rejoin_message = 22;
+}

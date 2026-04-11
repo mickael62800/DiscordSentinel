@@ -23,6 +23,7 @@ use tracing::{error, info};
 
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
 use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackServiceServer;
+use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
 use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerServiceServer;
 use sentinel_proto::images::v1::images_service_server::ImagesServiceServer;
 use sentinel_proto::members::v1::members_service_server::MembersServiceServer;
@@ -33,9 +34,11 @@ use sentinel_proto::security::v1::security_service_server::SecurityServiceServer
 use sentinel_proto::stats::v1::stats_service_server::StatsServiceServer;
 use sentinel_proto::tickets::v1::tickets_service_server::TicketsServiceServer;
 use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsServiceServer;
+use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
 
 use crate::adapters::inbound::grpc::automod::AutomodGrpc;
 use crate::adapters::inbound::grpc::blackjack::BlackjackGrpc;
+use crate::adapters::inbound::grpc::community::CommunityGrpc;
 use crate::adapters::inbound::grpc::coude::CoudePlayerGrpc;
 use crate::adapters::inbound::grpc::images::ImagesGrpc;
 use crate::adapters::inbound::grpc::members::MembersGrpc;
@@ -46,6 +49,7 @@ use crate::adapters::inbound::grpc::security::SecurityGrpc;
 use crate::adapters::inbound::grpc::stats::StatsGrpc;
 use crate::adapters::inbound::grpc::tickets::TicketsGrpc;
 use crate::adapters::inbound::grpc::voice::VoiceChannelsGrpc;
+use crate::adapters::inbound::grpc::welcome::WelcomeGrpc;
 use crate::adapters::inbound::http::state::AppState;
 
 /// Lance le serveur gRPC. A spawn dans une task tokio depuis `main.rs`.
@@ -62,6 +66,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     };
     let tickets = TicketsGrpc {
         tickets_uc: state.tickets_uc.clone(),
+        pg_pool: state.pg_pool.clone(),
     };
     let moderation = ModerationGrpc {
         moderation_uc: state.moderation_uc.clone(),
@@ -77,6 +82,13 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     };
     let roles = RolePanelsGrpc {
         uc: state.role_panels_uc.clone(),
+        discord_role_repo: state.discord_role_repo.clone(),
+    };
+    let welcome = WelcomeGrpc {
+        pg_pool: state.pg_pool.clone(),
+    };
+    let community = CommunityGrpc {
+        pg_pool: state.pg_pool.clone(),
     };
     let members = MembersGrpc {
         uc: state.members_uc.clone(),
@@ -118,6 +130,9 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let automod_svc = svc!(AutomodServiceServer, automod);
     let voice_svc = svc!(VoiceChannelsServiceServer, voice);
     let images_svc = svc!(ImagesServiceServer, images);
+    // Phase 7A.opt F.3/F.4 — nouveaux services.
+    let welcome_svc = svc!(WelcomeServiceServer, welcome);
+    let community_svc = svc!(CommunityServiceServer, community);
 
     // tonic-health : expose `grpc.health.v1.Health` + marque chaque service
     // comme SERVING. Permet `grpc_health_probe -addr=:50051` dans le healthcheck.
@@ -158,6 +173,12 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     health_reporter
         .set_serving::<ImagesServiceServer<ImagesGrpc>>()
         .await;
+    health_reporter
+        .set_serving::<WelcomeServiceServer<WelcomeGrpc>>()
+        .await;
+    health_reporter
+        .set_serving::<CommunityServiceServer<CommunityGrpc>>()
+        .await;
 
     info!(addr = %bind, "Sentinel gRPC pret (compression Gzip + health)");
 
@@ -175,6 +196,8 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(automod_svc)
         .add_service(voice_svc)
         .add_service(images_svc)
+        .add_service(welcome_svc)
+        .add_service(community_svc)
         .serve(bind)
         .await
     {

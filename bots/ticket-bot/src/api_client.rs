@@ -94,6 +94,10 @@ pub struct CreateTicketRequest {
 // ── Client ──
 
 pub struct ApiClient {
+    // Phase 7A.opt F.6 : `base` n'est plus utilise car SLA et priority sont
+    // maintenant en gRPC. Conserve pour compat TypeMap (le heartbeat des
+    // ticket-bot passe encore par BaseApiClient dans main.rs).
+    #[allow(dead_code)]
     pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
@@ -249,23 +253,22 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
-    // ── HTTP retenu (pas dans le proto v1) ──
+    // ── Phase 7A.opt F.6 — priority et SLA migres en gRPC ──
 
-    /// Met a jour la priorite — l'API expose ca via le meme endpoint
-    /// `/api/tickets/{id}/status` avec un payload `{priority}`. Pas d'RPC
-    /// dedie en v1, on garde le HTTP fire-and-forget existant.
+    /// gRPC `TicketsService.UpdatePriority`.
     pub async fn update_ticket_priority(&self, id: &str, priority: &str) -> Result<(), String> {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/tickets/{id}/status"),
-                &serde_json::json!({ "priority": priority }),
-            )
-            .await;
-        Ok(())
+        let req = proto::UpdatePriorityRequest {
+            id: id.to_string(),
+            priority: priority.to_string(),
+        };
+        let mut client = self.grpc.tickets();
+        self.grpc
+            .guarded(|| async move { client.update_priority(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// Met a jour les donnees SLA d'un ticket. Handler API ad hoc, pas de
-    /// use-case unifie -> reste sur HTTP fire-and-forget pour l'instant.
+    /// gRPC `TicketsService.UpdateSla`.
     pub async fn update_ticket_sla(
         &self,
         id: &str,
@@ -273,28 +276,18 @@ impl ApiClient {
         resolved_at: Option<&str>,
         satisfaction_rating: Option<u8>,
     ) {
-        let mut body = serde_json::Map::new();
-        if let Some(fr) = first_response_at {
-            body.insert(
-                "first_response_at".to_string(),
-                serde_json::Value::String(fr.to_string()),
-            );
-        }
-        if let Some(ra) = resolved_at {
-            body.insert(
-                "resolved_at".to_string(),
-                serde_json::Value::String(ra.to_string()),
-            );
-        }
-        if let Some(rating) = satisfaction_rating {
-            body.insert(
-                "satisfaction_rating".to_string(),
-                serde_json::Value::Number(rating.into()),
-            );
-        }
-        self.base
-            .patch_fire_and_forget(&format!("/api/tickets/{id}/sla"), &body)
+        let req = proto::UpdateSlaRequest {
+            id: id.to_string(),
+            first_response_at: first_response_at.map(|s| s.to_string()),
+            resolved_at: resolved_at.map(|s| s.to_string()),
+            satisfaction_rating: satisfaction_rating.map(|r| r as i32),
+        };
+        let mut client = self.grpc.tickets();
+        let _ = self
+            .grpc
+            .guarded(|| async move { client.update_sla(req).await.map(|_| ()) })
             .await;
+        // fire-and-forget : on ignore l'erreur (historique du handler HTTP).
     }
 }
 

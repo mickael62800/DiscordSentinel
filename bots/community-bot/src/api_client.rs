@@ -15,6 +15,7 @@ use serde::Deserialize;
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
+use sentinel_proto::community::v1 as proto_community;
 use sentinel_proto::roles::v1 as proto;
 
 // ── DTOs (surface inchangee) ──
@@ -69,6 +70,10 @@ pub struct AutoRole {
 }
 
 pub struct ApiClient {
+    // Phase 7A.opt F.3 : `base` n'est plus utilise — tous les appels metier
+    // du community-bot sont en gRPC (role panels + sponsorships + temp roles).
+    // Conserve pour le heartbeat via TypeMap.
+    #[allow(dead_code)]
     pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
@@ -158,28 +163,29 @@ impl ApiClient {
         Ok(resp.panel.map(proto_detail_to_dto))
     }
 
-    // ── Sponsorships (HTTP fire-and-forget — pas de RPC v1) ──
+    // ── Phase 7A.opt F.3 — Sponsorships + Temp Roles en gRPC ──
 
+    /// gRPC `CommunityService.CreateSponsorship`.
     pub async fn create_sponsorship(
         &self,
         guild_id: &str,
         sponsor_id: &str,
         sponsored_id: &str,
     ) {
-        self.base
-            .post_fire_and_forget(
-                "/api/sponsorships",
-                &serde_json::json!({
-                    "guild_id": guild_id,
-                    "sponsor_id": sponsor_id,
-                    "sponsored_id": sponsored_id,
-                }),
-            )
+        let req = proto_community::CreateSponsorshipRequest {
+            guild_id: guild_id.to_string(),
+            sponsor_id: sponsor_id.to_string(),
+            sponsored_id: sponsored_id.to_string(),
+        };
+        let mut client = self.grpc.community();
+        let _ = self
+            .grpc
+            .guarded(|| async move { client.create_sponsorship(req).await.map(|_| ()) })
             .await;
+        // fire-and-forget : on ignore l'erreur (historique HTTP).
     }
 
-    // ── Temp Roles (HTTP — repos direct cote API, pas de RPC v1) ──
-
+    /// gRPC `CommunityService.CreateTempRole`.
     pub async fn create_temp_role(
         &self,
         guild_id: &str,
@@ -187,38 +193,59 @@ impl ApiClient {
         role_id: &str,
         expires_at: &str,
     ) {
-        self.base
-            .post_fire_and_forget(
-                "/api/temp-roles",
-                &serde_json::json!({
-                    "guild_id": guild_id,
-                    "user_id": user_id,
-                    "role_id": role_id,
-                    "expires_at": expires_at,
-                }),
-            )
+        let req = proto_community::CreateTempRoleRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            role_id: role_id.to_string(),
+            expires_at: expires_at.to_string(),
+        };
+        let mut client = self.grpc.community();
+        let _ = self
+            .grpc
+            .guarded(|| async move { client.create_temp_role(req).await.map(|_| ()) })
             .await;
     }
 
+    /// gRPC `CommunityService.ListTempRoles`.
     pub async fn list_temp_roles(
         &self,
         guild_id: &str,
     ) -> Result<Vec<TempRoleApiEntry>, String> {
-        self.base
-            .get_json(&format!("/api/temp-roles/{}", guild_id))
+        let req = proto_community::ListTempRolesRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let mut client = self.grpc.community();
+        let list = self
+            .grpc
+            .guarded(|| async move { client.list_temp_roles(req).await.map(|r| r.into_inner()) })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list
+            .roles
+            .into_iter()
+            .map(|r| TempRoleApiEntry {
+                guild_id: r.guild_id,
+                user_id: r.user_id,
+                role_id: r.role_id,
+                expires_at: r.expires_at,
+            })
+            .collect())
     }
 
+    /// gRPC `CommunityService.DeleteTempRole`.
     pub async fn delete_temp_role(&self, guild_id: &str, user_id: &str, role_id: &str) {
-        let req = self.base.client().delete(format!(
-            "{}/api/temp-roles/{}/{}/{}",
-            self.base.base_url(),
-            guild_id,
-            user_id,
-            role_id
-        ));
-        if let Err(e) = self.base.auth(req).send().await {
-            tracing::warn!(error = %e, "Failed to delete temp role");
+        let req = proto_community::DeleteTempRoleRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            role_id: role_id.to_string(),
+        };
+        let mut client = self.grpc.community();
+        if let Err(e) = self
+            .grpc
+            .guarded(|| async move { client.delete_temp_role(req).await.map(|_| ()) })
+            .await
+        {
+            tracing::warn!(error = ?e, "Failed to delete temp role");
         }
     }
 }

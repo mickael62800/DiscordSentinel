@@ -67,6 +67,9 @@ pub struct SyncRole {
 }
 
 pub struct ApiClient {
+    // Phase 7A.opt F.5 : `base` n'est plus utilise — sync_discord_roles est
+    // migre en gRPC. Conserve pour le heartbeat via TypeMap.
+    #[allow(dead_code)]
     pub base: Arc<BaseApiClient>,
     grpc: Arc<SentinelGrpcClient>,
 }
@@ -156,25 +159,36 @@ impl ApiClient {
         Ok(resp.panel.map(proto_detail_to_dto))
     }
 
-    // ── Discord roles sync (HTTP — pas de use case v1) ──
+    // ── Phase 7A.opt F.5 — Discord roles sync en gRPC ──
 
+    /// gRPC `RolePanelsService.SyncDiscordRoles` (Phase 7A.opt F.5).
     pub async fn sync_discord_roles(
         &self,
         guild_id: &str,
         roles: Vec<SyncRole>,
     ) -> Result<(), String> {
-        #[derive(Serialize)]
-        struct Body {
-            roles: Vec<SyncRole>,
-        }
-        let _: serde_json::Value = self
-            .base
-            .post_json(
-                &format!("/api/discord-roles/{}/sync", guild_id),
-                &Body { roles },
-            )
-            .await?;
-        Ok(())
+        let req = proto::SyncDiscordRolesRequest {
+            guild_id: guild_id.to_string(),
+            roles: roles
+                .into_iter()
+                .map(|r| proto::SyncDiscordRole {
+                    id: r.id,
+                    name: r.name,
+                    color: r.color,
+                    position: r.position,
+                    permissions: r.permissions,
+                    mentionable: r.mentionable,
+                    managed: r.managed,
+                    icon: r.icon,
+                    member_count: r.member_count,
+                })
+                .collect(),
+        };
+        let mut client = self.grpc.role_panels();
+        self.grpc
+            .guarded(|| async move { client.sync_discord_roles(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 }
 

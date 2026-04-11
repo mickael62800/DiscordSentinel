@@ -1,0 +1,78 @@
+syntax = "proto3";
+
+package sentinel.community.v1;
+
+// Phase 7A.opt F.3 — Community : sponsorships + temp-roles.
+//
+// Wrappe les handlers HTTP `bot_persistence.rs` (sqlx direct — pas de use
+// case unifie cote API). Appele par community-bot.
+service CommunityService {
+  // Sponsorships
+  rpc CreateSponsorship(CreateSponsorshipRequest) returns (Empty);
+  rpc ListSponsorships(ListSponsorshipsRequest) returns (SponsorshipList);
+
+  // Temp roles
+  rpc CreateTempRole(CreateTempRoleRequest) returns (Empty);
+  rpc ListTempRoles(ListTempRolesRequest) returns (TempRoleList);
+  rpc DeleteTempRole(DeleteTempRoleRequest) returns (Empty);
+}
+
+message Empty {}
+
+// ── Sponsorships ──
+
+message CreateSponsorshipRequest {
+  string guild_id = 1;
+  string sponsor_id = 2;
+  string sponsored_id = 3;
+}
+
+message ListSponsorshipsRequest {
+  string guild_id = 1;
+}
+
+message Sponsorship {
+  string id = 1;
+  string guild_id = 2;
+  string sponsor_id = 3;
+  string sponsored_id = 4;
+  // RFC3339
+  string created_at = 5;
+}
+
+message SponsorshipList {
+  repeated Sponsorship sponsorships = 1;
+}
+
+// ── Temp Roles ──
+
+message CreateTempRoleRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string role_id = 3;
+  // RFC3339
+  string expires_at = 4;
+}
+
+message ListTempRolesRequest {
+  string guild_id = 1;
+}
+
+message DeleteTempRoleRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string role_id = 3;
+}
+
+message TempRole {
+  string id = 1;
+  string guild_id = 2;
+  string user_id = 3;
+  string role_id = 4;
+  string expires_at = 5;
+  string created_at = 6;
+}
+
+message TempRoleList {
+  repeated TempRole roles = 1;
+}

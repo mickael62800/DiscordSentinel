@@ -15,6 +15,30 @@ service RolePanelsService {
   rpc ListPanels(ListPanelsRequest) returns (RolePanelList);
   rpc SetMessageId(SetMessageIdRequest) returns (Empty);
   rpc ListAutoRoles(ListAutoRolesRequest) returns (AutoRoleList);
+  // Phase 7A.opt F.5 — sync batch des roles Discord vers l'API.
+  rpc SyncDiscordRoles(SyncDiscordRolesRequest) returns (SyncDiscordRolesResponse);
+}
+
+message SyncDiscordRole {
+  string id = 1;
+  string name = 2;
+  int32 color = 3;
+  int32 position = 4;
+  // Permissions en string car les bitfields Discord depassent i53 (safety JS).
+  string permissions = 5;
+  bool mentionable = 6;
+  bool managed = 7;
+  optional string icon = 8;
+  int32 member_count = 9;
+}
+
+message SyncDiscordRolesRequest {
+  string guild_id = 1;
+  repeated SyncDiscordRole roles = 2;
+}
+
+message SyncDiscordRolesResponse {
+  uint64 synced = 1;
 }
 
 message Empty {}
