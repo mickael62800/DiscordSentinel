@@ -1,3 +1,17 @@
+//! Client API du coude-bot.
+//!
+//! Phase 7A : CoudePlayerService (6 RPCs hot path joueurs) migre.
+//! Phase 7A.opt F.1 : 5 services supplementaires migres (combats, bets,
+//! economy, inventory, social). ~80% du wrapper passe maintenant par gRPC.
+//!
+//! Restent en HTTP (pas d'equivalent dans les use cases exposes en proto) :
+//! - methodes player "legacy" : spend_stat_point, reset_stats, record_win/
+//!   loss/draw, increment_cowardice/chaos, record_coins_earned/lost, repos
+//! - get_all_guild_ids, get_random_players (admin queries rares)
+//!
+//! Surface publique (types + signatures) inchangee : handlers et commandes
+//! du bot n'ont pas a etre touches.
+
 use std::sync::Arc;
 
 use serde::Deserialize;
@@ -7,7 +21,7 @@ use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 use sentinel_proto::coude::v1 as proto_coude;
 
 // ══════════════════════════════════════════════════════════════════════
-// ── Response DTOs (match what the API returns as JSON) ──
+// ── Response DTOs (preservation de la surface publique) ──
 // ══════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone, Deserialize)]
@@ -183,58 +197,8 @@ pub struct CurrentSeason {
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
-struct CooldownResponse {
-    pub expires_at: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
 struct CowardiceResponse {
     pub cowardice_count: i32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct CasinoTodayResponse {
-    pub count: u64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct FailliteResponse {
-    pub total_lost: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct SuccessResponse {
-    pub success: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct HasItemResponse {
-    pub has_item: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct ClaimPrimesResponse {
-    pub total_claimed: i64,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct ResolveBetsResponse {
-    pub results: Vec<BetResult>,
-    pub fighter_bonus: Option<FighterBetBonus>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct RefundBetsResponse {
-    pub refunded_count: usize,
-    pub refunded_total: i64,
 }
 
 // ══════════════════════════════════════════════════════════════════════
@@ -251,9 +215,11 @@ impl ApiClient {
         Self { base, grpc }
     }
 
-    // ── Players ──
+    // ══════════════════════════════════════════════════════════════════
+    // Players — gRPC (CoudePlayerService) + HTTP legacy pour les methodes
+    // sans equivalent proto.
+    // ══════════════════════════════════════════════════════════════════
 
-    /// gRPC `CoudePlayerService.GetOrCreatePlayer` (Phase 7A — hot path).
     pub async fn get_or_create_player(
         &self,
         guild_id: &str,
@@ -276,8 +242,6 @@ impl ApiClient {
         Ok(proto_player_to_dto(p))
     }
 
-    /// gRPC `CoudePlayerService.GetPlayer` (Phase 7A — hot path).
-    /// Renvoie `Ok(None)` si l'API repond `NotFound`.
     pub async fn get_player(
         &self,
         guild_id: &str,
@@ -290,9 +254,7 @@ impl ApiClient {
         let mut client = self.grpc.coude_players();
         let result = self
             .grpc
-            .guarded(|| async move {
-                client.get_player(req).await.map(|r| r.into_inner())
-            })
+            .guarded(|| async move { client.get_player(req).await.map(|r| r.into_inner()) })
             .await;
         match result {
             Ok(p) => Ok(Some(proto_player_to_dto(p))),
@@ -301,7 +263,6 @@ impl ApiClient {
         }
     }
 
-    /// gRPC `CoudePlayerService.UpdatePlayerClass` (Phase 7A).
     pub async fn update_player_class(
         &self,
         guild_id: &str,
@@ -322,8 +283,6 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
-    /// gRPC `CoudePlayerService.AddXp` (Phase 7A — hot path).
-    /// Returns (new_xp, new_level, leveled_up, stat_points_gained).
     pub async fn add_xp(
         &self,
         guild_id: &str,
@@ -344,7 +303,9 @@ impl ApiClient {
         Ok((r.new_xp, r.new_level, r.leveled_up, r.stat_points_gained))
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/spend-stat
+    // ── Players : HTTP legacy (pas d'equivalent proto) ──
+
+    /// HTTP : pas dans les use cases exposes.
     pub async fn spend_stat_point(
         &self,
         guild_id: &str,
@@ -359,10 +320,7 @@ impl ApiClient {
             .await
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/reset-stats
-    ///
-    /// Reset atomique : remet ATK/DEF a 0, restitue les points et deduit `cost` coins.
-    /// Retourne le joueur mis a jour.
+    /// HTTP : pas dans les use cases exposes.
     pub async fn reset_stats(
         &self,
         guild_id: &str,
@@ -377,19 +335,7 @@ impl ApiClient {
             .await
     }
 
-    /// GET /api/coude/{guild_id}/season/current
-    ///
-    /// Retourne la saison active (numero, debut, fin, jours restants).
-    /// Si aucune saison n'existe, l'API en cree une automatiquement.
-    pub async fn get_current_season(&self, guild_id: &str) -> Result<CurrentSeason, String> {
-        self.base
-            .get_json(&format!("/api/coude/{guild_id}/season/current"))
-            .await
-    }
-
-    // ── Stats recording ──
-
-    /// POST /api/coude/{guild_id}/players/{user_id}/record-win
+    /// HTTP : pas dans les use cases exposes (fire-and-forget).
     pub async fn record_win(
         &self,
         guild_id: &str,
@@ -406,7 +352,6 @@ impl ApiClient {
         Ok(())
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/record-loss
     pub async fn record_loss(
         &self,
         guild_id: &str,
@@ -422,7 +367,6 @@ impl ApiClient {
         Ok(())
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/record-draw
     pub async fn record_draw(
         &self,
         guild_id: &str,
@@ -438,24 +382,21 @@ impl ApiClient {
         Ok(())
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/increment-cowardice
-    /// Returns the updated cowardice_count.
     pub async fn increment_cowardice(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<i32, String> {
-        let res: CowardiceResponse = self
+        let resp: CowardiceResponse = self
             .base
             .post_json(
                 &format!("/api/coude/{guild_id}/players/{user_id}/increment-cowardice"),
                 &serde_json::json!({}),
             )
             .await?;
-        Ok(res.cowardice_count)
+        Ok(resp.cowardice_count)
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/increment-chaos
     pub async fn increment_chaos_events(
         &self,
         guild_id: &str,
@@ -470,7 +411,6 @@ impl ApiClient {
         Ok(())
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/coins-earned
     pub async fn record_coins_earned(
         &self,
         guild_id: &str,
@@ -486,7 +426,6 @@ impl ApiClient {
         Ok(())
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/coins-lost
     pub async fn record_coins_lost(
         &self,
         guild_id: &str,
@@ -502,117 +441,198 @@ impl ApiClient {
         Ok(())
     }
 
-    // ── Casino ──
+    // ══════════════════════════════════════════════════════════════════
+    // Social — gRPC (CoudeSocialService)
+    // ══════════════════════════════════════════════════════════════════
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/casino-win
+    pub async fn get_current_season(&self, guild_id: &str) -> Result<CurrentSeason, String> {
+        let req = proto_coude::CurrentSeasonRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let s = self
+            .grpc
+            .guarded(|| async move { client.current_season(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(CurrentSeason {
+            season_number: s.season_number,
+            started_at: s.started_at,
+            ends_at: s.ends_at,
+            days_remaining: s.days_remaining,
+        })
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Casino & Economy — gRPC (CoudeEconomyService)
+    // ══════════════════════════════════════════════════════════════════
+
     pub async fn record_casino_win(
         &self,
         guild_id: &str,
         user_id: &str,
         gain: i64,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/players/{user_id}/casino-win"),
-                &serde_json::json!({ "gain": gain }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::RecordCasinoWinRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            gain,
+        };
+        let mut client = self.grpc.coude_economy();
+        self.grpc
+            .guarded(|| async move { client.record_casino_win(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/casino-loss
     pub async fn record_casino_loss(
         &self,
         guild_id: &str,
         user_id: &str,
         lost: i64,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/players/{user_id}/casino-loss"),
-                &serde_json::json!({ "lost": lost }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::RecordCasinoLossRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            lost,
+        };
+        let mut client = self.grpc.coude_economy();
+        self.grpc
+            .guarded(|| async move { client.record_casino_loss(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/casino-faillite
-    /// Returns total_lost.
     pub async fn record_casino_faillite(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<i64, String> {
-        let res: FailliteResponse = self
-            .base
-            .post_json(
-                &format!("/api/coude/{guild_id}/players/{user_id}/casino-faillite"),
-                &serde_json::json!({}),
-            )
-            .await?;
-        Ok(res.total_lost)
+        let req = proto_coude::RecordCasinoFailliteRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_economy();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.record_casino_faillite(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.cleared_coins)
     }
 
-    /// GET /api/coude/{guild_id}/players/{user_id}/casino-today
     pub async fn count_casino_today(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<u64, String> {
-        let res: CasinoTodayResponse = self
-            .base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/players/{user_id}/casino-today"
-            ))
-            .await?;
-        Ok(res.count)
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_economy();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.count_casino_today(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.value.max(0) as u64)
     }
 
-    /// Somme des gains casino dans les dernieres 24h via wallet_transactions.
     pub async fn sum_casino_gains_today(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<i64, String> {
-        #[derive(serde::Deserialize)]
-        struct Resp {
-            total: i64,
-        }
-        let res: Resp = self
-            .base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/players/{user_id}/casino-gains-today"
-            ))
-            .await?;
-        Ok(res.total)
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_economy();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.sum_casino_gains_today(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.value)
     }
 
-    /// Nombre de vols effectues dans les dernieres 24h.
     pub async fn count_steal_today(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<u64, String> {
-        #[derive(serde::Deserialize)]
-        struct Resp {
-            count: u64,
-        }
-        let res: Resp = self
-            .base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/players/{user_id}/steal-today"
-            ))
-            .await?;
-        Ok(res.count)
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_economy();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.count_steal_today(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.value.max(0) as u64)
     }
 
-    // ── Combat lifecycle ──
+    pub async fn transfer_coins(
+        &self,
+        guild_id: &str,
+        from_id: &str,
+        to_id: &str,
+        amount: i64,
+    ) -> Result<(), String> {
+        let req = proto_coude::TransferRequest {
+            guild_id: guild_id.to_string(),
+            from_id: from_id.to_string(),
+            to_id: to_id.to_string(),
+            amount,
+        };
+        let mut client = self.grpc.coude_economy();
+        self.grpc
+            .guarded(|| async move { client.transfer(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
+    }
 
-    /// POST /api/coude/{guild_id}/combats/create
+    pub async fn record_steal(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        victim_id: &str,
+        amount: i64,
+    ) -> Result<i64, String> {
+        let req = proto_coude::StealRequest {
+            guild_id: guild_id.to_string(),
+            thief_id: thief_id.to_string(),
+            victim_id: victim_id.to_string(),
+            amount,
+        };
+        let mut client = self.grpc.coude_economy();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.steal(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.stolen)
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Combats — gRPC (CoudeCombatsService)
+    // ══════════════════════════════════════════════════════════════════
+
     pub async fn create_combat(
         &self,
         guild_id: &str,
-        channel_id: &str,
+        channel_id: Option<&str>,
         attacker_id: &str,
         attacker_name: &str,
         defender_id: &str,
@@ -620,108 +640,81 @@ impl ApiClient {
         mise: i64,
         special_attack: Option<&str>,
     ) -> Result<Combat, String> {
-        self.base
-            .post_json(
-                &format!("/api/coude/{guild_id}/combats/create"),
-                &serde_json::json!({
-                    "channel_id": channel_id,
-                    "attacker_id": attacker_id,
-                    "attacker_name": attacker_name,
-                    "defender_id": defender_id,
-                    "defender_name": defender_name,
-                    "mise": mise,
-                    "special_attack": special_attack,
-                }),
-            )
+        let req = proto_coude::CreateCombatRequest {
+            guild_id: guild_id.to_string(),
+            channel_id: channel_id.map(str::to_string),
+            attacker_id: attacker_id.to_string(),
+            attacker_name: attacker_name.to_string(),
+            defender_id: defender_id.to_string(),
+            defender_name: defender_name.to_string(),
+            mise,
+            special_attack: special_attack.map(str::to_string),
+        };
+        let mut client = self.grpc.coude_combats();
+        let c = self
+            .grpc
+            .guarded(|| async move { client.create(req).await.map(|r| r.into_inner()) })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(proto_combat_to_dto(c))
     }
 
-    /// GET /api/coude/combats/{combat_id}/detail
-    /// Returns None on 404.
     pub async fn get_combat(&self, id: &str) -> Result<Option<Combat>, String> {
-        let path = format!("/api/coude/combats/{id}/detail");
-        let resp = self
-            .base
-            .auth(
-                self.base
-                    .client()
-                    .get(format!("{}{}", self.base.base_url(), path)),
-            )
-            .send()
-            .await
-            .map_err(|e| format!("{e}"))?;
-        if resp.status().as_u16() == 404 {
-            return Ok(None);
+        let req = proto_coude::GetCombatRequest {
+            id: id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        let result = self
+            .grpc
+            .guarded(|| async move { client.get(req).await.map(|r| r.into_inner()) })
+            .await;
+        match result {
+            Ok(c) => Ok(Some(proto_combat_to_dto(c))),
+            Err(GrpcCallError::Status(s)) if s.code() == tonic::Code::NotFound => Ok(None),
+            Err(e) => Err(grpc_err_to_string(e)),
         }
-        if !resp.status().is_success() {
-            return Err(format!("API error {}", resp.status()));
-        }
-        resp.json::<Option<Combat>>()
-            .await
-            .map_err(|e| format!("{e}"))
     }
 
-    /// GET /api/coude/{guild_id}/combats/pending/attacker/{user_id}
     pub async fn get_pending_combat_for_attacker(
         &self,
         guild_id: &str,
         attacker_id: &str,
     ) -> Result<Option<Combat>, String> {
-        let path = format!(
-            "/api/coude/{guild_id}/combats/pending/attacker/{attacker_id}"
-        );
-        let resp = self
-            .base
-            .auth(
-                self.base
-                    .client()
-                    .get(format!("{}{}", self.base.base_url(), path)),
-            )
-            .send()
+        let req = proto_coude::GetPendingForAttackerRequest {
+            guild_id: guild_id.to_string(),
+            attacker_id: attacker_id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.get_pending_for_attacker(req).await.map(|r| r.into_inner())
+            })
             .await
-            .map_err(|e| format!("{e}"))?;
-        if resp.status().as_u16() == 404 {
-            return Ok(None);
-        }
-        if !resp.status().is_success() {
-            return Err(format!("API error {}", resp.status()));
-        }
-        resp.json::<Option<Combat>>()
-            .await
-            .map_err(|e| format!("{e}"))
+            .map_err(grpc_err_to_string)?;
+        Ok(r.combat.map(proto_combat_to_dto))
     }
 
-    /// GET /api/coude/{guild_id}/combats/pending/defender/{user_id}
     pub async fn get_pending_combat_for_defender(
         &self,
         guild_id: &str,
         defender_id: &str,
     ) -> Result<Option<Combat>, String> {
-        let path = format!(
-            "/api/coude/{guild_id}/combats/pending/defender/{defender_id}"
-        );
-        let resp = self
-            .base
-            .auth(
-                self.base
-                    .client()
-                    .get(format!("{}{}", self.base.base_url(), path)),
-            )
-            .send()
+        let req = proto_coude::GetPendingForDefenderRequest {
+            guild_id: guild_id.to_string(),
+            defender_id: defender_id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.get_pending_for_defender(req).await.map(|r| r.into_inner())
+            })
             .await
-            .map_err(|e| format!("{e}"))?;
-        if resp.status().as_u16() == 404 {
-            return Ok(None);
-        }
-        if !resp.status().is_success() {
-            return Err(format!("API error {}", resp.status()));
-        }
-        resp.json::<Option<Combat>>()
-            .await
-            .map_err(|e| format!("{e}"))
+            .map_err(grpc_err_to_string)?;
+        Ok(r.combat.map(proto_combat_to_dto))
     }
 
-    /// POST /api/coude/combats/{combat_id}/resolve
     pub async fn resolve_combat(
         &self,
         id: &str,
@@ -730,79 +723,86 @@ impl ApiClient {
         attacker_roll: Option<i32>,
         defender_roll: Option<i32>,
         chaos_event: Option<&str>,
-        result_message: &str,
+        result_message: Option<&str>,
         coins_transferred: i64,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/combats/{id}/resolve"),
-                &serde_json::json!({
-                    "status": status,
-                    "winner_id": winner_id,
-                    "attacker_roll": attacker_roll,
-                    "defender_roll": defender_roll,
-                    "chaos_event": chaos_event,
-                    "result_message": result_message,
-                    "coins_transferred": coins_transferred,
-                }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::ResolveCombatRequest {
+            id: id.to_string(),
+            status: status.to_string(),
+            winner_id: winner_id.map(str::to_string),
+            attacker_roll,
+            defender_roll,
+            chaos_event: chaos_event.map(str::to_string),
+            result_message: result_message.map(str::to_string),
+            coins_transferred,
+        };
+        let mut client = self.grpc.coude_combats();
+        self.grpc
+            .guarded(|| async move { client.resolve(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// POST /api/coude/combats/{combat_id}/betting
-    /// Returns true if combat was in pending status and got moved to betting.
-    pub async fn set_combat_betting(
-        &self,
-        id: &str,
-        message_id: &str,
-    ) -> Result<bool, String> {
-        let res: SuccessResponse = self
-            .base
-            .post_json(
-                &format!("/api/coude/combats/{id}/betting"),
-                &serde_json::json!({ "message_id": message_id }),
-            )
-            .await?;
-        Ok(res.success)
+    pub async fn set_combat_betting(&self, id: &str, message_id: &str) -> Result<bool, String> {
+        let req = proto_coude::SetBettingRequest {
+            id: id.to_string(),
+            message_id: message_id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.set_betting(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.transitioned)
     }
 
-    /// POST /api/coude/combats/{combat_id}/expire
     pub async fn expire_combat(&self, id: &str) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/combats/{id}/expire"),
-                &serde_json::json!({}),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::ExpireCombatRequest {
+            id: id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        self.grpc
+            .guarded(|| async move { client.expire(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// POST /api/coude/combats/{combat_id}/defender-special
     pub async fn set_defender_special(
         &self,
         id: &str,
         item_key: &str,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/combats/{id}/defender-special"),
-                &serde_json::json!({ "item_key": item_key }),
-            )
-            .await;
-        Ok(())
-    }
-
-    /// GET /api/coude/combats/expired
-    pub async fn get_expired_combats(&self) -> Result<Vec<Combat>, String> {
-        self.base
-            .get_json("/api/coude/combats/expired")
+        let req = proto_coude::SetDefenderSpecialRequest {
+            id: id.to_string(),
+            item_key: item_key.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        self.grpc
+            .guarded(|| async move { client.set_defender_special(req).await.map(|_| ()) })
             .await
+            .map_err(grpc_err_to_string)
     }
 
-    // ── Bets ──
+    pub async fn get_expired_combats(&self) -> Result<Vec<Combat>, String> {
+        let req = proto_coude::Empty {};
+        let mut client = self.grpc.coude_combats();
+        let list = self
+            .grpc
+            .guarded(|| async move {
+                client.list_expired_pending(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list.combats.into_iter().map(proto_combat_to_dto).collect())
+    }
 
-    /// POST /api/coude/{guild_id}/bets
+    // ══════════════════════════════════════════════════════════════════
+    // Bets — gRPC (CoudeBetsService)
+    // ══════════════════════════════════════════════════════════════════
+
     pub async fn place_bet(
         &self,
         guild_id: &str,
@@ -812,114 +812,143 @@ impl ApiClient {
         backed_id: &str,
         amount: i64,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/bets"),
-                &serde_json::json!({
-                    "combat_id": combat_id,
-                    "bettor_id": bettor_id,
-                    "bettor_name": bettor_name,
-                    "backed_id": backed_id,
-                    "amount": amount,
-                }),
-            )
-            .await;
-        Ok(())
-    }
-
-    /// GET /api/coude/combats/{combat_id}/bets
-    pub async fn get_combat_bets(
-        &self,
-        combat_id: &str,
-    ) -> Result<Vec<Bet>, String> {
-        self.base
-            .get_json(&format!("/api/coude/combats/{combat_id}/bets"))
+        let req = proto_coude::PlaceBetRequest {
+            guild_id: guild_id.to_string(),
+            combat_id: combat_id.to_string(),
+            bettor_id: bettor_id.to_string(),
+            bettor_name: bettor_name.to_string(),
+            backed_id: backed_id.to_string(),
+            amount,
+        };
+        let mut client = self.grpc.coude_bets();
+        self.grpc
+            .guarded(|| async move { client.place(req).await.map(|_| ()) })
             .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// GET /api/coude/{guild_id}/combats/betting/{user_id}
+    pub async fn get_combat_bets(&self, combat_id: &str) -> Result<Vec<Bet>, String> {
+        let req = proto_coude::ListForCombatRequest {
+            combat_id: combat_id.to_string(),
+        };
+        let mut client = self.grpc.coude_bets();
+        let list = self
+            .grpc
+            .guarded(|| async move {
+                client.list_for_combat(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list
+            .bets
+            .into_iter()
+            .map(|b| Bet {
+                id: b.id.to_string(),
+                combat_id: b.combat_id,
+                bettor_id: b.bettor_id,
+                bettor_name: b.bettor_name,
+                backed_id: b.backed_id,
+                amount: b.amount,
+            })
+            .collect())
+    }
+
     pub async fn get_betting_combat_for_player(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<Combat>, String> {
-        let path = format!("/api/coude/{guild_id}/combats/betting/{user_id}");
-        let resp = self
-            .base
-            .auth(
-                self.base
-                    .client()
-                    .get(format!("{}{}", self.base.base_url(), path)),
-            )
-            .send()
+        let req = proto_coude::GetBettingForParticipantRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.get_betting_for_participant(req).await.map(|r| r.into_inner())
+            })
             .await
-            .map_err(|e| format!("{e}"))?;
-        if resp.status().as_u16() == 404 {
-            return Ok(None);
-        }
-        if !resp.status().is_success() {
-            return Err(format!("API error {}", resp.status()));
-        }
-        resp.json::<Option<Combat>>()
-            .await
-            .map_err(|e| format!("{e}"))
+            .map_err(grpc_err_to_string)?;
+        Ok(r.combat.map(proto_combat_to_dto))
     }
 
-    /// POST /api/coude/combats/{combat_id}/resolve-bets
-    /// Returns (bet_results, optional fighter bonus).
     pub async fn resolve_bets(
         &self,
         combat_id: &str,
         winner_id: Option<&str>,
     ) -> Result<(Vec<BetResult>, Option<FighterBetBonus>), String> {
-        let res: ResolveBetsResponse = self
-            .base
-            .post_json(
-                &format!("/api/coude/combats/{combat_id}/resolve-bets"),
-                &serde_json::json!({ "winner_id": winner_id }),
-            )
-            .await?;
-        Ok((res.results, res.fighter_bonus))
+        let req = proto_coude::ResolveBetsRequest {
+            combat_id: combat_id.to_string(),
+            winner_id: winner_id.map(str::to_string),
+        };
+        let mut client = self.grpc.coude_bets();
+        let plan = self
+            .grpc
+            .guarded(|| async move { client.resolve(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        let results = plan
+            .payouts
+            .into_iter()
+            .map(|p| BetResult {
+                bettor_id: p.bettor_id,
+                bettor_name: p.bettor_name,
+                backed_id: p.backed_id,
+                amount_bet: p.amount_bet,
+                payout: p.payout,
+                won: p.won,
+            })
+            .collect();
+        let bonus = plan.fighter_bonus.map(|b| FighterBetBonus {
+            winner_id: b.winner_id,
+            winner_bonus: b.winner_bonus,
+            loser_id: b.loser_id,
+            loser_bonus: b.loser_bonus,
+            total_pot: b.total_pot,
+        });
+        Ok((results, bonus))
     }
 
-    /// POST /api/coude/combats/{combat_id}/refund-bets
-    /// Returns the list of refunded bets.
-    pub async fn refund_bets(
-        &self,
-        combat_id: &str,
-    ) -> Result<Vec<Bet>, String> {
-        // The API returns { refunded_count, refunded_total } not the bet list.
-        // We fetch bets first, then refund.
-        let bets = self.get_combat_bets(combat_id).await?;
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/combats/{combat_id}/refund-bets"),
-                &serde_json::json!({}),
-            )
-            .await;
-        Ok(bets)
+    pub async fn refund_bets(&self, combat_id: &str) -> Result<(usize, i64), String> {
+        let req = proto_coude::RefundBetsRequest {
+            combat_id: combat_id.to_string(),
+        };
+        let mut client = self.grpc.coude_bets();
+        let s = self
+            .grpc
+            .guarded(|| async move { client.refund(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok((s.refunded_count as usize, s.refunded_total))
     }
 
-    // ── Cooldowns ──
+    // ══════════════════════════════════════════════════════════════════
+    // Cooldowns — gRPC (CoudeSocialService)
+    // ══════════════════════════════════════════════════════════════════
 
-    /// GET /api/coude/{guild_id}/cooldown/{user_id}/{action}
-    /// Returns the expires_at string if a cooldown is active, None otherwise.
     pub async fn check_cooldown(
         &self,
         guild_id: &str,
         user_id: &str,
         action: &str,
     ) -> Result<Option<String>, String> {
-        let res: CooldownResponse = self
-            .base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/cooldown/{user_id}/{action}"
-            ))
-            .await?;
-        Ok(res.expires_at)
+        let req = proto_coude::CheckCooldownRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            action: action.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.check_cooldown(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.available_at)
     }
 
-    /// POST /api/coude/{guild_id}/cooldown/{user_id}/{action}
     pub async fn set_cooldown(
         &self,
         guild_id: &str,
@@ -927,62 +956,23 @@ impl ApiClient {
         action: &str,
         duration_secs: i64,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/cooldown/{user_id}/{action}"),
-                &serde_json::json!({ "duration_secs": duration_secs }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::SetCooldownRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            action: action.to_string(),
+            duration_secs,
+        };
+        let mut client = self.grpc.coude_social();
+        self.grpc
+            .guarded(|| async move { client.set_cooldown(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    // ── Economy ──
+    // ══════════════════════════════════════════════════════════════════
+    // Primes & Insurance — gRPC (CoudeInventoryService)
+    // ══════════════════════════════════════════════════════════════════
 
-    /// POST /api/coude/{guild_id}/transfer
-    pub async fn transfer_coins(
-        &self,
-        guild_id: &str,
-        from_id: &str,
-        to_id: &str,
-        amount: i64,
-    ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/transfer"),
-                &serde_json::json!({
-                    "from_id": from_id,
-                    "to_id": to_id,
-                    "amount": amount,
-                }),
-            )
-            .await;
-        Ok(())
-    }
-
-    /// POST /api/coude/{guild_id}/steal
-    pub async fn record_steal(
-        &self,
-        guild_id: &str,
-        thief_id: &str,
-        victim_id: &str,
-        amount: i64,
-    ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/steal"),
-                &serde_json::json!({
-                    "thief_id": thief_id,
-                    "victim_id": victim_id,
-                    "amount": amount,
-                }),
-            )
-            .await;
-        Ok(())
-    }
-
-    // ── Primes ──
-
-    /// POST /api/coude/{guild_id}/primes
     pub async fn create_prime(
         &self,
         guild_id: &str,
@@ -992,35 +982,45 @@ impl ApiClient {
         placed_by_name: &str,
         amount: i64,
     ) -> Result<Prime, String> {
-        self.base
-            .post_json(
-                &format!("/api/coude/{guild_id}/primes"),
-                &serde_json::json!({
-                    "target_id": target_id,
-                    "target_name": target_name,
-                    "placed_by_id": placed_by_id,
-                    "placed_by_name": placed_by_name,
-                    "amount": amount,
-                }),
-            )
+        let req = proto_coude::CreatePrimeRequest {
+            guild_id: guild_id.to_string(),
+            target_id: target_id.to_string(),
+            target_name: target_name.to_string(),
+            placed_by_id: placed_by_id.to_string(),
+            placed_by_name: placed_by_name.to_string(),
+            amount,
+        };
+        let mut client = self.grpc.coude_inventory();
+        let p = self
+            .grpc
+            .guarded(|| async move {
+                client.create_prime(req).await.map(|r| r.into_inner())
+            })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(proto_prime_to_dto(p))
     }
 
-    /// GET /api/coude/{guild_id}/primes/{target_id}/active
     pub async fn get_active_primes(
         &self,
         guild_id: &str,
         target_id: &str,
     ) -> Result<Vec<Prime>, String> {
-        self.base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/primes/{target_id}/active"
-            ))
+        let req = proto_coude::ListActivePrimesRequest {
+            guild_id: guild_id.to_string(),
+            target_id: target_id.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        let list = self
+            .grpc
+            .guarded(|| async move {
+                client.list_active_primes(req).await.map(|r| r.into_inner())
+            })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list.primes.into_iter().map(proto_prime_to_dto).collect())
     }
 
-    /// POST /api/coude/{guild_id}/primes/claim
-    /// Returns total_claimed amount.
     pub async fn claim_primes(
         &self,
         guild_id: &str,
@@ -1028,91 +1028,106 @@ impl ApiClient {
         claimer_id: &str,
         claimer_name: &str,
     ) -> Result<i64, String> {
-        let res: ClaimPrimesResponse = self
-            .base
-            .post_json(
-                &format!("/api/coude/{guild_id}/primes/claim"),
-                &serde_json::json!({
-                    "target_id": target_id,
-                    "claimer_id": claimer_id,
-                    "claimer_name": claimer_name,
-                }),
-            )
-            .await?;
-        Ok(res.total_claimed)
+        let req = proto_coude::ClaimPrimesRequest {
+            guild_id: guild_id.to_string(),
+            target_id: target_id.to_string(),
+            claimer_id: claimer_id.to_string(),
+            claimer_name: claimer_name.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.claim_primes(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.value)
     }
 
-    // ── Insurance ──
-
-    /// POST /api/coude/{guild_id}/insurance/buy
     pub async fn buy_insurance(
         &self,
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/insurance/buy"),
-                &serde_json::json!({ "user_id": user_id, "is_scam": is_scam }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::BuyInsuranceRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            is_scam,
+        };
+        let mut client = self.grpc.coude_inventory();
+        self.grpc
+            .guarded(|| async move { client.buy_insurance(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// GET /api/coude/{guild_id}/insurance/{user_id}
     pub async fn get_active_insurance(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<Insurance>, String> {
-        let path = format!("/api/coude/{guild_id}/insurance/{user_id}");
-        let resp = self
-            .base
-            .auth(
-                self.base
-                    .client()
-                    .get(format!("{}{}", self.base.base_url(), path)),
-            )
-            .send()
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.get_active_insurance(req).await.map(|r| r.into_inner())
+            })
             .await
-            .map_err(|e| format!("{e}"))?;
-        if resp.status().as_u16() == 404 {
-            return Ok(None);
-        }
-        if !resp.status().is_success() {
-            return Err(format!("API error {}", resp.status()));
-        }
-        resp.json::<Option<Insurance>>()
-            .await
-            .map_err(|e| format!("{e}"))
+            .map_err(grpc_err_to_string)?;
+        Ok(r.insurance.map(|i| Insurance {
+            id: i.id,
+            is_scam: i.is_scam,
+            expires_at: i.expires_at,
+        }))
     }
 
-    /// POST /api/coude/insurance/{insurance_id}/expire
     pub async fn expire_insurance(&self, id: &str) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/insurance/{id}/expire"),
-                &serde_json::json!({}),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::ExpireInsuranceRequest {
+            insurance_id: id.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        self.grpc
+            .guarded(|| async move { client.expire_insurance(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    // ── Leaderboard ──
+    // ══════════════════════════════════════════════════════════════════
+    // Leaderboards — gRPC (CoudeSocialService)
+    // ══════════════════════════════════════════════════════════════════
 
-    /// GET /api/coude/{guild_id}/leaderboard/{category}?limit={limit}
     async fn leaderboard(
         &self,
         guild_id: &str,
-        category: &str,
+        category: proto_coude::LeaderboardCategory,
         limit: i64,
     ) -> Result<Vec<LeaderboardEntry>, String> {
-        self.base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/leaderboard/{category}?limit={limit}"
-            ))
+        let req = proto_coude::LeaderboardRequest {
+            guild_id: guild_id.to_string(),
+            category: category as i32,
+            limit,
+        };
+        let mut client = self.grpc.coude_social();
+        let list = self
+            .grpc
+            .guarded(|| async move { client.leaderboard(req).await.map(|r| r.into_inner()) })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list
+            .entries
+            .into_iter()
+            .map(|e| LeaderboardEntry {
+                user_id: e.user_id,
+                username: e.username,
+                value: e.value,
+            })
+            .collect())
     }
 
     pub async fn leaderboard_richest(
@@ -1120,7 +1135,8 @@ impl ApiClient {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<LeaderboardEntry>, String> {
-        self.leaderboard(guild_id, "richest", limit).await
+        self.leaderboard(guild_id, proto_coude::LeaderboardCategory::Richest, limit)
+            .await
     }
 
     pub async fn leaderboard_thieves(
@@ -1128,7 +1144,8 @@ impl ApiClient {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<LeaderboardEntry>, String> {
-        self.leaderboard(guild_id, "thieves", limit).await
+        self.leaderboard(guild_id, proto_coude::LeaderboardCategory::Thieves, limit)
+            .await
     }
 
     pub async fn leaderboard_cowards(
@@ -1136,7 +1153,8 @@ impl ApiClient {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<LeaderboardEntry>, String> {
-        self.leaderboard(guild_id, "cowards", limit).await
+        self.leaderboard(guild_id, proto_coude::LeaderboardCategory::Cowards, limit)
+            .await
     }
 
     pub async fn leaderboard_chaos(
@@ -1144,7 +1162,8 @@ impl ApiClient {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<LeaderboardEntry>, String> {
-        self.leaderboard(guild_id, "chaos", limit).await
+        self.leaderboard(guild_id, proto_coude::LeaderboardCategory::Chaos, limit)
+            .await
     }
 
     pub async fn leaderboard_level(
@@ -1152,21 +1171,22 @@ impl ApiClient {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<LeaderboardEntry>, String> {
-        self.leaderboard(guild_id, "level", limit).await
+        self.leaderboard(guild_id, proto_coude::LeaderboardCategory::Level, limit)
+            .await
     }
 
-    // ── Utility ──
+    // ══════════════════════════════════════════════════════════════════
+    // HTTP legacy : methodes sans equivalent proto
+    // ══════════════════════════════════════════════════════════════════
 
-    /// GET /api/coude/guilds
     pub async fn get_all_guild_ids(&self) -> Result<Vec<String>, String> {
         self.base.get_json("/api/coude/guilds").await
     }
 
-    /// GET /api/coude/{guild_id}/players/random?count={count}
     pub async fn get_random_players(
         &self,
         guild_id: &str,
-        count: usize,
+        count: i64,
     ) -> Result<Vec<Player>, String> {
         self.base
             .get_json(&format!(
@@ -1175,7 +1195,10 @@ impl ApiClient {
             .await
     }
 
-    /// POST /api/coude/{guild_id}/daily-chaos
+    // ══════════════════════════════════════════════════════════════════
+    // Daily chaos + events — gRPC (CoudeSocialService)
+    // ══════════════════════════════════════════════════════════════════
+
     pub async fn log_daily_chaos(
         &self,
         guild_id: &str,
@@ -1185,100 +1208,145 @@ impl ApiClient {
         winner_name: &str,
         amount: i64,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/daily-chaos"),
-                &serde_json::json!({
-                    "loser_id": loser_id,
-                    "loser_name": loser_name,
-                    "winner_id": winner_id,
-                    "winner_name": winner_name,
-                    "amount": amount,
-                }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::LogDailyChaosRequest {
+            guild_id: guild_id.to_string(),
+            loser_id: loser_id.to_string(),
+            loser_name: loser_name.to_string(),
+            winner_id: winner_id.to_string(),
+            winner_name: winner_name.to_string(),
+            amount,
+        };
+        let mut client = self.grpc.coude_social();
+        self.grpc
+            .guarded(|| async move { client.log_daily_chaos(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// GET /api/coude/{guild_id}/events
     pub async fn get_active_events(
         &self,
         guild_id: &str,
     ) -> Result<Vec<ServerEvent>, String> {
-        self.base
-            .get_json(&format!("/api/coude/{guild_id}/events"))
+        let req = proto_coude::ListActiveEventsRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let list = self
+            .grpc
+            .guarded(|| async move {
+                client.list_active_events(req).await.map(|r| r.into_inner())
+            })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list
+            .events
+            .into_iter()
+            .map(|e| ServerEvent {
+                id: e.id,
+                guild_id: e.guild_id,
+                event_type: String::new(),
+                active: e.active,
+                expires_at: e.expires_at,
+                created_at: e.created_at,
+            })
+            .collect())
     }
 
-    // ── Inventory ──
+    // ══════════════════════════════════════════════════════════════════
+    // Inventory items — gRPC (CoudeInventoryService)
+    // ══════════════════════════════════════════════════════════════════
 
-    /// POST /api/coude/{guild_id}/inventory/{user_id}/add
     pub async fn add_item(
         &self,
         guild_id: &str,
         user_id: &str,
         item_key: &str,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/inventory/{user_id}/add"),
-                &serde_json::json!({ "item_key": item_key }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::AddItemRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            item_key: item_key.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        self.grpc
+            .guarded(|| async move { client.add_item(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// GET /api/coude/{guild_id}/inventory/{user_id}
     pub async fn get_inventory(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<Vec<InventoryItem>, String> {
-        self.base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/inventory/{user_id}"
-            ))
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        let list = self
+            .grpc
+            .guarded(|| async move {
+                client.list_inventory(req).await.map(|r| r.into_inner())
+            })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list
+            .items
+            .into_iter()
+            .map(|i| InventoryItem {
+                guild_id: i.guild_id,
+                user_id: i.user_id,
+                item_key: i.item_key,
+                quantity: i.quantity,
+            })
+            .collect())
     }
 
-    /// POST /api/coude/{guild_id}/inventory/{user_id}/use
     pub async fn use_item(
         &self,
         guild_id: &str,
         user_id: &str,
         item_key: &str,
     ) -> Result<bool, String> {
-        let res: SuccessResponse = self
-            .base
-            .post_json(
-                &format!("/api/coude/{guild_id}/inventory/{user_id}/use"),
-                &serde_json::json!({ "item_key": item_key }),
-            )
-            .await?;
-        Ok(res.success)
+        let req = proto_coude::UseItemRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            item_key: item_key.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.use_item(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.consumed)
     }
 
-    /// GET /api/coude/{guild_id}/inventory/{user_id}/has/{item_key}
     pub async fn has_item(
         &self,
         guild_id: &str,
         user_id: &str,
         item_key: &str,
     ) -> Result<bool, String> {
-        let res: HasItemResponse = self
-            .base
-            .get_json(&format!(
-                "/api/coude/{guild_id}/inventory/{user_id}/has/{item_key}"
-            ))
-            .await?;
-        Ok(res.has_item)
+        let req = proto_coude::HasItemRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            item_key: item_key.to_string(),
+        };
+        let mut client = self.grpc.coude_inventory();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.has_item(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.value)
     }
 
-    // ── Coins (backwards compat helpers) ──
+    // ══════════════════════════════════════════════════════════════════
+    // Coins helpers (Phase 7A — CoudePlayerService.AdjustCoins)
+    // ══════════════════════════════════════════════════════════════════
 
-    /// gRPC `CoudePlayerService.AdjustCoins` (Phase 7A — hot path).
-    /// Comme l'ancien endpoint HTTP n'etait pas idempotent et ne renvoyait
-    /// pas le joueur, on appelle GetOrCreate apres pour rester source-compat.
     pub async fn update_player_coins(
         &self,
         guild_id: &str,
@@ -1295,33 +1363,37 @@ impl ApiClient {
             .guarded(|| async move { client.adjust_coins(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)?;
+        // Refresh player state.
         self.get_or_create_player(guild_id, user_id, "").await
     }
 
-    /// Set player coins to an absolute value by computing delta.
     pub async fn set_player_coins(
         &self,
         guild_id: &str,
         user_id: &str,
         coins: i64,
     ) -> Result<(), String> {
-        // Get current player to compute delta
         let player = self.get_or_create_player(guild_id, user_id, "").await?;
         let delta = coins - player.coins;
         if delta != 0 {
-            self.base
-                .patch_fire_and_forget(
-                    &format!("/api/coude/players/{guild_id}/{user_id}/coins"),
-                    &serde_json::json!({ "amount": delta }),
-                )
-                .await;
+            let req = proto_coude::AdjustCoinsRequest {
+                guild_id: guild_id.to_string(),
+                user_id: user_id.to_string(),
+                delta,
+            };
+            let mut client = self.grpc.coude_players();
+            self.grpc
+                .guarded(|| async move { client.adjust_coins(req).await.map(|_| ()) })
+                .await
+                .map_err(grpc_err_to_string)?;
         }
         Ok(())
     }
 
-    // ── HP ──
+    // ══════════════════════════════════════════════════════════════════
+    // HP — gRPC (CoudePlayerService.UpdateHp)
+    // ══════════════════════════════════════════════════════════════════
 
-    /// gRPC `CoudePlayerService.UpdateHp` (Phase 7A).
     pub async fn update_hp(
         &self,
         guild_id: &str,
@@ -1342,6 +1414,7 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
+    /// HTTP : pas d'equivalent proto.
     pub async fn repos(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
         self.base
             .post_fire_and_forget(
@@ -1353,7 +1426,9 @@ impl ApiClient {
     }
 }
 
-// ── Helpers proto -> DTO local ──
+// ══════════════════════════════════════════════════════════════════════
+// ── Helpers proto -> DTO ──
+// ══════════════════════════════════════════════════════════════════════
 
 fn proto_player_to_dto(p: proto_coude::CoudePlayer) -> Player {
     Player {
@@ -1386,6 +1461,49 @@ fn proto_player_to_dto(p: proto_coude::CoudePlayer) -> Player {
         season: Some(p.season),
         created_at: p.created_at,
         updated_at: p.updated_at,
+    }
+}
+
+fn proto_combat_to_dto(c: proto_coude::CoudeCombat) -> Combat {
+    Combat {
+        id: c.id,
+        guild_id: c.guild_id,
+        channel_id: c.channel_id,
+        attacker_id: c.attacker_id,
+        attacker_name: c.attacker_name,
+        defender_id: c.defender_id,
+        defender_name: c.defender_name,
+        mise: c.mise,
+        status: c.status,
+        winner_id: c.winner_id,
+        attacker_roll: c.attacker_roll,
+        defender_roll: c.defender_roll,
+        chaos_event: c.chaos_event,
+        special_attack: c.special_attack,
+        defender_special: c.defender_special,
+        coins_transferred: c.coins_transferred,
+        result_message: c.result_message,
+        message_id: c.message_id,
+        created_at: c.created_at,
+        accepted_at: c.accepted_at,
+        resolved_at: c.resolved_at,
+    }
+}
+
+fn proto_prime_to_dto(p: proto_coude::CoudePrime) -> Prime {
+    Prime {
+        id: p.id,
+        guild_id: p.guild_id,
+        target_id: p.target_id,
+        target_name: p.target_name,
+        placed_by_id: p.placed_by_id,
+        placed_by_name: p.placed_by_name,
+        amount: p.amount,
+        claimed: p.claimed,
+        claimed_by_id: p.claimed_by_id,
+        claimed_by_name: p.claimed_by_name,
+        claimed_at: p.claimed_at,
+        created_at: p.created_at,
     }
 }
 

@@ -239,7 +239,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let combat = match api
         .create_combat(
             &guild_id,
-            &combat_channel,
+            Some(&combat_channel),
             &command.user.id.to_string(),
             &command.user.name,
             &target.id.to_string(),

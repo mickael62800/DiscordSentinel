@@ -2,12 +2,16 @@ syntax = "proto3";
 
 package sentinel.coude.v1;
 
-// Service Coup de Coude v1 — pilote partiel.
+// Service Coup de Coude — v1.
 //
-// Hot path joueurs uniquement (CRUD + progression). Les domaines combat,
-// economie, inventaire, betting et social restent en HTTP pour cette
-// iteration et seront migres ulterieurement quand les `ManageCoude*UseCase`
-// seront tous adaptes au pattern proto.
+// Phase 7A : CoudePlayerService (6 RPCs, hot path joueurs).
+// Phase 7A.opt F.1 : ajout des 5 services restants (combats, bets, economy,
+// inventory, social) — migration complete du domaine coude vers gRPC.
+
+// ══════════════════════════════════════════════════════════════════════
+// CoudePlayerService (Phase 7A)
+// ══════════════════════════════════════════════════════════════════════
+
 service CoudePlayerService {
   rpc GetOrCreatePlayer(GetOrCreatePlayerRequest) returns (CoudePlayer);
   rpc GetPlayer(GetPlayerRequest) returns (CoudePlayer);
@@ -80,7 +84,6 @@ message CoudePlayer {
   int32 hp_current = 22;
   int32 hp_max = 23;
   int32 season = 24;
-  // RFC3339
   string created_at = 25;
   string updated_at = 26;
 }
@@ -90,4 +93,470 @@ message XpProgress {
   int32 new_level = 2;
   bool leveled_up = 3;
   int32 stat_points_gained = 4;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CoudeCombatsService (Phase 7A.opt F.1)
+// ══════════════════════════════════════════════════════════════════════
+
+service CoudeCombatsService {
+  rpc List(ListCombatsRequest) returns (CombatList);
+  rpc Get(GetCombatRequest) returns (CoudeCombat);
+  rpc GetPendingForAttacker(GetPendingForAttackerRequest) returns (MaybeCombat);
+  rpc GetPendingForDefender(GetPendingForDefenderRequest) returns (MaybeCombat);
+  rpc ListExpiredPending(Empty) returns (CombatList);
+  rpc GetBettingForParticipant(GetBettingForParticipantRequest) returns (MaybeCombat);
+  rpc Create(CreateCombatRequest) returns (CoudeCombat);
+  rpc Cancel(CancelCombatRequest) returns (Empty);
+  rpc Resolve(ResolveCombatRequest) returns (Empty);
+  rpc SetBetting(SetBettingRequest) returns (SetBettingResponse);
+  rpc Expire(ExpireCombatRequest) returns (Empty);
+  rpc SetDefenderSpecial(SetDefenderSpecialRequest) returns (Empty);
+}
+
+message CoudeCombat {
+  string id = 1;
+  string guild_id = 2;
+  optional string channel_id = 3;
+  string attacker_id = 4;
+  string attacker_name = 5;
+  string defender_id = 6;
+  string defender_name = 7;
+  int64 mise = 8;
+  string status = 9;
+  optional string winner_id = 10;
+  optional int32 attacker_roll = 11;
+  optional int32 defender_roll = 12;
+  optional string chaos_event = 13;
+  optional string special_attack = 14;
+  optional string defender_special = 15;
+  optional int64 coins_transferred = 16;
+  optional string result_message = 17;
+  optional string message_id = 18;
+  string created_at = 19;
+  optional string accepted_at = 20;
+  optional string resolved_at = 21;
+}
+
+message CombatList {
+  repeated CoudeCombat combats = 1;
+}
+
+message MaybeCombat {
+  optional CoudeCombat combat = 1;
+}
+
+message ListCombatsRequest {
+  string guild_id = 1;
+  optional string status = 2;
+  int64 limit = 3;
+}
+
+message GetCombatRequest {
+  string id = 1;
+}
+
+message GetPendingForAttackerRequest {
+  string guild_id = 1;
+  string attacker_id = 2;
+}
+
+message GetPendingForDefenderRequest {
+  string guild_id = 1;
+  string defender_id = 2;
+}
+
+message GetBettingForParticipantRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message CreateCombatRequest {
+  string guild_id = 1;
+  optional string channel_id = 2;
+  string attacker_id = 3;
+  string attacker_name = 4;
+  string defender_id = 5;
+  string defender_name = 6;
+  int64 mise = 7;
+  optional string special_attack = 8;
+}
+
+message CancelCombatRequest {
+  string id = 1;
+}
+
+message ResolveCombatRequest {
+  string id = 1;
+  string status = 2;
+  optional string winner_id = 3;
+  optional int32 attacker_roll = 4;
+  optional int32 defender_roll = 5;
+  optional string chaos_event = 6;
+  optional string result_message = 7;
+  int64 coins_transferred = 8;
+}
+
+message SetBettingRequest {
+  string id = 1;
+  string message_id = 2;
+}
+
+message SetBettingResponse {
+  bool transitioned = 1;
+}
+
+message ExpireCombatRequest {
+  string id = 1;
+}
+
+message SetDefenderSpecialRequest {
+  string id = 1;
+  string item_key = 2;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CoudeBetsService (Phase 7A.opt F.1)
+// ══════════════════════════════════════════════════════════════════════
+
+service CoudeBetsService {
+  rpc Place(PlaceBetRequest) returns (Empty);
+  rpc ListForCombat(ListForCombatRequest) returns (BetList);
+  rpc Resolve(ResolveBetsRequest) returns (BetResolutionPlan);
+  rpc Refund(RefundBetsRequest) returns (RefundSummary);
+}
+
+message CoudeBet {
+  int64 id = 1;
+  string guild_id = 2;
+  string combat_id = 3;
+  string bettor_id = 4;
+  string bettor_name = 5;
+  string backed_id = 6;
+  int64 amount = 7;
+  optional bool won = 8;
+  optional int64 payout = 9;
+}
+
+message BetList {
+  repeated CoudeBet bets = 1;
+}
+
+message PlaceBetRequest {
+  string guild_id = 1;
+  string combat_id = 2;
+  string bettor_id = 3;
+  string bettor_name = 4;
+  string backed_id = 5;
+  int64 amount = 6;
+}
+
+message ListForCombatRequest {
+  string combat_id = 1;
+}
+
+message ResolveBetsRequest {
+  string combat_id = 1;
+  optional string winner_id = 2;
+}
+
+message RefundBetsRequest {
+  string combat_id = 1;
+}
+
+message BetPayout {
+  int64 bet_id = 1;
+  string bettor_id = 2;
+  string bettor_name = 3;
+  string backed_id = 4;
+  int64 amount_bet = 5;
+  int64 payout = 6;
+  bool won = 7;
+}
+
+message FighterBetBonus {
+  string winner_id = 1;
+  int64 winner_bonus = 2;
+  string loser_id = 3;
+  int64 loser_bonus = 4;
+  int64 total_pot = 5;
+}
+
+message BetResolutionPlan {
+  repeated BetPayout payouts = 1;
+  optional FighterBetBonus fighter_bonus = 2;
+}
+
+message RefundSummary {
+  uint64 refunded_count = 1;
+  int64 refunded_total = 2;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CoudeEconomyService (Phase 7A.opt F.1)
+// ══════════════════════════════════════════════════════════════════════
+
+service CoudeEconomyService {
+  rpc Transfer(TransferRequest) returns (Empty);
+  rpc Steal(StealRequest) returns (StealResponse);
+  rpc RecordCasinoWin(RecordCasinoWinRequest) returns (Empty);
+  rpc RecordCasinoLoss(RecordCasinoLossRequest) returns (Empty);
+  rpc RecordCasinoFaillite(RecordCasinoFailliteRequest) returns (RecordCasinoFailliteResponse);
+  rpc CountCasinoToday(UserInGuildRequest) returns (Int64Value);
+  rpc SumCasinoGainsToday(UserInGuildRequest) returns (Int64Value);
+  rpc CountStealToday(UserInGuildRequest) returns (Int64Value);
+}
+
+message Int64Value { int64 value = 1; }
+
+message UserInGuildRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message TransferRequest {
+  string guild_id = 1;
+  string from_id = 2;
+  string to_id = 3;
+  int64 amount = 4;
+}
+
+message StealRequest {
+  string guild_id = 1;
+  string thief_id = 2;
+  string victim_id = 3;
+  int64 amount = 4;
+}
+
+message StealResponse {
+  int64 stolen = 1;
+}
+
+message RecordCasinoWinRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  int64 gain = 3;
+}
+
+message RecordCasinoLossRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  int64 lost = 3;
+}
+
+message RecordCasinoFailliteRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message RecordCasinoFailliteResponse {
+  int64 cleared_coins = 1;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CoudeInventoryService (Phase 7A.opt F.1)
+// ══════════════════════════════════════════════════════════════════════
+
+service CoudeInventoryService {
+  rpc ListInventory(UserInGuildRequest) returns (InventoryList);
+  rpc AddItem(AddItemRequest) returns (Empty);
+  rpc UseItem(UseItemRequest) returns (UseItemResponse);
+  rpc HasItem(HasItemRequest) returns (BoolValue);
+
+  // Primes
+  rpc CreatePrime(CreatePrimeRequest) returns (CoudePrime);
+  rpc ListActivePrimes(ListActivePrimesRequest) returns (PrimeList);
+  rpc ClaimPrimes(ClaimPrimesRequest) returns (Int64Value);
+
+  // Insurance
+  rpc BuyInsurance(BuyInsuranceRequest) returns (Empty);
+  rpc GetActiveInsurance(UserInGuildRequest) returns (MaybeInsurance);
+  rpc ExpireInsurance(ExpireInsuranceRequest) returns (Empty);
+}
+
+message BoolValue { bool value = 1; }
+
+message CoudeInventoryItem {
+  string guild_id = 1;
+  string user_id = 2;
+  string item_key = 3;
+  int32 quantity = 4;
+}
+
+message InventoryList {
+  repeated CoudeInventoryItem items = 1;
+}
+
+message AddItemRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string item_key = 3;
+}
+
+message UseItemRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string item_key = 3;
+}
+
+message UseItemResponse {
+  bool consumed = 1;
+}
+
+message HasItemRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string item_key = 3;
+}
+
+message CoudePrime {
+  string id = 1;
+  string guild_id = 2;
+  string target_id = 3;
+  string target_name = 4;
+  string placed_by_id = 5;
+  string placed_by_name = 6;
+  int64 amount = 7;
+  bool claimed = 8;
+  optional string claimed_by_id = 9;
+  optional string claimed_by_name = 10;
+  optional string claimed_at = 11;
+  string created_at = 12;
+}
+
+message PrimeList {
+  repeated CoudePrime primes = 1;
+}
+
+message CreatePrimeRequest {
+  string guild_id = 1;
+  string target_id = 2;
+  string target_name = 3;
+  string placed_by_id = 4;
+  string placed_by_name = 5;
+  int64 amount = 6;
+}
+
+message ListActivePrimesRequest {
+  string guild_id = 1;
+  string target_id = 2;
+}
+
+message ClaimPrimesRequest {
+  string guild_id = 1;
+  string target_id = 2;
+  string claimer_id = 3;
+  string claimer_name = 4;
+}
+
+message CoudeInsurance {
+  string id = 1;
+  bool is_scam = 2;
+  string expires_at = 3;
+}
+
+message MaybeInsurance {
+  optional CoudeInsurance insurance = 1;
+}
+
+message BuyInsuranceRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  bool is_scam = 3;
+}
+
+message ExpireInsuranceRequest {
+  string insurance_id = 1;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// CoudeSocialService (Phase 7A.opt F.1)
+// ══════════════════════════════════════════════════════════════════════
+
+service CoudeSocialService {
+  rpc CheckCooldown(CheckCooldownRequest) returns (CheckCooldownResponse);
+  rpc SetCooldown(SetCooldownRequest) returns (Empty);
+  rpc Leaderboard(LeaderboardRequest) returns (LeaderboardList);
+  rpc ListActiveEvents(ListActiveEventsRequest) returns (EventList);
+  rpc LogDailyChaos(LogDailyChaosRequest) returns (Empty);
+  rpc CurrentSeason(CurrentSeasonRequest) returns (CoudeCurrentSeason);
+}
+
+message CheckCooldownRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string action = 3;
+}
+
+message CheckCooldownResponse {
+  // Absent si pas de cooldown actif (action permise).
+  optional string available_at = 1;
+}
+
+message SetCooldownRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string action = 3;
+  int64 duration_secs = 4;
+}
+
+enum LeaderboardCategory {
+  LEADERBOARD_CATEGORY_UNSPECIFIED = 0;
+  LEADERBOARD_CATEGORY_RICHEST = 1;
+  LEADERBOARD_CATEGORY_THIEVES = 2;
+  LEADERBOARD_CATEGORY_COWARDS = 3;
+  LEADERBOARD_CATEGORY_CHAOS = 4;
+  LEADERBOARD_CATEGORY_LEVEL = 5;
+}
+
+message LeaderboardRequest {
+  string guild_id = 1;
+  LeaderboardCategory category = 2;
+  int64 limit = 3;
+}
+
+message CoudeLeaderboardEntry {
+  string user_id = 1;
+  string username = 2;
+  int64 value = 3;
+}
+
+message LeaderboardList {
+  repeated CoudeLeaderboardEntry entries = 1;
+}
+
+message ListActiveEventsRequest {
+  string guild_id = 1;
+}
+
+message CoudeEvent {
+  string id = 1;
+  string guild_id = 2;
+  bool active = 3;
+  string expires_at = 4;
+  string created_at = 5;
+}
+
+message EventList {
+  repeated CoudeEvent events = 1;
+}
+
+message LogDailyChaosRequest {
+  string guild_id = 1;
+  string loser_id = 2;
+  string loser_name = 3;
+  string winner_id = 4;
+  string winner_name = 5;
+  int64 amount = 6;
+}
+
+message CurrentSeasonRequest {
+  string guild_id = 1;
+}
+
+message CoudeCurrentSeason {
+  int32 season_number = 1;
+  string started_at = 2;
+  string ends_at = 3;
+  int64 days_remaining = 4;
 }

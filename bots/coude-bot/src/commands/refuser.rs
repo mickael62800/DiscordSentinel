@@ -95,7 +95,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             None,
             None,
             None,
-            &refuse_msg,
+            Some(&refuse_msg),
             penalty,
         )
         .await

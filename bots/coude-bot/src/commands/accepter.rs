@@ -216,7 +216,7 @@ pub async fn resolve_combat_internal(
             Some(first_atk_roll),
             Some(first_def_roll),
             chaos_key,
-            &result.message,
+            Some(&result.message),
             result.coins_won,
         )
         .await
