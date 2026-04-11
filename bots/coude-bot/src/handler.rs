@@ -50,7 +50,7 @@ impl EventHandler for Handler {
         {
             error!(error = %e, "Impossible d'enregistrer les slash commands");
         } else {
-            info!("Slash commands enregistrees : coude, profil, shop, casino, prime, leaderboard, pari, voler, assurance, train");
+            info!("Slash commands enregistrees : coude, profil, shop, prime, leaderboard, pari, voler, assurance, train");
         }
 
         // Daily chaos background task
@@ -78,7 +78,6 @@ impl EventHandler for Handler {
                     "coude" => commands::coude::handle(&ctx, &command).await,
                     "profil" => commands::profil::handle(&ctx, &command).await,
                     "shop" => commands::shop_cmd::handle(&ctx, &command).await,
-                    "casino" => commands::casino::handle(&ctx, &command).await,
                     "prime" => commands::prime::handle(&ctx, &command).await,
                     "leaderboard" => commands::leaderboard::handle(&ctx, &command).await,
                     "pari" => commands::pari::handle(&ctx, &command).await,

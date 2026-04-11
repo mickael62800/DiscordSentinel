@@ -132,11 +132,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             format!("{}", player.total_stolen),
             true,
         )
-        .field(
-            "\u{1f3b0} Casino W/L",
-            format!("{}/{}", player.casino_wins, player.casino_losses),
-            true,
-        )
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 

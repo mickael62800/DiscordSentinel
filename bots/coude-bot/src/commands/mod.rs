@@ -1,7 +1,6 @@
 pub mod accepter;
 pub mod annuler;
 pub mod assurance;
-pub mod casino;
 pub mod classe;
 pub mod coude;
 pub mod defend_item;
@@ -26,7 +25,6 @@ pub fn all() -> Vec<CreateCommand> {
         coude::register(),
         profil::register(),
         shop_cmd::register(),
-        casino::register(),
         prime::register(),
         leaderboard::register(),
         pari::register(),
