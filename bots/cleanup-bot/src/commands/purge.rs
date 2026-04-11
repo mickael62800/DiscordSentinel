@@ -6,7 +6,7 @@ use serenity::all::{
 };
 use tracing::error;
 
-use sentinel_shared::discord_helpers::reply_ephemeral_embed;
+use sentinel_shared::discord_helpers::{defer_ephemeral, followup_ephemeral_embed};
 use sentinel_shared::embeds::{success_embed, moderate_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
@@ -131,9 +131,17 @@ pub fn register() -> CreateCommand {
                 .required(true),
             ),
         )
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "all",
+            "Supprimer TOUS les messages du salon (peut etre long)",
+        ))
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Defer immediatement : /purge peut depasser 3s (fetch + delete par lots avec sleep)
+    defer_ephemeral(ctx, command).await;
+
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
@@ -176,6 +184,34 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .min(100) as u8;
 
     let channel_id = command.channel_id;
+
+    // Branche speciale : /purge all — paginate jusqu'a vider le salon
+    if sub == "all" {
+        let (deleted, errors) = purge_all(ctx, channel_id).await;
+        let description = if errors > 0 {
+            format!(
+                "{} message(s) supprime(s).\n{} erreur(s) rencontree(s).",
+                deleted, errors
+            )
+        } else {
+            format!("{} message(s) supprime(s).", deleted)
+        };
+        let embed = success_embed("Purge complete terminee").description(description);
+        followup_ephemeral_embed(ctx, command, embed).await;
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<ApiClientKey>() {
+            api.send_log(
+                "info",
+                &guild_id.to_string(),
+                &format!(
+                    "Purge all : {} message(s) supprime(s) par {}",
+                    deleted, command.user.name
+                ),
+            );
+        }
+        return;
+    }
 
     // Recuperer les messages
     let messages = match channel_id
@@ -317,7 +353,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let embed = success_embed("Purge terminee").description(description);
-    reply_ephemeral_embed(ctx, command, embed).await;
+    followup_ephemeral_embed(ctx, command, embed).await;
 
     // Log via API
     let data = ctx.data.read().await;
@@ -361,8 +397,95 @@ fn chrono_now_unix() -> i64 {
         .as_secs() as i64
 }
 
-/// Reponse d'erreur ephemere.
+/// Purge complete d'un salon : boucle de fetch + delete jusqu'a l'epuisement.
+/// Retourne (nb_supprimes, nb_erreurs).
+async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64, u64) {
+    let mut deleted: u64 = 0;
+    let mut errors: u64 = 0;
+    let fourteen_days_secs: i64 = 14 * 24 * 60 * 60;
+    // Garde-fou : eviter une boucle infinie si un message refuse systematiquement de mourir
+    let mut empty_streak = 0u32;
+
+    loop {
+        let messages = match channel_id
+            .messages(&ctx.http, GetMessages::new().limit(100))
+            .await
+        {
+            Ok(m) => m,
+            Err(e) => {
+                error!(error = %e, "Erreur fetch messages (purge all)");
+                break;
+            }
+        };
+
+        if messages.is_empty() {
+            break;
+        }
+
+        let before = deleted;
+        let now = chrono_now_unix();
+        let mut recent_ids: Vec<MessageId> = Vec::new();
+        let mut old_ids: Vec<MessageId> = Vec::new();
+        for msg in &messages {
+            if now - msg.timestamp.unix_timestamp() < fourteen_days_secs {
+                recent_ids.push(msg.id);
+            } else {
+                old_ids.push(msg.id);
+            }
+        }
+
+        for chunk in recent_ids.chunks(100) {
+            if chunk.len() == 1 {
+                if let Err(e) = channel_id.delete_message(&ctx.http, chunk[0]).await {
+                    error!(error = %e, "Erreur delete individuel (purge all)");
+                    errors += 1;
+                } else {
+                    deleted += 1;
+                }
+            } else {
+                match channel_id.delete_messages(&ctx.http, chunk).await {
+                    Ok(_) => deleted += chunk.len() as u64,
+                    Err(e) => {
+                        error!(error = %e, "Erreur bulk delete (purge all), fallback individuel");
+                        for &id in chunk {
+                            if let Err(e) = channel_id.delete_message(&ctx.http, id).await {
+                                error!(error = %e, "Erreur delete fallback (purge all)");
+                                errors += 1;
+                            } else {
+                                deleted += 1;
+                            }
+                            tokio::time::sleep(Duration::from_millis(300)).await;
+                        }
+                    }
+                }
+            }
+        }
+
+        for &id in &old_ids {
+            if let Err(e) = channel_id.delete_message(&ctx.http, id).await {
+                error!(error = %e, "Erreur delete ancien (purge all)");
+                errors += 1;
+            } else {
+                deleted += 1;
+            }
+            tokio::time::sleep(Duration::from_millis(300)).await;
+        }
+
+        if deleted == before {
+            empty_streak += 1;
+            if empty_streak >= 2 {
+                break;
+            }
+        } else {
+            empty_streak = 0;
+        }
+    }
+
+    (deleted, errors)
+}
+
+/// Reponse d'erreur ephemere (via followup : on a defer au debut du handler).
 async fn reply_error(ctx: &Context, command: &CommandInteraction, message: &str) {
     let embed = moderate_embed("Erreur").description(message);
-    reply_ephemeral_embed(ctx, command, embed).await;
+    followup_ephemeral_embed(ctx, command, embed).await;
 }
