@@ -378,9 +378,23 @@ pub(super) async fn handle_close_table(ctx: &Context, component: &ComponentInter
         Some(m) => Arc::clone(m),
         None => return,
     };
+    let api = data.get::<crate::GameApiKey>().cloned();
     drop(data);
 
     mgr.remove(component.user.id);
+
+    // Marquer la table comme fermee en DB (sinon la row reste 'open' orpheline).
+    if let Some(api) = api {
+        match api.get_table_by_channel(&component.channel_id.to_string()).await {
+            Ok(Some(table)) => {
+                if let Err(e) = api.close_table(&table.id).await {
+                    warn!(error = %e, table_id = %table.id, "Echec close_table API");
+                }
+            }
+            Ok(None) => {}
+            Err(e) => warn!(error = %e, "Echec lookup table by channel"),
+        }
+    }
 
     tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
 

@@ -622,9 +622,11 @@ services:
       API_BASE_URL: http://api:3000
       GRPC_API_URL: http://api:50051   # Phase 7A : full BlackjackService (solo + wallet)
       API_KEY: ${API_KEY:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       RUST_LOG: info
     depends_on:
       - api
+      - redis
 
   coude-bot:
     build:
