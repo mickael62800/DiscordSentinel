@@ -207,7 +207,9 @@ impl BlackjackRepository for PgBlackjackRepository {
         .ok_or_else(|| DomainError::NotFound(format!("Partie blackjack {id} introuvable")))?;
 
         // Seules les parties en cours sont annulables.
-        if !matches!(row.status.as_str(), "in_progress" | "waiting") {
+        // Les parties solo ont status "playing", les parties multi-tables
+        // peuvent etre "waiting" quand le dealer est en train de distribuer.
+        if !matches!(row.status.as_str(), "playing" | "waiting") {
             return Err(DomainError::Conflict(format!(
                 "Partie deja terminee (status = {})", row.status
             )));

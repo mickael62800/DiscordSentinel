@@ -24,18 +24,40 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
     };
     let user_id = component.user.id;
 
-    // Verifier si deja une table ouverte
+    // Verifier si deja une table ouverte — on verifie aussi que le channel
+    // existe reellement pour detecter les entrees orphelines dans le
+    // ChannelManager in-memory (ex: channel supprime manuellement, cache
+    // non nettoye apres crash du bot, etc.).
     {
         let data = ctx.data.read().await;
         if let Some(mgr) = data.get::<ChannelManagerKey>() {
             if let Some(table) = mgr.get(user_id) {
-                let resp = CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .content(format!("Tu as deja une table ouverte ! <#{}>", table.channel_id))
-                        .ephemeral(true),
+                // Le channel existe-t-il toujours ?
+                let channel_still_exists = table
+                    .channel_id
+                    .to_channel(&ctx.http)
+                    .await
+                    .is_ok();
+                if channel_still_exists {
+                    let resp = CreateInteractionResponse::Message(
+                        CreateInteractionResponseMessage::new()
+                            .content(format!(
+                                "Tu as deja une table ouverte ! <#{}>",
+                                table.channel_id
+                            ))
+                            .ephemeral(true),
+                    );
+                    let _ = component.create_response(&ctx.http, resp).await;
+                    return;
+                }
+                // Sinon : entry orpheline -> on la purge et on continue
+                // vers la creation d'une nouvelle table.
+                warn!(
+                    user_id = %user_id,
+                    channel_id = %table.channel_id,
+                    "Channel fantome detecte dans ChannelManager, purge"
                 );
-                let _ = component.create_response(&ctx.http, resp).await;
-                return;
+                mgr.remove(user_id);
             }
         }
     }

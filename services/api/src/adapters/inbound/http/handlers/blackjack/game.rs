@@ -139,7 +139,7 @@ pub struct ListGamesQuery {
     pub status: Option<String>,
 }
 
-/// GET /api/blackjack/{guild_id}/games?status=in_progress
+/// GET /api/blackjack/admin/{guild_id}/games?status=playing
 pub async fn list_games(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,

@@ -16,7 +16,7 @@ const { selectedGuildId } = useGuildSelector();
 const { confirm } = useConfirm();
 const { success, error: toastError } = useToast();
 
-const statusFilter = ref<string>("in_progress");
+const statusFilter = ref<string>("playing");
 const games = ref<BlackjackGame[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
@@ -24,7 +24,7 @@ const cancelling = ref<string | null>(null);
 const expandedRow = ref<string | null>(null);
 
 const statusLabels: Record<string, string> = {
-  in_progress: "En cours",
+  playing: "En cours",
   waiting: "En attente",
   player_blackjack: "Blackjack !",
   player_bust: "Bust joueur",
@@ -37,7 +37,7 @@ const statusLabels: Record<string, string> = {
 };
 
 const statusIcons: Record<string, string> = {
-  in_progress: "🎮",
+  playing: "🎮",
   waiting: "⏳",
   player_blackjack: "🎰",
   player_bust: "💥",
@@ -49,7 +49,7 @@ const statusIcons: Record<string, string> = {
 };
 
 const statusOptions = [
-  { value: "in_progress", label: "🎮 En cours", count: 0 },
+  { value: "playing", label: "🎮 En cours", count: 0 },
   { value: "player_win", label: "✨ Victoires", count: 0 },
   { value: "dealer_win", label: "😔 Defaites", count: 0 },
   { value: "cancelled", label: "🚫 Annulees", count: 0 },
@@ -98,7 +98,7 @@ async function cancelGame(game: BlackjackGame) {
 
 function statusClass(status: string): string {
   switch (status) {
-    case "in_progress":
+    case "playing":
     case "waiting":
       return "status-warning";
     case "player_blackjack":
@@ -118,11 +118,11 @@ function statusClass(status: string): string {
 }
 
 function isCancellable(status: string): boolean {
-  return status === "in_progress" || status === "waiting";
+  return status === "playing" || status === "waiting";
 }
 
 // Stats globales
-const statsInProgress = computed(() => games.value.filter(g => g.status === "in_progress" || g.status === "waiting").length);
+const statsInProgress = computed(() => games.value.filter(g => g.status === "playing" || g.status === "waiting").length);
 const statsTotalBet = computed(() => games.value.reduce((s, g) => s + g.bet, 0));
 const statsWinRate = computed(() => {
   const finished = games.value.filter(g => ["player_win", "player_blackjack", "dealer_bust", "dealer_win", "player_bust"].includes(g.status));
