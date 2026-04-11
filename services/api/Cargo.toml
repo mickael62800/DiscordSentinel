@@ -64,6 +64,7 @@ rand = { workspace = true }
 
 [dev-dependencies]
 http-body-util = "0.1"
+tokio-stream = { version = "0.1", features = ["net"] }
 
 # Phase 1 — Quick wins : jemalloc comme allocateur global (Linux/macOS uniquement,
 # pas supporté sur MSVC Windows). Gain typique : -15 % RAM résidente sur API

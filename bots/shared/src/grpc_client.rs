@@ -365,3 +365,58 @@ impl Interceptor for AuthInterceptor {
         Ok(req)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_api_key_yields_no_header() {
+        let mut interceptor = AuthInterceptor::new("");
+        let req = interceptor.call(Request::new(())).unwrap();
+        assert!(req.metadata().get("authorization").is_none());
+    }
+
+    #[test]
+    fn ascii_api_key_injects_bearer_header() {
+        let mut interceptor = AuthInterceptor::new("topsecret");
+        let req = interceptor.call(Request::new(())).unwrap();
+        let header = req.metadata().get("authorization").expect("header present");
+        assert_eq!(header.to_str().unwrap(), "Bearer topsecret");
+    }
+
+    #[test]
+    fn invalid_api_key_chars_disable_auth_silently() {
+        let mut interceptor = AuthInterceptor::new("bad\nkey\0");
+        let req = interceptor.call(Request::new(())).unwrap();
+        assert!(req.metadata().get("authorization").is_none());
+    }
+
+    #[test]
+    fn interceptor_clone_preserves_header() {
+        let interceptor = AuthInterceptor::new("abc123");
+        let mut clone = interceptor.clone();
+        let req = clone.call(Request::new(())).unwrap();
+        assert_eq!(
+            req.metadata().get("authorization").unwrap().to_str().unwrap(),
+            "Bearer abc123"
+        );
+    }
+
+    #[test]
+    fn grpc_call_error_status_variant() {
+        let status = Status::unavailable("api down");
+        let err = GrpcCallError::Status(status);
+        match err {
+            GrpcCallError::Status(s) => assert_eq!(s.code(), tonic::Code::Unavailable),
+            _ => panic!("expected Status variant"),
+        }
+    }
+
+    #[test]
+    fn grpc_call_error_unavailable_display() {
+        let err = GrpcCallError::Unavailable;
+        let msg = format!("{err}");
+        assert!(msg.contains("indisponible") || msg.contains("circuit breaker"));
+    }
+}
