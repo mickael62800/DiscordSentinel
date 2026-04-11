@@ -71,19 +71,21 @@ fn bot_routes_standard() -> Router<AppState> {
         .route("/api/wallet/transfer", post(handlers::wallet::transfer))
         .route("/api/wallet/{guild_id}/leaderboard", get(handlers::wallet::leaderboard))
         .route("/api/wallet/{guild_id}/{user_id}/transactions", get(handlers::wallet::transactions))
-        // Phase 8 — administration wallets (liste + reset individuel + reset global)
-        .route("/api/wallet/{guild_id}/all", get(handlers::wallet::list_wallets))
-        .route("/api/wallet/{guild_id}/{user_id}/reset", post(handlers::wallet::reset_wallet))
-        .route("/api/wallet/{guild_id}/reset-all", post(handlers::wallet::reset_all_wallets))
+        // Phase 8 — administration wallets (pluriel pour eviter collision
+        // avec les routes dynamiques /api/wallet/{guild}/{user_id}).
+        .route("/api/wallets/{guild_id}", get(handlers::wallet::list_wallets))
+        .route("/api/wallets/{guild_id}/reset-all", post(handlers::wallet::reset_all_wallets))
+        .route("/api/wallets/{guild_id}/{user_id}/reset", post(handlers::wallet::reset_wallet))
         // Blackjack
         .route("/api/blackjack/start", post(handlers::blackjack::start_game))
         .route("/api/blackjack/{game_id}/hit", post(handlers::blackjack::hit))
         .route("/api/blackjack/{game_id}/stand", post(handlers::blackjack::stand))
         .route("/api/blackjack/{game_id}/double", post(handlers::blackjack::double_down))
         .route("/api/blackjack/{guild_id}/{user_id}/active", get(handlers::blackjack::get_active))
-        // Phase 8 — administration blackjack (liste + annulation)
-        .route("/api/blackjack/{guild_id}/games", get(handlers::blackjack::list_games))
-        .route("/api/blackjack/games/{game_id}", delete(handlers::blackjack::cancel_game))
+        // Phase 8 — administration blackjack (prefixe "admin" pour eviter
+        // collision avec les routes dynamiques /api/blackjack/{game_id}/*).
+        .route("/api/blackjack/admin/{guild_id}/games", get(handlers::blackjack::list_games))
+        .route("/api/blackjack/admin/games/{game_id}", delete(handlers::blackjack::cancel_game))
         // Blackjack tables (multijoueur)
         .route("/api/blackjack/tables", post(handlers::blackjack::create_table))
         .route("/api/blackjack/tables/{table_id}/join", post(handlers::blackjack::join_table))

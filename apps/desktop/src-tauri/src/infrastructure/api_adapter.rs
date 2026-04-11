@@ -484,7 +484,7 @@ impl CoudeRepository for ApiAdapter {
 
 impl WalletRepository for ApiAdapter {
     fn list_wallets(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<Wallet>, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/wallet/{}/all", self.base_url(), guild_id)))
+        self.get_json(self.client.get(format!("{}/api/wallets/{}", self.base_url(), guild_id)))
     }
 
     fn credit_wallet(&self, guild_id: String, user_id: String, amount: i64, description: String) -> Pin<Box<dyn Future<Output = Result<Wallet, String>> + Send>> {
@@ -506,13 +506,13 @@ impl WalletRepository for ApiAdapter {
     }
 
     fn reset_wallet(&self, guild_id: String, user_id: String, new_balance: i64) -> Pin<Box<dyn Future<Output = Result<Wallet, String>> + Send>> {
-        self.get_json(self.client.post(format!("{}/api/wallet/{}/{}/reset", self.base_url(), guild_id, user_id))
+        self.get_json(self.client.post(format!("{}/api/wallets/{}/{}/reset", self.base_url(), guild_id, user_id))
             .json(&serde_json::json!({ "new_balance": new_balance })))
     }
 
     fn reset_all_wallets(&self, guild_id: String, new_balance: i64) -> Pin<Box<dyn Future<Output = Result<u64, String>> + Send>> {
         let fut = self.get_json::<serde_json::Value>(
-            self.client.post(format!("{}/api/wallet/{}/reset-all", self.base_url(), guild_id))
+            self.client.post(format!("{}/api/wallets/{}/reset-all", self.base_url(), guild_id))
                 .json(&serde_json::json!({ "new_balance": new_balance })),
         );
         Box::pin(async move {
@@ -528,7 +528,7 @@ impl WalletRepository for ApiAdapter {
 
 impl BlackjackAdminRepository for ApiAdapter {
     fn list_games(&self, guild_id: String, status: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<BlackjackGame>, String>> + Send>> {
-        let mut url = format!("{}/api/blackjack/{}/games", self.base_url(), guild_id);
+        let mut url = format!("{}/api/blackjack/admin/{}/games", self.base_url(), guild_id);
         if let Some(s) = status {
             url = format!("{url}?status={s}");
         }
@@ -536,7 +536,7 @@ impl BlackjackAdminRepository for ApiAdapter {
     }
 
     fn cancel_game(&self, game_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
-        self.send_only(self.client.delete(format!("{}/api/blackjack/games/{}", self.base_url(), game_id)))
+        self.send_only(self.client.delete(format!("{}/api/blackjack/admin/games/{}", self.base_url(), game_id)))
     }
 }
 

@@ -7,7 +7,6 @@ import { useConfirm } from "../../composables/useConfirm";
 import { useToast } from "../../composables/useToast";
 import type { BlackjackGame } from "../../types";
 import AppButton from "../atoms/AppButton.vue";
-import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
@@ -22,9 +21,11 @@ const games = ref<BlackjackGame[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const cancelling = ref<string | null>(null);
+const expandedRow = ref<string | null>(null);
 
 const statusLabels: Record<string, string> = {
   in_progress: "En cours",
+  waiting: "En attente",
   player_blackjack: "Blackjack !",
   player_bust: "Bust joueur",
   dealer_bust: "Bust dealer",
@@ -35,15 +36,29 @@ const statusLabels: Record<string, string> = {
   all: "Toutes",
 };
 
+const statusIcons: Record<string, string> = {
+  in_progress: "🎮",
+  waiting: "⏳",
+  player_blackjack: "🎰",
+  player_bust: "💥",
+  dealer_bust: "💀",
+  player_win: "✨",
+  dealer_win: "😔",
+  push: "🤝",
+  cancelled: "🚫",
+};
+
 const statusOptions = [
-  { value: "in_progress", label: "En cours" },
-  { value: "player_win", label: "Victoires" },
-  { value: "dealer_win", label: "Defaites" },
-  { value: "cancelled", label: "Annulees" },
-  { value: "all", label: "Toutes" },
+  { value: "in_progress", label: "🎮 En cours", count: 0 },
+  { value: "player_win", label: "✨ Victoires", count: 0 },
+  { value: "dealer_win", label: "😔 Defaites", count: 0 },
+  { value: "cancelled", label: "🚫 Annulees", count: 0 },
+  { value: "all", label: "📋 Toutes", count: 0 },
 ];
 
-const filteredGames = computed(() => games.value);
+function toggleRow(id: string) {
+  expandedRow.value = expandedRow.value === id ? null : id;
+}
 
 async function fetchGames() {
   if (!selectedGuildId.value) return;
@@ -64,7 +79,8 @@ async function fetchGames() {
 
 async function cancelGame(game: BlackjackGame) {
   const ok = await confirm({
-    message: `Annuler la partie de ${game.username} (mise ${game.bet} coins) ? La mise sera remboursee.`,
+    title: "Annuler la partie",
+    message: `Annuler la partie de ${game.username} (mise ${game.bet} coins) ? La mise sera remboursee sur son wallet.`,
   });
   if (!ok) return;
 
@@ -80,20 +96,24 @@ async function cancelGame(game: BlackjackGame) {
   }
 }
 
-function statusVariant(status: string): "info" | "success" | "warning" | "danger" {
+function statusClass(status: string): string {
   switch (status) {
-    case "in_progress": return "warning";
+    case "in_progress":
+    case "waiting":
+      return "status-warning";
     case "player_blackjack":
     case "player_win":
     case "dealer_bust":
-      return "success";
+      return "status-success";
     case "dealer_win":
     case "player_bust":
-      return "danger";
+      return "status-danger";
+    case "push":
+      return "status-info";
     case "cancelled":
-      return "info";
+      return "status-muted";
     default:
-      return "info";
+      return "status-info";
   }
 }
 
@@ -101,83 +121,221 @@ function isCancellable(status: string): boolean {
   return status === "in_progress" || status === "waiting";
 }
 
+// Stats globales
+const statsInProgress = computed(() => games.value.filter(g => g.status === "in_progress" || g.status === "waiting").length);
+const statsTotalBet = computed(() => games.value.reduce((s, g) => s + g.bet, 0));
+const statsWinRate = computed(() => {
+  const finished = games.value.filter(g => ["player_win", "player_blackjack", "dealer_bust", "dealer_win", "player_bust"].includes(g.status));
+  if (finished.length === 0) return 0;
+  const wins = finished.filter(g => ["player_win", "player_blackjack", "dealer_bust"].includes(g.status)).length;
+  return Math.round((wins / finished.length) * 100);
+});
+
 watch(selectedGuildId, () => fetchGames());
 watch(statusFilter, () => fetchGames());
 onMounted(() => fetchGames());
 </script>
 
 <template>
-  <div class="page">
-    <header class="page-header">
-      <div>
-        <h1 class="page-title">🎰 Blackjack</h1>
-        <p class="page-subtitle">Administration des parties de blackjack — liste et annulation</p>
+  <div class="blackjack-page">
+    <!-- Hero header -->
+    <header class="hero">
+      <div class="hero-text">
+        <h1 class="hero-title">
+          <span class="hero-icon">🎰</span>
+          Blackjack
+        </h1>
+        <p class="hero-subtitle">
+          Administration des parties — surveillance, historique, annulation avec remboursement
+        </p>
       </div>
       <AppButton variant="secondary" @click="fetchGames" :disabled="loading">
-        Rafraichir
+        ↻ Rafraichir
       </AppButton>
     </header>
 
-    <div class="toolbar">
-      <label for="status-filter">Filtrer par statut :</label>
-      <select id="status-filter" v-model="statusFilter" class="select">
-        <option v-for="opt in statusOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
-      <span class="count">{{ filteredGames.length }} partie(s)</span>
+    <!-- KPI cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-active">
+        <div class="kpi-icon">🎮</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Parties en cours</span>
+          <strong class="kpi-value">{{ statsInProgress }}</strong>
+        </div>
+      </div>
+      <div class="kpi-card kpi-total">
+        <div class="kpi-icon">📊</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Total parties (200 max)</span>
+          <strong class="kpi-value">{{ games.length }}</strong>
+        </div>
+      </div>
+      <div class="kpi-card kpi-bets">
+        <div class="kpi-icon">💰</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Total mise</span>
+          <strong class="kpi-value">{{ statsTotalBet.toLocaleString() }}</strong>
+        </div>
+      </div>
+      <div class="kpi-card kpi-winrate">
+        <div class="kpi-icon">📈</div>
+        <div class="kpi-content">
+          <span class="kpi-label">Taux de victoire</span>
+          <strong class="kpi-value">{{ statsWinRate }}%</strong>
+        </div>
+      </div>
     </div>
 
+    <!-- Status filter tabs -->
+    <div class="tabs">
+      <button
+        v-for="opt in statusOptions"
+        :key="opt.value"
+        :class="['tab', { active: statusFilter === opt.value }]"
+        @click="statusFilter = opt.value"
+      >
+        {{ opt.label }}
+      </button>
+    </div>
+
+    <!-- Games table -->
     <LoadingState v-if="loading" />
     <ErrorState v-else-if="error" :message="error" @retry="fetchGames" />
-    <EmptyState v-else-if="filteredGames.length === 0" message="Aucune partie" />
+    <EmptyState v-else-if="games.length === 0" message="Aucune partie trouvee pour ce filtre" />
 
-    <div v-else class="games-list">
-      <div v-for="game in filteredGames" :key="game.id" class="game-card">
-        <div class="game-header">
-          <div class="game-player">
-            <strong>{{ game.username }}</strong>
-            <span class="user-id">{{ game.user_id }}</span>
+    <div v-else class="games-table">
+      <div class="table-header">
+        <div class="col-icon"></div>
+        <div class="col-player">Joueur</div>
+        <div class="col-bet">Mise</div>
+        <div class="col-scores">Scores</div>
+        <div class="col-payout">Gain</div>
+        <div class="col-status">Statut</div>
+        <div class="col-date">Date</div>
+        <div class="col-chevron"></div>
+      </div>
+
+      <div
+        v-for="game in games"
+        :key="game.id"
+        class="table-row"
+        :class="{ expanded: expandedRow === game.id }"
+      >
+        <div class="row-main" @click="toggleRow(game.id)">
+          <div class="col-icon">
+            <span class="status-emoji">{{ statusIcons[game.status] ?? '❓' }}</span>
           </div>
-          <AppBadge
-            :variant="statusVariant(game.status)"
-            :label="statusLabels[game.status] ?? game.status"
-          />
+          <div class="col-player">
+            <div class="player-name">{{ game.username }}</div>
+            <div class="player-id">{{ game.user_id }}</div>
+          </div>
+          <div class="col-bet">
+            <span class="bet-value">{{ game.bet.toLocaleString() }}</span>
+            <span class="bet-unit">coins</span>
+            <span v-if="game.doubled" class="doubled-badge">2x</span>
+          </div>
+          <div class="col-scores">
+            <div class="score-line">
+              <span class="score-label">J</span>
+              <strong class="score-value" :class="{ bust: game.player_score > 21 }">
+                {{ game.player_score }}
+              </strong>
+            </div>
+            <div class="score-line">
+              <span class="score-label">D</span>
+              <strong class="score-value" :class="{ bust: game.dealer_score > 21 }">
+                {{ game.dealer_score }}
+              </strong>
+            </div>
+          </div>
+          <div class="col-payout">
+            <span
+              v-if="game.payout !== 0"
+              :class="{ positive: game.payout > 0, negative: game.payout < 0 }"
+            >
+              {{ game.payout > 0 ? '+' : '' }}{{ game.payout.toLocaleString() }}
+            </span>
+            <span v-else class="muted">—</span>
+          </div>
+          <div class="col-status">
+            <span class="status-badge" :class="statusClass(game.status)">
+              {{ statusLabels[game.status] ?? game.status }}
+            </span>
+          </div>
+          <div class="col-date">
+            {{ fmt(game.created_at) }}
+          </div>
+          <div class="col-chevron">
+            <span class="chevron">{{ expandedRow === game.id ? '▼' : '▶' }}</span>
+          </div>
         </div>
 
-        <div class="game-body">
-          <div class="game-stat">
-            <span class="stat-label">Mise</span>
-            <strong>{{ game.bet }} coins</strong>
-            <small v-if="game.doubled">(doublee)</small>
-          </div>
-          <div class="game-stat">
-            <span class="stat-label">Score joueur</span>
-            <strong>{{ game.player_score }}</strong>
-          </div>
-          <div class="game-stat">
-            <span class="stat-label">Score dealer</span>
-            <strong>{{ game.dealer_score }}</strong>
-          </div>
-          <div class="game-stat" v-if="game.payout !== 0">
-            <span class="stat-label">Gain</span>
-            <strong :class="{ positive: game.payout > 0, negative: game.payout < 0 }">
-              {{ game.payout > 0 ? '+' : '' }}{{ game.payout }} coins
-            </strong>
-          </div>
-        </div>
+        <!-- Panel d'actions expand -->
+        <div v-if="expandedRow === game.id" class="row-actions">
+          <div class="detail-grid">
+            <div class="detail-block">
+              <h4>🆔 Identifiants</h4>
+              <div class="detail-row">
+                <span class="detail-label">Game ID</span>
+                <code>{{ game.id }}</code>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Guild</span>
+                <code>{{ game.guild_id }}</code>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">User</span>
+                <code>{{ game.user_id }}</code>
+              </div>
+            </div>
 
-        <div class="game-footer">
-          <span class="game-date">Demarree : {{ fmt(game.created_at) }}</span>
-          <span v-if="game.finished_at" class="game-date">Fin : {{ fmt(game.finished_at) }}</span>
-          <AppButton
-            v-if="isCancellable(game.status)"
-            variant="danger"
-            :disabled="cancelling === game.id"
-            @click="cancelGame(game)"
-          >
-            {{ cancelling === game.id ? "Annulation..." : "Annuler + rembourser" }}
-          </AppButton>
+            <div class="detail-block">
+              <h4>⏱️ Timeline</h4>
+              <div class="detail-row">
+                <span class="detail-label">Demarree</span>
+                <span>{{ fmt(game.created_at) }}</span>
+              </div>
+              <div class="detail-row" v-if="game.finished_at">
+                <span class="detail-label">Terminee</span>
+                <span>{{ fmt(game.finished_at) }}</span>
+              </div>
+              <div class="detail-row" v-else>
+                <span class="detail-label">Terminee</span>
+                <span class="muted">En cours...</span>
+              </div>
+            </div>
+
+            <div class="detail-block">
+              <h4>🎲 Detail du jeu</h4>
+              <div class="detail-row">
+                <span class="detail-label">Score joueur</span>
+                <strong :class="{ bust: game.player_score > 21 }">{{ game.player_score }}</strong>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Score dealer</span>
+                <strong :class="{ bust: game.dealer_score > 21 }">{{ game.dealer_score }}</strong>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Double</span>
+                <span>{{ game.doubled ? '✓ Oui' : '✗ Non' }}</span>
+              </div>
+            </div>
+
+            <div class="detail-block actions-block">
+              <h4>⚡ Actions admin</h4>
+              <AppButton
+                v-if="isCancellable(game.status)"
+                variant="danger"
+                :disabled="cancelling === game.id"
+                @click.stop="cancelGame(game)"
+              >
+                {{ cancelling === game.id ? '⌛ Annulation...' : '🚫 Annuler + rembourser' }}
+              </AppButton>
+              <p v-else class="muted-text">
+                Partie deja terminee — aucune action admin possible.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -185,140 +343,451 @@ onMounted(() => fetchGames());
 </template>
 
 <style scoped>
-.page {
-  padding: var(--space-md);
+/* ═════════════════════════════════════════════════
+   Page
+   ═════════════════════════════════════════════════ */
+.blackjack-page {
+  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  gap: 20px;
+  max-width: 1400px;
+  margin: 0 auto;
 }
 
-.page-header {
+/* ═════════════════════════════════════════════════
+   Hero
+   ═════════════════════════════════════════════════ */
+.hero {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: flex-end;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
 }
 
-.page-title {
-  margin: 0 0 var(--space-xs);
-  font-size: 1.5rem;
+.hero-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 6px;
+  font-size: 2rem;
+  font-weight: 700;
 }
 
-.page-subtitle {
+.hero-icon {
+  font-size: 2rem;
+}
+
+.hero-subtitle {
   margin: 0;
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: 0.95rem;
 }
 
-.toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  background: var(--surface);
-  padding: var(--space-sm) var(--space-md);
-  border-radius: var(--radius-md);
-}
-
-.toolbar label {
-  font-size: 0.875rem;
-  color: var(--text-muted);
-}
-
-.select {
-  background: var(--bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: var(--space-xs) var(--space-sm);
-}
-
-.count {
-  margin-left: auto;
-  color: var(--text-muted);
-  font-size: 0.875rem;
-}
-
-.games-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.game-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-sm);
-}
-
-.game-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.game-player strong {
-  display: block;
-  font-size: 1rem;
-}
-
-.user-id {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  font-family: monospace;
-}
-
-.game-body {
+/* ═════════════════════════════════════════════════
+   KPIs
+   ═════════════════════════════════════════════════ */
+.kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
 }
 
-.game-stat {
+.kpi-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  transition: transform 0.15s, border-color 0.15s;
+}
+
+.kpi-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.kpi-icon {
+  font-size: 2rem;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+.kpi-content {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.stat-label {
-  font-size: 0.75rem;
+.kpi-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+.kpi-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+}
+
+.kpi-active .kpi-icon { background: color-mix(in srgb, #3498db 25%, transparent); }
+.kpi-total .kpi-icon { background: color-mix(in srgb, #9b59b6 25%, transparent); }
+.kpi-bets .kpi-icon { background: color-mix(in srgb, #f1c40f 25%, transparent); }
+.kpi-winrate .kpi-icon { background: color-mix(in srgb, #2ecc71 25%, transparent); }
+
+/* ═════════════════════════════════════════════════
+   Tabs
+   ═════════════════════════════════════════════════ */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  flex: 1;
+  min-width: 120px;
+  padding: 10px 16px;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: 7px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
+  color: var(--text);
+}
+
+.tab.active {
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+/* ═════════════════════════════════════════════════
+   Games table
+   ═════════════════════════════════════════════════ */
+.games-table {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table-header,
+.row-main {
+  display: grid;
+  grid-template-columns: 50px 2fr 1.2fr 1fr 1fr 1.2fr 1.2fr 40px;
+  gap: 16px;
+  align-items: center;
+  padding: 14px 20px;
+}
+
+.table-header {
+  background: color-mix(in srgb, var(--accent) 5%, var(--surface));
+  border-bottom: 2px solid var(--border);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.table-row {
+  border-bottom: 1px solid var(--border);
+}
+
+.table-row:last-child {
+  border-bottom: none;
+}
+
+.row-main {
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.row-main:hover {
+  background: color-mix(in srgb, var(--accent) 4%, transparent);
+}
+
+.table-row.expanded .row-main {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+/* Columns */
+.col-icon {
+  text-align: center;
+}
+
+.status-emoji {
+  font-size: 1.5rem;
+}
+
+.player-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.player-id {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.col-bet {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.bet-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.bet-unit {
+  font-size: 0.7rem;
   color: var(--text-muted);
 }
 
-.game-stat strong {
-  font-size: 1.1rem;
+.doubled-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  background: var(--warning);
+  color: white;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 700;
 }
 
-.game-stat small {
-  font-size: 0.75rem;
-  color: var(--warning);
+.col-scores {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.game-stat .positive {
+.score-line {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.score-label {
+  width: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.score-value {
+  color: var(--text);
+}
+
+.score-value.bust {
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+.col-payout {
+  font-weight: 700;
+}
+
+.col-payout .positive {
   color: var(--success);
 }
 
-.game-stat .negative {
+.col-payout .negative {
   color: var(--danger);
 }
 
-.game-footer {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding-top: var(--space-sm);
-  border-top: 1px solid var(--border);
-  font-size: 0.8rem;
+.col-payout .muted,
+.muted,
+.muted-text {
   color: var(--text-muted);
 }
 
-.game-footer button {
-  margin-left: auto;
+/* Status badge */
+.status-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
 }
 
-.game-date {
-  font-size: 0.8rem;
+.status-badge.status-warning {
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+  color: var(--warning);
+}
+
+.status-badge.status-success {
+  background: color-mix(in srgb, var(--success) 20%, transparent);
+  color: var(--success);
+}
+
+.status-badge.status-danger {
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
+  color: var(--danger);
+}
+
+.status-badge.status-info {
+  background: color-mix(in srgb, var(--info, #3498db) 20%, transparent);
+  color: var(--info, #3498db);
+}
+
+.status-badge.status-muted {
+  background: color-mix(in srgb, var(--text-muted) 20%, transparent);
+  color: var(--text-muted);
+}
+
+.col-date {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.col-chevron {
+  text-align: center;
+}
+
+.chevron {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.table-row.expanded .chevron {
+  color: var(--accent);
+}
+
+/* ═════════════════════════════════════════════════
+   Expanded actions
+   ═════════════════════════════════════════════════ */
+.row-actions {
+  padding: 20px;
+  background: color-mix(in srgb, var(--accent) 3%, var(--bg));
+  border-top: 1px dashed var(--border);
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.detail-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.detail-block h4 {
+  margin: 0 0 12px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 0.85rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+
+.detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  color: var(--text-muted);
+}
+
+.detail-row code {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.detail-row strong.bust {
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+.actions-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.actions-block button {
+  width: 100%;
+}
+
+.muted-text {
+  margin: 0;
+  padding: 12px;
+  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .table-header,
+  .row-main {
+    grid-template-columns: 40px 2fr 1.2fr 1fr 1.2fr 30px;
+  }
+  .col-scores,
+  .col-date {
+    display: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .table-header,
+  .row-main {
+    grid-template-columns: 36px 2fr 1fr 30px;
+  }
+  .col-bet {
+    display: none;
+  }
+  .tab {
+    flex: 1 1 auto;
+    min-width: unset;
+  }
 }
 </style>
