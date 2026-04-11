@@ -333,7 +333,7 @@ fn proto_ticket_detail_to_dto(d: proto::TicketDetail) -> TicketDetail {
         ticket: d
             .ticket
             .map(proto_ticket_to_dto)
-            .unwrap_or_else(|| empty_ticket()),
+            .unwrap_or_else(empty_ticket),
         messages: d.messages.into_iter().map(proto_ticket_message_to_dto).collect(),
     }
 }

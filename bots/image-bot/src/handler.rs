@@ -416,11 +416,10 @@ pub(crate) fn detect_content_type(filename: &str, bytes: &[u8]) -> String {
         if bytes.starts_with(b"GIF8") {
             return "image/gif".to_string();
         }
-        if bytes.starts_with(b"RIFF") && bytes.len() >= 12 {
-            if bytes.get(8..12) == Some(b"WEBP") {
+        if bytes.starts_with(b"RIFF") && bytes.len() >= 12
+            && bytes.get(8..12) == Some(b"WEBP") {
                 return "image/webp".to_string();
             }
-        }
     }
 
     // Fallback extension

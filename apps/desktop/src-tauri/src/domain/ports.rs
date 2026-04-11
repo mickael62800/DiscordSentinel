@@ -115,7 +115,6 @@ pub trait DiscordRolesRepository: Send + Sync + 'static {
 
 pub trait MembersRepository: Send + Sync + 'static {
     fn get_members(&self, guild_id: String) -> BoxFut<Vec<Member>>;
-    fn get_member(&self, guild_id: String, user_id: String) -> BoxFut<Member>;
     fn get_member_summary(&self, guild_id: String, user_id: String) -> BoxFut<MemberSummary>;
 }
 

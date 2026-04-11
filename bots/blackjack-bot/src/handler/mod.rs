@@ -73,10 +73,7 @@ impl EventHandler for Handler {
                     }
                 }
 
-                match command.data.name.as_str() {
-                    "blackjack-setup" => commands::setup::handle(&ctx, &command).await,
-                    _ => {}
-                }
+                if command.data.name.as_str() == "blackjack-setup" { commands::setup::handle(&ctx, &command).await }
             }
             Interaction::Component(component) => {
                 let custom_id = component.data.custom_id.clone();

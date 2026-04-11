@@ -127,12 +127,10 @@ impl EventHandler for Handler {
                     }
                     }
                 });
-            } else {
-                if let Ok(role_id) = ar.role_id.parse::<u64>() {
-                    if let Ok(member) = guild_id.member(&ctx.http, new_member.user.id).await {
-                        if let Err(e) = member.add_role(&ctx.http, RoleId::new(role_id)).await {
-                            warn!(error = %e, "Failed to add auto-role");
-                        }
+            } else if let Ok(role_id) = ar.role_id.parse::<u64>() {
+                if let Ok(member) = guild_id.member(&ctx.http, new_member.user.id).await {
+                    if let Err(e) = member.add_role(&ctx.http, RoleId::new(role_id)).await {
+                        warn!(error = %e, "Failed to add auto-role");
                     }
                 }
             }

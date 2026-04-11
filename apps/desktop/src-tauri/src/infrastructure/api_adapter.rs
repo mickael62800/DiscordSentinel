@@ -450,10 +450,6 @@ impl MembersRepository for ApiAdapter {
         self.get_json(self.client.get(format!("{}/api/members/{}", self.base_url(), guild_id)))
     }
 
-    fn get_member(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<Member, String>> + Send>> {
-        self.get_json(self.client.get(format!("{}/api/members/{}/{}", self.base_url(), guild_id, user_id)))
-    }
-
     fn get_member_summary(&self, guild_id: String, user_id: String) -> Pin<Box<dyn Future<Output = Result<MemberSummary, String>> + Send>> {
         self.get_json(self.client.get(format!("{}/api/members/{}/{}/summary", self.base_url(), guild_id, user_id)))
     }

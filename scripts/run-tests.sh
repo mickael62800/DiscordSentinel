@@ -38,11 +38,31 @@ info "Application des migrations..."
 export DATABASE_URL="$DB_URL"
 cd services/api
 cargo sqlx migrate run --source ./migrations 2>/dev/null || {
-    # Si sqlx-cli n'est pas installe, utiliser psql directement
-    info "sqlx-cli non disponible, application manuelle des migrations..."
+    # Si sqlx-cli n'est pas installe, utiliser psql dans le container de test
+    # (evite de requerir psql sur le host Windows).
+    #
+    # Note Windows/Git Bash : MSYS_NO_PATHCONV=1 desactive la conversion
+    # automatique des paths POSIX (/tmp/...) en paths Windows (C:/...)
+    # sur les arguments passes aux commandes docker.
+    info "sqlx-cli non disponible, application via docker exec..."
+    MSYS_NO_PATHCONV=1 docker cp migrations sentinel-test-postgres:/tmp/migrations_run
+    MIGRATION_FAIL=0
     for f in migrations/*.sql; do
-        psql "$DB_URL" -f "$f" 2>/dev/null || true
+        BASENAME=$(basename "$f")
+        # Pattern OUT=$(...) + RC capture : set -e ne peut pas killer
+        # le script sur une assignment avec || ... bloc.
+        OUT=$(MSYS_NO_PATHCONV=1 docker exec sentinel-test-postgres psql -U sentinel_test -d sentinel_test \
+            -v ON_ERROR_STOP=1 -f "/tmp/migrations_run/$BASENAME" 2>&1) && RC=0 || RC=$?
+        if [ "$RC" -ne 0 ]; then
+            fail "Migration $BASENAME a echoue :"
+            echo "$OUT" | tail -10
+            MIGRATION_FAIL=1
+        fi
     done
+    if [ "$MIGRATION_FAIL" -ne 0 ]; then
+        fail "Une ou plusieurs migrations ont echoue — arret"
+        exit 1
+    fi
 }
 cd ../..
 ok "Migrations appliquees"

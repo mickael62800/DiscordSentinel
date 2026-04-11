@@ -49,7 +49,6 @@ tauri_passthrough!(get_guild_members, GuildService, get_guild_members -> Vec<Gui
 
 // Members
 tauri_passthrough!(get_members, MembersService, get_members -> Vec<Member>, guild_id: String);
-tauri_passthrough!(get_member, MembersService, get_member -> Member, guild_id: String, user_id: String);
 tauri_passthrough!(get_member_summary, MembersService, get_member_summary -> MemberSummary, guild_id: String, user_id: String);
 
 // Logs
@@ -182,13 +181,6 @@ pub fn has_discord_config(
 }
 
 #[tauri::command]
-pub fn get_discord_config(
-    service: State<'_, Arc<AuthService>>,
-) -> Result<Option<DiscordConfig>, String> {
-    service.get_discord_config()
-}
-
-#[tauri::command]
 pub fn save_discord_config(
     service: State<'_, Arc<AuthService>>,
     client_id: String,
@@ -235,14 +227,6 @@ pub fn save_bot_token(
 }
 
 #[tauri::command]
-pub fn get_bot_token(
-    service: State<'_, Arc<AuthService>>,
-    bot_name: String,
-) -> Result<Option<String>, String> {
-    service.get_bot_token(&bot_name)
-}
-
-#[tauri::command]
 pub fn get_all_bot_tokens(
     service: State<'_, Arc<AuthService>>,
 ) -> Result<Vec<(String, bool)>, String> {
@@ -272,11 +256,11 @@ pub async fn update_rule(
     enabled: bool,
 ) -> Result<(), String> {
     // Validation des bornes
-    if weight < 0.0 || weight > 10.0 {
+    if !(0.0..=10.0).contains(&weight) {
         return Err("Le poids doit etre entre 0 et 10".into());
     }
     for (name, val) in [("warn", threshold_warn), ("delete", threshold_delete), ("mute", threshold_mute), ("ban", threshold_ban)] {
-        if val < 0.0 || val > 100.0 {
+        if !(0.0..=100.0).contains(&val) {
             return Err(format!("Le seuil {} doit etre entre 0 et 100", name));
         }
     }

@@ -28,10 +28,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .map(|o| o.name.as_str())
         .unwrap_or("");
 
-    match sub {
-        "stats" => handle_stats(ctx, command).await,
-        _ => {}
-    }
+    if sub == "stats" { handle_stats(ctx, command).await }
 }
 
 async fn handle_stats(ctx: &Context, command: &CommandInteraction) {

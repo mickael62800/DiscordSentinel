@@ -16,10 +16,6 @@ impl MembersService {
         self.repo.get_members(guild_id).await
     }
 
-    pub async fn get_member(&self, guild_id: String, user_id: String) -> Result<Member, String> {
-        self.repo.get_member(guild_id, user_id).await
-    }
-
     pub async fn get_member_summary(&self, guild_id: String, user_id: String) -> Result<MemberSummary, String> {
         self.repo.get_member_summary(guild_id, user_id).await
     }

@@ -40,25 +40,6 @@ fn env_file_path() -> Option<std::path::PathBuf> {
     None
 }
 
-fn read_env_token(bot_name: &str) -> Option<String> {
-    let path = env_file_path()?;
-    let content = fs::read_to_string(&path).ok()?;
-    let key = bot_name_to_env_key(bot_name);
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('#') || trimmed.is_empty() {
-            continue;
-        }
-        if let Some(value) = trimmed.strip_prefix(&key).and_then(|rest| rest.strip_prefix('=')) {
-            let v = value.trim();
-            if !v.is_empty() {
-                return Some(v.to_string());
-            }
-        }
-    }
-    None
-}
-
 fn write_env_token(bot_name: &str, token: &str) -> Result<(), String> {
     let path = env_file_path().ok_or("Fichier .env introuvable")?;
     let content = fs::read_to_string(&path).map_err(|e| format!("Lecture .env: {}", e))?;
@@ -266,26 +247,6 @@ impl ConfigStore {
         Ok(base64::engine::general_purpose::STANDARD.encode(&combined))
     }
 
-    fn decrypt_token(encoded: &str) -> Result<String, String> {
-        use base64::Engine;
-        let combined = base64::engine::general_purpose::STANDARD
-            .decode(encoded)
-            .map_err(|e| format!("Base64 decode error: {}", e))?;
-        if combined.len() < 13 {
-            return Err("Invalid encrypted token".into());
-        }
-        let (nonce_bytes, ciphertext) = combined.split_at(12);
-        let key = Self::derive_key();
-        let cipher = Aes256Gcm::new_from_slice(&key)
-            .map_err(|e| format!("Cipher init error: {}", e))?;
-        let nonce = Nonce::from_slice(nonce_bytes);
-        let plaintext = cipher
-            .decrypt(nonce, ciphertext)
-            .map_err(|_| "Decryption failed — token may be corrupted or from another machine".to_string())?;
-        String::from_utf8(plaintext)
-            .map_err(|e| format!("UTF-8 decode error: {}", e))
-    }
-
     pub fn save_bot_token(&self, bot_name: &str, token: &str) -> Result<(), String> {
         // 1. Sauver chiffre dans LMDB
         let encrypted = Self::encrypt_token(token)?;
@@ -302,20 +263,6 @@ impl ConfigStore {
         Ok(())
     }
 
-    pub fn get_bot_token(&self, bot_name: &str) -> Result<Option<String>, String> {
-        // LMDB d'abord
-        let key = format!("{}{}", TOKEN_KEY_PREFIX, bot_name);
-        let rtxn = self.env.read_txn()
-            .map_err(|e| format!("Failed to create read txn: {}", e))?;
-        match self.db.get(&rtxn, &key)
-            .map_err(|e| format!("Failed to read token: {}", e))? {
-            Some(encrypted) => Ok(Some(Self::decrypt_token(encrypted)?)),
-            None => {
-                // Fallback: lire depuis .env
-                Ok(read_env_token(bot_name))
-            }
-        }
-    }
 
     /// Retourne (bot_name, has_token) — combine LMDB + .env
     pub fn get_all_bot_tokens(&self) -> Result<Vec<(String, bool)>, String> {

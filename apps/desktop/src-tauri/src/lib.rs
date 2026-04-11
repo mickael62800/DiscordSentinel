@@ -119,7 +119,6 @@ pub fn run() {
             presentation::commands::get_current_user,
             presentation::commands::logout,
             presentation::commands::has_discord_config,
-            presentation::commands::get_discord_config,
             presentation::commands::save_discord_config,
             presentation::commands::clear_discord_config,
             presentation::commands::get_api_config,
@@ -187,7 +186,6 @@ pub fn run() {
             presentation::commands::adjust_conduct_points,
             presentation::commands::ai_export_onnx,
             presentation::commands::get_members,
-            presentation::commands::get_member,
             presentation::commands::get_member_summary,
             presentation::commands::get_coude_combats,
             presentation::commands::get_coude_players,
@@ -199,7 +197,6 @@ pub fn run() {
             presentation::commands::rbac_update_role,
             presentation::commands::rbac_revoke_role,
             presentation::commands::save_bot_token,
-            presentation::commands::get_bot_token,
             presentation::commands::get_all_bot_tokens,
             presentation::commands::delete_bot_token,
         ])

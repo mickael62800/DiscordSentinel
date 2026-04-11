@@ -240,7 +240,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
 /// Parse les IDs utilisateurs depuis une chaine (espaces, virgules, ou les deux).
 pub fn parse_user_ids(input: &str) -> Vec<u64> {
     input
-        .split(|c: char| c == ',' || c == ' ' || c == '\n')
+        .split([',', ' ', '\n'])
         .filter_map(|s| {
             let trimmed = s.trim().trim_start_matches("<@").trim_start_matches('!').trim_end_matches('>');
             trimmed.parse::<u64>().ok()
