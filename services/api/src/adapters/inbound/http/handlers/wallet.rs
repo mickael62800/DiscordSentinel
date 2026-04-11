@@ -184,3 +184,67 @@ pub async fn transactions(
     let txs = state.wallet_repo.get_transactions(&guild_id, &user_id, limit).await?;
     Ok(Json(txs))
 }
+
+/// GET /api/wallet/{guild_id}/all — liste tous les wallets d'un serveur.
+/// Utilise par la page Wallet du desktop.
+pub async fn list_wallets(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<Vec<Wallet>>, ApiError> {
+    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
+    let wallets = state.wallet_repo.list_by_guild(&guild_id).await?;
+    Ok(Json(wallets))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ResetWalletDto {
+    /// Nouveau solde de depart (optionnel, defaut 100).
+    pub new_balance: Option<i64>,
+}
+
+/// POST /api/wallet/{guild_id}/{user_id}/reset — reset individuel.
+pub async fn reset_wallet(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(dto): Json<ResetWalletDto>,
+) -> Result<Json<Wallet>, ApiError> {
+    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
+    let new_balance = dto.new_balance.unwrap_or(100).max(0);
+
+    let wallet = state.wallet_repo.reset_wallet(&guild_id, &user_id, new_balance).await?;
+
+    state.broadcaster.broadcast(
+        "wallet_reset",
+        serde_json::json!({
+            "guild_id": guild_id,
+            "user_id": user_id,
+            "new_balance": new_balance,
+        }),
+    );
+
+    Ok(Json(wallet))
+}
+
+/// POST /api/wallet/{guild_id}/reset-all — reset bulk de tous les wallets.
+pub async fn reset_all_wallets(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<ResetWalletDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
+    let new_balance = dto.new_balance.unwrap_or(100).max(0);
+
+    let affected = state.wallet_repo.reset_all_wallets(&guild_id, new_balance).await?;
+
+    state.broadcaster.broadcast(
+        "wallet_reset_all",
+        serde_json::json!({
+            "guild_id": guild_id,
+            "affected": affected,
+            "new_balance": new_balance,
+        }),
+    );
+
+    info!(guild_id = %guild_id, affected, new_balance, "Bulk wallet reset");
+    Ok(Json(serde_json::json!({ "affected": affected, "new_balance": new_balance })))
+}

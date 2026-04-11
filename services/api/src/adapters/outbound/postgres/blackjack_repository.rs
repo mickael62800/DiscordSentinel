@@ -163,4 +163,99 @@ impl BlackjackRepository for PgBlackjackRepository {
 
         Ok(row.map(BlackjackGame::from))
     }
+
+    async fn list_by_guild(&self, guild_id: &str, status: Option<&str>) -> Result<Vec<BlackjackGame>, DomainError> {
+        let rows = if let Some(s) = status {
+            sqlx::query_as::<_, BlackjackRow>(
+                "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
+                 FROM blackjack_games
+                 WHERE guild_id = $1 AND status = $2
+                 ORDER BY created_at DESC
+                 LIMIT 200"
+            )
+            .bind(guild_id)
+            .bind(s)
+            .fetch_all(&self.pool).await
+        } else {
+            sqlx::query_as::<_, BlackjackRow>(
+                "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
+                 FROM blackjack_games
+                 WHERE guild_id = $1
+                 ORDER BY created_at DESC
+                 LIMIT 200"
+            )
+            .bind(guild_id)
+            .fetch_all(&self.pool).await
+        }
+        .map_err(|e| DomainError::Internal(format!("blackjack list_by_guild : {e}")))?;
+
+        Ok(rows.into_iter().map(BlackjackGame::from).collect())
+    }
+
+    async fn cancel_game(&self, id: Uuid) -> Result<(), DomainError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("cancel_game begin : {e}")))?;
+
+        // Recupere la partie pour obtenir la mise et valider le status.
+        let row = sqlx::query_as::<_, BlackjackRow>(
+            "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
+             FROM blackjack_games WHERE id = $1 FOR UPDATE"
+        )
+        .bind(id)
+        .fetch_optional(&mut *tx).await
+        .map_err(|e| DomainError::Internal(format!("cancel_game select : {e}")))?
+        .ok_or_else(|| DomainError::NotFound(format!("Partie blackjack {id} introuvable")))?;
+
+        // Seules les parties en cours sont annulables.
+        if !matches!(row.status.as_str(), "in_progress" | "waiting") {
+            return Err(DomainError::Conflict(format!(
+                "Partie deja terminee (status = {})", row.status
+            )));
+        }
+
+        // Marque la partie comme annulee.
+        sqlx::query(
+            "UPDATE blackjack_games
+             SET status = 'cancelled', finished_at = NOW()
+             WHERE id = $1"
+        )
+        .bind(id)
+        .execute(&mut *tx).await
+        .map_err(|e| DomainError::Internal(format!("cancel_game update : {e}")))?;
+
+        // Rembourse la mise sur le wallet du joueur.
+        let refund = row.bet + if row.doubled { row.bet } else { 0 };
+        sqlx::query(
+            "UPDATE user_wallets
+             SET coins = coins + $1, total_spent = GREATEST(0, total_spent - $1), updated_at = NOW()
+             WHERE guild_id = $2 AND user_id = $3"
+        )
+        .bind(refund)
+        .bind(&row.guild_id)
+        .bind(&row.user_id)
+        .execute(&mut *tx).await
+        .map_err(|e| DomainError::Internal(format!("cancel_game refund : {e}")))?;
+
+        sqlx::query(
+            "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at)
+             SELECT $1, $2, $3, $4,
+                    (SELECT coins FROM user_wallets WHERE guild_id = $2 AND user_id = $3),
+                    'blackjack_cancel', 'Annulation partie blackjack admin', NOW()"
+        )
+        .bind(Uuid::new_v4())
+        .bind(&row.guild_id)
+        .bind(&row.user_id)
+        .bind(refund)
+        .execute(&mut *tx).await
+        .map_err(|e| DomainError::Internal(format!("cancel_game audit : {e}")))?;
+
+        tx.commit().await
+            .map_err(|e| DomainError::Internal(format!("cancel_game commit : {e}")))?;
+
+        tracing::info!(
+            game_id = %id, guild_id = %row.guild_id, user_id = %row.user_id,
+            refund, "Blackjack game cancelled"
+        );
+        Ok(())
+    }
 }

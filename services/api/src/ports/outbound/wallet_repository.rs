@@ -12,4 +12,11 @@ pub trait WalletRepository: Send + Sync {
     async fn transfer(&self, guild_id: &str, from_user: &str, to_user: &str, amount: i64, source: &str, description: &str) -> Result<(), DomainError>;
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError>;
     async fn get_transactions(&self, guild_id: &str, user_id: &str, limit: i64) -> Result<Vec<WalletTransaction>, DomainError>;
+
+    /// Liste tous les wallets d'un serveur (page wallet du desktop).
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Wallet>, DomainError>;
+    /// Remet un wallet individuel a `new_balance` coins et efface son historique.
+    async fn reset_wallet(&self, guild_id: &str, user_id: &str, new_balance: i64) -> Result<Wallet, DomainError>;
+    /// Reset tous les wallets d'un serveur a `new_balance`. Retourne le nombre de comptes reset.
+    async fn reset_all_wallets(&self, guild_id: &str, new_balance: i64) -> Result<u64, DomainError>;
 }

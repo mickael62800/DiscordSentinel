@@ -339,4 +339,94 @@ impl WalletRepository for PgWalletRepository {
 
         Ok(rows.into_iter().map(WalletTransaction::from).collect())
     }
+
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Wallet>, DomainError> {
+        let rows = sqlx::query_as::<_, WalletRow>(
+            "SELECT id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at
+             FROM user_wallets WHERE guild_id = $1
+             ORDER BY coins DESC, updated_at DESC",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("list_by_guild: {e}")))?;
+
+        Ok(rows.into_iter().map(Wallet::from).collect())
+    }
+
+    async fn reset_wallet(&self, guild_id: &str, user_id: &str, new_balance: i64) -> Result<Wallet, DomainError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("reset begin tx: {e}")))?;
+
+        // Efface l'historique de transactions du joueur.
+        sqlx::query("DELETE FROM wallet_transactions WHERE guild_id = $1 AND user_id = $2")
+            .bind(guild_id).bind(user_id)
+            .execute(&mut *tx).await
+            .map_err(|e| DomainError::Internal(format!("reset wipe tx: {e}")))?;
+
+        // Reset le solde + total_earned/total_spent.
+        let row = sqlx::query_as::<_, WalletRow>(
+            r#"UPDATE user_wallets
+               SET coins = $1, total_earned = $1, total_spent = 0, updated_at = NOW()
+               WHERE guild_id = $2 AND user_id = $3
+               RETURNING id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at"#,
+        )
+        .bind(new_balance)
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| DomainError::Internal(format!("reset update: {e}")))?
+        .ok_or_else(|| DomainError::NotFound("Portefeuille introuvable".into()))?;
+
+        // Log d'audit du reset en wallet_transactions.
+        sqlx::query(
+            "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at)
+             VALUES ($1, $2, $3, $4, $5, 'reset', 'Reset admin', NOW())",
+        )
+        .bind(Uuid::new_v4())
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(new_balance)
+        .bind(new_balance)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| DomainError::Internal(format!("reset audit: {e}")))?;
+
+        tx.commit().await
+            .map_err(|e| DomainError::Internal(format!("reset commit: {e}")))?;
+
+        info!(guild_id, user_id, new_balance, "Wallet reset");
+        Ok(Wallet::from(row))
+    }
+
+    async fn reset_all_wallets(&self, guild_id: &str, new_balance: i64) -> Result<u64, DomainError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("reset_all begin tx: {e}")))?;
+
+        // Efface toutes les transactions de la guild.
+        sqlx::query("DELETE FROM wallet_transactions WHERE guild_id = $1")
+            .bind(guild_id)
+            .execute(&mut *tx).await
+            .map_err(|e| DomainError::Internal(format!("reset_all wipe tx: {e}")))?;
+
+        // Reset tous les wallets.
+        let affected = sqlx::query(
+            "UPDATE user_wallets
+             SET coins = $1, total_earned = $1, total_spent = 0, updated_at = NOW()
+             WHERE guild_id = $2",
+        )
+        .bind(new_balance)
+        .bind(guild_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| DomainError::Internal(format!("reset_all update: {e}")))?
+        .rows_affected();
+
+        tx.commit().await
+            .map_err(|e| DomainError::Internal(format!("reset_all commit: {e}")))?;
+
+        info!(guild_id, affected, new_balance, "Wallets bulk reset");
+        Ok(affected)
+    }
 }

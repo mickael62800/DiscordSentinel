@@ -26,13 +26,15 @@ use crate::application::members_service::MembersService;
 use crate::application::ia_config_service::{IaConfigService, IaConfig};
 use crate::application::analytics_service::{AnalyticsService, FullAnalytics};
 use crate::application::rbac_service::RbacService;
+use crate::application::wallet_service::WalletService;
+use crate::application::blackjack_admin_service::BlackjackAdminService;
 use crate::domain::entities::{
-    ApiConfig, AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, DailyActivity,
+    ApiConfig, AuditLog, AutoRoleConfig, BlackjackGame, BotDefinition, ConfirmedBan, DailyActivity,
     LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog,
     DiscordConfig, DiscordUser, Guild, GuildMember, GuildUserRole, Infraction, LogEntry, Member, MemberSummary,
     ModerationActionRequest, ModerationActionResponse, ModerationRule, MyRole, RolePanel, RolePanelDetail,
     SecurityEvent, ServerStats, Ticket, TicketDetail, TopUser, UpdateRuleParams, UserConductPoints,
-    UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail,
+    UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, Wallet,
     WatchedUser, DiscordRole, CoudeCombat, CoudePlayer,
 };
 
@@ -64,6 +66,17 @@ tauri_passthrough!(get_coude_combats, CoudeService, get_combats -> Vec<CoudeComb
 tauri_passthrough!(get_coude_players, CoudeService, get_players -> Vec<CoudePlayer>, guild_id: String);
 tauri_passthrough!(cancel_coude_combat, CoudeService, cancel_combat -> (), combat_id: String);
 tauri_passthrough!(adjust_coude_coins, CoudeService, adjust_coins -> (), guild_id: String, user_id: String, amount: i64);
+
+// Phase 8 — Wallet partage
+tauri_passthrough!(wallet_list, WalletService, list -> Vec<Wallet>, guild_id: String);
+tauri_passthrough!(wallet_credit, WalletService, credit -> Wallet, guild_id: String, user_id: String, amount: i64, description: String);
+tauri_passthrough!(wallet_debit, WalletService, debit -> Wallet, guild_id: String, user_id: String, amount: i64, description: String);
+tauri_passthrough!(wallet_reset, WalletService, reset -> Wallet, guild_id: String, user_id: String, new_balance: i64);
+tauri_passthrough!(wallet_reset_all, WalletService, reset_all -> u64, guild_id: String, new_balance: i64);
+
+// Phase 8 — Blackjack admin
+tauri_passthrough!(blackjack_list_games, BlackjackAdminService, list_games -> Vec<BlackjackGame>, guild_id: String, status: Option<String>);
+tauri_passthrough!(blackjack_cancel_game, BlackjackAdminService, cancel_game -> (), game_id: String);
 
 // Phase 7 B — RBAC fin
 tauri_passthrough!(rbac_list_guild_users, RbacService, list_guild_users -> Vec<GuildUserRole>, guild_id: String);

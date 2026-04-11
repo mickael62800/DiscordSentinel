@@ -618,6 +618,37 @@ pub struct CoudePlayer {
     pub title: Option<String>,
 }
 
+// ── Phase 8 — Wallet partage + Blackjack admin ──
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct Wallet {
+    pub id: String,
+    pub guild_id: String,
+    pub user_id: String,
+    pub username: String,
+    pub coins: i64,
+    pub total_earned: i64,
+    pub total_spent: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct BlackjackGame {
+    pub id: String,
+    pub guild_id: String,
+    pub user_id: String,
+    pub username: String,
+    pub bet: i64,
+    pub status: String,
+    pub player_score: i32,
+    pub dealer_score: i32,
+    pub doubled: bool,
+    pub payout: i64,
+    pub created_at: String,
+    pub finished_at: Option<String>,
+}
+
 // ═══════════════════════════════════════════════════
 // Phase 7 B — RBAC fin
 // ═══════════════════════════════════════════════════

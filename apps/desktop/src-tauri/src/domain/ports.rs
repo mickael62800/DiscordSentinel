@@ -7,7 +7,7 @@ use super::entities::{
     AuditLog, AutoRoleConfig, DailyActivity, LevelConfig, LevelReward, RolePanel, RolePanelDetail,
     Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier,
     TopUser, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser, DiscordRole,
-    CoudeCombat, CoudePlayer,
+    CoudeCombat, CoudePlayer, Wallet, BlackjackGame,
 };
 
 type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, String>> + Send>>;
@@ -125,6 +125,21 @@ pub trait CoudeRepository: Send + Sync + 'static {
     fn adjust_coins(&self, guild_id: String, user_id: String, amount: i64) -> BoxFut<()>;
 }
 
+/// Phase 8 — Wallet partage (casino, blackjack, coude...).
+pub trait WalletRepository: Send + Sync + 'static {
+    fn list_wallets(&self, guild_id: String) -> BoxFut<Vec<Wallet>>;
+    fn credit_wallet(&self, guild_id: String, user_id: String, amount: i64, description: String) -> BoxFut<Wallet>;
+    fn debit_wallet(&self, guild_id: String, user_id: String, amount: i64, description: String) -> BoxFut<Wallet>;
+    fn reset_wallet(&self, guild_id: String, user_id: String, new_balance: i64) -> BoxFut<Wallet>;
+    fn reset_all_wallets(&self, guild_id: String, new_balance: i64) -> BoxFut<u64>;
+}
+
+/// Phase 8 — Administration Blackjack (liste + annulation).
+pub trait BlackjackAdminRepository: Send + Sync + 'static {
+    fn list_games(&self, guild_id: String, status: Option<String>) -> BoxFut<Vec<BlackjackGame>>;
+    fn cancel_game(&self, game_id: String) -> BoxFut<()>;
+}
+
 /// Phase 7 B — Gestion RBAC fin des users d'une guild (backed par les
 /// endpoints `/api/rbac/*` cote API).
 pub trait RbacRepository: Send + Sync + 'static {
@@ -168,6 +183,8 @@ pub trait AppAdapter:
     + DiscordRolesRepository
     + MembersRepository
     + CoudeRepository
+    + WalletRepository
+    + BlackjackAdminRepository
     + RbacRepository
 {
 }

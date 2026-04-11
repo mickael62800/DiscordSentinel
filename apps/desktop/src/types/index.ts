@@ -653,3 +653,34 @@ export interface MyRole {
   guild_id: string;
   role: RbacRole;
 }
+
+// ═══════════════════════════════════════════════════
+// Phase 8 — Wallet partage + Blackjack admin
+// ═══════════════════════════════════════════════════
+
+export interface Wallet {
+  id: string;
+  guild_id: string;
+  user_id: string;
+  username: string;
+  coins: number;
+  total_earned: number;
+  total_spent: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BlackjackGame {
+  id: string;
+  guild_id: string;
+  user_id: string;
+  username: string;
+  bet: number;
+  status: string;
+  player_score: number;
+  dealer_score: number;
+  doubled: boolean;
+  payout: number;
+  created_at: string;
+  finished_at?: string;
+}

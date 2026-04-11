@@ -27,6 +27,8 @@ use application::watched_users_service::WatchedUsersService;
 use application::members_service::MembersService;
 use application::coude_service::CoudeService;
 use application::rbac_service::RbacService;
+use application::wallet_service::WalletService;
+use application::blackjack_admin_service::BlackjackAdminService;
 use domain::ports::AppAdapter;
 use infrastructure::api_adapter::ApiAdapter;
 use infrastructure::config_store::ConfigStore;
@@ -72,6 +74,8 @@ pub fn run() {
     let members_svc = Arc::new(MembersService::new(adapter.clone()));
     let coude_svc = Arc::new(CoudeService::new(adapter.clone()));
     let rbac_svc = Arc::new(RbacService::new(adapter.clone()));
+    let wallet_svc = Arc::new(WalletService::new(adapter.clone()));
+    let blackjack_admin_svc = Arc::new(BlackjackAdminService::new(adapter.clone()));
 
     // IA config uses direct HTTP (no repository trait needed)
     let (ia_base_url, ia_api_key) = match &api_config {
@@ -112,6 +116,8 @@ pub fn run() {
         .manage(members_svc)
         .manage(coude_svc)
         .manage(rbac_svc)
+        .manage(wallet_svc)
+        .manage(blackjack_admin_svc)
         .manage(ia_config_svc)
         .manage(analytics_svc)
         .invoke_handler(tauri::generate_handler![
@@ -196,6 +202,13 @@ pub fn run() {
             presentation::commands::rbac_grant_role,
             presentation::commands::rbac_update_role,
             presentation::commands::rbac_revoke_role,
+            presentation::commands::wallet_list,
+            presentation::commands::wallet_credit,
+            presentation::commands::wallet_debit,
+            presentation::commands::wallet_reset,
+            presentation::commands::wallet_reset_all,
+            presentation::commands::blackjack_list_games,
+            presentation::commands::blackjack_cancel_game,
             presentation::commands::save_bot_token,
             presentation::commands::get_all_bot_tokens,
             presentation::commands::delete_bot_token,

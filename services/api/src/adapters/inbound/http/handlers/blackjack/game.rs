@@ -133,3 +133,32 @@ pub async fn get_active(
     let game = state.blackjack_svc.get_active(&guild_id, &user_id).await?;
     Ok(Json(game.as_ref().map(to_dto)))
 }
+
+#[derive(serde::Deserialize)]
+pub struct ListGamesQuery {
+    pub status: Option<String>,
+}
+
+/// GET /api/blackjack/{guild_id}/games?status=in_progress
+pub async fn list_games(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    axum::extract::Query(q): axum::extract::Query<ListGamesQuery>,
+) -> Result<Json<Vec<BlackjackGameDto>>, ApiError> {
+    let games = state.blackjack_svc.list_games(&guild_id, q.status.as_deref()).await?;
+    Ok(Json(games.iter().map(to_dto).collect()))
+}
+
+/// DELETE /api/blackjack/games/{game_id}
+pub async fn cancel_game(
+    State(state): State<AppState>,
+    Path(game_id): Path<String>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let id = parse_uuid(&game_id)?;
+    state.blackjack_svc.cancel_game(id).await?;
+    state.broadcaster.broadcast(
+        "blackjack_cancelled",
+        serde_json::json!({ "game_id": game_id }),
+    );
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}

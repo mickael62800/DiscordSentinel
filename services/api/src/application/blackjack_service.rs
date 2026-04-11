@@ -199,6 +199,20 @@ impl BlackjackService {
         self.repo.get_active(guild_id, user_id).await
     }
 
+    /// Liste les parties (optionnellement filtrees par status) — admin desktop.
+    pub async fn list_games(
+        &self,
+        guild_id: &str,
+        status: Option<&str>,
+    ) -> Result<Vec<BlackjackGame>, DomainError> {
+        self.repo.list_by_guild(guild_id, status).await
+    }
+
+    /// Annule une partie en cours + rembourse la mise — admin desktop.
+    pub async fn cancel_game(&self, id: Uuid) -> Result<(), DomainError> {
+        self.repo.cancel_game(id).await
+    }
+
     // ── Helpers internes ──
 
     async fn get_game(&self, game_id: Uuid) -> Result<BlackjackGame, DomainError> {

@@ -22,3 +22,5 @@ pub mod discord_roles_service;
 pub mod members_service;
 pub mod coude_service;
 pub mod rbac_service;
+pub mod wallet_service;
+pub mod blackjack_admin_service;

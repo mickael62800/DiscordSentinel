@@ -45,6 +45,8 @@ const logItems = [
 
 const gameItems = [
   { path: "/coude", label: "Coup de Coude", icon: "zap" },
+  { path: "/blackjack", label: "Blackjack", icon: "layers" },
+  { path: "/wallet", label: "Wallet", icon: "dollar-sign" },
 ];
 
 const aiItems = [

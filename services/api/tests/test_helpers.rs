@@ -303,6 +303,9 @@ impl WalletRepository for StubWalletRepo {
     async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> { unimplemented!() }
     async fn get_transactions(&self, _: &str, _: &str, _: i64) -> Result<Vec<WalletTransaction>, DomainError> { unimplemented!() }
+    async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> { unimplemented!() }
+    async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
+    async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> { unimplemented!() }
 }
 
 pub struct StubBlackjackRepo;
@@ -312,6 +315,8 @@ impl BlackjackRepository for StubBlackjackRepo {
     async fn get_active(&self, _: &str, _: &str) -> Result<Option<BlackjackGame>, DomainError> { unimplemented!() }
     async fn update(&self, _: &BlackjackGame) -> Result<(), DomainError> { unimplemented!() }
     async fn get_by_id(&self, _: Uuid) -> Result<Option<BlackjackGame>, DomainError> { unimplemented!() }
+    async fn list_by_guild(&self, _: &str, _: Option<&str>) -> Result<Vec<BlackjackGame>, DomainError> { unimplemented!() }
+    async fn cancel_game(&self, _: Uuid) -> Result<(), DomainError> { unimplemented!() }
 }
 
 pub struct StubCoudeSocial;

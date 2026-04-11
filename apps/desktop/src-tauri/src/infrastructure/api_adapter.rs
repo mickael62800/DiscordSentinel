@@ -4,8 +4,8 @@ use std::sync::RwLock;
 
 use reqwest::{Client, RequestBuilder, Response};
 
-use crate::domain::entities::{AuditLog, AutoRoleConfig, BotDefinition, ConfirmedBan, CoudeCombat, CoudePlayer, DailyActivity, DiscordRole, Member, MemberSummary, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, WatchedUser};
-use crate::domain::ports::{AppAdapter, AuditLogRepository, CoudeRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, MembersRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WatchedUsersRepository};
+use crate::domain::entities::{AuditLog, AutoRoleConfig, BlackjackGame, BotDefinition, ConfirmedBan, CoudeCombat, CoudePlayer, DailyActivity, DiscordRole, Member, MemberSummary, TopUser, LevelConfig, LevelReward, BotGuildConfig, ConductConfig, ConductPointsLog, Guild, GuildMember, Infraction, LogEntry, ModerationActionRequest, ModerationActionResponse, ModerationRule, RolePanel, RolePanelDetail, SecurityEvent, ServerStats, Ticket, TicketDetail, UpdateRuleParams, UserConductPoints, UserDossier, UserLevel, UserModerationHistory, VoiceChannel, VoiceChannelDetail, Wallet, WatchedUser};
+use crate::domain::ports::{AppAdapter, AuditLogRepository, BlackjackAdminRepository, CoudeRepository, DashboardChartsRepository, DiscordRolesRepository, LevelRepository, MembersRepository, RolePanelsRepository, BotConfigRepository, ConductRepository, GuildRepository, InfractionsRepository, LogsRepository, ModerationRepository, RulesRepository, SecurityRepository, StatsRepository, TicketsRepository, VoiceChannelRepository, WalletRepository, WatchedUsersRepository};
 
 pub struct ApiAdapter {
     client: Client,
@@ -475,6 +475,68 @@ impl CoudeRepository for ApiAdapter {
     fn adjust_coins(&self, guild_id: String, user_id: String, amount: i64) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
         self.send_only(self.client.patch(format!("{}/api/coude/players/{}/{}/coins", self.base_url(), guild_id, user_id))
             .json(&serde_json::json!({ "amount": amount })))
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// Phase 8 — Wallet partage
+// ═══════════════════════════════════════════════════
+
+impl WalletRepository for ApiAdapter {
+    fn list_wallets(&self, guild_id: String) -> Pin<Box<dyn Future<Output = Result<Vec<Wallet>, String>> + Send>> {
+        self.get_json(self.client.get(format!("{}/api/wallet/{}/all", self.base_url(), guild_id)))
+    }
+
+    fn credit_wallet(&self, guild_id: String, user_id: String, amount: i64, description: String) -> Pin<Box<dyn Future<Output = Result<Wallet, String>> + Send>> {
+        self.get_json(self.client.post(format!("{}/api/wallet/{}/{}/credit", self.base_url(), guild_id, user_id))
+            .json(&serde_json::json!({
+                "amount": amount,
+                "source": "admin",
+                "description": description,
+            })))
+    }
+
+    fn debit_wallet(&self, guild_id: String, user_id: String, amount: i64, description: String) -> Pin<Box<dyn Future<Output = Result<Wallet, String>> + Send>> {
+        self.get_json(self.client.post(format!("{}/api/wallet/{}/{}/debit", self.base_url(), guild_id, user_id))
+            .json(&serde_json::json!({
+                "amount": amount,
+                "source": "admin",
+                "description": description,
+            })))
+    }
+
+    fn reset_wallet(&self, guild_id: String, user_id: String, new_balance: i64) -> Pin<Box<dyn Future<Output = Result<Wallet, String>> + Send>> {
+        self.get_json(self.client.post(format!("{}/api/wallet/{}/{}/reset", self.base_url(), guild_id, user_id))
+            .json(&serde_json::json!({ "new_balance": new_balance })))
+    }
+
+    fn reset_all_wallets(&self, guild_id: String, new_balance: i64) -> Pin<Box<dyn Future<Output = Result<u64, String>> + Send>> {
+        let fut = self.get_json::<serde_json::Value>(
+            self.client.post(format!("{}/api/wallet/{}/reset-all", self.base_url(), guild_id))
+                .json(&serde_json::json!({ "new_balance": new_balance })),
+        );
+        Box::pin(async move {
+            let v = fut.await?;
+            Ok(v.get("affected").and_then(|a| a.as_u64()).unwrap_or(0))
+        })
+    }
+}
+
+// ═══════════════════════════════════════════════════
+// Phase 8 — Blackjack admin (list + cancel)
+// ═══════════════════════════════════════════════════
+
+impl BlackjackAdminRepository for ApiAdapter {
+    fn list_games(&self, guild_id: String, status: Option<String>) -> Pin<Box<dyn Future<Output = Result<Vec<BlackjackGame>, String>> + Send>> {
+        let mut url = format!("{}/api/blackjack/{}/games", self.base_url(), guild_id);
+        if let Some(s) = status {
+            url = format!("{url}?status={s}");
+        }
+        self.get_json(self.client.get(url))
+    }
+
+    fn cancel_game(&self, game_id: String) -> Pin<Box<dyn Future<Output = Result<(), String>> + Send>> {
+        self.send_only(self.client.delete(format!("{}/api/blackjack/games/{}", self.base_url(), game_id)))
     }
 }
 
