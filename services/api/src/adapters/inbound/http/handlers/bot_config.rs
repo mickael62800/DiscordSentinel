@@ -22,11 +22,9 @@ pub async fn get_definitions(
 ) -> Result<Json<Vec<BotDefinitionDto>>, ApiError> {
     // Cache-first
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Ok(cached) = conn.get::<_, Option<String>>("bot:definitions").await {
-            if let Some(json) = cached {
-                if let Ok(dtos) = serde_json::from_str::<Vec<BotDefinitionDto>>(&json) {
-                    return Ok(Json(dtos));
-                }
+        if let Ok(Some(json)) = conn.get::<_, Option<String>>("bot:definitions").await {
+            if let Ok(dtos) = serde_json::from_str::<Vec<BotDefinitionDto>>(&json) {
+                return Ok(Json(dtos));
             }
         }
     }
@@ -58,11 +56,9 @@ pub async fn get_guild_config(
 
     // Cache-first
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Ok(cached) = conn.get::<_, Option<String>>(&cache_key).await {
-            if let Some(json) = cached {
-                if let Ok(dtos) = serde_json::from_str::<Vec<BotGuildConfigDto>>(&json) {
-                    return Ok(Json(dtos));
-                }
+        if let Ok(Some(json)) = conn.get::<_, Option<String>>(&cache_key).await {
+            if let Ok(dtos) = serde_json::from_str::<Vec<BotGuildConfigDto>>(&json) {
+                return Ok(Json(dtos));
             }
         }
     }
@@ -95,11 +91,9 @@ pub async fn get_bot_config(
 
     // Cache-first
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Ok(cached) = conn.get::<_, Option<String>>(&cache_key).await {
-            if let Some(json) = cached {
-                if let Ok(dtos) = serde_json::from_str::<Vec<BotGuildConfigDto>>(&json) {
-                    return Ok(Json(dtos));
-                }
+        if let Ok(Some(json)) = conn.get::<_, Option<String>>(&cache_key).await {
+            if let Ok(dtos) = serde_json::from_str::<Vec<BotGuildConfigDto>>(&json) {
+                return Ok(Json(dtos));
             }
         }
     }

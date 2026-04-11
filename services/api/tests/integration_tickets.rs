@@ -8,7 +8,7 @@ async fn pool() -> PgPool {
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("test_{}", uuid::Uuid::new_v4().simple()) }
+fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
 
 async fn create_ticket(pool: &PgPool, gid: &str, author: &str, title: &str, category: &str) -> uuid::Uuid {
     sqlx::query_as::<_, (uuid::Uuid,)>(

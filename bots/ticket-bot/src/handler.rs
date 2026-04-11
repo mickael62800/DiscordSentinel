@@ -102,10 +102,7 @@ impl EventHandler for Handler {
 
         match interaction {
             Interaction::Command(command) => {
-                match command.data.name.as_str() {
-                    "ticket" => commands::ticket::handle(&ctx, &command).await,
-                    _ => {}
-                }
+                if command.data.name.as_str() == "ticket" { commands::ticket::handle(&ctx, &command).await }
             }
             Interaction::Component(component) => {
                 match component.data.custom_id.as_str() {
@@ -328,7 +325,7 @@ async fn close_inactive_tickets(ctx: &Context) {
 
     // Lire le timeout depuis la config de chaque guild (ou defaut 7 jours)
     let mut timeout_days = 7i64;
-    for guild in ctx.cache.guilds() {
+    if let Some(guild) = ctx.cache.guilds().into_iter().next() {
         let guild_config = match base.get_guild_config(&guild.to_string()).await {
             Ok(cfg) => cfg,
             Err(e) => {
@@ -341,7 +338,6 @@ async fn close_inactive_tickets(ctx: &Context) {
             return; // 0 = desactive
         }
         timeout_days = configured as i64;
-        break;
     }
 
     for ticket in &tickets {
@@ -429,7 +425,7 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
             Err(_) => continue,
         };
 
-        for (_ch_id, channel) in &channels {
+        for channel in channels.values() {
             if !channel.name.starts_with("ticket-") {
                 continue;
             }

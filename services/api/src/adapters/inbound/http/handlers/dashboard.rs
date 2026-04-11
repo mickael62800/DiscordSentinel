@@ -32,7 +32,7 @@ pub async fn get_logs(
     let logs = state.log_repo.find_all(200).await?;
     let filtered: Vec<LogEntryDto> = logs
         .into_iter()
-        .filter(|l| params.guild_id.as_ref().map_or(true, |gid| l.server == *gid))
+        .filter(|l| params.guild_id.as_ref().is_none_or(|gid| l.server == *gid))
         .map(LogEntryDto::from)
         .collect();
     Ok(Json(filtered))

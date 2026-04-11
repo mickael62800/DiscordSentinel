@@ -230,7 +230,7 @@ mod tests {
         async fn find_all(&self, status: Option<&str>, _priority: Option<&str>, _search: Option<&str>, _author_id: Option<&str>, _limit: i64, _offset: i64) -> Result<Vec<Ticket>, DomainError> {
             let tickets = self.tickets.lock().unwrap();
             Ok(tickets.iter().filter(|t| {
-                status.map_or(true, |s| t.status == s)
+                status.is_none_or(|s| t.status == s)
             }).cloned().collect())
         }
 
@@ -297,7 +297,7 @@ mod tests {
 
     fn make_service() -> (ManageTicketsService, Arc<MockTicketRepo>) {
         let repo = Arc::new(MockTicketRepo::default());
-        let cache = Arc::new(MockCache::default());
+        let cache = Arc::new(MockCache);
         let service = ManageTicketsService::new(repo.clone(), cache);
         (service, repo)
     }

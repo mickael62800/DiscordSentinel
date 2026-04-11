@@ -120,7 +120,7 @@ impl ManageModerationUseCase for MockModerationUC {
             .actions
             .iter()
             .filter(|a| a.action_type.starts_with("ban"))
-            .filter(|a| guild_id.map_or(true, |g| a.guild_id == g))
+            .filter(|a| guild_id.is_none_or(|g| a.guild_id == g))
             .cloned()
             .collect();
         Ok(bans)

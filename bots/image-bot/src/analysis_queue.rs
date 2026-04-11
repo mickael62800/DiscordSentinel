@@ -43,7 +43,7 @@ mod tests {
             user_id: "3".to_string(),
             username: "test".to_string(),
             message_id: "4".to_string(),
-            image_data: "base64data".to_string(),
+            image_data: b"base64data".to_vec(),
             content_type: "image/png".to_string(),
             filename: "test.png".to_string(),
             confidence_override: None,

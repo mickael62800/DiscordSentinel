@@ -21,7 +21,7 @@ pub async fn handle_create(ctx: &Context, data: &InviteCreateEvent) {
     )).await;
 
     let mut evt = audit_event::simple(gid, "invite_create")
-        .with_channel(&data.channel_id, None)
+        .with_channel(data.channel_id, None)
         .with_details(serde_json::json!({
             "code": data.code,
             "max_uses": max_uses,
@@ -47,7 +47,7 @@ pub async fn handle_delete(ctx: &Context, data: &InviteDeleteEvent) {
     Handler::send_event(
         ctx,
         audit_event::simple(gid, "invite_delete")
-            .with_channel(&data.channel_id, None)
+            .with_channel(data.channel_id, None)
             .with_details(serde_json::json!({
                 "code": data.code,
             })),

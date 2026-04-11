@@ -224,13 +224,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         {
             tracing::warn!(error = %e, "Echec API record_casino_win");
         }
-    } else {
-        if let Err(e) = api
-            .record_casino_loss(&guild_id, &command.user.id.to_string(), -gain)
-            .await
-        {
-            tracing::warn!(error = %e, "Echec API record_casino_loss");
-        }
+    } else if let Err(e) = api
+        .record_casino_loss(&guild_id, &command.user.id.to_string(), -gain)
+        .await
+    {
+        tracing::warn!(error = %e, "Echec API record_casino_loss");
     }
 
     // XP pour jackpot x10 (roll > 92)
@@ -239,7 +237,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
             api.add_xp(&guild_id, &command.user.id.to_string(), 10).await
         {
-            xp_line.push_str(&format!("\n\n\u{2b06}\u{fe0f} +10 XP (Jackpot bonus !)"));
+            xp_line.push_str("\n\n\u{2b06}\u{fe0f} +10 XP (Jackpot bonus !)");
             if leveled_up {
                 let new_title = progression::title_for_level(new_level);
                 xp_line.push_str(&format!(

@@ -8,12 +8,15 @@ async fn pool() -> PgPool {
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("test_{}", uuid::Uuid::new_v4().simple()) }
+fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
 
 async fn create_channel(pool: &PgPool, gid: &str, owner: &str, channel_id: &str, kind: &str) -> uuid::Uuid {
+    // $4::voice_channel_kind : cast explicite du parametre TEXT bindé par sqlx
+    // vers l'enum Postgres (migration 103). Les string literals dans le SQL
+    // beneficient d'un cast implicite, mais pas les parametres bindés.
     sqlx::query_as::<_, (uuid::Uuid,)>(
         r#"INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, kind)
-           VALUES (gen_random_uuid(), $1, $2, 'Owner', $3, 'Salon', $4) RETURNING id"#,
+           VALUES (gen_random_uuid(), $1, $2, 'Owner', $3, 'Salon', $4::voice_channel_kind) RETURNING id"#,
     ).bind(gid).bind(owner).bind(channel_id).bind(kind).fetch_one(pool).await.unwrap().0
 }
 
@@ -24,7 +27,7 @@ async fn voice_channel_create_defaults() {
     let ch_id = format!("ch_{}", uuid::Uuid::new_v4().simple().to_string().chars().take(8).collect::<String>());
     let id = create_channel(&p, &gid, "444", &ch_id, "public").await;
     let row = sqlx::query_as::<_, (String, bool, bool, String)>(
-        "SELECT kind, locked, queue_enabled, channel_status FROM voice_channels WHERE id = $1",
+        "SELECT kind::text, locked, queue_enabled, channel_status FROM voice_channels WHERE id = $1",
     ).bind(id).fetch_one(&p).await.unwrap();
     assert_eq!(row.0, "public");
     assert!(!row.1); // not locked

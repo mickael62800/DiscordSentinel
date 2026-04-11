@@ -34,6 +34,7 @@ impl ModerationActionType {
     }
 
     /// Parse un type d'action depuis une string. Retourne `None` si invalide.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "warn" => Some(Self::Warn),

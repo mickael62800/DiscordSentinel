@@ -19,3 +19,6 @@ tonic = { workspace = true }
 prost = { workspace = true }
 sentinel-proto = { workspace = true }
 thiserror = { workspace = true }
+
+[lints]
+workspace = true

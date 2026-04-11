@@ -325,7 +325,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
             api.add_xp(&guild_id_clone, &thief_id_clone, 5).await
         {
-            xp_line.push_str(&format!("\n\u{2b06}\u{fe0f} +5 XP pour le voleur"));
+            xp_line.push_str("\n\u{2b06}\u{fe0f} +5 XP pour le voleur");
             if leveled_up {
                 let title = progression::title_for_level(new_level);
                 xp_line.push_str(&format!(
@@ -462,7 +462,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
             api.add_xp(guild_id, thief_id, 5).await
         {
-            xp_line.push_str(&format!("\n\u{2b06}\u{fe0f} +5 XP pour le voleur"));
+            xp_line.push_str("\n\u{2b06}\u{fe0f} +5 XP pour le voleur");
             if leveled_up {
                 let title = progression::title_for_level(new_level);
                 xp_line.push_str(&format!(

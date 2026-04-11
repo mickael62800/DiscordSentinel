@@ -283,7 +283,7 @@ impl VoiceChannelRepository for PgVoiceChannelRepository {
         .bind(&channel.queue_channel_id)
         .bind(&channel.category_id)
         .bind(&channel.channel_name)
-        .bind(&channel.kind)
+        .bind(channel.kind)
         .bind(&channel.visibility)
         .bind(channel.queue_enabled)
         .bind(channel.locked)

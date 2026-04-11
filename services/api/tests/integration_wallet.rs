@@ -14,7 +14,7 @@ async fn setup_pool() -> PgPool {
 
 /// Genere un guild_id unique pour isoler chaque test.
 fn unique_guild() -> String {
-    format!("test_{}", uuid::Uuid::new_v4().simple())
+    format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
 }
 
 // ══════════════════════════════════════════════════════════
@@ -159,12 +159,20 @@ async fn wallet_transactions_logged() {
 #[tokio::test]
 async fn wallet_leaderboard_sorted_by_coins() {
     let pool = setup_pool().await;
-    let repo = PgWalletRepository::new(pool);
+    let repo = PgWalletRepository::new(pool.clone());
     let gid = unique_guild();
 
     repo.get_or_create(&gid, "poor", "Poor", 10).await.unwrap();
     repo.get_or_create(&gid, "rich", "Rich", 1000).await.unwrap();
     repo.get_or_create(&gid, "mid", "Mid", 500).await.unwrap();
+
+    // leaderboard() lit depuis la materialized view mv_wallet_leaderboard
+    // qui est refreshee toutes les 5 min par le cache-worker en prod.
+    // En test, on force le refresh pour voir les donnees fraiches.
+    sqlx::query("REFRESH MATERIALIZED VIEW mv_wallet_leaderboard")
+        .execute(&pool)
+        .await
+        .unwrap();
 
     let lb = repo.leaderboard(&gid, 10).await.unwrap();
     assert_eq!(lb.len(), 3);

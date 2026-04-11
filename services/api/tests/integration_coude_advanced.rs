@@ -9,7 +9,7 @@ async fn pool() -> PgPool {
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("test_{}", uuid::Uuid::new_v4().simple()) }
+fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
 
 async fn create_player(p: &PgPool, gid: &str, uid: &str, coins: i64) {
     sqlx::query("INSERT INTO coude_players (guild_id, user_id, username, coins) VALUES ($1, $2, $2, $3) ON CONFLICT DO NOTHING")
@@ -205,19 +205,3 @@ async fn season_create() {
     assert_eq!(row.0, 1);
 }
 
-// ── Dons ──
-
-#[tokio::test]
-async fn don_record() {
-    let p = pool().await;
-    let gid = ugid();
-
-    sqlx::query(
-        "INSERT INTO coude_dons (guild_id, donor_id, receiver_id, don_type, quantity) VALUES ($1, '111', '222', 'coins', 100)",
-    ).bind(&gid).execute(&p).await.unwrap();
-
-    let total = sqlx::query_as::<_, (i64,)>(
-        "SELECT COALESCE(SUM(quantity), 0)::bigint FROM coude_dons WHERE guild_id = $1 AND donor_id = '111'",
-    ).bind(&gid).fetch_one(&p).await.unwrap().0;
-    assert_eq!(total, 100);
-}

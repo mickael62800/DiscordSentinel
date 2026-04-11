@@ -90,19 +90,17 @@ pub async fn bootstrap_watched_users(ctx: &Context) {
     if !redis_url.is_empty() {
         if let Ok(client) = redis::Client::open(redis_url) {
             if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
-                if let Ok(json) = conn.get::<_, Option<String>>(REDIS_KEY).await {
-                    if let Some(json) = json {
-                        if let Ok(ids) = serde_json::from_str::<Vec<String>>(&json) {
-                            watched_set.clear();
-                            for id in ids {
-                                watched_set.insert(id);
-                            }
-                            info!(
-                                count = watched_set.len(),
-                                "watched_users bootstrap depuis Redis"
-                            );
-                            return;
+                if let Ok(Some(json)) = conn.get::<_, Option<String>>(REDIS_KEY).await {
+                    if let Ok(ids) = serde_json::from_str::<Vec<String>>(&json) {
+                        watched_set.clear();
+                        for id in ids {
+                            watched_set.insert(id);
                         }
+                        info!(
+                            count = watched_set.len(),
+                            "watched_users bootstrap depuis Redis"
+                        );
+                        return;
                     }
                 }
             }

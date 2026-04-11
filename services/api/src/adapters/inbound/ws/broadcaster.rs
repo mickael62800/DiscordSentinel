@@ -22,6 +22,12 @@ pub struct EventBroadcaster {
     redis_client: Option<redis::Client>,
 }
 
+impl Default for EventBroadcaster {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl EventBroadcaster {
     pub fn new() -> Self {
         Self { redis_client: None }

@@ -16,8 +16,8 @@ pub async fn handle_create(ctx: &Context, channel: &GuildChannel) {
     Handler::send_event(
         ctx,
         audit_event::simple(gid_str, "channel_create")
-            .with_target(&channel.id, &channel.name)
-            .with_channel(&channel.id, Some(channel.name.clone()))
+            .with_target(channel.id, &channel.name)
+            .with_channel(channel.id, Some(channel.name.clone()))
             .with_details(serde_json::json!({
                 "kind": format!("{:?}", channel.kind),
             })),
@@ -45,8 +45,8 @@ pub async fn handle_delete(
     Handler::send_event(
         ctx,
         audit_event::simple(gid_str, "channel_delete")
-            .with_target(&channel.id, &channel.name)
-            .with_channel(&channel.id, Some(channel.name.clone())),
+            .with_target(channel.id, &channel.name)
+            .with_channel(channel.id, Some(channel.name.clone())),
     )
     .await;
 

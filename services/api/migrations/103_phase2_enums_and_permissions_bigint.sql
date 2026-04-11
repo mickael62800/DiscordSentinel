@@ -37,8 +37,15 @@ DROP MATERIALIZED VIEW IF EXISTS mv_coude_leaderboard;
 UPDATE coude_players SET class = 'bourrin'
   WHERE class IS NOT NULL AND class NOT IN ('bourrin', 'agile', 'fourbe', 'tank');
 
+-- DROP le DEFAULT avant le ALTER TYPE : PostgreSQL ne peut pas caster un
+-- DEFAULT TEXT ('bourrin'::text) vers un type ENUM automatiquement.
+ALTER TABLE coude_players ALTER COLUMN class DROP DEFAULT;
+
 ALTER TABLE coude_players
     ALTER COLUMN class TYPE coude_class USING class::coude_class;
+
+-- Re-etablir le DEFAULT avec le nouveau type
+ALTER TABLE coude_players ALTER COLUMN class SET DEFAULT 'bourrin'::coude_class;
 
 -- Recreer la MV (identique a 102)
 CREATE MATERIALIZED VIEW mv_coude_leaderboard AS
@@ -69,8 +76,13 @@ ALTER TABLE moderation_actions
 UPDATE voice_channels SET kind = 'public'
   WHERE kind NOT IN ('public', 'private');
 
+-- DROP le DEFAULT avant le ALTER TYPE (meme raison que coude_players.class)
+ALTER TABLE voice_channels ALTER COLUMN kind DROP DEFAULT;
+
 ALTER TABLE voice_channels
     ALTER COLUMN kind TYPE voice_channel_kind USING kind::voice_channel_kind;
+
+ALTER TABLE voice_channels ALTER COLUMN kind SET DEFAULT 'public'::voice_channel_kind;
 
 -- ── discord_roles.permissions TEXT -> BIGINT ─────────────────────────────────
 -- Discord permissions sont des bitfields 64 bits. Stocker en BIGINT permet
@@ -81,6 +93,9 @@ ALTER TABLE voice_channels
 -- Defensive : remplacer les valeurs vides ou non-numeriques par '0'
 UPDATE discord_roles SET permissions = '0'
   WHERE permissions !~ '^[0-9]+$';
+
+-- DROP le DEFAULT TEXT avant le ALTER TYPE BIGINT (meme pattern que les enums)
+ALTER TABLE discord_roles ALTER COLUMN permissions DROP DEFAULT;
 
 ALTER TABLE discord_roles
     ALTER COLUMN permissions TYPE BIGINT USING permissions::bigint;

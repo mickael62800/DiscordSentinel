@@ -22,6 +22,7 @@ impl TicketPriority {
     }
 
     /// Parse une priorite depuis une string. Retourne `None` si invalide.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "low" => Some(Self::Low),

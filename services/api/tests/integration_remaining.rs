@@ -10,7 +10,7 @@ async fn pool() -> PgPool {
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("test_{}", uuid::Uuid::new_v4().simple()) }
+fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
 
 #[allow(dead_code)]
 fn short_gid() -> String {
@@ -152,7 +152,7 @@ async fn bot_definition_has_config_schema() {
 
     if let Some((name, schema)) = automod {
         assert!(!name.is_empty());
-        assert!(schema.as_array().unwrap().len() > 0, "automod-bot doit avoir des config keys");
+        assert!(!schema.as_array().unwrap().is_empty(), "automod-bot doit avoir des config keys");
     }
 }
 

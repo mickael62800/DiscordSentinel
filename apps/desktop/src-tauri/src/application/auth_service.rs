@@ -71,10 +71,6 @@ impl AuthService {
         self.config_store.save_bot_token(bot_name, token)
     }
 
-    pub fn get_bot_token(&self, bot_name: &str) -> Result<Option<String>, String> {
-        self.config_store.get_bot_token(bot_name)
-    }
-
     pub fn get_all_bot_tokens(&self) -> Result<Vec<(String, bool)>, String> {
         self.config_store.get_all_bot_tokens()
     }
@@ -131,8 +127,6 @@ impl AuthService {
             response_body
         );
         let _ = writer.write_all(response.as_bytes()).await;
-        drop(writer);
-        drop(buf_reader);
         drop(listener);
 
         // Exchange code for token

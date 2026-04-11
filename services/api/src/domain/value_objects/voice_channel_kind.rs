@@ -6,7 +6,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "voice_channel_kind", rename_all = "lowercase")]
+#[derive(Default)]
 pub enum VoiceChannelKind {
+    #[default]
     Public,
     Private,
 }
@@ -27,8 +29,3 @@ impl VoiceChannelKind {
     }
 }
 
-impl Default for VoiceChannelKind {
-    fn default() -> Self {
-        Self::Public
-    }
-}

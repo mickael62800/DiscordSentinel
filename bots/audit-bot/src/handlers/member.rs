@@ -23,7 +23,7 @@ pub async fn handle_addition(ctx: &Context, new_member: &Member) {
     Handler::send_event(
         ctx,
         audit_event::simple(gid_str.clone(), "member_join")
-            .with_target(&new_member.user.id, &new_member.user.name)
+            .with_target(new_member.user.id, &new_member.user.name)
             .with_details(serde_json::json!({
                 "account_created_at": new_member.user.created_at().to_string(),
             })),
@@ -53,7 +53,7 @@ pub async fn handle_removal(ctx: &Context, guild_id: GuildId, user: &User) {
     Handler::send_event(
         ctx,
         audit_event::simple(gid_str.clone(), "member_leave")
-            .with_target(&user.id, &user.name),
+            .with_target(user.id, &user.name),
     )
     .await;
 
@@ -105,7 +105,7 @@ pub async fn handle_ban_addition(ctx: &Context, guild_id: GuildId, banned_user: 
     Handler::send_event(
         ctx,
         audit_event::simple(gid_str.clone(), "member_ban")
-            .with_target(&banned_user.id, &banned_user.name),
+            .with_target(banned_user.id, &banned_user.name),
     )
     .await;
 
@@ -151,7 +151,7 @@ pub async fn handle_ban_removal(ctx: &Context, guild_id: GuildId, unbanned_user:
     Handler::send_event(
         ctx,
         audit_event::simple(gid, "member_unban")
-            .with_target(&unbanned_user.id, &unbanned_user.name),
+            .with_target(unbanned_user.id, &unbanned_user.name),
     )
     .await;
 }
@@ -299,9 +299,9 @@ pub async fn handle_update(
     // Timeout (mute) detecte
     let old_timeout = old.as_ref().and_then(|m| m.communication_disabled_until);
     let new_timeout = new_member.communication_disabled_until;
-    if old_timeout.is_none() && new_timeout.is_some() {
+    if let (None, Some(timeout)) = (old_timeout, new_timeout) {
         Handler::log(ctx, "warn", &gid_str, &format!(
-            "{} a ete mute (timeout jusqu'a {})", user_name, new_timeout.unwrap()
+            "{} a ete mute (timeout jusqu'a {})", user_name, timeout
         )).await;
 
         Handler::send_event(
@@ -309,7 +309,7 @@ pub async fn handle_update(
             audit_event::simple(gid_str.clone(), "member_timeout")
                 .with_target(&user_id, user_name)
                 .with_details(serde_json::json!({
-                    "timeout_until": new_timeout.unwrap().to_string(),
+                    "timeout_until": timeout.to_string(),
                 })),
         )
         .await;

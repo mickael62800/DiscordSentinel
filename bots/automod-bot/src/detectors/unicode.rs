@@ -80,7 +80,7 @@ fn is_invisible(c: char) -> bool {
 }
 
 fn is_latin(c: char) -> bool {
-    matches!(c, 'A'..='Z' | 'a'..='z')
+    c.is_ascii_alphabetic()
 }
 
 fn is_cyrillic(c: char) -> bool {

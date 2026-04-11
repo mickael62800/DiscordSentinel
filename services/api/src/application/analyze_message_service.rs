@@ -344,6 +344,81 @@ fn resolve_thresholds(rules: &[crate::domain::entities::Rule]) -> (f64, f64, f64
     (warn, delete, mute, ban)
 }
 
+// ── Mocks minimaux pour les tests ──
+
+#[cfg(test)]
+struct MockIaConfigRepo;
+
+#[cfg(test)]
+#[async_trait]
+impl IaConfigRepository for MockIaConfigRepo {
+    async fn get(&self, _: &str) -> Result<Option<crate::domain::entities::IaConfig>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn save(&self, config: &crate::domain::entities::IaConfig) -> Result<crate::domain::entities::IaConfig, crate::domain::errors::DomainError> { Ok(config.clone()) }
+}
+
+#[cfg(test)]
+struct MockRuleRepo;
+
+#[cfg(test)]
+#[async_trait]
+impl RuleRepository for MockRuleRepo {
+    async fn find_by_guild(&self, _: &str) -> Result<Vec<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn find_all(&self) -> Result<Vec<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn find_by_id(&self, _: uuid::Uuid) -> Result<Option<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn save(&self, rule: &crate::domain::entities::Rule) -> Result<crate::domain::entities::Rule, crate::domain::errors::DomainError> { Ok(rule.clone()) }
+    async fn toggle(&self, _: uuid::Uuid, _: bool) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn delete(&self, _: uuid::Uuid) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+}
+
+#[cfg(test)]
+struct MockInfractionRepo;
+
+#[cfg(test)]
+#[async_trait]
+impl InfractionRepository for MockInfractionRepo {
+    async fn save(&self, _: &crate::domain::entities::Infraction) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn find_by_guild(&self, _: &str, _: &crate::ports::inbound::InfractionFilters) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn find_all(&self, _: i64, _: i64) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn count_today(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
+    async fn find_by_id(&self, _: &str) -> Result<Option<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn delete_by_id(&self, _: &str) -> Result<bool, crate::domain::errors::DomainError> { Ok(false) }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
+}
+
+#[cfg(test)]
+struct MockCache;
+
+#[cfg(test)]
+#[async_trait]
+impl CachePort for MockCache {
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<crate::domain::entities::Rule>>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn set_rules(&self, _: &str, _: &[crate::domain::entities::Rule]) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn invalidate_rules(&self, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn get_json(&self, _: &str) -> Result<Option<String>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn invalidate(&self, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn invalidate_pattern(&self, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+}
+
+#[cfg(test)]
+struct MockConduct;
+
+#[cfg(test)]
+#[async_trait]
+impl ManageConductUseCase for MockConduct {
+    async fn get_config(&self, _: &str) -> Result<crate::domain::entities::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn save_config(&self, _: crate::ports::inbound::SaveConductConfigCommand) -> Result<crate::domain::entities::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn get_points(&self, _: &str, _: &str) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::UserConductPoints>, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<crate::domain::entities::ConductPointsLog>, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> {
+        let now = chrono::Utc::now();
+        Ok(crate::domain::entities::UserConductPoints { id: uuid::Uuid::new_v4(), guild_id: String::new(), user_id: String::new(), username: String::new(), points: 100, last_regen_at: now, created_at: now, updated_at: now })
+    }
+    async fn add_points(&self, _: crate::ports::inbound::AddPointsCommand) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn run_regen(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -877,79 +952,4 @@ mod tests {
         let result = build_contextual_content("z", &ctx, "unknown");
         assert!(result.contains("---")); // natural format
     }
-}
-
-// ── Mocks minimaux pour les tests ──
-
-#[cfg(test)]
-struct MockIaConfigRepo;
-
-#[cfg(test)]
-#[async_trait]
-impl IaConfigRepository for MockIaConfigRepo {
-    async fn get(&self, _: &str) -> Result<Option<crate::domain::entities::IaConfig>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn save(&self, config: &crate::domain::entities::IaConfig) -> Result<crate::domain::entities::IaConfig, crate::domain::errors::DomainError> { Ok(config.clone()) }
-}
-
-#[cfg(test)]
-struct MockRuleRepo;
-
-#[cfg(test)]
-#[async_trait]
-impl RuleRepository for MockRuleRepo {
-    async fn find_by_guild(&self, _: &str) -> Result<Vec<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn find_all(&self) -> Result<Vec<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn find_by_id(&self, _: uuid::Uuid) -> Result<Option<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn save(&self, rule: &crate::domain::entities::Rule) -> Result<crate::domain::entities::Rule, crate::domain::errors::DomainError> { Ok(rule.clone()) }
-    async fn toggle(&self, _: uuid::Uuid, _: bool) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-    async fn delete(&self, _: uuid::Uuid) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-}
-
-#[cfg(test)]
-struct MockInfractionRepo;
-
-#[cfg(test)]
-#[async_trait]
-impl InfractionRepository for MockInfractionRepo {
-    async fn save(&self, _: &crate::domain::entities::Infraction) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-    async fn find_by_guild(&self, _: &str, _: &crate::ports::inbound::InfractionFilters) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn find_all(&self, _: i64, _: i64) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn count_today(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
-    async fn find_by_id(&self, _: &str) -> Result<Option<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn delete_by_id(&self, _: &str) -> Result<bool, crate::domain::errors::DomainError> { Ok(false) }
-    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
-}
-
-#[cfg(test)]
-struct MockCache;
-
-#[cfg(test)]
-#[async_trait]
-impl CachePort for MockCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<crate::domain::entities::Rule>>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[crate::domain::entities::Rule]) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-    async fn invalidate_rules(&self, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-    async fn get_json(&self, _: &str) -> Result<Option<String>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-    async fn invalidate(&self, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-    async fn invalidate_pattern(&self, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-}
-
-#[cfg(test)]
-struct MockConduct;
-
-#[cfg(test)]
-#[async_trait]
-impl ManageConductUseCase for MockConduct {
-    async fn get_config(&self, _: &str) -> Result<crate::domain::entities::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn save_config(&self, _: crate::ports::inbound::SaveConductConfigCommand) -> Result<crate::domain::entities::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_points(&self, _: &str, _: &str) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::UserConductPoints>, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<crate::domain::entities::ConductPointsLog>, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> {
-        let now = chrono::Utc::now();
-        Ok(crate::domain::entities::UserConductPoints { id: uuid::Uuid::new_v4(), guild_id: String::new(), user_id: String::new(), username: String::new(), points: 100, last_regen_at: now, created_at: now, updated_at: now })
-    }
-    async fn add_points(&self, _: crate::ports::inbound::AddPointsCommand) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn run_regen(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
 }

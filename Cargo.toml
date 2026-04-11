@@ -98,6 +98,14 @@ redis = { version = "0.27", features = ["tokio-comp", "aio", "streams"] }
 sentinel-proto = { path = "services/proto" }
 sentinel-shared = { path = "bots/shared" }
 
+# ── Lints partagés (à activer dans chaque crate via `[lints] workspace = true`) ──
+[workspace.lints.clippy]
+too_many_arguments = "allow"
+result_large_err = "allow"
+doc_lazy_continuation = "allow"
+empty_line_after_doc_comments = "allow"
+type_complexity = "allow"
+
 # ── Profil release partagé (Phase 1 quick wins) ──
 [profile.release]
 lto = "fat"

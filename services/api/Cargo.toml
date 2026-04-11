@@ -70,3 +70,6 @@ http-body-util = "0.1"
 # long-running grâce à une meilleure gestion de la fragmentation.
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
+
+[lints]
+workspace = true

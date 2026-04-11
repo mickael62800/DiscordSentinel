@@ -5,7 +5,7 @@ const DEFAULT_ANALYTICS_REFRESH_SECS: u64 = 5 * SECS_PER_MINUTE;
 /// Intervalle par defaut pour le rafraichissement du cache dashboard (secondes).
 const DEFAULT_DASHBOARD_REFRESH_SECS: u64 = 10 * SECS_PER_MINUTE;
 /// Intervalle par defaut pour le rafraichissement du cache voice stats (secondes).
-const DEFAULT_VOICE_STATS_REFRESH_SECS: u64 = 1 * SECS_PER_HOUR;
+const DEFAULT_VOICE_STATS_REFRESH_SECS: u64 = SECS_PER_HOUR;
 /// Phase 2 A.2 — Intervalle de refresh des vues materialisees leaderboards.
 /// 5 minutes : compromis entre fraicheur (les ranks bougent vite en periode de
 /// raid coude/casino) et cout du REFRESH CONCURRENTLY (qui scanne la table).

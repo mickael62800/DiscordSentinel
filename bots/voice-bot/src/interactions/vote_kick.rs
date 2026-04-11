@@ -222,19 +222,17 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
                 {
                     tracing::warn!(error = %e, "failed to send vote kick expulsion result");
                 }
-            } else {
-                if let Err(e) = mc
-                    .say(
-                        &ctx_clone.http,
-                        format!(
-                            "Vote termine : <@{}> **reste** dans le salon.",
-                            vote.target
-                        ),
-                    )
-                    .await
-                {
-                    tracing::warn!(error = %e, "failed to send vote kick rejection result");
-                }
+            } else if let Err(e) = mc
+                .say(
+                    &ctx_clone.http,
+                    format!(
+                        "Vote termine : <@{}> **reste** dans le salon.",
+                        vote.target
+                    ),
+                )
+                .await
+            {
+                tracing::warn!(error = %e, "failed to send vote kick rejection result");
             }
         }
     });

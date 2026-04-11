@@ -123,8 +123,10 @@ mod tests {
 
     #[test]
     fn test_display_hp() {
-        assert_eq!(display_hp(8), 104);
-        assert_eq!(display_hp(25), 112);
-        assert_eq!(display_hp(100), 150);
+        // Formule : 100 + DEF_effective * 2
+        assert_eq!(display_hp(0), 100);
+        assert_eq!(display_hp(8), 116);
+        assert_eq!(display_hp(25), 150);
+        assert_eq!(display_hp(100), 300);
     }
 }

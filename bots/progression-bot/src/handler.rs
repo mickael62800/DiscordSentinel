@@ -245,8 +245,7 @@ impl EventHandler for Handler {
             let base_xp = 15.0;
             let final_xp = (base_xp * channel_mult * role_mult * streak_mult)
                 .round()
-                .min(1000.0)
-                .max(1.0) as i64;
+                .clamp(1.0, 1000.0) as i64;
 
             // Ajouter l'XP texte
             match api

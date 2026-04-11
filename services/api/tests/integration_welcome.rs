@@ -8,7 +8,7 @@ async fn pool() -> PgPool {
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("test_{}", uuid::Uuid::new_v4().simple()) }
+fn ugid() -> String { format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128) }
 
 // ══════════════════════════════════════════════════════════
 //  Config CRUD

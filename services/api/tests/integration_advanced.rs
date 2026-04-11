@@ -9,7 +9,13 @@ async fn pool() -> PgPool {
     PgPool::connect(&url).await.unwrap()
 }
 
-fn ugid() -> String { format!("test_{}", uuid::Uuid::new_v4().simple()) }
+/// Genere un guild_id unique au format snowflake (≤19 chiffres) pour
+/// respecter VARCHAR(20) depuis la migration 101.
+fn ugid() -> String {
+    let u = uuid::Uuid::new_v4().as_u128();
+    // modulo 10^18 garantit ≤18 chiffres (snowflake Discord = 18-19 digits)
+    format!("{}", u % 1_000_000_000_000_000_000_u128)
+}
 
 // ══════════════════════════════════════════════════════════
 //  Hourly activity — heatmap

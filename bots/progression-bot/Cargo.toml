@@ -25,3 +25,6 @@ time = "0.3"
 # processus long-running grace a une meilleure gestion de la fragmentation.
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
+
+[lints]
+workspace = true

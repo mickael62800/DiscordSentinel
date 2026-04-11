@@ -59,17 +59,17 @@ impl ManageVoiceChannelsService {
             return Err(DomainError::ValidationError("Le nom du theme ne peut pas depasser 100 caracteres".to_string()));
         }
         if let Some(limit) = cmd.member_limit {
-            if limit < 0 || limit > 99 {
+            if !(0..=99).contains(&limit) {
                 return Err(DomainError::ValidationError("La limite de membres doit etre entre 0 et 99".to_string()));
             }
         }
         if let Some(bitrate) = cmd.bitrate {
-            if bitrate < 8000 || bitrate > 384000 {
+            if !(8000..=384000).contains(&bitrate) {
                 return Err(DomainError::ValidationError("Le bitrate doit etre entre 8000 et 384000".to_string()));
             }
         }
         if let Some(slowmode) = cmd.slowmode_secs {
-            if slowmode < 0 || slowmode > 21600 {
+            if !(0..=21600).contains(&slowmode) {
                 return Err(DomainError::ValidationError("Le slowmode doit etre entre 0 et 21600 secondes".to_string()));
             }
         }

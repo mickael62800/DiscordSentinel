@@ -56,7 +56,7 @@ impl StrikeRepository for InMemoryStrikeRepo {
         Ok(strikes
             .iter()
             .filter(|s| s.guild_id == guild_id && s.user_id == user_id)
-            .filter(|s| s.expires_at.map_or(true, |e| e > now))
+            .filter(|s| s.expires_at.is_none_or(|e| e > now))
             .filter(|s| s.created_at > cutoff)
             .cloned()
             .collect())

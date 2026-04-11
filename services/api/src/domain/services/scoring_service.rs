@@ -288,7 +288,7 @@ mod tests {
 
     #[test]
     fn test_custom_nsfw_rule_overrides_weight() {
-        let rules = vec![make_rule(FlagType::Nsfw, 4.0)];
+        let rules = [make_rule(FlagType::Nsfw, 4.0)];
         // Simuler un scoring direct — le poids custom doit etre utilise
         let rule = rules.iter().find(|r| r.flag_type == FlagType::Nsfw && r.enabled);
         assert_eq!(rule.unwrap().weight, 4.0);

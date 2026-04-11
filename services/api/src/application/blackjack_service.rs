@@ -46,7 +46,7 @@ impl BlackjackService {
         }
 
         // Vérifier qu'il n'y a pas de partie active
-        if let Some(_) = self.repo.get_active(&guild_id, &user_id).await? {
+        if self.repo.get_active(&guild_id, &user_id).await?.is_some() {
             return Err(DomainError::Conflict(
                 "Tu as déjà une partie de blackjack en cours.".into(),
             ));

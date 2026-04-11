@@ -36,3 +36,6 @@ base64 = "0.22"
 hostname = "0.4"
 tokio-tungstenite = { version = "0.24", features = ["native-tls"] }
 futures-util = { workspace = true }
+
+[lints]
+workspace = true

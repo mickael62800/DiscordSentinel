@@ -18,7 +18,7 @@ pub async fn handle_create(ctx: &Context, new: &Role) {
     Handler::send_event(
         ctx,
         audit_event::simple(gid_str, "role_create")
-            .with_target(&new.id, &new.name)
+            .with_target(new.id, &new.name)
             .with_details(serde_json::json!({
                 "colour": format!("#{:06x}", new.colour.0),
                 "permissions": new.permissions.bits().to_string(),
@@ -112,7 +112,7 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
     Handler::send_event(
         ctx,
         audit_event::simple(gid_str.clone(), "role_update")
-            .with_target(&new.id, &new.name)
+            .with_target(new.id, &new.name)
             .with_details(details),
     )
     .await;

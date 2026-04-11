@@ -10,7 +10,7 @@ async fn setup_pool() -> PgPool {
 }
 
 fn unique_guild() -> String {
-    format!("test_{}", uuid::Uuid::new_v4().simple())
+    format!("{}", uuid::Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
 }
 
 /// Cree un joueur coude avec un solde initial.

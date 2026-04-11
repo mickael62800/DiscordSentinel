@@ -901,8 +901,8 @@ impl GameDb {
                 // Part du pot redistribuable pour les parieurs gagnants
                 let parieur_winner_pot = if winner_pool > 0 {
                     // Parieurs gagnants recup leur mise + part proportionnelle du pot perdant (- commission)
-                    let loser_pot_after_cut = (loser_pool as f64 * 0.85) as i64;
-                    loser_pot_after_cut
+                    
+                    (loser_pool as f64 * 0.85) as i64
                 } else {
                     0
                 };
@@ -949,13 +949,12 @@ impl GameDb {
 
         // Appliquer les paiements parieurs
         for result in &results {
-            if result.won && result.payout > 0 {
-                if !guild_id.is_empty() {
+            if result.won && result.payout > 0
+                && !guild_id.is_empty() {
                     if let Err(e) = self.update_player_coins(&guild_id, &result.bettor_id, result.payout).await {
                         warn!(error = %e, "Failed to update bettor coins");
                     }
                 }
-            }
         }
 
         // Appliquer les bonus combattants

@@ -12,7 +12,7 @@ pub async fn handle_create(ctx: &Context, thread: &GuildChannel) {
     )).await;
 
     let mut evt = audit_event::simple(gid, "thread_create")
-        .with_target(&thread.id, &thread.name)
+        .with_target(thread.id, &thread.name)
         .with_details(serde_json::json!({
             "kind": format!("{:?}", thread.kind),
         }));
@@ -37,7 +37,7 @@ pub async fn handle_delete(
     )).await;
 
     let mut evt = audit_event::simple(gid, "thread_delete")
-        .with_target(&thread.id, &thread_name);
+        .with_target(thread.id, &thread_name);
     evt.channel_id = full_thread.as_ref().and_then(|t| t.parent_id.map(|p| p.to_string()));
 
     Handler::send_event(ctx, evt).await;

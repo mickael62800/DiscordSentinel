@@ -70,7 +70,7 @@ impl ModerationRepository for PgModerationRepository {
         .bind(&action.target_name)
         .bind(&action.action_type)
         .bind(&action.reason)
-        .bind(&action.gravity)
+        .bind(action.gravity)
         .bind(action.duration.map(|d| d as i64))
         .bind(action.created_at)
         .execute(&self.pool)

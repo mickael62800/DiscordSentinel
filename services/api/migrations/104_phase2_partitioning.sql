@@ -75,6 +75,18 @@ CREATE TABLE infractions_2027_03 PARTITION OF infractions FOR VALUES FROM ('2027
 -- Migration des donnees
 INSERT INTO infractions SELECT * FROM infractions_old;
 
+-- DROP des anciens index (toujours attaches a infractions_old qui sera
+-- supprimee juste apres). Les noms sont globaux dans le schema et doivent
+-- etre liberes avant de les recreer sur la nouvelle table partitionnee.
+DROP INDEX IF EXISTS idx_infractions_guild;
+DROP INDEX IF EXISTS idx_infractions_user;
+DROP INDEX IF EXISTS idx_infractions_created;
+DROP INDEX IF EXISTS idx_infractions_action;
+DROP INDEX IF EXISTS idx_infractions_guild_created;
+DROP INDEX IF EXISTS idx_infractions_guild_action;
+DROP INDEX IF EXISTS idx_infractions_guild_action_created;
+DROP INDEX IF EXISTS idx_infractions_flags_gin;
+
 -- Recreation des index (auto-propagated to partitions)
 CREATE INDEX idx_infractions_user ON infractions (guild_id, user_id);
 CREATE INDEX idx_infractions_guild_created ON infractions (guild_id, created_at DESC);
@@ -122,6 +134,14 @@ CREATE TABLE audit_logs_2027_03 PARTITION OF audit_logs FOR VALUES FROM ('2027-0
 
 INSERT INTO audit_logs SELECT * FROM audit_logs_old;
 
+DROP INDEX IF EXISTS idx_audit_logs_guild;
+DROP INDEX IF EXISTS idx_audit_logs_event_type;
+DROP INDEX IF EXISTS idx_audit_logs_actor;
+DROP INDEX IF EXISTS idx_audit_logs_target;
+DROP INDEX IF EXISTS idx_audit_logs_created_at;
+DROP INDEX IF EXISTS idx_audit_logs_guild_created;
+DROP INDEX IF EXISTS idx_audit_logs_guild_type_date;
+
 CREATE INDEX idx_audit_logs_event_type ON audit_logs (event_type);
 CREATE INDEX idx_audit_logs_actor ON audit_logs (actor_id);
 CREATE INDEX idx_audit_logs_target ON audit_logs (target_id);
@@ -167,6 +187,11 @@ CREATE TABLE user_activity_log_2027_03 PARTITION OF user_activity_log FOR VALUES
 
 INSERT INTO user_activity_log SELECT * FROM user_activity_log_old;
 
+DROP INDEX IF EXISTS idx_user_activity_guild_user;
+DROP INDEX IF EXISTS idx_user_activity_created;
+DROP INDEX IF EXISTS idx_user_activity_type;
+DROP INDEX IF EXISTS idx_user_activity_guild_user_type;
+
 CREATE INDEX idx_user_activity_guild_user ON user_activity_log (guild_id, user_id);
 CREATE INDEX idx_user_activity_created ON user_activity_log (created_at);
 CREATE INDEX idx_user_activity_type ON user_activity_log (event_type);
@@ -208,6 +233,11 @@ CREATE TABLE logs_2027_02 PARTITION OF logs FOR VALUES FROM ('2027-02-01') TO ('
 CREATE TABLE logs_2027_03 PARTITION OF logs FOR VALUES FROM ('2027-03-01') TO ('2027-04-01');
 
 INSERT INTO logs SELECT * FROM logs_old;
+
+DROP INDEX IF EXISTS idx_logs_timestamp;
+DROP INDEX IF EXISTS idx_logs_level;
+DROP INDEX IF EXISTS idx_logs_bot;
+DROP INDEX IF EXISTS idx_logs_category;
 
 CREATE INDEX idx_logs_timestamp ON logs (timestamp DESC);
 CREATE INDEX idx_logs_level ON logs (level);

@@ -25,11 +25,9 @@ pub async fn list_members(
 
     // Cache-first
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Ok(cached) = conn.get::<_, Option<String>>(&cache_key).await {
-            if let Some(json) = cached {
-                if let Ok(members) = serde_json::from_str::<Vec<DiscordMember>>(&json) {
-                    return Ok(Json(members));
-                }
+        if let Ok(Some(json)) = conn.get::<_, Option<String>>(&cache_key).await {
+            if let Ok(members) = serde_json::from_str::<Vec<DiscordMember>>(&json) {
+                return Ok(Json(members));
             }
         }
     }

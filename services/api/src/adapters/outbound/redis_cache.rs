@@ -106,7 +106,7 @@ impl From<&Rule> for CachedRule {
 }
 
 impl CachedRule {
-    fn to_rule(self) -> Rule {
+    fn into_rule(self) -> Rule {
         Rule {
             id: self.id.parse().unwrap_or_else(|_| {
                 tracing::warn!("Invalid UUID in cache: {}, using nil", self.id);
@@ -143,7 +143,7 @@ impl CachePort for RedisCache {
                 self.record_hit();
                 let cached: Vec<CachedRule> = serde_json::from_str(&json)
                     .map_err(|e| DomainError::Internal(format!("Redis deserialize: {e}")))?;
-                Ok(Some(cached.into_iter().map(|c| c.to_rule()).collect()))
+                Ok(Some(cached.into_iter().map(|c| c.into_rule()).collect()))
             }
             None => {
                 self.record_miss();
