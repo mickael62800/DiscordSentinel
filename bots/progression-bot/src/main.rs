@@ -22,6 +22,7 @@ use tracing::info;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
@@ -45,6 +46,21 @@ async fn main() {
 
     let base = Arc::new(BaseApiClient::new(&config, "progression-bot"));
 
+    // Phase 7A — pilote gRPC : connexion lazy au serveur tonic de l'API.
+    // L'URL est lue depuis GRPC_API_URL (defaut http://127.0.0.1:50051).
+    // L'auth Bearer reuse API_KEY. Si la connexion echoue au demarrage,
+    // le circuit breaker prendra le relais et chaque appel sera proprement
+    // court-circuite — le bot ne crashe pas.
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => {
+            tracing::error!(error = %e, "Echec init SentinelGrpcClient — fallback HTTP partiel");
+            // On panique ici plutot que de demarrer le bot dans un etat
+            // degrade silencieux : la migration gRPC est obligatoire pour ce bot.
+            panic!("SentinelGrpcClient: {e}");
+        }
+    };
+
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
         | GatewayIntents::GUILD_VOICE_STATES
@@ -60,7 +76,8 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base));
-        data.insert::<StatsApiKey>(ApiClient::new(Arc::clone(&base)));
+        data.insert::<GrpcClientKey>(Arc::clone(&grpc));
+        data.insert::<StatsApiKey>(ApiClient::new(Arc::clone(&base), Arc::clone(&grpc)));
         data.insert::<TrackerKey>(StatsTracker::new());
         data.insert::<XpCooldownKey>(XpCooldown::new());
         data.insert::<StreakTrackerKey>(StreakTracker::new());

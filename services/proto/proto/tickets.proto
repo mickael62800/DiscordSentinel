@@ -1,0 +1,107 @@
+syntax = "proto3";
+
+package sentinel.tickets.v1;
+
+// Service tickets : creation, reponse, statut, assignation, channels.
+// Wrappe le use-case ManageTicketsUseCase cote API.
+service TicketsService {
+  rpc ListTickets(ListTicketsRequest) returns (TicketList);
+  rpc GetTicketDetail(GetTicketDetailRequest) returns (TicketDetail);
+  rpc CreateTicket(CreateTicketRequest) returns (Ticket);
+  rpc ReplyTicket(ReplyTicketRequest) returns (Empty);
+  rpc CloseTicket(CloseTicketRequest) returns (Empty);
+  rpc UpdateStatus(UpdateStatusRequest) returns (Empty);
+  rpc AssignTicket(AssignTicketRequest) returns (Empty);
+  rpc UpdateTicketChannel(UpdateTicketChannelRequest) returns (Empty);
+}
+
+message Empty {}
+
+message ListTicketsRequest {
+  optional string status = 1;
+  optional string priority = 2;
+  optional string search = 3;
+  optional string author_id = 4;
+  int64 limit = 5;
+  int64 offset = 6;
+}
+
+message GetTicketDetailRequest {
+  string id = 1;
+}
+
+message CreateTicketRequest {
+  string title = 1;
+  string priority = 2;
+  string author_id = 3;
+  string author_name = 4;
+  string server = 5;
+  string category = 6;
+  string ticket_type = 7;
+  optional string channel_id = 8;
+}
+
+message ReplyTicketRequest {
+  string ticket_id = 1;
+  string content = 2;
+  string author_name = 3;
+  string author_role = 4;
+}
+
+message CloseTicketRequest {
+  string id = 1;
+}
+
+message UpdateStatusRequest {
+  string id = 1;
+  string status = 2;
+}
+
+message AssignTicketRequest {
+  string ticket_id = 1;
+  string assignee = 2;
+}
+
+message UpdateTicketChannelRequest {
+  string ticket_id = 1;
+  optional string voice_channel_id = 2;
+  optional string invited_user_id = 3;
+}
+
+message Ticket {
+  string id = 1;
+  string title = 2;
+  string status = 3;
+  string priority = 4;
+  string author_id = 5;
+  string author_name = 6;
+  optional string assigned_to = 7;
+  string server = 8;
+  string category = 9;
+  string ticket_type = 10;
+  optional string channel_id = 11;
+  optional string voice_channel_id = 12;
+  optional string invited_user_id = 13;
+  // RFC3339
+  string created_at = 14;
+  string updated_at = 15;
+  uint32 messages_count = 16;
+}
+
+message TicketMessage {
+  string id = 1;
+  string ticket_id = 2;
+  string author_name = 3;
+  string author_role = 4;
+  string content = 5;
+  string created_at = 6;
+}
+
+message TicketList {
+  repeated Ticket tickets = 1;
+}
+
+message TicketDetail {
+  Ticket ticket = 1;
+  repeated TicketMessage messages = 2;
+}

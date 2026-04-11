@@ -2,6 +2,9 @@ use std::sync::Arc;
 
 use serde::Deserialize;
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
+
+use sentinel_proto::coude::v1 as proto_coude;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Response DTOs (match what the API returns as JSON) ──
@@ -240,76 +243,86 @@ struct RefundBetsResponse {
 
 pub struct ApiClient {
     pub base: Arc<BaseApiClient>,
+    grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>) -> Self {
-        Self { base }
+    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { base, grpc }
     }
 
     // ── Players ──
 
-    /// POST /api/coude/{guild_id}/players/get-or-create
+    /// gRPC `CoudePlayerService.GetOrCreatePlayer` (Phase 7A — hot path).
     pub async fn get_or_create_player(
         &self,
         guild_id: &str,
         user_id: &str,
         username: &str,
     ) -> Result<Player, String> {
-        self.base
-            .post_json(
-                &format!("/api/coude/{guild_id}/players/get-or-create"),
-                &serde_json::json!({ "user_id": user_id, "username": username }),
-            )
+        let req = proto_coude::GetOrCreatePlayerRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            username: username.to_string(),
+        };
+        let mut client = self.grpc.coude_players();
+        let p = self
+            .grpc
+            .guarded(|| async move {
+                client.get_or_create_player(req).await.map(|r| r.into_inner())
+            })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(proto_player_to_dto(p))
     }
 
-    /// GET /api/coude/{guild_id}/players/{user_id}
-    /// Returns None on 404.
+    /// gRPC `CoudePlayerService.GetPlayer` (Phase 7A — hot path).
+    /// Renvoie `Ok(None)` si l'API repond `NotFound`.
     pub async fn get_player(
         &self,
         guild_id: &str,
         user_id: &str,
     ) -> Result<Option<Player>, String> {
-        let path = format!("/api/coude/{guild_id}/players/{user_id}");
-        let resp = self
-            .base
-            .auth(
-                self.base
-                    .client()
-                    .get(format!("{}{}", self.base.base_url(), path)),
-            )
-            .send()
-            .await
-            .map_err(|e| format!("{e}"))?;
-        if resp.status().as_u16() == 404 {
-            return Ok(None);
+        let req = proto_coude::GetPlayerRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_players();
+        let result = self
+            .grpc
+            .guarded(|| async move {
+                client.get_player(req).await.map(|r| r.into_inner())
+            })
+            .await;
+        match result {
+            Ok(p) => Ok(Some(proto_player_to_dto(p))),
+            Err(GrpcCallError::Status(s)) if s.code() == tonic::Code::NotFound => Ok(None),
+            Err(e) => Err(grpc_err_to_string(e)),
         }
-        if !resp.status().is_success() {
-            return Err(format!("API error {}", resp.status()));
-        }
-        resp.json::<Option<Player>>()
-            .await
-            .map_err(|e| format!("{e}"))
     }
 
-    /// PATCH /api/coude/{guild_id}/players/{user_id}/class
+    /// gRPC `CoudePlayerService.UpdatePlayerClass` (Phase 7A).
     pub async fn update_player_class(
         &self,
         guild_id: &str,
         user_id: &str,
         class: &str,
     ) -> Result<(), String> {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/coude/{guild_id}/players/{user_id}/class"),
-                &serde_json::json!({ "class": class }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::UpdatePlayerClassRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            class: class.to_string(),
+        };
+        let mut client = self.grpc.coude_players();
+        self.grpc
+            .guarded(|| async move {
+                client.update_player_class(req).await.map(|_| ())
+            })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// POST /api/coude/{guild_id}/players/{user_id}/xp
+    /// gRPC `CoudePlayerService.AddXp` (Phase 7A — hot path).
     /// Returns (new_xp, new_level, leveled_up, stat_points_gained).
     pub async fn add_xp(
         &self,
@@ -317,14 +330,18 @@ impl ApiClient {
         user_id: &str,
         amount: i64,
     ) -> Result<(i64, i32, bool, i32), String> {
-        let res: XpResult = self
-            .base
-            .post_json(
-                &format!("/api/coude/{guild_id}/players/{user_id}/xp"),
-                &serde_json::json!({ "amount": amount }),
-            )
-            .await?;
-        Ok((res.new_xp, res.new_level, res.leveled_up, res.stat_points_gained))
+        let req = proto_coude::AddXpRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            amount,
+        };
+        let mut client = self.grpc.coude_players();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.add_xp(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok((r.new_xp, r.new_level, r.leveled_up, r.stat_points_gained))
     }
 
     /// POST /api/coude/{guild_id}/players/{user_id}/spend-stat
@@ -1259,20 +1276,25 @@ impl ApiClient {
 
     // ── Coins (backwards compat helpers) ──
 
-    /// PATCH /api/coude/players/{guild_id}/{user_id}/coins then GET to return updated player.
+    /// gRPC `CoudePlayerService.AdjustCoins` (Phase 7A — hot path).
+    /// Comme l'ancien endpoint HTTP n'etait pas idempotent et ne renvoyait
+    /// pas le joueur, on appelle GetOrCreate apres pour rester source-compat.
     pub async fn update_player_coins(
         &self,
         guild_id: &str,
         user_id: &str,
         delta: i64,
     ) -> Result<Player, String> {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/coude/players/{guild_id}/{user_id}/coins"),
-                &serde_json::json!({ "amount": delta }),
-            )
-            .await;
-        // Fetch the updated player to return it (matching db.rs signature).
+        let req = proto_coude::AdjustCoinsRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            delta,
+        };
+        let mut client = self.grpc.coude_players();
+        self.grpc
+            .guarded(|| async move { client.adjust_coins(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)?;
         self.get_or_create_player(guild_id, user_id, "").await
     }
 
@@ -1299,6 +1321,7 @@ impl ApiClient {
 
     // ── HP ──
 
+    /// gRPC `CoudePlayerService.UpdateHp` (Phase 7A).
     pub async fn update_hp(
         &self,
         guild_id: &str,
@@ -1306,13 +1329,17 @@ impl ApiClient {
         hp_current: i32,
         hp_max: i32,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/players/{user_id}/hp"),
-                &serde_json::json!({ "hp_current": hp_current, "hp_max": hp_max }),
-            )
-            .await;
-        Ok(())
+        let req = proto_coude::UpdateHpRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            hp_current,
+            hp_max,
+        };
+        let mut client = self.grpc.coude_players();
+        self.grpc
+            .guarded(|| async move { client.update_hp(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     pub async fn repos(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
@@ -1323,5 +1350,49 @@ impl ApiClient {
             )
             .await;
         Ok(())
+    }
+}
+
+// ── Helpers proto -> DTO local ──
+
+fn proto_player_to_dto(p: proto_coude::CoudePlayer) -> Player {
+    Player {
+        guild_id: p.guild_id,
+        user_id: p.user_id,
+        username: p.username,
+        coins: p.coins,
+        total_wins: p.total_wins,
+        total_losses: p.total_losses,
+        total_draws: p.total_draws,
+        total_earned: p.total_earned,
+        total_lost: p.total_lost,
+        total_stolen: p.total_stolen,
+        cowardice_count: p.cowardice_count,
+        chaos_events: p.chaos_events,
+        casino_wins: p.casino_wins,
+        casino_losses: p.casino_losses,
+        level: p.level,
+        xp: p.xp,
+        stat_points: p.stat_points,
+        atk: p.atk,
+        def: p.def,
+        class: p.class,
+        title: p.title,
+        class_changed_at: None,
+        hp_current: Some(p.hp_current),
+        hp_max: Some(p.hp_max),
+        hp_last_regen: None,
+        repos_last_used: None,
+        season: Some(p.season),
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+    }
+}
+
+fn grpc_err_to_string(e: GrpcCallError) -> String {
+    match e {
+        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
+        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
     }
 }

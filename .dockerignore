@@ -1,0 +1,60 @@
+# Phase 7A — .dockerignore racine pour drastiquement reduire le contexte de
+# build (sans ce fichier, ~545 MB de target/ locaux sont copies a chaque build).
+
+# Rust
+target/
+**/target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Node / desktop
+node_modules/
+**/node_modules/
+dist/
+**/dist/
+.next/
+**/.next/
+.svelte-kit/
+**/.svelte-kit/
+
+# Tauri
+apps/desktop/src-tauri/target/
+apps/desktop/.tauri/
+
+# Git / IDE
+.git/
+.gitignore
+.github/
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Docs / tests artifacts (pas necessaires aux builds)
+docs/
+*.md
+!**/Cargo.toml
+test-results/
+coverage/
+*.log
+
+# Env (jamais dans une image)
+.env
+.env.local
+.env.*.local
+
+# AI artifacts (montes en volume au runtime)
+ai/training/
+ai/data/
+
+# Docker meta
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile
+**/Dockerfile
+
+# Memory tools
+memory/

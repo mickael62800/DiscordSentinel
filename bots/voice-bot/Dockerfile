@@ -1,13 +1,23 @@
-FROM rust:1.88-alpine AS builder
-RUN apk add --no-cache musl-dev pkgconf openssl-dev openssl-libs-static
+# Phase 7A optimisations — cargo-chef + BuildKit cache mounts.
+# Le workspace racine permet un builder partage : deps compilees une fois et
+# cachees entre builds via --mount=type=cache. Rebuild apres modif source ~30s.
+FROM lukemathwalker/cargo-chef:latest-rust-alpine AS chef
+RUN apk add --no-cache     musl-dev pkgconf openssl-dev openssl-libs-static     protoc protobuf-dev     make g++ linux-headers
 WORKDIR /app
-COPY bots/shared /app/bots/shared
-COPY bots/voice-bot/Cargo.toml bots/voice-bot/Cargo.lock* /app/bots/voice-bot/
-RUN mkdir -p bots/voice-bot/src && echo "fn main() {}" > bots/voice-bot/src/main.rs && cd bots/voice-bot && cargo build --release && rm -rf src
-COPY bots/voice-bot/src /app/bots/voice-bot/src
-RUN cd bots/voice-bot && touch src/main.rs && cargo build --release
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+# Cook des dependances uniquement (couche cacheable)
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo chef cook --release --recipe-path recipe.json --bin voice-bot
+# Build reel
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo build --release --bin voice-bot &&     cp target/release/voice-bot /tmp/voice-bot
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /app/bots/voice-bot/target/release/voice-bot /usr/local/bin/voice-bot
+COPY --from=builder /tmp/voice-bot /usr/local/bin/voice-bot
 ENTRYPOINT ["voice-bot"]

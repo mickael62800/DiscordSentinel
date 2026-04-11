@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package sentinel.images.v1;
+
+// Service images : analyse NSFW / produits illicites via inference ONNX.
+//
+// Avantage gRPC majeur : `bytes image_data` envoie l'image en binaire pur,
+// **pas besoin d'encoder en base64** (gain ~33% sur la taille du payload
+// vs l'ancien JSON HTTP). Pour des images de quelques centaines de Ko, la
+// difference est significative sur des serveurs a fort trafic d'images.
+service ImagesService {
+  rpc AnalyzeImage(AnalyzeImageRequest) returns (AnalyzeImageResponse);
+}
+
+message AnalyzeImageRequest {
+  string guild_id = 1;
+  string channel_id = 2;
+  string user_id = 3;
+  string username = 4;
+  string message_id = 5;
+  // Bytes natifs de l'image (PNG/JPG/WEBP/GIF/BMP). Pas de base64.
+  bytes image_data = 6;
+  string content_type = 7;
+  string filename = 8;
+}
+
+// Action a appliquer cote bot. Identique a `Action` du domain.
+enum Action {
+  ACTION_NONE = 0;
+  ACTION_WARN = 1;
+  ACTION_DELETE = 2;
+  ACTION_MUTE = 3;
+  ACTION_BAN = 4;
+}
+
+message Classification {
+  string label = 1;
+  float confidence = 2;
+}
+
+message AnalyzeImageResponse {
+  Action action = 1;
+  string reason = 2;
+  double score = 3;
+  optional uint64 duration = 4;
+  repeated Classification classifications = 5;
+}

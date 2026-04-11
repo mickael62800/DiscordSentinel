@@ -1,0 +1,106 @@
+[workspace]
+resolver = "2"
+members = [
+    # Partagé
+    "services/proto",
+    "bots/shared",
+
+    # Backend
+    "services/api",
+    "services/gateway",
+
+    # Workers
+    "services/workers/worker-common",
+    "services/workers/ai-worker",
+    "services/workers/analytics-worker",
+    "services/workers/appeal-sla-worker",
+    "services/workers/audit-cache-worker",
+    "services/workers/blackjack-cleanup-worker",
+    "services/workers/cache-worker",
+    "services/workers/cleanup-worker",
+    "services/workers/coude-worker",
+    "services/workers/discord-audit-sync-worker",
+    "services/workers/export-worker",
+    "services/workers/moderation-worker",
+    "services/workers/monitoring-worker",
+    "services/workers/temp-roles-worker",
+
+    # Bots Discord
+    "bots/audit-bot",
+    "bots/automod-bot",
+    "bots/blackjack-bot",
+    "bots/cleanup-bot",
+    "bots/community-bot",
+    "bots/coude-bot",
+    "bots/game-bot",
+    "bots/image-bot",
+    "bots/moderation-bot",
+    "bots/progression-bot",
+    "bots/roles-bot",
+    "bots/security-bot",
+    "bots/ticket-bot",
+    "bots/voice-bot",
+    "bots/welcome-bot",
+
+    # Desktop
+    "apps/desktop/src-tauri",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+# ── Dependencies partagées par tous les crates ──
+#
+# Les crates membres doivent maintenant déclarer :
+#   tokio = { workspace = true }
+#   serde = { workspace = true }
+#   ...
+#
+# Les deps spécifiques (jemalloc target-gated, ort, sqlx, dioxus, etc.)
+# restent inline dans chaque Cargo.toml de crate.
+[workspace.dependencies]
+# Async / runtime
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+async-trait = "0.1"
+futures-util = "0.3"
+
+# Sérialisation
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+prost = "0.13"
+
+# Observabilité
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Utils communs
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+dashmap = "6"
+dotenvy = "0.15"
+rand = "0.8"
+
+# HTTP / réseau
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+# gRPC (Phase 7A)
+tonic = { version = "0.12", features = ["transport", "codegen", "prost", "gzip"] }
+
+# Discord
+serenity = { version = "0.12", default-features = false, features = ["client", "gateway", "model", "cache", "rustls_backend"] }
+
+# Redis
+redis = { version = "0.27", features = ["tokio-comp", "aio", "streams"] }
+
+# Internes (paths)
+sentinel-proto = { path = "services/proto" }
+sentinel-shared = { path = "bots/shared" }
+
+# ── Profil release partagé (Phase 1 quick wins) ──
+[profile.release]
+lto = "fat"
+codegen-units = 1
+strip = true
+# panic = "unwind" (défaut) pour isoler les paniques par task tokio

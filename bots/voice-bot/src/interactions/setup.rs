@@ -309,7 +309,7 @@ async fn handle_open(ctx: &Context, component: &ComponentInteraction) {
     {
         let data = ctx.data.read().await;
         let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone());
+        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
         if let Err(e) = api.create_channel(&request).await {
             error!(error = %e, "Erreur enregistrement API du salon");
         }

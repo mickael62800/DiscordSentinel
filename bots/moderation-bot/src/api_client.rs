@@ -1,6 +1,11 @@
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
+
+use sentinel_proto::moderation::v1 as proto_mod;
 
 /// Action de moderation envoyee au backend.
 #[derive(Debug, Serialize)]
@@ -111,26 +116,107 @@ pub struct SanctionReminder {
     pub created_at: String,
 }
 
-/// Client API specifique a la moderation. Delegue les appels generiques au BaseApiClient.
+/// Client API de la moderation.
+///
+/// Phase 7A — Migration gRPC partielle :
+/// - `log_action` (hot path : chaque ban/mute/warn) -> `ModerationService.LogAction`
+/// - `get_history` (consultation frequente) -> `ModerationService.GetHistory`
+/// - tout le reste reste HTTP via `BaseApiClient` : evidence, review queue,
+///   modstats, reminders, notes, bot config, pending actions. Ces endpoints
+///   utilisent des repos directs cote API et ne sont pas exposes par le
+///   `ManageModerationUseCase` v1 — ils seront migres dans une iteration
+///   ulterieure quand le domaine sera consolide.
+///
+/// ## Comportement si l'API tombe
+///
+/// - `log_action` (gRPC) : circuit breaker apres 5 echecs, ouvert 10s. Une
+///   sanction ratee est loggee en erreur — elle reste appliquee cote Discord
+///   (le ban/mute a deja eu lieu via Serenity), seul le log backend est
+///   manquant. Le moderateur est notifie via le retour Err.
+/// - `get_history` (gRPC) : retourne `Err("API indisponible...")`, la
+///   commande slash repond a l'utilisateur clairement.
+/// - Endpoints HTTP (evidence, review, etc.) : comportement inchange,
+///   `BaseApiClient` retry une fois puis remonte l'erreur.
 pub struct ApiClient {
     base: BaseApiClient,
+    grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: BaseApiClient) -> Self {
-        Self { base }
+    pub fn new(base: BaseApiClient, grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { base, grpc }
     }
 
-    /// Enregistre une action de moderation dans le backend.
-    pub async fn log_action(&self, action: &ModerationAction) -> Result<ModerationActionResponse, String> {
-        self.base.post_json("/api/moderation/actions", action).await
-    }
-
-    /// Recupere l'historique des sanctions d'un utilisateur.
-    pub async fn get_history(&self, guild_id: &str, user_id: &str) -> Result<UserHistory, String> {
-        self.base
-            .get_json(&format!("/api/moderation/history/{}/{}", guild_id, user_id))
+    /// Enregistre une action de moderation dans le backend (gRPC).
+    pub async fn log_action(
+        &self,
+        action: &ModerationAction,
+    ) -> Result<ModerationActionResponse, String> {
+        let req = proto_mod::LogActionRequest {
+            guild_id: action.guild_id.clone(),
+            channel_id: action.channel_id.clone(),
+            moderator_id: action.moderator_id.clone(),
+            moderator_name: action.moderator_name.clone(),
+            target_id: action.target_id.clone(),
+            target_name: action.target_name.clone(),
+            action_type: action.action_type.clone(),
+            reason: action.reason.clone(),
+            gravity: action.gravity.clone(),
+            duration: action.duration,
+        };
+        let mut client = self.grpc.moderation();
+        let resp = self
+            .grpc
+            .guarded(|| async move { client.log_action(req).await.map(|r| r.into_inner()) })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(ModerationActionResponse {
+            id: resp.id,
+            action_type: resp.action_type,
+            target_name: resp.target_name,
+            reason: resp.reason,
+            // Champs d'escalation : pas exposes par le proto v1, le serveur
+            // peut les renvoyer dans le champ reason ou via une RPC dediee
+            // ulterieurement. Pour l'instant on renvoie None — l'auto-escalade
+            // visible cote bot est gardee dans une iteration future.
+            escalation_action: None,
+            escalation_duration: None,
+            strikes_count: None,
+        })
+    }
+
+    /// Recupere l'historique des sanctions d'un utilisateur (gRPC).
+    pub async fn get_history(&self, guild_id: &str, user_id: &str) -> Result<UserHistory, String> {
+        let req = proto_mod::GetHistoryRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.moderation();
+        let history = self
+            .grpc
+            .guarded(|| async move { client.get_history(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(UserHistory {
+            target_id: history.target_id,
+            target_name: history.target_name,
+            total_warns: history.total_warns,
+            total_mutes: history.total_mutes,
+            total_bans: history.total_bans,
+            actions: history
+                .actions
+                .into_iter()
+                .map(|a| ModerationActionResponse {
+                    id: a.id,
+                    action_type: a.action_type,
+                    target_name: a.target_name,
+                    reason: a.reason,
+                    escalation_action: None,
+                    escalation_duration: None,
+                    strikes_count: None,
+                })
+                .collect(),
+        })
     }
 
     /// MOD #1 — Liste les sanctions temporaires actives (reminders pending) d'une guild.
@@ -301,5 +387,13 @@ impl ApiClient {
                 }),
             )
             .await;
+    }
+}
+
+fn grpc_err_to_string(e: GrpcCallError) -> String {
+    match e {
+        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
+        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
     }
 }

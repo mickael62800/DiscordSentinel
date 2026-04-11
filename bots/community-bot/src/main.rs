@@ -20,6 +20,7 @@ use tracing::info;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
@@ -41,7 +42,14 @@ async fn main() {
 
     let config = Config::from_env("COMMUNITY_DISCORD_TOKEN");
     let base_api = Arc::new(BaseApiClient::new(&config, "community-bot"));
-    let roles_api = ApiClient::new(base_api.clone());
+
+    // Phase 7A — gRPC interne (RolePanelsService).
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => panic!("SentinelGrpcClient: {e}"),
+    };
+
+    let roles_api = ApiClient::new(base_api.clone(), Arc::clone(&grpc));
 
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS
@@ -56,6 +64,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(base_api.clone());
+        data.insert::<GrpcClientKey>(Arc::clone(&grpc));
         data.insert::<RolesApiKey>(roles_api);
         data.insert::<TempRoleKey>(TempRoleTracker::new());
         data.insert::<SponsorshipKey>(SponsorshipTracker::new());

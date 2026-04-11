@@ -1,9 +1,38 @@
+//! Client API du ticket-bot.
+//!
+//! Phase 7A — Migration gRPC :
+//! - Tout le domaine `tickets` (list, get, create, reply, close, status, assign,
+//!   channels) passe par gRPC via `SentinelGrpcClient::tickets()`.
+//! - `update_ticket_priority` et `update_ticket_sla` restent sur HTTP : ils
+//!   utilisent un endpoint flexible (`PATCH /api/tickets/{id}/status` avec
+//!   `{priority}`) ou un handler ad hoc (`/sla`) qui n'a pas de RPC dedie en v1.
+//!
+//! Surface publique inchangee : `handler.rs` et `commands/*` continuent
+//! d'appeler les memes methodes.
+//!
+//! ## Comportement si l'API tombe
+//!
+//! Tous les appels gRPC passent par `SentinelGrpcClient::guarded()` :
+//! - Apres 5 echecs consecutifs (`Unavailable`/`DeadlineExceeded`/`Internal`),
+//!   le circuit breaker s'ouvre 10s et les appels suivants renvoient
+//!   immediatement `Err("API indisponible...")`.
+//! - `list_tickets` : la boucle de check_escalations (toutes les 5 min) saute
+//!   simplement le tour — pas d'escalade pendant la panne, repart au tour
+//!   suivant quand l'API revient.
+//! - `create_ticket` / `reply_ticket` : la commande slash repond a
+//!   l'utilisateur « API indisponible, reessayez ». Pas de message perdu
+//!   silencieusement.
+//! - `close_ticket` / `update_status` / `assign_ticket` : idem.
+
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
-// ── Tickets ──
+use sentinel_proto::tickets::v1 as proto;
+
+// ── DTOs publics (surface inchangee) ──
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -62,49 +91,85 @@ pub struct CreateTicketRequest {
     pub channel_id: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
-struct ReplyPayload {
-    content: String,
-    author_name: String,
-    author_role: String,
-}
-
-#[derive(Debug, Serialize)]
-#[allow(dead_code)]
-struct AssignPayload {
-    assignee: String,
-}
-
-#[derive(Debug, Serialize)]
-struct UpdateTicketChannelPayload {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    voice_channel_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    invited_user_id: Option<String>,
-}
-
 // ── Client ──
 
 pub struct ApiClient {
     pub base: Arc<BaseApiClient>,
+    grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>) -> Self {
-        Self { base }
+    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { base, grpc }
+    }
+
+    /// Helper : construit un `ApiClient` depuis le TypeMap Serenity. Renvoie
+    /// `None` si le `BaseApiClient` ou le `SentinelGrpcClient` ne sont pas
+    /// presents (ne devrait pas arriver en pratique : main.rs les insere
+    /// tous deux au demarrage).
+    #[allow(dead_code)]
+    pub fn from_data(data: &serenity::prelude::TypeMap) -> Option<Self> {
+        let base = data
+            .get::<sentinel_shared::heartbeat::ApiClientKey>()?
+            .clone();
+        let grpc = data
+            .get::<sentinel_shared::grpc_client::GrpcClientKey>()?
+            .clone();
+        Some(Self::new(base, grpc))
     }
 
     pub async fn list_tickets(&self) -> Result<Vec<Ticket>, String> {
-        self.base.get_json("/api/tickets").await
+        let req = proto::ListTicketsRequest {
+            status: None,
+            priority: None,
+            search: None,
+            author_id: None,
+            limit: 200,
+            offset: 0,
+        };
+        let mut client = self.grpc.tickets();
+        let list = self
+            .grpc
+            .guarded(|| async move { client.list_tickets(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list.tickets.into_iter().map(proto_ticket_to_dto).collect())
     }
 
     pub async fn create_ticket(&self, request: &CreateTicketRequest) -> Result<Ticket, String> {
-        self.base.post_json("/api/tickets", request).await
+        let req = proto::CreateTicketRequest {
+            title: request.title.clone(),
+            priority: request.priority.clone(),
+            author_id: request.author_id.clone(),
+            author_name: request.author_name.clone(),
+            server: request.server.clone(),
+            category: request.category.clone(),
+            ticket_type: request.ticket_type.clone(),
+            channel_id: request.channel_id.clone(),
+        };
+        let mut client = self.grpc.tickets();
+        let t = self
+            .grpc
+            .guarded(|| async move { client.create_ticket(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(proto_ticket_to_dto(t))
     }
 
     #[allow(dead_code)]
     pub async fn get_ticket(&self, id: &str) -> Result<TicketDetail, String> {
-        self.base.get_json(&format!("/api/tickets/{id}")).await
+        let req = proto::GetTicketDetailRequest {
+            id: id.to_string(),
+        };
+        let mut client = self.grpc.tickets();
+        let detail = self
+            .grpc
+            .guarded(|| async move {
+                client.get_ticket_detail(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(proto_ticket_detail_to_dto(detail))
     }
 
     pub async fn reply_ticket(
@@ -114,81 +179,81 @@ impl ApiClient {
         author_name: &str,
         author_role: &str,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/tickets/{ticket_id}/messages"),
-                &ReplyPayload {
-                    content: content.to_string(),
-                    author_name: author_name.to_string(),
-                    author_role: author_role.to_string(),
-                },
-            )
-            .await;
-        Ok(())
+        let req = proto::ReplyTicketRequest {
+            ticket_id: ticket_id.to_string(),
+            content: content.to_string(),
+            author_name: author_name.to_string(),
+            author_role: author_role.to_string(),
+        };
+        let mut client = self.grpc.tickets();
+        self.grpc
+            .guarded(|| async move { client.reply_ticket(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     #[allow(dead_code)]
     pub async fn update_status(&self, id: &str, status: &str) -> Result<(), String> {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/tickets/{id}/status"),
-                &serde_json::json!({ "status": status }),
-            )
-            .await;
-        Ok(())
+        let req = proto::UpdateStatusRequest {
+            id: id.to_string(),
+            status: status.to_string(),
+        };
+        let mut client = self.grpc.tickets();
+        self.grpc
+            .guarded(|| async move { client.update_status(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     pub async fn close_ticket(&self, id: &str) -> Result<(), String> {
-        // PATCH without body
-        let req = self.base.client().patch(format!(
-            "{}/api/tickets/{id}/close",
-            self.base.base_url()
-        ));
-        self.base
-            .auth(req)
-            .send()
+        let req = proto::CloseTicketRequest {
+            id: id.to_string(),
+        };
+        let mut client = self.grpc.tickets();
+        self.grpc
+            .guarded(|| async move { client.close_ticket(req).await.map(|_| ()) })
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-        Ok(())
+            .map_err(grpc_err_to_string)
     }
 
     #[allow(dead_code)]
     pub async fn assign_ticket(&self, id: &str, assignee: &str) -> Result<(), String> {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/tickets/{id}/assign"),
-                &AssignPayload {
-                    assignee: assignee.to_string(),
-                },
-            )
-            .await;
-        Ok(())
+        let req = proto::AssignTicketRequest {
+            ticket_id: id.to_string(),
+            assignee: assignee.to_string(),
+        };
+        let mut client = self.grpc.tickets();
+        self.grpc
+            .guarded(|| async move { client.assign_ticket(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    /// Met a jour les donnees SLA d'un ticket (fire-and-forget).
-    pub async fn update_ticket_sla(
+    pub async fn update_ticket_channel(
         &self,
         id: &str,
-        first_response_at: Option<&str>,
-        resolved_at: Option<&str>,
-        satisfaction_rating: Option<u8>,
-    ) {
-        let mut body = serde_json::Map::new();
-        if let Some(fr) = first_response_at {
-            body.insert("first_response_at".to_string(), serde_json::Value::String(fr.to_string()));
-        }
-        if let Some(ra) = resolved_at {
-            body.insert("resolved_at".to_string(), serde_json::Value::String(ra.to_string()));
-        }
-        if let Some(rating) = satisfaction_rating {
-            body.insert("satisfaction_rating".to_string(), serde_json::Value::Number(rating.into()));
-        }
-
-        self.base
-            .patch_fire_and_forget(&format!("/api/tickets/{id}/sla"), &body)
-            .await;
+        voice_channel_id: Option<String>,
+        invited_user_id: Option<String>,
+    ) -> Result<(), String> {
+        let req = proto::UpdateTicketChannelRequest {
+            ticket_id: id.to_string(),
+            voice_channel_id,
+            invited_user_id,
+        };
+        let mut client = self.grpc.tickets();
+        self.grpc
+            .guarded(|| async move {
+                client.update_ticket_channel(req).await.map(|_| ())
+            })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
+    // ── HTTP retenu (pas dans le proto v1) ──
+
+    /// Met a jour la priorite — l'API expose ca via le meme endpoint
+    /// `/api/tickets/{id}/status` avec un payload `{priority}`. Pas d'RPC
+    /// dedie en v1, on garde le HTTP fire-and-forget existant.
     pub async fn update_ticket_priority(&self, id: &str, priority: &str) -> Result<(), String> {
         self.base
             .patch_fire_and_forget(
@@ -199,21 +264,115 @@ impl ApiClient {
         Ok(())
     }
 
-    pub async fn update_ticket_channel(
+    /// Met a jour les donnees SLA d'un ticket. Handler API ad hoc, pas de
+    /// use-case unifie -> reste sur HTTP fire-and-forget pour l'instant.
+    pub async fn update_ticket_sla(
         &self,
         id: &str,
-        voice_channel_id: Option<String>,
-        invited_user_id: Option<String>,
-    ) -> Result<(), String> {
+        first_response_at: Option<&str>,
+        resolved_at: Option<&str>,
+        satisfaction_rating: Option<u8>,
+    ) {
+        let mut body = serde_json::Map::new();
+        if let Some(fr) = first_response_at {
+            body.insert(
+                "first_response_at".to_string(),
+                serde_json::Value::String(fr.to_string()),
+            );
+        }
+        if let Some(ra) = resolved_at {
+            body.insert(
+                "resolved_at".to_string(),
+                serde_json::Value::String(ra.to_string()),
+            );
+        }
+        if let Some(rating) = satisfaction_rating {
+            body.insert(
+                "satisfaction_rating".to_string(),
+                serde_json::Value::Number(rating.into()),
+            );
+        }
         self.base
-            .patch_fire_and_forget(
-                &format!("/api/tickets/{id}/channels"),
-                &UpdateTicketChannelPayload {
-                    voice_channel_id,
-                    invited_user_id,
-                },
-            )
+            .patch_fire_and_forget(&format!("/api/tickets/{id}/sla"), &body)
             .await;
-        Ok(())
+    }
+}
+
+// ── Helpers proto -> DTO ──
+
+fn proto_ticket_to_dto(t: proto::Ticket) -> Ticket {
+    Ticket {
+        id: t.id,
+        title: t.title,
+        status: t.status,
+        priority: t.priority,
+        author_id: t.author_id,
+        author_name: t.author_name,
+        assigned_to: t.assigned_to,
+        server: t.server,
+        category: t.category,
+        ticket_type: Some(t.ticket_type),
+        channel_id: t.channel_id,
+        voice_channel_id: t.voice_channel_id,
+        invited_user_id: t.invited_user_id,
+        created_at: t.created_at,
+        updated_at: t.updated_at,
+        messages_count: t.messages_count,
+        first_response_at: None,
+        resolved_at: None,
+        satisfaction_rating: None,
+    }
+}
+
+fn proto_ticket_message_to_dto(m: proto::TicketMessage) -> TicketMessage {
+    TicketMessage {
+        id: m.id,
+        ticket_id: m.ticket_id,
+        author_name: m.author_name,
+        author_role: m.author_role,
+        content: m.content,
+        created_at: m.created_at,
+    }
+}
+
+fn proto_ticket_detail_to_dto(d: proto::TicketDetail) -> TicketDetail {
+    TicketDetail {
+        ticket: d
+            .ticket
+            .map(proto_ticket_to_dto)
+            .unwrap_or_else(|| empty_ticket()),
+        messages: d.messages.into_iter().map(proto_ticket_message_to_dto).collect(),
+    }
+}
+
+fn empty_ticket() -> Ticket {
+    Ticket {
+        id: String::new(),
+        title: String::new(),
+        status: String::new(),
+        priority: String::new(),
+        author_id: String::new(),
+        author_name: String::new(),
+        assigned_to: None,
+        server: String::new(),
+        category: String::new(),
+        ticket_type: None,
+        channel_id: None,
+        voice_channel_id: None,
+        invited_user_id: None,
+        created_at: String::new(),
+        updated_at: String::new(),
+        messages_count: 0,
+        first_response_at: None,
+        resolved_at: None,
+        satisfaction_rating: None,
+    }
+}
+
+fn grpc_err_to_string(e: GrpcCallError) -> String {
+    match e {
+        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
+        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
     }
 }

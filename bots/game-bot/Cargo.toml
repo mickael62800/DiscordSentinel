@@ -5,15 +5,15 @@ edition = "2021"
 description = "Bot Discord de gestion des jeux — inscription et notification par #NomDuJeu"
 
 [dependencies]
-sentinel-shared = { path = "../shared" }
-serenity = { version = "0.12", default-features = false, features = ["client", "gateway", "model", "cache", "rustls_backend"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-dotenvy = "0.15"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+sentinel-shared = { workspace = true }
+serenity = { workspace = true }
+tokio = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+dotenvy = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 regex = "1"
 
 # Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS uniquement,
@@ -21,15 +21,3 @@ regex = "1"
 # processus long-running grace a une meilleure gestion de la fragmentation.
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
-
-# Phase 1 — Quick wins : profil release optimise pour la production.
-# - lto = "fat" : optimisation cross-crate complete (-10 % binaire, -5/10 % CPU)
-# - codegen-units = 1 : permet a LTO d'etre maximalement efficace
-# - strip = true : retire les symboles de debug du binaire final
-#
-# On garde panic = "unwind" (defaut) pour isoler les paniques par tache tokio
-# et eviter qu'une seule tache panique fasse crasher tout le process.
-[profile.release]
-lto = "fat"
-codegen-units = 1
-strip = true

@@ -21,6 +21,7 @@ use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
@@ -42,6 +43,12 @@ async fn main() {
 
     let api = Arc::new(BaseApiClient::new(&config, "ticket-bot"));
 
+    // Phase 7A — gRPC interne (TicketsService).
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => panic!("SentinelGrpcClient: {e}"),
+    };
+
     let intents = GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
         | GatewayIntents::GUILDS;
@@ -55,6 +62,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(api.clone());
+        data.insert::<GrpcClientKey>(grpc.clone());
         data.insert::<config::ConfigKey>(config.clone());
         data.insert::<SlaTrackerKey>(SlaTracker::new());
     }
@@ -65,6 +73,7 @@ async fn main() {
     let data_for_escalation = Arc::clone(&client.data);
     let http_for_escalation = Arc::clone(&client.http);
     let api_for_escalation = Arc::clone(&api);
+    let grpc_for_escalation = Arc::clone(&grpc);
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
@@ -72,6 +81,7 @@ async fn main() {
                 &data_for_escalation,
                 &http_for_escalation,
                 &api_for_escalation,
+                &grpc_for_escalation,
             )
             .await;
         }
@@ -87,6 +97,7 @@ async fn check_escalations(
     data: &Arc<RwLock<TypeMap>>,
     http: &Arc<serenity::http::Http>,
     api: &Arc<BaseApiClient>,
+    grpc: &Arc<SentinelGrpcClient>,
 ) {
     let data_lock = data.read().await;
     let sla_tracker = match data_lock.get::<SlaTrackerKey>() {
@@ -97,7 +108,7 @@ async fn check_escalations(
     // Nettoyer les tickets orphelins > 48h
     sla_tracker.cleanup_stale();
 
-    let api_client = ApiClient::new(api.clone());
+    let api_client = ApiClient::new(api.clone(), grpc.clone());
     let tickets = match api_client.list_tickets().await {
         Ok(t) => t,
         Err(_) => return,

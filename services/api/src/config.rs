@@ -4,6 +4,9 @@ pub struct AppConfig {
     pub api_key: String,
     pub host: String,
     pub port: u16,
+    /// Phase 7A — port d'ecoute du serveur gRPC interne (tonic).
+    /// Coexiste avec le port HTTP/Axum. Defaut : 50051.
+    pub grpc_port: u16,
     pub rate_limit_per_sec: u64,
     pub max_body_size: usize,
     pub shutdown_timeout_secs: u64,
@@ -43,6 +46,10 @@ impl AppConfig {
                 .unwrap_or_else(|_| "3000".into())
                 .parse()
                 .expect("PORT invalide"),
+            grpc_port: std::env::var("GRPC_PORT")
+                .unwrap_or_else(|_| "50051".into())
+                .parse()
+                .unwrap_or(50051),
             rate_limit_per_sec: std::env::var("RATE_LIMIT_PER_SEC")
                 .unwrap_or_else(|_| "200".into())
                 .parse()
@@ -70,5 +77,9 @@ impl AppConfig {
 
     pub fn bind_addr(&self) -> String {
         format!("{}:{}", self.host, self.port)
+    }
+
+    pub fn grpc_bind_addr(&self) -> String {
+        format!("{}:{}", self.host, self.grpc_port)
     }
 }

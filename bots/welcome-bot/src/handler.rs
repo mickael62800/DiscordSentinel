@@ -39,9 +39,13 @@ impl EventHandler for Handler {
             Some(b) => Arc::clone(b),
             None => return,
         };
+        let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+            Some(g) => Arc::clone(g),
+            None => return,
+        };
         drop(data);
 
-        let api = WelcomeApiClient::new(base.clone());
+        let api = WelcomeApiClient::new(base.clone(), grpc);
         let config = match api.get_config(&guild_id.to_string()).await {
             Ok(c) => c,
             Err(e) => {
@@ -160,9 +164,13 @@ impl EventHandler for Handler {
             Some(b) => Arc::clone(b),
             None => return,
         };
+        let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+            Some(g) => Arc::clone(g),
+            None => return,
+        };
         drop(data);
 
-        let api = WelcomeApiClient::new(base.clone());
+        let api = WelcomeApiClient::new(base.clone(), grpc);
         let config = match api.get_config(&guild_id.to_string()).await {
             Ok(c) => c,
             Err(_) => return,
@@ -246,9 +254,13 @@ async fn handle_rules_accept(
         Some(b) => Arc::clone(b),
         None => return,
     };
+    let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+        Some(g) => Arc::clone(g),
+        None => return,
+    };
     drop(data);
 
-    let api = WelcomeApiClient::new(base);
+    let api = WelcomeApiClient::new(base, grpc);
     let config = match api.get_config(&guild_id.to_string()).await {
         Ok(c) => c,
         Err(_) => return,

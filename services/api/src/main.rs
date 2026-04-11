@@ -77,10 +77,30 @@ async fn main() {
     );
 
     // ── Connexions infrastructure ──
+    //
+    // Phase 7A opt C.1 : compat pgbouncer transaction pooling.
+    //
+    // `.statement_cache_capacity(0)` : pgbouncer en transaction pooling ne
+    //   garantit pas que deux requêtes consécutives arrivent sur la même
+    //   backend connection, donc les prepared statements cachés par sqlx
+    //   (via son cache LRU par défaut) peuvent être invalidés silencieusement
+    //   et cela déclenche `query_wait_timeout` (code 08P01). Désactiver le
+    //   cache résout le problème — coût CPU marginal.
+    //
+    // `.application_name("sentinel-api")` : permet à pgbouncer/postgres de
+    //   tracer les connexions par service (visible dans `pg_stat_activity`).
+    use sqlx::postgres::PgConnectOptions;
+    use std::str::FromStr;
+    let connect_opts = PgConnectOptions::from_str(&config.database_url)
+        .expect("DATABASE_URL invalide")
+        .statement_cache_capacity(0)
+        .application_name("sentinel-api");
     let pg_pool = PgPoolOptions::new()
         .max_connections(20)
-        .acquire_timeout(Duration::from_secs(5))
-        .connect(&config.database_url)
+        .min_connections(2)
+        .acquire_timeout(Duration::from_secs(10))
+        .test_before_acquire(false)
+        .connect_with(connect_opts)
         .await
         .expect("Impossible de se connecter à PostgreSQL");
 
@@ -311,6 +331,22 @@ async fn main() {
     };
 
     let api_log_repo = state.log_repo.clone();
+
+    // Phase 7A — gRPC interne (tonic) en parallele d'Axum.
+    // Coexistence sur 2 ports : HTTP sur PORT, gRPC sur GRPC_PORT.
+    // Les bots sont migres progressivement; HTTP reste actif tant qu'au
+    // moins un consommateur n'est pas migre.
+    {
+        let grpc_state = state.clone();
+        let grpc_addr: std::net::SocketAddr = config
+            .grpc_bind_addr()
+            .parse()
+            .expect("GRPC_PORT/HOST invalide");
+        tokio::spawn(async move {
+            sentinel_api::adapters::inbound::grpc::serve_grpc(grpc_state, grpc_addr).await;
+        });
+    }
+
     let app = router::build(state, config.max_body_size, config.rate_limit_per_sec, &config.allowed_origins);
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr())

@@ -1,0 +1,69 @@
+syntax = "proto3";
+
+package sentinel.members.v1;
+
+// Service partage : gestion des membres Discord (CRUD).
+// Wrappe `ManageMembersUseCase` cote API. Consomme par welcome-bot,
+// security-bot, et a terme par voice-bot et automod-bot.
+service MembersService {
+  rpc GetMember(GetMemberRequest) returns (GetMemberResponse);
+  rpc SyncMembers(SyncMembersRequest) returns (SyncMembersResponse);
+  rpc RegisterMember(RegisterMemberRequest) returns (Empty);
+  rpc RemoveMember(RemoveMemberRequest) returns (Empty);
+  rpc UpdateMember(UpdateMemberRequest) returns (Empty);
+}
+
+message Empty {}
+
+message GetMemberRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+// `member` est absent si l'utilisateur n'existe pas (au lieu de NotFound).
+message GetMemberResponse {
+  optional GuildMember member = 1;
+}
+
+message SyncMembersRequest {
+  string guild_id = 1;
+  repeated GuildMember members = 2;
+}
+
+message SyncMembersResponse {
+  uint64 synced_count = 1;
+}
+
+message RegisterMemberRequest {
+  GuildMember member = 1;
+}
+
+message RemoveMemberRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message UpdateMemberRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  optional string username = 3;
+  optional string display_name = 4;
+  optional string avatar = 5;
+  // JSON encode (le champ roles cote domain est `serde_json::Value`).
+  optional string roles_json = 6;
+}
+
+message GuildMember {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  optional string display_name = 4;
+  optional string avatar = 5;
+  // JSON encode pour rester transparent au domain.
+  string roles_json = 6;
+  // RFC3339, optionnels.
+  optional string joined_at = 7;
+  optional string account_created = 8;
+  bool is_bot = 9;
+  optional string last_seen_at = 10;
+}

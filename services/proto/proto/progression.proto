@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package sentinel.progression.v1;
+
+import "common.proto";
+
+// Service progression : XP, niveaux, leaderboards, recompenses.
+// Wrappe les use-cases ManageLevelsService cote API.
+service ProgressionService {
+  rpc AddXp(AddXpRequest) returns (AddXpResponse);
+  rpc GetUserLevel(GetUserLevelRequest) returns (UserLevel);
+  rpc GetLeaderboard(GetLeaderboardRequest) returns (Leaderboard);
+  rpc GetRewards(GetRewardsRequest) returns (RewardList);
+}
+
+message AddXpRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  int64 amount = 4;
+  sentinel.common.v1.XpSource source = 5;
+}
+
+message AddXpResponse {
+  UserLevel user = 1;
+  bool leveled_up = 2;
+  int32 old_level = 3;
+  optional string reward_role_id = 4;
+  sentinel.common.v1.XpSource source = 5;
+}
+
+message GetUserLevelRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message GetLeaderboardRequest {
+  string guild_id = 1;
+  int64 limit = 2;
+  // Si UNSPECIFIED, retourne le leaderboard total (texte+voice).
+  sentinel.common.v1.XpSource source = 3;
+}
+
+message GetRewardsRequest {
+  string guild_id = 1;
+}
+
+message UserLevel {
+  string id = 1;
+  string guild_id = 2;
+  string user_id = 3;
+  string username = 4;
+  int64 xp = 5;
+  int32 level = 6;
+  int64 xp_current = 7;
+  int64 xp_needed = 8;
+  int64 xp_text = 9;
+  int32 level_text = 10;
+  int64 xp_text_current = 11;
+  int64 xp_text_needed = 12;
+  int64 xp_voice = 13;
+  int32 level_voice = 14;
+  int64 xp_voice_current = 15;
+  int64 xp_voice_needed = 16;
+  // RFC3339
+  string last_xp_at = 17;
+}
+
+message Leaderboard {
+  repeated UserLevel users = 1;
+}
+
+message LevelReward {
+  string id = 1;
+  string guild_id = 2;
+  int32 level = 3;
+  string role_id = 4;
+  sentinel.common.v1.XpSource source = 5;
+}
+
+message RewardList {
+  repeated LevelReward rewards = 1;
+}

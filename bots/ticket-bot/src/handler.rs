@@ -186,7 +186,7 @@ impl EventHandler for Handler {
             Some(client) => client,
             None => return,
         };
-        let api = ApiClient::new(base.clone());
+        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
 
         let author_role = match msg.guild_id {
             Some(guild_id) => {
@@ -317,7 +317,7 @@ async fn close_inactive_tickets(ctx: &Context) {
         Some(b) => b,
         None => return,
     };
-    let api = ApiClient::new(base.clone());
+    let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
 
     let tickets = match api.list_tickets().await {
         Ok(t) => t,
@@ -440,7 +440,7 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
                     // Recuperer le dernier message du ticket depuis l'API
                     let data_lock = ctx.data.read().await;
                     if let Some(base) = data_lock.get::<ApiClientKey>() {
-                        let api = ApiClient::new(base.clone());
+                        let api = ApiClient::new(base.clone(), data_lock.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
                         if let Ok(detail) = api.get_ticket(ticket_id).await {
                             if let Some(last_msg) = detail.messages.last() {
                                 if last_msg.author_role == "moderator" {

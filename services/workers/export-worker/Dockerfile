@@ -1,21 +1,23 @@
-# -- Build stage --
-FROM rust:1.88-alpine AS builder
-
-RUN apk add --no-cache musl-dev pkgconf openssl-dev openssl-libs-static
-
+# Phase 7A optimisations — cargo-chef + BuildKit cache mounts.
+# Le workspace racine permet un builder partage : deps compilees une fois et
+# cachees entre builds via --mount=type=cache. Rebuild apres modif source ~30s.
+FROM lukemathwalker/cargo-chef:latest-rust-alpine AS chef
+RUN apk add --no-cache     musl-dev pkgconf openssl-dev openssl-libs-static     protoc protobuf-dev     make g++ linux-headers
 WORKDIR /app
-COPY services/workers/worker-common /app/services/workers/worker-common
-COPY services/workers/export-worker/Cargo.toml services/workers/export-worker/Cargo.lock* /app/services/workers/export-worker/
-RUN mkdir -p services/workers/export-worker/src && echo "fn main() {}" > services/workers/export-worker/src/main.rs && cd services/workers/export-worker && cargo build --release && rm -rf src
 
-COPY services/workers/export-worker/src /app/services/workers/export-worker/src
-RUN cd services/workers/export-worker && touch src/main.rs && cargo build --release
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-# -- Runtime stage --
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+# Cook des dependances uniquement (couche cacheable)
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo chef cook --release --recipe-path recipe.json --bin sentinel-export-worker
+# Build reel
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo build --release --bin sentinel-export-worker &&     cp target/release/sentinel-export-worker /tmp/sentinel-export-worker
+
 FROM alpine:3.21
-
 RUN apk add --no-cache ca-certificates
-
-COPY --from=builder /app/services/workers/export-worker/target/release/sentinel-export-worker /usr/local/bin/sentinel-export-worker
-
+COPY --from=builder /tmp/sentinel-export-worker /usr/local/bin/sentinel-export-worker
 ENTRYPOINT ["sentinel-export-worker"]

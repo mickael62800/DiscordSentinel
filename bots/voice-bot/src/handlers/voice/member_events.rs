@@ -158,7 +158,7 @@ async fn check_queue_join(
     };
 
     // Chercher dans l'API quel voice channel a ce queue_channel_id
-    let api = crate::api_client::ApiClient::new(Arc::clone(base));
+    let api = crate::api_client::ApiClient::new(Arc::clone(base), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
     let channels = match api.list_channels(&guild_id.to_string()).await {
         Ok(chs) => chs,
         Err(_) => return,

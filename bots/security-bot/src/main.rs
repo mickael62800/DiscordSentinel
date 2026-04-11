@@ -17,6 +17,7 @@ use tracing::info;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
@@ -60,6 +61,12 @@ async fn main() {
 
     let base_api = Arc::new(BaseApiClient::new(&config, "security-bot"));
 
+    // Phase 7A — gRPC interne (SecurityService + MembersService).
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => panic!("SentinelGrpcClient: {e}"),
+    };
+
     let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
         .cache_settings(sentinel_shared::cache_settings::medium())
@@ -69,7 +76,8 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
-        data.insert::<SecurityApiKey>(ApiClient::new(Arc::clone(&base_api)));
+        data.insert::<GrpcClientKey>(Arc::clone(&grpc));
+        data.insert::<SecurityApiKey>(ApiClient::new(Arc::clone(&base_api), Arc::clone(&grpc)));
         data.insert::<RaidDetectorKey>(RaidDetector::new(
             config.raid_join_threshold,
             config.raid_join_window_secs,

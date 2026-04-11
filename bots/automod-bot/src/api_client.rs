@@ -1,12 +1,29 @@
+//! Client API du automod-bot.
+//!
+//! Phase 7A — Migration gRPC complete : `analyze` est le **hot path le plus
+//! chaud du projet** (un appel par message Discord recu sur tous les
+//! serveurs). Le gain perf gRPC est ici maximal.
+//!
+//! ## Comportement si l'API tombe
+//!
+//! Le circuit breaker (5 echecs / 10s) court-circuite immediatement les
+//! appels suivants. Pendant l'ouverture, `analyze` retourne `Err("API
+//! indisponible")` et le bot **n'applique aucune action de moderation**.
+//! Comportement par defaut : laisser passer le message (ne pas faire de
+//! faux positifs basees sur une API down). Cote handler, le timeout
+//! original de 5s est conserve pour ne pas bloquer le bot.
+
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
+
+use sentinel_proto::automod::v1 as proto;
 
 use crate::detectors::DetectionFlags;
 
-/// Payload envoye au backend pour analyse.
 #[derive(Debug, Serialize)]
 pub struct AnalyzeRequest {
     pub guild_id: String,
@@ -16,11 +33,9 @@ pub struct AnalyzeRequest {
     pub content: String,
     pub flags: DetectionFlags,
     pub metadata: MessageMetadata,
-    /// Messages recents du canal pour contextualiser le sentiment.
     pub context_messages: Vec<ContextMessage>,
 }
 
-/// Message de contexte conversationnel (messages precedents dans le canal).
 #[derive(Debug, Serialize)]
 pub struct ContextMessage {
     pub username: String,
@@ -33,7 +48,6 @@ pub struct MessageMetadata {
     pub timestamp: String,
 }
 
-/// Reponse du backend.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct AnalyzeResponse {
@@ -54,43 +68,76 @@ pub enum Action {
     Ban,
 }
 
-/// Client specifique a l'automod-bot, encapsule le BaseApiClient partage.
 pub struct ApiClient {
+    #[allow(dead_code)]
     pub base: Arc<BaseApiClient>,
+    grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>) -> Self {
-        Self { base }
+    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { base, grpc }
     }
 
-    /// Envoie un message au backend pour analyse et retourne l'action a effectuer.
-    /// Timeout de 5 secondes pour eviter de bloquer le bot.
-    /// Note: uses custom timeout, cannot use BaseApiClient helpers.
+    /// gRPC `AutomodService.AnalyzeMessage` (hot path le plus chaud).
     pub async fn analyze(&self, request: &AnalyzeRequest) -> Result<AnalyzeResponse, String> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/analyze", self.base.base_url()))
-            .timeout(std::time::Duration::from_secs(5))
-            .json(request);
-
-        let resp = self.base.auth(req)
-            .send()
+        let req = proto::AnalyzeMessageRequest {
+            guild_id: request.guild_id.clone(),
+            channel_id: request.channel_id.clone(),
+            user_id: request.user_id.clone(),
+            username: request.username.clone(),
+            content: request.content.clone(),
+            flags: Some(proto::DetectionFlags {
+                spam: request.flags.spam,
+                insult: request.flags.insult,
+                link: request.flags.link,
+                phishing: request.flags.phishing,
+            }),
+            message_id: request.metadata.message_id.clone(),
+            timestamp: request.metadata.timestamp.clone(),
+            context_messages: request
+                .context_messages
+                .iter()
+                .map(|m| proto::ContextMessage {
+                    username: m.username.clone(),
+                    content: m.content.clone(),
+                })
+                .collect(),
+        };
+        let mut client = self.grpc.automod();
+        let resp = self
+            .grpc
+            .guarded(|| async move {
+                client.analyze_message(req).await.map(|r| r.into_inner())
+            })
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
+            .map_err(grpc_err_to_string)?;
+        Ok(AnalyzeResponse {
+            action: proto_action_to_action(resp.action),
+            reason: if resp.reason.is_empty() {
+                None
+            } else {
+                Some(resp.reason)
+            },
+            duration: resp.duration,
+        })
+    }
+}
 
-        if !resp.status().is_success() {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_else(|e| {
-                tracing::warn!(error = %e, "Echec lecture body de la reponse API");
-                String::new()
-            });
-            return Err(format!("API error {}: {}", status, body));
-        }
+fn proto_action_to_action(value: i32) -> Action {
+    match proto::Action::try_from(value).unwrap_or(proto::Action::None) {
+        proto::Action::None => Action::None,
+        proto::Action::Warn => Action::Warn,
+        proto::Action::Delete => Action::Delete,
+        proto::Action::Mute => Action::Mute,
+        proto::Action::Ban => Action::Ban,
+    }
+}
 
-        resp.json::<AnalyzeResponse>()
-            .await
-            .map_err(|e| format!("Parse error: {e}"))
+fn grpc_err_to_string(e: GrpcCallError) -> String {
+    match e {
+        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
+        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
     }
 }

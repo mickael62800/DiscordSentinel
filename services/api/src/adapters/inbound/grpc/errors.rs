@@ -1,0 +1,24 @@
+//! Mapping `DomainError` -> `tonic::Status`. Aligne sur les codes HTTP
+//! deja utilises cote Axum (cf. `adapters/inbound/http/errors.rs`).
+
+use tonic::{Code, Status};
+
+use crate::domain::errors::DomainError;
+
+pub fn domain_to_status(err: DomainError) -> Status {
+    let (code, msg) = match &err {
+        DomainError::RuleNotFound(_)
+        | DomainError::InfractionNotFound(_)
+        | DomainError::TicketNotFound(_)
+        | DomainError::NotFound(_) => (Code::NotFound, err.to_string()),
+
+        DomainError::InvalidRule(_) => (Code::InvalidArgument, err.to_string()),
+        DomainError::ValidationError(_) => (Code::InvalidArgument, err.to_string()),
+        DomainError::Conflict(_) => (Code::AlreadyExists, err.to_string()),
+        DomainError::Forbidden(_) => (Code::PermissionDenied, err.to_string()),
+        DomainError::RateLimited(_) => (Code::ResourceExhausted, err.to_string()),
+        DomainError::Timeout(_) => (Code::DeadlineExceeded, err.to_string()),
+        DomainError::Internal(_) => (Code::Internal, err.to_string()),
+    };
+    Status::new(code, msg)
+}

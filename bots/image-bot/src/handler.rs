@@ -230,7 +230,7 @@ async fn process_image_attachment(
     filename: &str,
     guild_id: &str,
 ) {
-    let (base, max_image_size) = {
+    let (base, grpc, max_image_size) = {
         let data = ctx.data.read().await;
         let base = match data.get::<ApiClientKey>() {
             Some(client) => Arc::clone(client),
@@ -239,11 +239,18 @@ async fn process_image_attachment(
                 return;
             }
         };
+        let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+            Some(g) => Arc::clone(g),
+            None => {
+                error!("SentinelGrpcClient introuvable dans le contexte");
+                return;
+            }
+        };
         let max_size = data.get::<MaxImageSizeKey>().copied().unwrap_or(DEFAULT_MAX_IMAGE_SIZE);
-        (base, max_size)
+        (base, grpc, max_size)
     };
 
-    let api_client = ApiClient::new(Arc::clone(&base), max_image_size);
+    let api_client = ApiClient::new(Arc::clone(&base), grpc, max_image_size);
 
     // Telecharger l'image
     let image_bytes = match api_client.download_image(image_url).await {
@@ -276,9 +283,7 @@ async fn process_image_attachment(
         }
     }
 
-    // Encoder en base64
-    use base64::Engine;
-    let image_b64 = base64::engine::general_purpose::STANDARD.encode(&image_bytes);
+    // Phase 7A : plus d'encodage base64 — gRPC envoie les bytes natifs.
 
     // Determiner le content type
     let content_type = detect_content_type(filename, &image_bytes);
@@ -318,7 +323,7 @@ async fn process_image_attachment(
         user_id: msg.author.id.to_string(),
         username: msg.author.name.clone(),
         message_id: msg.id.to_string(),
-        image_data: image_b64,
+        image_data: image_bytes.clone(),
         content_type,
         filename: filename.to_string(),
         confidence_override: Some(confidence_override),

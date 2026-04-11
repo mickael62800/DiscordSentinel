@@ -1,0 +1,80 @@
+syntax = "proto3";
+
+package sentinel.stats.v1;
+
+// Service stats : compteurs messages/vocal, leaderboards, overview serveur.
+// Wrappe le use-case ManageStatsUseCase cote API.
+service StatsService {
+  // Fire-and-forget cote bot : on retourne Empty mais on n'attend pas le
+  // resultat dans les hot paths (message_create, voice_state_update).
+  rpc RecordMessages(RecordMessagesRequest) returns (Empty);
+  rpc RecordVoice(RecordVoiceRequest) returns (Empty);
+
+  rpc GetUserStats(GetUserStatsRequest) returns (GetUserStatsResponse);
+  rpc GetGuildOverview(GetGuildOverviewRequest) returns (GuildOverview);
+  rpc GetLeaderboard(GetLeaderboardRequest) returns (UserStatsList);
+}
+
+message Empty {}
+
+message RecordMessagesRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  uint64 count = 4;
+}
+
+message RecordVoiceRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  uint64 seconds = 4;
+  string channel_id = 5;
+  string channel_name = 6;
+}
+
+message GetUserStatsRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+// `stats` est absent si l'utilisateur n'a pas encore d'entree.
+message GetUserStatsResponse {
+  optional UserStats stats = 1;
+}
+
+message GetGuildOverviewRequest {
+  string guild_id = 1;
+}
+
+message GetLeaderboardRequest {
+  string guild_id = 1;
+  uint32 limit = 2;
+}
+
+message UserStats {
+  string id = 1;
+  string guild_id = 2;
+  string user_id = 3;
+  string username = 4;
+  uint64 message_count = 5;
+  uint64 voice_seconds = 6;
+  // RFC3339
+  string updated_at = 7;
+}
+
+message UserStatsList {
+  repeated UserStats users = 1;
+}
+
+message GuildOverview {
+  string guild_id = 1;
+  uint64 total_messages = 2;
+  uint64 total_voice_seconds = 3;
+  uint64 active_members = 4;
+  uint64 total_infractions = 5;
+  uint64 total_warns = 6;
+  uint64 total_mutes = 7;
+  uint64 total_bans = 8;
+  repeated UserStats top_members = 9;
+}

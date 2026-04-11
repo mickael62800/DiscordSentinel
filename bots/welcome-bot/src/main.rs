@@ -15,6 +15,7 @@ use tracing::info;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::{BotConfig, SimpleConfig};
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::handler::Handler;
@@ -39,6 +40,12 @@ async fn main() {
 
     let base_api = Arc::new(BaseApiClient::new(&config, "welcome-bot"));
 
+    // Phase 7A — gRPC interne (MembersService).
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => panic!("SentinelGrpcClient: {e}"),
+    };
+
     let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .cache_settings(sentinel_shared::cache_settings::minimal())
@@ -48,6 +55,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(base_api.clone());
+        data.insert::<GrpcClientKey>(grpc.clone());
     }
 
     spawn_heartbeat(base_api.clone());

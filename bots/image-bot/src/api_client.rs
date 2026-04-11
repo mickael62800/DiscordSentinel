@@ -1,10 +1,24 @@
+//! Client API du image-bot.
+//!
+//! Phase 7A — Migration gRPC complete :
+//! - `analyze_image` -> `ImagesService.AnalyzeImage` avec **bytes natifs**.
+//!   Plus de base64 (gain ~33% sur la bande passante vs HTTP+JSON pour des
+//!   images de plusieurs centaines de Ko, ce qui est typique en Discord).
+//! - `download_image` reste sur le client HTTP brut (telechargement
+//!   d'attachments Discord externes, pas de l'API Sentinel).
+//!
+//! Surface publique : `image_data` du `AnalyzeImageRequest` est maintenant
+//! `Vec<u8>` au lieu de `String` base64. Le handler ne fait plus l'encodage.
+
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
-/// Payload envoye au backend pour analyse d'image.
+use sentinel_proto::images::v1 as proto;
+
 #[derive(Debug, Serialize)]
 pub struct AnalyzeImageRequest {
     pub guild_id: String,
@@ -12,24 +26,20 @@ pub struct AnalyzeImageRequest {
     pub user_id: String,
     pub username: String,
     pub message_id: String,
-    /// Image encodee en base64
-    pub image_data: String,
-    /// Type MIME de l'image (image/png, image/jpeg, etc.)
+    /// Bytes natifs de l'image — plus de base64.
+    #[serde(skip)]
+    pub image_data: Vec<u8>,
     pub content_type: String,
-    /// Nom du fichier original
     pub filename: String,
-    /// Seuil de confiance override pour ce salon (optionnel)
+    /// Conserves pour compat handler — pas envoyes en proto v1.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub confidence_override: Option<f64>,
-    /// True si l'image est un screenshot (pour OCR cote API)
     #[serde(default)]
     pub is_screenshot: bool,
-    /// True si l'image est un GIF anime
     #[serde(default)]
     pub is_animated: bool,
 }
 
-/// Reponse du backend apres analyse d'image.
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct AnalyzeImageResponse {
@@ -71,16 +81,21 @@ impl Action {
     }
 }
 
-/// Client specifique a l'image-bot, encapsule le BaseApiClient partage.
 pub struct ApiClient {
     pub base: Arc<BaseApiClient>,
+    grpc: Arc<SentinelGrpcClient>,
     max_image_size: u64,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>, max_image_size: u64) -> Self {
+    pub fn new(
+        base: Arc<BaseApiClient>,
+        grpc: Arc<SentinelGrpcClient>,
+        max_image_size: u64,
+    ) -> Self {
         Self {
             base,
+            grpc,
             max_image_size,
         }
     }
@@ -89,24 +104,70 @@ impl ApiClient {
         self.max_image_size
     }
 
-    /// Envoie une image au backend pour analyse (NSFW / produits illicites).
-    /// Note: returns reqwest::Error and uses raw client — cannot use BaseApiClient helpers.
+    /// gRPC `ImagesService.AnalyzeImage`. Bytes natifs, pas de base64.
     pub async fn analyze_image(
         &self,
         request: &AnalyzeImageRequest,
-    ) -> Result<AnalyzeImageResponse, reqwest::Error> {
-        let req = self
-            .base
-            .client()
-            .post(format!("{}/analyze/image", self.base.base_url()))
-            .json(request);
-
-        self.base.auth(req).send().await?.json().await
+    ) -> Result<AnalyzeImageResponse, String> {
+        let req = proto::AnalyzeImageRequest {
+            guild_id: request.guild_id.clone(),
+            channel_id: request.channel_id.clone(),
+            user_id: request.user_id.clone(),
+            username: request.username.clone(),
+            message_id: request.message_id.clone(),
+            image_data: request.image_data.clone(),
+            content_type: request.content_type.clone(),
+            filename: request.filename.clone(),
+        };
+        let mut client = self.grpc.images();
+        let resp = self
+            .grpc
+            .guarded(|| async move {
+                client.analyze_image(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(AnalyzeImageResponse {
+            action: proto_action_to_action(resp.action),
+            reason: if resp.reason.is_empty() {
+                None
+            } else {
+                Some(resp.reason)
+            },
+            duration: resp.duration,
+            classifications: resp
+                .classifications
+                .into_iter()
+                .map(|c| Classification {
+                    label: c.label,
+                    confidence: c.confidence,
+                })
+                .collect(),
+        })
     }
 
-    /// Telecharge une image depuis une URL (attachment Discord).
+    /// Telecharge une image depuis une URL externe (attachment Discord).
+    /// Reste sur HTTP brut — ce n'est pas un appel a l'API Sentinel.
     pub async fn download_image(&self, url: &str) -> Result<Vec<u8>, reqwest::Error> {
         let bytes = self.base.client().get(url).send().await?.bytes().await?;
         Ok(bytes.to_vec())
+    }
+}
+
+fn proto_action_to_action(value: i32) -> Action {
+    match proto::Action::try_from(value).unwrap_or(proto::Action::None) {
+        proto::Action::None => Action::None,
+        proto::Action::Warn => Action::Warn,
+        proto::Action::Delete => Action::Delete,
+        proto::Action::Mute => Action::Mute,
+        proto::Action::Ban => Action::Ban,
+    }
+}
+
+fn grpc_err_to_string(e: GrpcCallError) -> String {
+    match e {
+        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
+        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
     }
 }

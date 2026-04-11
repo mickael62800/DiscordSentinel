@@ -1,9 +1,33 @@
+//! Client API du voice-bot.
+//!
+//! Phase 7A — Migration gRPC :
+//! - VoiceChannels CRUD (list, create, delete, update, get, transfer,
+//!   add_co_admin, add_to_whitelist, ban_user) -> `VoiceChannelsService`
+//! - `log_moderation_action` -> reuse `ModerationService.LogAction`
+//!
+//! ## Note d'implementation
+//!
+//! Le voice-bot construit un nouvel `ApiClient` a chaque interaction (27
+//! call sites repartis dans 10+ fichiers). Pour eviter de toucher chaque
+//! site, le `SentinelGrpcClient` est stocke dans un `OnceLock` global
+//! initialise depuis `main.rs` via [`init_grpc`]. `ApiClient::new(base)`
+//! garde sa signature originale et lit le client depuis le static.
+
 use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
-// ── Request DTOs ──
+use sentinel_proto::moderation::v1 as proto_mod;
+use sentinel_proto::voice::v1 as proto;
+
+// Phase 7A opt D.2 : passage du `OnceLock<Arc<SentinelGrpcClient>>` global
+// au pattern classique (grpc field dans le struct, fourni par le TypeMap
+// Serenity via `from_data`). Supprime le state global, rend l'ApiClient
+// testable, et aligne voice-bot sur les 10 autres bots migres.
+
+// ── Request DTOs (surface inchangee) ──
 
 #[derive(Debug, Serialize)]
 pub struct CreateVoiceChannelRequest {
@@ -81,7 +105,7 @@ pub struct LogModerationActionRequest {
     pub duration: Option<i64>,
 }
 
-// ── Response DTOs ──
+// ── Response DTOs (surface inchangee) ──
 
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
@@ -116,46 +140,91 @@ pub struct VoiceChannelDetailResponse {
 // ── Client ──
 
 pub struct ApiClient {
+    #[allow(dead_code)]
     pub base: Arc<BaseApiClient>,
+    grpc: Arc<SentinelGrpcClient>,
 }
 
 impl ApiClient {
-    pub fn new(base: Arc<BaseApiClient>) -> Self {
-        Self { base }
+    /// Construction classique : prend le `BaseApiClient` HTTP (legacy, garde
+    /// pour compat/heartbeat) et le `SentinelGrpcClient` (Phase 7A).
+    pub fn new(base: Arc<BaseApiClient>, grpc: Arc<SentinelGrpcClient>) -> Self {
+        Self { base, grpc }
     }
 
-    // ── Channels ──
+    /// Helper : construit un `ApiClient` depuis le TypeMap Serenity. Renvoie
+    /// `None` si l'un des deux clients n'a pas ete insere dans `main.rs`.
+    /// Actuellement non utilise (les call sites fetchent base + grpc en ligne)
+    /// mais garde pour de futurs refactors vers un pattern plus concis.
+    #[allow(dead_code)]
+    pub fn from_data(data: &serenity::prelude::TypeMap) -> Option<Self> {
+        let base = data
+            .get::<sentinel_shared::heartbeat::ApiClientKey>()?
+            .clone();
+        let grpc = data
+            .get::<sentinel_shared::grpc_client::GrpcClientKey>()?
+            .clone();
+        Some(Self::new(base, grpc))
+    }
+
+    // ── Channels (gRPC) ──
 
     pub async fn list_channels(
         &self,
         guild_id: &str,
     ) -> Result<Vec<VoiceChannelResponse>, String> {
-        self.base
-            .get_json(&format!("/api/voice-channels/{guild_id}"))
+        let req = proto::ListChannelsRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        let list = g
+            .guarded(|| async move {
+                client.list_channels(req).await.map(|r| r.into_inner())
+            })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list.channels.into_iter().map(proto_to_response).collect())
     }
 
     pub async fn create_channel(
         &self,
         request: &CreateVoiceChannelRequest,
     ) -> Result<VoiceChannelResponse, String> {
-        self.base
-            .post_json("/api/voice-channels", request)
+        let req = proto::CreateChannelRequest {
+            guild_id: request.guild_id.clone(),
+            owner_id: request.owner_id.clone(),
+            owner_name: request.owner_name.clone(),
+            channel_id: request.channel_id.clone(),
+            text_channel_id: request.text_channel_id.clone(),
+            members_channel_id: request.members_channel_id.clone(),
+            queue_channel_id: request.queue_channel_id.clone(),
+            category_id: request.category_id.clone(),
+            channel_name: request.channel_name.clone(),
+            kind: request.kind.clone(),
+            visibility: request.visibility.clone(),
+            queue_enabled: request.queue_enabled,
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        let c = g
+            .guarded(|| async move {
+                client.create_channel(req).await.map(|r| r.into_inner())
+            })
             .await
+            .map_err(grpc_err_to_string)?;
+        Ok(proto_to_response(c))
     }
 
     pub async fn delete_channel(&self, channel_id: &str) -> Result<(), String> {
-        // DELETE without body — use raw client
-        let req = self.base.client().delete(format!(
-            "{}/api/voice-channels/by-channel/{channel_id}",
-            self.base.base_url()
-        ));
-        self.base
-            .auth(req)
-            .send()
+        let req = proto::DeleteChannelRequest {
+            channel_id: channel_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        g.guarded(|| async move { client.delete_channel(req).await.map(|_| ()) })
             .await
-            .map_err(|e| format!("Erreur reseau: {e}"))?;
-        Ok(())
+            .map_err(grpc_err_to_string)
     }
 
     pub async fn update_channel(
@@ -163,34 +232,40 @@ impl ApiClient {
         channel_id: &str,
         request: &UpdateVoiceChannelRequest,
     ) -> Result<(), String> {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/voice-channels/by-channel/{channel_id}"),
-                request,
-            )
-            .await;
-        Ok(())
+        let req = proto::UpdateChannelRequest {
+            channel_id: channel_id.to_string(),
+            visibility: request.visibility.clone(),
+            locked: request.locked,
+            queue_enabled: request.queue_enabled,
+            name: request.name.clone(),
+            status: request.status.clone(),
+            member_limit: request.member_limit.map(|opt| proto::MemberLimitUpdate { value: opt }),
+            queue_channel_id: request
+                .queue_channel_id
+                .clone()
+                .map(|opt| proto::QueueChannelUpdate { value: opt }),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        g.guarded(|| async move { client.update_channel(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     pub async fn get_channel(
         &self,
         channel_id: &str,
     ) -> Result<Option<VoiceChannelResponse>, String> {
-        let path = format!("/api/voice-channels/by-channel/{channel_id}");
-        let resp = self.base.auth(
-            self.base.client().get(format!("{}{}", self.base.base_url(), path))
-        ).send().await.map_err(|e| format!("Erreur reseau: {e}"))?;
-
-        if resp.status().as_u16() == 404 {
-            return Ok(None);
-        }
-
-        let detail = resp
-            .json::<VoiceChannelDetailResponse>()
+        let req = proto::GetChannelRequest {
+            channel_id: channel_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        let resp = g
+            .guarded(|| async move { client.get_channel(req).await.map(|r| r.into_inner()) })
             .await
-            .map_err(|e| format!("Erreur parsing: {e}"))?;
-
-        Ok(Some(detail.channel))
+            .map_err(grpc_err_to_string)?;
+        Ok(resp.channel.map(proto_to_response))
     }
 
     // ── Transfer ──
@@ -200,13 +275,16 @@ impl ApiClient {
         channel_id: &str,
         request: &TransferOwnershipRequest,
     ) -> Result<(), String> {
-        self.base
-            .patch_fire_and_forget(
-                &format!("/api/voice-channels/by-channel/{channel_id}/transfer"),
-                request,
-            )
-            .await;
-        Ok(())
+        let req = proto::TransferOwnershipRequest {
+            channel_id: channel_id.to_string(),
+            new_owner_id: request.new_owner_id.clone(),
+            new_owner_name: request.new_owner_name.clone(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        g.guarded(|| async move { client.transfer_ownership(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     // ── Co-admins ──
@@ -216,22 +294,32 @@ impl ApiClient {
         channel_id: &str,
         request: &AddCoAdminRequest,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/voice-channels/by-channel/{channel_id}/co-admins"),
-                request,
-            )
-            .await;
-        Ok(())
+        let req = proto::AddCoAdminRequest {
+            channel_id: channel_id.to_string(),
+            user_id: request.user_id.clone(),
+            user_name: request.user_name.clone(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        g.guarded(|| async move { client.add_co_admin(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     // ── Whitelist ──
 
     pub async fn add_to_whitelist(&self, request: &AddWhitelistRequest) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget("/api/voice-channels/whitelist", request)
-            .await;
-        Ok(())
+        let req = proto::AddToWhitelistRequest {
+            guild_id: request.guild_id.clone(),
+            owner_id: request.owner_id.clone(),
+            target_id: request.target_id.clone(),
+            target_name: request.target_name.clone(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        g.guarded(|| async move { client.add_to_whitelist(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     // ── Bans ──
@@ -241,24 +329,73 @@ impl ApiClient {
         channel_id: &str,
         request: &BanFromChannelRequest,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/voice-channels/by-channel/{channel_id}/bans"),
-                request,
-            )
-            .await;
-        Ok(())
+        let req = proto::BanFromChannelRequest {
+            channel_id: channel_id.to_string(),
+            user_id: request.user_id.clone(),
+            user_name: request.user_name.clone(),
+            banned_by: request.banned_by.clone(),
+            reason: request.reason.clone(),
+            duration_secs: request.duration_secs,
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        g.guarded(|| async move { client.ban_from_channel(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
-    // ── Moderation (log anti-flood mutes) ──
+    // ── Moderation log (reuse ModerationService.LogAction) ──
 
     pub async fn log_moderation_action(
         &self,
         request: &LogModerationActionRequest,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget("/api/moderation/actions", request)
-            .await;
-        Ok(())
+        let req = proto_mod::LogActionRequest {
+            guild_id: request.guild_id.clone(),
+            channel_id: request.channel_id.clone(),
+            moderator_id: request.moderator_id.clone(),
+            moderator_name: request.moderator_name.clone(),
+            target_id: request.target_id.clone(),
+            target_name: request.target_name.clone(),
+            action_type: request.action_type.clone(),
+            reason: request.reason.clone(),
+            gravity: None,
+            duration: request.duration.map(|d| d as u64),
+        };
+        let g = &self.grpc;
+        let mut client = g.moderation();
+        g.guarded(|| async move { client.log_action(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
+    }
+}
+
+fn proto_to_response(c: proto::VoiceChannel) -> VoiceChannelResponse {
+    VoiceChannelResponse {
+        id: c.id,
+        guild_id: c.guild_id,
+        owner_id: c.owner_id,
+        owner_name: c.owner_name,
+        channel_id: c.channel_id,
+        text_channel_id: c.text_channel_id,
+        members_channel_id: c.members_channel_id,
+        queue_channel_id: c.queue_channel_id,
+        category_id: c.category_id,
+        channel_name: c.channel_name,
+        kind: c.kind,
+        visibility: c.visibility,
+        queue_enabled: c.queue_enabled,
+        locked: c.locked,
+        member_limit: c.member_limit,
+        status: c.status,
+        created_at: c.created_at,
+    }
+}
+
+fn grpc_err_to_string(e: GrpcCallError) -> String {
+    match e {
+        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
+        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
     }
 }

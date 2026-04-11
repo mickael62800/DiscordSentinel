@@ -1,0 +1,127 @@
+syntax = "proto3";
+
+package sentinel.voice.v1;
+
+// Service voice channels : creation/gestion des salons vocaux dynamiques.
+// Wrappe `ManageVoiceChannelsUseCase` cote API. Themes et invite-links
+// restent en HTTP pour cette iteration (pas appeles depuis api_client.rs
+// du bot).
+service VoiceChannelsService {
+  rpc ListChannels(ListChannelsRequest) returns (VoiceChannelList);
+  rpc CreateChannel(CreateChannelRequest) returns (VoiceChannel);
+  rpc DeleteChannel(DeleteChannelRequest) returns (Empty);
+  rpc UpdateChannel(UpdateChannelRequest) returns (Empty);
+  rpc GetChannel(GetChannelRequest) returns (GetChannelResponse);
+  rpc TransferOwnership(TransferOwnershipRequest) returns (Empty);
+  rpc AddCoAdmin(AddCoAdminRequest) returns (Empty);
+  rpc AddToWhitelist(AddToWhitelistRequest) returns (Empty);
+  rpc BanFromChannel(BanFromChannelRequest) returns (Empty);
+}
+
+message Empty {}
+
+message ListChannelsRequest {
+  string guild_id = 1;
+}
+
+message DeleteChannelRequest {
+  string channel_id = 1;
+}
+
+message GetChannelRequest {
+  string channel_id = 1;
+}
+
+// `channel` absent si introuvable (parite avec HTTP 404).
+message GetChannelResponse {
+  optional VoiceChannel channel = 1;
+}
+
+message CreateChannelRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+  string owner_name = 3;
+  string channel_id = 4;
+  optional string text_channel_id = 5;
+  optional string members_channel_id = 6;
+  optional string queue_channel_id = 7;
+  optional string category_id = 8;
+  string channel_name = 9;
+  string kind = 10;
+  string visibility = 11;
+  bool queue_enabled = 12;
+}
+
+message UpdateChannelRequest {
+  string channel_id = 1;
+  optional string visibility = 2;
+  optional bool locked = 3;
+  optional bool queue_enabled = 4;
+  optional string name = 5;
+  optional string status = 6;
+  // member_limit : tri-state via wrapper. Absent = pas de changement,
+  // present avec valeur = set, present sans valeur = clear.
+  optional MemberLimitUpdate member_limit = 7;
+  optional QueueChannelUpdate queue_channel_id = 8;
+}
+
+message MemberLimitUpdate {
+  optional int32 value = 1;
+}
+
+message QueueChannelUpdate {
+  optional string value = 1;
+}
+
+message TransferOwnershipRequest {
+  string channel_id = 1;
+  string new_owner_id = 2;
+  string new_owner_name = 3;
+}
+
+message AddCoAdminRequest {
+  string channel_id = 1;
+  string user_id = 2;
+  string user_name = 3;
+}
+
+message AddToWhitelistRequest {
+  string guild_id = 1;
+  string owner_id = 2;
+  string target_id = 3;
+  string target_name = 4;
+}
+
+message BanFromChannelRequest {
+  string channel_id = 1;
+  string user_id = 2;
+  string user_name = 3;
+  string banned_by = 4;
+  optional string reason = 5;
+  optional int64 duration_secs = 6;
+}
+
+message VoiceChannel {
+  string id = 1;
+  string guild_id = 2;
+  string owner_id = 3;
+  string owner_name = 4;
+  string channel_id = 5;
+  optional string text_channel_id = 6;
+  optional string members_channel_id = 7;
+  optional string queue_channel_id = 8;
+  optional string category_id = 9;
+  string channel_name = 10;
+  string kind = 11;
+  string visibility = 12;
+  bool queue_enabled = 13;
+  bool locked = 14;
+  optional int32 member_limit = 15;
+  optional string status = 16;
+  // RFC3339
+  string created_at = 17;
+}
+
+message VoiceChannelList {
+  repeated VoiceChannel channels = 1;
+}

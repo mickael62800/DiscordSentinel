@@ -9,11 +9,33 @@
 - Event `guild_member_addition` — vérification âge compte, détection raid, captcha
 - Event `message` — slowmode adaptatif si raid détecté
 
-## Dépendances externes
+## API interne (Phase 7A)
 
-- API interne (`security_events`, `manual_watched_users`)
-- Discord Gateway + REST
-- Service CAPTCHA (optionnel)
+**Statut : full gRPC.** Tous les appels métier de security-bot passent par gRPC.
+
+**gRPC** (deux services sur `:50051`) :
+
+`SecurityService` (défini dans `services/proto/proto/security.proto`) :
+- `ReportEvent` — push d'un événement de sécurité (raid détecté, alt, lockdown, etc.)
+- `ListEvents` — listing pour `/security history`
+
+`MembersService` (défini dans `services/proto/proto/members.proto` — **partagé avec welcome-bot**) :
+- `SyncMembers` — sync batch des membres au démarrage / refresh
+- `RegisterMember` — nouveau membre détecté
+- `RemoveMember` — départ
+- `UpdateMember` — changement pseudo/avatar/rôles
+- `GetMember` — lookup individuel
+
+`SecurityService` wrappe `ManageSecurityUseCase`, `MembersService` wrappe `ManageMembersUseCase`. Le champ `roles` (JSON arbitraire côté domain `serde_json::Value`) est sérialisé en `string roles_json` côté proto pour rester transparent.
+
+**HTTP retenu** : aucun appel métier. Le `BaseApiClient` reste injecté pour le heartbeat partagé.
+
+## Comportement si l'API tombe
+
+- **`report_event` (gRPC)** : circuit breaker → erreur. Les détections (raid, alt, etc.) sont **toujours appliquées côté Discord** (kick/quarantine/lockdown via Serenity), mais la trace côté API est manquante. Acceptable : l'action de défense est prioritaire sur le logging.
+- **`list_events` (gRPC)** : `/security history` répond une erreur claire au modérateur.
+- **Members CRUD (gRPC fire-and-forget)** : sync échoue, pas d'impact immédiat sur Discord. Les retries automatiques ne sont pas implémentés ; la prochaine sync (au prochain join) tentera de rattraper.
+- **Trackers in-memory** (`RaidDetector`, `AltDetector`, `QuarantineManager`, `LockdownManager`) : **autonomes**, ne dépendent pas de l'API. Les défenses continuent de marcher complètement même API down.
 
 ## Modules clés
 
@@ -21,11 +43,13 @@
 - `src/security/account_checker.rs` — vérification de l'âge minimum des comptes
 - `src/security/alt_detector.rs` — clustering par date de création et similarité de nom
 - `src/security/quarantine.rs` / `lockdown.rs` / `slowmode.rs` — actions réactives
+- `src/api_client.rs` — wrapper gRPC `SecurityService` + `MembersService` (full)
 
 ## Variables d'env
 
 - `SECURITY_DISCORD_TOKEN`
 - `API_BASE_URL`
+- `GRPC_API_URL`
 - `API_KEY`
 - `RAID_JOIN_THRESHOLD` / `RAID_JOIN_WINDOW_SECS`
 - `CAPTCHA_ENABLED`

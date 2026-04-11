@@ -503,9 +503,16 @@ async fn send_to_backend(
             return;
         }
     };
+    let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+        Some(g) => Arc::clone(g),
+        None => {
+            error!("SentinelGrpcClient introuvable dans le contexte");
+            return;
+        }
+    };
     drop(data);
 
-    let api_client = ApiClient::new(Arc::clone(&base));
+    let api_client = ApiClient::new(Arc::clone(&base), grpc);
 
     match api_client.analyze(&request).await {
         Ok(response) => {

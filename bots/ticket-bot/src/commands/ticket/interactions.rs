@@ -140,7 +140,7 @@ pub async fn handle_invite_select(ctx: &Context, component: &ComponentInteractio
     if let Some(ref ticket_id) = get_ticket_id_from_channel(ctx, component.channel_id).await {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
             if let Err(e) = api.update_ticket_channel(ticket_id, None, Some(user_id.to_string())).await {
                 error!(error = %e, ticket_id = %ticket_id, "Erreur sync invited_user_id vers API");
             }
@@ -355,7 +355,7 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
             if let Some(ref ticket_id) = get_ticket_id_from_channel(ctx, component.channel_id).await {
                 let data = ctx.data.read().await;
                 if let Some(base) = data.get::<ApiClientKey>() {
-                    let api = ApiClient::new(base.clone());
+                    let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
                     if let Err(e) = api.update_ticket_channel(ticket_id, Some(vc.id.to_string()), None).await {
                         error!(error = %e, ticket_id = %ticket_id, "Erreur sync voice_channel_id vers API");
                     }

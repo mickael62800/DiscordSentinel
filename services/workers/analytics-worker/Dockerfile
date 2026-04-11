@@ -1,21 +1,23 @@
-# -- Build stage --
-FROM rust:1.88-alpine AS builder
-
-RUN apk add --no-cache musl-dev pkgconf openssl-dev openssl-libs-static
-
+# Phase 7A optimisations — cargo-chef + BuildKit cache mounts.
+# Le workspace racine permet un builder partage : deps compilees une fois et
+# cachees entre builds via --mount=type=cache. Rebuild apres modif source ~30s.
+FROM lukemathwalker/cargo-chef:latest-rust-alpine AS chef
+RUN apk add --no-cache     musl-dev pkgconf openssl-dev openssl-libs-static     protoc protobuf-dev     make g++ linux-headers
 WORKDIR /app
-COPY services/workers/worker-common /app/services/workers/worker-common
-COPY services/workers/analytics-worker/Cargo.toml services/workers/analytics-worker/Cargo.lock* /app/services/workers/analytics-worker/
-RUN mkdir -p services/workers/analytics-worker/src && echo "fn main() {}" > services/workers/analytics-worker/src/main.rs && cd services/workers/analytics-worker && cargo build --release && rm -rf src
 
-COPY services/workers/analytics-worker/src /app/services/workers/analytics-worker/src
-RUN cd services/workers/analytics-worker && touch src/main.rs && cargo build --release
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-# -- Runtime stage --
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+# Cook des dependances uniquement (couche cacheable)
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo chef cook --release --recipe-path recipe.json --bin sentinel-analytics-worker
+# Build reel
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo build --release --bin sentinel-analytics-worker &&     cp target/release/sentinel-analytics-worker /tmp/sentinel-analytics-worker
+
 FROM alpine:3.21
-
 RUN apk add --no-cache ca-certificates
-
-COPY --from=builder /app/services/workers/analytics-worker/target/release/sentinel-analytics-worker /usr/local/bin/sentinel-analytics-worker
-
+COPY --from=builder /tmp/sentinel-analytics-worker /usr/local/bin/sentinel-analytics-worker
 ENTRYPOINT ["sentinel-analytics-worker"]

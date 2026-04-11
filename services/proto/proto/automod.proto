@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package sentinel.automod.v1;
+
+// Service automod : analyse de messages en temps reel.
+//
+// **Hot path le plus chaud du projet** — appele a chaque message Discord
+// par automod-bot. Le gain perf gRPC est ici maximal : protobuf binaire
+// au lieu de JSON, multiplexage HTTP/2, contrat type strict.
+service AutomodService {
+  rpc AnalyzeMessage(AnalyzeMessageRequest) returns (AnalyzeMessageResponse);
+}
+
+message DetectionFlags {
+  bool spam = 1;
+  bool insult = 2;
+  bool link = 3;
+  bool phishing = 4;
+}
+
+message ContextMessage {
+  string username = 1;
+  string content = 2;
+}
+
+message AnalyzeMessageRequest {
+  string guild_id = 1;
+  string channel_id = 2;
+  string user_id = 3;
+  string username = 4;
+  string content = 5;
+  DetectionFlags flags = 6;
+  string message_id = 7;
+  // RFC3339
+  string timestamp = 8;
+  // Messages precedents pour l'analyse de sentiment.
+  repeated ContextMessage context_messages = 9;
+}
+
+// Action a appliquer cote bot. Identique a `Action` du domain.
+enum Action {
+  ACTION_NONE = 0;
+  ACTION_WARN = 1;
+  ACTION_DELETE = 2;
+  ACTION_MUTE = 3;
+  ACTION_BAN = 4;
+}
+
+message AnalyzeMessageResponse {
+  Action action = 1;
+  string reason = 2;
+  double score = 3;
+  optional uint64 duration = 4;
+}

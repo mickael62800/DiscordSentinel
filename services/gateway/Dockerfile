@@ -1,26 +1,23 @@
-# ── Build stage ──
-FROM rust:1.88-alpine AS builder
-
-RUN apk add --no-cache musl-dev pkgconf openssl-dev openssl-libs-static
-
+# Phase 7A optimisations — cargo-chef + BuildKit cache mounts.
+# Le workspace racine permet un builder partage : deps compilees une fois et
+# cachees entre builds via --mount=type=cache. Rebuild apres modif source ~30s.
+FROM lukemathwalker/cargo-chef:latest-rust-alpine AS chef
+RUN apk add --no-cache     musl-dev pkgconf openssl-dev openssl-libs-static     protoc protobuf-dev     make g++ linux-headers
 WORKDIR /app
 
-# Copier les dependances locales
-COPY services/workers/worker-common /app/services/workers/worker-common
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
 
-# Deps cache
-COPY services/gateway/Cargo.toml services/gateway/Cargo.lock* /app/services/gateway/
-RUN mkdir -p services/gateway/src && echo "fn main() {}" > services/gateway/src/main.rs && cd services/gateway && cargo build --release && rm -rf src
-
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+# Cook des dependances uniquement (couche cacheable)
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo chef cook --release --recipe-path recipe.json --bin sentinel-gateway
 # Build reel
-COPY services/gateway/src /app/services/gateway/src
-RUN cd services/gateway && touch src/main.rs && cargo build --release
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo build --release --bin sentinel-gateway &&     cp target/release/sentinel-gateway /tmp/sentinel-gateway
 
-# ── Runtime stage ──
 FROM alpine:3.21
-
 RUN apk add --no-cache ca-certificates
-
-COPY --from=builder /app/services/gateway/target/release/sentinel-gateway /usr/local/bin/sentinel-gateway
-
+COPY --from=builder /tmp/sentinel-gateway /usr/local/bin/sentinel-gateway
 ENTRYPOINT ["sentinel-gateway"]

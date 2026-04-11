@@ -74,7 +74,7 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
     // Logger l'action via l'API
     let data = ctx.data.read().await;
     if let Some(base) = data.get::<ApiClientKey>() {
-        let api = ApiClient::new(base.clone());
+        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
         let request = LogModerationActionRequest {
             guild_id: guild_id.get().to_string(),
             channel_id: channel_id.get().to_string(),

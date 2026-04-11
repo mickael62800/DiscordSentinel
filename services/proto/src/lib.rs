@@ -1,0 +1,83 @@
+//! Definitions protobuf compilees pour la communication gRPC interne
+//! entre l'API Sentinel et les bots Discord.
+//!
+//! Les modules sont generes a la compilation par `tonic-build` (cf. `build.rs`).
+//! Chaque package proto devient un sous-module Rust.
+
+pub mod common {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.common.v1");
+    }
+}
+
+pub mod progression {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.progression.v1");
+    }
+}
+
+pub mod stats {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.stats.v1");
+    }
+}
+
+pub mod tickets {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.tickets.v1");
+    }
+}
+
+pub mod moderation {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.moderation.v1");
+    }
+}
+
+pub mod blackjack {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.blackjack.v1");
+    }
+}
+
+pub mod coude {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.coude.v1");
+    }
+}
+
+pub mod roles {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.roles.v1");
+    }
+}
+
+pub mod members {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.members.v1");
+    }
+}
+
+pub mod security {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.security.v1");
+    }
+}
+
+pub mod automod {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.automod.v1");
+    }
+}
+
+pub mod voice {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.voice.v1");
+    }
+}
+
+pub mod images {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.images.v1");
+    }
+}

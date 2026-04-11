@@ -57,7 +57,7 @@ pub async fn require_admin(
     let channel_resp = {
         let data = ctx.data.read().await;
         let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone());
+        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
         api.get_channel(&voice_channel_id.get().to_string()).await
     };
 

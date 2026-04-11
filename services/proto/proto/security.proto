@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package sentinel.security.v1;
+
+// Service security : reporting d'evenements de securite + listing.
+// Wrappe `ManageSecurityUseCase`.
+service SecurityService {
+  rpc ReportEvent(ReportEventRequest) returns (SecurityEvent);
+  rpc ListEvents(ListEventsRequest) returns (SecurityEventList);
+}
+
+message ReportEventRequest {
+  string guild_id = 1;
+  string event_type = 2;
+  // "low" | "medium" | "high" | "critical"
+  string severity = 3;
+  string description = 4;
+  repeated string user_ids = 5;
+}
+
+message ListEventsRequest {
+  // Si absent, retourne les events de toutes les guilds (admin).
+  optional string guild_id = 1;
+}
+
+message SecurityEvent {
+  string id = 1;
+  string guild_id = 2;
+  string event_type = 3;
+  string severity = 4;
+  string description = 5;
+  repeated string user_ids = 6;
+  // RFC3339
+  string created_at = 7;
+}
+
+message SecurityEventList {
+  repeated SecurityEvent events = 1;
+}

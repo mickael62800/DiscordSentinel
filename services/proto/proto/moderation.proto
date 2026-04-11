@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package sentinel.moderation.v1;
+
+// Service moderation v1 : log d'actions et historique utilisateur.
+//
+// Scope volontairement reduit pour ce premier portage : seul le hot path
+// (`LogAction` appele a chaque ban/mute/warn) et `GetHistory` (consultation
+// frequente) sont migres. Les endpoints evidence / review / modstats /
+// pending utilisent des repos directs sans use-case unifie cote API
+// (`ManageModerationUseCase` n'expose que ces 2 methodes utiles ici) — ils
+// seront ajoutes en v2 quand le domaine sera consolide.
+service ModerationService {
+  rpc LogAction(LogActionRequest) returns (ModerationAction);
+  rpc GetHistory(GetHistoryRequest) returns (UserHistory);
+}
+
+message LogActionRequest {
+  string guild_id = 1;
+  string channel_id = 2;
+  string moderator_id = 3;
+  string moderator_name = 4;
+  string target_id = 5;
+  string target_name = 6;
+  string action_type = 7;
+  string reason = 8;
+  // "low" | "medium" | "high" | "critical"
+  optional string gravity = 9;
+  // Duree en secondes (None = permanent)
+  optional uint64 duration = 10;
+}
+
+message GetHistoryRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message ModerationAction {
+  string id = 1;
+  string guild_id = 2;
+  string channel_id = 3;
+  string moderator_id = 4;
+  string moderator_name = 5;
+  string target_id = 6;
+  string target_name = 7;
+  string action_type = 8;
+  string reason = 9;
+  optional string gravity = 10;
+  optional uint64 duration = 11;
+  // RFC3339
+  string created_at = 12;
+}
+
+message UserHistory {
+  string target_id = 1;
+  string target_name = 2;
+  uint32 total_warns = 3;
+  uint32 total_mutes = 4;
+  uint32 total_bans = 5;
+  repeated ModerationAction actions = 6;
+}

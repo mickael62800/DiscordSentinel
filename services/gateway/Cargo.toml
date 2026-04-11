@@ -7,28 +7,28 @@ description = "Gateway WebSocket dediee — relay temps reel entre l'API et les 
 [dependencies]
 # Web / WebSocket
 axum = { version = "0.8", features = ["ws"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tokio = { workspace = true }
 tower-http = { version = "0.6", features = ["cors", "trace", "request-id", "propagate-header"] }
 
 # Redis Streams (Phase 5B : XREAD live tail remplace pub/sub)
-redis = { version = "0.27", features = ["tokio-comp", "streams"] }
+redis = { workspace = true }
 
 # HTTP Client
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+reqwest = { workspace = true }
 
 # Serialization
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 # Observability
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
 
 # Utils
-dotenvy = "0.15"
-futures-util = "0.3"
-uuid = { version = "1", features = ["v4"] }
-dashmap = "6"
+dotenvy = { workspace = true }
+futures-util = { workspace = true }
+uuid = { workspace = true }
+dashmap = { workspace = true }
 
 # Shared worker infra (shutdown_signal)
 sentinel-worker-common = { path = "../workers/worker-common" }
@@ -38,15 +38,3 @@ sentinel-worker-common = { path = "../workers/worker-common" }
 # processus long-running grace a une meilleure gestion de la fragmentation.
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
-
-# Phase 1 — Quick wins : profil release optimise pour la production.
-# - lto = "fat" : optimisation cross-crate complete (-10 % binaire, -5/10 % CPU)
-# - codegen-units = 1 : permet a LTO d'etre maximalement efficace
-# - strip = true : retire les symboles de debug du binaire final
-#
-# On garde panic = "unwind" (defaut) pour isoler les paniques par tache tokio
-# et eviter qu'une seule tache panique fasse crasher tout le process.
-[profile.release]
-lto = "fat"
-codegen-units = 1
-strip = true

@@ -5,14 +5,14 @@ edition = "2021"
 description = "Worker de monitoring DiscordSentinel — detecte les bots et workers hors ligne"
 
 [dependencies]
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
-redis = { version = "0.27", features = ["tokio-comp"] }
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-dotenvy = "0.15"
+tokio = { workspace = true }
+redis = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dotenvy = { workspace = true }
 sentinel-worker-common = { path = "../worker-common" }
 
 # Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS uniquement,
@@ -20,15 +20,3 @@ sentinel-worker-common = { path = "../worker-common" }
 # processus long-running grace a une meilleure gestion de la fragmentation.
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
-
-# Phase 1 — Quick wins : profil release optimise pour la production.
-# - lto = "fat" : optimisation cross-crate complete (-10 % binaire, -5/10 % CPU)
-# - codegen-units = 1 : permet a LTO d'etre maximalement efficace
-# - strip = true : retire les symboles de debug du binaire final
-#
-# On garde panic = "unwind" (defaut) pour isoler les paniques par tache tokio
-# et eviter qu'une seule tache panique fasse crasher tout le process.
-[profile.release]
-lto = "fat"
-codegen-units = 1
-strip = true

@@ -22,6 +22,7 @@ use tracing::info;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
@@ -45,7 +46,17 @@ async fn main() {
     info!(api_url = %config.api_base_url(), "Demarrage du voice bot");
 
     let api = Arc::new(BaseApiClient::new(&config, "voice-bot"));
-    let voice_api = ApiClient::new(api.clone());
+
+    // Phase 7A — gRPC interne (VoiceChannelsService + ModerationService).
+    // Phase 7A opt D.2 : passage du pattern OnceLock au classique TypeMap.
+    // Le client est insere dans Serenity data et fetche par chaque call site
+    // via `data.get::<GrpcClientKey>()`.
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => panic!("SentinelGrpcClient: {e}"),
+    };
+
+    let voice_api = ApiClient::new(api.clone(), Arc::clone(&grpc));
 
     let intents = GatewayIntents::GUILDS
         | GatewayIntents::GUILD_VOICE_STATES
@@ -98,6 +109,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(api.clone());
+        data.insert::<GrpcClientKey>(Arc::clone(&grpc));
         data.insert::<ConfigKey>(config);
         data.insert::<FloodTrackerKey>(Arc::new(FloodTracker::new()));
         data.insert::<VoteTrackerKey>(Arc::new(VoteTracker::new()));

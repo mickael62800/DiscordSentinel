@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package sentinel.common.v1;
+
+// Source d'XP : message texte ou minute vocale.
+enum XpSource {
+  XP_SOURCE_UNSPECIFIED = 0;
+  XP_SOURCE_TEXT = 1;
+  XP_SOURCE_VOICE = 2;
+}
+
+// Reponse vide reutilisable.
+message Empty {}

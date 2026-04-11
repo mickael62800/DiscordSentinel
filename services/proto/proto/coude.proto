@@ -1,0 +1,93 @@
+syntax = "proto3";
+
+package sentinel.coude.v1;
+
+// Service Coup de Coude v1 — pilote partiel.
+//
+// Hot path joueurs uniquement (CRUD + progression). Les domaines combat,
+// economie, inventaire, betting et social restent en HTTP pour cette
+// iteration et seront migres ulterieurement quand les `ManageCoude*UseCase`
+// seront tous adaptes au pattern proto.
+service CoudePlayerService {
+  rpc GetOrCreatePlayer(GetOrCreatePlayerRequest) returns (CoudePlayer);
+  rpc GetPlayer(GetPlayerRequest) returns (CoudePlayer);
+  rpc UpdatePlayerClass(UpdatePlayerClassRequest) returns (Empty);
+  rpc AddXp(AddXpRequest) returns (XpProgress);
+  rpc AdjustCoins(AdjustCoinsRequest) returns (Empty);
+  rpc UpdateHp(UpdateHpRequest) returns (Empty);
+}
+
+message Empty {}
+
+message GetOrCreatePlayerRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+}
+
+message GetPlayerRequest {
+  string guild_id = 1;
+  string user_id = 2;
+}
+
+message UpdatePlayerClassRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string class = 3;
+}
+
+message AddXpRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  int64 amount = 3;
+}
+
+message AdjustCoinsRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  int64 delta = 3;
+}
+
+message UpdateHpRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  int32 hp_current = 3;
+  int32 hp_max = 4;
+}
+
+message CoudePlayer {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  int64 coins = 4;
+  int32 total_wins = 5;
+  int32 total_losses = 6;
+  int32 total_draws = 7;
+  int64 total_earned = 8;
+  int64 total_lost = 9;
+  int64 total_stolen = 10;
+  int32 cowardice_count = 11;
+  int32 chaos_events = 12;
+  int32 casino_wins = 13;
+  int32 casino_losses = 14;
+  int32 level = 15;
+  int64 xp = 16;
+  int32 stat_points = 17;
+  int32 atk = 18;
+  int32 def = 19;
+  optional string class = 20;
+  optional string title = 21;
+  int32 hp_current = 22;
+  int32 hp_max = 23;
+  int32 season = 24;
+  // RFC3339
+  string created_at = 25;
+  string updated_at = 26;
+}
+
+message XpProgress {
+  int64 new_xp = 1;
+  int32 new_level = 2;
+  bool leveled_up = 3;
+  int32 stat_points_gained = 4;
+}

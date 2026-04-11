@@ -58,7 +58,7 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
         {
             let data = ctx.data.read().await;
             let base = data.get::<ApiClientKey>().expect("ApiClient");
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
             if let Err(e) = api
                 .update_channel(&voice_channel_id.get().to_string(), &update)
                 .await
@@ -118,7 +118,7 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
         {
             let data = ctx.data.read().await;
             let base = data.get::<ApiClientKey>().expect("ApiClient");
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
             if let Err(e) = api
                 .update_channel(&voice_channel_id.get().to_string(), &update)
                 .await

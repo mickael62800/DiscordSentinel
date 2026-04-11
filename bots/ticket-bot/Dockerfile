@@ -1,13 +1,23 @@
-FROM rust:1.88-alpine AS builder
-RUN apk add --no-cache musl-dev pkgconf openssl-dev openssl-libs-static
+# Phase 7A optimisations — cargo-chef + BuildKit cache mounts.
+# Le workspace racine permet un builder partage : deps compilees une fois et
+# cachees entre builds via --mount=type=cache. Rebuild apres modif source ~30s.
+FROM lukemathwalker/cargo-chef:latest-rust-alpine AS chef
+RUN apk add --no-cache     musl-dev pkgconf openssl-dev openssl-libs-static     protoc protobuf-dev     make g++ linux-headers
 WORKDIR /app
-COPY bots/shared /app/bots/shared
-COPY bots/ticket-bot/Cargo.toml bots/ticket-bot/Cargo.lock* /app/bots/ticket-bot/
-RUN mkdir -p bots/ticket-bot/src && echo "fn main() {}" > bots/ticket-bot/src/main.rs && cd bots/ticket-bot && cargo build --release && rm -rf src
-COPY bots/ticket-bot/src /app/bots/ticket-bot/src
-RUN cd bots/ticket-bot && touch src/main.rs && cargo build --release
+
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+FROM chef AS builder
+COPY --from=planner /app/recipe.json recipe.json
+# Cook des dependances uniquement (couche cacheable)
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo chef cook --release --recipe-path recipe.json --bin ticket-bot
+# Build reel
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked     --mount=type=cache,target=/app/target,sharing=locked     cargo build --release --bin ticket-bot &&     cp target/release/ticket-bot /tmp/ticket-bot
 
 FROM alpine:3.21
 RUN apk add --no-cache ca-certificates
-COPY --from=builder /app/bots/ticket-bot/target/release/ticket-bot /usr/local/bin/ticket-bot
+COPY --from=builder /tmp/ticket-bot /usr/local/bin/ticket-bot
 ENTRYPOINT ["ticket-bot"]

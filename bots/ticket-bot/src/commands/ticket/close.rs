@@ -134,7 +134,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let data = ctx.data.read().await;
     if let Some(base) = data.get::<ApiClientKey>() {
         if let Some(ref id) = ticket_id {
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
             if let Err(e) = api.close_ticket(id).await {
                 error!(error = %e, ticket_id = %id, "Erreur fermeture ticket API");
             }
@@ -214,7 +214,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     if let Some(ref id) = ticket_id {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data2.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
             if let Ok(detail) = api.get_ticket(id).await {
                 // Trouver l'auteur pour lui envoyer le DM
                 if let Ok(author_id) = detail.ticket.author_id.parse::<u64>() {
@@ -343,7 +343,6 @@ pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInter
                 // Fire-and-forget : on ne peut pas retrouver l'UUID complet
                 // depuis le short id sans appel API, donc on log via send_log
                 // Le rating est deja logge ci-dessus
-                let _api = crate::api_client::ApiClient::new(base.clone());
                 // Note: le rating sera visible dans les logs desktop
                 // Pour une persistance complete, il faudrait stocker l'UUID
                 // dans le custom_id ou dans un DashMap

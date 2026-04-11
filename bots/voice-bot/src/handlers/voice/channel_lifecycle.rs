@@ -225,7 +225,7 @@ pub(super) async fn create_temp_channel(
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
             let request = CreateVoiceChannelRequest {
                 guild_id: guild_id.get().to_string(),
                 owner_id: user_id.get().to_string(),
@@ -303,7 +303,7 @@ pub(super) async fn check_and_delete_empty(
     let queue_channel_id = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
             api.get_channel(&voice_channel_id.get().to_string())
                 .await
                 .ok()
@@ -320,7 +320,7 @@ pub(super) async fn check_and_delete_empty(
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let api = ApiClient::new(base.clone());
+            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
             if let Err(e) = api
                 .delete_channel(&voice_channel_id.get().to_string())
                 .await

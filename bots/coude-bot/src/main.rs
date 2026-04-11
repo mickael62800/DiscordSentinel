@@ -20,6 +20,7 @@ use tracing::info;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::config::Config;
@@ -47,7 +48,13 @@ async fn main() {
 
     let base_api = Arc::new(BaseApiClient::new(&config, "coude-bot"));
 
-    let api_client = api_client::ApiClient::new(Arc::clone(&base_api));
+    // Phase 7A — gRPC interne (CoudePlayerService).
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => panic!("SentinelGrpcClient: {e}"),
+    };
+
+    let api_client = api_client::ApiClient::new(Arc::clone(&base_api), Arc::clone(&grpc));
 
     let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
@@ -58,6 +65,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
+        data.insert::<GrpcClientKey>(Arc::clone(&grpc));
         data.insert::<GameApiKey>(api_client);
     }
 

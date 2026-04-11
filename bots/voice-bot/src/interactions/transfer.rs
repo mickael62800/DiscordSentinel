@@ -79,7 +79,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
     let ch = {
         let data = ctx.data.read().await;
         let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone());
+        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
         match api.get_channel(&voice_channel_id.get().to_string()).await {
             Ok(Some(ch)) => ch,
             _ => {
@@ -198,7 +198,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
     {
         let data = ctx.data.read().await;
         let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone());
+        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
         if let Err(e) = api
             .transfer_ownership(&voice_channel_id.get().to_string(), &request)
             .await

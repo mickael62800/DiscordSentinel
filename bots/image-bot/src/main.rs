@@ -21,6 +21,7 @@ use tracing::{error, info, warn};
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::config::BotConfig;
 use sentinel_shared::embeds::moderate_embed;
+use sentinel_shared::grpc_client::{GrpcClientKey, SentinelGrpcClient};
 use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::analysis_queue::AnalysisQueue;
@@ -49,6 +50,12 @@ async fn main() {
 
     let base_api = Arc::new(BaseApiClient::new(&config, "image-bot"));
 
+    // Phase 7A — gRPC interne (ImagesService).
+    let grpc = match SentinelGrpcClient::from_env().await {
+        Ok(c) => Arc::new(c),
+        Err(e) => panic!("SentinelGrpcClient: {e}"),
+    };
+
     let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
         .cache_settings(sentinel_shared::cache_settings::small())
@@ -61,6 +68,7 @@ async fn main() {
     {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
+        data.insert::<GrpcClientKey>(Arc::clone(&grpc));
         data.insert::<ProcessedMessagesKey>(Arc::new(DashMap::new()));
         data.insert::<MaxImageSizeKey>(config.max_image_size);
         data.insert::<HashCacheKey>(ImageHashCache::new(300));
@@ -71,10 +79,15 @@ async fn main() {
 
     // Background task : consumer de la queue d'analyse
     let api_for_queue = Arc::clone(&base_api);
+    let grpc_for_queue = Arc::clone(&grpc);
     let http_for_queue = Arc::clone(&client.http);
     tokio::spawn(async move {
         while let Some(queued) = rx.recv().await {
-            let api_client = ApiClient::new(Arc::clone(&api_for_queue), handler::DEFAULT_MAX_IMAGE_SIZE);
+            let api_client = ApiClient::new(
+                Arc::clone(&api_for_queue),
+                Arc::clone(&grpc_for_queue),
+                handler::DEFAULT_MAX_IMAGE_SIZE,
+            );
             let max_retries = 3u32;
 
             let mut success = false;

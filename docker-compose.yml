@@ -58,7 +58,9 @@ services:
     container_name: sentinel-pgbouncer
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
+      # Phase 7A opt C.1 : DATABASE_URL doit pointer sur **postgres** (upstream),
+      # pas sur pgbouncer lui-meme. Bug pre-existant qui causait des boucles.
+      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 25
@@ -73,6 +75,9 @@ services:
       AUTH_TYPE: scram-sha-256
     ports:
       - "127.0.0.1:6432:5432"
+    # Phase 7A opt C.2 : pas de healthcheck CMD (edoburu/pgbouncer n'a ni nc
+    # ni pg_isready). pgbouncer demarre en ~1s apres postgres healthy, donc
+    # `condition: service_started` cote api est suffisant.
     depends_on:
       postgres:
         condition: service_healthy
@@ -105,14 +110,29 @@ services:
   # ──────────────────────────────────────────────
 
   api:
+    # Phase 7A : context = racine du repo car services/api depend de
+    # services/proto via path. Le Dockerfile a ete adapte en consequence.
     build:
-      context: ./services/api
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: services/api/Dockerfile
     container_name: sentinel-api
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "3000:3000"     # HTTP/Axum (legacy + endpoints non migres)
+      - "50051:50051"   # Phase 7A : gRPC/tonic interne aux bots
+    # Phase 7A opt B.2 : healthcheck gRPC via grpc_health_probe (tonic-health).
+    # Verifie que le serveur tonic repond sur les 12 services simultanement.
+    healthcheck:
+      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
     environment:
+      # Phase 7A opt C.1 : pgbouncer transaction pooling reactive.
+      # Le fix sqlx statement_cache_capacity(0) cote main.rs resout les
+      # query_wait_timeout. Pool sizing : 25 connexions par replica API
+      # (cf. DEFAULT_POOL_SIZE du service pgbouncer).
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_KEY: ${API_KEY}
@@ -131,6 +151,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
   gateway:
     build:
@@ -426,6 +448,7 @@ services:
     environment:
       AUTOMOD_DISCORD_TOKEN: ${AUTOMOD_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : full gRPC (AnalyzeMessage hot path)
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
@@ -440,6 +463,7 @@ services:
     environment:
       MODERATION_DISCORD_TOKEN: ${MODERATION_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : partiel (LogAction + GetHistory)
       API_KEY: ${API_KEY:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
@@ -456,6 +480,7 @@ services:
     environment:
       SECURITY_DISCORD_TOKEN: ${SECURITY_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : full (Security + Members)
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
@@ -470,6 +495,7 @@ services:
     environment:
       TICKET_DISCORD_TOKEN: ${TICKET_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : full TicketsService
       API_KEY: ${API_KEY:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
@@ -486,6 +512,7 @@ services:
     environment:
       IMAGE_DISCORD_TOKEN: ${IMAGE_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : full ImagesService (bytes natifs)
       API_KEY: ${API_KEY:-}
       MAX_IMAGE_SIZE: ${MAX_IMAGE_SIZE:-10485760}
       RUST_LOG: info
@@ -501,6 +528,7 @@ services:
     environment:
       VOICE_DISCORD_TOKEN: ${VOICE_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : full VoiceChannels + Moderation
       API_KEY: ${API_KEY:-}
       VOICE_GUILD_ID: ${VOICE_GUILD_ID}
       VOICE_PUBLIC_CREATOR_CHANNEL_ID: ${VOICE_PUBLIC_CREATOR_CHANNEL_ID}
@@ -519,6 +547,7 @@ services:
     environment:
       PROGRESSION_DISCORD_TOKEN: ${PROGRESSION_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : full Progression + Stats
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
@@ -547,6 +576,7 @@ services:
     environment:
       COMMUNITY_DISCORD_TOKEN: ${COMMUNITY_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : partiel RolePanelsService
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
@@ -561,6 +591,7 @@ services:
     environment:
       ROLES_DISCORD_TOKEN: ${ROLES_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : partiel RolePanelsService
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
@@ -589,6 +620,7 @@ services:
     environment:
       BLACKJACK_DISCORD_TOKEN: ${BLACKJACK_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : full BlackjackService (solo + wallet)
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
@@ -603,6 +635,36 @@ services:
     environment:
       COUDE_DISCORD_TOKEN: ${COUDE_DISCORD_TOKEN}
       API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : partiel CoudePlayerService
+      API_KEY: ${API_KEY:-}
+      RUST_LOG: info
+    depends_on:
+      - api
+
+  game-bot:
+    build:
+      context: .
+      dockerfile: bots/game-bot/Dockerfile
+    container_name: sentinel-game-bot
+    restart: unless-stopped
+    environment:
+      GAME_DISCORD_TOKEN: ${GAME_DISCORD_TOKEN}
+      API_BASE_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
+      RUST_LOG: info
+    depends_on:
+      - api
+
+  welcome-bot:
+    build:
+      context: .
+      dockerfile: bots/welcome-bot/Dockerfile
+    container_name: sentinel-welcome-bot
+    restart: unless-stopped
+    environment:
+      WELCOME_DISCORD_TOKEN: ${WELCOME_DISCORD_TOKEN}
+      API_BASE_URL: http://api:3000
+      GRPC_API_URL: http://api:50051   # Phase 7A : partiel MembersService.GetMember
       API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
