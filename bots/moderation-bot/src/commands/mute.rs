@@ -405,16 +405,23 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
     info!(target = %target_name, "Unmute applique");
 
     let unmute_embed = success_embed("🔊 Unmute")
-        .field("Cible", format!("<@{target_id}>"), false);
+        .field("Cible", format!("<@{target_id}>"), true)
+        .field("Moderateur", format!("<@{}>", command.user.id), true);
 
+    // Reponse ephemere au modo
     if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().embed(unmute_embed),
+            CreateInteractionResponseMessage::new()
+                .content(format!("✅ <@{target_id}> a ete unmute."))
+                .ephemeral(true),
         ),
     ).await {
-        warn!(error = %e, "Failed to send unmute response embed");
+        warn!(error = %e, "Failed to send unmute response");
     }
+
+    // Log dans le salon dedie
+    super::log_to_channel(ctx, &guild_id.to_string(), unmute_embed).await;
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
