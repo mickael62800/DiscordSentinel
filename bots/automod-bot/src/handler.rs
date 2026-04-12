@@ -507,11 +507,22 @@ async fn send_review_card(
         .embed(embed)
         .components(vec![row1, row2]);
 
-    if let Err(e) = serenity::model::id::ChannelId::new(review_channel_id)
+    match serenity::model::id::ChannelId::new(review_channel_id)
         .send_message(&ctx.http, builder)
         .await
     {
-        warn!(error = %e, "Echec envoi carte de review automod");
+        Ok(_) => info!(
+            user = %msg.author.name,
+            channel = %msg.channel_id,
+            action = %action_label,
+            review_channel = review_channel_id,
+            "Carte de review envoyee"
+        ),
+        Err(e) => error!(
+            error = %e,
+            review_channel = review_channel_id,
+            "Echec envoi carte de review automod — verifier que le bot a acces au salon"
+        ),
     }
 }
 
@@ -570,13 +581,14 @@ async fn handle_review_button(ctx: &Context, component: &serenity::model::applic
 
     if action == Action::None {
         // Ignorer — mettre a jour la carte
+        info!(target = %user_id_str, moderator = %moderator_name, "Detection ignoree via review");
         let ignored_embed = serenity::builder::CreateEmbed::new()
             .title("🛡️ AutoMod — ❌ Ignore par un moderateur")
             .description(format!("Moderateur : **{}**\nAucune action appliquee.", moderator_name))
             .color(0x95a5a6)
             .timestamp(serenity::model::Timestamp::now());
 
-        let _ = component
+        if let Err(e) = component
             .create_response(
                 &ctx.http,
                 serenity::builder::CreateInteractionResponse::UpdateMessage(
@@ -585,7 +597,10 @@ async fn handle_review_button(ctx: &Context, component: &serenity::model::applic
                         .components(vec![]),
                 ),
             )
-            .await;
+            .await
+        {
+            error!(error = %e, "Echec update carte review (ignore)");
+        }
         return;
     }
 
@@ -606,53 +621,86 @@ async fn handle_review_button(ctx: &Context, component: &serenity::model::applic
     // Execute l'action
     match action {
         Action::Warn => {
+            info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Warn valide via review");
             let embed = warn_embed("⚠️ Avertissement AutoMod")
                 .color(colors.warn)
                 .field("📝 Raison", "Contenu inapproprie detecte par l'IA", false)
                 .field("👮 Valide par", moderator_name, true);
-            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
+            if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
+                error!(error = %e, "Echec envoi embed warn dans le salon");
+            }
         }
         Action::Delete => {
             if let Ok(msg_id) = message_id_str.parse::<u64>() {
-                let _ = channel_id
+                match channel_id
                     .delete_message(&ctx.http, serenity::model::id::MessageId::new(msg_id))
-                    .await;
+                    .await
+                {
+                    Ok(_) => info!(message_id = %msg_id, "Message supprime via review"),
+                    Err(e) => warn!(error = %e, message_id = %msg_id, "Echec suppression message (peut-etre deja supprime)"),
+                }
             }
             let embed = moderate_embed("🗑️ Message supprime par un moderateur")
                 .color(colors.delete)
                 .field("👮 Valide par", moderator_name, true);
-            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
+            if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
+                error!(error = %e, "Echec envoi embed delete dans le salon");
+            }
         }
         Action::Mute => {
+            // Supprimer le message original
             if let Ok(msg_id) = message_id_str.parse::<u64>() {
-                let _ = channel_id
+                if let Err(e) = channel_id
                     .delete_message(&ctx.http, serenity::model::id::MessageId::new(msg_id))
-                    .await;
-            }
-            if let (Some(guild_id), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>()) {
-                if let Ok(mut member) = guild_id.member(&ctx.http, serenity::model::id::UserId::new(uid)).await {
-                    let secs = std::time::SystemTime::now()
-                        .duration_since(std::time::UNIX_EPOCH)
-                        .map(|d| d.as_secs() as i64 + mute_duration_secs as i64)
-                        .unwrap_or(0);
-                    if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(secs) {
-                        let timeout = serenity::model::Timestamp::from(dt);
-                        let _ = member.disable_communication_until_datetime(&ctx.http, timeout).await;
-                    }
+                    .await
+                {
+                    warn!(error = %e, "Echec suppression message (mute review)");
                 }
             }
+            // Appliquer le timeout Discord
+            let mut mute_applied = false;
+            if let (Some(guild_id), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>()) {
+                match guild_id.member(&ctx.http, serenity::model::id::UserId::new(uid)).await {
+                    Ok(mut member) => {
+                        let secs = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs() as i64 + mute_duration_secs as i64)
+                            .unwrap_or(0);
+                        match time::OffsetDateTime::from_unix_timestamp(secs) {
+                            Ok(dt) => {
+                                let timeout = serenity::model::Timestamp::from(dt);
+                                match member.disable_communication_until_datetime(&ctx.http, timeout).await {
+                                    Ok(_) => {
+                                        info!(user_id = %uid, duration = mute_duration_secs, "Mute applique via review");
+                                        mute_applied = true;
+                                    }
+                                    Err(e) => error!(error = %e, user_id = %uid, "Echec Discord disable_communication — le bot a-t-il la permission MODERATE_MEMBERS ?"),
+                                }
+                            }
+                            Err(e) => error!(error = %e, "Timestamp invalide pour mute"),
+                        }
+                    }
+                    Err(e) => warn!(error = %e, user_id = %uid, "Membre introuvable pour mute"),
+                }
+            } else {
+                warn!(guild_id = ?component.guild_id, user_id = %user_id_str, "guild_id ou user_id invalide pour mute");
+            }
             let mute_min = mute_duration_secs / 60;
-            let embed = danger_embed("🔇 Mute applique par un moderateur")
+            let status_text = if mute_applied { "applique" } else { "ECHOUE (voir logs)" };
+            let embed = danger_embed(&format!("🔇 Mute {} par un moderateur", status_text))
                 .color(colors.mute)
                 .field("⏱ Duree", format!("{} minutes", mute_min), true)
                 .field("👮 Valide par", moderator_name, true);
             let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
         }
         Action::Ban => {
+            info!(target = %user_id_str, channel = %channel_id_str, moderator = %moderator_name, "Ban signale via review");
             let embed = critical_embed("🔨 Signalement pour bannissement (valide)")
                 .color(colors.ban)
                 .field("👮 Valide par", moderator_name, true);
-            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
+            if let Err(e) = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await {
+                error!(error = %e, "Echec envoi embed ban dans le salon");
+            }
             // Note : le ban reel reste a la main du modérateur pour l'instant
             // (pas d'auto-ban meme en review mode). On pourrait ajouter un
             // guild.ban_member() ici si le proprio de la guild le souhaite.
