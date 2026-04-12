@@ -2,6 +2,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
+use serenity::builder::CreateEmbedFooter;
 use tracing::{info, warn};
 
 use sentinel_shared::embeds::danger_embed;
@@ -132,7 +133,9 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
         .field("Duree", format!("{}min", duration_min), true)
-        .field("Raison", reason, false);
+        .field("Raison", reason, false)
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
     // Confirmation ephemere au moderateur
     let followup = serenity::builder::CreateInteractionResponseFollowup::new()
@@ -228,7 +231,9 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
-        .field("Raison", reason, false);
+        .field("Raison", reason, false)
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
     // Confirmation ephemere au moderateur
     let followup = serenity::builder::CreateInteractionResponseFollowup::new()

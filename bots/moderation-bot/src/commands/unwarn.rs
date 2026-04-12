@@ -219,7 +219,9 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
                         &action_id[..8.min(action_id.len())],
                         component.user.id
                     ))
-                    .color(0x2ecc71);
+                    .color(0x2ecc71)
+                    .timestamp(serenity::model::Timestamp::now())
+                    .footer(serenity::builder::CreateEmbedFooter::new("Moderation | Sentinel"));
                 super::log_to_channel(ctx, &guild_id.to_string(), log_embed).await;
             }
         }

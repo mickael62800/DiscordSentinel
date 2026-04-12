@@ -178,6 +178,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         channel = %channel.name,
         "Convocation creee"
     );
+
+    // Log dans le salon dedie
+    let call_log_embed = info_embed("📞 Convocation")
+        .field("Cible", format!("<@{}>", target.id), true)
+        .field("ID Cible", target.id.to_string(), true)
+        .field("Moderateur", format!("<@{}>", command.user.id), true)
+        .field("Salon cree", format!("<#{}>", channel.id), false)
+        .field("Raison", reason, false)
+        .thumbnail(target.face())
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(serenity::builder::CreateEmbedFooter::new("Moderation | Sentinel"));
+    super::log_to_channel(ctx, &guild_id.to_string(), call_log_embed).await;
 }
 
 /// Gere le clic sur "Terminer la convocation" → supprime le salon.

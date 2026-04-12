@@ -3,6 +3,7 @@ use serenity::all::{
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, User,
 };
+use serenity::builder::CreateEmbedFooter;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
@@ -331,11 +332,19 @@ pub async fn execute_mute(
         }
     }
 
-    let channel_embed = moderate_embed(format!("🔇 Mute ({duration_label})"))
+    let mut channel_embed = moderate_embed(format!("🔇 Mute ({duration_label})"))
+        .thumbnail(target.face())
         .field("Cible", format!("<@{}>", target.id), true)
         .field("Moderateur", format!("<@{}>", moderator_id), true)
         .field("Duree", duration_label.to_string(), true)
+        .field("ID Cible", target.id.to_string(), true)
         .field("Raison", reason, false);
+    if let Some(cmd) = command {
+        channel_embed = channel_embed.field("Salon", format!("<#{}>", cmd.channel_id), true);
+    }
+    let channel_embed = channel_embed
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
     // Editer la reponse deferee pour confirmer au moderateur
     if let Some(cmd) = command {
@@ -406,7 +415,9 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
 
     let unmute_embed = success_embed("🔊 Unmute")
         .field("Cible", format!("<@{target_id}>"), true)
-        .field("Moderateur", format!("<@{}>", command.user.id), true);
+        .field("Moderateur", format!("<@{}>", command.user.id), true)
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
     // Reponse ephemere au modo
     if let Err(e) = command.create_response(

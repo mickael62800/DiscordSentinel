@@ -3,6 +3,7 @@ use serenity::all::{
     CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, User,
 };
+use serenity::builder::CreateEmbedFooter;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
@@ -308,11 +309,19 @@ pub async fn execute_ban(
 
     info!(target = %target.name, duration = %duration_label, "Ban applique");
 
-    let channel_embed = critical_embed(format!("🔨 Ban ({duration_label})"))
+    let mut channel_embed = critical_embed(format!("🔨 Ban ({duration_label})"))
+        .thumbnail(target.face())
         .field("Cible", format!("<@{}>", target.id), true)
         .field("Moderateur", format!("<@{}>", moderator_id), true)
         .field("Duree", duration_label.to_string(), true)
+        .field("ID Cible", target.id.to_string(), true)
         .field("Raison", reason, false);
+    if let Some(cmd) = command {
+        channel_embed = channel_embed.field("Salon", format!("<#{}>", cmd.channel_id), true);
+    }
+    let channel_embed = channel_embed
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
     // Editer la reponse deferee pour confirmer au moderateur
     if let Some(cmd) = command {
@@ -383,7 +392,9 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
 
     let unban_embed = success_embed("✅ Unban")
         .field("Moderateur", format!("<@{}>", command.user.id), true)
-        .field("Utilisateur", format!("`{user_id_str}`"), false);
+        .field("Utilisateur", format!("`{user_id_str}`"), false)
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
     if let Err(e) = command.create_response(
         &ctx.http,

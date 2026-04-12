@@ -3,6 +3,7 @@ use serenity::all::{
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
     CreateMessage,
 };
+use serenity::builder::CreateEmbedFooter;
 use tracing::{error, info, warn};
 
 use sentinel_shared::embeds::{sentinel_embed, gravity_color, gravity_emoji, danger_embed, moderate_embed};
@@ -121,10 +122,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 format!("{} Warn ({gravity}){strikes_label}", gravity_emoji(gravity)),
                 gravity_color(gravity),
             )
+            .thumbnail(target.face())
             .field("Cible", format!("<@{}>", target.id), true)
             .field("Moderateur", format!("<@{}>", command.user.id), true)
             .field("Gravite", gravity, true)
-            .field("Raison", reason, false);
+            .field("ID Cible", target.id.to_string(), true)
+            .field("Salon", format!("<#{}>", command.channel_id), true)
+            .field("Strikes", resp.strikes_count.map(|c| c.to_string()).unwrap_or_else(|| "—".to_string()), true)
+            .field("Raison", reason, false)
+            .timestamp(serenity::model::Timestamp::now())
+            .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
 
             // Editer la reponse deferee pour confirmer au modo
             if let Err(e) = command.edit_response(
@@ -158,13 +165,23 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         } else {
                             let esc_embed = moderate_embed(format!("🔇 Mute auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
                                 .field("Cible", format!("<@{}>", target.id), true)
-                                .field("Duree", format!("{}min", secs / 60), true);
+                                .field("ID Cible", target.id.to_string(), true)
+                                .field("Duree", format!("{}min", secs / 60), true)
+                                .field("Declencheur", format!("/warn par <@{}>", command.user.id), false)
+                                .thumbnail(target.face())
+                                .timestamp(serenity::model::Timestamp::now())
+                                .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                             super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
                         }
                     }
                     "ban" => {
                         let esc_embed = danger_embed(format!("🔨 Ban auto (escalation — {} strikes)", resp.strikes_count.unwrap_or(0)))
-                            .field("Cible", format!("<@{}>", target.id), true);
+                            .field("Cible", format!("<@{}>", target.id), true)
+                            .field("ID Cible", target.id.to_string(), true)
+                            .field("Declencheur", format!("/warn par <@{}>", command.user.id), false)
+                            .thumbnail(target.face())
+                            .timestamp(serenity::model::Timestamp::now())
+                            .footer(CreateEmbedFooter::new("Moderation | Sentinel"));
                         super::log_to_channel(ctx, &guild_id.to_string(), esc_embed).await;
                         if let Err(e) = guild_id.ban_with_reason(&ctx.http, target.id, 1, reason).await {
                             warn!(error = %e, "Escalation ban echouee");
