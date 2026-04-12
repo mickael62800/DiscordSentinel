@@ -211,11 +211,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command.create_response(
+    // /warn defere l'interaction au debut du handler, il faut donc
+    // utiliser edit_response (create_response = Interaction already acked).
+    if let Err(e) = command.edit_response(
         &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(content).ephemeral(false),
-        ),
+        serenity::builder::EditInteractionResponse::new().content(content),
     ).await {
         warn!(error = %e, "Failed to send reply text");
     }
