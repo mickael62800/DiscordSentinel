@@ -47,6 +47,9 @@ impl EventHandler for Handler {
 
         register_guilds(&ctx, &ready).await;
 
+        // Vider les anciennes commandes globales (evite les doublons).
+        let _ = serenity::model::application::Command::set_global_commands(&ctx.http, vec![]).await;
+
         // Enregistrement par guild (instantane) au lieu de global (jusqu'a 1h).
         let cmds = commands::all();
         for guild in &ready.guilds {
