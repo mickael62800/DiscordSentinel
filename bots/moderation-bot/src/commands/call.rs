@@ -219,17 +219,13 @@ pub async fn handle_close(ctx: &Context, component: &ComponentInteraction) {
         .map(|id| component.user.id.get() == id)
         .unwrap_or(false);
 
-    let has_mod_permission = if let Some(guild_id) = component.guild_id {
-        guild_id
-            .member(&ctx.http, component.user.id)
-            .await
-            .ok()
-            .and_then(|m| m.permissions(&ctx.cache).ok())
-            .map(|p| p.contains(serenity::all::Permissions::MODERATE_MEMBERS) || p.contains(serenity::all::Permissions::ADMINISTRATOR))
-            .unwrap_or(false)
-    } else {
-        false
-    };
+    // Les interactions Discord incluent member.permissions pre-calcule.
+    let has_mod_permission = component
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.contains(serenity::all::Permissions::MODERATE_MEMBERS) || p.contains(serenity::all::Permissions::ADMINISTRATOR))
+        .unwrap_or(false);
 
     if !is_original_mod && !has_mod_permission {
         let _ = component

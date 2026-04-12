@@ -19,14 +19,15 @@ pub async fn analyze(
     let command = dto.into();
     let analysis = state.analyze_uc.analyze(command).await?;
 
-    // Broadcast event if an action was taken
-    let action_str = analysis.action.as_str();
-    if action_str != "none" {
+    // Broadcast event if an action was taken.
+    // M7 — comparaison typee (enum) au lieu de string pour eviter la
+    // divergence silencieuse si as_str() change un jour.
+    if analysis.action != crate::domain::value_objects::Action::None {
         state.broadcaster.broadcast(
             "infraction_new",
             serde_json::json!({
                 "username": username,
-                "action": action_str,
+                "action": analysis.action.as_str(),
                 "reason": &analysis.reason,
             }),
         );

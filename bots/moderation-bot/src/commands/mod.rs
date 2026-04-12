@@ -17,9 +17,8 @@ pub mod transcript;
 pub mod unwarn;
 pub mod warn;
 
-use serenity::all::{ChannelId, Context, CreateEmbed, CreateEmbedFooter, CreateMessage, GuildId, UserId};
+use serenity::all::{ChannelId, Context, CreateEmbed, CreateMessage, GuildId, UserId};
 use serenity::builder::CreateCommand;
-use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 /// Envoie un embed de log dans le salon de logs configure pour la guild.

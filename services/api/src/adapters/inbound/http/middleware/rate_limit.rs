@@ -80,13 +80,39 @@ impl RateLimiter {
     }
 }
 
+/// Extrait l'IP cliente en priorisant X-Forwarded-For (derriere un reverse
+/// proxy) puis X-Real-IP, puis la socket directe. Sans ca, derriere un proxy
+/// toutes les requetes viennent de 127.0.0.1 et le rate limit s'applique
+/// globalement au lieu de par-client.
+fn client_ip(request: &Request, fallback: IpAddr) -> IpAddr {
+    if let Some(xff) = request.headers().get("x-forwarded-for") {
+        if let Ok(s) = xff.to_str() {
+            // X-Forwarded-For peut contenir plusieurs IPs "client, proxy1, proxy2"
+            if let Some(first) = s.split(',').next() {
+                if let Ok(ip) = first.trim().parse::<IpAddr>() {
+                    return ip;
+                }
+            }
+        }
+    }
+    if let Some(xri) = request.headers().get("x-real-ip") {
+        if let Ok(s) = xri.to_str() {
+            if let Ok(ip) = s.trim().parse::<IpAddr>() {
+                return ip;
+            }
+        }
+    }
+    fallback
+}
+
 pub async fn rate_limit_middleware(
     ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>,
     axum::extract::State(limiter): axum::extract::State<RateLimiter>,
     request: Request,
     next: Next,
 ) -> Response {
-    if limiter.check(addr.ip()).await {
+    let ip = client_ip(&request, addr.ip());
+    if limiter.check(ip).await {
         next.run(request).await
     } else {
         (

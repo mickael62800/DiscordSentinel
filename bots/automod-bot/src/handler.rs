@@ -586,21 +586,20 @@ async fn handle_review_button(ctx: &Context, component: &serenity::model::applic
     // H1 — Gate permission : seuls les moderateurs peuvent valider une action.
     // Sans ce check, n'importe quel user avec le custom_id peut declencher
     // mute/ban/delete via un POST d'interaction crafted.
-    let has_perm = if let Some(guild_id) = component.guild_id {
-        guild_id
-            .member(&ctx.http, component.user.id)
-            .await
-            .ok()
-            .and_then(|m| m.permissions(&ctx.cache).ok())
-            .map(|p| {
-                p.contains(serenity::all::Permissions::MODERATE_MEMBERS)
-                    || p.contains(serenity::all::Permissions::MANAGE_MESSAGES)
-                    || p.contains(serenity::all::Permissions::ADMINISTRATOR)
-            })
-            .unwrap_or(false)
-    } else {
-        false
-    };
+    // Les interactions Discord incluent `member.permissions` pre-calcule
+    // dans le payload (cf. PartialMember.permissions). On l'utilise
+    // directement au lieu de Member::permissions(cache) qui est deprecie
+    // et ne considere pas les overwrites de channel.
+    let has_perm = component
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| {
+            p.contains(serenity::all::Permissions::MODERATE_MEMBERS)
+                || p.contains(serenity::all::Permissions::MANAGE_MESSAGES)
+                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+        })
+        .unwrap_or(false);
 
     if !has_perm {
         let _ = component
@@ -1144,10 +1143,20 @@ async fn execute_action(
             // mute. L'inverse masquait l'echec.
             if let (Some(guild_id), Ok(member)) = (msg.guild_id, msg.member(&ctx.http).await) {
                 let mut member = guild_id.member(&ctx.http, member.user.id).await?;
+                // M10 — Borne la duree du mute a 28 jours (limite Discord)
+                // pour eviter un overflow de timestamp sur l'addition i64.
+                const MAX_MUTE_SECS: u64 = 28 * 24 * 3600;
+                let safe_duration = mute_duration_secs.min(MAX_MUTE_SECS);
                 let secs = match std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                 {
-                    Ok(d) => d.as_secs() as i64 + mute_duration_secs as i64,
+                    Ok(d) => match (d.as_secs() as i64).checked_add(safe_duration as i64) {
+                        Some(v) => v,
+                        None => {
+                            error!("Overflow timestamp mute (cas improbable)");
+                            return Ok(());
+                        }
+                    },
                     Err(e) => {
                         error!(error = %e, "Erreur horloge systeme pour le calcul du mute");
                         return Ok(());

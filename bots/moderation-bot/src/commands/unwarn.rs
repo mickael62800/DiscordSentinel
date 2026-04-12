@@ -152,21 +152,17 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
         None => return,
     };
 
-    // Verifier permission
-    let has_permission = if let Some(guild_id) = component.guild_id {
-        guild_id
-            .member(&ctx.http, component.user.id)
-            .await
-            .ok()
-            .and_then(|m| m.permissions(&ctx.cache).ok())
-            .map(|p| {
-                p.contains(serenity::all::Permissions::MODERATE_MEMBERS)
-                    || p.contains(serenity::all::Permissions::ADMINISTRATOR)
-            })
-            .unwrap_or(false)
-    } else {
-        false
-    };
+    // Verifier permission (member.permissions est pre-calcule par Discord
+    // sur les interactions, pas besoin de cache).
+    let has_permission = component
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| {
+            p.contains(serenity::all::Permissions::MODERATE_MEMBERS)
+                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+        })
+        .unwrap_or(false);
 
     if !has_permission {
         let _ = component
