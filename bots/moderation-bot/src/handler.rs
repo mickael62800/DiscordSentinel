@@ -132,7 +132,7 @@ impl EventHandler for Handler {
             Interaction::Component(component) => {
                 let custom_id = &component.data.custom_id;
 
-                if custom_id == commands::call::CALL_CLOSE_ID {
+                if custom_id.starts_with(commands::call::CALL_CLOSE_PREFIX) {
                     commands::call::handle_close(&ctx, &component).await;
                 } else if custom_id.starts_with(commands::appeal::APPEAL_PREFIX) {
                     commands::appeal::handle_appeal_button(&ctx, &component).await;

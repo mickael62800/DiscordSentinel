@@ -15,7 +15,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 use crate::api_client::ModerationAction;
 use crate::handler::ModerationApiKey;
 
-pub const CALL_CLOSE_ID: &str = "sentinel_mod_call_close";
+pub const CALL_CLOSE_PREFIX: &str = "sentinel_mod_call_close:";
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("call")
@@ -116,7 +116,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     // Message d'accueil
-    let close_button = CreateButton::new(CALL_CLOSE_ID)
+    let close_button = CreateButton::new(format!("{}{}", CALL_CLOSE_PREFIX, command.user.id))
         .label("Terminer la convocation")
         .style(serenity::all::ButtonStyle::Danger);
     let row = CreateActionRow::Buttons(vec![close_button]);
@@ -181,8 +181,48 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 }
 
 /// Gere le clic sur "Terminer la convocation" → supprime le salon.
+/// Seul le moderateur qui a cree la convocation OU un membre avec
+/// la permission MODERATE_MEMBERS peut fermer.
 pub async fn handle_close(ctx: &Context, component: &ComponentInteraction) {
     let channel_id = component.channel_id;
+
+    // Extraire le moderateur d'origine depuis le custom_id (format: prefix:mod_id)
+    let original_mod_id = component
+        .data
+        .custom_id
+        .strip_prefix(CALL_CLOSE_PREFIX)
+        .and_then(|s| s.parse::<u64>().ok());
+
+    // Verifier les permissions : moderateur d'origine OU permission MODERATE_MEMBERS
+    let is_original_mod = original_mod_id
+        .map(|id| component.user.id.get() == id)
+        .unwrap_or(false);
+
+    let has_mod_permission = if let Some(guild_id) = component.guild_id {
+        guild_id
+            .member(&ctx.http, component.user.id)
+            .await
+            .ok()
+            .and_then(|m| m.permissions(&ctx.cache).ok())
+            .map(|p| p.contains(serenity::all::Permissions::MODERATE_MEMBERS) || p.contains(serenity::all::Permissions::ADMINISTRATOR))
+            .unwrap_or(false)
+    } else {
+        false
+    };
+
+    if !is_original_mod && !has_mod_permission {
+        let _ = component
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Seul un moderateur peut clore la convocation.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        return;
+    }
 
     // Repondre d'abord
     let response = CreateInteractionResponse::Message(
