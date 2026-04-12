@@ -668,3 +668,18 @@ pub async fn get_modstats(
 
     Ok(Json(dtos))
 }
+
+/// DELETE /api/moderation/actions/{id} — supprime une action (unwarn).
+pub async fn delete_action(
+    State(state): State<AppState>,
+    Path(id): Path<String>,
+) -> Result<axum::http::StatusCode, ApiError> {
+    let uuid = uuid::Uuid::parse_str(&id)
+        .map_err(|_| ApiError(crate::domain::errors::DomainError::ValidationError("ID invalide".into())))?;
+    let deleted = state.moderation_uc.delete_action(uuid).await?;
+    if deleted {
+        Ok(axum::http::StatusCode::NO_CONTENT)
+    } else {
+        Err(ApiError(crate::domain::errors::DomainError::NotFound("Action introuvable".into())))
+    }
+}

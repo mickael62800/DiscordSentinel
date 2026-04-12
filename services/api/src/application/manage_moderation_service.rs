@@ -106,4 +106,8 @@ impl ManageModerationUseCase for ManageModerationService {
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {
         self.repo.delete_bans_for_user(guild_id, target_id).await
     }
+
+    async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
+        self.repo.delete_action(id).await
+    }
 }

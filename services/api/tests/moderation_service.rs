@@ -59,6 +59,13 @@ impl ModerationRepository for InMemoryModerationRepo {
         actions.retain(|a| !(a.guild_id == guild_id && a.target_id == target_id && a.action_type.starts_with("ban")));
         Ok(())
     }
+
+    async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
+        let mut actions = self.actions.lock().await;
+        let len_before = actions.len();
+        actions.retain(|a| a.id != id);
+        Ok(actions.len() < len_before)
+    }
 }
 
 // ══════════════════════════════════════════════════════════

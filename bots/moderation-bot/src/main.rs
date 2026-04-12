@@ -64,7 +64,7 @@ async fn main() {
         let mut data = client.data.write().await;
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<GrpcClientKey>(Arc::clone(&grpc));
-        data.insert::<ModerationApiKey>(mod_api);
+        data.insert::<ModerationApiKey>(std::sync::Arc::new(mod_api));
         data.insert::<PendingActionsKey>(DashMap::new());
         data.insert::<RiskyPendingKey>(DashMap::new());
     }

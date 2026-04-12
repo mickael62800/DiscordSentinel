@@ -129,6 +129,7 @@ impl ManageModerationUseCase for MockModerationUC {
     async fn delete_bans_for_user(&self, _guild_id: &str, _target_id: &str) -> Result<(), DomainError> {
         Ok(())
     }
+    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
 }
 
 // ══════════════════════════════════════════════════════════

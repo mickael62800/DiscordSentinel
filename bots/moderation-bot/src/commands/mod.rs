@@ -14,6 +14,7 @@ pub mod notes;
 pub mod review;
 pub mod template;
 pub mod transcript;
+pub mod unwarn;
 pub mod warn;
 
 use serenity::all::{ChannelId, Context, CreateEmbed, CreateEmbedFooter, CreateMessage};
@@ -71,5 +72,6 @@ pub fn all() -> Vec<CreateCommand> {
         transcript::register(),
         mass::register_massmute(),
         mass::register_massban(),
+        unwarn::register(),
     ]
 }

@@ -32,7 +32,10 @@ pub struct ModerationActionResponse {
     pub id: String,
     pub action_type: String,
     pub target_name: String,
+    pub moderator_name: String,
     pub reason: String,
+    pub gravity: Option<String>,
+    pub created_at: String,
     pub escalation_action: Option<String>,
     pub escalation_duration: Option<u64>,
     pub strikes_count: Option<u32>,
@@ -174,11 +177,10 @@ impl ApiClient {
             id: resp.id,
             action_type: resp.action_type,
             target_name: resp.target_name,
+            moderator_name: resp.moderator_name,
             reason: resp.reason,
-            // Champs d'escalation : pas exposes par le proto v1, le serveur
-            // peut les renvoyer dans le champ reason ou via une RPC dediee
-            // ulterieurement. Pour l'instant on renvoie None — l'auto-escalade
-            // visible cote bot est gardee dans une iteration future.
+            gravity: resp.gravity,
+            created_at: resp.created_at,
             escalation_action: None,
             escalation_duration: None,
             strikes_count: None,
@@ -210,13 +212,27 @@ impl ApiClient {
                     id: a.id,
                     action_type: a.action_type,
                     target_name: a.target_name,
+                    moderator_name: a.moderator_name,
                     reason: a.reason,
+                    gravity: a.gravity,
+                    created_at: a.created_at,
                     escalation_action: None,
                     escalation_duration: None,
                     strikes_count: None,
                 })
                 .collect(),
         })
+    }
+
+    /// Supprime une action de moderation par son ID (unwarn).
+    pub async fn delete_action(&self, action_id: &str) -> Result<bool, String> {
+        let req = self.base.client()
+            .delete(format!("{}/api/moderation/actions/{}", self.base.base_url(), action_id));
+        let resp = self.base.auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur HTTP delete_action: {e}"))?;
+        Ok(resp.status().is_success())
     }
 
     /// MOD #1 — Liste les sanctions temporaires actives (reminders pending) d'une guild.

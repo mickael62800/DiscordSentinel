@@ -131,4 +131,13 @@ impl ModerationRepository for PgModerationRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
         Ok(())
     }
+
+    async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
+        let result = sqlx::query("DELETE FROM moderation_actions WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(result.rows_affected() > 0)
+    }
 }

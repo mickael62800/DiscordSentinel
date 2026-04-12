@@ -84,6 +84,7 @@ impl ManageModerationUseCase for StubModeration {
     async fn get_history(&self, _: &str, _: &str) -> Result<UserModerationHistory, DomainError> { unimplemented!() }
     async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { unimplemented!() }
     async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { unimplemented!() }
 }
 
 pub struct StubStats;

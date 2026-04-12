@@ -135,6 +135,7 @@ fn strikes_routes() -> Router<AppState> {
 fn moderation_routes() -> Router<AppState> {
     Router::new()
         .route("/actions", post(handlers::moderation::log_action))
+        .route("/actions/{id}", delete(handlers::moderation::delete_action))
         .route("/bans", get(handlers::moderation::list_bans))
         .route("/execute-ban", post(handlers::moderation::execute_ban))
         .route("/execute-unban", post(handlers::moderation::execute_unban))

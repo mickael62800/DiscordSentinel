@@ -19,7 +19,7 @@ use crate::reason_templates;
 /// Cle TypeMap pour le client API specifique a la moderation.
 pub struct ModerationApiKey;
 impl TypeMapKey for ModerationApiKey {
-    type Value = ApiClient;
+    type Value = std::sync::Arc<ApiClient>;
 }
 
 /// Actions en attente d'approbation (mode apprenti).
@@ -102,6 +102,7 @@ impl EventHandler for Handler {
 
                 match cmd_name.as_str() {
                     "warn" => commands::warn::handle(&ctx, &command).await,
+                    "unwarn" => commands::unwarn::handle(&ctx, &command).await,
                     "mute" => commands::mute::handle(&ctx, &command).await,
                     "unmute" => commands::mute::handle_unmute(&ctx, &command).await,
                     "ban" => commands::ban::handle(&ctx, &command).await,
@@ -132,7 +133,9 @@ impl EventHandler for Handler {
             Interaction::Component(component) => {
                 let custom_id = &component.data.custom_id;
 
-                if custom_id.starts_with(commands::call::CALL_CLOSE_PREFIX) {
+                if custom_id.starts_with(commands::unwarn::UNWARN_PREFIX) {
+                    commands::unwarn::handle_button(&ctx, &component).await;
+                } else if custom_id.starts_with(commands::call::CALL_CLOSE_PREFIX) {
                     commands::call::handle_close(&ctx, &component).await;
                 } else if custom_id.starts_with(commands::appeal::APPEAL_PREFIX) {
                     commands::appeal::handle_appeal_button(&ctx, &component).await;
