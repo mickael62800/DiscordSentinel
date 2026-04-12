@@ -24,9 +24,12 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let target_id = command.data.options.iter().find(|o| o.name == "user")
+    let target_id = match command.data.options.iter().find(|o| o.name == "user")
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-        .unwrap();
+    {
+        Some(id) => id,
+        None => { sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Parametre 'user' manquant.").await; return; }
+    };
 
     let format = command.data.options.iter().find(|o| o.name == "format")
         .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })

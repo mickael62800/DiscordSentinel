@@ -48,7 +48,9 @@ impl EventHandler for Handler {
         register_guilds(&ctx, &ready).await;
 
         // Vider les anciennes commandes globales (evite les doublons).
-        let _ = serenity::model::application::Command::set_global_commands(&ctx.http, vec![]).await;
+        if let Err(e) = serenity::model::application::Command::set_global_commands(&ctx.http, vec![]).await {
+            warn!(error = %e, "Echec nettoyage commandes globales (peut laisser des doublons)");
+        }
 
         // Enregistrement par guild (instantane) au lieu de global (jusqu'a 1h).
         let cmds = commands::all();
@@ -260,11 +262,11 @@ async fn handle_approve(ctx: &Context, component: &serenity::model::application:
         }
     };
 
-    // Cleanup : supprimer les actions en attente > 24h
-    if pending_actions.len() > 50 {
-        let now = Instant::now();
-        pending_actions.retain(|_, p| now.duration_since(p.proposed_at).as_secs() < 86400);
-    }
+    // Cleanup : toujours purger les actions expirees (> 24h), peu importe la
+    // taille de la map. Le check > 50 precedent laissait les entrees expirees
+    // s'accumuler indefiniment si la map restait sous 50 items.
+    let now = Instant::now();
+    pending_actions.retain(|_, p| now.duration_since(p.proposed_at).as_secs() < 86400);
 
     let api = match data.get::<ModerationApiKey>() {
         Some(a) => a,
@@ -280,6 +282,7 @@ async fn handle_approve(ctx: &Context, component: &serenity::model::application:
             // Event temps reel pour le desktop
             if let Some(base) = data.get::<ApiClientKey>() {
                 base.publish_event("pending_action_resolved", serde_json::json!({
+                    "version": "1",
                     "action_id": pending_id,
                     "status": "approved",
                     "reviewed_by": component.user.id.to_string(),
@@ -328,6 +331,18 @@ async fn handle_reject(ctx: &Context, component: &serenity::model::application::
         // Persister le rejet via l'API
         if let Some(api) = data.get::<ModerationApiKey>() {
             api.resolve_pending_action(&pending_id, "rejected", &component.user.id.to_string()).await;
+        }
+
+        // Event temps reel pour le desktop (symetrique avec approve)
+        if let Some(base) = data.get::<ApiClientKey>() {
+            base.publish_event("pending_action_resolved", serde_json::json!({
+                "version": "1",
+                "action_id": pending_id,
+                "status": "rejected",
+                "reviewed_by": component.user.id.to_string(),
+                "action_type": pending.action.action_type,
+                "target_id": pending.action.target_id,
+            }));
         }
 
         let response = serenity::all::CreateInteractionResponse::Message(

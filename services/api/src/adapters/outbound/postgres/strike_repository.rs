@@ -56,8 +56,13 @@ struct StrikeConfigRow {
 
 impl From<StrikeConfigRow> for StrikeConfig {
     fn from(r: StrikeConfigRow) -> Self {
-        let thresholds: Vec<StrikeThreshold> =
-            serde_json::from_value(r.thresholds).unwrap_or_default();
+        let thresholds: Vec<StrikeThreshold> = match serde_json::from_value(r.thresholds.clone()) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(guild_id = %r.guild_id, error = %e, raw = %r.thresholds, "Parse thresholds JSON echoue, fallback vec![]");
+                Vec::new()
+            }
+        };
         Self {
             guild_id: r.guild_id,
             window_secs: r.window_secs,
@@ -118,6 +123,15 @@ impl StrikeRepository for PgStrikeRepository {
             .await
             .map_err(|e| DomainError::Internal(format!("delete_strikes: {e}")))?;
         Ok(())
+    }
+
+    async fn delete_strike_by_infraction_id(&self, infraction_id: Uuid) -> Result<u64, DomainError> {
+        let result = sqlx::query("DELETE FROM user_strikes WHERE infraction_id = $1")
+            .bind(infraction_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(format!("delete_strike_by_infraction_id: {e}")))?;
+        Ok(result.rows_affected())
     }
 
     async fn get_config(&self, guild_id: &str) -> Result<Option<StrikeConfig>, DomainError> {

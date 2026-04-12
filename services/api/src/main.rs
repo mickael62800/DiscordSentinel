@@ -221,7 +221,8 @@ async fn main() {
     let infractions_uc = Arc::new(ManageInfractionsService::new(infraction_repo.clone()));
     let tickets_uc = Arc::new(ManageTicketsService::new(ticket_repo.clone(), cache.clone()));
     let security_uc = Arc::new(ManageSecurityService::new(security_repo.clone(), cache.clone()));
-    let moderation_uc = Arc::new(ManageModerationService::new(moderation_repo.clone(), cache.clone(), conduct_uc.clone()));
+    // Note : la creation de moderation_uc est differee plus bas pour pouvoir
+    // injecter strikes_uc via with_strikes_uc (log_action_with_strike).
     let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone(), redis_client.clone()));
     let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone()));
     // Phase 5C — Batch writes : idem que log_repo, pour les audit events.
@@ -239,7 +240,16 @@ async fn main() {
     let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
     let notes_uc = Arc::new(ManageNotesService::new(notes_repo));
     let reminders_uc = Arc::new(ManageRemindersService::new(reminder_repo));
-    let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo));
+    let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo.clone()));
+    let moderation_uc = Arc::new(
+        ManageModerationService::new(
+            moderation_repo.clone(),
+            strike_repo.clone(),
+            cache.clone(),
+            conduct_uc.clone(),
+        )
+        .with_strikes_uc(strikes_uc.clone() as Arc<dyn sentinel_api::ports::inbound::ManageStrikesUseCase>),
+    );
     let member_repo = Arc::new(PgMemberRepository::new(pg_pool.clone()));
     let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));
     let wallet_repo = Arc::new(PgWalletRepository::new(pg_pool.clone()));

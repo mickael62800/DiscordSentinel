@@ -62,6 +62,17 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Defer : add/list touchent l'API HTTP (evidence), possible > 3s.
+    if let Err(e) = command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Defer(
+            CreateInteractionResponseMessage::new().ephemeral(true),
+        ),
+    ).await {
+        warn!(error = %e, cmd = "evidence", "Echec defer interaction Discord");
+        return;
+    }
+
     let sub = command
         .data
         .options
@@ -145,11 +156,9 @@ async fn handle_add(
                 .field("URL", url, false)
                 .field("Par", format!("<@{}>", ev.uploaded_by), true);
             if let Err(e) = command
-                .create_response(
+                .edit_response(
                     &ctx.http,
-                    CreateInteractionResponse::Message(
-                        CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
-                    ),
+                    serenity::builder::EditInteractionResponse::new().embed(embed),
                 )
                 .await
             {
@@ -227,11 +236,9 @@ async fn handle_list(
     .description(description);
 
     if let Err(e) = command
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
-            ),
+            serenity::builder::EditInteractionResponse::new().embed(embed),
         )
         .await
     {
@@ -244,12 +251,11 @@ fn short_id(full: &str) -> String {
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
+    // Apres Defer, utiliser edit_response (create_response ferait Unknown Interaction).
     if let Err(e) = command
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().content(content).ephemeral(true),
-            ),
+            serenity::builder::EditInteractionResponse::new().content(content),
         )
         .await
     {

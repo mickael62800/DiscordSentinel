@@ -32,9 +32,12 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let target_id = command.data.options.iter().find(|o| o.name == "user")
+    let target_id = match command.data.options.iter().find(|o| o.name == "user")
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-        .unwrap();
+    {
+        Some(id) => id,
+        None => { reply_ephemeral(ctx, command, "Parametre 'user' manquant.").await; return; }
+    };
 
     let reason = command.data.options.iter().find(|o| o.name == "reason")
         .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
@@ -246,12 +249,16 @@ pub async fn handle_close(ctx: &Context, component: &ComponentInteraction) {
         warn!(error = %e, "Failed to send call close response");
     }
 
-    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
-
-    if let Err(e) = channel_id.delete(&ctx.http).await {
-        error!(error = %e, "Impossible de supprimer le salon de convocation");
-    } else {
-        info!(channel_id = %channel_id, "Salon de convocation supprime");
-    }
+    // Sleep + delete en tache detachee pour ne pas bloquer le handler
+    // d'interaction (le ACK a deja ete envoye au-dessus).
+    let http = ctx.http.clone();
+    tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+        if let Err(e) = channel_id.delete(&http).await {
+            error!(error = %e, "Impossible de supprimer le salon de convocation");
+        } else {
+            info!(channel_id = %channel_id, "Salon de convocation supprime");
+        }
+    });
 }
 

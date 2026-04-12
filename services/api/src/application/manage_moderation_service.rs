@@ -5,28 +5,51 @@ use uuid::Uuid;
 
 use crate::domain::entities::{ModerationAction, UserModerationHistory};
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{DeductPointsCommand, LogModerationCommand, ManageConductUseCase, ManageModerationUseCase};
+use crate::ports::inbound::{
+    AddStrikeCommand, DeductPointsCommand, LoggedModerationAction, LogModerationCommand,
+    ManageConductUseCase, ManageModerationUseCase, ManageStrikesUseCase,
+};
 use tracing::warn;
 
-use crate::ports::outbound::{CachePort, ModerationRepository};
+use crate::ports::outbound::{CachePort, ModerationRepository, StrikeRepository};
 
 const HISTORY_TTL: u64 = 180; // 3 minutes
 
 pub struct ManageModerationService {
     repo: Arc<dyn ModerationRepository>,
+    strike_repo: Arc<dyn StrikeRepository>,
     cache: Arc<dyn CachePort>,
     conduct_uc: Arc<dyn ManageConductUseCase>,
+    strikes_uc: Option<Arc<dyn ManageStrikesUseCase>>,
 }
 
 impl ManageModerationService {
-    pub fn new(repo: Arc<dyn ModerationRepository>, cache: Arc<dyn CachePort>, conduct_uc: Arc<dyn ManageConductUseCase>) -> Self {
-        Self { repo, cache, conduct_uc }
+    pub fn new(
+        repo: Arc<dyn ModerationRepository>,
+        strike_repo: Arc<dyn StrikeRepository>,
+        cache: Arc<dyn CachePort>,
+        conduct_uc: Arc<dyn ManageConductUseCase>,
+    ) -> Self {
+        Self { repo, strike_repo, cache, conduct_uc, strikes_uc: None }
+    }
+
+    /// Injecte le use case strikes (optionnel — active `log_action_with_strike`).
+    /// Builder-style pour eviter une dependance circulaire a la construction
+    /// (strikes_uc n'existe pas encore quand ManageModerationService::new est
+    /// appele dans main.rs).
+    pub fn with_strikes_uc(mut self, strikes_uc: Arc<dyn ManageStrikesUseCase>) -> Self {
+        self.strikes_uc = Some(strikes_uc);
+        self
     }
 }
 
 #[async_trait]
 impl ManageModerationUseCase for ManageModerationService {
     async fn log_action(&self, cmd: LogModerationCommand) -> Result<ModerationAction, DomainError> {
+        // Truncate raison a 500 chars AVANT persist (pas seulement dans l'embed).
+        // Evite que la DB contienne plus de texte que ce que les UIs peuvent afficher.
+        let truncated_reason: String = cmd.reason.chars().take(500).collect();
+
         let action = ModerationAction {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id.clone(),
@@ -36,7 +59,7 @@ impl ManageModerationUseCase for ManageModerationService {
             target_id: cmd.target_id.clone(),
             target_name: cmd.target_name,
             action_type: cmd.action_type,
-            reason: cmd.reason,
+            reason: truncated_reason,
             gravity: cmd.gravity.as_deref().and_then(crate::domain::value_objects::ModerationGravity::from_str_lossy),
             duration: cmd.duration,
             created_at: chrono::Utc::now(),
@@ -61,6 +84,49 @@ impl ManageModerationUseCase for ManageModerationService {
         }
 
         Ok(action)
+    }
+
+    async fn log_action_with_strike(&self, cmd: LogModerationCommand) -> Result<LoggedModerationAction, DomainError> {
+        // Capture les champs necessaires pour la commande strike AVANT le move.
+        let guild_id = cmd.guild_id.clone();
+        let target_id = cmd.target_id.clone();
+        let reason = cmd.reason.clone();
+
+        let action = self.log_action(cmd).await?;
+
+        // Si le strikes_uc n'a pas ete injecte, on retourne sans strike
+        // (compat descendante : certains tests n'en ont pas besoin).
+        let strike = match &self.strikes_uc {
+            Some(uc) => {
+                match uc
+                    .add_strike(AddStrikeCommand {
+                        guild_id,
+                        user_id: target_id,
+                        reason,
+                        source: "moderator".into(),
+                        infraction_id: Some(action.id),
+                    })
+                    .await
+                {
+                    Ok(r) => Some(r),
+                    Err(e) => {
+                        // Compensation non destructive : l'action reste, on log
+                        // l'incoherence pour alerting.
+                        tracing::error!(
+                            error = %e,
+                            action_id = %action.id,
+                            guild_id = %action.guild_id,
+                            target_id = %action.target_id,
+                            "INCOHERENCE : action sauvee mais strike echoue"
+                        );
+                        None
+                    }
+                }
+            }
+            None => None,
+        };
+
+        Ok(LoggedModerationAction { action, strike })
     }
 
     async fn get_history(&self, guild_id: &str, target_id: &str) -> Result<UserModerationHistory, DomainError> {
@@ -104,25 +170,45 @@ impl ManageModerationUseCase for ManageModerationService {
     }
 
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {
-        self.repo.delete_bans_for_user(guild_id, target_id).await
+        self.repo.delete_bans_for_user(guild_id, target_id).await?;
+        let cache_key = format!("modhistory:{guild_id}:{target_id}");
+        if let Err(e) = self.cache.invalidate(&cache_key).await {
+            warn!(error = %e, cache_key = %cache_key, "Echec invalidation cache mod history apres delete_bans_for_user");
+        }
+        Ok(())
     }
 
     async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
-        // Lire l'action avant suppression pour obtenir guild_id + target_id
-        // (necessaire pour invalider le cache).
-        let actions = self.repo.find_bans(None, 1000, 0).await.unwrap_or_default();
-        // On cherche parmi toutes les actions (pas juste les bans) — fallback:
-        // on invalide tous les caches modhistory si on ne trouve pas l'action.
-        // L'approche propre serait un find_by_id, mais pour eviter un refactor
-        // on supprime d'abord puis on invalide par pattern.
+        // Lire l'action avant suppression pour pouvoir invalider le cache cible
+        // et supprimer le strike associe (lien via infraction_id = action.id).
+        let action = match self.repo.find_by_id(id).await? {
+            Some(a) => a,
+            None => return Ok(false),
+        };
+
         let deleted = self.repo.delete_action(id).await?;
-        if deleted {
-            // Invalider tous les caches d'historique de moderation.
-            // C'est un peu large mais garantit la coherence.
-            if let Err(e) = self.cache.invalidate_pattern("modhistory:*").await {
-                tracing::warn!(error = %e, "Echec invalidation cache mod history");
+        if !deleted {
+            return Ok(false);
+        }
+
+        // Supprimer le strike lie (sinon l'escalation continue de compter
+        // l'infraction qu'on vient de retirer).
+        match self.strike_repo.delete_strike_by_infraction_id(id).await {
+            Ok(count) if count > 0 => {
+                tracing::info!(action_id = %id, strikes_removed = count, "Strikes lies a l'action supprimes");
+            }
+            Ok(_) => {}
+            Err(e) => {
+                warn!(error = %e, action_id = %id, "Echec suppression strike lie a l'action");
             }
         }
-        Ok(deleted)
+
+        // Invalidation ciblee du cache modhistory pour ce user uniquement.
+        let cache_key = format!("modhistory:{}:{}", action.guild_id, action.target_id);
+        if let Err(e) = self.cache.invalidate(&cache_key).await {
+            warn!(error = %e, cache_key = %cache_key, "Echec invalidation cache mod history apres delete_action");
+        }
+
+        Ok(true)
     }
 }

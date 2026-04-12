@@ -12,12 +12,22 @@ use crate::domain::errors::DomainError;
 /// POST /api/notes
 pub async fn add_note(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddNoteDto>,
 ) -> Result<Json<UserNoteDto>, ApiError> {
     // Validation
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_content(&dto.content).map_err(ApiError)?;
+
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour ajouter une note",
+    )
+    .await?;
 
     let command = dto.into();
     let note = state.notes_uc.add_note(command).await?;
@@ -27,10 +37,15 @@ pub async fn add_note(
 /// GET /api/notes/{guild_id}/{user_id}
 pub async fn get_notes(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<UserNoteDto>>, ApiError> {
     // Validation
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
+
+    // Moderator+ requis : les notes sont sensibles (contexte interne de modo).
+    use crate::adapters::inbound::http::middleware::rbac::check_role;
+    check_role(&rbac, Role::Moderator, "moderator+ requis pour lire les notes")?;
 
     let notes = state.notes_uc.get_notes(&guild_id, &user_id).await?;
     Ok(map_to_dtos(notes))

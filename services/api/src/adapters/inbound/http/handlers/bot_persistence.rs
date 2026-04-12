@@ -13,7 +13,7 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
@@ -428,9 +428,32 @@ pub struct ResolvePendingActionDto {
 /// PATCH /api/moderation/pending/{id}
 pub async fn resolve_pending_action(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<String>,
     Json(dto): Json<ResolvePendingActionDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    // H10 — Revérif permission serveur : on lookup le guild_id de l'action
+    // pending puis on gate sur Moderator+.
+    if rbac.is_some() {
+        let gid: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM pending_mod_actions WHERE id = $1::uuid",
+        )
+        .bind(&id)
+        .fetch_optional(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("fetch pending guild_id: {e}"))))?;
+        if let Some((guild_id,)) = gid {
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Moderator,
+                "moderator+ requis pour resoudre une action en attente",
+            )
+            .await?;
+        }
+    }
+
     sqlx::query(
         "UPDATE pending_mod_actions SET status = $1, reviewed_by = $2, updated_at = NOW() \
          WHERE id = $3::uuid",

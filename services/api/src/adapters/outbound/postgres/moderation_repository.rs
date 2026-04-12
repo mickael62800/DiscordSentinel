@@ -80,9 +80,21 @@ impl ModerationRepository for PgModerationRepository {
         Ok(())
     }
 
+    async fn find_by_id(&self, id: Uuid) -> Result<Option<ModerationAction>, DomainError> {
+        let row = sqlx::query_as::<_, ActionRow>(
+            "SELECT * FROM moderation_actions WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.map(ModerationAction::from))
+    }
+
     async fn find_by_target(&self, guild_id: &str, target_id: &str) -> Result<Vec<ModerationAction>, DomainError> {
         let rows = sqlx::query_as::<_, ActionRow>(
-            "SELECT * FROM moderation_actions WHERE guild_id = $1 AND target_id = $2 ORDER BY created_at DESC LIMIT 50",
+            "SELECT * FROM moderation_actions WHERE guild_id = $1 AND target_id = $2 ORDER BY created_at DESC LIMIT 200",
         )
         .bind(guild_id)
         .bind(target_id)

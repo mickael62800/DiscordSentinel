@@ -30,7 +30,18 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let user1_id = command
+    // Defer : 2 appels API get_history peuvent depasser 3s cumules.
+    if let Err(e) = command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Defer(
+            CreateInteractionResponseMessage::new().ephemeral(true),
+        ),
+    ).await {
+        warn!(error = %e, cmd = "compare", "Echec defer interaction Discord");
+        return;
+    }
+
+    let user1_id = match command
         .data
         .options
         .iter()
@@ -38,9 +49,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value {
             CommandDataOptionValue::User(id) => Some(*id),
             _ => None,
-        })
-        .unwrap();
-    let user2_id = command
+        }) {
+        Some(id) => id,
+        None => { reply_text(ctx, command, "Parametre 'user1' manquant.").await; return; }
+    };
+    let user2_id = match command
         .data
         .options
         .iter()
@@ -48,8 +61,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value {
             CommandDataOptionValue::User(id) => Some(*id),
             _ => None,
-        })
-        .unwrap();
+        }) {
+        Some(id) => id,
+        None => { reply_text(ctx, command, "Parametre 'user2' manquant.").await; return; }
+    };
 
     if user1_id == user2_id {
         reply_text(ctx, command, "Les deux utilisateurs doivent etre differents.").await;
@@ -120,11 +135,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         );
 
     if let Err(e) = command
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
-            ),
+            serenity::builder::EditInteractionResponse::new().embed(embed),
         )
         .await
     {
@@ -165,12 +178,11 @@ fn format_history_block(h: &UserHistory) -> String {
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
+    // Apres Defer, on edit la reponse (create_response ferait Unknown Interaction).
     if let Err(e) = command
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().content(content).ephemeral(true),
-            ),
+            serenity::builder::EditInteractionResponse::new().content(content),
         )
         .await
     {

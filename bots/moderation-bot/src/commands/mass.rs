@@ -157,6 +157,18 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
 }
 
 pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
+    // Defer immediat : la boucle ban peut prendre plusieurs secondes pour 200
+    // users et Discord timeout les interactions apres 3s.
+    if let Err(e) = command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Defer(
+            CreateInteractionResponseMessage::new().ephemeral(true),
+        ),
+    ).await {
+        warn!(error = %e, cmd = "massban", "Echec defer interaction Discord");
+        return;
+    }
+
     let users_str = command.data.options.iter().find(|o| o.name == "users")
         .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
         .unwrap_or("");
@@ -167,29 +179,27 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => {
+            let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
+                .content("Commande serveur uniquement.")).await;
+            return;
+        }
     };
 
     let user_ids = parse_user_ids(users_str);
     if user_ids.is_empty() {
-        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Aucun ID utilisateur valide detecte.").await;
+        let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
+            .content("Aucun ID utilisateur valide detecte.")).await;
         return;
     }
     if user_ids.len() > 200 {
-        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Maximum 200 utilisateurs par commande.").await;
+        let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
+            .content("Maximum 200 utilisateurs par commande.")).await;
         return;
     }
 
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content(format!("Ban en cours de {} utilisateurs...", user_ids.len()))
-                .ephemeral(true),
-        ),
-    ).await {
-        warn!(error = %e, "Failed to send massban initial response");
-    }
+    let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
+        .content(format!("Ban en cours de {} utilisateurs...", user_ids.len()))).await;
 
     let mut success = 0u32;
     let mut failures = 0u32;
@@ -256,12 +266,16 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
 
 /// Parse les IDs utilisateurs depuis une chaine (espaces, virgules, ou les deux).
 pub fn parse_user_ids(input: &str) -> Vec<u64> {
+    // Dedup tout en preservant l'ordre : un user qui apparait 2x ne doit
+    // pas etre sanctionne 2x (sinon erreur Discord + double log).
+    let mut seen = std::collections::HashSet::new();
     input
         .split([',', ' ', '\n'])
         .filter_map(|s| {
             let trimmed = s.trim().trim_start_matches("<@").trim_start_matches('!').trim_end_matches('>');
             trimmed.parse::<u64>().ok()
         })
+        .filter(|id| seen.insert(*id))
         .collect()
 }
 

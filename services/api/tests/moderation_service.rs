@@ -12,7 +12,7 @@ use sentinel_api::application::ManageModerationService;
 use sentinel_api::domain::entities::*;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::*;
-use sentinel_api::ports::outbound::{CachePort, ModerationRepository};
+use sentinel_api::ports::outbound::{CachePort, ModerationRepository, StrikeRepository};
 
 // ══════════════════════════════════════════════════════════
 // Mock Repository (in-memory)
@@ -33,6 +33,11 @@ impl ModerationRepository for InMemoryModerationRepo {
     async fn save(&self, action: &ModerationAction) -> Result<(), DomainError> {
         self.actions.lock().await.push(action.clone());
         Ok(())
+    }
+
+    async fn find_by_id(&self, id: uuid::Uuid) -> Result<Option<ModerationAction>, DomainError> {
+        let actions = self.actions.lock().await;
+        Ok(actions.iter().find(|a| a.id == id).cloned())
     }
 
     async fn find_by_target(&self, guild_id: &str, target_id: &str) -> Result<Vec<ModerationAction>, DomainError> {
@@ -66,6 +71,22 @@ impl ModerationRepository for InMemoryModerationRepo {
         actions.retain(|a| a.id != id);
         Ok(actions.len() < len_before)
     }
+}
+
+// ══════════════════════════════════════════════════════════
+// Mock Strike Repository (no-op)
+// ══════════════════════════════════════════════════════════
+
+struct NoOpStrikeRepo;
+
+#[async_trait]
+impl StrikeRepository for NoOpStrikeRepo {
+    async fn save_strike(&self, _: &UserStrike) -> Result<(), DomainError> { Ok(()) }
+    async fn find_active_strikes(&self, _: &str, _: &str, _: i64) -> Result<Vec<UserStrike>, DomainError> { Ok(vec![]) }
+    async fn delete_strikes(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn delete_strike_by_infraction_id(&self, _: uuid::Uuid) -> Result<u64, DomainError> { Ok(0) }
+    async fn get_config(&self, _: &str) -> Result<Option<StrikeConfig>, DomainError> { Ok(None) }
+    async fn save_config(&self, _: &StrikeConfig) -> Result<(), DomainError> { Ok(()) }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -131,8 +152,10 @@ fn build_service() -> (ManageModerationService, Arc<InMemoryModerationRepo>, Arc
     let repo = Arc::new(InMemoryModerationRepo::new());
     let cache = Arc::new(NoOpCache);
     let conduct = Arc::new(MockConduct::new());
+    let strike_repo = Arc::new(NoOpStrikeRepo);
     let svc = ManageModerationService::new(
         repo.clone() as Arc<dyn ModerationRepository>,
+        strike_repo as Arc<dyn StrikeRepository>,
         cache as Arc<dyn CachePort>,
         conduct.clone() as Arc<dyn ManageConductUseCase>,
     );

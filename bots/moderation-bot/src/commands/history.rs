@@ -19,9 +19,12 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let target_id = command.data.options.iter().find(|o| o.name == "user")
+    let target_id = match command.data.options.iter().find(|o| o.name == "user")
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-        .unwrap();
+    {
+        Some(id) => id,
+        None => { reply_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+    };
 
     let guild_id = match command.guild_id {
         Some(id) => id,

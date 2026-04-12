@@ -30,7 +30,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await;
 
-    let target_id = command
+    let target_id = match command
         .data
         .options
         .iter()
@@ -38,8 +38,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value {
             CommandDataOptionValue::User(id) => Some(*id),
             _ => None,
-        })
-        .unwrap();
+        }) {
+        Some(id) => id,
+        None => {
+            edit_response(ctx, command, "Parametre 'user' manquant.").await;
+            return;
+        }
+    };
 
     let guild_id = match command.guild_id {
         Some(id) => id.to_string(),

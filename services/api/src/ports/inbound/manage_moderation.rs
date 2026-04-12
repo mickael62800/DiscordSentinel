@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{ModerationAction, UserModerationHistory};
+use crate::domain::entities::{ModerationAction, StrikeResult, UserModerationHistory};
 use crate::domain::errors::DomainError;
 
 pub struct LogModerationCommand {
@@ -16,9 +16,28 @@ pub struct LogModerationCommand {
     pub duration: Option<u64>,
 }
 
+/// Resultat agrégé d'un log_action : action persistée + strike result optionnel.
+/// Permet d'internaliser l'orchestration action+strike dans le service plutôt
+/// que dans le handler HTTP (atomicité d'ordonnancement).
+pub struct LoggedModerationAction {
+    pub action: ModerationAction,
+    pub strike: Option<StrikeResult>,
+}
+
 #[async_trait]
 pub trait ManageModerationUseCase: Send + Sync {
     async fn log_action(&self, command: LogModerationCommand) -> Result<ModerationAction, DomainError>;
+    /// Variante atomique (du point de vue architecture) : enregistre l'action
+    /// et applique immediatement le strike associe dans la meme sequence.
+    /// Si le strike echoue l'action reste sauvee (compensation non-destructive)
+    /// mais on retourne quand meme un resultat exploitable cote handler.
+    ///
+    /// Default impl : appelle `log_action` sans strike (retrocompat pour les
+    /// stubs de test qui n'ont pas besoin du strike).
+    async fn log_action_with_strike(&self, command: LogModerationCommand) -> Result<LoggedModerationAction, DomainError> {
+        let action = self.log_action(command).await?;
+        Ok(LoggedModerationAction { action, strike: None })
+    }
     async fn get_history(&self, guild_id: &str, target_id: &str) -> Result<UserModerationHistory, DomainError>;
     async fn list_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError>;
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError>;

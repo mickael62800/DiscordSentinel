@@ -34,18 +34,24 @@ pub fn register() -> CreateCommand {
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Deferer immediatement pour eviter le timeout 3s Discord.
-    let _ = command.create_response(
+    if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Defer(
             CreateInteractionResponseMessage::new().ephemeral(true),
         ),
-    ).await;
+    ).await {
+        warn!(error = %e, cmd = "warn", "Echec defer interaction Discord");
+        return;
+    }
 
     let options = &command.data.options;
 
-    let target_id = options.iter().find(|o| o.name == "user")
+    let target_id = match options.iter().find(|o| o.name == "user")
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
-        .unwrap();
+    {
+        Some(id) => id,
+        None => { reply_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+    };
 
     let gravity = options.iter().find(|o| o.name == "gravity")
         .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })

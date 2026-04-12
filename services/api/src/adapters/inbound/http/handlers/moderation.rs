@@ -1,5 +1,5 @@
 use axum::extract::{Path, Query, State};
-use axum::Json;
+use axum::{Extension, Json};
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::dto::moderation::{
@@ -9,9 +9,11 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{check_role, check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::ports::inbound::{AddStrikeCommand, CreateReminderCommand};
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::CreateReminderCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -23,12 +25,23 @@ pub struct BansQuery {
 /// POST /api/moderation/actions — enregistrer une action de modération
 pub async fn log_action(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<LogActionDto>,
 ) -> Result<Json<ModerationActionResponseDto>, ApiError> {
     // Validation
     validation::validate_moderation_action(
         &dto.guild_id, &dto.moderator_id, &dto.target_id, &dto.reason, &dto.action_type,
     ).map_err(ApiError)?;
+
+    // Phase 7B — Gate RBAC (pass-through pour les appels bot/internal sans token Discord).
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour enregistrer une action de moderation",
+    )
+    .await?;
 
     let action_type = dto.action_type.clone();
     let target_name = dto.target_name.clone();
@@ -37,26 +50,14 @@ pub async fn log_action(
 
     let guild_id = dto.guild_id.clone();
     let target_id = dto.target_id.clone();
-    let strike_reason = dto.reason.clone();
     let moderator_id = dto.moderator_id.clone();
     let duration = dto.duration;
 
     let command = dto.into();
-    let action = state.moderation_uc.log_action(command).await?;
-
-    // Add a strike and check for escalation
-    let strike_result = state
-        .strikes_uc
-        .add_strike(AddStrikeCommand {
-            guild_id: guild_id.clone(),
-            user_id: target_id.clone(),
-            reason: strike_reason,
-            source: "moderator".into(),
-            infraction_id: None,
-        })
-        .await
-        .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, target_id = %target_id, "Echec ajout strike"))
-        .ok();
+    // Orchestration atomique (action + strike) dans le service.
+    let logged = state.moderation_uc.log_action_with_strike(command).await?;
+    let action = logged.action;
+    let strike_result = logged.strike;
 
     let mut dto = ModerationActionResponseDto::from(action);
     if let Some(ref sr) = strike_result {
@@ -114,7 +115,28 @@ pub async fn log_action(
                 duration_secs: dur,
                 remind_before_secs: 3600,
             }).await {
-                warn!(error = %e, "Echec creation rappel pour sanction temporaire");
+                // Niveau ERROR (pas warn) : une sanction temporaire sans
+                // rappel = durée perpétuelle jusqu'à intervention manuelle.
+                // Broadcast aussi pour alerting desktop.
+                tracing::error!(
+                    error = %e,
+                    guild_id = %guild_id,
+                    target_id = %target_id,
+                    action_id = %dto.id,
+                    duration_secs = dur,
+                    "INCOHERENCE : sanction temporaire sans reminder — intervention manuelle requise"
+                );
+                state.broadcaster.broadcast(
+                    "reminder_creation_failed",
+                    serde_json::json!({
+                        "version": "1",
+                        "guild_id": guild_id,
+                        "target_id": target_id,
+                        "action_id": dto.id,
+                        "action_type": action_type,
+                        "error": e.to_string(),
+                    }),
+                );
             }
         }
     }
@@ -132,12 +154,22 @@ pub struct ExecuteBanDto {
 /// POST /api/moderation/execute-ban — execute un ban Discord + log l'action
 pub async fn execute_ban(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<ExecuteBanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_reason(&dto.reason).map_err(ApiError)?;
+
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour executer un ban",
+    )
+    .await?;
 
     state
         .discord_api
@@ -185,10 +217,20 @@ pub struct ExecuteUnbanDto {
 /// POST /api/moderation/execute-unban — debannir un utilisateur Discord
 pub async fn execute_unban(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<ExecuteUnbanDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
     validation::validate_guild_user_path(&dto.guild_id, &dto.user_id).map_err(ApiError)?;
+
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour deban un user",
+    )
+    .await?;
 
     state
         .discord_api
@@ -290,8 +332,31 @@ pub struct EvidenceEntryDto {
 
 pub async fn add_evidence(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddEvidenceDto>,
 ) -> Result<Json<EvidenceEntryDto>, ApiError> {
+    // Pour gater RBAC on a besoin du guild_id : on le recupere via l'action liee.
+    if rbac.is_some() {
+        if let Ok(action_uuid) = uuid::Uuid::parse_str(&dto.action_id) {
+            let gid: Option<(String,)> = sqlx::query_as(
+                "SELECT guild_id FROM moderation_actions WHERE id = $1",
+            )
+            .bind(action_uuid)
+            .fetch_optional(&state.pg_pool)
+            .await
+            .map_err(|e| ApiError(DomainError::Internal(format!("fetch action guild_id: {e}"))))?;
+            if let Some((guild_id,)) = gid {
+                check_role_for_guild(
+                    &state,
+                    &rbac,
+                    &guild_id,
+                    Role::Moderator,
+                    "moderator+ requis pour attacher une preuve",
+                )
+                .await?;
+            }
+        }
+    }
     // Validation minimale — l'URL n'est pas verifiee, le moderateur est responsable
     if dto.url.trim().is_empty() || dto.url.len() > 2000 {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
@@ -428,6 +493,7 @@ pub struct ReviewQueueEntryDto {
 
 pub async fn add_review(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddReviewDto>,
 ) -> Result<Json<ReviewQueueEntryDto>, ApiError> {
     let action_uuid = uuid::Uuid::parse_str(&dto.action_id).map_err(|_| {
@@ -437,6 +503,15 @@ pub async fn add_review(
     })?;
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("added_by", &dto.added_by).map_err(ApiError)?;
+
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour ajouter une review",
+    )
+    .await?;
     let reason = dto.reason.as_ref().map(|r| r.chars().take(500).collect::<String>());
 
     #[derive(sqlx::FromRow)]
@@ -488,9 +563,11 @@ pub async fn add_review(
 /// l'action de moderation liee (JOIN avec moderation_actions).
 pub async fn list_pending_reviews(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<ReviewQueueEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
+    check_role(&rbac, Role::Moderator, "moderator+ requis pour lister les reviews")?;
 
     #[derive(sqlx::FromRow)]
     struct Row {
@@ -559,6 +636,7 @@ pub struct ResolveReviewDto {
 
 pub async fn resolve_review(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<String>,
     Json(dto): Json<ResolveReviewDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
@@ -567,6 +645,27 @@ pub async fn resolve_review(
             "id invalide".into(),
         ))
     })?;
+
+    // Pour gater RBAC on recupere le guild_id de la review.
+    if rbac.is_some() {
+        let gid: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM review_queue WHERE id = $1",
+        )
+        .bind(review_uuid)
+        .fetch_optional(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("fetch review guild_id: {e}"))))?;
+        if let Some((guild_id,)) = gid {
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Moderator,
+                "moderator+ requis pour resoudre une review",
+            )
+            .await?;
+        }
+    }
 
     if !matches!(dto.status.as_str(), "approved" | "rejected" | "changed") {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
@@ -615,9 +714,11 @@ pub async fn resolve_review(
 /// Approche pragmatique : sqlx direct (pas de use-case), read-only, aggregation simple.
 pub async fn get_modstats(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::ModStatsEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
+    check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
 
     #[derive(sqlx::FromRow)]
     struct StatsRow {
@@ -672,10 +773,33 @@ pub async fn get_modstats(
 /// DELETE /api/moderation/actions/{id} — supprime une action (unwarn).
 pub async fn delete_action(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(id): Path<String>,
 ) -> Result<axum::http::StatusCode, ApiError> {
     let uuid = uuid::Uuid::parse_str(&id)
         .map_err(|_| ApiError(crate::domain::errors::DomainError::ValidationError("ID invalide".into())))?;
+
+    // RBAC : lookup du guild_id avant la suppression.
+    if rbac.is_some() {
+        let gid: Option<(String,)> = sqlx::query_as(
+            "SELECT guild_id FROM moderation_actions WHERE id = $1",
+        )
+        .bind(uuid)
+        .fetch_optional(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("fetch action guild_id: {e}"))))?;
+        if let Some((guild_id,)) = gid {
+            check_role_for_guild(
+                &state,
+                &rbac,
+                &guild_id,
+                Role::Moderator,
+                "moderator+ requis pour supprimer une action",
+            )
+            .await?;
+        }
+    }
+
     let deleted = state.moderation_uc.delete_action(uuid).await?;
     if deleted {
         Ok(axum::http::StatusCode::NO_CONTENT)

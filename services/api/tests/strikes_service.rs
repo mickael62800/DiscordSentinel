@@ -68,6 +68,13 @@ impl StrikeRepository for InMemoryStrikeRepo {
         Ok(())
     }
 
+    async fn delete_strike_by_infraction_id(&self, infraction_id: uuid::Uuid) -> Result<u64, DomainError> {
+        let mut strikes = self.strikes.lock().await;
+        let before = strikes.len();
+        strikes.retain(|s| s.infraction_id != Some(infraction_id));
+        Ok((before - strikes.len()) as u64)
+    }
+
     async fn get_config(&self, guild_id: &str) -> Result<Option<StrikeConfig>, DomainError> {
         let configs = self.configs.lock().await;
         Ok(configs.get(guild_id).cloned())

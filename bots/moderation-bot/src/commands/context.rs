@@ -21,6 +21,17 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Defer : les 3 fetch de messages peuvent depasser 3s sur un serveur lent.
+    if let Err(e) = command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Defer(
+            CreateInteractionResponseMessage::new().ephemeral(true),
+        ),
+    ).await {
+        warn!(error = %e, cmd = "context", "Echec defer interaction Discord");
+        return;
+    }
+
     let message_id_str = command.data.options.iter().find(|o| o.name == "message_id")
         .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
         .unwrap_or("");
@@ -32,7 +43,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let message_id: u64 = match message_id_str.parse() {
         Ok(id) => id,
         Err(_) => {
-            sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "ID de message invalide. Clic droit > Copier l'ID du message.").await;
+            let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
+                .content("ID de message invalide. Clic droit > Copier l'ID du message.")).await;
             return;
         }
     };
@@ -83,7 +95,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     if context_lines.is_empty() {
-        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "Aucun message trouve autour de cet ID.").await;
+        let _ = command.edit_response(&ctx.http, serenity::builder::EditInteractionResponse::new()
+            .content("Aucun message trouve autour de cet ID.")).await;
         return;
     }
 
@@ -102,11 +115,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             format!("{} messages avant + cible + {} messages apres", count, count),
         ));
 
-    if let Err(e) = command.create_response(
+    if let Err(e) = command.edit_response(
         &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
-        ),
+        serenity::builder::EditInteractionResponse::new().embed(embed),
     ).await {
         warn!(error = %e, "Failed to send context response");
     }
