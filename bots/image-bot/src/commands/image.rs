@@ -11,6 +11,7 @@ use crate::handler::{HashCacheKey, ProcessedMessagesKey};
 pub fn register() -> CreateCommand {
     CreateCommand::new("image")
         .description("Commandes de l'image bot")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,

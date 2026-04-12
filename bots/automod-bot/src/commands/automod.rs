@@ -12,6 +12,7 @@ use crate::handler::{FloodTrackerKey, ProcessedMessagesKey, SlowmodeTrackerKey};
 pub fn register() -> CreateCommand {
     CreateCommand::new("automod")
         .description("Commandes de l'automod bot")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,

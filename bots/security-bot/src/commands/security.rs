@@ -13,6 +13,7 @@ use crate::handler::{
 pub fn register() -> CreateCommand {
     CreateCommand::new("security")
         .description("Commandes du security bot")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,

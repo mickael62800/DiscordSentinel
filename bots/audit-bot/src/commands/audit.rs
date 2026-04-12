@@ -13,6 +13,7 @@ use crate::handler::WeeklyTrackerKey;
 pub fn register() -> CreateCommand {
     CreateCommand::new("audit")
         .description("Commandes du audit bot")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,

@@ -11,6 +11,7 @@ use crate::handler::{send_role_panel, RolesApiKey};
 pub fn register() -> CreateCommand {
     CreateCommand::new("roles-panel")
         .description("Gerer les panels de roles")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,

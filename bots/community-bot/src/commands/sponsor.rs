@@ -14,6 +14,7 @@ use crate::handler::SponsorshipKey;
 pub fn register() -> CreateCommand {
     CreateCommand::new("parrain")
         .description("Parrainer un nouveau membre du serveur")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "membre", "Membre a parrainer")
                 .required(true),
