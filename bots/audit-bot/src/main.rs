@@ -130,9 +130,17 @@ async fn main() {
                         .await
                         .unwrap_or_default();
 
+                    // Priorite : weekly_report_channel_id, sinon fallback log_channel_id
                     let log_channel = guild_config
-                        .get("log_channel_id")
-                        .and_then(|v| v.parse::<u64>().ok());
+                        .get("weekly_report_channel_id")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .filter(|id| *id > 0)
+                        .or_else(|| {
+                            guild_config
+                                .get("log_channel_id")
+                                .and_then(|v| v.parse::<u64>().ok())
+                                .filter(|id| *id > 0)
+                        });
 
                     if let Some(channel_id) = log_channel {
                         let channel = serenity::model::id::ChannelId::new(channel_id);

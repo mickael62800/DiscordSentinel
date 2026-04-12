@@ -3,9 +3,34 @@ use serenity::model::event::MessageUpdateEvent;
 use serenity::model::id::{ChannelId, GuildId, MessageId};
 use serenity::prelude::*;
 
+use sentinel_shared::embeds::critical_embed;
+
 use crate::audit_event;
 use crate::handler::{AnomalyDetectorKey, Handler, MessageCacheKey, WeeklyTrackerKey};
 use crate::weekly_report::StatField;
+
+/// Helper : construit et envoie un embed d'anomalie dans anomaly_channel_id.
+async fn post_anomaly_embed(
+    ctx: &Context,
+    guild_id: &str,
+    anomaly_type: &str,
+    count: usize,
+    window_secs: u64,
+    context_info: &str,
+) {
+    let embed = critical_embed(format!("🚨 ANOMALIE — {}", anomaly_type))
+        .field("Count", count.to_string(), true)
+        .field("Fenetre", format!("{}s", window_secs), true)
+        .description(format!(
+            "Un pattern anormal a ete detecte sur la guild.\n{}",
+            context_info
+        ))
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "Audit | Sentinel — Urgence",
+        ));
+    Handler::post_to_channel(ctx, guild_id, &["anomaly_channel_id"], embed).await;
+}
 
 pub async fn handle_delete(
     ctx: &Context,
@@ -76,35 +101,48 @@ pub async fn handle_delete(
         ).await;
     }
 
-    // Anomaly detection
-    if let Some(anomaly) = data.get::<AnomalyDetectorKey>() {
-        if let Some(alert) = anomaly.record(gid, "delete") {
-            Handler::log(
-                ctx,
-                "error",
-                &gid_str,
-                &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
-            ).await;
-
-            Handler::send_event(
-                ctx,
-                audit_event::simple(gid_str.clone(), "anomaly_detected")
-                    .with_details(serde_json::json!({
-                        "anomaly_type": alert.anomaly_type,
-                        "count": alert.count,
-                        "window_secs": alert.window_secs,
-                    })),
-            ).await;
-
-            if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-                tracker.increment(gid, StatField::Anomaly);
-            }
-        }
-    }
-
     // Weekly stats
     if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
         tracker.increment(gid, StatField::MessageDeleted);
+    }
+    drop(data);
+
+    // Anomaly detection (on release le lock data d'abord pour pouvoir poster)
+    let alert_opt = {
+        let data = ctx.data.read().await;
+        data.get::<AnomalyDetectorKey>()
+            .and_then(|anomaly| anomaly.record(gid, "delete"))
+    };
+    if let Some(alert) = alert_opt {
+        Handler::log(
+            ctx,
+            "error",
+            &gid_str,
+            &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
+        ).await;
+
+        post_anomaly_embed(
+            ctx, &gid_str,
+            &alert.anomaly_type,
+            alert.count,
+            alert.window_secs,
+            &format!("Dernier salon : <#{}>", channel_id),
+        ).await;
+
+        Handler::send_event(
+            ctx,
+            audit_event::simple(gid_str.clone(), "anomaly_detected")
+                .with_details(serde_json::json!({
+                    "anomaly_type": alert.anomaly_type,
+                    "count": alert.count,
+                    "window_secs": alert.window_secs,
+                })),
+        ).await;
+
+        let data = ctx.data.read().await;
+        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
+            tracker.increment(gid, StatField::Anomaly);
+        }
     }
 }
 
@@ -199,37 +237,56 @@ pub async fn handle_delete_bulk(
     )
     .await;
 
-    // Anomaly : compter comme N deletes
-    let data = ctx.data.read().await;
-    if let Some(anomaly) = data.get::<AnomalyDetectorKey>() {
-        for _ in 0..count {
-            if let Some(alert) = anomaly.record(gid, "delete") {
-                Handler::log(
-                    ctx,
-                    "error",
-                    &gid_str,
-                    &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
-                ).await;
-
-                Handler::send_event(
-                    ctx,
-                    audit_event::simple(gid_str.clone(), "anomaly_detected")
-                        .with_details(serde_json::json!({
-                            "anomaly_type": alert.anomaly_type,
-                            "count": alert.count,
-                            "window_secs": alert.window_secs,
-                        })),
-                ).await;
-
-                if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-                    tracker.increment(gid, StatField::Anomaly);
+    // Anomaly : compter comme N deletes, capturer l'alerte eventuelle sans
+    // tenir le lock pendant l'envoi Discord.
+    let alert_opt = {
+        let data = ctx.data.read().await;
+        let mut found = None;
+        if let Some(anomaly) = data.get::<AnomalyDetectorKey>() {
+            for _ in 0..count {
+                if let Some(alert) = anomaly.record(gid, "delete") {
+                    found = Some(alert);
+                    break;
                 }
-                break; // Une seule alerte par bulk
             }
+        }
+        found
+    };
+
+    if let Some(alert) = alert_opt {
+        Handler::log(
+            ctx,
+            "error",
+            &gid_str,
+            &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
+        ).await;
+
+        post_anomaly_embed(
+            ctx, &gid_str,
+            &alert.anomaly_type,
+            alert.count,
+            alert.window_secs,
+            &format!("Purge bulk dans <#{}> ({} messages)", channel_id, count),
+        ).await;
+
+        Handler::send_event(
+            ctx,
+            audit_event::simple(gid_str.clone(), "anomaly_detected")
+                .with_details(serde_json::json!({
+                    "anomaly_type": alert.anomaly_type,
+                    "count": alert.count,
+                    "window_secs": alert.window_secs,
+                })),
+        ).await;
+
+        let data = ctx.data.read().await;
+        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
+            tracker.increment(gid, StatField::Anomaly);
         }
     }
 
     // Weekly stats
+    let data = ctx.data.read().await;
     if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
         tracker.increment_deleted(gid, count as u64);
     }

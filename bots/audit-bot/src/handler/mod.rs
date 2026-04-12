@@ -72,6 +72,60 @@ impl Handler {
             api.send_log(level, guild_id, message);
         }
     }
+
+    /// Poste un embed dans le premier salon configure trouve parmi `config_keys`,
+    /// avec fallback sur `log_channel_id`. Si aucun n'est configure, ne fait rien.
+    ///
+    /// Utilise pour router les events audit vers les 4 salons dedies
+    /// (join_leave, profile_edit, anomaly, weekly_report) avec retrocompat.
+    pub async fn post_to_channel(
+        ctx: &Context,
+        guild_id: &str,
+        config_keys: &[&str],
+        embed: serenity::builder::CreateEmbed,
+    ) {
+        // Lire la config une fois
+        let config = {
+            let data = ctx.data.read().await;
+            match data.get::<ApiClientKey>() {
+                Some(base) => base.get_guild_config(guild_id).await.unwrap_or_default(),
+                None => return,
+            }
+        };
+
+        // Chercher le premier salon configure parmi les cles fournies,
+        // puis fallback sur log_channel_id
+        let mut channel_id: Option<u64> = None;
+        for key in config_keys {
+            if let Some(v) = config.get(*key) {
+                if let Ok(id) = v.parse::<u64>() {
+                    if id > 0 {
+                        channel_id = Some(id);
+                        break;
+                    }
+                }
+            }
+        }
+        if channel_id.is_none() {
+            if let Some(v) = config.get("log_channel_id") {
+                if let Ok(id) = v.parse::<u64>() {
+                    if id > 0 {
+                        channel_id = Some(id);
+                    }
+                }
+            }
+        }
+
+        let channel = match channel_id {
+            Some(id) => ChannelId::new(id),
+            None => return,
+        };
+
+        let msg = serenity::builder::CreateMessage::new().embed(embed);
+        if let Err(e) = channel.send_message(&ctx.http, msg).await {
+            warn!(error = %e, channel_id = %channel, "Echec envoi embed audit-bot");
+        }
+    }
 }
 
 #[async_trait]

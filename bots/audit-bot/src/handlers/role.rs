@@ -117,33 +117,53 @@ pub async fn handle_update(ctx: &Context, old: Option<Role>, new: &Role) {
     )
     .await;
 
-    // Anomaly detection
-    let data = ctx.data.read().await;
-    if let Some(anomaly) = data.get::<AnomalyDetectorKey>() {
-        if let Some(alert) = anomaly.record(gid, "role_change") {
-            Handler::log(
-                ctx,
-                "error",
-                &gid_str,
-                &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
-            ).await;
+    // Anomaly detection (release le lock avant l'envoi Discord)
+    let alert_opt = {
+        let data = ctx.data.read().await;
+        data.get::<AnomalyDetectorKey>()
+            .and_then(|anomaly| anomaly.record(gid, "role_change"))
+    };
 
-            Handler::send_event(
-                ctx,
-                audit_event::simple(gid_str, "anomaly_detected")
-                    .with_details(serde_json::json!({
-                        "anomaly_type": alert.anomaly_type,
-                        "count": alert.count,
-                        "window_secs": alert.window_secs,
-                    })),
-            ).await;
+    if let Some(alert) = alert_opt {
+        Handler::log(
+            ctx,
+            "error",
+            &gid_str,
+            &format!("ANOMALIE : {} ({} en {}s)", alert.anomaly_type, alert.count, alert.window_secs),
+        ).await;
 
-            if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
-                tracker.increment(gid, StatField::Anomaly);
-            }
+        // Embed Discord → anomaly_channel_id (URGENT)
+        let anomaly_embed = sentinel_shared::embeds::critical_embed(format!(
+            "🚨 ANOMALIE — {}",
+            alert.anomaly_type
+        ))
+        .field("Count", alert.count.to_string(), true)
+        .field("Fenetre", format!("{}s", alert.window_secs), true)
+        .description(format!(
+            "Un pattern anormal de **{}** a ete detecte.\nDernier role : **@{}**",
+            alert.anomaly_type, new.name
+        ))
+        .timestamp(serenity::model::Timestamp::now())
+        .footer(serenity::builder::CreateEmbedFooter::new("Audit | Sentinel — Urgence"));
+        Handler::post_to_channel(ctx, &gid_str, &["anomaly_channel_id"], anomaly_embed).await;
+
+        Handler::send_event(
+            ctx,
+            audit_event::simple(gid_str.clone(), "anomaly_detected")
+                .with_details(serde_json::json!({
+                    "anomaly_type": alert.anomaly_type,
+                    "count": alert.count,
+                    "window_secs": alert.window_secs,
+                })),
+        ).await;
+
+        let data = ctx.data.read().await;
+        if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
+            tracker.increment(gid, StatField::Anomaly);
         }
     }
 
+    let data = ctx.data.read().await;
     if let Some(tracker) = data.get::<WeeklyTrackerKey>() {
         tracker.increment(gid, StatField::RoleChange);
     }
