@@ -17,6 +17,14 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(CommandOptionType::User, "user", "L'utilisateur concerne")
                 .required(true),
         )
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "all",
+                "Supprimer TOUS les warns de l'utilisateur (au lieu de choisir)",
+            )
+            .required(false),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -54,6 +62,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    // Option `all` : retire tous les warns d'un coup (au lieu d'afficher les boutons)
+    let unwarn_all = command
+        .data
+        .options
+        .iter()
+        .find(|o| o.name == "all")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::Boolean(b) => Some(*b),
+            _ => None,
+        })
+        .unwrap_or(false);
+
     let api = match ctx.data.read().await.get::<ModerationApiKey>().cloned() {
         Some(a) => a,
         None => {
@@ -85,6 +105,57 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             &format!("<@{}> n'a aucun avertissement actif.", target_id),
         )
         .await;
+        return;
+    }
+
+    // Branche `all=true` : supprime tous les warns d'un coup
+    if unwarn_all {
+        let total = warns.len();
+        let mut success = 0u32;
+        let mut failed = 0u32;
+
+        for w in &warns {
+            match api.delete_action(&w.id).await {
+                Ok(true) => success += 1,
+                Ok(false) => failed += 1,
+                Err(e) => {
+                    warn!(error = %e, action_id = %w.id, "Echec suppression warn (all)");
+                    failed += 1;
+                }
+            }
+        }
+
+        info!(
+            moderator = %command.user.name,
+            target = %target_id,
+            success, failed, total,
+            "/unwarn all execute"
+        );
+
+        let summary_embed = serenity::builder::CreateEmbed::new()
+            .title("🗑️ Suppression massive d'avertissements")
+            .description(format!(
+                "**{success}/{total}** avertissements supprimes pour <@{target_id}>\n\n\
+                 Moderateur : **{}**",
+                command.user.name
+            ))
+            .field("Reussi", success.to_string(), true)
+            .field("Echec", failed.to_string(), true)
+            .color(if failed == 0 { 0x2ecc71 } else { 0xf59e0b })
+            .timestamp(serenity::model::Timestamp::now())
+            .footer(serenity::builder::CreateEmbedFooter::new(
+                "Moderation | Sentinel",
+            ));
+
+        let _ = command
+            .edit_response(
+                &ctx.http,
+                serenity::builder::EditInteractionResponse::new().embed(summary_embed.clone()),
+            )
+            .await;
+
+        // Log dans le salon dedie
+        super::log_to_channel(ctx, &guild_id, summary_embed).await;
         return;
     }
 
