@@ -29,9 +29,9 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     ) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        // Lock + vérifier le solde de l'expéditeur.
+        // Phase 8 : lire le solde depuis user_wallets (wallet partage).
         let sender: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
         .bind(guild_id)
         .bind(from_id)
@@ -49,8 +49,9 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             )));
         }
 
+        // Phase 8 : coins dans user_wallets (wallet partage).
         sqlx::query(
-            "UPDATE coude_players SET coins = coins - $3, updated_at = NOW()
+            "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id)
@@ -61,7 +62,7 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         .map_err(pg_err)?;
 
         let result = sqlx::query(
-            "UPDATE coude_players SET coins = coins + $3, updated_at = NOW()
+            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id)
@@ -88,8 +89,9 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     ) -> Result<i64, DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
+        // Phase 8 : lire le solde depuis user_wallets.
         let victim: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
         .bind(guild_id)
         .bind(victim_id)
@@ -107,32 +109,36 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             return Ok(0);
         }
 
+        // Debiter la victime (wallet partage).
         sqlx::query(
-            r#"UPDATE coude_players
-               SET coins = coins - $3, total_lost = total_lost + $3, updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2"#,
+            "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(guild_id)
-        .bind(victim_id)
-        .bind(actual_stolen)
-        .execute(&mut *tx)
-        .await
-        .map_err(pg_err)?;
+        .bind(guild_id).bind(victim_id).bind(actual_stolen)
+        .execute(&mut *tx).await.map_err(pg_err)?;
+
+        // Crediter le voleur (wallet partage).
+        sqlx::query(
+            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(thief_id).bind(actual_stolen)
+        .execute(&mut *tx).await.map_err(pg_err)?;
+
+        // Stats coude_players (total_stolen, total_lost) — pas de mutation coins.
+        sqlx::query(
+            "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(victim_id).bind(actual_stolen)
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
         sqlx::query(
-            r#"UPDATE coude_players
-               SET coins = coins + $3,
-                   total_stolen = total_stolen + $3,
-                   total_earned = total_earned + $3,
-                   updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2"#,
+            "UPDATE coude_players SET total_stolen = total_stolen + $3, total_earned = total_earned + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(guild_id)
-        .bind(thief_id)
-        .bind(actual_stolen)
-        .execute(&mut *tx)
-        .await
-        .map_err(pg_err)?;
+        .bind(guild_id).bind(thief_id).bind(actual_stolen)
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
         tx.commit().await.map_err(pg_err)?;
         Ok(actual_stolen)

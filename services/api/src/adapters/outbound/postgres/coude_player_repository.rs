@@ -20,16 +20,21 @@ impl PgCoudePlayerRepository {
 }
 
 /// Toutes les colonnes de `coude_players` qu'on remonte côté domaine.
+/// Phase 8 : le champ `coins` est lu depuis `user_wallets` (wallet partage)
+/// au lieu de `coude_players.coins` (qui reste en DB pour compat legacy mais
+/// n'est plus la source de verite). Si aucun wallet n'existe encore pour ce
+/// joueur, on retourne 0 — le wallet sera cree au premier `get_or_create`.
 const PLAYER_COLUMNS: &str = r#"
-    guild_id, user_id, username, coins,
-    total_wins, total_losses, total_draws,
-    total_earned, total_lost, total_stolen,
-    cowardice_count, chaos_events, casino_wins, casino_losses,
-    level, xp, stat_points, atk, def, class, title,
-    hp_current, hp_max,
-    hp_last_regen, repos_last_used, class_changed_at,
-    season,
-    created_at, updated_at
+    cp.guild_id, cp.user_id, cp.username,
+    COALESCE((SELECT w.coins FROM user_wallets w WHERE w.guild_id = cp.guild_id AND w.user_id = cp.user_id), 0) AS coins,
+    cp.total_wins, cp.total_losses, cp.total_draws,
+    cp.total_earned, cp.total_lost, cp.total_stolen,
+    cp.cowardice_count, cp.chaos_events, cp.casino_wins, cp.casino_losses,
+    cp.level, cp.xp, cp.stat_points, cp.atk, cp.def, cp.class, cp.title,
+    cp.hp_current, cp.hp_max,
+    cp.hp_last_regen, cp.repos_last_used, cp.class_changed_at,
+    cp.season,
+    cp.created_at, cp.updated_at
 "#;
 
 #[derive(sqlx::FromRow)]
@@ -113,18 +118,44 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         username: &str,
     ) -> Result<CoudePlayer, DomainError> {
-        let sql = format!(
+        // 1. Creer/mettre a jour le joueur coude
+        sqlx::query(
             r#"INSERT INTO coude_players (guild_id, user_id, username)
                VALUES ($1, $2, $3)
                ON CONFLICT (guild_id, user_id)
-               DO UPDATE SET username = EXCLUDED.username, updated_at = NOW()
-               RETURNING {cols}"#,
+               DO UPDATE SET username = EXCLUDED.username, updated_at = NOW()"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(username)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        // 2. Auto-creer le wallet partage si absent (starting_coins = 200).
+        let starting_coins: i64 = std::env::var("WALLET_STARTING_COINS")
+            .ok().and_then(|v| v.parse().ok()).unwrap_or(200);
+        sqlx::query(
+            r#"INSERT INTO user_wallets (id, guild_id, user_id, username, coins, total_earned, total_spent, created_at, updated_at)
+               VALUES (gen_random_uuid(), $1, $2, $3, $4, $4, 0, NOW(), NOW())
+               ON CONFLICT (guild_id, user_id) DO NOTHING"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(username)
+        .bind(starting_coins)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        // 3. Re-fetch avec le PLAYER_COLUMNS qui lit coins depuis user_wallets
+        let sql = format!(
+            "SELECT {cols} FROM coude_players cp WHERE cp.guild_id = $1 AND cp.user_id = $2",
             cols = PLAYER_COLUMNS
         );
         let row: PlayerRow = sqlx::query_as(&sql)
             .bind(guild_id)
             .bind(user_id)
-            .bind(username)
             .fetch_one(&self.pool)
             .await
             .map_err(pg_err)?;
@@ -137,7 +168,7 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
     ) -> Result<Option<CoudePlayer>, DomainError> {
         let sql = format!(
-            "SELECT {cols} FROM coude_players WHERE guild_id = $1 AND user_id = $2",
+            "SELECT {cols} FROM coude_players cp WHERE cp.guild_id = $1 AND cp.user_id = $2",
             cols = PLAYER_COLUMNS
         );
         let row: Option<PlayerRow> = sqlx::query_as(&sql)
@@ -157,8 +188,8 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         // Staleness max 5 min — acceptable pour une UI listing.
         let sql = format!(
             r#"SELECT {cols}
-               FROM mv_coude_leaderboard
-               WHERE guild_id = $1
+               FROM mv_coude_leaderboard cp
+               WHERE cp.guild_id = $1
                ORDER BY rank
                LIMIT $2"#,
             cols = PLAYER_COLUMNS
@@ -180,8 +211,9 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
     ) -> Result<Vec<CoudePlayer>, DomainError> {
         let sql = format!(
             r#"SELECT {cols}
-               FROM coude_players
-               WHERE guild_id = $1 AND coins > $2
+               FROM coude_players cp
+               WHERE cp.guild_id = $1
+                 AND COALESCE((SELECT w.coins FROM user_wallets w WHERE w.guild_id = cp.guild_id AND w.user_id = cp.user_id), 0) > $2
                ORDER BY RANDOM()
                LIMIT $3"#,
             cols = PLAYER_COLUMNS
@@ -321,26 +353,44 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         cost: i64,
     ) -> Result<Option<CoudePlayer>, DomainError> {
-        let sql = format!(
+        // Verifier que le wallet a assez de coins pour payer le reset.
+        let wallet_coins: Option<i64> = sqlx::query_scalar(
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(user_id)
+        .fetch_optional(&self.pool).await.map_err(pg_err)?;
+
+        let balance = wallet_coins.unwrap_or(0);
+        if balance < cost {
+            return Ok(None); // Pas assez de coins
+        }
+
+        // Reset les stats dans coude_players.
+        sqlx::query(
             r#"UPDATE coude_players
                SET stat_points = stat_points + atk + def,
-                   atk = 0,
-                   def = 0,
-                   coins = coins - $3,
-                   updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2
-                 AND coins >= $3
-                 AND (atk > 0 OR def > 0)
-               RETURNING {cols}"#,
+                   atk = 0, def = 0, updated_at = NOW()
+               WHERE guild_id = $1 AND user_id = $2 AND (atk > 0 OR def > 0)"#,
+        )
+        .bind(guild_id).bind(user_id)
+        .execute(&self.pool).await.map_err(pg_err)?;
+
+        // Debiter le cout du reset sur le wallet partage.
+        sqlx::query(
+            "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(user_id).bind(cost)
+        .execute(&self.pool).await.map_err(pg_err)?;
+
+        // Re-fetch le joueur avec les coins a jour.
+        let sql = format!(
+            "SELECT {cols} FROM coude_players cp WHERE cp.guild_id = $1 AND cp.user_id = $2",
             cols = PLAYER_COLUMNS
         );
         let row: Option<PlayerRow> = sqlx::query_as(&sql)
-            .bind(guild_id)
-            .bind(user_id)
-            .bind(cost)
-            .fetch_optional(&self.pool)
-            .await
-            .map_err(pg_err)?;
+            .bind(guild_id).bind(user_id)
+            .fetch_optional(&self.pool).await.map_err(pg_err)?;
         Ok(row.map(Into::into))
     }
 
@@ -350,8 +400,9 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         delta: i64,
     ) -> Result<bool, DomainError> {
+        // Phase 8 : les coins vivent dans user_wallets (wallet partage).
         let result = sqlx::query(
-            "UPDATE coude_players
+            "UPDATE user_wallets
              SET coins = GREATEST(0, coins + $1), updated_at = NOW()
              WHERE guild_id = $2 AND user_id = $3",
         )
@@ -370,19 +421,20 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         amount: i64,
     ) -> Result<bool, DomainError> {
-        let result = sqlx::query(
-            r#"UPDATE coude_players
-               SET coins = coins + $3,
-                   total_earned = total_earned + $3,
-                   updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2"#,
+        // Stats dans coude_players + coins dans user_wallets.
+        sqlx::query(
+            "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(guild_id)
-        .bind(user_id)
-        .bind(amount)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        .bind(guild_id).bind(user_id).bind(amount)
+        .execute(&self.pool).await.map_err(pg_err)?;
+
+        let result = sqlx::query(
+            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(user_id).bind(amount)
+        .execute(&self.pool).await.map_err(pg_err)?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -392,19 +444,20 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         amount: i64,
     ) -> Result<bool, DomainError> {
-        let result = sqlx::query(
-            r#"UPDATE coude_players
-               SET coins = GREATEST(0, coins - $3),
-                   total_lost = total_lost + $3,
-                   updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2"#,
+        // Stats dans coude_players + coins dans user_wallets.
+        sqlx::query(
+            "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(guild_id)
-        .bind(user_id)
-        .bind(amount)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        .bind(guild_id).bind(user_id).bind(amount)
+        .execute(&self.pool).await.map_err(pg_err)?;
+
+        let result = sqlx::query(
+            "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(user_id).bind(amount)
+        .execute(&self.pool).await.map_err(pg_err)?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -415,22 +468,25 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         earned: i64,
         stolen: i64,
     ) -> Result<bool, DomainError> {
-        let result = sqlx::query(
+        // Stats dans coude_players (sans toucher coins).
+        sqlx::query(
             r#"UPDATE coude_players
                SET total_wins = total_wins + 1,
-                   coins = coins + $3,
                    total_earned = total_earned + $3,
                    total_stolen = total_stolen + $4,
                    updated_at = NOW()
                WHERE guild_id = $1 AND user_id = $2"#,
         )
-        .bind(guild_id)
-        .bind(user_id)
-        .bind(earned)
-        .bind(stolen)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        .bind(guild_id).bind(user_id).bind(earned).bind(stolen)
+        .execute(&self.pool).await.map_err(pg_err)?;
+
+        // Coins dans user_wallets.
+        let result = sqlx::query(
+            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(user_id).bind(earned)
+        .execute(&self.pool).await.map_err(pg_err)?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -440,21 +496,24 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         lost: i64,
     ) -> Result<bool, DomainError> {
-        // LEAST(coins, $3) → on ne perd jamais plus que ce qu'on a (pas de dette).
-        let result = sqlx::query(
+        // Stats dans coude_players (sans toucher coins).
+        sqlx::query(
             r#"UPDATE coude_players
                SET total_losses = total_losses + 1,
-                   coins = coins - LEAST(coins, $3),
-                   total_lost = total_lost + LEAST(coins, $3),
+                   total_lost = total_lost + $3,
                    updated_at = NOW()
                WHERE guild_id = $1 AND user_id = $2"#,
         )
-        .bind(guild_id)
-        .bind(user_id)
-        .bind(lost)
-        .execute(&self.pool)
-        .await
-        .map_err(pg_err)?;
+        .bind(guild_id).bind(user_id).bind(lost)
+        .execute(&self.pool).await.map_err(pg_err)?;
+
+        // Coins dans user_wallets (LEAST pour eviter la dette).
+        let result = sqlx::query(
+            "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(user_id).bind(lost)
+        .execute(&self.pool).await.map_err(pg_err)?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -464,13 +523,18 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         lost: i64,
     ) -> Result<bool, DomainError> {
+        // Stats dans coude_players.
+        sqlx::query(
+            "UPDATE coude_players SET total_draws = total_draws + 1, total_lost = total_lost + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(user_id).bind(lost)
+        .execute(&self.pool).await.map_err(pg_err)?;
+
+        // Coins dans user_wallets.
         let result = sqlx::query(
-            r#"UPDATE coude_players
-               SET total_draws = total_draws + 1,
-                   coins = GREATEST(0, coins - $3),
-                   total_lost = total_lost + $3,
-                   updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2"#,
+            "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id)
         .bind(user_id)

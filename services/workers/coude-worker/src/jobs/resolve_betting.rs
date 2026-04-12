@@ -228,33 +228,42 @@ async fn resolve_single(
     .await
     .map_err(|e| format!("resolve combat: {e}"))?;
 
-    // ── Transferer les coins ──
-    if let Err(e) = sqlx::query(
-        "UPDATE coude_players SET coins = coins + $3, total_wins = total_wins + 1,
+    // ── Stats dans coude_players (sans toucher coins) ──
+    let _ = sqlx::query(
+        "UPDATE coude_players SET total_wins = total_wins + 1,
          total_earned = total_earned + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
-    .bind(&combat.guild_id)
-    .bind(&winner_id)
-    .bind(coins_transferred)
-    .execute(pool)
-    .await
-    {
-        warn!(error = %e, "Echec credit coins gagnant");
-    }
+    .bind(&combat.guild_id).bind(&winner_id).bind(coins_transferred)
+    .execute(pool).await;
 
-    if let Err(e) = sqlx::query(
-        "UPDATE coude_players SET coins = GREATEST(0, coins - $3), total_losses = total_losses + 1,
+    let _ = sqlx::query(
+        "UPDATE coude_players SET total_losses = total_losses + 1,
          total_lost = total_lost + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
-    .bind(&combat.guild_id)
-    .bind(&loser_id)
-    .bind(coins_lost)
-    .execute(pool)
-    .await
+    .bind(&combat.guild_id).bind(&loser_id).bind(coins_lost)
+    .execute(pool).await;
+
+    // ── Transferer les coins dans user_wallets (wallet partage) ──
+    if let Err(e) = sqlx::query(
+        "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&combat.guild_id).bind(&winner_id).bind(coins_transferred)
+    .execute(pool).await
     {
-        warn!(error = %e, "Echec debit coins perdant");
+        warn!(error = %e, "Echec credit wallet gagnant");
+    }
+
+    if let Err(e) = sqlx::query(
+        "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&combat.guild_id).bind(&loser_id).bind(coins_lost)
+    .execute(pool).await
+    {
+        warn!(error = %e, "Echec debit wallet perdant");
     }
 
     // ── Update HP apres le combat ──
@@ -263,15 +272,20 @@ async fn resolve_single(
 
     // ── Vol bonus chaos "Vol" ──
     if result.vol_coins > 0 {
+        // Stats coude_players
         let _ = sqlx::query(
-            "UPDATE coude_players SET coins = coins + $3, total_stolen = total_stolen + $3,
+            "UPDATE coude_players SET total_stolen = total_stolen + $3,
              updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(&combat.guild_id)
-        .bind(&winner_id)
-        .bind(result.vol_coins)
-        .execute(pool)
-        .await;
+        .bind(&combat.guild_id).bind(&winner_id).bind(result.vol_coins)
+        .execute(pool).await;
+        // Coins wallet
+        let _ = sqlx::query(
+            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3,
+             updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(&combat.guild_id).bind(&winner_id).bind(result.vol_coins)
+        .execute(pool).await;
     }
 
     // ── Chaos events count ──
@@ -321,8 +335,16 @@ async fn resolve_single(
     if bet_results.total_lost_by_bettors > 0 {
         let combat_bonus = bet_results.total_lost_by_bettors / 10;
         if combat_bonus > 0 {
+            // Stats coude_players
             let _ = sqlx::query(
-                "UPDATE coude_players SET coins = coins + $3, total_earned = total_earned + $3,
+                "UPDATE coude_players SET total_earned = total_earned + $3,
+                 updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+            )
+            .bind(&combat.guild_id).bind(&winner_id).bind(combat_bonus)
+            .execute(pool).await;
+            // Coins wallet
+            let _ = sqlx::query(
+                "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3,
                  updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
             )
             .bind(&combat.guild_id)
@@ -416,7 +438,7 @@ async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str) -> BetRes
         if bet.backed_id == winner_id {
             let payout = bet.amount * 2;
             let _ = sqlx::query(
-                "UPDATE coude_players SET coins = coins + $3, updated_at = NOW()
+                "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
                  WHERE guild_id = $1 AND user_id = $2",
             )
             .bind(&bet.guild_id)
