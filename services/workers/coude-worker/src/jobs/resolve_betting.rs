@@ -102,7 +102,7 @@ async fn resolve_single(
 ) -> Result<(), String> {
     // ── Charger les joueurs complets ──
     let attacker_row = sqlx::query_as::<_, PlayerRow>(
-        "SELECT user_id, class, level, atk, def, cowardice_count, hp_current
+        "SELECT user_id, class::text, level, atk, def, cowardice_count, hp_current
          FROM coude_players WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id)
@@ -113,7 +113,7 @@ async fn resolve_single(
     .ok_or("Attaquant introuvable")?;
 
     let defender_row = sqlx::query_as::<_, PlayerRow>(
-        "SELECT user_id, class, level, atk, def, cowardice_count, hp_current
+        "SELECT user_id, class::text, level, atk, def, cowardice_count, hp_current
          FROM coude_players WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id)
