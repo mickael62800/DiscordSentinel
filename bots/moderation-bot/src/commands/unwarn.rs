@@ -125,11 +125,19 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
         }
 
+        // Reset force des strikes : delete_action retire les strikes lies via
+        // infraction_id, mais les strikes orphelins (sans infraction_id, crees
+        // avant le fix de liaison) ne seraient pas touches. reset_strikes
+        // purge tout pour ce user.
+        if let Err(e) = api.reset_strikes(&guild_id, &target_id.to_string()).await {
+            warn!(error = %e, "Echec reset_strikes apres unwarn all");
+        }
+
         info!(
             moderator = %command.user.name,
             target = %target_id,
             success, failed, total,
-            "/unwarn all execute"
+            "/unwarn all execute + strikes reset"
         );
 
         let summary_embed = serenity::builder::CreateEmbed::new()

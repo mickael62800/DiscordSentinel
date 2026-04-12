@@ -236,6 +236,29 @@ impl ApiClient {
         Ok(resp.status().is_success())
     }
 
+    /// Reset tous les strikes actifs d'un utilisateur (purge user_strikes).
+    /// Utilise par /unwarn all pour garantir que meme les strikes orphelins
+    /// (sans infraction_id, crees avant le fix de liaison) sont retires.
+    pub async fn reset_strikes(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
+        let req = self.base.client().delete(format!(
+            "{}/api/strikes/{}/{}",
+            self.base.base_url(),
+            guild_id,
+            user_id
+        ));
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur HTTP reset_strikes: {e}"))?;
+        if resp.status().is_success() {
+            Ok(())
+        } else {
+            Err(format!("reset_strikes: HTTP {}", resp.status()))
+        }
+    }
+
     /// MOD #1 — Liste les sanctions temporaires actives (reminders pending) d'une guild.
     pub async fn get_active_reminders(&self, guild_id: &str) -> Result<Vec<SanctionReminder>, String> {
         self.base
