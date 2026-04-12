@@ -56,7 +56,8 @@ pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), S
     // Le delai de paris est configurable par guild via `bet_delay_secs`
     // (defaut 300 = 5 min). La requete lit la config de chaque guild pour
     // ne resoudre que les combats dont le delai est vraiment ecoule.
-    let combats = sqlx::query_as::<_, BettingCombat>(
+    // 1. Recuperer les combats en phase betting dont le delai est ecoule.
+    let mut combats = sqlx::query_as::<_, BettingCombat>(
         r#"UPDATE coude_combats SET status = 'resolving'
         WHERE id IN (
             SELECT c.id FROM coude_combats c
@@ -79,6 +80,26 @@ pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), S
     .fetch_all(pool)
     .await
     .map_err(|e| format!("Erreur requete betting combats: {e}"))?;
+
+    // 2. Recuperer aussi les combats bloques en 'resolving' depuis > 2 min
+    //    (crash d'un tick precedent, erreur SQL, etc.). On les re-traite.
+    let stuck = sqlx::query_as::<_, BettingCombat>(
+        r#"SELECT id, guild_id, channel_id, message_id,
+            attacker_id, attacker_name, defender_id, defender_name,
+            mise, special_attack, defender_special
+        FROM coude_combats
+        WHERE status = 'resolving'
+          AND accepted_at < NOW() - INTERVAL '2 minutes'
+        "#,
+    )
+    .fetch_all(pool)
+    .await
+    .map_err(|e| format!("Erreur requete stuck combats: {e}"))?;
+
+    if !stuck.is_empty() {
+        info!(count = stuck.len(), "Combats bloques en 'resolving' recuperes (retry)");
+        combats.extend(stuck);
+    }
 
     if combats.is_empty() {
         return Ok(());
