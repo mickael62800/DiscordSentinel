@@ -832,17 +832,12 @@ async fn send_to_backend(
                     &log_message,
                 );
 
-                if log_channel_id != 0 {
-                    send_discord_log(
-                        ctx, msg, &response.action, action_label,
-                        response.reason.as_deref().unwrap_or("Automod"),
-                        &request.flags, log_channel_id, colors,
-                    ).await;
-                }
+                // L'ancien send_discord_log est remplace par la carte review
+                // (on ne l'envoie plus pour eviter le doublon).
             }
 
-            // Phase 8 — mode review : on ne lance plus l'action
-            // directement, on envoie une carte de review aux modos.
+            // Phase 8 — mode review : on envoie une carte de review aux
+            // modos au lieu d'appliquer l'action directement.
             if log_channel_id != 0 {
                 send_review_card(
                     ctx, msg, &response.action,
