@@ -44,6 +44,13 @@ pub fn register_massban() -> CreateCommand {
 }
 
 pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur.
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "❌ Permission MODERATE_MEMBERS requise pour /massmute.").await;
+        warn!(user = %command.user.name, "Tentative /massmute sans permission");
+        return;
+    }
+
     let users_str = command.data.options.iter().find(|o| o.name == "users")
         .and_then(|o| match &o.value { CommandDataOptionValue::String(s) => Some(s.as_str()), _ => None })
         .unwrap_or("");
@@ -164,6 +171,13 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
 }
 
 pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur : BAN_MEMBERS (plus strict).
+    if !super::has_mod_permission(command, serenity::all::Permissions::BAN_MEMBERS) {
+        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "❌ Permission BAN_MEMBERS requise pour /massban.").await;
+        warn!(user = %command.user.name, "Tentative /massban sans permission");
+        return;
+    }
+
     // Defer immediat : la boucle ban peut prendre plusieurs secondes pour 200
     // users et Discord timeout les interactions apres 3s.
     if let Err(e) = command.create_response(

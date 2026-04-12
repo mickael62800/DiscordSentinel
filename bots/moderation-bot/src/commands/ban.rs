@@ -48,6 +48,20 @@ pub fn register_unban() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur avant tout : BAN_MEMBERS (plus strict que warn/mute).
+    if !super::has_mod_permission(command, serenity::all::Permissions::BAN_MEMBERS) {
+        let _ = command.create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("❌ Permission BAN_MEMBERS requise pour /ban.")
+                    .ephemeral(true),
+            ),
+        ).await;
+        warn!(user = %command.user.name, "Tentative /ban sans permission");
+        return;
+    }
+
     // Deferer immediatement pour eviter le timeout 3s Discord.
     if let Err(e) = command.create_response(
         &ctx.http,

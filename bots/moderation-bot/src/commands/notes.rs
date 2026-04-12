@@ -30,6 +30,13 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur.
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        sentinel_shared::discord_helpers::reply_ephemeral(ctx, command, "❌ Permission MODERATE_MEMBERS requise pour /note.").await;
+        tracing::warn!(user = %command.user.name, "Tentative /note sans permission");
+        return;
+    }
+
     let options = &command.data.options;
 
     let target_id = match options.iter().find(|o| o.name == "user")

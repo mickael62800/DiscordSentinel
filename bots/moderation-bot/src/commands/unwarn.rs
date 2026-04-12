@@ -28,6 +28,20 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur avant tout.
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        let _ = command.create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("❌ Permission MODERATE_MEMBERS requise pour /unwarn.")
+                    .ephemeral(true),
+            ),
+        ).await;
+        warn!(user = %command.user.name, "Tentative /unwarn sans permission");
+        return;
+    }
+
     // Defer pour eviter le timeout 3s
     let _ = command
         .create_response(

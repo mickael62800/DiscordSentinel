@@ -17,7 +17,10 @@ pub mod transcript;
 pub mod unwarn;
 pub mod warn;
 
-use serenity::all::{ChannelId, Context, CreateEmbed, CreateMessage, GuildId, UserId};
+use serenity::all::{
+    ChannelId, CommandInteraction, Context, CreateEmbed, CreateMessage, GuildId, Permissions,
+    UserId,
+};
 use serenity::builder::CreateCommand;
 use sentinel_shared::heartbeat::ApiClientKey;
 
@@ -114,6 +117,23 @@ pub fn immunity_message(role_id: u64, action_label: &str) -> String {
         "🛡️ Ce membre est **immunise** contre les sanctions (role <@&{}>).\nImpossible d'appliquer : **{}**.",
         role_id, action_label
     )
+}
+
+/// Vérifie que l'appelant a les permissions de modération requises. Check
+/// serveur explicite : `default_member_permissions` est un hint UI Discord
+/// qui peut etre override dans les parametres de la guild (Integrations >
+/// Permissions du bot), donc un user non-modo peut reussir a appeler la
+/// commande malgre le hint.
+///
+/// Retourne `true` si l'appelant a au moins une des permissions listees,
+/// `false` sinon. `false` = la commande doit abort.
+pub fn has_mod_permission(command: &CommandInteraction, required: Permissions) -> bool {
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.contains(required) || p.contains(Permissions::ADMINISTRATOR))
+        .unwrap_or(false)
 }
 
 pub fn all() -> Vec<CreateCommand> {

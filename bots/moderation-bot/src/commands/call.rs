@@ -32,6 +32,13 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Check permission cote serveur (voir super::has_mod_permission).
+    if !super::has_mod_permission(command, serenity::all::Permissions::MODERATE_MEMBERS) {
+        reply_ephemeral(ctx, command, "❌ Permission MODERATE_MEMBERS requise pour /call.").await;
+        warn!(user = %command.user.name, "Tentative /call sans permission");
+        return;
+    }
+
     let target_id = match command.data.options.iter().find(|o| o.name == "user")
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
     {
