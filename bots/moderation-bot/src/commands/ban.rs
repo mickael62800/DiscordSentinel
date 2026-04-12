@@ -311,7 +311,7 @@ pub async fn execute_ban(
             .create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(channel_embed),
+                    CreateInteractionResponseMessage::new().embed(channel_embed).ephemeral(true),
                 ),
             )
             .await

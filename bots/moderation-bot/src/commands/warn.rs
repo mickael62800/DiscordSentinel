@@ -121,7 +121,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(channel_embed),
+                    CreateInteractionResponseMessage::new().embed(channel_embed).ephemeral(true),
                 ),
             ).await {
                 warn!(error = %e, "Failed to send warn response embed");
