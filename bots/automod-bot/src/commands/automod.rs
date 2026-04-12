@@ -3,11 +3,26 @@ use serenity::all::{
     CreateCommandOption,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral_embed;
+use sentinel_shared::discord_helpers::{reply_ephemeral, reply_ephemeral_embed};
 use sentinel_shared::embeds::info_embed;
 
 use crate::detectors::{self, DetectorConfig};
 use crate::handler::{FloodTrackerKey, ProcessedMessagesKey, SlowmodeTrackerKey};
+
+/// Check permission serveur : default_member_permissions est juste un hint
+/// UI Discord (override par les params de guild ou une interaction forgee).
+/// On revalide explicitement MANAGE_GUILD sur chaque call.
+fn has_manage_guild(command: &CommandInteraction) -> bool {
+    command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| {
+            p.contains(serenity::all::Permissions::MANAGE_GUILD)
+                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+        })
+        .unwrap_or(false)
+}
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("automod")
@@ -38,6 +53,24 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur avant tout. Meme si /automod est read-only,
+    // expose des infos internes (tailles de caches, etat des trackers)
+    // qui ne doivent pas etre accessibles a n'importe qui.
+    if !has_manage_guild(command) {
+        reply_ephemeral(
+            ctx,
+            command,
+            "❌ Permission MANAGE_GUILD requise pour /automod.",
+        )
+        .await;
+        tracing::warn!(
+            user = %command.user.name,
+            user_id = %command.user.id,
+            "Tentative /automod sans permission"
+        );
+        return;
+    }
+
     let sub = command
         .data
         .options
