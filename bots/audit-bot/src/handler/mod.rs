@@ -134,15 +134,21 @@ impl EventHandler for Handler {
         info!(bot = %ready.user.name, guilds = ready.guilds.len(), "Audit bot connecte");
         register_guilds(&ctx, &ready).await;
 
+        // Vider les anciennes commandes globales (evite "Cette commande est
+        // obsolete" quand on migre de global vers guild-level).
         if let Err(e) = serenity::model::application::Command::set_global_commands(
-            &ctx.http,
-            commands::all(),
-        )
-        .await
-        {
-            error!(error = %e, "Erreur enregistrement commandes");
-        } else {
-            info!("Slash commands enregistrees : audit");
+            &ctx.http, vec![]
+        ).await {
+            warn!(error = %e, "Echec nettoyage commandes globales audit-bot");
+        }
+
+        // Enregistrement par guild (instantane) au lieu de global (jusqu'a 1h).
+        let cmds = commands::all();
+        for guild in &ready.guilds {
+            match guild.id.set_commands(&ctx.http, cmds.clone()).await {
+                Ok(_) => info!(guild_id = %guild.id, "Slash commands audit enregistrees pour la guild"),
+                Err(e) => error!(error = %e, guild_id = %guild.id, "Echec enregistrement slash commands audit"),
+            }
         }
 
         // Phase 6A — bootstrap + consumer stream Redis.
