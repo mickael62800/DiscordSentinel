@@ -53,13 +53,20 @@ impl From<PlayerRow> for PlayerLite {
 pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), String> {
     // Verrouiller atomiquement : passer les combats de "betting" a "resolving"
     // pour eviter qu'un autre worker les traite en parallele. 5 minutes =
-    // bet_delay_secs par defaut cote bot.
+    // Le delai de paris est configurable par guild via `bet_delay_secs`
+    // (defaut 300 = 5 min). La requete lit la config de chaque guild pour
+    // ne resoudre que les combats dont le delai est vraiment ecoule.
     let combats = sqlx::query_as::<_, BettingCombat>(
         r#"UPDATE coude_combats SET status = 'resolving'
         WHERE id IN (
-            SELECT id FROM coude_combats
-            WHERE status = 'betting' AND accepted_at < NOW() - INTERVAL '5 minutes'
-            FOR UPDATE SKIP LOCKED
+            SELECT c.id FROM coude_combats c
+            LEFT JOIN bot_guild_configs cfg
+                ON cfg.guild_id = c.guild_id
+                AND cfg.bot_name = 'coude'
+                AND cfg.config_key = 'bet_delay_secs'
+            WHERE c.status = 'betting'
+              AND c.accepted_at < NOW() - (COALESCE(cfg.config_value::int, 300) * INTERVAL '1 second')
+            FOR UPDATE OF c SKIP LOCKED
         )
         RETURNING id, guild_id, channel_id, message_id,
             attacker_id, attacker_name, defender_id, defender_name,
