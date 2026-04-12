@@ -60,7 +60,7 @@ pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), S
         r#"UPDATE coude_combats SET status = 'resolving'
         WHERE id IN (
             SELECT c.id FROM coude_combats c
-            LEFT JOIN bot_guild_configs cfg
+            LEFT JOIN bot_guild_config cfg
                 ON cfg.guild_id = c.guild_id
                 AND cfg.bot_name = 'coude'
                 AND cfg.config_key = 'bet_delay_secs'
@@ -360,7 +360,7 @@ async fn resolve_single(
 
     // ── Poster le resultat sur Discord ──
     let configured_channel = sqlx::query_scalar::<_, String>(
-        "SELECT config_value FROM bot_guild_configs
+        "SELECT config_value FROM bot_guild_config
          WHERE guild_id = $1 AND bot_name = 'coude' AND config_key = 'channel_combats'",
     )
     .bind(&combat.guild_id)

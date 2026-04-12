@@ -29,7 +29,7 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         r#"
         SELECT c.id, c.guild_id, c.channel_id, c.attacker_id, c.attacker_name, c.defender_id, c.defender_name, c.mise
         FROM coude_combats c
-        LEFT JOIN bot_guild_configs cfg ON cfg.guild_id = c.guild_id AND cfg.bot_name = 'coude' AND cfg.config_key = 'combat_expire_secs'
+        LEFT JOIN bot_guild_config cfg ON cfg.guild_id = c.guild_id AND cfg.bot_name = 'coude' AND cfg.config_key = 'combat_expire_secs'
         WHERE c.status = 'pending'
           AND c.created_at < NOW() - MAKE_INTERVAL(secs := COALESCE(cfg.config_value::int, 86400))
         "#,
