@@ -31,7 +31,10 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         FROM coude_combats c
         LEFT JOIN bot_guild_config cfg ON cfg.guild_id = c.guild_id AND cfg.bot_name = 'coude' AND cfg.config_key = 'combat_expire_secs'
         WHERE c.status = 'pending'
-          AND c.created_at < NOW() - MAKE_INTERVAL(secs := COALESCE(cfg.config_value::int, 86400))
+          AND c.created_at < NOW() - MAKE_INTERVAL(secs := COALESCE(
+                CASE WHEN cfg.config_value ~ '^\d+$' THEN cfg.config_value::int ELSE NULL END,
+                86400
+              ))
         "#,
     )
     .fetch_all(pool)

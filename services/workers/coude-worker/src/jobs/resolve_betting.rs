@@ -102,6 +102,19 @@ pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), S
     }
 
     if combats.is_empty() {
+        // Log pour debug : combien de combats en betting existent (sans filtre delai)
+        let total_betting: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM coude_combats WHERE status IN ('betting', 'resolving')",
+        )
+        .fetch_one(pool)
+        .await
+        .unwrap_or(0);
+        if total_betting > 0 {
+            info!(
+                betting_count = total_betting,
+                "Aucun combat a resoudre ce tick (combats en attente de fin du delai de paris)"
+            );
+        }
         return Ok(());
     }
 
