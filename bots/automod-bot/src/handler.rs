@@ -350,21 +350,313 @@ impl EventHandler for Handler {
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Command(command) = interaction {
-            if let Some(guild_id) = command.guild_id {
-                let data = ctx.data.read().await;
-                if let Some(api) = data.get::<ApiClientKey>() {
-                    if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
-                        return;
+        match interaction {
+            Interaction::Command(command) => {
+                if let Some(guild_id) = command.guild_id {
+                    let data = ctx.data.read().await;
+                    if let Some(api) = data.get::<ApiClientKey>() {
+                        if !sentinel_shared::discord_helpers::is_bot_enabled(api, &guild_id.to_string()).await {
+                            return;
+                        }
+                    }
+                }
+                if command.data.name.as_str() == "automod" {
+                    commands::automod::handle(&ctx, &command).await;
+                }
+            }
+            Interaction::Component(component) => {
+                if component.data.custom_id.starts_with("am_") {
+                    handle_review_button(&ctx, &component).await;
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Phase 8 — Mode review : carte de proposition + handler de boutons
+// ══════════════════════════════════════════════════════════════════════
+
+/// Custom ID format : `am_{action}:{guild_id}:{channel_id}:{message_id}:{user_id}`
+/// action = w (warn) | d (delete) | m (mute) | b (ban) | i (ignore)
+const AM_PREFIX: &str = "am_";
+
+/// Envoie une carte de review dans le salon de logs au lieu d'appliquer
+/// l'action directement. Les moderateurs cliquent sur un bouton pour
+/// valider ou ajuster la severite.
+async fn send_review_card(
+    ctx: &Context,
+    msg: &Message,
+    suggested_action: &Action,
+    reason: &str,
+    score: f64,
+    flags: &crate::detectors::DetectionFlags,
+    review_channel_id: u64,
+    colors: &EmbedColors,
+) {
+    let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let channel_id = msg.channel_id.to_string();
+    let message_id = msg.id.to_string();
+    let user_id = msg.author.id.to_string();
+    let content_preview = sanitize_embed_content(&msg.content, 500);
+
+    let action_label = match suggested_action {
+        Action::Warn => "⚠️ Avertissement",
+        Action::Delete => "🗑️ Suppression",
+        Action::Mute => "🔇 Mute",
+        Action::Ban => "🔨 Bannissement",
+        Action::None => return,
+    };
+
+    let action_color = match suggested_action {
+        Action::Warn => colors.warn,
+        Action::Delete => colors.delete,
+        Action::Mute => colors.mute,
+        Action::Ban => colors.ban,
+        Action::None => 0x95a5a6,
+    };
+
+    let mut flag_parts = Vec::new();
+    if flags.spam { flag_parts.push("Spam"); }
+    if flags.insult { flag_parts.push("Insulte"); }
+    if flags.link { flag_parts.push("Lien"); }
+    if flags.phishing { flag_parts.push("Phishing"); }
+    let flags_str = if flag_parts.is_empty() { "Aucun".to_string() } else { flag_parts.join(", ") };
+
+    let embed = serenity::builder::CreateEmbed::new()
+        .title(format!("🛡️ AutoMod — Action suggeree : {}", action_label))
+        .color(action_color)
+        .field("👤 Utilisateur", format!("<@{}> (`{}`)", user_id, msg.author.name), true)
+        .field("💬 Salon", format!("<#{}>", channel_id), true)
+        .field("🎯 Score IA", format!("{:.0}%", score * 100.0), true)
+        .field("📝 Message original", format!("```{}```", content_preview), false)
+        .field("🤖 Raison IA", reason, false)
+        .field("🚩 Flags detectes", &flags_str, true)
+        .thumbnail(msg.author.face())
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "AutoMod Review | Cliquez pour valider ou ajuster",
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+
+    // Suffixe commun pour les custom_id
+    let id_suffix = format!("{}:{}:{}:{}", guild_id, channel_id, message_id, user_id);
+
+    // Bouton principal (action suggeree) + ajustements + ignorer
+    let btn_apply = serenity::builder::CreateButton::new(format!("am_{}:{}", action_char(suggested_action), id_suffix))
+        .label(format!("✅ Appliquer ({})", action_label))
+        .style(serenity::all::ButtonStyle::Success);
+
+    let btn_warn = serenity::builder::CreateButton::new(format!("am_w:{}", id_suffix))
+        .label("⚠️ Warn")
+        .style(serenity::all::ButtonStyle::Secondary);
+
+    let btn_delete = serenity::builder::CreateButton::new(format!("am_d:{}", id_suffix))
+        .label("🗑️ Delete")
+        .style(serenity::all::ButtonStyle::Secondary);
+
+    let btn_mute = serenity::builder::CreateButton::new(format!("am_m:{}", id_suffix))
+        .label("🔇 Mute")
+        .style(serenity::all::ButtonStyle::Danger);
+
+    let btn_ignore = serenity::builder::CreateButton::new(format!("am_i:{}", id_suffix))
+        .label("❌ Ignorer")
+        .style(serenity::all::ButtonStyle::Secondary);
+
+    let row1 = serenity::builder::CreateActionRow::Buttons(vec![btn_apply, btn_ignore]);
+    let row2 = serenity::builder::CreateActionRow::Buttons(vec![btn_warn, btn_delete, btn_mute]);
+
+    let builder = serenity::builder::CreateMessage::new()
+        .embed(embed)
+        .components(vec![row1, row2]);
+
+    if let Err(e) = serenity::model::id::ChannelId::new(review_channel_id)
+        .send_message(&ctx.http, builder)
+        .await
+    {
+        warn!(error = %e, "Echec envoi carte de review automod");
+    }
+}
+
+fn action_char(action: &Action) -> char {
+    match action {
+        Action::Warn => 'w',
+        Action::Delete => 'd',
+        Action::Mute => 'm',
+        Action::Ban => 'b',
+        Action::None => 'i',
+    }
+}
+
+fn char_to_action(c: char) -> Action {
+    match c {
+        'w' => Action::Warn,
+        'd' => Action::Delete,
+        'm' => Action::Mute,
+        'b' => Action::Ban,
+        _ => Action::None,
+    }
+}
+
+/// Handler des boutons de review. Parse le custom_id, execute l'action
+/// choisie par le moderateur, et met a jour la carte.
+async fn handle_review_button(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    let custom_id = &component.data.custom_id;
+    // Format : am_{action}:{guild_id}:{channel_id}:{message_id}:{user_id}
+    let parts: Vec<&str> = custom_id.split(':').collect();
+    if parts.len() != 5 {
+        return;
+    }
+
+    let action_str = parts[0].strip_prefix(AM_PREFIX).unwrap_or("i");
+    let action_char = action_str.chars().next().unwrap_or('i');
+    let action = char_to_action(action_char);
+    let _guild_id_str = parts[1];
+    let channel_id_str = parts[2];
+    let message_id_str = parts[3];
+    let user_id_str = parts[4];
+
+    let moderator_name = &component.user.name;
+
+    // Charger la config guild pour mute_duration
+    let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let data = ctx.data.read().await;
+    let config = if let Some(api) = data.get::<ApiClientKey>() {
+        api.get_guild_config(&guild_id).await.unwrap_or_default()
+    } else {
+        std::collections::HashMap::new()
+    };
+    drop(data);
+
+    let mute_duration_secs = BaseApiClient::config_u64(&config, "mute_duration_secs", DEFAULT_MUTE_DURATION_SECS);
+    let colors = build_embed_colors(&config);
+
+    if action == Action::None {
+        // Ignorer — mettre a jour la carte
+        let ignored_embed = serenity::builder::CreateEmbed::new()
+            .title("🛡️ AutoMod — ❌ Ignore par un moderateur")
+            .description(format!("Moderateur : **{}**\nAucune action appliquee.", moderator_name))
+            .color(0x95a5a6)
+            .timestamp(serenity::model::Timestamp::now());
+
+        let _ = component
+            .create_response(
+                &ctx.http,
+                serenity::builder::CreateInteractionResponse::UpdateMessage(
+                    serenity::builder::CreateInteractionResponseMessage::new()
+                        .embed(ignored_embed)
+                        .components(vec![]),
+                ),
+            )
+            .await;
+        return;
+    }
+
+    // Executer l'action sur le message original
+    let action_label = match &action {
+        Action::Warn => "⚠️ Avertissement",
+        Action::Delete => "🗑️ Suppression",
+        Action::Mute => "🔇 Mute",
+        Action::Ban => "🔨 Bannissement",
+        Action::None => "Aucune",
+    };
+
+    let channel_id = match channel_id_str.parse::<u64>() {
+        Ok(id) => serenity::model::id::ChannelId::new(id),
+        Err(_) => return,
+    };
+
+    // Execute l'action
+    match action {
+        Action::Warn => {
+            let embed = warn_embed("⚠️ Avertissement AutoMod")
+                .color(colors.warn)
+                .field("📝 Raison", "Contenu inapproprie detecte par l'IA", false)
+                .field("👮 Valide par", moderator_name, true);
+            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
+        }
+        Action::Delete => {
+            if let Ok(msg_id) = message_id_str.parse::<u64>() {
+                let _ = channel_id
+                    .delete_message(&ctx.http, serenity::model::id::MessageId::new(msg_id))
+                    .await;
+            }
+            let embed = moderate_embed("🗑️ Message supprime par un moderateur")
+                .color(colors.delete)
+                .field("👮 Valide par", moderator_name, true);
+            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
+        }
+        Action::Mute => {
+            if let Ok(msg_id) = message_id_str.parse::<u64>() {
+                let _ = channel_id
+                    .delete_message(&ctx.http, serenity::model::id::MessageId::new(msg_id))
+                    .await;
+            }
+            if let (Some(guild_id), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>()) {
+                if let Ok(mut member) = guild_id.member(&ctx.http, serenity::model::id::UserId::new(uid)).await {
+                    let secs = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map(|d| d.as_secs() as i64 + mute_duration_secs as i64)
+                        .unwrap_or(0);
+                    if let Ok(dt) = time::OffsetDateTime::from_unix_timestamp(secs) {
+                        let timeout = serenity::model::Timestamp::from(dt);
+                        let _ = member.disable_communication_until_datetime(&ctx.http, timeout).await;
                     }
                 }
             }
-
-            if command.data.name.as_str() == "automod" {
-                commands::automod::handle(&ctx, &command).await;
-            }
+            let mute_min = mute_duration_secs / 60;
+            let embed = danger_embed("🔇 Mute applique par un moderateur")
+                .color(colors.mute)
+                .field("⏱ Duree", format!("{} minutes", mute_min), true)
+                .field("👮 Valide par", moderator_name, true);
+            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
         }
+        Action::Ban => {
+            let embed = critical_embed("🔨 Signalement pour bannissement (valide)")
+                .color(colors.ban)
+                .field("👮 Valide par", moderator_name, true);
+            let _ = channel_id.send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed)).await;
+            // Note : le ban reel reste a la main du modérateur pour l'instant
+            // (pas d'auto-ban meme en review mode). On pourrait ajouter un
+            // guild.ban_member() ici si le proprio de la guild le souhaite.
+        }
+        Action::None => {}
     }
+
+    // Mettre a jour la carte de review (retirer les boutons, afficher le resultat)
+    let result_embed = serenity::builder::CreateEmbed::new()
+        .title(format!("🛡️ AutoMod — {} applique", action_label))
+        .description(format!(
+            "Moderateur : **{}**\nCible : <@{}>\nSalon : <#{}>",
+            moderator_name, user_id_str, channel_id_str
+        ))
+        .color(match action {
+            Action::Warn => colors.warn,
+            Action::Delete => colors.delete,
+            Action::Mute => colors.mute,
+            Action::Ban => colors.ban,
+            Action::None => 0x95a5a6,
+        })
+        .footer(serenity::builder::CreateEmbedFooter::new("AutoMod Review | Action executee"))
+        .timestamp(serenity::model::Timestamp::now());
+
+    let _ = component
+        .create_response(
+            &ctx.http,
+            serenity::builder::CreateInteractionResponse::UpdateMessage(
+                serenity::builder::CreateInteractionResponseMessage::new()
+                    .embed(result_embed)
+                    .components(vec![]),
+            ),
+        )
+        .await;
+
+    info!(
+        moderator = %moderator_name,
+        action = %action_label,
+        target_user = %user_id_str,
+        "Action automod validee par un moderateur"
+    );
 }
 
 /// Sanitise le contenu utilisateur pour l'affichage dans les embeds Discord.
@@ -549,8 +841,22 @@ async fn send_to_backend(
                 }
             }
 
-            if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs, colors).await {
-                error!(error = %e, "Erreur lors de l'execution de l'action");
+            // Phase 8 — mode review : on ne lance plus l'action
+            // directement, on envoie une carte de review aux modos.
+            if log_channel_id != 0 {
+                send_review_card(
+                    ctx, msg, &response.action,
+                    response.reason.as_deref().unwrap_or("Automod"),
+                    response.score.unwrap_or(0.0),
+                    &request.flags,
+                    log_channel_id, colors,
+                ).await;
+            } else {
+                // Pas de salon review configure — fallback sur l'ancien
+                // comportement (action directe).
+                if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs, colors).await {
+                    error!(error = %e, "Erreur lors de l'execution de l'action");
+                }
             }
         }
         Err(e) => {

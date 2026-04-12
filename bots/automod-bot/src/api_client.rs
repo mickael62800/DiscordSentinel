@@ -56,6 +56,8 @@ pub struct AnalyzeResponse {
     pub reason: Option<String>,
     #[serde(default)]
     pub duration: Option<u64>,
+    #[serde(default)]
+    pub score: Option<f64>,
 }
 
 #[derive(Debug, Deserialize, PartialEq)]
@@ -120,6 +122,7 @@ impl ApiClient {
                 Some(resp.reason)
             },
             duration: resp.duration,
+            score: Some(resp.score),
         })
     }
 }
