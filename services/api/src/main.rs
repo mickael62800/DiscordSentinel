@@ -115,6 +115,16 @@ async fn main() {
     let redis_client =
         redis::Client::open(config.redis_url.as_str()).expect("URL Redis invalide");
 
+    // Purger le cache des definitions de bots apres migration : les migrations
+    // peuvent modifier les config_schema (ex: 113 = ajout des 4 salons audit),
+    // mais le cache Redis bot:definitions a un TTL d'1h. Sans ca, les changements
+    // n'apparaissent qu'apres expiration du TTL.
+    if let Ok(mut conn) = redis_client.get_multiplexed_async_connection().await {
+        use redis::AsyncCommands;
+        let _: Result<(), _> = conn.del::<_, ()>("bot:definitions").await;
+        info!("Cache Redis bot:definitions purge (post-migration)");
+    }
+
     // Vérifier la connexion Redis au démarrage
     match redis_client.get_multiplexed_async_connection().await {
         Ok(_) => info!("Redis connecté"),
