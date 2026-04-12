@@ -114,6 +114,7 @@ impl EventHandler for Handler {
         }
 
         let colors = build_embed_colors(&config);
+        let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
 
         // Verifier les salons exclus
         let ignored_channels_str = BaseApiClient::config_or(&config, "ignored_channels", "");
@@ -143,6 +144,7 @@ impl EventHandler for Handler {
         let content = &msg.content;
 
         // Detection pieces jointes suspectes
+        let files_review = BaseApiClient::config_bool(&config, "files_review_mode", true);
         if detector_config.suspicious_files_enabled && !msg.attachments.is_empty() {
             const DANGEROUS_EXTENSIONS: &[&str] = &[
                 "exe", "bat", "cmd", "scr", "ps1", "vbs", "js",
@@ -158,20 +160,27 @@ impl EventHandler for Handler {
 
             if let Some(attachment) = suspicious {
                 info!(user = %msg.author.name, filename = %attachment.filename, "Fichier suspect detecte");
-                let embed = moderate_embed("🗑\u{fe0f} Fichier suspect supprime")
-                    .color(colors.delete)
-                    .field("📝 Raison", "Piece jointe avec extension dangereuse.", false)
-                    .field("📎 Fichier", &attachment.filename, false)
-                    .thumbnail(msg.author.face());
-                let builder = serenity::builder::CreateMessage::new().embed(embed);
-                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
-                    warn!(error = %e, "Echec envoi notification fichier suspect");
-                }
-                if let Err(e) = msg.delete(&ctx.http).await {
-                    warn!(error = %e, message_id = %msg.id, "Echec suppression message fichier suspect");
+                let reason = format!("Piece jointe suspecte : {}", attachment.filename);
+
+                if files_review && log_channel_id != 0 {
+                    let flags = detectors::DetectionFlags { spam: false, insult: false, link: false, phishing: false };
+                    send_review_card(&ctx, &msg, &Action::Delete, &reason, 1.0, &flags, log_channel_id, &colors).await;
+                } else {
+                    let embed = moderate_embed("🗑\u{fe0f} Fichier suspect supprime")
+                        .color(colors.delete)
+                        .field("📝 Raison", &reason, false)
+                        .field("📎 Fichier", &attachment.filename, false)
+                        .thumbnail(msg.author.face());
+                    let builder = serenity::builder::CreateMessage::new().embed(embed);
+                    if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                        warn!(error = %e, "Echec envoi notification fichier suspect");
+                    }
+                    if let Err(e) = msg.delete(&ctx.http).await {
+                        warn!(error = %e, message_id = %msg.id, "Echec suppression message fichier suspect");
+                    }
                 }
 
-                let log_msg = format!("Fichier suspect supprime — {} : {}", msg.author.name, attachment.filename);
+                let log_msg = format!("Fichier suspect — {} : {}", msg.author.name, attachment.filename);
                 let data = ctx.data.read().await;
                 if let Some(base) = data.get::<ApiClientKey>() {
                     base.send_log("warn", &guild_id, &log_msg);
@@ -216,24 +225,30 @@ impl EventHandler for Handler {
                     tracker.remove(&(msg.channel_id, msg.author.id));
                 }
 
-                let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
-                    .color(colors.warn)
-                    .field("📝 Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
-                    .thumbnail(msg.author.face());
-                let builder = serenity::builder::CreateMessage::new().embed(embed);
-                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
-                    warn!(error = %e, "Echec envoi avertissement flood");
-                }
+                let flood_review = BaseApiClient::config_bool(&config, "flood_review_mode", true);
+                if flood_review && log_channel_id != 0 {
+                    let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
+                    send_review_card(&ctx, &msg, &Action::Warn, "Flood detecte — messages envoyes trop rapidement.", 0.9, &flags, log_channel_id, &colors).await;
+                } else {
+                    let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                        .color(colors.warn)
+                        .field("📝 Raison", "Merci de ne pas envoyer autant de messages aussi rapidement.", false)
+                        .thumbnail(msg.author.face());
+                    let builder = serenity::builder::CreateMessage::new().embed(embed);
+                    if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                        warn!(error = %e, "Echec envoi avertissement flood");
+                    }
 
-                let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
-                let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
-                let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
-                let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
-                let ctx_clone = ctx.clone();
-                let msg_clone = msg.clone();
-                tokio::spawn(async move {
-                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, ctx_max_msgs, ctx_max_chars).await;
-                });
+                    let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
+                    let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
+                    let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
+                    let ctx_clone = ctx.clone();
+                    let msg_clone = msg.clone();
+                    tokio::spawn(async move {
+                        let ai_review = true; // flood passe par le backend IA en review
+                        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars).await;
+                    });
+                }
                 return;
             }
         }
@@ -243,13 +258,19 @@ impl EventHandler for Handler {
             && detectors::spam::detect_caps(content, detector_config.caps_threshold_chars)
         {
             info!(user = %msg.author.name, "Caps detecte");
-            let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
-                .color(colors.warn)
-                .field("📝 Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
-                .thumbnail(msg.author.face());
-            let builder = serenity::builder::CreateMessage::new().embed(embed);
-            if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
-                warn!(error = %e, "Echec envoi avertissement caps");
+            let caps_review = BaseApiClient::config_bool(&config, "caps_review_mode", true);
+            if caps_review && log_channel_id != 0 {
+                let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
+                send_review_card(&ctx, &msg, &Action::Warn, "Abus de majuscules detecte.", 0.8, &flags, log_channel_id, &colors).await;
+            } else {
+                let embed = warn_embed("⚠\u{fe0f} Avertissement AutoMod")
+                    .color(colors.warn)
+                    .field("📝 Raison", "Merci d'ecrire normalement sans tout mettre en majuscules.", false)
+                    .thumbnail(msg.author.face());
+                let builder = serenity::builder::CreateMessage::new().embed(embed);
+                if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
+                    warn!(error = %e, "Echec envoi avertissement caps");
+                }
             }
         }
 
@@ -300,14 +321,14 @@ impl EventHandler for Handler {
             return;
         }
 
-        let log_channel_id = BaseApiClient::config_u64(&config, "log_channel_id", 0);
         let context_max_messages = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
         let context_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
 
         let ctx_clone = ctx.clone();
         let msg_clone = msg.clone();
         tokio::spawn(async move {
-            send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, &colors, context_max_messages, context_max_chars).await;
+            let ai_review = BaseApiClient::config_bool(&config, "ai_review_mode", true);
+            send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars).await;
         });
     }
 
@@ -755,6 +776,7 @@ async fn send_to_backend(
     flags: detectors::DetectionFlags,
     mute_duration_secs: u64,
     log_channel_id: u64,
+    ai_review_mode: bool,
     colors: &EmbedColors,
     context_max_messages: u8,
     context_max_chars: usize,
@@ -852,9 +874,11 @@ async fn send_to_backend(
                 // (on ne l'envoie plus pour eviter le doublon).
             }
 
-            // Phase 8 — mode review : on envoie une carte de review aux
-            // modos au lieu d'appliquer l'action directement.
-            if log_channel_id != 0 {
+            // Phase 8 — mode review par feature. Chaque type de detection
+            // peut etre en mode review (carte moderateur) ou auto (action
+            // directe). La config key est `{feature}_review_mode` (defaut
+            // true = review pour tout).
+            if ai_review_mode && log_channel_id != 0 {
                 send_review_card(
                     ctx, msg, &response.action,
                     response.reason.as_deref().unwrap_or("Automod"),
@@ -863,8 +887,7 @@ async fn send_to_backend(
                     log_channel_id, colors,
                 ).await;
             } else {
-                // Pas de salon review configure — fallback sur l'ancien
-                // comportement (action directe).
+                // Mode auto ou pas de salon review → action directe.
                 if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs, colors).await {
                     error!(error = %e, "Erreur lors de l'execution de l'action");
                 }
