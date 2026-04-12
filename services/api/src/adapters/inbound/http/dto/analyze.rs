@@ -43,8 +43,16 @@ pub struct AnalyzeResponseDto {
 
 impl From<AnalyzeRequestDto> for AnalyzeMessageCommand {
     fn from(dto: AnalyzeRequestDto) -> Self {
-        // Tronquer le contenu a 2500 chars (Discord = 2000 + marge)
+        // Tronquer le contenu a 2500 chars (Discord = 2000 + marge).
+        // H9 — logger explicitement si truncation : si un lien phishing est en
+        // fin de message long, on sait qu'il a ete coupe.
         let content = if dto.content.len() > 2500 {
+            tracing::warn!(
+                guild_id = %dto.guild_id,
+                user_id = %dto.user_id,
+                original_len = dto.content.len(),
+                "Contenu analyse tronque a 2500 chars (perte potentielle d'indices en queue)"
+            );
             dto.content.chars().take(2500).collect()
         } else {
             dto.content

@@ -368,6 +368,40 @@ impl EventHandler for Handler {
                 }
             }
         });
+
+        // O1/H6 — Background cleanup : purge des caches processed + flood
+        // tracker toutes les 5 minutes. Evite d'attendre une burst > 2000/5000
+        // items avant de nettoyer (fuite memoire lente sinon).
+        let ctx_clean = ctx.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+                let data = ctx_clean.data.read().await;
+                let now = Instant::now();
+
+                if let Some(processed) = data.get::<ProcessedMessagesKey>() {
+                    let before = processed.len();
+                    processed.retain(|_, ts| now.duration_since(*ts).as_secs() < 300);
+                    let removed = before.saturating_sub(processed.len());
+                    if removed > 0 {
+                        info!(removed, remaining = processed.len(), "Purge background processed cache");
+                    }
+                }
+
+                if let Some(tracker) = data.get::<FloodTrackerKey>() {
+                    let before = tracker.len();
+                    tracker.retain(|_, ts| {
+                        ts.last()
+                            .map(|t| now.duration_since(*t).as_secs() < 600)
+                            .unwrap_or(false)
+                    });
+                    let removed = before.saturating_sub(tracker.len());
+                    if removed > 0 {
+                        info!(removed, remaining = tracker.len(), "Purge background flood tracker");
+                    }
+                }
+            }
+        });
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -549,15 +583,67 @@ fn char_to_action(c: char) -> Action {
 /// Handler des boutons de review. Parse le custom_id, execute l'action
 /// choisie par le moderateur, et met a jour la carte.
 async fn handle_review_button(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    // H1 — Gate permission : seuls les moderateurs peuvent valider une action.
+    // Sans ce check, n'importe quel user avec le custom_id peut declencher
+    // mute/ban/delete via un POST d'interaction crafted.
+    let has_perm = if let Some(guild_id) = component.guild_id {
+        guild_id
+            .member(&ctx.http, component.user.id)
+            .await
+            .ok()
+            .and_then(|m| m.permissions(&ctx.cache).ok())
+            .map(|p| {
+                p.contains(serenity::all::Permissions::MODERATE_MEMBERS)
+                    || p.contains(serenity::all::Permissions::MANAGE_MESSAGES)
+                    || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+            })
+            .unwrap_or(false)
+    } else {
+        false
+    };
+
+    if !has_perm {
+        let _ = component
+            .create_response(
+                &ctx.http,
+                serenity::builder::CreateInteractionResponse::Message(
+                    serenity::builder::CreateInteractionResponseMessage::new()
+                        .content("❌ Seul un moderateur peut valider une action automod.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        warn!(
+            user = %component.user.name,
+            user_id = %component.user.id,
+            "Tentative d'action review sans permission"
+        );
+        return;
+    }
+
     let custom_id = &component.data.custom_id;
     // Format : am_{action}:{guild_id}:{channel_id}:{message_id}:{user_id}
     let parts: Vec<&str> = custom_id.split(':').collect();
     if parts.len() != 5 {
+        warn!(custom_id = %custom_id, "custom_id review malforme (nombre de parts incorrect)");
         return;
     }
 
-    let action_str = parts[0].strip_prefix(AM_PREFIX).unwrap_or("i");
-    let action_char = action_str.chars().next().unwrap_or('i');
+    // C1 — Validation stricte du prefix + action char (plus de fallback "i").
+    let action_str = match parts[0].strip_prefix(AM_PREFIX) {
+        Some(s) => s,
+        None => {
+            warn!(custom_id = %custom_id, "custom_id review sans prefix am_");
+            return;
+        }
+    };
+    let action_char = match action_str.chars().next() {
+        Some(c) if matches!(c, 'w' | 'd' | 'm' | 'b' | 'i') => c,
+        _ => {
+            warn!(custom_id = %custom_id, "custom_id review action char invalide");
+            return;
+        }
+    };
     let action = char_to_action(action_char);
     let _guild_id_str = parts[1];
     let channel_id_str = parts[2];
@@ -648,16 +734,10 @@ async fn handle_review_button(ctx: &Context, component: &serenity::model::applic
             }
         }
         Action::Mute => {
-            // Supprimer le message original
-            if let Ok(msg_id) = message_id_str.parse::<u64>() {
-                if let Err(e) = channel_id
-                    .delete_message(&ctx.http, serenity::model::id::MessageId::new(msg_id))
-                    .await
-                {
-                    warn!(error = %e, "Echec suppression message (mute review)");
-                }
-            }
-            // Appliquer le timeout Discord
+            // H2 — Ordre inverse : MUTE d'abord, puis delete.
+            // Si delete echoue (permissions message), au moins le user est mute.
+            // L'inverse masquait l'echec : le modo pensait avoir agit alors
+            // que l'utilisateur pouvait continuer a ecrire.
             let mut mute_applied = false;
             if let (Some(guild_id), Ok(uid)) = (component.guild_id, user_id_str.parse::<u64>()) {
                 match guild_id.member(&ctx.http, serenity::model::id::UserId::new(uid)).await {
@@ -684,6 +764,16 @@ async fn handle_review_button(ctx: &Context, component: &serenity::model::applic
                 }
             } else {
                 warn!(guild_id = ?component.guild_id, user_id = %user_id_str, "guild_id ou user_id invalide pour mute");
+            }
+
+            // Supprimer le message original APRES le mute (best-effort).
+            if let Ok(msg_id) = message_id_str.parse::<u64>() {
+                if let Err(e) = channel_id
+                    .delete_message(&ctx.http, serenity::model::id::MessageId::new(msg_id))
+                    .await
+                {
+                    warn!(error = %e, "Echec suppression message apres mute review");
+                }
             }
             let mute_min = mute_duration_secs / 60;
             let status_text = if mute_applied { "applique" } else { "ECHOUE (voir logs)" };
@@ -746,12 +836,17 @@ async fn handle_review_button(ctx: &Context, component: &serenity::model::applic
 
 /// Sanitise le contenu utilisateur pour l'affichage dans les embeds Discord.
 /// Empeche l'injection de markdown, mentions, spoilers, etc.
+///
+/// B4 — on remplace `@role`/`@everyone`/`@here` par des formes neutralisees
+/// au lieu d'injecter un zero-width space (qui apparait bizarrement sur
+/// certains clients Discord mobile). Les autres `@` sont laisses tels quels.
 fn sanitize_embed_content(content: &str, max_len: usize) -> String {
     let truncated: String = content.chars().take(max_len).collect();
     truncated
         .replace("```", "` ` `")
         .replace("||", "| |")
-        .replace('@', "@\u{200b}") // zero-width space pour bloquer les mentions
+        .replace("@everyone", "@-everyone")
+        .replace("@here", "@-here")
 }
 
 /// Construit la config des detecteurs depuis la guild config.
@@ -808,12 +903,28 @@ fn is_night_mode(start: u8, end: u8) -> bool {
 }
 
 /// Reduit les seuils de detection pour le mode nuit (seuils divises par ~2).
+/// M8 — lower bounds realistes : "aa" ne doit pas etre flagué meme en night mode.
 fn apply_night_mode(config: &mut DetectorConfig) {
-    config.spam_repeat_char_threshold = (config.spam_repeat_char_threshold / 2).max(2);
-    config.spam_repeat_word_threshold = (config.spam_repeat_word_threshold / 2).max(2);
-    config.caps_threshold_chars = (config.caps_threshold_chars / 2).max(4);
-    config.emoji_spam_max = (config.emoji_spam_max / 2).max(3);
-    config.mentions_max = (config.mentions_max / 2).max(2);
+    config.spam_repeat_char_threshold = (config.spam_repeat_char_threshold / 2).max(4);
+    config.spam_repeat_word_threshold = (config.spam_repeat_word_threshold / 2).max(3);
+    config.caps_threshold_chars = (config.caps_threshold_chars / 2).max(6);
+    config.emoji_spam_max = (config.emoji_spam_max / 2).max(5);
+    config.mentions_max = (config.mentions_max / 2).max(3);
+}
+
+/// M1 — Genere une raison descriptive a partir des flags detecteurs
+/// quand le backend n'en retourne pas. Evite l'affichage generique "Automod".
+fn build_fallback_reason(flags: &detectors::DetectionFlags) -> String {
+    let mut parts = Vec::new();
+    if flags.phishing { parts.push("lien de phishing"); }
+    if flags.insult { parts.push("langage inapproprie"); }
+    if flags.spam { parts.push("spam"); }
+    if flags.link { parts.push("lien non autorise"); }
+    if parts.is_empty() {
+        "Contenu inapproprie detecte".to_string()
+    } else {
+        format!("Detection : {}", parts.join(", "))
+    }
 }
 
 
@@ -896,6 +1007,15 @@ async fn send_to_backend(
         Ok(response) => {
             info!(action = ?response.action, reason = ?response.reason, "Reponse du backend");
 
+            // M1 — si le backend ne remonte pas de raison, en generer une depuis
+            // les flags (plutot que "Automod" generique).
+            let fallback_reason = build_fallback_reason(&request.flags);
+            let effective_reason = response
+                .reason
+                .clone()
+                .filter(|s| !s.trim().is_empty())
+                .unwrap_or(fallback_reason);
+
             if response.action != Action::None {
                 let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
                 let action_label = match &response.action {
@@ -909,7 +1029,7 @@ async fn send_to_backend(
                     "{} — {} : {}",
                     action_label,
                     msg.author.name,
-                    response.reason.as_deref().unwrap_or("Automod"),
+                    effective_reason,
                 );
 
                 base.send_log(
@@ -929,14 +1049,14 @@ async fn send_to_backend(
             if ai_review_mode && log_channel_id != 0 {
                 send_review_card(
                     ctx, msg, &response.action,
-                    response.reason.as_deref().unwrap_or("Automod"),
+                    &effective_reason,
                     response.score.unwrap_or(0.0),
                     &request.flags,
                     log_channel_id, colors,
                 ).await;
             } else {
                 // Mode auto ou pas de salon review → action directe.
-                if let Err(e) = execute_action(ctx, msg, &response.action, response.reason.as_deref(), mute_duration_secs, colors).await {
+                if let Err(e) = execute_action(ctx, msg, &response.action, Some(effective_reason.as_str()), mute_duration_secs, colors).await {
                     error!(error = %e, "Erreur lors de l'execution de l'action");
                 }
             }
@@ -1020,7 +1140,8 @@ async fn execute_action(
             if let Err(e) = msg.channel_id.send_message(&ctx.http, builder).await {
                 warn!(error = %e, "Echec envoi notification mute");
             }
-            msg.delete(&ctx.http).await?;
+            // H2 — Mute AVANT delete : si delete echoue le user reste quand meme
+            // mute. L'inverse masquait l'echec.
             if let (Some(guild_id), Ok(member)) = (msg.guild_id, msg.member(&ctx.http).await) {
                 let mut member = guild_id.member(&ctx.http, member.user.id).await?;
                 let secs = match std::time::SystemTime::now()
@@ -1044,6 +1165,11 @@ async fn execute_action(
                     .disable_communication_until_datetime(&ctx.http, timeout)
                     .await?;
                 info!(user = %msg.author.name, duration_secs = mute_duration_secs, "Utilisateur mute");
+            }
+            // Delete best-effort apres mute reussi (l'inverse cacherait un
+            // echec mute si le delete reussit).
+            if let Err(e) = msg.delete(&ctx.http).await {
+                warn!(error = %e, message_id = %msg.id, "Echec suppression message apres mute automod");
             }
         }
         Action::Ban => {

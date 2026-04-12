@@ -29,8 +29,19 @@ struct EventRow {
 
 impl From<EventRow> for SecurityEvent {
     fn from(row: EventRow) -> Self {
-        let user_ids: Vec<String> =
-            serde_json::from_value(row.user_ids).unwrap_or_default();
+        let user_ids: Vec<String> = match serde_json::from_value(row.user_ids.clone()) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(
+                    event_id = %row.id,
+                    guild_id = %row.guild_id,
+                    error = %e,
+                    raw = %row.user_ids,
+                    "Parse user_ids JSON echoue dans security_event, fallback vec![]"
+                );
+                Vec::new()
+            }
+        };
         Self {
             id: row.id,
             guild_id: row.guild_id,
