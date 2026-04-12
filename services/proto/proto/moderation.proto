@@ -49,6 +49,13 @@ message ModerationAction {
   optional uint64 duration = 11;
   // RFC3339
   string created_at = 12;
+  // Renseignes uniquement en reponse de LogAction (None dans GetHistory).
+  // Nombre de strikes actifs pour le user apres cette action.
+  optional uint32 strikes_count = 13;
+  // Action d'escalation declenchee par le seuil de strikes (mute, ban, ...).
+  optional string escalation_action = 14;
+  // Duree de l'escalation en secondes (None = permanent).
+  optional uint64 escalation_duration = 15;
 }
 
 message UserHistory {

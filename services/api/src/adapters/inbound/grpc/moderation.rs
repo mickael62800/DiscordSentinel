@@ -30,9 +30,10 @@ impl ModerationService for ModerationGrpc {
         request: Request<proto::LogActionRequest>,
     ) -> Result<Response<proto::ModerationAction>, Status> {
         let req = request.into_inner();
-        let action = self
+        // Phase 7B : orchestration atomique action+strike via le service.
+        let logged = self
             .moderation_uc
-            .log_action(LogModerationCommand {
+            .log_action_with_strike(LogModerationCommand {
                 guild_id: req.guild_id,
                 channel_id: req.channel_id,
                 moderator_id: req.moderator_id,
@@ -46,7 +47,14 @@ impl ModerationService for ModerationGrpc {
             })
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(moderation_action_to_proto(action)))
+
+        let mut proto_action = moderation_action_to_proto(logged.action);
+        if let Some(sr) = logged.strike {
+            proto_action.strikes_count = Some(sr.active_count);
+            proto_action.escalation_action = sr.escalation_action;
+            proto_action.escalation_duration = sr.escalation_duration;
+        }
+        Ok(Response::new(proto_action))
     }
 
     async fn get_history(
@@ -77,6 +85,10 @@ fn moderation_action_to_proto(a: ModerationAction) -> proto::ModerationAction {
         gravity: a.gravity.map(|g| g.as_str().to_string()),
         duration: a.duration,
         created_at: a.created_at.to_rfc3339(),
+        // Renseignes uniquement en reponse de LogAction (overrides plus bas).
+        strikes_count: None,
+        escalation_action: None,
+        escalation_duration: None,
     }
 }
 

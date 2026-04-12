@@ -181,9 +181,10 @@ impl ApiClient {
             reason: resp.reason,
             gravity: resp.gravity,
             created_at: resp.created_at,
-            escalation_action: None,
-            escalation_duration: None,
-            strikes_count: None,
+            // Phase 7B : strikes_count + escalation remontes par le serveur gRPC.
+            escalation_action: resp.escalation_action,
+            escalation_duration: resp.escalation_duration,
+            strikes_count: resp.strikes_count,
         })
     }
 
