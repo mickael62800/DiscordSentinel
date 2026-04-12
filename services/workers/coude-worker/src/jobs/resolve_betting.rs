@@ -65,7 +65,10 @@ pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), S
                 AND cfg.bot_name = 'coude'
                 AND cfg.config_key = 'bet_delay_secs'
             WHERE c.status = 'betting'
-              AND c.accepted_at < NOW() - (COALESCE(cfg.config_value::int, 300) * INTERVAL '1 second')
+              AND c.accepted_at < NOW() - (COALESCE(
+                    CASE WHEN cfg.config_value ~ '^\d+$' THEN cfg.config_value::int ELSE NULL END,
+                    300
+                  ) * INTERVAL '1 second')
             FOR UPDATE OF c SKIP LOCKED
         )
         RETURNING id, guild_id, channel_id, message_id,
