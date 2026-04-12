@@ -72,6 +72,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
+    // Verifier immunite via ignored_roles
+    if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
+        reply_text(ctx, command, &super::immunity_message(role_id, "Warn")).await;
+        return;
+    }
+
     // Log dans le backend
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {

@@ -92,6 +92,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Verifier immunite via ignored_roles
+    if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
+        reply_text(ctx, command, &super::immunity_message(role_id, "Mute")).await;
+        return;
+    }
+
     // Charger la config per-guild depuis l'API
     let guild_config = {
         let data = ctx.data.read().await;

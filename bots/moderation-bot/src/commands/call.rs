@@ -53,6 +53,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Err(_) => { reply_ephemeral(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
+    // Verifier immunite via ignored_roles
+    if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
+        reply_ephemeral(ctx, command, &super::immunity_message(role_id, "Convocation")).await;
+        return;
+    }
+
     let bot_id = ctx.cache.current_user().id;
 
     // Lire la categorie depuis la config

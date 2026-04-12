@@ -86,6 +86,7 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
     let duration_secs = duration_min * 60;
     let mut success = 0u32;
     let mut failures = 0u32;
+    let mut immune = 0u32;
 
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
@@ -95,6 +96,11 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
 
     for uid in &user_ids {
         let user_id = serenity::model::id::UserId::new(*uid);
+        // Skip les membres immunises
+        if super::find_immune_role(ctx, guild_id, user_id).await.is_some() {
+            immune += 1;
+            continue;
+        }
         match guild_id.member(&ctx.http, user_id).await {
             Ok(mut member) => {
                 let ts = std::time::SystemTime::now()
@@ -132,6 +138,7 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
+        .field("Immunises", immune.to_string(), true)
         .field("Duree", format!("{}min", duration_min), true)
         .field("Raison", reason, false)
         .timestamp(serenity::model::Timestamp::now())
@@ -203,6 +210,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
 
     let mut success = 0u32;
     let mut failures = 0u32;
+    let mut immune = 0u32;
 
     let data = ctx.data.read().await;
     let api = match data.get::<ModerationApiKey>() {
@@ -212,6 +220,11 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
 
     for uid in &user_ids {
         let user_id = serenity::model::id::UserId::new(*uid);
+        // Skip les membres immunises
+        if super::find_immune_role(ctx, guild_id, user_id).await.is_some() {
+            immune += 1;
+            continue;
+        }
         let target_name = user_id.to_user(&ctx.http).await
             .map(|u| u.name.clone())
             .unwrap_or_else(|_| uid.to_string());
@@ -241,6 +254,7 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
+        .field("Immunises", immune.to_string(), true)
         .field("Raison", reason, false)
         .timestamp(serenity::model::Timestamp::now())
         .footer(CreateEmbedFooter::new("Moderation | Sentinel"));

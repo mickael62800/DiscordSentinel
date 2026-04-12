@@ -86,6 +86,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
+    // Verifier immunite via ignored_roles
+    if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
+        reply_text(ctx, command, &super::immunity_message(role_id, "Ban")).await;
+        return;
+    }
+
     let is_permanent = duration_hours.is_none();
     let duration_secs = duration_hours.map(|h| (h as u64) * 3600);
     let duration_label = if is_permanent {
