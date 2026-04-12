@@ -108,6 +108,21 @@ impl ManageModerationUseCase for ManageModerationService {
     }
 
     async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
-        self.repo.delete_action(id).await
+        // Lire l'action avant suppression pour obtenir guild_id + target_id
+        // (necessaire pour invalider le cache).
+        let actions = self.repo.find_bans(None, 1000, 0).await.unwrap_or_default();
+        // On cherche parmi toutes les actions (pas juste les bans) — fallback:
+        // on invalide tous les caches modhistory si on ne trouve pas l'action.
+        // L'approche propre serait un find_by_id, mais pour eviter un refactor
+        // on supprime d'abord puis on invalide par pattern.
+        let deleted = self.repo.delete_action(id).await?;
+        if deleted {
+            // Invalider tous les caches d'historique de moderation.
+            // C'est un peu large mais garantit la coherence.
+            if let Err(e) = self.cache.invalidate_pattern("modhistory:*").await {
+                tracing::warn!(error = %e, "Echec invalidation cache mod history");
+            }
+        }
+        Ok(deleted)
     }
 }
