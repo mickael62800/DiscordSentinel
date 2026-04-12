@@ -326,22 +326,28 @@ pub async fn execute_mute(
     let channel_embed = moderate_embed(format!("🔇 Mute ({duration_label})"))
         .field("Cible", format!("<@{}>", target.id), true)
         .field("Moderateur", format!("<@{}>", moderator_id), true)
-        .field("Duree", duration_label, true)
+        .field("Duree", duration_label.to_string(), true)
         .field("Raison", reason, false);
 
+    // Reponse ephemere au moderateur
     if let Some(cmd) = command {
         if let Err(e) = cmd
             .create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(channel_embed).ephemeral(true),
+                    CreateInteractionResponseMessage::new()
+                        .content(format!("✅ Mute applique sur <@{}> ({}).", target.id, duration_label))
+                        .ephemeral(true),
                 ),
             )
             .await
         {
-            warn!(error = %e, "Failed to send mute response embed");
+            warn!(error = %e, "Failed to send mute response");
         }
     }
+
+    // Log dans le salon de logs
+    super::log_to_channel(ctx, &guild_id.to_string(), channel_embed).await;
 }
 
 pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {

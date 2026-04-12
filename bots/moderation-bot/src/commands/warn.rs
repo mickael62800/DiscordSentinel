@@ -118,14 +118,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .field("Gravite", gravity, true)
             .field("Raison", reason, false);
 
+            // Reponse ephemere au modo
             if let Err(e) = command.create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(channel_embed).ephemeral(true),
+                    CreateInteractionResponseMessage::new()
+                        .content(format!("✅ Avertissement envoye a <@{}>.", target.id))
+                        .ephemeral(true),
                 ),
             ).await {
-                warn!(error = %e, "Failed to send warn response embed");
+                warn!(error = %e, "Failed to send warn response");
             }
+
+            // Log dans le salon de logs
+            super::log_to_channel(ctx, &guild_id.to_string(), channel_embed).await;
 
             // Appliquer l'escalation si le seuil de strikes est atteint
             if let Some(ref esc_action) = resp.escalation_action {

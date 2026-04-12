@@ -303,22 +303,28 @@ pub async fn execute_ban(
     let channel_embed = critical_embed(format!("🔨 Ban ({duration_label})"))
         .field("Cible", format!("<@{}>", target.id), true)
         .field("Moderateur", format!("<@{}>", moderator_id), true)
-        .field("Duree", duration_label, true)
+        .field("Duree", duration_label.to_string(), true)
         .field("Raison", reason, false);
 
+    // Reponse ephemere au moderateur
     if let Some(cmd) = command {
         if let Err(e) = cmd
             .create_response(
                 &ctx.http,
                 CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new().embed(channel_embed).ephemeral(true),
+                    CreateInteractionResponseMessage::new()
+                        .content(format!("✅ Ban applique sur <@{}> ({}).", target.id, duration_label))
+                        .ephemeral(true),
                 ),
             )
             .await
         {
-            warn!(error = %e, "Failed to send ban response embed");
+            warn!(error = %e, "Failed to send ban response");
         }
     }
+
+    // Log dans le salon de logs
+    super::log_to_channel(ctx, &guild_id.to_string(), channel_embed).await;
 }
 
 pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
