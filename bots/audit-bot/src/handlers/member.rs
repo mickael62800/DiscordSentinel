@@ -141,15 +141,9 @@ pub async fn handle_ban_addition(ctx: &Context, guild_id: GuildId, banned_user: 
         "Membre banni : {} ({})", banned_user.name, banned_user.id
     )).await;
 
-    // Embed Discord → join_leave_channel_id
-    let embed = critical_embed("🔨 Membre banni")
-        .field("Membre", format!("<@{}>", banned_user.id), true)
-        .field("Pseudo", &banned_user.name, true)
-        .field("ID", banned_user.id.to_string(), true)
-        .thumbnail(banned_user.face())
-        .timestamp(serenity::model::Timestamp::now())
-        .footer(serenity::builder::CreateEmbedFooter::new("Audit | Sentinel"));
-    Handler::post_to_channel(ctx, &gid_str, &["join_leave_channel_id"], embed).await;
+    // Note : PAS d'embed dans join_leave_channel — le moderation-bot log deja
+    // les bans dans son propre salon de logs, ce qui creait un doublon.
+    // Les data vont toujours en DB (audit_logs + logs) pour l'historique.
 
     Handler::send_event(
         ctx,
@@ -214,15 +208,8 @@ pub async fn handle_ban_removal(ctx: &Context, guild_id: GuildId, unbanned_user:
         "Membre debanni : {} ({})", unbanned_user.name, unbanned_user.id
     )).await;
 
-    // Embed Discord → join_leave_channel_id
-    let embed = info_embed("🔓 Membre debanni")
-        .field("Membre", format!("<@{}>", unbanned_user.id), true)
-        .field("Pseudo", &unbanned_user.name, true)
-        .field("ID", unbanned_user.id.to_string(), true)
-        .thumbnail(unbanned_user.face())
-        .timestamp(serenity::model::Timestamp::now())
-        .footer(serenity::builder::CreateEmbedFooter::new("Audit | Sentinel"));
-    Handler::post_to_channel(ctx, &gid, &["join_leave_channel_id"], embed).await;
+    // Note : PAS d'embed dans join_leave_channel — cf. handle_ban_addition,
+    // le moderation-bot log deja les unban. Les data restent en DB.
 
     Handler::send_event(
         ctx,
