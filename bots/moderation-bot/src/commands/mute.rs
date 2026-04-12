@@ -47,6 +47,14 @@ pub fn register_unmute() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Deferer immediatement pour eviter le timeout 3s Discord.
+    let _ = command.create_response(
+        &ctx.http,
+        CreateInteractionResponse::Defer(
+            CreateInteractionResponseMessage::new().ephemeral(true),
+        ),
+    ).await;
+
     let options = &command.data.options;
 
     let target_id = options.iter().find(|o| o.name == "user")
@@ -329,20 +337,17 @@ pub async fn execute_mute(
         .field("Duree", duration_label.to_string(), true)
         .field("Raison", reason, false);
 
-    // Reponse ephemere au moderateur
+    // Editer la reponse deferee pour confirmer au moderateur
     if let Some(cmd) = command {
         if let Err(e) = cmd
-            .create_response(
+            .edit_response(
                 &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .content(format!("✅ Mute applique sur <@{}> ({}).", target.id, duration_label))
-                        .ephemeral(true),
-                ),
+                serenity::builder::EditInteractionResponse::new()
+                    .content(format!("✅ Mute applique sur <@{}> ({}).", target.id, duration_label)),
             )
             .await
         {
-            warn!(error = %e, "Failed to send mute response");
+            warn!(error = %e, "Failed to edit mute response");
         }
     }
 
