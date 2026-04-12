@@ -442,29 +442,45 @@ async fn send_review_card(
     // Suffixe commun pour les custom_id
     let id_suffix = format!("{}:{}:{}:{}", guild_id, channel_id, message_id, user_id);
 
-    // Bouton principal (action suggeree) + ajustements + ignorer
-    let btn_apply = serenity::builder::CreateButton::new(format!("am_{}:{}", action_char(suggested_action), id_suffix))
+    // Bouton principal (action suggeree) + ajustements + ignorer.
+    // Les boutons de la rangee 2 excluent l'action suggeree pour eviter
+    // un custom_id duplique (Discord rejette le formulaire sinon).
+    let suggested_char = action_char(suggested_action);
+
+    let btn_apply = serenity::builder::CreateButton::new(format!("am_{}:{}", suggested_char, id_suffix))
         .label(format!("✅ Appliquer ({})", action_label))
         .style(serenity::all::ButtonStyle::Success);
-
-    let btn_warn = serenity::builder::CreateButton::new(format!("am_w:{}", id_suffix))
-        .label("⚠️ Warn")
-        .style(serenity::all::ButtonStyle::Secondary);
-
-    let btn_delete = serenity::builder::CreateButton::new(format!("am_d:{}", id_suffix))
-        .label("🗑️ Delete")
-        .style(serenity::all::ButtonStyle::Secondary);
-
-    let btn_mute = serenity::builder::CreateButton::new(format!("am_m:{}", id_suffix))
-        .label("🔇 Mute")
-        .style(serenity::all::ButtonStyle::Danger);
 
     let btn_ignore = serenity::builder::CreateButton::new(format!("am_i:{}", id_suffix))
         .label("❌ Ignorer")
         .style(serenity::all::ButtonStyle::Secondary);
 
+    // Rangee 2 : ajustements de severite (sans doublon avec le bouton principal)
+    let mut adjust_buttons = Vec::new();
+    if suggested_char != 'w' {
+        adjust_buttons.push(
+            serenity::builder::CreateButton::new(format!("am_w:{}", id_suffix))
+                .label("⚠️ Warn")
+                .style(serenity::all::ButtonStyle::Secondary),
+        );
+    }
+    if suggested_char != 'd' {
+        adjust_buttons.push(
+            serenity::builder::CreateButton::new(format!("am_d:{}", id_suffix))
+                .label("🗑️ Delete")
+                .style(serenity::all::ButtonStyle::Secondary),
+        );
+    }
+    if suggested_char != 'm' {
+        adjust_buttons.push(
+            serenity::builder::CreateButton::new(format!("am_m:{}", id_suffix))
+                .label("🔇 Mute")
+                .style(serenity::all::ButtonStyle::Danger),
+        );
+    }
+
     let row1 = serenity::builder::CreateActionRow::Buttons(vec![btn_apply, btn_ignore]);
-    let row2 = serenity::builder::CreateActionRow::Buttons(vec![btn_warn, btn_delete, btn_mute]);
+    let row2 = serenity::builder::CreateActionRow::Buttons(adjust_buttons);
 
     let builder = serenity::builder::CreateMessage::new()
         .embed(embed)
