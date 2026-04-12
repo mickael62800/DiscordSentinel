@@ -382,16 +382,21 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
     info!(target_id = user_id_str, "Unban applique");
 
     let unban_embed = success_embed("✅ Unban")
+        .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Utilisateur", format!("`{user_id_str}`"), false);
 
     if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().embed(unban_embed),
+            CreateInteractionResponseMessage::new()
+                .content(format!("✅ Unban applique sur `{user_id_str}`."))
+                .ephemeral(true),
         ),
     ).await {
-        warn!(error = %e, "Failed to send unban response embed");
+        warn!(error = %e, "Failed to send unban response");
     }
+
+    super::log_to_channel(ctx, &guild_id.to_string(), unban_embed).await;
 }
 
 async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {

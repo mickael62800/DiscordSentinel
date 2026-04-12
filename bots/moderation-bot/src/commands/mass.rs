@@ -70,12 +70,13 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Repondre immediatement (defer)
+    // Repondre immediatement (defer, ephemere)
     if let Err(e) = command.create_response(
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
-                .content(format!("Mute en cours de {} utilisateurs...", user_ids.len())),
+                .content(format!("Mute en cours de {} utilisateurs...", user_ids.len()))
+                .ephemeral(true),
         ),
     ).await {
         warn!(error = %e, "Failed to send massmute initial response");
@@ -127,17 +128,22 @@ pub async fn handle_massmute(ctx: &Context, command: &CommandInteraction) {
     }
 
     let embed = danger_embed(format!("Mass Mute — {} utilisateurs", user_ids.len()))
+        .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
         .field("Duree", format!("{}min", duration_min), true)
         .field("Raison", reason, false);
 
-    if let Err(e) = command.channel_id.send_message(
-        &ctx.http,
-        serenity::builder::CreateMessage::new().embed(embed),
-    ).await {
-        warn!(error = %e, "Failed to send mass mute summary");
+    // Confirmation ephemere au moderateur
+    let followup = serenity::builder::CreateInteractionResponseFollowup::new()
+        .content(format!("✅ Mass mute termine : {success}/{} utilisateurs.", user_ids.len()))
+        .ephemeral(true);
+    if let Err(e) = command.create_followup(&ctx.http, followup).await {
+        warn!(error = %e, "Failed to send mass mute followup");
     }
+
+    // Log dans le salon de logs
+    super::log_to_channel(ctx, &guild_id.to_string(), embed).await;
 
     info!(
         moderator = %command.user.name,
@@ -175,7 +181,8 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
         &ctx.http,
         CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
-                .content(format!("Ban en cours de {} utilisateurs...", user_ids.len())),
+                .content(format!("Ban en cours de {} utilisateurs...", user_ids.len()))
+                .ephemeral(true),
         ),
     ).await {
         warn!(error = %e, "Failed to send massban initial response");
@@ -218,16 +225,21 @@ pub async fn handle_massban(ctx: &Context, command: &CommandInteraction) {
     }
 
     let embed = danger_embed(format!("Mass Ban — {} utilisateurs", user_ids.len()))
+        .field("Moderateur", format!("<@{}>", command.user.id), true)
         .field("Reussi", success.to_string(), true)
         .field("Echoue", failures.to_string(), true)
         .field("Raison", reason, false);
 
-    if let Err(e) = command.channel_id.send_message(
-        &ctx.http,
-        serenity::builder::CreateMessage::new().embed(embed),
-    ).await {
-        warn!(error = %e, "Failed to send mass ban summary");
+    // Confirmation ephemere au moderateur
+    let followup = serenity::builder::CreateInteractionResponseFollowup::new()
+        .content(format!("✅ Mass ban termine : {success}/{} utilisateurs.", user_ids.len()))
+        .ephemeral(true);
+    if let Err(e) = command.create_followup(&ctx.http, followup).await {
+        warn!(error = %e, "Failed to send mass ban followup");
     }
+
+    // Log dans le salon de logs
+    super::log_to_channel(ctx, &guild_id.to_string(), embed).await;
 
     info!(
         moderator = %command.user.name,
