@@ -47,16 +47,15 @@ impl EventHandler for Handler {
 
         register_guilds(&ctx, &ready).await;
 
-        if let Err(e) = serenity::model::application::Command::set_global_commands(
-            &ctx.http,
-            commands::all(),
-        )
-        .await
-        {
-            error!(error = %e, "Impossible d'enregistrer les slash commands");
-        } else {
-            info!("Slash commands enregistrees : warn, mute, unmute, ban, unban, history, note, call, context, appeal, export, massmute, massban");
+        // Enregistrement par guild (instantane) au lieu de global (jusqu'a 1h).
+        let cmds = commands::all();
+        for guild in &ready.guilds {
+            match guild.id.set_commands(&ctx.http, cmds.clone()).await {
+                Ok(_) => info!(guild_id = %guild.id, "Slash commands enregistrees pour la guild"),
+                Err(e) => error!(error = %e, guild_id = %guild.id, "Echec enregistrement slash commands"),
+            }
         }
+        info!("Slash commands : warn, unwarn, mute, unmute, ban, unban, history, note, call, context, appeal, export, massmute, massban");
 
         // Phase 5B : consumer durable Redis Streams avec XREADGROUP + XACK.
         // Replay au redemarrage des events emis pendant que le bot etait down.
