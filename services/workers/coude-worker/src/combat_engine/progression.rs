@@ -7,6 +7,7 @@ pub fn xp_for_level(level: i32) -> i64 {
 }
 
 /// Titre correspondant au niveau.
+#[allow(dead_code)]
 pub fn title_for_level(level: i32) -> &'static str {
     match level {
         1..=4 => "Debutant",
