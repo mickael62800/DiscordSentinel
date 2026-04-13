@@ -59,22 +59,45 @@ pub(super) async fn create_temp_channel(
     // user_limit par defaut : 10 pour les salons de jeu, 0 (illimite) sinon
     let default_user_limit: u32 = if kind == "game" { 10 } else { 0 };
 
-    // Charger la position de base depuis la config guild
-    let base_position: Option<u16> = {
+    // Charger la position cible : priorite anchor > base_position > default
+    // anchor : lit la position ACTUELLE d'une categorie ancre et prend +1
+    // base_position : index numerique hardcode
+    let (anchor_category_id, base_position) = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            base.get_guild_config(&guild_id.to_string())
-                .await
-                .ok()
-                .and_then(|cfg| cfg.get("voice_base_position").and_then(|v| v.parse().ok()))
+            let cfg = base.get_guild_config(&guild_id.to_string()).await.ok();
+            let anchor = cfg.as_ref()
+                .and_then(|c| c.get("voice_anchor_category_id"))
+                .and_then(|v| v.parse::<u64>().ok())
+                .filter(|id| *id > 0);
+            let pos = cfg.as_ref()
+                .and_then(|c| c.get("voice_base_position"))
+                .and_then(|v| v.parse::<u16>().ok());
+            (anchor, pos)
         } else {
-            None
+            (None, None)
         }
+    };
+
+    // Si une categorie ancre est configuree, lire sa position ACTUELLE depuis
+    // le cache Discord et prendre +1 (robuste aux reorganisations manuelles).
+    let target_position: Option<u16> = if let Some(anchor_id) = anchor_category_id {
+        let anchor_channel = ChannelId::new(anchor_id);
+        ctx.cache
+            .guild(guild_id)
+            .and_then(|g| {
+                g.channels
+                    .get(&anchor_channel)
+                    .map(|ch| ch.position.saturating_add(1))
+            })
+            .or(base_position)
+    } else {
+        base_position
     };
 
     // 1. Creer la categorie (avec position si configuree)
     let mut create_cat = CreateChannel::new(&cat_name).kind(ChannelType::Category);
-    if let Some(pos) = base_position {
+    if let Some(pos) = target_position {
         create_cat = create_cat.position(pos);
     }
     let cat = match guild_id.create_channel(&ctx.http, create_cat).await {
