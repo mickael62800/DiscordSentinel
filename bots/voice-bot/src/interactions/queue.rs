@@ -42,6 +42,33 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             }
         }
 
+        // Retirer le deny CONNECT sur @everyone du vocal principal : maintenant
+        // que la queue est desactivee, tout le monde peut rejoindre a nouveau.
+        let everyone_role = serenity::model::id::RoleId::new(guild_id.get());
+        // On delete l'override @everyone pour revenir a l'etat par defaut.
+        // Si le salon etait "hidden" (VIEW_CHANNEL deny), on recree l'override
+        // uniquement avec VIEW_CHANNEL deny.
+        if let Err(e) = voice_channel_id
+            .delete_permission(
+                &ctx.http,
+                serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
+            )
+            .await
+        {
+            tracing::warn!(error = %e, "failed to remove @everyone deny CONNECT on voice when disabling queue");
+        }
+        // Restaurer le hidden state si le salon etait cache
+        if ch.visibility == "hidden" {
+            let overwrite = serenity::model::channel::PermissionOverwrite {
+                allow: Permissions::empty(),
+                deny: Permissions::VIEW_CHANNEL,
+                kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
+            };
+            if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+                tracing::warn!(error = %e, "failed to restore hidden state after disabling queue");
+            }
+        }
+
         // Update API
         let update = UpdateVoiceChannelRequest {
             visibility: None,
@@ -95,13 +122,33 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
 
         // Permissions on queue: everyone can join but not speak
         let everyone_role = serenity::model::id::RoleId::new(guild_id.get());
-        let overwrite = serenity::model::channel::PermissionOverwrite {
+        let queue_overwrite = serenity::model::channel::PermissionOverwrite {
             allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT,
             deny: Permissions::SPEAK,
             kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
         };
-        if let Err(e) = queue_channel_id.create_permission(&ctx.http, overwrite).await {
+        if let Err(e) = queue_channel_id.create_permission(&ctx.http, queue_overwrite).await {
             tracing::warn!(error = %e, "failed to set queue channel permissions");
+        }
+
+        // FIX QUEUE BYPASS : deny CONNECT sur le vocal principal pour @everyone.
+        // Sans ca, les users non-invites peuvent cliquer directement sur le
+        // vocal principal et entrer sans passer par la file d'attente.
+        // Les user overrides (ALLOW CONNECT pour l'owner + users acceptes)
+        // priment sur le role deny donc ils peuvent toujours rejoindre.
+        // On preserve le VIEW_CHANNEL deny si le salon etait hidden.
+        let voice_deny = if ch.visibility == "hidden" {
+            Permissions::VIEW_CHANNEL | Permissions::CONNECT
+        } else {
+            Permissions::CONNECT
+        };
+        let voice_overwrite = serenity::model::channel::PermissionOverwrite {
+            allow: Permissions::empty(),
+            deny: voice_deny,
+            kind: serenity::model::channel::PermissionOverwriteType::Role(everyone_role),
+        };
+        if let Err(e) = voice_channel_id.create_permission(&ctx.http, voice_overwrite).await {
+            tracing::warn!(error = %e, "failed to lock voice channel behind queue");
         }
 
         // Update API
