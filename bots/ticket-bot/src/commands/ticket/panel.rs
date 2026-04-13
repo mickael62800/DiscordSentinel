@@ -186,7 +186,11 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
             let max_open: u64 = sentinel_shared::api_client::BaseApiClient::config_u64(&guild_config, "max_open_per_user", 0);
 
             if max_open > 0 {
-                let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+                let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+                    Some(g) => g.clone(),
+                    None => return,
+                };
+                let api = ApiClient::new(base.clone(), grpc);
                 if let Ok(tickets) = api.list_tickets().await {
                     let open_count = tickets.iter().filter(|t| {
                         t.author_id == author.id.to_string() && t.status != "closed"
@@ -257,7 +261,14 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
             return;
         }
     };
-    let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+    let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+        Some(g) => g.clone(),
+        None => {
+            error!("GrpcClientKey introuvable dans le context");
+            return;
+        }
+    };
+    let api = ApiClient::new(base.clone(), grpc);
     let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
         Ok(cfg) => cfg,
         Err(e) => {

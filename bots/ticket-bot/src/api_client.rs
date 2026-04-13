@@ -123,21 +123,35 @@ impl ApiClient {
     }
 
     pub async fn list_tickets(&self) -> Result<Vec<Ticket>, String> {
-        let req = proto::ListTicketsRequest {
-            status: None,
-            priority: None,
-            search: None,
-            author_id: None,
-            limit: 200,
-            offset: 0,
-        };
-        let mut client = self.grpc.tickets();
-        let list = self
-            .grpc
-            .guarded(|| async move { client.list_tickets(req).await.map(|r| r.into_inner()) })
-            .await
-            .map_err(grpc_err_to_string)?;
-        Ok(list.tickets.into_iter().map(proto_ticket_to_dto).collect())
+        // Pagination : on boucle par pages de 500 jusqu'a epuisement,
+        // avec une borne dure pour eviter toute boucle pathologique.
+        const PAGE_SIZE: i64 = 500;
+        const MAX_PAGES: usize = 40; // 20 000 tickets max
+        let mut out: Vec<Ticket> = Vec::new();
+        let mut offset: i64 = 0;
+        for _ in 0..MAX_PAGES {
+            let req = proto::ListTicketsRequest {
+                status: None,
+                priority: None,
+                search: None,
+                author_id: None,
+                limit: PAGE_SIZE,
+                offset,
+            };
+            let mut client = self.grpc.tickets();
+            let list = self
+                .grpc
+                .guarded(|| async move { client.list_tickets(req).await.map(|r| r.into_inner()) })
+                .await
+                .map_err(grpc_err_to_string)?;
+            let returned = list.tickets.len();
+            out.extend(list.tickets.into_iter().map(proto_ticket_to_dto));
+            if returned < PAGE_SIZE as usize {
+                break;
+            }
+            offset += PAGE_SIZE;
+        }
+        Ok(out)
     }
 
     pub async fn create_ticket(&self, request: &CreateTicketRequest) -> Result<Ticket, String> {
@@ -283,11 +297,14 @@ impl ApiClient {
             satisfaction_rating: satisfaction_rating.map(|r| r as i32),
         };
         let mut client = self.grpc.tickets();
-        let _ = self
+        let id_owned = id.to_string();
+        if let Err(e) = self
             .grpc
             .guarded(|| async move { client.update_sla(req).await.map(|_| ()) })
-            .await;
-        // fire-and-forget : on ignore l'erreur (historique du handler HTTP).
+            .await
+        {
+            tracing::warn!(ticket_id = %id_owned, error = %grpc_err_to_string(e), "UpdateSla a echoue");
+        }
     }
 }
 

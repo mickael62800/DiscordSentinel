@@ -139,8 +139,11 @@ pub async fn handle_invite_select(ctx: &Context, component: &ComponentInteractio
     // Sync invited_user_id vers l'API
     if let Some(ref ticket_id) = get_ticket_id_from_channel(ctx, component.channel_id).await {
         let data = ctx.data.read().await;
-        if let Some(base) = data.get::<ApiClientKey>() {
-            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+        if let (Some(base), Some(grpc)) = (
+            data.get::<ApiClientKey>(),
+            data.get::<sentinel_shared::grpc_client::GrpcClientKey>(),
+        ) {
+            let api = ApiClient::new(base.clone(), grpc.clone());
             if let Err(e) = api.update_ticket_channel(ticket_id, None, Some(user_id.to_string())).await {
                 error!(error = %e, ticket_id = %ticket_id, "Erreur sync invited_user_id vers API");
             }
@@ -354,8 +357,11 @@ pub async fn handle_vocal_user_accept(ctx: &Context, component: &ComponentIntera
             // Sync voice_channel_id vers l'API
             if let Some(ref ticket_id) = get_ticket_id_from_channel(ctx, component.channel_id).await {
                 let data = ctx.data.read().await;
-                if let Some(base) = data.get::<ApiClientKey>() {
-                    let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+                if let (Some(base), Some(grpc)) = (
+                    data.get::<ApiClientKey>(),
+                    data.get::<sentinel_shared::grpc_client::GrpcClientKey>(),
+                ) {
+                    let api = ApiClient::new(base.clone(), grpc.clone());
                     if let Err(e) = api.update_ticket_channel(ticket_id, Some(vc.id.to_string()), None).await {
                         error!(error = %e, ticket_id = %ticket_id, "Erreur sync voice_channel_id vers API");
                     }
@@ -400,6 +406,25 @@ pub async fn handle_vocal_user_decline(ctx: &Context, component: &ComponentInter
 
 /// Gere le clic sur le bouton "Reponses rapides" dans un ticket.
 pub async fn handle_template_button(ctx: &Context, component: &ComponentInteraction) {
+    // Les templates de reponses rapides sont reserves au staff : un
+    // utilisateur lambda ne doit pas pouvoir poster de messages officiels
+    // au nom du bot.
+    if let Some(gid) = component.guild_id {
+        if !is_staff_member(ctx, gid, component.user.id).await {
+            if let Err(e) = component.create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Seul le staff peut utiliser les reponses rapides.")
+                        .ephemeral(true),
+                ),
+            ).await {
+                warn!(error = %e, "Failed to send template staff-only rejection");
+            }
+            return;
+        }
+    }
+
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
     let templates_raw = {
@@ -448,6 +473,24 @@ pub async fn handle_template_button(ctx: &Context, component: &ComponentInteract
 
 /// Gere la selection d'un template → envoie le contenu dans le salon.
 pub async fn handle_template_select(ctx: &Context, component: &ComponentInteraction) {
+    // Double garde : meme si le menu est ephemeral, on re-verifie le staff
+    // au cas ou un custom_id serait forge manuellement.
+    if let Some(gid) = component.guild_id {
+        if !is_staff_member(ctx, gid, component.user.id).await {
+            if let Err(e) = component.create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("Seul le staff peut envoyer une reponse rapide.")
+                        .ephemeral(true),
+                ),
+            ).await {
+                warn!(error = %e, "Failed to send template-select staff-only rejection");
+            }
+            return;
+        }
+    }
+
     let selected_index = match &component.data.kind {
         serenity::all::ComponentInteractionDataKind::StringSelect { values } => {
             values.first().and_then(|v| v.parse::<usize>().ok())

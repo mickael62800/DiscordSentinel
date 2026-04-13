@@ -134,9 +134,11 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let data = ctx.data.read().await;
     if let Some(base) = data.get::<ApiClientKey>() {
         if let Some(ref id) = ticket_id {
-            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
-            if let Err(e) = api.close_ticket(id).await {
-                error!(error = %e, ticket_id = %id, "Erreur fermeture ticket API");
+            if let Some(grpc) = data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+                let api = ApiClient::new(base.clone(), grpc.clone());
+                if let Err(e) = api.close_ticket(id).await {
+                    error!(error = %e, ticket_id = %id, "Erreur fermeture ticket API");
+                }
             }
         } else {
             warn!(channel = %channel_name, "Impossible de trouver l'UUID du ticket dans le topic du salon");
@@ -213,8 +215,11 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     if transcript_enabled {
     if let Some(ref id) = ticket_id {
         let data2 = ctx.data.read().await;
-        if let Some(base) = data2.get::<ApiClientKey>() {
-            let api = ApiClient::new(base.clone(), data2.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+        if let (Some(base), Some(grpc)) = (
+            data2.get::<ApiClientKey>(),
+            data2.get::<sentinel_shared::grpc_client::GrpcClientKey>(),
+        ) {
+            let api = ApiClient::new(base.clone(), grpc.clone());
             if let Ok(detail) = api.get_ticket(id).await {
                 // Trouver l'auteur pour lui envoyer le DM
                 if let Ok(author_id) = detail.ticket.author_id.parse::<u64>() {
@@ -242,10 +247,23 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
                             transcript.push_str("_Aucun message dans ce ticket._\n");
                         }
 
-                        // Discord limite a 2000 caracteres par message
-                        for chunk in transcript.as_bytes().chunks(1900) {
-                            let text = String::from_utf8_lossy(chunk);
-                            if let Err(e) = dm_channel.say(&ctx.http, &*text).await {
+                        // Discord limite a 2000 caracteres par message.
+                        // Chunking par *caracteres* pour ne pas casser les codepoints UTF-8.
+                        let mut buf = String::new();
+                        let mut char_count = 0usize;
+                        for ch in transcript.chars() {
+                            if char_count + 1 > 1900 {
+                                if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
+                                    warn!(error = %e, "Failed to send transcript DM chunk");
+                                }
+                                buf.clear();
+                                char_count = 0;
+                            }
+                            buf.push(ch);
+                            char_count += 1;
+                        }
+                        if !buf.is_empty() {
+                            if let Err(e) = dm_channel.say(&ctx.http, &buf).await {
                                 warn!(error = %e, "Failed to send transcript DM chunk");
                             }
                         }

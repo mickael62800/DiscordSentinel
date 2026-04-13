@@ -69,6 +69,17 @@ async fn handle_panel(
     ctx: &Context,
     command: &CommandInteraction,
 ) -> Result<(), serenity::Error> {
+    // Reserve aux admins/moderateurs : evite qu'un utilisateur lambda
+    // spamme des panels de tickets dans n'importe quel salon.
+    if let Some(guild_id) = command.guild_id {
+        let is_staff = crate::commands::ticket::helpers::is_staff_member(ctx, guild_id, command.user.id).await;
+        if !is_staff {
+            return reply(ctx, command, "Seuls les administrateurs et moderateurs peuvent deployer le panel.").await;
+        }
+    } else {
+        return reply(ctx, command, "Cette commande doit etre utilisee dans un serveur.").await;
+    }
+
     command.channel_id.send_message(&ctx.http, build_panel_message()).await?;
     reply(ctx, command, "Panneau de tickets deploye !").await
 }
@@ -121,9 +132,11 @@ async fn handle_close(
     let data = ctx.data.read().await;
     if let Some(base) = data.get::<ApiClientKey>() {
         if let Some(ref id) = ticket_id {
-            let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
-            if let Err(e) = api.close_ticket(id).await {
-                error!(error = %e, ticket_id = %id, "Erreur fermeture ticket API");
+            if let Some(grpc) = data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+                let api = ApiClient::new(base.clone(), grpc.clone());
+                if let Err(e) = api.close_ticket(id).await {
+                    error!(error = %e, ticket_id = %id, "Erreur fermeture ticket API");
+                }
             }
         } else {
             warn!(channel = %channel_name, "Impossible de trouver l'UUID du ticket dans le topic du salon");

@@ -183,7 +183,11 @@ impl EventHandler for Handler {
             Some(client) => client,
             None => return,
         };
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+        let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+            Some(g) => g.clone(),
+            None => return,
+        };
+        let api = ApiClient::new(base.clone(), grpc);
 
         let author_role = match msg.guild_id {
             Some(guild_id) => {
@@ -314,7 +318,11 @@ async fn close_inactive_tickets(ctx: &Context) {
         Some(b) => b,
         None => return,
     };
-    let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+    let grpc = match data.get::<sentinel_shared::grpc_client::GrpcClientKey>() {
+        Some(g) => g.clone(),
+        None => return,
+    };
+    let api = ApiClient::new(base.clone(), grpc);
 
     let tickets = match api.list_tickets().await {
         Ok(t) => t,
@@ -323,25 +331,37 @@ async fn close_inactive_tickets(ctx: &Context) {
 
     let now = chrono::Utc::now();
 
-    // Lire le timeout depuis la config de chaque guild (ou defaut 7 jours)
-    let mut timeout_days = 7i64;
-    if let Some(guild) = ctx.cache.guilds().into_iter().next() {
-        let guild_config = match base.get_guild_config(&guild.to_string()).await {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                tracing::warn!(error = %e, guild_id = %guild, "Echec chargement config guild");
-                std::collections::HashMap::new()
-            }
-        };
-        let configured = sentinel_shared::api_client::BaseApiClient::config_u64(&guild_config, "inactive_close_days", 7);
-        if configured == 0 {
-            return; // 0 = desactive
-        }
-        timeout_days = configured as i64;
-    }
+    // Cache des configs par guild pour eviter de re-fetch pour chaque ticket.
+    let mut guild_timeouts: std::collections::HashMap<String, i64> =
+        std::collections::HashMap::new();
 
     for ticket in &tickets {
         if ticket.status == "closed" {
+            continue;
+        }
+
+        // Recuperer le timeout specifique de la guild du ticket.
+        let timeout_days = if let Some(t) = guild_timeouts.get(&ticket.server) {
+            *t
+        } else {
+            let guild_config = match base.get_guild_config(&ticket.server).await {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %ticket.server, "Echec chargement config guild");
+                    std::collections::HashMap::new()
+                }
+            };
+            let configured = sentinel_shared::api_client::BaseApiClient::config_u64(
+                &guild_config,
+                "inactive_close_days",
+                7,
+            ) as i64;
+            guild_timeouts.insert(ticket.server.clone(), configured);
+            configured
+        };
+
+        // 0 = desactive pour cette guild
+        if timeout_days <= 0 {
             continue;
         }
 
@@ -435,8 +455,11 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
                 if id == ticket_id {
                     // Recuperer le dernier message du ticket depuis l'API
                     let data_lock = ctx.data.read().await;
-                    if let Some(base) = data_lock.get::<ApiClientKey>() {
-                        let api = ApiClient::new(base.clone(), data_lock.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey").clone());
+                    if let (Some(base), Some(grpc)) = (
+                        data_lock.get::<ApiClientKey>(),
+                        data_lock.get::<sentinel_shared::grpc_client::GrpcClientKey>(),
+                    ) {
+                        let api = ApiClient::new(base.clone(), grpc.clone());
                         if let Ok(detail) = api.get_ticket(ticket_id).await {
                             if let Some(last_msg) = detail.messages.last() {
                                 if last_msg.author_role == "moderator" {
