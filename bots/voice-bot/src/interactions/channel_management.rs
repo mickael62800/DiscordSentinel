@@ -9,8 +9,6 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use sentinel_shared::heartbeat::ApiClientKey;
-
 use crate::api_client::{ApiClient, UpdateVoiceChannelRequest};
 
 /// Handle channel management interactions.
@@ -90,8 +88,10 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
             error!(error = %e, "Erreur API update visibility");
         }
@@ -176,8 +176,10 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
             error!(error = %e, "Erreur API update lock");
         }
@@ -280,8 +282,10 @@ async fn handle_limit_select(ctx: &Context, component: &ComponentInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
             error!(error = %e, "Erreur API update limit");
         }
@@ -314,8 +318,10 @@ async fn handle_rename_modal(ctx: &Context, component: &ComponentInteraction) {
     // Check ownership via API
     let is_owner = {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         match api.get_channel(&voice_channel_id.get().to_string()).await {
             Ok(Some(ch)) => ch.owner_id == component.user.id.get().to_string(),
             _ => false,
@@ -357,8 +363,10 @@ async fn handle_status_modal(ctx: &Context, component: &ComponentInteraction) {
 
     let is_owner = {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         match api.get_channel(&voice_channel_id.get().to_string()).await {
             Ok(Some(ch)) => ch.owner_id == component.user.id.get().to_string(),
             _ => false,
@@ -432,8 +440,10 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
     // Also rename the category if it exists
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Ok(Some(ch)) = api.get_channel(&voice_channel_id.get().to_string()).await {
             if let Some(cat_id_str) = &ch.category_id {
                 if let Ok(cat_id) = cat_id_str.parse::<u64>() {
@@ -459,8 +469,10 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
             error!(error = %e, "Erreur API update name");
         }
@@ -516,8 +528,10 @@ async fn handle_modal_status(ctx: &Context, modal: &ModalInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api.update_channel(&voice_channel_id.get().to_string(), &update).await {
             error!(error = %e, "Erreur API update status");
         }

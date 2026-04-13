@@ -154,9 +154,7 @@ impl ApiClient {
 
     /// Helper : construit un `ApiClient` depuis le TypeMap Serenity. Renvoie
     /// `None` si l'un des deux clients n'a pas ete insere dans `main.rs`.
-    /// Actuellement non utilise (les call sites fetchent base + grpc en ligne)
-    /// mais garde pour de futurs refactors vers un pattern plus concis.
-    #[allow(dead_code)]
+    /// Pattern standard utilise dans tous les call sites voice-bot.
     pub fn from_data(data: &serenity::prelude::TypeMap) -> Option<Self> {
         let base = data
             .get::<sentinel_shared::heartbeat::ApiClientKey>()?

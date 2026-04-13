@@ -2,8 +2,6 @@ use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-use sentinel_shared::heartbeat::ApiClientKey;
-
 use crate::api_client::{ApiClient, LogModerationActionRequest};
 use crate::handler::{FloodTrackerKey, MembersToVoiceMapKey};
 
@@ -73,8 +71,7 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
 
     // Logger l'action via l'API
     let data = ctx.data.read().await;
-    if let Some(base) = data.get::<ApiClientKey>() {
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+    if let Some(api) = ApiClient::from_data(&data) {
         let request = LogModerationActionRequest {
             guild_id: guild_id.get().to_string(),
             channel_id: channel_id.get().to_string(),

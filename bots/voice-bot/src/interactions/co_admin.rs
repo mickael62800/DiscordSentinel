@@ -8,8 +8,6 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use sentinel_shared::heartbeat::ApiClientKey;
-
 use crate::api_client::{ApiClient, AddCoAdminRequest};
 
 /// Handle co-admin interactions: promote/demote.
@@ -78,8 +76,10 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
     // Verify ownership
     let ch = {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         match api.get_channel(&voice_channel_id.get().to_string()).await {
             Ok(Some(ch)) => ch,
             _ => {
@@ -166,8 +166,10 @@ async fn handle_coadmin_select(ctx: &Context, component: &ComponentInteraction) 
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api
             .add_co_admin(&voice_channel_id.get().to_string(), &request)
             .await

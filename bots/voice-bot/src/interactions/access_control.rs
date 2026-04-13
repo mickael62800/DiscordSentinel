@@ -9,8 +9,6 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use sentinel_shared::heartbeat::ApiClientKey;
-
 use crate::api_client::{ApiClient, AddWhitelistRequest, BanFromChannelRequest};
 
 /// Handle access control interactions: invite, kick, ban.
@@ -110,8 +108,10 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api.add_to_whitelist(&request).await {
             warn!(error = %e, "Erreur API whitelist");
         }
@@ -394,8 +394,10 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
 
     {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
         if let Err(e) = api
             .ban_user(&voice_channel_id.get().to_string(), &ban_request)
             .await

@@ -33,8 +33,7 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
     // Verifier le type du salon via l'API
     let channel_kind = {
         let data = ctx.data.read().await;
-        if let Some(base) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
-            let api = crate::api_client::ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        if let Some(api) = crate::api_client::ApiClient::from_data(&data) {
             api.get_channel(&voice_channel_id.get().to_string())
                 .await
                 .ok()

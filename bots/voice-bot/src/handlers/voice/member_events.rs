@@ -1,7 +1,5 @@
 //! Événements voice state : join/leave/move, plus la logique de file d'attente.
 
-use std::sync::Arc;
-
 use serenity::all::ButtonStyle;
 use serenity::builder::{CreateActionRow, CreateButton, CreateMessage};
 use serenity::model::id::{ChannelId, GuildId, UserId};
@@ -152,13 +150,11 @@ async fn check_queue_join(
     }
 
     let data = ctx.data.read().await;
-    let base = match data.get::<ApiClientKey>() {
-        Some(b) => b,
-        None => return,
+    let Some(api) = crate::api_client::ApiClient::from_data(&data) else {
+        return;
     };
 
     // Chercher dans l'API quel voice channel a ce queue_channel_id
-    let api = crate::api_client::ApiClient::new(Arc::clone(base), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
     let channels = match api.list_channels(&guild_id.to_string()).await {
         Ok(chs) => chs,
         Err(_) => return,

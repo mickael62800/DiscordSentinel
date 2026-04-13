@@ -12,8 +12,6 @@ use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use sentinel_shared::heartbeat::ApiClientKey;
-
 use crate::api_client::{ApiClient, VoiceChannelResponse};
 use crate::handler::{TextToVoiceMapKey, MembersToVoiceMapKey};
 
@@ -56,8 +54,11 @@ pub async fn require_admin(
     // Fetch channel info from API
     let channel_resp = {
         let data = ctx.data.read().await;
-        let base = data.get::<ApiClientKey>().expect("ApiClient");
-        let api = ApiClient::new(base.clone(), data.get::<sentinel_shared::grpc_client::GrpcClientKey>().expect("GrpcClientKey manquant").clone());
+        let Some(api) = ApiClient::from_data(&data) else {
+            warn!("ApiClient ou GrpcClient manquants dans TypeMap");
+            respond_ephemeral(ctx, component, "Erreur interne (client API indisponible).").await;
+            return None;
+        };
         api.get_channel(&voice_channel_id.get().to_string()).await
     };
 
