@@ -35,7 +35,8 @@ pub async fn handle_voice_state_update(
     let user_id = new.user_id;
 
     // Charger les creator channel IDs : d'abord depuis l'API, fallback sur les env vars
-    let (public_creator_id, private_creator_id) = {
+    // game_creator_channel_id est optionnel (None si non configure).
+    let (public_creator_id, private_creator_id, game_creator_id) = {
         let data = ctx.data.read().await;
         let env_config = match data.get::<ConfigKey>() {
             Some(config) => (
@@ -62,15 +63,20 @@ pub async fn handle_voice_state_update(
                         .and_then(|v| v.parse::<u64>().ok())
                         .map(ChannelId::new)
                         .unwrap_or(env_config.1);
-                    (public_id, private_id)
+                    let game_id = config
+                        .get("game_creator_channel_id")
+                        .and_then(|v| v.parse::<u64>().ok())
+                        .filter(|id| *id > 0)
+                        .map(ChannelId::new);
+                    (public_id, private_id, game_id)
                 }
                 Err(e) => {
                     warn!(error = %e, "Config API indisponible, fallback sur env vars");
-                    env_config
+                    (env_config.0, env_config.1, None)
                 }
             }
         } else {
-            env_config
+            (env_config.0, env_config.1, None)
         }
     };
 
@@ -106,6 +112,8 @@ pub async fn handle_voice_state_update(
             create_temp_channel(ctx, guild_id, user_id, "public").await;
         } else if channel_id == private_creator_id {
             create_temp_channel(ctx, guild_id, user_id, "private").await;
+        } else if game_creator_id == Some(channel_id) {
+            create_temp_channel(ctx, guild_id, user_id, "game").await;
         } else {
             // Verifier file d'attente + donner acces panel membres
             check_queue_join(ctx, guild_id, channel_id, user_id).await;

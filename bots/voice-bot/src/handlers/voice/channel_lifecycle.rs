@@ -49,8 +49,15 @@ pub(super) async fn create_temp_channel(
         Err(_) => return,
     };
     let display_name = member.display_name().to_string();
-    let cat_name = format!("Salon de {display_name}");
+    // Nom de la categorie : prefix special pour les salons game
+    let cat_name = if kind == "game" {
+        format!("🎮 {display_name}")
+    } else {
+        format!("Salon de {display_name}")
+    };
     let everyone_role = guild_id.everyone_role();
+    // user_limit par defaut : 10 pour les salons de jeu, 0 (illimite) sinon
+    let default_user_limit: u32 = if kind == "game" { 10 } else { 0 };
 
     // Charger la position de base depuis la config guild
     let base_position: Option<u16> = {
@@ -79,13 +86,14 @@ pub(super) async fn create_temp_channel(
     };
 
     // 2. Creer le salon vocal
+    let mut voice_builder = CreateChannel::new("vocal")
+        .kind(ChannelType::Voice)
+        .category(cat.id);
+    if default_user_limit > 0 {
+        voice_builder = voice_builder.user_limit(default_user_limit);
+    }
     let voice_channel = match guild_id
-        .create_channel(
-            &ctx.http,
-            CreateChannel::new("vocal")
-                .kind(ChannelType::Voice)
-                .category(cat.id),
-        )
+        .create_channel(&ctx.http, voice_builder)
         .await
     {
         Ok(ch) => ch,
@@ -115,8 +123,8 @@ pub(super) async fn create_temp_channel(
         tracing::warn!(error = %e, "failed to set owner permission on voice channel");
     }
 
-    // 3. Panel admin config (prive seulement)
-    let admin_channel_id = if kind == "private" {
+    // 3. Panel admin config (prive + game — ces 2 types ont un panel owner)
+    let admin_channel_id = if kind == "private" || kind == "game" {
         match guild_id
             .create_channel(
                 &ctx.http,
@@ -213,9 +221,50 @@ pub(super) async fn create_temp_channel(
         warn!(error = %why, "Erreur deplacement membre");
     }
 
-    // Envoyer le panneau de controle (prive seulement)
+    // 5. Pour les salons "game", creer automatiquement la file d'attente
+    //    et locker le vocal principal (deny CONNECT @everyone). Les user
+    //    overrides ALLOW sur l'owner priment donc il peut rejoindre.
+    //    Tout autre user doit passer par la queue + etre accepte.
+    let queue_channel_id: Option<ChannelId> = if kind == "game" {
+        let queue_name = format!("File d'attente - {display_name}");
+        let queue_builder = CreateChannel::new(&queue_name)
+            .kind(ChannelType::Voice)
+            .category(cat.id);
+        match guild_id.create_channel(&ctx.http, queue_builder).await {
+            Ok(qch) => {
+                // Permissions queue : everyone peut join mais pas speak
+                let queue_overwrite = PermissionOverwrite {
+                    allow: Permissions::VIEW_CHANNEL | Permissions::CONNECT,
+                    deny: Permissions::SPEAK,
+                    kind: PermissionOverwriteType::Role(everyone_role),
+                };
+                if let Err(e) = qch.id.create_permission(&ctx.http, queue_overwrite).await {
+                    warn!(error = %e, "failed to set queue channel permissions (game)");
+                }
+                // Deny CONNECT sur le vocal principal pour @everyone
+                let voice_overwrite = PermissionOverwrite {
+                    allow: Permissions::empty(),
+                    deny: Permissions::CONNECT,
+                    kind: PermissionOverwriteType::Role(everyone_role),
+                };
+                if let Err(e) = voice_channel_id.create_permission(&ctx.http, voice_overwrite).await {
+                    warn!(error = %e, "failed to lock game voice channel behind queue");
+                }
+                Some(qch.id)
+            }
+            Err(e) => {
+                error!(error = %e, "Erreur creation queue channel (game)");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
+    // Envoyer le panneau de controle (prive + game)
     if let Some(aid) = admin_channel_id {
-        send_control_panel(ctx, aid, false, false, false, user_id.get()).await;
+        let queue_enabled_init = queue_channel_id.is_some();
+        send_control_panel(ctx, aid, false, false, queue_enabled_init, user_id.get()).await;
     }
 
     // Envoyer le panel membres avec vote kick
@@ -232,12 +281,12 @@ pub(super) async fn create_temp_channel(
                 channel_id: voice_channel_id.get().to_string(),
                 text_channel_id: admin_channel_id.map(|id| id.get().to_string()),
                 members_channel_id: Some(members_channel.id.get().to_string()),
-                queue_channel_id: None,
+                queue_channel_id: queue_channel_id.map(|id| id.get().to_string()),
                 category_id: Some(cat.id.get().to_string()),
                 channel_name: cat_name.clone(),
                 kind: kind.to_string(),
                 visibility: "visible".to_string(),
-                queue_enabled: false,
+                queue_enabled: queue_channel_id.is_some(),
             };
 
             if let Err(e) = api.create_channel(&request).await {
