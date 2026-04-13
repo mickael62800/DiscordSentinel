@@ -122,7 +122,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
     let custom_id = &component.data.custom_id;
 
-    // Verifier que c'est le bon joueur
     let game_id = if let Some(id) = custom_id.split(':').nth(1) {
         id.to_string()
     } else {
@@ -140,6 +139,11 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         return;
     };
 
+    let guild_id = match component.guild_id {
+        Some(g) => g.to_string(),
+        None => return,
+    };
+
     let data = ctx.data.read().await;
     let api = match data.get::<GameApiKey>() {
         Some(a) => a,
@@ -149,8 +153,25 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    // Verifier que c'est bien le proprietaire de la partie
-    // On execute l'action — l'API rejettera si le game_id ne correspond pas
+    // SECURITE : on verifie que le clicker est bien proprietaire de la
+    // partie ciblee. `hit/stand/double_down` cote API ne prennent que le
+    // game_id, donc sans ce garde-fou n'importe qui voyant les boutons
+    // pourrait agir sur la main d'un autre joueur dans un salon partage.
+    // On fetch la partie active de l'utilisateur et on compare a game_id.
+    let user_id_str = component.user.id.to_string();
+    let owns_game = match api.get_active(&guild_id, &user_id_str).await {
+        Ok(Some(g)) => g.id == game_id,
+        _ => false,
+    };
+    if !owns_game {
+        reply_component_ephemeral(
+            ctx,
+            component,
+            "Ce n'est pas ta partie — tu ne peux pas jouer a la place d'un autre.",
+        )
+        .await;
+        return;
+    }
 
     let result = match action {
         "hit" => api.hit(&game_id).await,

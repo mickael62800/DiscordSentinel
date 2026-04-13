@@ -51,7 +51,10 @@ async fn main() {
     // Phase 7A — gRPC interne (BlackjackService).
     let grpc = match SentinelGrpcClient::from_env().await {
         Ok(c) => Arc::new(c),
-        Err(e) => panic!("SentinelGrpcClient: {e}"),
+        Err(e) => {
+            eprintln!("Erreur fatale: impossible d'initialiser SentinelGrpcClient: {e}");
+            std::process::exit(1);
+        }
     };
 
     let api_client = ApiClient::new(Arc::clone(&base_api), Arc::clone(&grpc));

@@ -70,8 +70,10 @@ impl BlackjackService {
 
         // Vérifier le blackjack naturel
         let (status, payout, finished_at) = if player_score == 21 {
-            // Blackjack naturel du joueur
-            let payout = (bet as f64 * (1.0 + blackjack_payout)) as i64;
+            // Blackjack naturel du joueur. On `.round()` au lieu de
+            // tronquer : pour bet=51 avec payout=1.5, le calcul donne
+            // 127.5 -> 128 (fair) au lieu de 127 (perte de 0.5 coin).
+            let payout = (bet as f64 * (1.0 + blackjack_payout)).round() as i64;
             ("player_blackjack".to_string(), payout, Some(Utc::now()))
         } else {
             ("playing".to_string(), 0, None)

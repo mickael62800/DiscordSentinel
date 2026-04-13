@@ -231,12 +231,22 @@ impl ApiClient {
         user_id: &str,
         user_name: &str,
     ) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/blackjack/tables/{table_id}/join"),
-                &serde_json::json!({ "user_id": user_id, "user_name": user_name }),
-            )
-            .await;
+        // Avant : post_fire_and_forget + Ok(()) -> le bot confirmait "inscrit"
+        // quel que soit le status HTTP. Desormais on verifie explicitement.
+        let url = format!(
+            "{}/api/blackjack/tables/{}/join",
+            self.base.base_url(),
+            table_id
+        );
+        let req = self
+            .base
+            .client()
+            .post(url)
+            .json(&serde_json::json!({ "user_id": user_id, "user_name": user_name }));
+        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("API error: {}", resp.status()));
+        }
         Ok(())
     }
 
@@ -264,7 +274,10 @@ impl ApiClient {
             self.base.base_url(),
             table_id
         ));
-        let _ = self.base.auth(req).send().await;
+        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("API error: {}", resp.status()));
+        }
         Ok(())
     }
 }
