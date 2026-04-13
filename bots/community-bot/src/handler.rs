@@ -164,8 +164,11 @@ impl EventHandler for Handler {
                 }
             }
             Interaction::Component(component) => {
-                if component.data.custom_id.starts_with("role_") {
+                let cid = component.data.custom_id.as_str();
+                if cid.starts_with("role_") {
                     handle_role_button(&ctx, &component).await;
+                } else if cid.starts_with("sponsor_accept:") || cid.starts_with("sponsor_refuse:") {
+                    commands::sponsor::handle_button(&ctx, &component).await;
                 }
             }
             _ => {}
