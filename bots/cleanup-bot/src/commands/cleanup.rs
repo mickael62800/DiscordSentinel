@@ -13,6 +13,7 @@ use crate::api_client::ApiClient;
 pub fn register() -> CreateCommand {
     CreateCommand::new("cleanup")
         .description("Nettoyer les donnees anciennes (admin)")
+        .default_member_permissions(serenity::all::Permissions::ADMINISTRATOR)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,

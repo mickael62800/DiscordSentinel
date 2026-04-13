@@ -13,6 +13,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 pub fn register() -> CreateCommand {
     CreateCommand::new("purge")
         .description("Supprimer des messages dans le salon")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_MESSAGES)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
@@ -131,11 +132,21 @@ pub fn register() -> CreateCommand {
                 .required(true),
             ),
         )
-        .add_option(CreateCommandOption::new(
-            CommandOptionType::SubCommand,
-            "all",
-            "Supprimer TOUS les messages du salon (peut etre long)",
-        ))
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::SubCommand,
+                "all",
+                "Supprimer TOUS les messages du salon (peut etre long)",
+            )
+            .add_sub_option(
+                CreateCommandOption::new(
+                    CommandOptionType::String,
+                    "confirmation",
+                    "Tapez CONFIRMER (en majuscules) pour valider cette action irreversible",
+                )
+                .required(true),
+            ),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -187,6 +198,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Branche speciale : /purge all — paginate jusqu'a vider le salon
     if sub == "all" {
+        // Garde-fou irreversible : on exige le texte "CONFIRMER" en clair
+        // plutot qu'un simple clic. Evite les erreurs de manipulation.
+        let confirmation = sub_opts
+            .iter()
+            .find(|o| o.name == "confirmation")
+            .and_then(|o| o.value.as_str())
+            .unwrap_or("");
+        if confirmation != "CONFIRMER" {
+            reply_error(
+                ctx,
+                command,
+                "Action annulee. Pour confirmer la suppression **irreversible** de tous les messages, \
+                 tapez exactement `CONFIRMER` (en majuscules) dans le parametre `confirmation`.",
+            )
+            .await;
+            return;
+        }
+
         let (deleted, errors) = purge_all(ctx, channel_id).await;
         let description = if errors > 0 {
             format!(
