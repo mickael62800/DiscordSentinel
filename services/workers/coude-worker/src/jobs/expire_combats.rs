@@ -84,15 +84,28 @@ async fn expire_single_combat(pool: &PgPool, combat: &ExpiredCombat) -> Result<(
     // 2. Penalite pour le defenseur : 20% de la mise
     let penalty = (combat.mise as f64 * 0.20).max(1.0) as i64;
 
+    // Phase 8 : coins sur user_wallets (wallet partage), stats sur coude_players.
     sqlx::query(
-        "UPDATE coude_players SET coins = GREATEST(0, coins - $3), total_lost = total_lost + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+        "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id)
     .bind(&combat.defender_id)
     .bind(penalty)
     .execute(pool)
     .await
-    .map_err(|e| format!("penalite defenseur: {e}"))?;
+    .map_err(|e| format!("penalite defenseur wallet: {e}"))?;
+
+    sqlx::query(
+        "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&combat.guild_id)
+    .bind(&combat.defender_id)
+    .bind(penalty)
+    .execute(pool)
+    .await
+    .map_err(|e| format!("penalite defenseur stats: {e}"))?;
 
     // 3. Incrementer la lachete du defenseur
     sqlx::query(
@@ -133,10 +146,11 @@ async fn refund_combat_bets(pool: &PgPool, combat_id: Uuid) -> Result<(), String
         return Ok(());
     }
 
-    // Rembourser chaque parieur
+    // Rembourser chaque parieur sur le wallet partage (Phase 8).
     for (bet_id, guild_id, bettor_id, amount) in &bets {
         sqlx::query(
-            "UPDATE coude_players SET coins = coins + $3, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+            "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id)
         .bind(bettor_id)
