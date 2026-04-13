@@ -12,9 +12,17 @@ use sentinel_shared::heartbeat::ApiClientKey;
 use crate::handler::{CooldownKey, SponsorshipKey};
 
 pub fn register() -> CreateCommand {
+    // Option B : ouvert a tous les membres. Pas de default_member_permissions.
+    // Les abus sont prevenus par un ensemble de gardes dans le handler :
+    //   - cooldown 30s par user
+    //   - anti self-parrain
+    //   - anti bot
+    //   - target doit etre membre actuel
+    //   - parrain doit etre membre du serveur depuis N jours (default 7)
+    //   - target doit etre nouveau sur le serveur (default < 30 jours)
+    //   - max filleuls actifs par parrain (default 3)
     CreateCommand::new("parrain")
         .description("Parrainer un nouveau membre du serveur")
-        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "membre", "Membre a parrainer")
                 .required(true),
@@ -22,25 +30,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    // Check permission serveur (default_member_permissions est un hint UI).
-    let has_manage_guild = command
-        .member
-        .as_ref()
-        .and_then(|m| m.permissions)
-        .map(|p| {
-            p.contains(serenity::all::Permissions::MANAGE_GUILD)
-                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
-        })
-        .unwrap_or(false);
-
-    if !has_manage_guild {
-        reply_ephemeral(ctx, command, "❌ Permission MANAGE_GUILD requise pour /parrain.").await;
-        warn!(user = %command.user.name, "Tentative /parrain sans permission");
-        return;
-    }
-
-    // Rate limit anti-spam : 30s par user. Sans ca, un admin (ou un compte
-    // compromis avec les droits) pourrait spammer des parrainages.
+    // Rate limit anti-spam : 30s par user.
     {
         let data = ctx.data.read().await;
         if let Some(cooldown) = data.get::<CooldownKey>() {
@@ -66,8 +56,49 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => { reply_ephemeral(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
-    // Lire la config
-    let max_sponsorships = {
+    // ══════════════════════════════════════════════════════════════════
+    // GARDES ANTI-ABUS
+    // ══════════════════════════════════════════════════════════════════
+
+    // 1. Anti self-sponsor (trivialement rapide)
+    if target_id == command.user.id {
+        reply_ephemeral(ctx, command, "❌ Vous ne pouvez pas vous parrainer vous-meme.").await;
+        return;
+    }
+
+    // 2. Target != bot
+    let target_user = match target_id.to_user(&ctx.http).await {
+        Ok(u) => u,
+        Err(_) => {
+            reply_ephemeral(ctx, command, "❌ Utilisateur introuvable.").await;
+            return;
+        }
+    };
+    if target_user.bot {
+        reply_ephemeral(ctx, command, "❌ Vous ne pouvez pas parrainer un bot.").await;
+        return;
+    }
+
+    // 3. Target doit etre membre actuel du serveur
+    let target_member = match guild_id.member(&ctx.http, target_id).await {
+        Ok(m) => m,
+        Err(_) => {
+            reply_ephemeral(ctx, command, "❌ Ce membre n'est pas (ou plus) sur le serveur.").await;
+            return;
+        }
+    };
+
+    // 4. Parrain doit etre membre actuel (sanity check)
+    let parrain_member = match guild_id.member(&ctx.http, command.user.id).await {
+        Ok(m) => m,
+        Err(_) => {
+            reply_ephemeral(ctx, command, "❌ Erreur : vous devez etre membre du serveur.").await;
+            return;
+        }
+    };
+
+    // Lire la config guild (seuils anti-abus)
+    let (max_sponsorships, min_parrain_days, max_filleul_days) = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
             let gc = match base.get_guild_config(&guild_id.to_string()).await {
@@ -77,11 +108,53 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     std::collections::HashMap::new()
                 }
             };
-            BaseApiClient::config_u64(&gc, "max_sponsorships", 3) as u32
+            (
+                BaseApiClient::config_u64(&gc, "max_sponsorships", 3) as u32,
+                BaseApiClient::config_u64(&gc, "sponsor_min_parrain_days", 7),
+                BaseApiClient::config_u64(&gc, "sponsor_max_filleul_days", 30),
+            )
         } else {
-            3
+            (3, 7, 30)
         }
     };
+
+    // 5. Parrain doit etre sur le serveur depuis >= min_parrain_days jours
+    let parrain_joined_days = parrain_member.joined_at
+        .map(|j| {
+            let now = serenity::model::Timestamp::now().unix_timestamp();
+            ((now - j.unix_timestamp()) / 86400).max(0) as u64
+        })
+        .unwrap_or(0);
+    if parrain_joined_days < min_parrain_days {
+        let remaining = min_parrain_days - parrain_joined_days;
+        reply_ephemeral(
+            ctx, command,
+            &format!(
+                "❌ Vous devez etre membre du serveur depuis au moins **{min_parrain_days} jours** pour parrainer. \
+                 Encore **{remaining}** jour(s) a attendre."
+            ),
+        ).await;
+        return;
+    }
+
+    // 6. Target doit etre un membre recent (< max_filleul_days jours)
+    //    Au-dela, il est deja integre et n'a pas besoin d'etre parraine.
+    let target_joined_days = target_member.joined_at
+        .map(|j| {
+            let now = serenity::model::Timestamp::now().unix_timestamp();
+            ((now - j.unix_timestamp()) / 86400).max(0) as u64
+        })
+        .unwrap_or(u64::MAX);
+    if target_joined_days > max_filleul_days {
+        reply_ephemeral(
+            ctx, command,
+            &format!(
+                "❌ <@{}> est sur le serveur depuis plus de **{max_filleul_days} jours**, il n'est plus eligible au parrainage.",
+                target_id
+            ),
+        ).await;
+        return;
+    }
 
     let data = ctx.data.read().await;
     let tracker = match data.get::<SponsorshipKey>() {
