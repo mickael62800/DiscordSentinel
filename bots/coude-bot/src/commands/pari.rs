@@ -134,13 +134,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Deduire la mise du parieur
-    if let Err(e) = api.update_player_coins(&guild_id, &bettor_id, -mise).await {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
-        return;
-    }
-
-    // Inserer le pari
+    // place_bet est atomique cote API : SELECT FOR UPDATE + UPDATE debit +
+    // INSERT dans une seule transaction sur user_wallets. Pas de debit
+    // upfront cote bot (sinon double-debit : une fois par update_player_coins,
+    // une fois par le tx interne de place_bet).
     if let Err(e) = api
         .place_bet(
             &guild_id,
@@ -152,10 +149,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
     {
-        // Rembourser en cas d'erreur
-        if let Err(e2) = api.update_player_coins(&guild_id, &bettor_id, mise).await {
-            tracing::warn!(error = %e2, "Echec API update_player_coins remboursement pari");
-        }
         reply_ephemeral(ctx, command, &format!("Erreur pari : {e}")).await;
         return;
     }

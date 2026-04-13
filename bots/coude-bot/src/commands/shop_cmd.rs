@@ -101,11 +101,23 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 return;
             }
 
-            // Ajouter l'item
+            // Ajouter l'item — rollback coins si l'ajout echoue, sinon le
+            // joueur perd ses coins sans rien recevoir.
             if let Err(e) = api
                 .add_item(&guild_id, &command.user.id.to_string(), &key)
                 .await
             {
+                if let Err(e2) = api
+                    .update_player_coins(&guild_id, &command.user.id.to_string(), price)
+                    .await
+                {
+                    tracing::error!(
+                        error = %e2,
+                        user = %command.user.id,
+                        price,
+                        "Echec rollback coins apres echec add_item shop : coins perdus"
+                    );
+                }
                 reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
                 return;
             }

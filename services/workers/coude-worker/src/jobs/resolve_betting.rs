@@ -81,15 +81,24 @@ pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), S
     .await
     .map_err(|e| format!("Erreur requete betting combats: {e}"))?;
 
-    // 2. Recuperer aussi les combats bloques en 'resolving' depuis > 2 min
-    //    (crash d'un tick precedent, erreur SQL, etc.). On les re-traite.
+    // 2. Recuperer les combats bloques en 'resolving' depuis > 2 min (crash
+    //    d'un tick precedent). On les ATOMIQUEMENT touche (accepted_at =
+    //    NOW()) pour eviter que deux workers concurrents re-traitent le
+    //    meme combat stuck et doublent XP/coins/chaos. Avant, un simple
+    //    SELECT sans lock permettait le double-traitement. Avec NOW(), le
+    //    filtre `< NOW() - 2 min` ne matche plus, donc un tick ulterieur
+    //    ne le reprendra pas tant que ce worker n'a pas termine.
     let stuck = sqlx::query_as::<_, BettingCombat>(
-        r#"SELECT id, guild_id, channel_id, message_id,
+        r#"UPDATE coude_combats SET accepted_at = NOW()
+        WHERE id IN (
+            SELECT id FROM coude_combats
+            WHERE status = 'resolving'
+              AND accepted_at < NOW() - INTERVAL '2 minutes'
+            FOR UPDATE SKIP LOCKED
+        )
+        RETURNING id, guild_id, channel_id, message_id,
             attacker_id, attacker_name, defender_id, defender_name,
             mise, special_attack, defender_special
-        FROM coude_combats
-        WHERE status = 'resolving'
-          AND accepted_at < NOW() - INTERVAL '2 minutes'
         "#,
     )
     .fetch_all(pool)
