@@ -14,10 +14,12 @@ pub const DEFEND_SELECT_PREFIX: &str = "coude_defend_select:";
 const DEFENSIVE_ITEMS: &[&str] = &[
     "rage",         // +50% attaque -30% defense (risque)
     "double_coup",  // Lance le de deux fois par round
-    "explosion",    // Les deux perdent 50% de la mise
+    "explosion",    // Les deux perdent 50% de la mise (defenseur uniquement)
     "mindgame",     // Revele la classe et HP adverses
     "bouclier",     // +20% DEF pendant le combat
     "antidote",     // Immunise contre le poison
+    "poison",       // L'adversaire perd 5 HP par round
+    "coup_traitre", // Reduit la DEF adverse de 50%
 ];
 
 /// Gere le clic sur le bouton "Objet" — affiche l'inventaire du defenseur.

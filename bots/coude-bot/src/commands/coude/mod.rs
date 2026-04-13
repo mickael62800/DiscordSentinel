@@ -44,8 +44,10 @@ pub fn register() -> CreateCommand {
                 .add_string_choice("Double coup", "double_coup")
                 .add_string_choice("Coup traitre", "coup_traitre")
                 .add_string_choice("Rage", "rage")
-                .add_string_choice("Explosion", "explosion")
-                .add_string_choice("Poison", "poison"),
+                .add_string_choice("Poison", "poison")
+                .add_string_choice("Mindgame", "mindgame")
+                .add_string_choice("Bouclier", "bouclier")
+                .add_string_choice("Antidote", "antidote"),
         )
 }
 

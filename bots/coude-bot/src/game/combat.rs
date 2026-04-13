@@ -220,8 +220,16 @@ pub fn resolve_combat(
     let def_double = defender_special == Some("double_coup");
 
     // Has poison?
-    let atk_poison = special == Some("poison");
-    let def_poison = defender_special == Some("poison");
+    let mut atk_poison = special == Some("poison");
+    let mut def_poison = defender_special == Some("poison");
+
+    // Antidote : immunise contre le poison adverse
+    if special == Some("antidote") {
+        def_poison = false;
+    }
+    if defender_special == Some("antidote") {
+        atk_poison = false;
+    }
 
     // Happy hour
     let happy_hour = active_events.iter().any(|e| e.event_type == "happy_hour");
@@ -273,6 +281,18 @@ pub fn resolve_combat(
     let mut vol_coins_total: i64 = 0;
     let mut attacker_class_revealed: Option<String> = None;
     let mut defender_class_revealed: Option<String> = None;
+
+    // Mindgame : revele la classe adverse des le debut du combat
+    if special == Some("mindgame") {
+        defender_class_revealed = Some(
+            defender.class.clone().unwrap_or_else(|| "bourrin".to_string()),
+        );
+    }
+    if defender_special == Some("mindgame") {
+        attacker_class_revealed = Some(
+            attacker.class.clone().unwrap_or_else(|| "bourrin".to_string()),
+        );
+    }
 
     // ══════════════════════════════════════════════════════════════════
     // ── Combat loop ──
