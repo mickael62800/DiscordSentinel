@@ -38,12 +38,11 @@ pub async fn create_session_card(
         }
     };
 
-    let now = chrono::Utc::now().format("%H:%M").to_string();
     let mut card = SessionCard::new(
         log_channel,
         creator_name.to_string(),
         channel_type.to_string(),
-        now,
+        chrono::Utc::now().timestamp(),
     );
 
     card.add_event(format!("\u{1f3a4} **{}** a cree le salon", creator_name));
@@ -110,9 +109,8 @@ pub async fn session_closed(ctx: &Context, voice_channel_id: ChannelId, total_du
             Some(e) => e,
             None => return,
         };
-        let now = chrono::Utc::now().format("%H:%M").to_string();
         entry.closed = true;
-        entry.closed_at = Some(now);
+        entry.closed_at_unix = Some(chrono::Utc::now().timestamp());
         entry.total_duration = Some(total_duration.to_string());
         entry.add_event(format!("\u{1f6d1} **Salon supprime** | Duree : {}", total_duration));
         entry.clone()

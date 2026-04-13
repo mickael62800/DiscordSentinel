@@ -3,9 +3,12 @@ use serenity::model::id::{ChannelId, MessageId};
 use serenity::prelude::*;
 
 /// Evenement dans l'historique d'une session vocale.
+/// `timestamp_unix` est un Unix timestamp (secondes depuis epoch, UTC).
+/// On le formate en `<t:UNIX:t>` a l'affichage — Discord rend l'heure
+/// dans le fuseau local du spectateur, quelle que soit la TZ du serveur.
 #[derive(Clone)]
 pub struct SessionEvent {
-    pub timestamp: String,
+    pub timestamp_unix: i64,
     pub text: String,
 }
 
@@ -20,14 +23,16 @@ pub struct SessionCard {
     pub creator_name: String,
     pub channel_type: String,
     pub visibility: String,
-    pub created_at: String,
+    /// Unix timestamp de creation (secondes UTC).
+    pub created_at_unix: i64,
     /// Historique des evenements
     pub events: Vec<SessionEvent>,
     /// Nombre de membres actuellement presents
     pub current_members: u32,
     /// Salon termine ?
     pub closed: bool,
-    pub closed_at: Option<String>,
+    /// Unix timestamp de fermeture (secondes UTC).
+    pub closed_at_unix: Option<i64>,
     pub total_duration: Option<String>,
 }
 
@@ -36,7 +41,7 @@ impl SessionCard {
         log_channel_id: ChannelId,
         creator_name: String,
         channel_type: String,
-        created_at: String,
+        created_at_unix: i64,
     ) -> Self {
         Self {
             log_message_id: None,
@@ -44,19 +49,18 @@ impl SessionCard {
             creator_name,
             channel_type,
             visibility: "Visible".to_string(),
-            created_at,
+            created_at_unix,
             events: Vec::new(),
             current_members: 0,
             closed: false,
-            closed_at: None,
+            closed_at_unix: None,
             total_duration: None,
         }
     }
 
     pub fn add_event(&mut self, text: String) {
-        let now = chrono::Utc::now().format("%H:%M").to_string();
         self.events.push(SessionEvent {
-            timestamp: now,
+            timestamp_unix: chrono::Utc::now().timestamp(),
             text,
         });
     }
@@ -66,13 +70,14 @@ impl SessionCard {
         let type_emoji = if self.channel_type == "private" { "\u{1f512}" } else { "\u{1f50a}" };
         let status_emoji = if self.closed { "\u{1f534}" } else { "\u{1f7e2}" };
 
-        // Ligne header compacte
+        // Ligne header compacte. `<t:UNIX:t>` = heure courte (ex. 19:00)
+        // dans le fuseau local du spectateur.
         let header = format!(
-            "{} **{}** {} {} | {} | Cree a {}",
+            "{} **{}** {} {} | {} | Cree a <t:{}:t>",
             type_emoji, self.creator_name, status_emoji,
             if self.channel_type == "private" { "Prive" } else { "Public" },
             self.visibility,
-            self.created_at,
+            self.created_at_unix,
         );
 
         // Historique des evenements
@@ -81,7 +86,7 @@ impl SessionCard {
             history.push_str("_En attente de membres..._");
         } else {
             for event in &self.events {
-                history.push_str(&format!("`{}` {}\n", event.timestamp, event.text));
+                history.push_str(&format!("<t:{}:t> {}\n", event.timestamp_unix, event.text));
             }
         }
 
@@ -96,11 +101,12 @@ impl SessionCard {
             history = format!("_... {} evenements precedents ..._\n{}", self.events.len() / 2, &history[safe_keep..]);
         }
 
-        // Footer
+        // Footer — le markdown `<t:...:t>` n'est pas rendu ici, donc on
+        // se contente de la duree. L'heure exacte de fermeture est visible
+        // dans l'historique d'evenements au-dessus.
         let footer_text = if self.closed {
             format!(
-                "Salon supprime {} | Duree : {}",
-                self.closed_at.as_deref().unwrap_or(""),
+                "Salon supprime | Duree : {}",
                 self.total_duration.as_deref().unwrap_or("?"),
             )
         } else {
