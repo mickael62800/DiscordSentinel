@@ -1,17 +1,11 @@
 use serenity::async_trait;
-use serenity::builder::{
-    CreateActionRow, CreateButton, CreateEmbed, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage,
-};
-use serenity::model::application::{ButtonStyle, ComponentInteraction, Interaction};
+use serenity::builder::{CreateActionRow, CreateButton, CreateEmbed, CreateMessage};
+use serenity::model::application::{ButtonStyle, Interaction};
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
-use serenity::model::guild::Member;
-use serenity::model::id::RoleId;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use sentinel_shared::embeds::{neutral_embed, success_embed};
 use sentinel_shared::heartbeat::register_guilds;
 
 use crate::api_client::{ApiClient, SyncRole};
@@ -55,117 +49,18 @@ impl EventHandler for Handler {
         });
     }
 
-    // -- Auto-role quand un membre rejoint --
-
-    async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
-        let guild_id = new_member.guild_id;
-        let data = ctx.data.read().await;
-        let api = match data.get::<RolesApiKey>() {
-            Some(a) => a,
-            None => return,
-        };
-
-        let auto_roles = match api.get_auto_roles(&guild_id.to_string()).await {
-            Ok(r) => r,
-            Err(e) => {
-                warn!(error = %e, "Erreur chargement auto-roles");
-                return;
-            }
-        };
-
-        for ar in &auto_roles {
-            if !ar.enabled { continue; }
-
-            if ar.delay_secs > 0 {
-                let ctx_clone = ctx.clone();
-                let guild = guild_id;
-                let user = new_member.user.id;
-                let role_id: u64 = match ar.role_id.parse() {
-                    Ok(r) => r,
-                    Err(_) => continue,
-                };
-                let delay = ar.delay_secs as u64;
-
-                tokio::spawn(async move {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(delay)).await;
-                    if let Ok(member) = guild.member(&ctx_clone.http, user).await {
-                        if let Err(e) = member.add_role(&ctx_clone.http, RoleId::new(role_id)).await {
-                            warn!(error = %e, "Failed to add delayed auto-role");
-                        }
-                    }
-                });
-            } else if let Ok(role_id) = ar.role_id.parse::<u64>() {
-                if let Ok(member) = guild_id.member(&ctx.http, new_member.user.id).await {
-                    if let Err(e) = member.add_role(&ctx.http, RoleId::new(role_id)).await {
-                        warn!(error = %e, "Failed to add auto-role");
-                    }
-                }
-            }
-        }
-    }
-
-    // -- Clic sur un bouton de panel de roles --
+    // Note : guild_member_addition (auto-roles) et les clics sur les
+    // boutons `role_*` sont geres par community-bot, qui a la version
+    // feature-rich (prerequis, exclusive_groups, temp_roles). Roles-bot
+    // se contente de deployer les panels (/roles-panel deploy) et de
+    // synchroniser les roles Discord vers le backend API.
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        match interaction {
-            Interaction::Command(command) => {
-                if command.data.name.as_str() == "roles-panel" { commands::roles_panel::handle(&ctx, &command).await }
-            }
-            Interaction::Component(component) => {
-                if component.data.custom_id.starts_with("role_") {
-                    handle_role_button(&ctx, &component).await;
-                }
-            }
-            _ => {}
-        }
-    }
-}
-
-async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
-    let custom_id = &component.data.custom_id;
-    let role_id_str = custom_id.strip_prefix("role_").unwrap_or("");
-    let role_id: u64 = match role_id_str.parse() {
-        Ok(id) => id,
-        Err(_) => return,
-    };
-
-    let guild_id = match component.guild_id {
-        Some(g) => g,
-        None => return,
-    };
-
-    let member = match guild_id.member(&ctx.http, component.user.id).await {
-        Ok(m) => m,
-        Err(_) => return,
-    };
-
-    let role = RoleId::new(role_id);
-    let has_role = member.roles.contains(&role);
-
-    let embed = if has_role {
-        if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
-            if let Err(e) = m.remove_role(&ctx.http, role).await {
-                warn!(error = %e, "Failed to remove panel role");
+        if let Interaction::Command(command) = interaction {
+            if command.data.name.as_str() == "roles-panel" {
+                commands::roles_panel::handle(&ctx, &command).await;
             }
         }
-        neutral_embed("\u{21a9}\u{fe0f} Role retire")
-            .description(format!("Le role <@&{}> vous a ete retire.", role_id))
-    } else {
-        if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
-            if let Err(e) = m.add_role(&ctx.http, role).await {
-                warn!(error = %e, "Failed to add panel role");
-            }
-        }
-        success_embed("\u{2705} Role attribue")
-            .description(format!("Le role <@&{}> vous a ete attribue.", role_id))
-    };
-
-    let msg = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .ephemeral(true);
-    let response = CreateInteractionResponse::Message(msg);
-    if let Err(e) = component.create_response(&ctx.http, response).await {
-        warn!(error = %e, "Failed to send role toggle response");
     }
 }
 
@@ -219,10 +114,10 @@ pub async fn send_role_panel(
         .map(|chunk| CreateActionRow::Buttons(chunk.to_vec()))
         .collect();
 
-    let mut message = CreateMessage::new().embed(embed);
-    for row in rows {
-        message = message.components(vec![row]);
-    }
+    // Bug historique : la boucle precedente appelait `.components(vec![row])`
+    // a chaque iteration, ce qui REMPLACE la liste a chaque fois. Resultat :
+    // un panel avec plus de 5 boutons n'affichait que la derniere rangee.
+    let message = CreateMessage::new().embed(embed).components(rows);
 
     channel_id.send_message(&ctx.http, message).await
 }

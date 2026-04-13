@@ -44,15 +44,6 @@ pub struct RolePanelEntry {
     pub position: i32,
 }
 
-#[derive(Debug, Deserialize)]
-#[allow(dead_code)]
-pub struct AutoRole {
-    pub role_id: String,
-    pub role_name: String,
-    pub delay_secs: i32,
-    pub enabled: bool,
-}
-
 #[derive(Debug, Serialize)]
 pub struct SyncRole {
     pub id: String,
@@ -98,21 +89,6 @@ impl ApiClient {
             .await
             .map_err(grpc_err_to_string)?;
         Ok(resp.panel.map(proto_detail_to_dto))
-    }
-
-    pub async fn get_auto_roles(&self, guild_id: &str) -> Result<Vec<AutoRole>, String> {
-        let req = proto::ListAutoRolesRequest {
-            guild_id: guild_id.to_string(),
-        };
-        let mut client = self.grpc.role_panels();
-        let list = self
-            .grpc
-            .guarded(|| async move {
-                client.list_auto_roles(req).await.map(|r| r.into_inner())
-            })
-            .await
-            .map_err(grpc_err_to_string)?;
-        Ok(list.roles.into_iter().map(proto_auto_role_to_dto).collect())
     }
 
     pub async fn set_message_id(
@@ -234,15 +210,6 @@ fn proto_detail_to_dto(d: proto::RolePanelDetail) -> RolePanelDetail {
             enabled: false,
         }),
         entries: d.entries.into_iter().map(proto_entry_to_dto).collect(),
-    }
-}
-
-fn proto_auto_role_to_dto(r: proto::AutoRole) -> AutoRole {
-    AutoRole {
-        role_id: r.role_id,
-        role_name: r.role_name,
-        delay_secs: r.delay_secs,
-        enabled: r.enabled,
     }
 }
 

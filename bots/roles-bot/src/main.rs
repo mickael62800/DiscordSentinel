@@ -40,7 +40,10 @@ async fn main() {
     // Phase 7A — gRPC interne (RolePanelsService).
     let grpc = match SentinelGrpcClient::from_env().await {
         Ok(c) => Arc::new(c),
-        Err(e) => panic!("SentinelGrpcClient: {e}"),
+        Err(e) => {
+            eprintln!("Erreur fatale: impossible d'initialiser SentinelGrpcClient: {e}");
+            std::process::exit(1);
+        }
     };
 
     let roles_api = ApiClient::new(base_api.clone(), Arc::clone(&grpc));
