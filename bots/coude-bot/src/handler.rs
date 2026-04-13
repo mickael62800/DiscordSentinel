@@ -97,7 +97,11 @@ impl EventHandler for Handler {
             Interaction::Component(component) => {
                 let custom_id = &component.data.custom_id;
 
-                if custom_id.starts_with(commands::accepter::ACCEPT_PREFIX) {
+                if custom_id.starts_with(commands::coude::PRECONFIRM_OK_PREFIX) {
+                    commands::coude::handle_preconfirm_ok(&ctx, &component).await;
+                } else if custom_id.starts_with(commands::coude::PRECONFIRM_NO_PREFIX) {
+                    commands::coude::handle_preconfirm_no(&ctx, &component).await;
+                } else if custom_id.starts_with(commands::accepter::ACCEPT_PREFIX) {
                     commands::accepter::handle(&ctx, &component).await;
                 } else if custom_id.starts_with(commands::defend_item::DEFEND_SELECT_PREFIX) {
                     commands::defend_item::handle_defend_select(&ctx, &component).await;

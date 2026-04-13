@@ -7,9 +7,10 @@
 mod challenge_ui;
 
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    CreateMessage,
+    ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType, ComponentInteraction,
+    Context, CreateActionRow, CreateButton, CreateCommand, CreateCommandOption, CreateEmbed,
+    CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
+    EditInteractionResponse, UserId,
 };
 
 use crate::game::progression;
@@ -20,6 +21,12 @@ use challenge_ui::{
     build_bloodbath_embed, build_challenge_buttons, build_challenge_embed, build_handicap_warning,
     build_notification_embed, build_surprise_embed,
 };
+
+/// Prefixe du bouton "Confirmer" affiche avant la creation du combat (pour
+/// que l'attaquant voit ses PV avant de lancer le defi).
+pub const PRECONFIRM_OK_PREFIX: &str = "coude_prec_ok|";
+/// Prefixe du bouton "Annuler" du meme flow.
+pub const PRECONFIRM_NO_PREFIX: &str = "coude_prec_no|";
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("coude")
@@ -145,9 +152,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    // Matchmaking check
+    // Matchmaking check (handicap sera recalcule apres la confirmation)
     let level_gap = (attacker.level - defender_player.level).abs();
-    let (handicap, blocked) =
+    let (_handicap, blocked) =
         progression::matchmaking_handicap(attacker.level, defender_player.level);
 
     if blocked {
@@ -205,7 +212,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Verifier l'item special
+    // Verifier l'item special (has_item seulement — la consommation est
+    // differee apres la confirmation pour ne pas gaspiller l'item si
+    // l'attaquant annule le preconfirm).
     if let Some(ref item_key) = special {
         let has = match api
             .has_item(&guild_id, &command.user.id.to_string(), item_key)
@@ -226,140 +235,348 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .await;
             return;
         }
-        // Consommer l'item
-        if let Err(e) = api
-            .use_item(&guild_id, &command.user.id.to_string(), item_key)
-            .await
-        {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
-            return;
-        }
     }
 
-    // Creer le combat (channel_id = salon combats configure)
-    let combat_channel = config.channel_combats().unwrap(); // deja verifie par check_channel
-    let combat = match api
-        .create_combat(
-            &guild_id,
-            Some(&combat_channel),
-            &command.user.id.to_string(),
-            &command.user.name,
-            &target.id.to_string(),
-            &target.name,
-            mise,
-            special.as_deref(),
-        )
-        .await
-    {
-        Ok(c) => c,
-        Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur creation combat : {e}")).await;
-            return;
-        }
+    // Preconfirmation : on montre les PV de l'attaquant + boutons oui/non.
+    // Le combat n'est PAS encore cree a ce stade ; ca evite :
+    // - de consommer l'item si l'attaquant change d'avis ;
+    // - de laisser une row pending en DB si l'attaquant abandonne ;
+    // - de surprendre quelqu'un qui ne savait pas qu'il etait low HP.
+    let hp_current = attacker.hp_current.unwrap_or(100);
+    let hp_max = attacker.hp_max.unwrap_or(100);
+    let hp_pct = if hp_max > 0 { (hp_current * 100) / hp_max } else { 0 };
+    let hp_warn = if hp_pct <= 25 {
+        "\n\n\u{26a0}\u{fe0f} **Tu es tres bas en PV !** Si tu lances ce combat tu risques une faillite HP rapide."
+    } else if hp_pct <= 50 {
+        "\n\n\u{26a0}\u{fe0f} Tu as moins de la moitie de tes PV. Pense a `/repos` avant si tu peux."
+    } else {
+        ""
     };
 
-    // Si attaque surprise : auto-resolve (gere dans accepter)
-    if special.as_deref() == Some("surprise") {
-        drop(data);
-        super::accepter::resolve_combat_internal(ctx, &combat, command.channel_id).await;
-
-        if let Err(e) = command
-            .create_response(
-                &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .embed(build_surprise_embed(command.user.id, target.id)),
-                ),
-            )
-            .await
-        {
-            tracing::warn!(error = %e, "Echec response Discord");
-        }
-        return;
-    }
-
-    // Bloodbath event : auto-accept
-    let data = ctx.data.read().await;
-    let api = data.get::<GameApiKey>().unwrap();
-    let events = api.get_active_events(&guild_id).await.unwrap_or_else(|e| {
-        tracing::warn!(error = %e, "Echec API get_active_events");
-        vec![]
-    });
-    let bloodbath = events.iter().any(|e| e.event_type == "bloodbath");
-
-    if bloodbath {
-        drop(data);
-        super::accepter::resolve_combat_internal(ctx, &combat, command.channel_id).await;
-
-        if let Err(e) = command
-            .create_response(
-                &ctx.http,
-                CreateInteractionResponse::Message(
-                    CreateInteractionResponseMessage::new()
-                        .embed(build_bloodbath_embed(command.user.id, target.id)),
-                ),
-            )
-            .await
-        {
-            tracing::warn!(error = %e, "Echec response Discord");
-        }
-        return;
-    }
-
-    // Normal flow : envoyer le defi avec boutons
-    let special_label = special
+    let special_suffix = special
         .as_deref()
         .map(|s| format!(" | Special : **{}**", s))
         .unwrap_or_default();
+    let special_for_id = special.as_deref().unwrap_or("-");
 
-    let handicap_warning = build_handicap_warning(
-        command.user.id,
-        attacker.level,
-        target.id,
-        defender_player.level,
-        handicap,
+    let custom_ok = format!(
+        "{}{}|{}|{}",
+        PRECONFIRM_OK_PREFIX, target.id, mise, special_for_id
+    );
+    let custom_no = format!(
+        "{}{}|{}|{}",
+        PRECONFIRM_NO_PREFIX, target.id, mise, special_for_id
     );
 
-    let embed = build_challenge_embed(
-        command.user.id,
-        target.id,
-        mise,
-        &special_label,
-        &handicap_warning,
-    );
-    let row = build_challenge_buttons(&combat.id);
+    let confirm_embed = CreateEmbed::new()
+        .title("\u{2694}\u{fe0f} Confirmer le defi ?")
+        .description(format!(
+            "Tu vas defier <@{}> pour **{} coins**.{}\n\n\
+             \u{2764}\u{fe0f} **Tes PV actuels : {} / {}**{}\n\n\
+             Lancer le combat ?",
+            target.id, mise, special_suffix, hp_current, hp_max, hp_warn
+        ))
+        .color(if hp_pct <= 25 { 0xE74C3C } else { 0xF1C40F })
+        .footer(CreateEmbedFooter::new(
+            "Coup de Coude | Sentinel — cette confirmation t'est reservee",
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+
+    let row = CreateActionRow::Buttons(vec![
+        CreateButton::new(custom_ok)
+            .label("Confirmer")
+            .style(ButtonStyle::Success)
+            .emoji(serenity::model::channel::ReactionType::Unicode(
+                "\u{2705}".to_string(),
+            )),
+        CreateButton::new(custom_no)
+            .label("Annuler")
+            .style(ButtonStyle::Secondary)
+            .emoji(serenity::model::channel::ReactionType::Unicode(
+                "\u{274c}".to_string(),
+            )),
+    ]);
 
     if let Err(e) = command
         .create_response(
             &ctx.http,
             CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(vec![row]),
+                    .embed(confirm_embed)
+                    .components(vec![row])
+                    .ephemeral(true),
             ),
         )
         .await
     {
-        tracing::warn!(error = %e, "Echec response Discord");
+        tracing::warn!(error = %e, "Echec response Discord preconfirm");
+    }
+}
+
+/// Handler du bouton "Confirmer" affiche par `/coude` avant la creation du
+/// combat. Parse le custom_id, rejoue les validations minimales, consomme
+/// l'item eventuel puis cree le combat et poste le defi normal.
+pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteraction) {
+    let (target_id_str, mise, special) = match parse_preconfirm_id(&component.data.custom_id, PRECONFIRM_OK_PREFIX) {
+        Some(x) => x,
+        None => {
+            edit_component_message(ctx, component, "Custom id invalide.").await;
+            return;
+        }
+    };
+
+    let guild_id = match component.guild_id {
+        Some(id) => id.to_string(),
+        None => {
+            edit_component_message(ctx, component, "Commande serveur uniquement.").await;
+            return;
+        }
+    };
+
+    let config = load_guild_config(ctx, &guild_id).await;
+
+    let target_id = match target_id_str.parse::<u64>() {
+        Ok(v) => UserId::new(v),
+        Err(_) => {
+            edit_component_message(ctx, component, "Cible invalide.").await;
+            return;
+        }
+    };
+    let target = match target_id.to_user(&ctx.http).await {
+        Ok(u) => u,
+        Err(_) => {
+            edit_component_message(ctx, component, "Cible introuvable.").await;
+            return;
+        }
+    };
+
+    let attacker_user = &component.user;
+
+    let data = ctx.data.read().await;
+    let api = data.get::<GameApiKey>().unwrap();
+
+    // Re-fetch attacker pour check coins a jour (un vol/combat a pu passer
+    // entre le /coude et le clic sur Confirmer).
+    let attacker = match api
+        .get_or_create_player(&guild_id, &attacker_user.id.to_string(), &attacker_user.name)
+        .await
+    {
+        Ok(p) => p,
+        Err(e) => {
+            edit_component_message(ctx, component, &format!("Erreur API : {e}")).await;
+            return;
+        }
+    };
+
+    if attacker.coins < mise {
+        edit_component_message(
+            ctx,
+            component,
+            &format!(
+                "Ton solde n'est plus suffisant ! (tu as {} coins, mise demandee : {})",
+                attacker.coins, mise
+            ),
+        )
+        .await;
+        return;
     }
 
-    // Notifier dans le salon notifications (mention du defenseur)
+    // Pas de combat en cours entre temps
+    if let Ok(Some(_)) = api
+        .get_pending_combat_for_attacker(&guild_id, &attacker_user.id.to_string())
+        .await
+    {
+        edit_component_message(ctx, component, "Tu as deja un defi en attente !").await;
+        return;
+    }
+
+    let defender_player = match api
+        .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
+        .await
+    {
+        Ok(p) => p,
+        Err(e) => {
+            edit_component_message(ctx, component, &format!("Erreur API : {e}")).await;
+            return;
+        }
+    };
+
+    let (handicap, _blocked) = progression::matchmaking_handicap(attacker.level, defender_player.level);
+
+    // Consommer l'item SEULEMENT ici (apres confirm).
+    if special != "-" {
+        let has = api
+            .has_item(&guild_id, &attacker_user.id.to_string(), &special)
+            .await
+            .unwrap_or(false);
+        if !has {
+            edit_component_message(
+                ctx,
+                component,
+                &format!("Tu n'as plus l'objet **{}** dans ton inventaire !", special),
+            )
+            .await;
+            return;
+        }
+        if let Err(e) = api
+            .use_item(&guild_id, &attacker_user.id.to_string(), &special)
+            .await
+        {
+            edit_component_message(ctx, component, &format!("Erreur API : {e}")).await;
+            return;
+        }
+    }
+
+    let combat_channel = match config.channel_combats() {
+        Some(c) => c,
+        None => {
+            edit_component_message(ctx, component, "Salon combats non configure.").await;
+            return;
+        }
+    };
+
+    let special_opt = if special == "-" { None } else { Some(special.as_str()) };
+
+    let combat = match api
+        .create_combat(
+            &guild_id,
+            Some(&combat_channel),
+            &attacker_user.id.to_string(),
+            &attacker_user.name,
+            &target.id.to_string(),
+            &target.name,
+            mise,
+            special_opt,
+        )
+        .await
+    {
+        Ok(c) => c,
+        Err(e) => {
+            edit_component_message(ctx, component, &format!("Erreur creation combat : {e}")).await;
+            return;
+        }
+    };
+
+    // Attaque surprise : auto-resolve direct
+    if special_opt == Some("surprise") {
+        drop(data);
+        super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await;
+        let _ = component
+            .channel_id
+            .send_message(
+                &ctx.http,
+                CreateMessage::new().embed(build_surprise_embed(attacker_user.id, target.id)),
+            )
+            .await;
+        edit_component_message(ctx, component, "\u{2705} Defi surprise lance !").await;
+        return;
+    }
+
+    // Bloodbath : auto-accept
+    let events = api.get_active_events(&guild_id).await.unwrap_or_default();
+    let bloodbath = events.iter().any(|e| e.event_type == "bloodbath");
+    if bloodbath {
+        drop(data);
+        super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await;
+        let _ = component
+            .channel_id
+            .send_message(
+                &ctx.http,
+                CreateMessage::new().embed(build_bloodbath_embed(attacker_user.id, target.id)),
+            )
+            .await;
+        edit_component_message(ctx, component, "\u{2705} Defi Bloodbath lance !").await;
+        return;
+    }
+
+    // Flow normal : poster le defi public avec boutons
+    let special_label = special_opt
+        .map(|s| format!(" | Special : **{}**", s))
+        .unwrap_or_default();
+    let handicap_warning = build_handicap_warning(
+        attacker_user.id,
+        attacker.level,
+        target.id,
+        defender_player.level,
+        handicap,
+    );
+    let challenge_embed = build_challenge_embed(
+        attacker_user.id,
+        target.id,
+        mise,
+        &special_label,
+        &handicap_warning,
+    );
+    let challenge_row = build_challenge_buttons(&combat.id);
+
+    if let Err(e) = component
+        .channel_id
+        .send_message(
+            &ctx.http,
+            CreateMessage::new()
+                .embed(challenge_embed)
+                .components(vec![challenge_row]),
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec send_message defi");
+    }
+
+    // Notifier dans le salon notifications
     if let Some(notif_ch) = config.channel_notifications() {
         if let Ok(ch_id) = notif_ch.parse::<u64>() {
             let notif_embed = build_notification_embed(
                 target.id,
-                &command.user.name,
+                &attacker_user.name,
                 mise,
                 &combat_channel,
             );
-
-            if let Err(e) = serenity::model::id::ChannelId::new(ch_id)
+            let _ = serenity::model::id::ChannelId::new(ch_id)
                 .send_message(&ctx.http, CreateMessage::new().embed(notif_embed))
-                .await
-            {
-                tracing::warn!(error = %e, "Echec send_message salon notifications");
-            }
+                .await;
         }
+    }
+
+    edit_component_message(ctx, component, "\u{2705} Defi envoye dans le salon combats !").await;
+}
+
+/// Handler du bouton "Annuler" du preconfirm.
+pub async fn handle_preconfirm_no(ctx: &Context, component: &ComponentInteraction) {
+    edit_component_message(ctx, component, "\u{274c} Defi annule avant envoi. Aucune mise prelevee.").await;
+}
+
+fn parse_preconfirm_id(id: &str, prefix: &str) -> Option<(String, i64, String)> {
+    let rest = id.strip_prefix(prefix)?;
+    let mut parts = rest.splitn(3, '|');
+    let target = parts.next()?.to_string();
+    let mise: i64 = parts.next()?.parse().ok()?;
+    let special = parts.next()?.to_string();
+    Some((target, mise, special))
+}
+
+async fn edit_component_message(ctx: &Context, component: &ComponentInteraction, content: &str) {
+    // On accuse reception (defer update) puis on edit le message ephemere
+    // pour virer les boutons et mettre le status final.
+    if let Err(e) = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::UpdateMessage(
+                CreateInteractionResponseMessage::new()
+                    .content(content)
+                    .embeds(vec![])
+                    .components(vec![]),
+            ),
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec update preconfirm message");
+        // Fallback : follow-up ephemere
+        let _ = component
+            .edit_response(
+                &ctx.http,
+                EditInteractionResponse::new().content(content).components(vec![]),
+            )
+            .await;
     }
 }
 
