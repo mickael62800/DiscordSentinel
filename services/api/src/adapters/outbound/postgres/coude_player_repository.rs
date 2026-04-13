@@ -330,11 +330,15 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         stat: CombatStat,
     ) -> Result<Option<CoudePlayer>, DomainError> {
         // `stat.column()` retourne uniquement "atk" ou "def" — sûr à interpoler.
+        // L'UPDATE a besoin de l'alias `cp` parce que PLAYER_COLUMNS reference
+        // `cp.guild_id` / `cp.user_id` dans la sous-requete wallet — sans
+        // cet alias sur la table cible, Postgres jette "missing FROM-clause
+        // entry for table cp" et toute la commande /train tombe en 500.
         let col = stat.column();
         let sql = format!(
-            r#"UPDATE coude_players
+            r#"UPDATE coude_players AS cp
                SET {col} = {col} + 1, stat_points = stat_points - 1, updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2 AND stat_points >= 1
+               WHERE cp.guild_id = $1 AND cp.user_id = $2 AND cp.stat_points >= 1
                RETURNING {cols}"#,
             col = col,
             cols = PLAYER_COLUMNS
