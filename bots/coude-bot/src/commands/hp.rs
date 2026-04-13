@@ -7,8 +7,38 @@ use crate::game::combat;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
-/// HP regenerated per tick.
-const REGEN_HP_PER_HOUR: i32 = 10;
+/// Paliers de regen (HP/h par bande de % HP courant).
+/// Doivent rester en sync avec services/workers/coude-worker/src/jobs/hp_regen.rs.
+const RATE_0_25: f64 = 100.0;
+const RATE_25_50: f64 = 50.0;
+const RATE_50_75: f64 = 30.0;
+const RATE_75_100: f64 = 10.0;
+
+/// Calcule le temps (en minutes) necessaire pour passer de `hp_current` a
+/// `hp_max` avec la regen degressive.
+fn estimate_minutes_to_full(mut hp_current: i32, hp_max: i32) -> i32 {
+    if hp_current >= hp_max || hp_max <= 0 {
+        return 0;
+    }
+    let mut total_minutes = 0.0_f64;
+    // On consomme palier par palier ; chaque palier est defini par un
+    // plafond en HP absolu et un taux horaire.
+    let thresholds: [(i32, f64); 4] = [
+        (hp_max / 4, RATE_0_25),
+        (hp_max / 2, RATE_25_50),
+        ((hp_max * 3) / 4, RATE_50_75),
+        (hp_max, RATE_75_100),
+    ];
+    for (ceiling, rate) in thresholds {
+        if hp_current >= ceiling {
+            continue;
+        }
+        let delta = (ceiling - hp_current) as f64;
+        total_minutes += (delta / rate) * 60.0;
+        hp_current = ceiling;
+    }
+    total_minutes.ceil() as i32
+}
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("hp")
@@ -68,45 +98,43 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     // Status emoji/text
-    let status = if hp_pct <= 20 {
-        "\u{1f480} **CRITIQUE** \u{2014} Tu ne peux pas combattre !"
+    let status = if hp_pct < 10 {
+        "\u{1f480} **KO** \u{2014} Tu ne peux pas combattre ! (seuil : 10 %)"
+    } else if hp_pct <= 25 {
+        "\u{1fa78} **Critique** \u{2014} Pense a te soigner !"
     } else if hp_pct <= 50 {
-        "\u{1f915} **Blesse** \u{2014} Pense a te soigner !"
+        "\u{1f915} **Blesse**"
     } else if hp_pct < 100 {
         "\u{1f44d} **En forme**"
     } else {
         "\u{2764}\u{fe0f} **Pleine sante !**"
     };
 
-    // Regen timer (based on hp_last_regen)
+    // Regen timer : on affiche le taux du palier courant + estimation
+    // du temps total pour un full heal.
     let regen_msg = if hp_current >= hp_max {
         "\u{2705} HP au maximum !".to_string()
     } else {
-        let hp_needed = hp_max - hp_current;
-        let hours_needed = ((hp_needed as f64) / (REGEN_HP_PER_HOUR as f64)).ceil() as i32;
-
-        let next_regen = if let Some(ref last_regen) = player.hp_last_regen {
-            if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(last_regen) {
-                let next = dt.with_timezone(&chrono::Utc)
-                    + chrono::Duration::hours(1);
-                let remaining = next
-                    .signed_duration_since(chrono::Utc::now())
-                    .num_minutes();
-                if remaining > 0 {
-                    format!("Prochaine regen dans ~{}min", remaining)
-                } else {
-                    "Regen imminente !".to_string()
-                }
-            } else {
-                "Regen en cours...".to_string()
-            }
+        let current_rate = if hp_pct < 25 {
+            RATE_0_25
+        } else if hp_pct < 50 {
+            RATE_25_50
+        } else if hp_pct < 75 {
+            RATE_50_75
         } else {
-            "Regen en cours...".to_string()
+            RATE_75_100
         };
-
+        let minutes_to_full = estimate_minutes_to_full(hp_current, hp_max);
+        let full_heal_str = if minutes_to_full < 60 {
+            format!("~{}min", minutes_to_full)
+        } else {
+            format!("~{}h{:02}", minutes_to_full / 60, minutes_to_full % 60)
+        };
         format!(
-            "\u{1f504} +{} HP/heure | ~{}h pour full HP\n\u{23f0} {}",
-            REGEN_HP_PER_HOUR, hours_needed, next_regen
+            "\u{1f504} Palier actuel : **+{} HP/h** (regen degressive)\n\
+             \u{23f0} Full heal dans environ **{}**\n\
+             \u{1f4a4} `/repos` = heal total instantane (cooldown 12h)",
+            current_rate as i32, full_heal_str
         )
     };
 

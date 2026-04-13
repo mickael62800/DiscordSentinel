@@ -28,9 +28,9 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
         spawn_periodic(
             "resolve_betting",
             config.betting_check_secs,
-            pool,
-            shutdown,
-            api_url,
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
             "coude-worker",
             move |pool| {
                 let api = api.clone();
@@ -39,4 +39,15 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
             },
         );
     }
+
+    // Job 3 : regen passive des HP (taux degressif par palier)
+    spawn_periodic(
+        "hp_regen",
+        config.hp_regen_tick_secs,
+        pool,
+        shutdown,
+        api_url,
+        "coude-worker",
+        |pool| Box::pin(async move { jobs::hp_regen::run(&pool).await }),
+    );
 }

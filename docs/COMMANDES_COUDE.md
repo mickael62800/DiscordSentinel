@@ -38,10 +38,26 @@ Pas à taper à la main — ce sont les boutons qui apparaissent sur le défi.
 - **Annuler** (par l'attaquant) : pénalité configurée sur le serveur.
 
 ### `/hp`
-Affiche tes PV actuels / max.
+Affiche tes PV actuels / max, ton palier de régen courant et l'estimation pour full heal.
 
 ### `/repos`
 Regen **complète** tes PV. Cooldown **12h**. À utiliser avant un combat si tu es bas.
+
+### ❤️ Régen passive des PV
+
+Tes PV se régénèrent tout seuls au fil du temps, avec un **taux dégressif par palier** : plus tu es bas, plus tu récupères vite.
+
+| Ton % HP | Taux | ≈ temps par palier (sur 100 HP) |
+|---|---|---|
+| 0 – 25 % | **+100 HP/h** | 15 min pour passer de 0 à 25 |
+| 25 – 50 % | **+50 HP/h** | 30 min pour passer de 25 à 50 |
+| 50 – 75 % | **+30 HP/h** | 50 min pour passer de 50 à 75 |
+| 75 – 100 % | **+10 HP/h** | 2h30 pour finir de 75 à 100 |
+
+👉 **Full heal depuis 0 HP : ~3h45 de régen passive**, dont les 50 premiers PV en ~45 min.
+👉 `/repos` reste le raccourci full heal instantané (cooldown 12h).
+
+> ⚠️ **Tu ne peux pas lancer `/coude` si tu es à moins de 10 % de tes PV.** Le bot refuse la commande et te suggère d'utiliser `/repos` ou d'attendre un peu.
 
 ---
 

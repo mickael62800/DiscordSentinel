@@ -152,6 +152,26 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    // HP minimum pour combattre (10 % par defaut).
+    // On bloque avant meme d'ouvrir la preconfirmation : inutile de faire
+    // cliquer l'attaquant pour ensuite lui dire qu'il est en KO.
+    let hp_current_now = attacker.hp_current.unwrap_or(100);
+    let hp_max_now = attacker.hp_max.unwrap_or(100);
+    let hp_pct_now = if hp_max_now > 0 { (hp_current_now * 100) / hp_max_now } else { 0 };
+    if hp_pct_now < 10 {
+        reply_ephemeral(
+            ctx,
+            command,
+            &format!(
+                "\u{1f480} Tu es trop bas en PV pour combattre ! ({}/{} — {}%)\n\
+                 Utilise `/repos` (cooldown 12h) ou attends la regen passive.",
+                hp_current_now, hp_max_now, hp_pct_now
+            ),
+        )
+        .await;
+        return;
+    }
+
     // Matchmaking check (handicap sera recalcule apres la confirmation)
     let level_gap = (attacker.level - defender_player.level).abs();
     let (_handicap, blocked) =
@@ -375,6 +395,24 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
             &format!(
                 "Ton solde n'est plus suffisant ! (tu as {} coins, mise demandee : {})",
                 attacker.coins, mise
+            ),
+        )
+        .await;
+        return;
+    }
+
+    // Revalidation HP : si l'attaquant a pris des degats entre le /coude et
+    // le clic Confirmer, on refuse plutot que de lancer un combat perdu d'avance.
+    let hp_c = attacker.hp_current.unwrap_or(100);
+    let hp_m = attacker.hp_max.unwrap_or(100);
+    let pct = if hp_m > 0 { (hp_c * 100) / hp_m } else { 0 };
+    if pct < 10 {
+        edit_component_message(
+            ctx,
+            component,
+            &format!(
+                "\u{1f480} Tu es trop bas en PV maintenant ({}/{} — {}%). Defi annule.",
+                hp_c, hp_m, pct
             ),
         )
         .await;
