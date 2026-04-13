@@ -54,10 +54,8 @@ async fn main() {
     let grpc = match SentinelGrpcClient::from_env().await {
         Ok(c) => Arc::new(c),
         Err(e) => {
-            tracing::error!(error = %e, "Echec init SentinelGrpcClient — fallback HTTP partiel");
-            // On panique ici plutot que de demarrer le bot dans un etat
-            // degrade silencieux : la migration gRPC est obligatoire pour ce bot.
-            panic!("SentinelGrpcClient: {e}");
+            eprintln!("Erreur fatale: impossible d'initialiser SentinelGrpcClient: {e}");
+            std::process::exit(1);
         }
     };
 

@@ -324,6 +324,14 @@ impl EventHandler for Handler {
         let was_in_voice = old.as_ref().and_then(|s| s.channel_id).is_some();
         let is_in_voice = new.channel_id.is_some();
 
+        // AFK = self_mute + self_deaf (meme critere que security-bot).
+        // Empeche le farming d'XP vocal "passif" (user branche mais absent).
+        let is_afk_now = new.self_mute && new.self_deaf;
+        let was_afk = old
+            .as_ref()
+            .map(|s| s.self_mute && s.self_deaf)
+            .unwrap_or(false);
+
         let tracker = data.get::<TrackerKey>();
         let api = data.get::<StatsApiKey>();
 
@@ -331,8 +339,21 @@ impl EventHandler for Handler {
             (false, true) => {
                 // Rejoint un salon vocal
                 if let Some(tracker) = tracker {
-                    tracker.voice_join(guild_id.get(), user_id.get()).await;
+                    tracker
+                        .voice_join(guild_id.get(), user_id.get(), is_afk_now)
+                        .await;
                 }
+            }
+            (true, true) => {
+                // Toujours en vocal : detecter transitions AFK <-> actif.
+                if was_afk != is_afk_now {
+                    if let Some(tracker) = tracker {
+                        tracker
+                            .set_voice_afk(guild_id.get(), user_id.get(), is_afk_now)
+                            .await;
+                    }
+                }
+                return;
             }
             (true, false) => {
                 // Quitte le salon vocal — calculer la duree et envoyer au backend
