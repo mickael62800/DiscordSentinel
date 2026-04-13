@@ -92,8 +92,16 @@ pub async fn get_channel_detail(
 
 pub async fn create_channel(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateVoiceChannelDto>,
 ) -> Result<Json<VoiceChannelResponseDto>, ApiError> {
+    // Gate RBAC : moderator+ requis pour creer un voice channel.
+    // Pass-through pour les appels bot-internal (rbac absent).
+    check_role_for_guild(
+        &state, &rbac, &dto.guild_id, Role::Moderator,
+        "moderator+ requis pour creer un voice channel",
+    )
+    .await?;
     let command = dto.into();
     let channel = state.voice_channels_uc.create_channel(command).await?;
 
@@ -145,9 +153,11 @@ pub async fn delete_channel(
 
 pub async fn update_channel(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<UpdateVoiceChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour modifier un voice channel").await?;
     state
         .voice_channels_uc
         .update_channel(UpdateVoiceChannelCommand {
@@ -173,9 +183,11 @@ pub async fn update_channel(
 
 pub async fn transfer_ownership(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<TransferOwnershipDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour transferer un voice channel").await?;
     let new_owner_name = dto.new_owner_name.clone();
 
     state
@@ -203,9 +215,11 @@ pub async fn transfer_ownership(
 
 pub async fn add_co_admin(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<AddCoAdminDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour ajouter un co-admin voice").await?;
     state
         .voice_channels_uc
         .add_co_admin(ManageCoAdminCommand {
@@ -244,8 +258,14 @@ pub async fn get_whitelist(
 
 pub async fn add_to_whitelist(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<AddWhitelistDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state, &rbac, &dto.guild_id, Role::Moderator,
+        "moderator+ pour ajouter a la whitelist voice",
+    )
+    .await?;
     state
         .voice_channels_uc
         .add_to_whitelist(ManageWhitelistCommand {
@@ -281,9 +301,11 @@ pub async fn remove_from_whitelist(
 
 pub async fn ban_from_channel(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
     Json(dto): Json<BanFromChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour bannir d'un voice channel").await?;
     state
         .voice_channels_uc
         .ban_from_channel(BanFromChannelCommand {

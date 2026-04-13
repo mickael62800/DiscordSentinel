@@ -17,6 +17,7 @@ impl CooldownTracker {
     }
 
     /// Verifie le cooldown. Retourne Some(remaining_secs) si en cooldown, None si OK.
+    /// Supprime l'entree au passage si elle est expiree (cleanup inline).
     pub fn check(&self, user_id: UserId) -> Option<u64> {
         if let Some(entry) = self.map.get(&user_id) {
             let elapsed = entry.value().elapsed().as_secs();
@@ -24,11 +25,19 @@ impl CooldownTracker {
                 return Some(COOLDOWN_SECS - elapsed);
             }
         }
+        // Expired (ou absent) — drop l'entree pour eviter le leak memoire.
+        self.map.remove(&user_id);
         None
     }
 
     /// Enregistre le timestamp de creation.
     pub fn set(&self, user_id: UserId) {
+        // Cleanup periodique quand la map devient grosse : retire les
+        // entrees dont le cooldown a expire. Seuil choisi pour ne pas
+        // ralentir le check critique path.
+        if self.map.len() > 500 {
+            self.map.retain(|_, ts| ts.elapsed().as_secs() < COOLDOWN_SECS);
+        }
         self.map.insert(user_id, Instant::now());
     }
 }

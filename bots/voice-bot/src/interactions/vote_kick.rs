@@ -109,10 +109,39 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
         }
     };
 
-    // Ne pas voter contre un admin (prive seulement)
+    // Ne pas voter contre un admin (prive seulement : owner OU co-admin)
     if is_private && owner == Some(target) {
         respond_ephemeral(ctx, component, "Impossible de voter contre le proprietaire.").await;
         return;
+    }
+    // C5 — proteger aussi les co-admins : un user avec MANAGE_CHANNELS sur
+    // le vocal a ete promu co-admin via add_co_admin (ou est l'owner).
+    // On inspecte les permission overwrites du channel Discord plutot que
+    // de re-fetch l'API (plus rapide + consistant avec l'etat reel).
+    if is_private {
+        let target_is_staff = component
+            .guild_id
+            .and_then(|gid| ctx.cache.guild(gid))
+            .and_then(|g| g.channels.get(&voice_channel_id).cloned())
+            .map(|ch| {
+                ch.permission_overwrites.iter().any(|ov| {
+                    matches!(
+                        ov.kind,
+                        serenity::model::channel::PermissionOverwriteType::Member(uid) if uid == target
+                    ) && ov.allow.contains(serenity::model::Permissions::MANAGE_CHANNELS)
+                })
+            })
+            .unwrap_or(false);
+
+        if target_is_staff {
+            respond_ephemeral(
+                ctx,
+                component,
+                "Impossible de voter contre un co-admin du salon.",
+            )
+            .await;
+            return;
+        }
     }
 
     // Compter les membres dans le vocal

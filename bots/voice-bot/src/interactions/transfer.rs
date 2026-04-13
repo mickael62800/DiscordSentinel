@@ -127,7 +127,43 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
         .map(|u| u.name.clone())
         .unwrap_or_else(|_| new_owner_id.to_string());
 
-    // Update Discord permissions: grant new owner manage, remove old owner manage
+    // C4 — API AVANT les permissions Discord : si l'API echoue on n'a pas
+    // deja modifie l'etat Discord, donc pas d'incoherence DB/Discord.
+    // Si Discord echoue apres, l'API sera en avance mais un nouveau transfer
+    // peut reparer, alors que l'inverse (Discord modifie + API KO) laisse
+    // l'ancien owner "coince" en DB sans plus avoir les perms Discord.
+    let request = TransferOwnershipRequest {
+        new_owner_id: new_owner_id.to_string(),
+        new_owner_name: new_owner_name.clone(),
+    };
+
+    {
+        let data = ctx.data.read().await;
+        let Some(api) = ApiClient::from_data(&data) else {
+            error!("ApiClient ou GrpcClient manquants dans TypeMap");
+            return;
+        };
+        if let Err(e) = api
+            .transfer_ownership(&voice_channel_id.get().to_string(), &request)
+            .await
+        {
+            error!(error = %e, "Erreur API transfer ownership — abort");
+            super::respond_ephemeral(
+                ctx, component,
+                "Echec du transfert cote serveur. Aucune modification appliquee.",
+            ).await;
+            return;
+        }
+
+        // Update local owner cache
+        if let Some(map) = data.get::<VoiceOwnerMapKey>() {
+            map.insert(voice_channel_id, new_owner_user_id);
+        }
+    }
+
+    // API OK — maintenant on applique les permissions Discord. Si une de ces
+    // etapes echoue, l'owner en DB est le nouveau mais certaines perms ne
+    // sont pas appliquees → l'owner peut retenter /transfer pour resync.
     let new_owner_overwrite = serenity::model::channel::PermissionOverwrite {
         allow: Permissions::VIEW_CHANNEL
             | Permissions::CONNECT
@@ -161,7 +197,6 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
         if let Ok(text_id) = text_id_str.parse::<u64>() {
             let text_channel = ChannelId::new(text_id);
 
-            // Grant new owner full access to admin panel
             let new_text_overwrite = serenity::model::channel::PermissionOverwrite {
                 allow: Permissions::VIEW_CHANNEL
                     | Permissions::SEND_MESSAGES
@@ -176,7 +211,6 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
                 tracing::warn!(error = %e, "failed to grant new owner permission on admin text panel");
             }
 
-            // Remove old owner's explicit access to admin panel
             if let Err(e) = text_channel
                 .delete_permission(
                     &ctx.http,
@@ -186,31 +220,6 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
             {
                 tracing::warn!(error = %e, "failed to remove old owner permission from admin text panel");
             }
-        }
-    }
-
-    // Transfer via API
-    let request = TransferOwnershipRequest {
-        new_owner_id: new_owner_id.to_string(),
-        new_owner_name: new_owner_name.clone(),
-    };
-
-    {
-        let data = ctx.data.read().await;
-        let Some(api) = ApiClient::from_data(&data) else {
-            error!("ApiClient ou GrpcClient manquants dans TypeMap");
-            return;
-        };
-        if let Err(e) = api
-            .transfer_ownership(&voice_channel_id.get().to_string(), &request)
-            .await
-        {
-            error!(error = %e, "Erreur API transfer ownership");
-        }
-
-        // Update local owner cache
-        if let Some(map) = data.get::<VoiceOwnerMapKey>() {
-            map.insert(voice_channel_id, new_owner_user_id);
         }
     }
 
