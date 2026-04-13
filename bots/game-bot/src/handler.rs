@@ -1,4 +1,6 @@
-use std::sync::Arc;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use serenity::async_trait;
 use serenity::builder::{CreateEmbed, CreateMessage};
@@ -13,6 +15,36 @@ use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 use crate::api_client::GameApiClient;
 use crate::commands;
 use crate::detector;
+
+/// Cooldown anti-spam sur la detection des mentions `#Jeu` : un user ne
+/// peut declencher au maximum une notification pour un jeu donne toutes
+/// les N secondes dans la meme guild.
+const MENTION_COOLDOWN_SECS: u64 = 60;
+
+static MENTION_COOLDOWN: std::sync::LazyLock<Mutex<HashMap<(u64, u64, String), Instant>>> =
+    std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// Retourne true si l'appelant n'a pas encore cooldown pour ce jeu.
+fn can_notify(guild_id: u64, user_id: u64, game_id: &str) -> bool {
+    let key = (guild_id, user_id, game_id.to_string());
+    let now = Instant::now();
+    let cooldown = Duration::from_secs(MENTION_COOLDOWN_SECS);
+    let mut map = match MENTION_COOLDOWN.lock() {
+        Ok(g) => g,
+        Err(p) => p.into_inner(),
+    };
+    if let Some(ts) = map.get(&key) {
+        if now.duration_since(*ts) < cooldown {
+            return false;
+        }
+    }
+    map.insert(key, now);
+    // Cleanup opportuniste pour borner la memoire.
+    if map.len() > 500 {
+        map.retain(|_, ts| now.duration_since(*ts) < cooldown);
+    }
+    true
+}
 
 pub struct Handler;
 
@@ -55,8 +87,12 @@ impl EventHandler for Handler {
             }
         }
 
-        // Detecter les mentions de jeux (#NomDuJeu)
-        let mentions = detector::extract_game_mentions(&msg.content);
+        // Detecter les mentions de jeux (#NomDuJeu) et dedupliquer pour
+        // eviter qu'un message contenant `#X #X #X` declenche plusieurs
+        // lookups API et plusieurs notifications.
+        let mut mentions = detector::extract_game_mentions(&msg.content);
+        mentions.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));
+        mentions.dedup_by(|a, b| a.to_lowercase() == b.to_lowercase());
         if mentions.is_empty() {
             return;
         }
@@ -81,6 +117,12 @@ impl EventHandler for Handler {
                     continue;
                 }
             };
+
+            // Anti-spam ping : un meme user ne peut declencher qu'une
+            // notification par jeu toutes les MENTION_COOLDOWN_SECS.
+            if !can_notify(guild_id.get(), msg.author.id.get(), &game.id) {
+                continue;
+            }
 
             // Recuperer les inscrits
             let subs = match api.get_subscribers(&guild_id_str, &game.id).await {
