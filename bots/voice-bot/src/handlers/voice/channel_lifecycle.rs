@@ -90,11 +90,13 @@ pub(super) async fn create_temp_channel(
         })
     });
 
-    // 1. Creer la categorie (avec position si configuree)
-    let mut create_cat = CreateChannel::new(&cat_name).kind(ChannelType::Category);
-    if let Some(pos) = target_position {
-        create_cat = create_cat.position(pos);
-    }
+    // 1. Creer la categorie (sans position — Discord accepte .position() mais
+    //    ne decale pas les autres categories existantes, ce qui cree une
+    //    collision visuelle differente selon le client : admin voit bien,
+    //    user classique voit la nouvelle cat en fin de liste. Fix : on cree
+    //    d'abord puis on force la position via reorder_channels (endpoint
+    //    Discord PATCH /guilds/{id}/channels qui fait le shift atomique).
+    let create_cat = CreateChannel::new(&cat_name).kind(ChannelType::Category);
     let cat = match guild_id.create_channel(&ctx.http, create_cat).await {
         Ok(ch) => ch,
         Err(why) => {
@@ -102,6 +104,22 @@ pub(super) async fn create_temp_channel(
             return;
         }
     };
+
+    // Si une position cible est configuree (ancre), forcer le reorder via
+    // l'endpoint dedie de Discord qui gere le shift des autres channels.
+    if let Some(pos) = target_position {
+        if let Err(e) = guild_id
+            .reorder_channels(&ctx.http, [(cat.id, pos as u64)])
+            .await
+        {
+            warn!(
+                error = %e,
+                cat_id = %cat.id,
+                target_pos = pos,
+                "reorder_channels echoue — la nouvelle categorie sera en bas pour certains clients"
+            );
+        }
+    }
 
     // 2. Creer le salon vocal
     let mut voice_builder = CreateChannel::new("vocal")
