@@ -171,12 +171,21 @@ pub struct SponsorshipRow {
 /// POST /api/sponsorships
 pub async fn create_sponsorship(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateSponsorshipDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("sponsor_id", &dto.sponsor_id).map_err(ApiError)?;
     validation::validate_discord_id("sponsored_id", &dto.sponsored_id).map_err(ApiError)?;
+
+    // C4 — Gate RBAC : moderator+ requis pour creer un parrainage.
+    // Pass-through pour les appels bot-internal (rbac absent).
+    check_role_for_guild(
+        &state, &rbac, &dto.guild_id, Role::Moderator,
+        "moderator+ requis pour creer un parrainage",
+    )
+    .await?;
 
     sqlx::query(
         "INSERT INTO sponsorships (guild_id, sponsor_id, sponsored_id) \
@@ -241,12 +250,20 @@ pub struct TempRoleRow {
 /// POST /api/temp-roles
 pub async fn create_temp_role(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<CreateTempRoleDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // Validation
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
     validation::validate_discord_id("role_id", &dto.role_id).map_err(ApiError)?;
+
+    // C5 — Gate RBAC : moderator+ requis pour assigner un role temporaire.
+    check_role_for_guild(
+        &state, &rbac, &dto.guild_id, Role::Moderator,
+        "moderator+ requis pour creer un temp_role",
+    )
+    .await?;
 
     sqlx::query(
         "INSERT INTO temp_roles (guild_id, user_id, role_id, expires_at) \

@@ -37,6 +37,47 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur (default_member_permissions est juste un hint
+    // UI Discord, bypassable via params de guild ou interaction forgee).
+    let has_manage_guild = command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| {
+            p.contains(serenity::all::Permissions::MANAGE_GUILD)
+                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+        })
+        .unwrap_or(false);
+
+    if !has_manage_guild {
+        let _ = command
+            .create_response(
+                &ctx.http,
+                CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content("❌ Permission MANAGE_GUILD requise pour /roles-panel.")
+                        .ephemeral(true),
+                ),
+            )
+            .await;
+        warn!(user = %command.user.name, "Tentative /roles-panel sans permission");
+        return;
+    }
+
+    // Defer immediatement (eviter le timeout 3s Discord sur les appels gRPC).
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, "Echec defer /roles-panel");
+        return;
+    }
+
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
@@ -148,21 +189,26 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction, guild_id: &str
 }
 
 async fn respond(ctx: &Context, command: &CommandInteraction, content: &str) {
-    let msg = CreateInteractionResponseMessage::new()
-        .content(content)
-        .ephemeral(true);
-    let response = CreateInteractionResponse::Message(msg);
-    if let Err(e) = command.create_response(&ctx.http, response).await {
-        warn!(error = %e, "Failed to send ephemeral response");
+    // handle() defere toujours d'abord, donc on utilise edit_response.
+    if let Err(e) = command
+        .edit_response(
+            &ctx.http,
+            serenity::builder::EditInteractionResponse::new().content(content),
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to edit ephemeral response");
     }
 }
 
 async fn respond_embed(ctx: &Context, command: &CommandInteraction, embed: CreateEmbed) {
-    let msg = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .ephemeral(true);
-    let response = CreateInteractionResponse::Message(msg);
-    if let Err(e) = command.create_response(&ctx.http, response).await {
-        warn!(error = %e, "Failed to send embed response");
+    if let Err(e) = command
+        .edit_response(
+            &ctx.http,
+            serenity::builder::EditInteractionResponse::new().embed(embed),
+        )
+        .await
+    {
+        warn!(error = %e, "Failed to edit embed response");
     }
 }

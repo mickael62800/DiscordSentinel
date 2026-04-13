@@ -166,33 +166,38 @@ impl ApiClient {
     // ── Phase 7A.opt F.3 — Sponsorships + Temp Roles en gRPC ──
 
     /// gRPC `CommunityService.CreateSponsorship`.
+    /// Retourne Result pour permettre au caller de rollback en cas d'echec.
     pub async fn create_sponsorship(
         &self,
         guild_id: &str,
         sponsor_id: &str,
         sponsored_id: &str,
-    ) {
+    ) -> Result<(), String> {
         let req = proto_community::CreateSponsorshipRequest {
             guild_id: guild_id.to_string(),
             sponsor_id: sponsor_id.to_string(),
             sponsored_id: sponsored_id.to_string(),
         };
         let mut client = self.grpc.community();
-        let _ = self
-            .grpc
+        self.grpc
             .guarded(|| async move { client.create_sponsorship(req).await.map(|_| ()) })
-            .await;
-        // fire-and-forget : on ignore l'erreur (historique HTTP).
+            .await
+            .map_err(|e| {
+                tracing::warn!(error = ?e, "Failed to create sponsorship");
+                grpc_err_to_string(e)
+            })
     }
 
     /// gRPC `CommunityService.CreateTempRole`.
+    /// Retourne Result pour permettre au caller de rollback (ex: ne pas
+    /// assigner le role Discord si la persistance echoue).
     pub async fn create_temp_role(
         &self,
         guild_id: &str,
         user_id: &str,
         role_id: &str,
         expires_at: &str,
-    ) {
+    ) -> Result<(), String> {
         let req = proto_community::CreateTempRoleRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -200,10 +205,13 @@ impl ApiClient {
             expires_at: expires_at.to_string(),
         };
         let mut client = self.grpc.community();
-        let _ = self
-            .grpc
+        self.grpc
             .guarded(|| async move { client.create_temp_role(req).await.map(|_| ()) })
-            .await;
+            .await
+            .map_err(|e| {
+                tracing::warn!(error = ?e, "Failed to create temp role");
+                grpc_err_to_string(e)
+            })
     }
 
     /// gRPC `CommunityService.ListTempRoles`.

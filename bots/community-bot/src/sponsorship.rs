@@ -60,6 +60,15 @@ impl SponsorshipTracker {
     pub fn active_count(&self, guild_id: u64, parrain_id: u64) -> u32 {
         self.counts.get(&(guild_id, parrain_id)).map(|c| *c).unwrap_or(0)
     }
+
+    /// Retire un parrainage (utilise pour le rollback si l'API echoue).
+    pub fn remove_sponsor(&self, guild_id: u64, parrain_id: u64, filleul_id: u64) {
+        if self.sponsors.remove(&(guild_id, filleul_id)).is_some() {
+            if let Some(mut entry) = self.counts.get_mut(&(guild_id, parrain_id)) {
+                *entry = entry.saturating_sub(1);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

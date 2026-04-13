@@ -22,6 +22,23 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
+    // Check permission serveur (default_member_permissions est un hint UI).
+    let has_manage_guild = command
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| {
+            p.contains(serenity::all::Permissions::MANAGE_GUILD)
+                || p.contains(serenity::all::Permissions::ADMINISTRATOR)
+        })
+        .unwrap_or(false);
+
+    if !has_manage_guild {
+        reply_ephemeral(ctx, command, "❌ Permission MANAGE_GUILD requise pour /parrain.").await;
+        warn!(user = %command.user.name, "Tentative /parrain sans permission");
+        return;
+    }
+
     let target_id = match command.data.options.iter().find(|o| o.name == "membre")
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
     {
@@ -57,8 +74,36 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => { reply_ephemeral(ctx, command, "Erreur interne.").await; return; }
     };
 
+    // H6 — Check LOCAL d'abord (limite de parrainages). Si le local passe,
+    // on appelle l'API AVANT de modifier le tracker definitivement. Si l'API
+    // echoue on abort sans avoir perturbe le tracker.
+    // Note : tracker.sponsor() modifie le DashMap. Si l'API echoue apres, on
+    // doit revert via tracker.remove_sponsor(). L'ordre est :
+    //   1. Validation locale (limite)
+    //   2. tracker.sponsor() (tentative)
+    //   3. API create_sponsorship()
+    //   4. Si API KO → tracker.remove_sponsor() (rollback)
     match tracker.sponsor(guild_id.get(), command.user.id.get(), target_id.get(), max_sponsorships) {
         Ok(()) => {
+            // Persister via l'API, avec rollback si echec
+            let api_result = if let Some(api) = data.get::<crate::handler::RolesApiKey>() {
+                api.create_sponsorship(
+                    &guild_id.to_string(),
+                    &command.user.id.to_string(),
+                    &target_id.to_string(),
+                ).await
+            } else {
+                Ok(())
+            };
+
+            if let Err(e) = api_result {
+                // Rollback du tracker en memoire
+                tracker.remove_sponsor(guild_id.get(), command.user.id.get(), target_id.get());
+                warn!(error = %e, "Echec API create_sponsorship — rollback tracker local");
+                reply_ephemeral(ctx, command, "Echec d'enregistrement du parrainage cote serveur. Rien n'a ete applique.").await;
+                return;
+            }
+
             let embed = success_embed("Parrainage enregistre !")
                 .description(format!(
                     "<@{}> est maintenant le parrain de <@{}>.\n\
@@ -75,15 +120,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 ),
             ).await {
                 warn!(error = %e, "Failed to send sponsorship response");
-            }
-
-            // Persister le parrainage via l'API
-            if let Some(api) = data.get::<crate::handler::RolesApiKey>() {
-                api.create_sponsorship(
-                    &guild_id.to_string(),
-                    &command.user.id.to_string(),
-                    &target_id.to_string(),
-                ).await;
             }
 
             // Log + event temps reel

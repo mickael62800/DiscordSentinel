@@ -46,7 +46,13 @@ impl EventHandler for Handler {
         info!(bot = %ready.user.name, guilds = ready.guilds.len(), "Community bot connecte");
         register_guilds(&ctx, &ready).await;
 
-        // Enregistrer les commandes
+        // Vider les anciennes commandes globales (evite les doublons quand on
+        // a d'abord deploye en global puis migre en per-guild).
+        if let Err(e) = serenity::model::application::Command::set_global_commands(&ctx.http, vec![]).await {
+            warn!(error = %e, "Echec nettoyage commandes globales community-bot");
+        }
+
+        // Enregistrer les commandes par guild (instantane vs 1h pour global)
         for guild_status in &ready.guilds {
             let guild_id = guild_status.id;
             if let Err(e) = guild_id
@@ -226,7 +232,51 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
             return;
         }
 
-        // Retirer les roles exclusifs en conflit
+        // C1 — Si c'est un role temporaire, persister en API AVANT d'assigner
+        // le role Discord. Si l'API echoue, on abort sans modifier Discord.
+        // Pour les roles non-temporaires, pas de persistance necessaire.
+        let temp_raw = BaseApiClient::config_or(&guild_config, "temp_roles", "");
+        let temp_roles_config = temp_roles::parse_temp_roles(&temp_raw);
+        let temp_duration = temp_roles::get_temp_duration(&temp_roles_config, role_id);
+
+        if let Some(duration) = temp_duration {
+            // Persister d'abord via l'API
+            let expires_at = (chrono::Utc::now() + chrono::Duration::seconds(duration as i64)).to_rfc3339();
+            let api_result = {
+                let data = ctx.data.read().await;
+                if let Some(api) = data.get::<RolesApiKey>() {
+                    api.create_temp_role(
+                        &guild_id.to_string(),
+                        &component.user.id.to_string(),
+                        &role_id.to_string(),
+                        &expires_at,
+                    ).await
+                } else {
+                    Err("ApiClient indisponible".to_string())
+                }
+            };
+
+            if let Err(e) = api_result {
+                warn!(error = %e, "Echec persistance temp_role — abort");
+                let embed = neutral_embed("Erreur")
+                    .description("Impossible d'enregistrer le role temporaire cote serveur. Rien n'a ete applique.");
+                let response = CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new().embed(embed).ephemeral(true),
+                );
+                if let Err(e) = component.create_response(&ctx.http, response).await {
+                    warn!(error = %e, "Failed to send temp_role API error response");
+                }
+                return;
+            }
+
+            // API OK — tracker local
+            let data = ctx.data.read().await;
+            if let Some(tracker) = data.get::<TempRoleKey>() {
+                tracker.add(guild_id.get(), component.user.id.get(), role_id, duration);
+            }
+        }
+
+        // Retirer les roles exclusifs en conflit (apres la persistance OK)
         let groups_raw = BaseApiClient::config_or(&guild_config, "exclusive_groups", "");
         let groups = exclusive_groups::parse_groups(&groups_raw);
         let conflicts = exclusive_groups::get_conflicting_roles(&groups, role_id);
@@ -240,30 +290,20 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
             }
         }
 
-        // Ajouter le role
+        // Ajouter le role (enfin — apres validation API et cleanup conflits)
         if let Ok(m) = guild_id.member(&ctx.http, component.user.id).await {
             if let Err(e) = m.add_role(&ctx.http, role).await {
                 warn!(error = %e, "Failed to add role");
-            }
-        }
-
-        // Verifier si c'est un role temporaire
-        let temp_raw = BaseApiClient::config_or(&guild_config, "temp_roles", "");
-        let temp_roles_config = temp_roles::parse_temp_roles(&temp_raw);
-        if let Some(duration) = temp_roles::get_temp_duration(&temp_roles_config, role_id) {
-            let data = ctx.data.read().await;
-            if let Some(tracker) = data.get::<TempRoleKey>() {
-                tracker.add(guild_id.get(), component.user.id.get(), role_id, duration);
-            }
-            // Persister via l'API
-            if let Some(api) = data.get::<RolesApiKey>() {
-                let expires_at = (chrono::Utc::now() + chrono::Duration::seconds(duration as i64)).to_rfc3339();
-                api.create_temp_role(
-                    &guild_id.to_string(),
-                    &component.user.id.to_string(),
-                    &role_id.to_string(),
-                    &expires_at,
-                ).await;
+                // Si c'etait un temp_role, rollback la persistance API
+                if temp_duration.is_some() {
+                    let data = ctx.data.read().await;
+                    if let Some(tracker) = data.get::<TempRoleKey>() {
+                        tracker.remove(guild_id.get(), component.user.id.get(), role_id);
+                    }
+                    // Note : on ne rollback pas l'API ici (pas de endpoint
+                    // delete direct disponible sans worker). Le cleanup-worker
+                    // traitera l'orphelin a la prochaine passe.
+                }
             }
         }
 
