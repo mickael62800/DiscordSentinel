@@ -7,6 +7,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 mod api_client;
 mod commands;
 mod config;
+mod cooldown;
 mod exclusive_groups;
 mod handler;
 mod prerequisites;
@@ -25,7 +26,8 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
 use crate::config::Config;
-use crate::handler::{Handler, RolesApiKey, SponsorshipKey, TempRoleKey};
+use crate::cooldown::InteractionCooldown;
+use crate::handler::{CooldownKey, Handler, RolesApiKey, SponsorshipKey, TempRoleKey};
 use crate::sponsorship::SponsorshipTracker;
 use crate::temp_roles::TempRoleTracker;
 
@@ -68,6 +70,7 @@ async fn main() {
         data.insert::<RolesApiKey>(roles_api);
         data.insert::<TempRoleKey>(TempRoleTracker::new());
         data.insert::<SponsorshipKey>(SponsorshipTracker::new());
+        data.insert::<CooldownKey>(Arc::new(InteractionCooldown::new()));
     }
 
     spawn_heartbeat(base_api.clone());

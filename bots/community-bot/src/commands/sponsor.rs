@@ -9,7 +9,7 @@ use sentinel_shared::discord_helpers::reply_ephemeral;
 use sentinel_shared::embeds::success_embed;
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use crate::handler::SponsorshipKey;
+use crate::handler::{CooldownKey, SponsorshipKey};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("parrain")
@@ -37,6 +37,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         reply_ephemeral(ctx, command, "❌ Permission MANAGE_GUILD requise pour /parrain.").await;
         warn!(user = %command.user.name, "Tentative /parrain sans permission");
         return;
+    }
+
+    // Rate limit anti-spam : 30s par user. Sans ca, un admin (ou un compte
+    // compromis avec les droits) pourrait spammer des parrainages.
+    {
+        let data = ctx.data.read().await;
+        if let Some(cooldown) = data.get::<CooldownKey>() {
+            if let Some(remaining) = cooldown.check_and_set(command.user.id.get(), "parrain", 30) {
+                reply_ephemeral(
+                    ctx, command,
+                    &format!("⏱️ Cooldown actif. Attends {remaining}s avant de parrainer a nouveau."),
+                ).await;
+                return;
+            }
+        }
     }
 
     let target_id = match command.data.options.iter().find(|o| o.name == "membre")

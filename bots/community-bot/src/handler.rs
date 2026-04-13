@@ -15,8 +15,11 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{neutral_embed, success_embed};
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
+use std::sync::Arc;
+
 use crate::api_client::ApiClient;
 use crate::commands;
+use crate::cooldown::InteractionCooldown;
 use crate::exclusive_groups;
 use crate::prerequisites;
 use crate::sponsorship::SponsorshipTracker;
@@ -26,6 +29,12 @@ use crate::temp_roles::{self, TempRoleTracker};
 pub struct RolesApiKey;
 impl TypeMapKey for RolesApiKey {
     type Value = ApiClient;
+}
+
+/// Cle TypeMap pour le rate limiter des interactions (anti-spam).
+pub struct CooldownKey;
+impl TypeMapKey for CooldownKey {
+    type Value = Arc<InteractionCooldown>;
 }
 
 pub struct TempRoleKey;
@@ -176,6 +185,27 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
         Some(g) => g,
         None => return,
     };
+
+    // Rate limit anti-spam : 2s par (user, role) pour eviter un user qui
+    // clique 50 fois/s avec un self-bot. Chaque clic declenche ~5 appels
+    // API/Discord, donc sans ca un seul user peut DDoS le bot entier.
+    {
+        let data = ctx.data.read().await;
+        if let Some(cooldown) = data.get::<CooldownKey>() {
+            let key = format!("role_{}", role_id);
+            if let Some(remaining) = cooldown.check_and_set(component.user.id.get(), &key, 2) {
+                let response = CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .content(format!(
+                            "⏱️ Calme-toi un peu... attends {remaining}s avant de refaire cette action."
+                        ))
+                        .ephemeral(true),
+                );
+                let _ = component.create_response(&ctx.http, response).await;
+                return;
+            }
+        }
+    }
 
     let member = match guild_id.member(&ctx.http, component.user.id).await {
         Ok(m) => m,
