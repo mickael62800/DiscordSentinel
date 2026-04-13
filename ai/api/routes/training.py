@@ -597,13 +597,24 @@ def _train_text(req: TrainingRequest) -> None:
                 epoch + 1, req.epochs, state.loss, state.accuracy, state.val_loss, state.val_accuracy,
             )
 
-            # Sauvegarde du meilleur modele
+            # Sauvegarde du meilleur modele.
+            # `safe_serialization=False` contourne un bug Windows de
+            # safetensors : quand la lib re-mmap le fichier qu'elle vient
+            # d'ecrire, Windows refuse l'operation sur un fichier mappe
+            # ouvert (os error 1224). Le format pytorch_model.bin est
+            # sequentiel, sans mmap, donc pas de conflit.
             if not early_stopping.step(state.val_loss, epoch + 1):
                 if early_stopping.counter == 0:
                     state.best_epoch = epoch + 1
                     checkpoint_dir = AI_ROOT / "training" / "text" / "checkpoints" / "best_model"
                     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-                    model.save_pretrained(str(checkpoint_dir))
+                    # Nettoyer l'ancien checkpoint pour eviter tout residu mmap
+                    for old in checkpoint_dir.glob("model.safetensors*"):
+                        try:
+                            old.unlink()
+                        except OSError:
+                            pass
+                    model.save_pretrained(str(checkpoint_dir), safe_serialization=False)
                     tokenizer.save_pretrained(str(checkpoint_dir))
             else:
                 state.early_stopped = True
