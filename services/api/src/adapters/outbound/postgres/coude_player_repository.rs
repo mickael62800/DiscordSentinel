@@ -2,6 +2,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 
+use crate::adapters::outbound::postgres::wallet_tx_log::log_wallet_tx;
 use crate::domain::entities::{
     coude_title_for_level, coude_xp_for_level, CombatStat, CoudePlayer, XpProgress, COUDE_MAX_LEVEL,
 };
@@ -353,16 +354,19 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         cost: i64,
     ) -> Result<Option<CoudePlayer>, DomainError> {
-        // Verifier que le wallet a assez de coins pour payer le reset.
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+
+        // Verifier que le wallet a assez de coins pour payer le reset (lock).
         let wallet_coins: Option<i64> = sqlx::query_scalar(
-            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2",
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
         .bind(guild_id).bind(user_id)
-        .fetch_optional(&self.pool).await.map_err(pg_err)?;
+        .fetch_optional(&mut *tx).await.map_err(pg_err)?;
 
         let balance = wallet_coins.unwrap_or(0);
         if balance < cost {
-            return Ok(None); // Pas assez de coins
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(None);
         }
 
         // Reset les stats dans coude_players.
@@ -373,15 +377,18 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
                WHERE guild_id = $1 AND user_id = $2 AND (atk > 0 OR def > 0)"#,
         )
         .bind(guild_id).bind(user_id)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
         // Debiter le cout du reset sur le wallet partage.
-        sqlx::query(
+        let balance_after: i64 = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
+             WHERE guild_id = $1 AND user_id = $2
+             RETURNING coins",
         )
         .bind(guild_id).bind(user_id).bind(cost)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .fetch_one(&mut *tx).await.map_err(pg_err)?;
+
+        log_wallet_tx(&mut tx, guild_id, user_id, -cost, balance_after, "coude_reset_stats", "Reset des stats").await?;
 
         // Re-fetch le joueur avec les coins a jour.
         let sql = format!(
@@ -390,7 +397,9 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         );
         let row: Option<PlayerRow> = sqlx::query_as(&sql)
             .bind(guild_id).bind(user_id)
-            .fetch_optional(&self.pool).await.map_err(pg_err)?;
+            .fetch_optional(&mut *tx).await.map_err(pg_err)?;
+
+        tx.commit().await.map_err(pg_err)?;
         Ok(row.map(Into::into))
     }
 
@@ -400,19 +409,26 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         delta: i64,
     ) -> Result<bool, DomainError> {
-        // Phase 8 : les coins vivent dans user_wallets (wallet partage).
-        let result = sqlx::query(
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        let row: Option<i64> = sqlx::query_scalar(
             "UPDATE user_wallets
              SET coins = GREATEST(0, coins + $1), updated_at = NOW()
-             WHERE guild_id = $2 AND user_id = $3",
+             WHERE guild_id = $2 AND user_id = $3
+             RETURNING coins",
         )
         .bind(delta)
         .bind(guild_id)
         .bind(user_id)
-        .execute(&self.pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(pg_err)?;
-        Ok(result.rows_affected() > 0)
+        let Some(balance_after) = row else {
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(false);
+        };
+        log_wallet_tx(&mut tx, guild_id, user_id, delta, balance_after, "coude_adjust", "Ajustement manuel").await?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(true)
     }
 
     async fn record_coins_earned(
@@ -421,21 +437,28 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         amount: i64,
     ) -> Result<bool, DomainError> {
-        // Stats dans coude_players + coins dans user_wallets.
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
         sqlx::query(
             "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id).bind(user_id).bind(amount)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
-        let result = sqlx::query(
+        let row: Option<i64> = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
+             WHERE guild_id = $1 AND user_id = $2
+             RETURNING coins",
         )
         .bind(guild_id).bind(user_id).bind(amount)
-        .execute(&self.pool).await.map_err(pg_err)?;
-        Ok(result.rows_affected() > 0)
+        .fetch_optional(&mut *tx).await.map_err(pg_err)?;
+        let Some(balance_after) = row else {
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(false);
+        };
+        log_wallet_tx(&mut tx, guild_id, user_id, amount, balance_after, "coude_earn", "Gain coude").await?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(true)
     }
 
     async fn record_coins_lost(
@@ -444,21 +467,28 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         amount: i64,
     ) -> Result<bool, DomainError> {
-        // Stats dans coude_players + coins dans user_wallets.
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
         sqlx::query(
             "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id).bind(user_id).bind(amount)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
-        let result = sqlx::query(
+        let row: Option<i64> = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
+             WHERE guild_id = $1 AND user_id = $2
+             RETURNING coins",
         )
         .bind(guild_id).bind(user_id).bind(amount)
-        .execute(&self.pool).await.map_err(pg_err)?;
-        Ok(result.rows_affected() > 0)
+        .fetch_optional(&mut *tx).await.map_err(pg_err)?;
+        let Some(balance_after) = row else {
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(false);
+        };
+        log_wallet_tx(&mut tx, guild_id, user_id, -amount, balance_after, "coude_loss", "Perte coude").await?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(true)
     }
 
     async fn record_win(
@@ -468,7 +498,7 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         earned: i64,
         stolen: i64,
     ) -> Result<bool, DomainError> {
-        // Stats dans coude_players (sans toucher coins).
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
         sqlx::query(
             r#"UPDATE coude_players
                SET total_wins = total_wins + 1,
@@ -478,16 +508,22 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
                WHERE guild_id = $1 AND user_id = $2"#,
         )
         .bind(guild_id).bind(user_id).bind(earned).bind(stolen)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
-        // Coins dans user_wallets.
-        let result = sqlx::query(
+        let row: Option<i64> = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
+             WHERE guild_id = $1 AND user_id = $2
+             RETURNING coins",
         )
         .bind(guild_id).bind(user_id).bind(earned)
-        .execute(&self.pool).await.map_err(pg_err)?;
-        Ok(result.rows_affected() > 0)
+        .fetch_optional(&mut *tx).await.map_err(pg_err)?;
+        let Some(balance_after) = row else {
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(false);
+        };
+        log_wallet_tx(&mut tx, guild_id, user_id, earned, balance_after, "coude_combat_win", "Combat gagne").await?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(true)
     }
 
     async fn record_loss(
@@ -496,7 +532,7 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         lost: i64,
     ) -> Result<bool, DomainError> {
-        // Stats dans coude_players (sans toucher coins).
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
         sqlx::query(
             r#"UPDATE coude_players
                SET total_losses = total_losses + 1,
@@ -505,16 +541,22 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
                WHERE guild_id = $1 AND user_id = $2"#,
         )
         .bind(guild_id).bind(user_id).bind(lost)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
-        // Coins dans user_wallets (LEAST pour eviter la dette).
-        let result = sqlx::query(
+        let row: Option<i64> = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
+             WHERE guild_id = $1 AND user_id = $2
+             RETURNING coins",
         )
         .bind(guild_id).bind(user_id).bind(lost)
-        .execute(&self.pool).await.map_err(pg_err)?;
-        Ok(result.rows_affected() > 0)
+        .fetch_optional(&mut *tx).await.map_err(pg_err)?;
+        let Some(balance_after) = row else {
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(false);
+        };
+        log_wallet_tx(&mut tx, guild_id, user_id, -lost, balance_after, "coude_combat_loss", "Combat perdu").await?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(true)
     }
 
     async fn record_draw(
@@ -523,26 +565,32 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         lost: i64,
     ) -> Result<bool, DomainError> {
-        // Stats dans coude_players.
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
         sqlx::query(
             "UPDATE coude_players SET total_draws = total_draws + 1, total_lost = total_lost + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(guild_id).bind(user_id).bind(lost)
-        .execute(&self.pool).await.map_err(pg_err)?;
+        .execute(&mut *tx).await.map_err(pg_err)?;
 
-        // Coins dans user_wallets.
-        let result = sqlx::query(
+        let row: Option<i64> = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
+             WHERE guild_id = $1 AND user_id = $2
+             RETURNING coins",
         )
         .bind(guild_id)
         .bind(user_id)
         .bind(lost)
-        .execute(&self.pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(pg_err)?;
-        Ok(result.rows_affected() > 0)
+        let Some(balance_after) = row else {
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(false);
+        };
+        log_wallet_tx(&mut tx, guild_id, user_id, -lost, balance_after, "coude_combat_draw", "Combat egalite").await?;
+        tx.commit().await.map_err(pg_err)?;
+        Ok(true)
     }
 
     async fn increment_cowardice(

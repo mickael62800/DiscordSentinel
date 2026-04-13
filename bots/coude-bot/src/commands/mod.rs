@@ -13,6 +13,7 @@ pub mod profil;
 pub mod refuser;
 pub mod repos;
 pub mod reset_stats;
+pub mod resume;
 pub mod saison;
 pub mod shop_cmd;
 pub mod train;
@@ -37,5 +38,6 @@ pub fn all() -> Vec<CreateCommand> {
         repos::register(),
         saison::register(),
         reset_stats::register(),
+        resume::register(),
     ]
 }

@@ -92,6 +92,19 @@ pub struct Combat {
 
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
+pub struct WalletTransaction {
+    pub id: String,
+    pub guild_id: String,
+    pub user_id: String,
+    pub amount: i64,
+    pub balance_after: i64,
+    pub source: String,
+    pub description: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct Prime {
     pub id: String,
     pub guild_id: String,
@@ -1181,6 +1194,19 @@ impl ApiClient {
 
     pub async fn get_all_guild_ids(&self) -> Result<Vec<String>, String> {
         self.base.get_json("/api/coude/guilds").await
+    }
+
+    pub async fn get_wallet_transactions(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WalletTransaction>, String> {
+        self.base
+            .get_json(&format!(
+                "/api/wallet/{guild_id}/{user_id}/transactions?limit={limit}"
+            ))
+            .await
     }
 
     pub async fn get_random_players(

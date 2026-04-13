@@ -90,6 +90,7 @@ impl EventHandler for Handler {
                     "repos" => commands::repos::handle(&ctx, &command).await,
                     "saison" => commands::saison::handle(&ctx, &command).await,
                     "reset-stats" => commands::reset_stats::handle(&ctx, &command).await,
+                    "resume" => commands::resume::handle(&ctx, &command).await,
                     _ => {}
                 }
             }

@@ -2,6 +2,8 @@ use sqlx::PgPool;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use crate::jobs::wallet_log::{credit_and_log, debit_and_log};
+
 /// Modele leger pour les combats expires.
 #[derive(Debug, sqlx::FromRow)]
 #[allow(dead_code)]
@@ -85,16 +87,8 @@ async fn expire_single_combat(pool: &PgPool, combat: &ExpiredCombat) -> Result<(
     let penalty = (combat.mise as f64 * 0.20).max(1.0) as i64;
 
     // Phase 8 : coins sur user_wallets (wallet partage), stats sur coude_players.
-    sqlx::query(
-        "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-         WHERE guild_id = $1 AND user_id = $2",
-    )
-    .bind(&combat.guild_id)
-    .bind(&combat.defender_id)
-    .bind(penalty)
-    .execute(pool)
-    .await
-    .map_err(|e| format!("penalite defenseur wallet: {e}"))?;
+    let desc = format!("Penalite lachete combat {}", combat.id);
+    debit_and_log(pool, &combat.guild_id, &combat.defender_id, penalty, "coude_combat_expire_penalty", &desc).await;
 
     sqlx::query(
         "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
@@ -147,17 +141,9 @@ async fn refund_combat_bets(pool: &PgPool, combat_id: Uuid) -> Result<(), String
     }
 
     // Rembourser chaque parieur sur le wallet partage (Phase 8).
-    for (bet_id, guild_id, bettor_id, amount) in &bets {
-        sqlx::query(
-            "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
-        )
-        .bind(guild_id)
-        .bind(bettor_id)
-        .bind(amount)
-        .execute(pool)
-        .await
-        .map_err(|e| format!("refund bet {}: {}", bet_id, e))?;
+    for (_bet_id, guild_id, bettor_id, amount) in &bets {
+        let desc = format!("Remboursement pari combat expire {}", combat_id);
+        credit_and_log(pool, guild_id, bettor_id, *amount, false, "coude_bet_expire_refund", &desc).await;
     }
 
     // Marquer les paris comme rembourses

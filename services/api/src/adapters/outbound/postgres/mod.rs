@@ -50,6 +50,8 @@ pub use member_repository::PgMemberRepository;
 mod wallet_repository;
 pub use wallet_repository::PgWalletRepository;
 
+pub(crate) mod wallet_tx_log;
+
 mod blackjack_repository;
 pub use blackjack_repository::PgBlackjackRepository;
 
