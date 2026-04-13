@@ -20,13 +20,20 @@ pub const CAPTCHA_MATH_PREFIX: &str = "sentinel_captcha_math_";
 /// Cle: (guild_id, user_id) → (index correct du bouton, timestamp).
 pub struct CaptchaPending {
     pending: DashMap<(GuildId, UserId), (usize, Instant)>,
+    /// Duree de vie d'un captcha en secondes (au-dela l'entree est invalide).
+    ttl_secs: u64,
 }
 
 #[allow(dead_code)]
 impl CaptchaPending {
     pub fn new() -> Self {
+        Self::with_ttl(600) // 10 minutes par defaut
+    }
+
+    pub fn with_ttl(ttl_secs: u64) -> Self {
         Self {
             pending: DashMap::new(),
+            ttl_secs,
         }
     }
 
@@ -36,11 +43,25 @@ impl CaptchaPending {
             .insert((guild_id, user_id), (correct_index, Instant::now()));
     }
 
-    /// Verifie si le bouton presse est correct. Retourne Some(true/false) ou None si pas de captcha en attente.
+    /// Verifie si le bouton presse est correct. Retourne:
+    /// - `Some(true/false)` si un captcha valide existe
+    /// - `None` si aucun captcha en attente OU si l'entree a expire
     pub fn verify(&self, guild_id: GuildId, user_id: UserId, pressed_index: usize) -> Option<bool> {
         let entry = self.pending.get(&(guild_id, user_id))?;
-        let (correct, _) = *entry.value();
+        let (correct, stored_at) = *entry.value();
+        drop(entry);
+        if stored_at.elapsed() >= std::time::Duration::from_secs(self.ttl_secs) {
+            // Entree expiree : on la supprime et on considere qu'il n'y a plus de captcha.
+            self.pending.remove(&(guild_id, user_id));
+            return None;
+        }
         Some(pressed_index == correct)
+    }
+
+    /// Supprime toutes les entrees expirees. Appele par la task de background.
+    pub fn cleanup_expired(&self) {
+        let ttl = std::time::Duration::from_secs(self.ttl_secs);
+        self.pending.retain(|_, (_, ts)| ts.elapsed() < ttl);
     }
 
     /// Supprime un captcha en attente (apres verification ou timeout).

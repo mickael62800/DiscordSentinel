@@ -278,7 +278,7 @@ impl EventHandler for Handler {
             .unwrap_or(env_config.alt_detection_enabled);
         let raid_pattern_enabled = guild_config
             .get("raid_pattern_enabled")
-            .map(|v| v != "false" && v != "0")
+            .map(|v| v == "true" || v == "1")
             .unwrap_or(env_config.raid_pattern_enabled);
         let raid_pattern_score_threshold = guild_config
             .get("raid_pattern_score_threshold")
@@ -851,10 +851,13 @@ impl EventHandler for Handler {
                         continue;
                     }
 
-                    let guild_config = base
-                        .get_guild_config(&guild_id.to_string())
-                        .await
-                        .unwrap_or_default();
+                    let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+                        Ok(cfg) => cfg,
+                        Err(e) => {
+                            tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild (captcha bouton)");
+                            std::collections::HashMap::new()
+                        }
+                    };
                     let role_id = guild_config
                         .get("quarantine_role_id")
                         .and_then(|v| v.parse::<u64>().ok())

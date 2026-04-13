@@ -64,7 +64,10 @@ async fn main() {
     // Phase 7A — gRPC interne (SecurityService + MembersService).
     let grpc = match SentinelGrpcClient::from_env().await {
         Ok(c) => Arc::new(c),
-        Err(e) => panic!("SentinelGrpcClient: {e}"),
+        Err(e) => {
+            eprintln!("Erreur fatale: impossible d'initialiser SentinelGrpcClient: {e}");
+            std::process::exit(1);
+        }
     };
 
     let mut client = Client::builder(config.base().discord_token.as_str(), intents)
@@ -87,7 +90,7 @@ async fn main() {
         data.insert::<SlowmodeKey>(SlowmodeManager::new());
         data.insert::<LockdownKey>(LockdownManager::new());
         data.insert::<RecentJoinsKey>(RecentJoinsTracker::new(config.raid_join_window_secs));
-        data.insert::<CaptchaPendingKey>(CaptchaPending::new());
+        data.insert::<CaptchaPendingKey>(CaptchaPending::with_ttl(config.captcha_timeout_secs));
         data.insert::<AltDetectorKey>(AltDetector::new(
             config.alt_retention_secs,
             config.alt_name_distance,
@@ -113,6 +116,11 @@ async fn main() {
                 None => continue,
             };
 
+            // Nettoyer les entrees captcha expirees en meme temps que la quarantaine.
+            if let Some(cp) = data.get::<CaptchaPendingKey>() {
+                cp.cleanup_expired();
+            }
+
             let expired = quarantine.expired_users(captcha_timeout);
             for (guild_id, user_id) in expired {
                 // Kick l'utilisateur qui n'a pas verifie
@@ -131,6 +139,9 @@ async fn main() {
                     );
                 }
                 quarantine.remove_tracking(guild_id, user_id);
+                if let Some(cp) = data.get::<CaptchaPendingKey>() {
+                    cp.remove(guild_id, user_id);
+                }
             }
         }
     });

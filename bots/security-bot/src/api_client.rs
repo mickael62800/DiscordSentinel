@@ -68,7 +68,7 @@ impl ApiClient {
     pub async fn list_events(
         &self,
         guild_id: &str,
-        _limit: u32,
+        limit: u32,
     ) -> Result<Vec<serde_json::Value>, String> {
         let req = proto_security::ListEventsRequest {
             guild_id: Some(guild_id.to_string()),
@@ -79,10 +79,12 @@ impl ApiClient {
             .guarded(|| async move { client.list_events(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
-        // Surface : on garde Vec<Value> pour ne pas casser les call sites.
+        // Le proto ne porte pas de champ `limit` : on tronque cote client.
+        // Les evenements sont supposes etre retournes les plus recents d'abord.
         Ok(list
             .events
             .into_iter()
+            .take(limit as usize)
             .map(|e| {
                 serde_json::json!({
                     "id": e.id,
