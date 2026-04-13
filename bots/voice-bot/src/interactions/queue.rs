@@ -184,6 +184,12 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
 // ── Accept from Queue ──
 
 async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
+    // Defense en profondeur : meme si le salon admin-panel n'est visible que
+    // par l'owner/co-admin, on re-verifie l'ownership via l'API.
+    let Some((voice_channel_id, _ch)) = super::require_admin(ctx, component).await else {
+        return;
+    };
+
     let custom_id = component.data.custom_id.as_str();
     let target_id_str = custom_id.strip_prefix("queue_accept_").unwrap_or("");
     let target_id: u64 = match target_id_str.parse() {
@@ -195,14 +201,6 @@ async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
     };
 
     let target_user_id = UserId::new(target_id);
-    let text_channel_id = component.channel_id;
-
-    let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
-        vc
-    } else {
-        super::respond_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
-        return;
-    };
 
     let guild_id = component.guild_id.unwrap_or_default();
 
@@ -249,6 +247,11 @@ async fn handle_queue_accept(ctx: &Context, component: &ComponentInteraction) {
 // ── Refuse from Queue ──
 
 async fn handle_queue_refuse(ctx: &Context, component: &ComponentInteraction) {
+    // Defense en profondeur : re-verifie l'ownership via l'API.
+    if super::require_admin(ctx, component).await.is_none() {
+        return;
+    }
+
     let custom_id = component.data.custom_id.as_str();
     let target_id_str = custom_id.strip_prefix("queue_refuse_").unwrap_or("");
     let target_id: u64 = match target_id_str.parse() {

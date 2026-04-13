@@ -14,7 +14,7 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
 use crate::config::Config;
-use crate::state::{AfkTracker, CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
+use crate::state::{AfkTracker, CooldownTracker, FloodTracker, VoteTracker};
 
 // ── TypeMap keys (bot-specific) ──
 
@@ -36,11 +36,6 @@ impl TypeMapKey for VoteTrackerKey {
 pub struct CooldownTrackerKey;
 impl TypeMapKey for CooldownTrackerKey {
     type Value = Arc<CooldownTracker>;
-}
-
-pub struct PendingChannelsKey;
-impl TypeMapKey for PendingChannelsKey {
-    type Value = Arc<PendingChannels>;
 }
 
 /// Mapping text_channel_id -> voice_channel_id (pour retrouver le vocal depuis le panel admin)

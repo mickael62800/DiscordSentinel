@@ -2,7 +2,6 @@ pub mod access_control;
 pub mod channel_management;
 pub mod co_admin;
 pub mod queue;
-pub mod setup;
 pub mod transfer;
 pub mod vote_kick;
 
@@ -132,11 +131,6 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
     info!(custom_id = %custom_id, user = %component.user.id, "Component interaction");
 
     match custom_id {
-        // Setup
-        "btn_toggle_hidden" | "btn_open" | "btn_cancel" => {
-            setup::handle(ctx, component).await;
-        }
-
         // Channel management
         "btn_hide" | "btn_lock" | "btn_limit" | "btn_rename" | "btn_status" => {
             channel_management::handle(ctx, component).await;

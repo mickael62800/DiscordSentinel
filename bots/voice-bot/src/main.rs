@@ -29,9 +29,9 @@ use crate::api_client::ApiClient;
 use crate::config::Config;
 use crate::handler::{
     AfkTrackerKey, ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
-    PendingChannelsKey, SessionCardKey, TextToVoiceMapKey, VoiceOwnerMapKey, VoteTrackerKey,
+    SessionCardKey, TextToVoiceMapKey, VoiceOwnerMapKey, VoteTrackerKey,
 };
-use crate::state::{AfkTracker, CooldownTracker, FloodTracker, PendingChannels, VoteTracker};
+use crate::state::{AfkTracker, CooldownTracker, FloodTracker, VoteTracker};
 
 #[tokio::main]
 async fn main() {
@@ -53,7 +53,10 @@ async fn main() {
     // via `data.get::<GrpcClientKey>()`.
     let grpc = match SentinelGrpcClient::from_env().await {
         Ok(c) => Arc::new(c),
-        Err(e) => panic!("SentinelGrpcClient: {e}"),
+        Err(e) => {
+            eprintln!("Erreur fatale: impossible d'initialiser SentinelGrpcClient: {e}");
+            std::process::exit(1);
+        }
     };
 
     let voice_api = ApiClient::new(api.clone(), Arc::clone(&grpc));
@@ -72,28 +75,56 @@ async fn main() {
     let guild_id_str = config.guild_id.to_string();
     match voice_api.list_channels(&guild_id_str).await {
         Ok(channels) => {
+            let mut restored = 0usize;
             for ch in &channels {
-                let voice_id = serenity::model::id::ChannelId::new(
-                    ch.channel_id.parse::<u64>().unwrap_or(0),
-                );
-                let owner_id = serenity::model::id::UserId::new(
-                    ch.owner_id.parse::<u64>().unwrap_or(0),
-                );
+                // Skip les entrees avec un channel_id ou owner_id non parsable :
+                // mettre ChannelId(0)/UserId(0) polluait les DashMap et cassait
+                // les lookups ulterieurs.
+                let voice_id = match ch.channel_id.parse::<u64>() {
+                    Ok(id) if id > 0 => serenity::model::id::ChannelId::new(id),
+                    _ => {
+                        tracing::warn!(
+                            channel_id = %ch.channel_id,
+                            "channel_id invalide dans l'API, entree ignoree"
+                        );
+                        continue;
+                    }
+                };
+                let owner_id = match ch.owner_id.parse::<u64>() {
+                    Ok(id) if id > 0 => serenity::model::id::UserId::new(id),
+                    _ => {
+                        tracing::warn!(
+                            owner_id = %ch.owner_id,
+                            channel_id = %ch.channel_id,
+                            "owner_id invalide dans l'API, entree ignoree"
+                        );
+                        continue;
+                    }
+                };
 
                 voice_owner.insert(voice_id, owner_id);
 
                 if let Some(ref tid) = ch.text_channel_id {
                     if let Ok(id) = tid.parse::<u64>() {
-                        text_to_voice.insert(serenity::model::id::ChannelId::new(id), voice_id);
+                        if id > 0 {
+                            text_to_voice.insert(serenity::model::id::ChannelId::new(id), voice_id);
+                        }
                     }
                 }
                 if let Some(ref mid) = ch.members_channel_id {
                     if let Ok(id) = mid.parse::<u64>() {
-                        members_to_voice.insert(serenity::model::id::ChannelId::new(id), voice_id);
+                        if id > 0 {
+                            members_to_voice.insert(serenity::model::id::ChannelId::new(id), voice_id);
+                        }
                     }
                 }
+                restored += 1;
             }
-            info!(count = channels.len(), "Salons temporaires restaures depuis l'API");
+            info!(
+                total = channels.len(),
+                restored,
+                "Salons temporaires restaures depuis l'API"
+            );
         }
         Err(e) => {
             tracing::warn!(error = %e, "Impossible de charger les salons existants depuis l'API");
@@ -114,7 +145,6 @@ async fn main() {
         data.insert::<FloodTrackerKey>(Arc::new(FloodTracker::new()));
         data.insert::<VoteTrackerKey>(Arc::new(VoteTracker::new()));
         data.insert::<CooldownTrackerKey>(Arc::new(CooldownTracker::new()));
-        data.insert::<PendingChannelsKey>(Arc::new(PendingChannels::new()));
         data.insert::<TextToVoiceMapKey>(text_to_voice);
         data.insert::<MembersToVoiceMapKey>(members_to_voice);
         data.insert::<VoiceOwnerMapKey>(voice_owner);
