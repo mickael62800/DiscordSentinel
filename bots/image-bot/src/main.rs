@@ -53,7 +53,10 @@ async fn main() {
     // Phase 7A — gRPC interne (ImagesService).
     let grpc = match SentinelGrpcClient::from_env().await {
         Ok(c) => Arc::new(c),
-        Err(e) => panic!("SentinelGrpcClient: {e}"),
+        Err(e) => {
+            eprintln!("Erreur fatale: impossible d'initialiser SentinelGrpcClient: {e}");
+            std::process::exit(1);
+        }
     };
 
     let mut client = Client::builder(config.base().discord_token.as_str(), intents)

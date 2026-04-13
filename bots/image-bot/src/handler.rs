@@ -438,6 +438,26 @@ pub(crate) fn detect_content_type(filename: &str, bytes: &[u8]) -> String {
     .to_string()
 }
 
+/// Retourne `true` si l'utilisateur est un admin ou moderateur du guild
+/// (a `MANAGE_GUILD` ou `ADMINISTRATOR`). Utilise pour proteger les staff
+/// des actions Mute/Ban automatiques declenchees par des faux positifs IA.
+async fn is_staff(
+    ctx: &Context,
+    guild_id: serenity::model::id::GuildId,
+    user_id: serenity::model::id::UserId,
+) -> bool {
+    let member = match guild_id.member(&ctx.http, user_id).await {
+        Ok(m) => m,
+        Err(_) => return false, // en cas de doute, on ne protege pas (comportement par defaut avant le fix)
+    };
+    if let Some(guild) = guild_id.to_guild_cached(&ctx.cache) {
+        let perms = guild.member_permissions(&member);
+        perms.manage_guild() || perms.administrator()
+    } else {
+        false
+    }
+}
+
 /// Formate les classifications en une chaine lisible.
 pub(crate) fn format_classifications(classifications: &[Classification]) -> String {
     if classifications.is_empty() {
@@ -506,6 +526,18 @@ async fn execute_action(
         Action::Mute => {
             let mute_duration_secs: u64 = duration.unwrap_or(DEFAULT_MUTE_DURATION_SECS);
             let mute_minutes = mute_duration_secs / 60;
+
+            // Defense en profondeur : on ne mute pas les admins/moderateurs
+            // (false positives IA). Si la cible a MANAGE_GUILD on se contente
+            // de supprimer le message.
+            if let Some(guild_id) = msg.guild_id {
+                if is_staff(ctx, guild_id, msg.author.id).await {
+                    warn!(user = %msg.author.name, "Mute ignore : cible est staff");
+                    msg.delete(&ctx.http).await?;
+                    return Ok(());
+                }
+            }
+
             let embed = danger_embed("\u{1f507} Mute — Image interdite")
                 .description(format!("<@{}>", msg.author.id))
                 .field("\u{1f4dd} Raison", reason_text, false)
@@ -519,7 +551,7 @@ async fn execute_action(
             }
             msg.delete(&ctx.http).await?;
 
-            if let (Some(guild_id), Ok(_member)) = (msg.guild_id, msg.member(&ctx.http).await) {
+            if let Some(guild_id) = msg.guild_id {
                 let mut member = guild_id.member(&ctx.http, msg.author.id).await?;
                 let now_secs = std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
@@ -542,6 +574,14 @@ async fn execute_action(
         }
         Action::Ban => {
             if let Some(guild_id) = msg.guild_id {
+                // Defense en profondeur : on ne ban jamais un staff
+                // (false positives IA = catastrophe irreversible).
+                if is_staff(ctx, guild_id, msg.author.id).await {
+                    warn!(user = %msg.author.name, "Ban ignore : cible est staff");
+                    let _ = msg.delete(&ctx.http).await;
+                    return Ok(());
+                }
+
                 let embed = build_action_embed(
                     critical_embed("\u{1f528} Ban — Image interdite"), msg, reason_text, &detection_text,
                 );

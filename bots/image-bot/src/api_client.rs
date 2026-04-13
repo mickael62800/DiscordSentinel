@@ -148,9 +148,53 @@ impl ApiClient {
 
     /// Telecharge une image depuis une URL externe (attachment Discord).
     /// Reste sur HTTP brut — ce n'est pas un appel a l'API Sentinel.
-    pub async fn download_image(&self, url: &str) -> Result<Vec<u8>, reqwest::Error> {
-        let bytes = self.base.client().get(url).send().await?.bytes().await?;
-        Ok(bytes.to_vec())
+    ///
+    /// Garde-fous defense-in-depth :
+    /// - timeout global de 30s (evite qu'un serveur malveillant bloque
+    ///   indefiniment la task tokio)
+    /// - rejet avant download si Content-Length > max_image_size (evite
+    ///   de commencer un transfert enorme)
+    /// - rejet apres download si la taille reelle depasse max_image_size
+    ///   (les serveurs peuvent mentir sur Content-Length)
+    pub async fn download_image(&self, url: &str) -> Result<Vec<u8>, String> {
+        use std::time::Duration;
+
+        let fut = async {
+            let resp = self
+                .base
+                .client()
+                .get(url)
+                .send()
+                .await
+                .map_err(|e| format!("download: {e}"))?;
+
+            if !resp.status().is_success() {
+                return Err(format!("download: HTTP {}", resp.status()));
+            }
+
+            if let Some(len) = resp.content_length() {
+                if len > self.max_image_size {
+                    return Err(format!(
+                        "download: fichier trop gros ({} > {} max)",
+                        len, self.max_image_size
+                    ));
+                }
+            }
+
+            let bytes = resp.bytes().await.map_err(|e| format!("download body: {e}"))?;
+            if bytes.len() as u64 > self.max_image_size {
+                return Err(format!(
+                    "download: fichier depasse la taille max ({} bytes)",
+                    self.max_image_size
+                ));
+            }
+            Ok(bytes.to_vec())
+        };
+
+        match tokio::time::timeout(Duration::from_secs(30), fut).await {
+            Ok(r) => r,
+            Err(_) => Err("download: timeout apres 30s".to_string()),
+        }
     }
 }
 
