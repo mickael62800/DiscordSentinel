@@ -152,10 +152,10 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     ) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
+        // Phase 8 : credit sur user_wallets, stats sur coude_players.
         let result = sqlx::query(
             r#"UPDATE coude_players
                SET casino_wins = casino_wins + 1,
-                   coins = coins + $3,
                    total_earned = total_earned + $3,
                    updated_at = NOW()
                WHERE guild_id = $1 AND user_id = $2"#,
@@ -170,6 +170,17 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         if result.rows_affected() == 0 {
             return Err(DomainError::NotFound("Joueur introuvable".into()));
         }
+
+        sqlx::query(
+            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(gain)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
 
         sqlx::query("INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)")
             .bind(guild_id)
@@ -201,10 +212,10 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             .await
             .map_err(pg_err)?;
 
+        // Phase 8 : debit sur user_wallets, stats sur coude_players.
         let result = sqlx::query(
             r#"UPDATE coude_players
                SET casino_losses = casino_losses + 1,
-                   coins = GREATEST(0, coins - $3),
                    total_lost = total_lost + $3,
                    updated_at = NOW()
                WHERE guild_id = $1 AND user_id = $2"#,
@@ -220,6 +231,17 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             return Err(DomainError::NotFound("Joueur introuvable".into()));
         }
 
+        sqlx::query(
+            "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(lost)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
         tx.commit().await.map_err(pg_err)?;
         Ok(())
     }
@@ -231,9 +253,9 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     ) -> Result<i64, DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        // Lire le solde avant faillite pour loguer le bon montant.
+        // Phase 8 : le solde vit dans user_wallets. Lire + locker le wallet.
         let coins_before: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
         .bind(guild_id)
         .bind(user_id)
@@ -244,17 +266,30 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         let (coins_before,) = coins_before
             .ok_or_else(|| DomainError::NotFound("Joueur introuvable".into()))?;
 
+        // Vider le wallet.
+        sqlx::query(
+            "UPDATE user_wallets SET coins = 0, total_spent = total_spent + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(coins_before)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        // Maj des stats dans coude_players (casino_losses + total_lost).
         let row: (i64,) = sqlx::query_as(
             r#"UPDATE coude_players
                SET casino_losses = casino_losses + 1,
-                   total_lost = total_lost + coins,
-                   coins = 0,
+                   total_lost = total_lost + $3,
                    updated_at = NOW()
                WHERE guild_id = $1 AND user_id = $2
                RETURNING total_lost"#,
         )
         .bind(guild_id)
         .bind(user_id)
+        .bind(coins_before)
         .fetch_one(&mut *tx)
         .await
         .map_err(pg_err)?;

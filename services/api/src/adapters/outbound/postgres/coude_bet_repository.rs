@@ -68,9 +68,12 @@ impl CoudeBetRepository for PgCoudeBetRepository {
     async fn place(&self, new: NewCoudeBet) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        // Lock the bettor row + check balance.
+        // Phase 8 : le solde vit dans user_wallets (wallet partage).
+        // Avant, cette fn lisait+debitait coude_players.coins (colonne legacy),
+        // ce qui faisait tourner tout le systeme de paris sur un solde
+        // desynchronise du vrai wallet.
         let bettor: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM coude_players WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
         .bind(&new.guild_id)
         .bind(&new.bettor_id)
@@ -88,9 +91,9 @@ impl CoudeBetRepository for PgCoudeBetRepository {
             )));
         }
 
-        // Debit.
+        // Debit sur le wallet partage.
         sqlx::query(
-            "UPDATE coude_players SET coins = coins - $3, updated_at = NOW()
+            "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(&new.guild_id)
@@ -131,10 +134,20 @@ impl CoudeBetRepository for PgCoudeBetRepository {
             // Crédite le joueur si gagné (inclut total_earned) OU si remboursement égalité
             // (payout = mise mais won = false : on rembourse mais sans toucher total_earned).
             if payout.won && payout.payout > 0 {
+                // Credit sur le wallet partage + stats dans coude_players.
                 sqlx::query(
-                    r#"UPDATE coude_players
-                       SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-                       WHERE guild_id = $1 AND user_id = $2"#,
+                    "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+                     WHERE guild_id = $1 AND user_id = $2",
+                )
+                .bind(guild_id)
+                .bind(&payout.bettor_id)
+                .bind(payout.payout)
+                .execute(&mut *tx)
+                .await
+                .map_err(pg_err)?;
+                sqlx::query(
+                    "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
+                     WHERE guild_id = $1 AND user_id = $2",
                 )
                 .bind(guild_id)
                 .bind(&payout.bettor_id)
@@ -143,9 +156,9 @@ impl CoudeBetRepository for PgCoudeBetRepository {
                 .await
                 .map_err(pg_err)?;
             } else if !payout.won && payout.payout > 0 {
-                // Remboursement égalité : juste les coins, pas total_earned.
+                // Remboursement égalité : juste les coins (wallet), pas total_earned.
                 sqlx::query(
-                    "UPDATE coude_players SET coins = coins + $3, updated_at = NOW()
+                    "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
                      WHERE guild_id = $1 AND user_id = $2",
                 )
                 .bind(guild_id)
@@ -167,10 +180,20 @@ impl CoudeBetRepository for PgCoudeBetRepository {
 
         if let Some(bonus) = &plan.fighter_bonus {
             if bonus.winner_bonus > 0 {
+                // Wallet partage + stats coude_players
                 sqlx::query(
-                    r#"UPDATE coude_players
-                       SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-                       WHERE guild_id = $1 AND user_id = $2"#,
+                    "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+                     WHERE guild_id = $1 AND user_id = $2",
+                )
+                .bind(guild_id)
+                .bind(&bonus.winner_id)
+                .bind(bonus.winner_bonus)
+                .execute(&mut *tx)
+                .await
+                .map_err(pg_err)?;
+                sqlx::query(
+                    "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
+                     WHERE guild_id = $1 AND user_id = $2",
                 )
                 .bind(guild_id)
                 .bind(&bonus.winner_id)
@@ -181,9 +204,18 @@ impl CoudeBetRepository for PgCoudeBetRepository {
             }
             if bonus.loser_bonus > 0 {
                 sqlx::query(
-                    r#"UPDATE coude_players
-                       SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-                       WHERE guild_id = $1 AND user_id = $2"#,
+                    "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
+                     WHERE guild_id = $1 AND user_id = $2",
+                )
+                .bind(guild_id)
+                .bind(&bonus.loser_id)
+                .bind(bonus.loser_bonus)
+                .execute(&mut *tx)
+                .await
+                .map_err(pg_err)?;
+                sqlx::query(
+                    "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
+                     WHERE guild_id = $1 AND user_id = $2",
                 )
                 .bind(guild_id)
                 .bind(&bonus.loser_id)
@@ -216,8 +248,9 @@ impl CoudeBetRepository for PgCoudeBetRepository {
 
         let mut refunded_total = 0i64;
         for (bet_id, bettor_id, amount) in &bets {
+            // Remboursement sur le wallet partage.
             sqlx::query(
-                "UPDATE coude_players SET coins = coins + $3, updated_at = NOW()
+                "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
                  WHERE guild_id = $1 AND user_id = $2",
             )
             .bind(guild_id)

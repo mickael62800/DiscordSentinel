@@ -119,8 +119,18 @@ impl CoudeSocialRepository for PgCoudeSocialRepository {
         // (pas d'interpolation de strings arbitraires).
         let sql = match category {
             LeaderboardCategory::Richest => {
-                "SELECT user_id, username, coins AS value FROM coude_players \
-                 WHERE guild_id = $1 ORDER BY coins DESC LIMIT $2"
+                // Depuis la migration 080, `coude_players.coins` est une
+                // colonne legacy frozen. Le solde reel vit dans
+                // `user_wallets` (wallet partage entre jeux). On JOIN pour
+                // ne remonter que les joueurs Coude actifs, triees par
+                // leur solde wallet.
+                "SELECT cp.user_id, cp.username, w.coins AS value \
+                 FROM coude_players cp \
+                 INNER JOIN user_wallets w \
+                   ON w.guild_id = cp.guild_id AND w.user_id = cp.user_id \
+                 WHERE cp.guild_id = $1 \
+                 ORDER BY w.coins DESC \
+                 LIMIT $2"
             }
             LeaderboardCategory::Thieves => {
                 "SELECT user_id, username, total_stolen AS value FROM coude_players \
