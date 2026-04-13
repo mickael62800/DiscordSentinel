@@ -151,6 +151,15 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             tracing::warn!(error = %e, "failed to lock voice channel behind queue");
         }
 
+        // Placer la file d'attente au-dessus du vocal pour la rendre visible
+        crate::handlers::voice::channel_lifecycle::place_queue_above_voice(
+            ctx,
+            guild_id,
+            queue_channel_id,
+            voice_channel_id,
+        )
+        .await;
+
         // Update API
         let update = UpdateVoiceChannelRequest {
             visibility: None,

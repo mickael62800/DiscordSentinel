@@ -1,9 +1,8 @@
 use serenity::builder::{
-    CreateActionRow, CreateButton, CreateEmbed, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateModal, CreateInputText,
+    CreateActionRow, CreateInteractionResponse, CreateModal, CreateInputText,
     EditChannel,
 };
-use serenity::model::application::{ButtonStyle, ComponentInteraction, InputTextStyle, ModalInteraction};
+use serenity::model::application::{ComponentInteraction, InputTextStyle, ModalInteraction};
 use serenity::model::id::ChannelId;
 use serenity::model::Permissions;
 use serenity::prelude::*;
@@ -18,23 +17,23 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     match custom_id {
         "btn_hide" => handle_hide(ctx, component).await,
         "btn_lock" => handle_lock(ctx, component).await,
-        "btn_limit" => handle_limit_menu(ctx, component).await,
+        "btn_limit" => handle_limit_modal(ctx, component).await,
         "btn_rename" => handle_rename_modal(ctx, component).await,
         "btn_status" => handle_status_modal(ctx, component).await,
-        other if other.starts_with("limit_") => handle_limit_select(ctx, component).await,
         _ => {
             warn!(custom_id = %custom_id, "Channel management interaction inconnue");
         }
     }
 }
 
-/// Handle modal submissions for rename and status.
+/// Handle modal submissions for rename, status and limit.
 pub async fn handle_modal(ctx: &Context, modal: &ModalInteraction) {
     let custom_id = modal.data.custom_id.as_str();
 
     match custom_id {
         "modal_rename" => handle_modal_rename(ctx, modal).await,
         "modal_status" => handle_modal_status(ctx, modal).await,
+        "modal_limit" => handle_modal_limit(ctx, modal).await,
         _ => {
             warn!(custom_id = %custom_id, "Channel management modal inconnue");
         }
@@ -142,7 +141,9 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
 
     // Toggle Discord permissions (merger, pas ecraser)
     if currently_locked {
-        // Unlock: retirer CONNECT des deny, ajouter aux allow
+        // Unlock: retirer CONNECT des deny, ajouter aux allow sur @everyone.
+        // On laisse les overrides utilisateur intacts : les personnes
+        // whitelistees pendant le lock conservent leur acces explicite.
         let overwrite = serenity::model::channel::PermissionOverwrite {
             allow: base_allow | Permissions::CONNECT,
             deny: base_deny - Permissions::CONNECT,
@@ -152,7 +153,50 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
             tracing::warn!(error = %e, "failed to set permission when unlocking channel");
         }
     } else {
-        // Lock: ajouter CONNECT aux deny, retirer des allow
+        // Lock: on snapshot les membres actuellement presents dans le vocal
+        // et on leur pose un override explicite ALLOW CONNECT. Comme les
+        // overrides membre priment sur le role @everyone, ils peuvent ainsi
+        // sortir puis revenir meme avec le salon verrouille. Les overrides
+        // utilisateur existants (anciens invites / acceptes via la queue)
+        // restent evidemment valides.
+        let current_members: Vec<serenity::model::id::UserId> = ctx
+            .cache
+            .guild(guild_id)
+            .map(|g| {
+                g.voice_states
+                    .values()
+                    .filter(|vs| vs.channel_id == Some(voice_channel_id))
+                    .map(|vs| vs.user_id)
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        for user_id in current_members {
+            // Merger avec l'override existant pour ne pas ecraser un SPEAK
+            // ou un MANAGE_CHANNELS deja present (ex: owner, co-admin).
+            let existing_user = voice_channel_id
+                .to_channel(&ctx.http).await.ok()
+                .and_then(|c| c.guild())
+                .and_then(|c| {
+                    c.permission_overwrites.iter()
+                        .find(|ow| ow.kind == serenity::model::channel::PermissionOverwriteType::Member(user_id))
+                        .cloned()
+                });
+            let (u_allow, u_deny) = match existing_user {
+                Some(ow) => (ow.allow, ow.deny),
+                None => (Permissions::empty(), Permissions::empty()),
+            };
+            let overwrite = serenity::model::channel::PermissionOverwrite {
+                allow: u_allow | Permissions::VIEW_CHANNEL | Permissions::CONNECT | Permissions::SPEAK,
+                deny: u_deny - Permissions::CONNECT,
+                kind: serenity::model::channel::PermissionOverwriteType::Member(user_id),
+            };
+            if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
+                tracing::warn!(error = %e, user = %user_id, "failed to whitelist member on lock");
+            }
+        }
+
+        // Lock: ajouter CONNECT aux deny, retirer des allow sur @everyone
         let overwrite = serenity::model::channel::PermissionOverwrite {
             allow: base_allow - Permissions::CONNECT,
             deny: base_deny | Permissions::CONNECT,
@@ -196,80 +240,72 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
     info!(voice = %voice_channel_id, locked = new_locked, "Lock change");
 }
 
-// ── Limit ──
+// ── Limit (modal free-form) ──
 
-async fn handle_limit_menu(ctx: &Context, component: &ComponentInteraction) {
-    let Some((_voice_channel_id, _ch)) = super::require_admin(ctx, component).await else {
+async fn handle_limit_modal(ctx: &Context, component: &ComponentInteraction) {
+    if super::require_admin(ctx, component).await.is_none() {
         return;
-    };
+    }
 
-    // Show a row of buttons for common limits
-    let embed = CreateEmbed::new()
-        .title("Limite de membres")
-        .description("Choisissez une limite de membres pour votre salon vocal.")
-        .color(0x3498db);
-
-    let row1 = CreateActionRow::Buttons(vec![
-        CreateButton::new("limit_0")
-            .label("Aucune")
-            .style(ButtonStyle::Secondary),
-        CreateButton::new("limit_2")
-            .label("2")
-            .style(ButtonStyle::Primary),
-        CreateButton::new("limit_5")
-            .label("5")
-            .style(ButtonStyle::Primary),
-        CreateButton::new("limit_10")
-            .label("10")
-            .style(ButtonStyle::Primary),
-        CreateButton::new("limit_25")
-            .label("25")
-            .style(ButtonStyle::Primary),
+    let modal = CreateModal::new("modal_limit", "Limite de membres").components(vec![
+        CreateActionRow::InputText(
+            CreateInputText::new(InputTextStyle::Short, "Nombre (0 = aucune limite)", "limit_input")
+                .placeholder("Ex: 8 — laisser 0 pour supprimer la limite")
+                .min_length(1)
+                .max_length(3)
+                .required(true),
+        ),
     ]);
 
-    let msg = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .components(vec![row1])
-        .ephemeral(true);
-
-    let response = CreateInteractionResponse::Message(msg);
+    let response = CreateInteractionResponse::Modal(modal);
     if let Err(e) = component.create_response(&ctx.http, response).await {
-        warn!(error = %e, "Erreur envoi menu limite");
+        warn!(error = %e, "Erreur ouverture modal limite");
     }
 }
 
-async fn handle_limit_select(ctx: &Context, component: &ComponentInteraction) {
-    let custom_id = component.data.custom_id.as_str();
-    let limit_str = custom_id.strip_prefix("limit_").unwrap_or("0");
-    let limit: i32 = limit_str.parse().unwrap_or(0);
-
-    // We need the voice channel ID - find it from the text panel
-    let text_channel_id = component.channel_id;
+async fn handle_modal_limit(ctx: &Context, modal: &ModalInteraction) {
+    let text_channel_id = modal.channel_id;
     let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
         vc
-    } else if let Some(vc) = super::find_voice_from_members(ctx, text_channel_id).await {
-        vc
     } else {
-        super::respond_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_ephemeral_modal(ctx, modal, "Impossible de trouver le salon vocal.").await;
         return;
     };
 
-    // Set the user limit on the Discord voice channel
-    let member_limit = if limit == 0 { None } else { Some(limit) };
+    let raw = modal
+        .data
+        .components
+        .first()
+        .and_then(|row| row.components.first())
+        .and_then(|c| match c {
+            serenity::model::application::ActionRowComponent::InputText(input) => {
+                input.value.clone()
+            }
+            _ => None,
+        })
+        .unwrap_or_default();
 
-    let edit = if let Some(lim) = member_limit {
-        EditChannel::new().user_limit(lim as u32)
-    } else {
-        EditChannel::new().user_limit(0)
+    let limit: i32 = match raw.trim().parse::<i32>() {
+        Ok(n) if (0..=99).contains(&n) => n,
+        _ => {
+            super::respond_ephemeral_modal(
+                ctx,
+                modal,
+                "Valeur invalide. Entrez un nombre entre 0 et 99 (0 = aucune limite).",
+            )
+            .await;
+            return;
+        }
     };
 
+    let edit = EditChannel::new().user_limit(limit as u32);
     if let Err(e) = voice_channel_id.edit(&ctx.http, edit).await {
         error!(error = %e, "Erreur modification limite Discord");
-        super::respond_ephemeral(ctx, component, "Erreur lors de la modification de la limite.").await;
+        super::respond_ephemeral_modal(ctx, modal, "Erreur lors de la modification de la limite.").await;
         return;
     }
 
-    // Update API
+    let member_limit = if limit == 0 { None } else { Some(limit) };
     let update = UpdateVoiceChannelRequest {
         visibility: None,
         locked: None,
@@ -296,9 +332,7 @@ async fn handle_limit_select(ctx: &Context, component: &ComponentInteraction) {
     } else {
         format!("La limite a ete definie a **{limit}** membres.")
     };
-
-    super::respond_ephemeral(ctx, component, &limit_text).await;
-
+    super::respond_ephemeral_modal(ctx, modal, &limit_text).await;
     info!(voice = %voice_channel_id, limit = limit, "Limite changee");
 }
 
@@ -514,6 +548,22 @@ async fn handle_modal_status(ctx: &Context, modal: &ModalInteraction) {
     let status: Option<String> = new_status
         .map(|s| s.trim().to_string())
         .filter(|s: &String| !s.is_empty());
+
+    // Appliquer le statut sur Discord (feature voice channel status 2023).
+    // Serenity 0.12 supporte `EditChannel::status()` qui declenche l'endpoint
+    // PUT /channels/{id}/voice-status. Une chaine vide supprime le statut.
+    let discord_status = status.clone().unwrap_or_default();
+    let edit = EditChannel::new().status(discord_status.as_str());
+    if let Err(e) = voice_channel_id.edit(&ctx.http, edit).await {
+        error!(error = %e, "Erreur application statut Discord");
+        super::respond_ephemeral_modal(
+            ctx,
+            modal,
+            "Erreur lors de l'application du statut sur Discord.",
+        )
+        .await;
+        return;
+    }
 
     // Update API
     let update = UpdateVoiceChannelRequest {

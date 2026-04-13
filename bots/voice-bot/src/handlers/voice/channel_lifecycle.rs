@@ -286,6 +286,10 @@ pub(super) async fn create_temp_channel(
                 if let Err(e) = voice_channel_id.create_permission(&ctx.http, voice_overwrite).await {
                     warn!(error = %e, "failed to lock game voice channel behind queue");
                 }
+                // Placer la file d'attente AU-DESSUS du vocal principal pour
+                // le rendre plus visible (reorder_channels pousse le vocal
+                // d'un cran vers le bas dans la categorie).
+                place_queue_above_voice(ctx, guild_id, qch.id, voice_channel_id).await;
                 Some(qch.id)
             }
             Err(e) => {
@@ -515,6 +519,41 @@ pub(super) async fn check_and_delete_empty(
         if let Some(map) = data.get::<VoiceOwnerMapKey>() {
             map.remove(&voice_channel_id);
         }
+    }
+}
+
+/// Place la file d'attente juste au-dessus du salon vocal principal dans la
+/// categorie. Utilise `reorder_channels` qui gere le shift atomique des
+/// autres channels. Si le lookup echoue, le salon reste en bas (comportement
+/// par defaut de Discord) — l'echec est non fatal.
+pub async fn place_queue_above_voice(
+    ctx: &Context,
+    guild_id: GuildId,
+    queue_channel_id: ChannelId,
+    voice_channel_id: ChannelId,
+) {
+    let voice_pos = ctx
+        .cache
+        .guild(guild_id)
+        .and_then(|g| g.channels.get(&voice_channel_id).map(|c| c.position));
+
+    let voice_pos = match voice_pos {
+        Some(p) => p as u64,
+        None => return,
+    };
+
+    // On donne au queue la position actuelle du voice ; Discord decale le
+    // voice (et les suivants) d'un cran vers le bas automatiquement.
+    if let Err(e) = guild_id
+        .reorder_channels(&ctx.http, [(queue_channel_id, voice_pos)])
+        .await
+    {
+        warn!(
+            error = %e,
+            queue = %queue_channel_id,
+            voice = %voice_channel_id,
+            "reorder_channels echoue — la file d'attente reste en bas"
+        );
     }
 }
 
