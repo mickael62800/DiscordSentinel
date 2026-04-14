@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import { useRules } from "../../composables/useRules";
+import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useToast } from "../../composables/useToast";
 import type { UpdateRuleParams } from "../../types";
 import RuleCard from "../organisms/RuleCard.vue";
-import RuleEditModal from "../organisms/RuleEditModal.vue";
 
 const { success, error: showError } = useToast();
-const { rules, loading, editing, toggleRule, updateRule, openEdit, closeEdit } = useRules();
+const { selectedGuildId } = useGuildSelector();
+const { rules, loading, toggleRule, updateRule } = useRules();
 
 async function handleSave(params: UpdateRuleParams) {
   try {
     await updateRule(params);
-    closeEdit();
     success("Regle mise a jour avec succes");
   } catch (e) {
     console.error("Erreur mise a jour regle:", e);
@@ -35,23 +35,19 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
     <h1>Regles de moderation</h1>
 
     <div v-if="loading" class="loading">Chargement...</div>
-
+    <div v-else-if="!selectedGuildId" class="empty">
+      Selectionne un serveur pour voir ses regles.
+    </div>
     <div v-else class="rules-grid">
       <RuleCard
         v-for="rule in rules"
         :key="rule.id"
         :rule="rule"
+        :guild-id="selectedGuildId"
         @toggle="handleToggle"
-        @edit="openEdit"
+        @save="handleSave"
       />
     </div>
-
-    <RuleEditModal
-      v-if="editing"
-      :rule="editing"
-      @save="handleSave"
-      @close="closeEdit"
-    />
   </div>
 </template>
 
@@ -62,7 +58,14 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 
 .rules-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
   gap: 16px;
+}
+
+.loading,
+.empty {
+  color: var(--text-secondary);
+  padding: 40px;
+  text-align: center;
 }
 </style>
