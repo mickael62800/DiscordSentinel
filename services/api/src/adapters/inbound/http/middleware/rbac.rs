@@ -293,6 +293,11 @@ pub fn check_role(
     let Some(axum::Extension(ctx)) = rbac else {
         return Ok(());
     };
+
+    // NOTE : pas d'acces a AppState ici (helper sync). Pour le bypass
+    // superadmin, utiliser la variante async `check_role_for_guild` ou
+    // appeler directement `require_superadmin` depuis le handler.
+    // Alternative : exposer `check_role_with_state` si besoin.
     match require_role(ctx, required) {
         Ok(()) => Ok(()),
         Err(_) => Err(ApiError(DomainError::Forbidden(forbidden_msg.to_string()))),

@@ -7,7 +7,7 @@ use crate::adapters::inbound::http::dto::watched_users::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -78,11 +78,16 @@ pub async fn remove_watched_user(
     rbac: Option<Extension<RoleContext>>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role(
+    // Utilise check_role_for_guild (async, avec bypass superadmin) plutot
+    // que check_role (sync, sans bypass).
+    check_role_for_guild(
+        &state,
         &rbac,
+        &guild_id,
         Role::Moderator,
         "moderator+ requis pour retirer un watched user",
-    )?;
+    )
+    .await?;
     state
         .watched_users_uc
         .remove_manual_watch(&guild_id, &user_id)
