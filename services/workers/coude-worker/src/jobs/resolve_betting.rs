@@ -53,10 +53,15 @@ impl From<PlayerRow> for PlayerLite {
 /// items) au lieu du vieux random simple.
 pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), String> {
     // Verrouiller atomiquement : passer les combats de "betting" a "resolving"
-    // pour eviter qu'un autre worker les traite en parallele. 5 minutes =
-    // Le delai de paris est configurable par guild via `bet_delay_secs`
-    // (defaut 300 = 5 min). La requete lit la config de chaque guild pour
-    // ne resoudre que les combats dont le delai est vraiment ecoule.
+    // pour eviter qu'un autre worker les traite en parallele.
+    //
+    // Le delai de paris est configurable par guild via la cle `bet_delay_secs`
+    // dans bot_guild_config (defaut 300 = 5 min). Cette cle vit sous
+    // `bot_name = 'coude-worker'` (migration 120). Avant, elle etait
+    // referencee sous `bot_name = 'coude'` qui n'existait nulle part, donc
+    // la valeur editee depuis l'UI desktop n'etait JAMAIS prise en compte
+    // et le worker tournait toujours avec le defaut en dur.
+    //
     // 1. Recuperer les combats en phase betting dont le delai est ecoule.
     let mut combats = sqlx::query_as::<_, BettingCombat>(
         r#"UPDATE coude_combats SET status = 'resolving'
@@ -64,7 +69,7 @@ pub async fn run(pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), S
             SELECT c.id FROM coude_combats c
             LEFT JOIN bot_guild_config cfg
                 ON cfg.guild_id = c.guild_id
-                AND cfg.bot_name = 'coude'
+                AND cfg.bot_name = 'coude-worker'
                 AND cfg.config_key = 'bet_delay_secs'
             WHERE c.status = 'betting'
               AND c.accepted_at < NOW() - (COALESCE(
