@@ -1,4 +1,4 @@
-import { httpGet, httpPatch } from "@/api/http";
+import { httpDelete, httpGet, httpPatch } from "@/api/http";
 import type { VoiceChannel, VoiceChannelDetail } from "@/types";
 import { q } from "./_query";
 
@@ -24,4 +24,25 @@ export const voiceChannelsService = {
   close(channelId: string): Promise<unknown> {
     return httpPatch(`/api/voice-channels/by-channel/${channelId}/close`);
   },
+  purge(channelId: string): Promise<unknown> {
+    return httpDelete(`/api/voice-channels/by-channel/${channelId}/purge`);
+  },
+  purgeHistory(guildId: string): Promise<{ deleted: number }> {
+    return httpDelete(`/api/voice-channels/${guildId}/history`);
+  },
+  getEvents(channelId: string, limit = 200): Promise<VoiceChannelEvent[]> {
+    return httpGet(`/api/voice-channels/by-channel/${channelId}/events${q({ limit })}`);
+  },
 };
+
+export interface VoiceChannelEvent {
+  id: string;
+  guild_id: string;
+  event_type: string;
+  actor_id: string | null;
+  actor_name: string | null;
+  channel_id: string | null;
+  channel_name: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+}

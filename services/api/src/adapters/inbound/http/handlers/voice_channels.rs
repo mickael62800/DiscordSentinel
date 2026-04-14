@@ -50,6 +50,33 @@ use crate::ports::inbound::{
     BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, ManageCoAdminCommand,
     ManageWhitelistCommand, TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
 };
+use crate::ports::inbound::manage_audit_logs::CreateAuditLogCommand;
+
+async fn log_voice_event(
+    state: &AppState,
+    guild_id: String,
+    event_type: &str,
+    channel_id: String,
+    channel_name: Option<String>,
+    actor_id: Option<String>,
+    actor_name: Option<String>,
+    details: serde_json::Value,
+) {
+    let cmd = CreateAuditLogCommand {
+        guild_id,
+        event_type: event_type.to_string(),
+        actor_id,
+        actor_name,
+        target_id: None,
+        target_name: None,
+        channel_id: Some(channel_id),
+        channel_name,
+        details,
+    };
+    if let Err(e) = state.audit_logs_uc.create(cmd).await {
+        tracing::warn!("failed to log voice audit event: {e}");
+    }
+}
 
 #[derive(Debug, Deserialize)]
 pub struct PaginationQuery {
@@ -96,6 +123,121 @@ pub async fn list_history_channels(
     Ok(map_to_dtos(channels))
 }
 
+/// DELETE /api/voice-channels/by-channel/{channel_id}/purge
+/// Suppression definitive (hard-delete) d'un salon archive. Refuse si le salon
+/// est toujours ouvert — utilisez /close d'abord.
+pub async fn purge_channel(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(channel_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour purger un voice channel").await?;
+
+    let res = sqlx::query(
+        "DELETE FROM voice_channels WHERE channel_id = $1 AND channel_status = 'closed'",
+    )
+    .bind(&channel_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("purge voice channel: {e}"))))?;
+
+    if res.rows_affected() == 0 {
+        return Err(ApiError(DomainError::ValidationError(
+            "salon introuvable ou encore ouvert (fermez-le d'abord)".into(),
+        )));
+    }
+
+    state.broadcaster.broadcast(
+        "voice_channel_closed",
+        serde_json::json!({ "channel_id": &channel_id, "purged": true }),
+    );
+
+    Ok(ok_response())
+}
+
+/// DELETE /api/voice-channels/{guild_id}/history
+/// Purge (hard-delete) tous les salons fermes d'une guild.
+pub async fn purge_history(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state, &rbac, &guild_id, Role::Moderator,
+        "moderator+ pour purger l'historique voice",
+    )
+    .await?;
+
+    let res = sqlx::query(
+        "DELETE FROM voice_channels WHERE guild_id = $1 AND channel_status = 'closed'",
+    )
+    .bind(&guild_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("purge history: {e}"))))?;
+
+    state.broadcaster.broadcast(
+        "voice_channel_closed",
+        serde_json::json!({ "guild_id": &guild_id, "purged_all": true }),
+    );
+
+    Ok(Json(serde_json::json!({ "deleted": res.rows_affected() })))
+}
+
+/// GET /api/voice-channels/by-channel/{channel_id}/events
+/// Timeline d'un salon vocal : join/leave/move + create/update/close.
+pub async fn list_channel_events(
+    State(state): State<AppState>,
+    Path(channel_id): Path<String>,
+    Query(params): Query<PaginationQuery>,
+) -> Result<Json<Vec<serde_json::Value>>, ApiError> {
+    let limit = params.limit.unwrap_or(200).clamp(1, 1000);
+    let rows: Vec<(
+        uuid::Uuid,
+        String,
+        String,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        Option<String>,
+        serde_json::Value,
+        chrono::DateTime<chrono::Utc>,
+    )> = sqlx::query_as(
+        "SELECT id, guild_id, event_type, actor_id, actor_name, channel_id, channel_name, details, created_at
+         FROM audit_logs
+         WHERE channel_id = $1
+           AND event_type IN (
+             'voice_join', 'voice_leave', 'voice_move',
+             'voice_channel_created', 'voice_channel_updated', 'voice_channel_closed'
+           )
+         ORDER BY created_at ASC
+         LIMIT $2",
+    )
+    .bind(&channel_id)
+    .bind(limit)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("fetch voice events: {e}"))))?;
+
+    let events: Vec<serde_json::Value> = rows
+        .into_iter()
+        .map(|(id, guild_id, event_type, actor_id, actor_name, ch_id, ch_name, details, created_at)| {
+            serde_json::json!({
+                "id": id.to_string(),
+                "guild_id": guild_id,
+                "event_type": event_type,
+                "actor_id": actor_id,
+                "actor_name": actor_name,
+                "channel_id": ch_id,
+                "channel_name": ch_name,
+                "details": details,
+                "created_at": created_at.to_rfc3339(),
+            })
+        })
+        .collect();
+    Ok(Json(events))
+}
+
 pub async fn get_channel_detail(
     State(state): State<AppState>,
     Path(channel_id): Path<String>,
@@ -119,6 +261,24 @@ pub async fn create_channel(
     let command = dto.into();
     let channel = state.voice_channels_uc.create_channel(command).await?;
 
+    log_voice_event(
+        &state,
+        channel.guild_id.clone(),
+        "voice_channel_created",
+        channel.channel_id.clone(),
+        Some(channel.channel_name.clone()),
+        Some(channel.owner_id.clone()),
+        Some(channel.owner_name.clone()),
+        serde_json::json!({
+            "kind": channel.kind.as_str(),
+            "visibility": channel.visibility,
+            "queue_enabled": channel.queue_enabled,
+            "stage_enabled": channel.stage_enabled,
+            "member_limit": channel.member_limit,
+        }),
+    )
+    .await;
+
     state.broadcaster.broadcast(
         "voice_channel_created",
         serde_json::json!({
@@ -137,7 +297,22 @@ pub async fn close_channel(
     State(state): State<AppState>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
+    let before = state.voice_channels_uc.get_channel_detail(&channel_id).await.ok();
     state.voice_channels_uc.close_channel(&channel_id).await?;
+
+    if let Some(d) = before {
+        log_voice_event(
+            &state,
+            d.channel.guild_id.clone(),
+            "voice_channel_closed",
+            channel_id.clone(),
+            Some(d.channel.channel_name.clone()),
+            None,
+            None,
+            serde_json::json!({}),
+        )
+        .await;
+    }
 
     state.broadcaster.broadcast(
         "voice_channel_closed",
@@ -172,6 +347,17 @@ pub async fn update_channel(
     Json(dto): Json<UpdateVoiceChannelDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour modifier un voice channel").await?;
+
+    let changes = serde_json::json!({
+        "visibility": dto.visibility.clone(),
+        "locked": dto.locked,
+        "queue_enabled": dto.queue_enabled,
+        "name": dto.name.clone(),
+        "status": dto.status.clone(),
+        "member_limit": dto.member_limit,
+        "stage_enabled": dto.stage_enabled,
+    });
+
     state
         .voice_channels_uc
         .update_channel(UpdateVoiceChannelCommand {
@@ -186,6 +372,20 @@ pub async fn update_channel(
             stage_enabled: dto.stage_enabled,
         })
         .await?;
+
+    if let Ok(detail) = state.voice_channels_uc.get_channel_detail(&channel_id).await {
+        log_voice_event(
+            &state,
+            detail.channel.guild_id.clone(),
+            "voice_channel_updated",
+            channel_id.clone(),
+            Some(detail.channel.channel_name.clone()),
+            None,
+            None,
+            changes,
+        )
+        .await;
+    }
 
     state.broadcaster.broadcast(
         "voice_channel_updated",

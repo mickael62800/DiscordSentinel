@@ -28,7 +28,31 @@ const {
   fetchHistory,
   closeChannel,
   closeAllDisplayed,
+  purging,
+  purgeChannel,
+  purgingAll,
+  purgeAllHistory,
 } = useVoiceChannels();
+
+async function handlePurgeAll() {
+  const ok = await confirmDialog({
+    title: "Vider l'historique",
+    message:
+      `Supprimer definitivement les ${historyChannels.value.length} salon(s) de l'historique ?\n\n` +
+      "Toutes les lignes fermees et leurs timelines seront effacees de la BDD. Action irreversible.",
+  });
+  if (!ok) return;
+  await purgeAllHistory();
+}
+
+async function handlePurge(channelId: string, channelName: string) {
+  const ok = await confirmDialog({
+    title: "Supprimer de l'historique",
+    message: `Supprimer definitivement "${channelName}" ?\n\nLa ligne et sa timeline seront effacees de la BDD. Cette action est irreversible.`,
+  });
+  if (!ok) return;
+  await purgeChannel(channelId);
+}
 useRealtimeRefresh(
   ["voice_channel_created", "voice_channel_closed", "voice_channel_updated", "voice_invite_created", "voice_invite_used", "voice_invite_revoked"],
   async () => {
@@ -36,7 +60,43 @@ useRealtimeRefresh(
   },
 );
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
-const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
+const { detail, events, loading: detailLoading, eventsLoading, fetchDetail } = useVoiceChannelDetail();
+
+function eventLabel(type: string): string {
+  switch (type) {
+    case "voice_join": return "Entree";
+    case "voice_leave": return "Sortie";
+    case "voice_move": return "Deplacement";
+    case "voice_channel_created": return "Salon cree";
+    case "voice_channel_updated": return "Modification";
+    case "voice_channel_closed": return "Salon ferme";
+    default: return type;
+  }
+}
+
+function eventVariant(type: string): "info" | "warning" | "danger" | "default" {
+  switch (type) {
+    case "voice_join":
+    case "voice_channel_created": return "info";
+    case "voice_leave":
+    case "voice_move": return "default";
+    case "voice_channel_updated": return "warning";
+    case "voice_channel_closed": return "danger";
+    default: return "default";
+  }
+}
+
+function formatEventDetails(type: string, details: Record<string, unknown>): string {
+  if (!details || Object.keys(details).length === 0) return "";
+  if (type === "voice_move") {
+    const from = details.from_channel ?? "?";
+    const to = details.to_channel ?? "?";
+    return `${from} -> ${to}`;
+  }
+  const entries = Object.entries(details).filter(([, v]) => v !== null && v !== undefined);
+  if (entries.length === 0) return "";
+  return entries.map(([k, v]) => `${k}: ${JSON.stringify(v)}`).join(", ");
+}
 
 async function handleCloseChannel(channelId: string, channelName: string) {
   const ok = await confirmDialog({
@@ -126,6 +186,18 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           <li v-for="ca in detail.co_admins" :key="ca.id">{{ ca.user_name }}</li>
         </ul>
 
+        <h3>Timeline</h3>
+        <div v-if="eventsLoading" class="loading">Chargement de la timeline...</div>
+        <div v-else-if="events.length === 0" class="empty">Aucun evenement enregistre pour ce salon</div>
+        <ul v-else class="timeline">
+          <li v-for="ev in events" :key="ev.id" class="timeline-item">
+            <span class="timeline-time">{{ fmt(ev.created_at) }}</span>
+            <AppBadge :label="eventLabel(ev.event_type)" :variant="eventVariant(ev.event_type)" />
+            <span v-if="ev.actor_name" class="timeline-actor">{{ ev.actor_name }}</span>
+            <span class="timeline-details">{{ formatEventDetails(ev.event_type, ev.details) }}</span>
+          </li>
+        </ul>
+
         <h3 v-if="detail.bans.length">Bans ({{ detail.bans.length }})</h3>
         <div v-if="detail.bans.length" class="bans-table">
           <div v-for="ban in detail.bans" :key="ban.id" class="ban-row">
@@ -210,11 +282,24 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
       <!-- Historique (salons fermes)              -->
       <!-- ======================================== -->
       <section class="history-section">
-        <h2 class="history-title">
-          Historique
-          <span class="history-count">{{ historyChannels.length }}</span>
-        </h2>
-        <p class="history-subtitle">Salons vocaux fermes / archives</p>
+        <div class="history-head">
+          <div>
+            <h2 class="history-title">
+              Historique
+              <span class="history-count">{{ historyChannels.length }}</span>
+            </h2>
+            <p class="history-subtitle">Salons vocaux fermes / archives</p>
+          </div>
+          <button
+            v-if="historyChannels.length > 0"
+            class="cleanup-btn"
+            :disabled="purgingAll"
+            title="Supprime definitivement tout l'historique en BDD"
+            @click="handlePurgeAll"
+          >
+            {{ purgingAll ? "Suppression…" : `Tout supprimer (${historyChannels.length})` }}
+          </button>
+        </div>
 
         <div v-if="historyLoading" class="loading">Chargement de l'historique...</div>
         <div v-else-if="historyChannels.length === 0" class="empty">
@@ -227,6 +312,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
               <th>Proprietaire</th>
               <th>Type</th>
               <th>Creation</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -240,6 +326,16 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
               <td>{{ ch.owner_name }}</td>
               <td><AppBadge :label="ch.kind" :variant="kindVariant(ch.kind)" /></td>
               <td>{{ fmt(ch.created_at) }}</td>
+              <td @click.stop>
+                <button
+                  class="close-row-btn"
+                  :disabled="purging === ch.channel_id"
+                  title="Supprimer definitivement cette ligne"
+                  @click="handlePurge(ch.channel_id, ch.channel_name)"
+                >
+                  {{ purging === ch.channel_id ? "…" : "Supprimer" }}
+                </button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -452,6 +548,14 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   border-top: 1px solid var(--border);
 }
 
+.history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
 .history-title {
   display: flex;
   align-items: center;
@@ -483,5 +587,47 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
 
 .history-table tbody tr:hover {
   opacity: 1;
+}
+
+.timeline {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 24px;
+  border-left: 2px solid var(--border);
+}
+
+.timeline-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+
+.timeline-item:last-child {
+  border-bottom: none;
+}
+
+.timeline-time {
+  color: var(--text-secondary);
+  font-size: 11px;
+  min-width: 130px;
+  font-variant-numeric: tabular-nums;
+}
+
+.timeline-actor {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.timeline-details {
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-family: monospace;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

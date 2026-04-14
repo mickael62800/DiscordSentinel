@@ -156,7 +156,11 @@ fn voice_channel_routes() -> Router<AppState> {
     Router::new()
         .route("/_all", get(handlers::voice_channels::list_all_channels))
         .route("/{guild_id}", get(handlers::voice_channels::list_channels))
-        .route("/{guild_id}/history", get(handlers::voice_channels::list_history_channels))
+        .route(
+            "/{guild_id}/history",
+            get(handlers::voice_channels::list_history_channels)
+                .delete(handlers::voice_channels::purge_history),
+        )
         .route("/", post(handlers::voice_channels::create_channel))
         .route(
             "/by-channel/{channel_id}",
@@ -165,6 +169,8 @@ fn voice_channel_routes() -> Router<AppState> {
                 .delete(handlers::voice_channels::delete_channel),
         )
         .route("/by-channel/{channel_id}/close", patch(handlers::voice_channels::close_channel))
+        .route("/by-channel/{channel_id}/events", get(handlers::voice_channels::list_channel_events))
+        .route("/by-channel/{channel_id}/purge", delete(handlers::voice_channels::purge_channel))
         .route("/by-channel/{channel_id}/transfer", patch(handlers::voice_channels::transfer_ownership))
         .route("/by-channel/{channel_id}/co-admins", post(handlers::voice_channels::add_co_admin))
         .route("/by-channel/{channel_id}/co-admins/{user_id}", delete(handlers::voice_channels::remove_co_admin))

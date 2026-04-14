@@ -3,7 +3,7 @@ import type { VoiceChannel, VoiceChannelDetail } from "../types";
 import { useGuildFetch } from "./useGuildFetch";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
-import { voiceChannelsService } from "@/services/voiceChannelsService";
+import { voiceChannelsService, type VoiceChannelEvent } from "@/services/voiceChannelsService";
 
 export function useVoiceChannels() {
   const { success, error: showError } = useToast();
@@ -65,6 +65,42 @@ export function useVoiceChannels() {
     }
   }
 
+  const purging = ref<string | null>(null);
+  const purgingAll = ref(false);
+
+  async function purgeAllHistory(): Promise<number> {
+    if (!selectedGuildId.value) return 0;
+    purgingAll.value = true;
+    try {
+      const res = await voiceChannelsService.purgeHistory(selectedGuildId.value);
+      await fetchHistory();
+      success(`${res.deleted} salon(s) supprime(s) de l'historique.`);
+      return res.deleted;
+    } catch (e) {
+      console.error("Erreur purge historique:", e);
+      showError("Erreur lors de la suppression de l'historique.");
+      return 0;
+    } finally {
+      purgingAll.value = false;
+    }
+  }
+
+  async function purgeChannel(channelId: string): Promise<boolean> {
+    purging.value = channelId;
+    try {
+      await voiceChannelsService.purge(channelId);
+      await fetchHistory();
+      success("Salon supprime de l'historique.");
+      return true;
+    } catch (e) {
+      console.error("Erreur purge salon vocal:", e);
+      showError("Erreur lors de la suppression du salon.");
+      return false;
+    } finally {
+      purging.value = null;
+    }
+  }
+
   async function closeAllDisplayed(): Promise<number> {
     cleaningAll.value = true;
     let success_count = 0;
@@ -102,13 +138,19 @@ export function useVoiceChannels() {
     fetchHistory,
     closeChannel,
     closeAllDisplayed,
+    purging,
+    purgeChannel,
+    purgingAll,
+    purgeAllHistory,
   };
 }
 
 export function useVoiceChannelDetail() {
   const { error: showError } = useToast();
   const detail = ref<VoiceChannelDetail | null>(null);
+  const events = ref<VoiceChannelEvent[]>([]);
   const loading = ref(false);
+  const eventsLoading = ref(false);
   const error = ref<string | null>(null);
 
   async function fetchDetail(channelId: string) {
@@ -122,7 +164,16 @@ export function useVoiceChannelDetail() {
     } finally {
       loading.value = false;
     }
+    eventsLoading.value = true;
+    try {
+      events.value = await voiceChannelsService.getEvents(channelId);
+    } catch (e) {
+      console.warn("Erreur chargement timeline salon vocal:", e);
+      events.value = [];
+    } finally {
+      eventsLoading.value = false;
+    }
   }
 
-  return { detail, loading, error, fetchDetail };
+  return { detail, events, loading, eventsLoading, error, fetchDetail };
 }
