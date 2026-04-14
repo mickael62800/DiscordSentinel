@@ -61,6 +61,9 @@ async-trait = { workspace = true }
 dotenvy = { workspace = true }
 futures-util = { workspace = true }
 rand = { workspace = true }
+# Metriques systeme (CPU/RAM/host). Utilise avec `pid: host` dans
+# docker-compose pour voir les stats reelles de la machine et pas du conteneur.
+sysinfo = { version = "0.33", default-features = false, features = ["system"] }
 
 [dev-dependencies]
 http-body-util = "0.1"

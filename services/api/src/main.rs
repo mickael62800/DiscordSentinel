@@ -37,6 +37,9 @@ use sentinel_api::config::AppConfig;
 async fn main() {
     dotenvy::dotenv().ok();
 
+    // Fixe le t0 pour l'uptime expose via /api/system/info.
+    sentinel_api::adapters::inbound::http::handlers::system::record_startup();
+
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| "sentinel_api=info,tower_http=debug".into());
 

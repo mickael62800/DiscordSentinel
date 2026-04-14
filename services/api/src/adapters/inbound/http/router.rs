@@ -504,6 +504,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/models/reload", post(handlers::models_status::reload_model))
         // Cache monitoring
         .route("/api/cache/stats", get(handlers::cache_stats::get_cache_stats))
+        // Detail systeme (bots/workers list + CPU/RAM host + uptime + taille BDD)
+        .route("/api/system/info", get(handlers::system::get_system_info))
         // Coup de coude
         .nest("/api/coude", coude_routes())
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)

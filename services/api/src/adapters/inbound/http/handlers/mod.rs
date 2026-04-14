@@ -37,3 +37,4 @@ pub mod blackjack;
 pub mod games;
 pub mod welcome;
 pub mod oauth;
+pub mod system;

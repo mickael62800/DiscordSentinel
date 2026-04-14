@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from "vue";
 import DashboardStatsSection from "../organisms/DashboardStatsSection.vue";
+import DashboardSystemDetail from "../organisms/DashboardSystemDetail.vue";
 import DashboardChartsSection from "../organisms/DashboardChartsSection.vue";
 import AnalyticsSection from "../organisms/AnalyticsSection.vue";
 import {
@@ -33,6 +34,7 @@ ChartJS.register(
 const days = ref(30);
 
 const statsRef = ref<InstanceType<typeof DashboardStatsSection> | null>(null);
+const systemRef = ref<InstanceType<typeof DashboardSystemDetail> | null>(null);
 const chartsRef = ref<InstanceType<typeof DashboardChartsSection> | null>(null);
 const analyticsRef = ref<InstanceType<typeof AnalyticsSection> | null>(null);
 
@@ -43,6 +45,7 @@ async function handleRefresh() {
   try {
     await Promise.all([
       statsRef.value?.refresh(),
+      systemRef.value?.refresh(),
       chartsRef.value?.refresh(),
       analyticsRef.value?.refresh(),
     ]);
@@ -95,6 +98,7 @@ const periods = computed(() => [7, 14, 30, 90]);
     </div>
 
     <DashboardStatsSection ref="statsRef" />
+    <DashboardSystemDetail ref="systemRef" />
     <DashboardChartsSection ref="chartsRef" :days="days" />
     <AnalyticsSection ref="analyticsRef" :days="days" />
   </div>

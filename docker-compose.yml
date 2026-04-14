@@ -117,6 +117,10 @@ services:
       dockerfile: services/api/Dockerfile
     container_name: sentinel-api
     restart: unless-stopped
+    # Partage le namespace PID de l'host → /proc dans le conteneur refere
+    # a l'host, ce qui permet a sysinfo de remonter le CPU/RAM reel de la
+    # machine (pas du conteneur). Necessaire pour l'endpoint /api/system/info.
+    pid: host
     ports:
       - "3000:3000"     # HTTP/Axum (legacy + endpoints non migres)
       - "50051:50051"   # Phase 7A : gRPC/tonic interne aux bots
