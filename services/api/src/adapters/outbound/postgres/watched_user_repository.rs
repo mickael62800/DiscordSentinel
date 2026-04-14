@@ -70,75 +70,51 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<WatchedUser>, DomainError> {
+        // Phase X — surveillance purement MANUELLE : avant, la requete
+        // faisait un UNION entre tous les users avec infractions (auto) et
+        // les users dans manual_watched_users. Consequence : impossible de
+        // retirer un user avec des infractions (il revenait via la branche
+        // auto), et impossible d'ajouter un user deja auto-tracke (il etait
+        // deja "watched"). On ne retourne maintenant QUE les entrees
+        // manual_watched_users, enrichies avec leurs stats d'infractions.
         let query = r#"
-            WITH user_infractions AS (
-                SELECT
-                    i.guild_id,
-                    i.user_id,
-                    i.username,
-                    COUNT(*) FILTER (WHERE i.action = 'warn') AS total_warns,
-                    COUNT(*) FILTER (WHERE i.action = 'mute') AS total_mutes,
-                    COUNT(*) FILTER (WHERE i.action = 'ban') AS total_bans,
-                    MAX(i.created_at) AS last_incident_at,
-                    MIN(i.created_at) AS first_seen_at
-                FROM infractions i
-                WHERE ($1::text IS NULL OR i.guild_id = $1)
-                GROUP BY i.guild_id, i.user_id, i.username
-            ),
-            user_security AS (
-                SELECT
-                    se.guild_id,
-                    u.user_id,
-                    COUNT(*) AS security_events_count
-                FROM security_events se,
-                     jsonb_array_elements_text(se.user_ids) AS u(user_id)
-                WHERE ($1::text IS NULL OR se.guild_id = $1)
-                GROUP BY se.guild_id, u.user_id
-            )
-            SELECT * FROM (
-                SELECT
-                    ui.user_id,
-                    ui.username,
-                    ui.guild_id,
-                    COALESCE(g.name, ui.guild_id) AS guild_name,
-                    ui.total_warns,
-                    ui.total_mutes,
-                    ui.total_bans,
-                    ucp.points AS conduct_points,
-                    cc.max_points AS max_conduct_points,
-                    ui.last_incident_at,
-                    COALESCE(us.security_events_count, 0) AS security_events_count,
-                    ui.first_seen_at
-                FROM user_infractions ui
-                LEFT JOIN guilds g ON g.guild_id = ui.guild_id
-                LEFT JOIN user_conduct_points ucp ON ucp.guild_id = ui.guild_id AND ucp.user_id = ui.user_id
-                LEFT JOIN conduct_config cc ON cc.guild_id = ui.guild_id
-                LEFT JOIN user_security us ON us.guild_id = ui.guild_id AND us.user_id = ui.user_id
-
-                UNION ALL
-
-                SELECT
-                    mw.user_id,
-                    mw.username,
-                    mw.guild_id,
-                    COALESCE(g2.name, mw.guild_id) AS guild_name,
-                    0::bigint AS total_warns,
-                    0::bigint AS total_mutes,
-                    0::bigint AS total_bans,
-                    NULL::int AS conduct_points,
-                    NULL::int AS max_conduct_points,
-                    NULL::timestamptz AS last_incident_at,
-                    0::bigint AS security_events_count,
-                    mw.created_at AS first_seen_at
-                FROM manual_watched_users mw
-                LEFT JOIN guilds g2 ON g2.guild_id = mw.guild_id
-                WHERE ($1::text IS NULL OR mw.guild_id = $1)
-                  AND NOT EXISTS (
-                      SELECT 1 FROM infractions i2
-                      WHERE i2.guild_id = mw.guild_id AND i2.user_id = mw.user_id
-                  )
-            ) combined
-            ORDER BY total_warns + total_mutes + total_bans DESC, last_incident_at DESC NULLS LAST
+            SELECT
+                mw.user_id,
+                mw.username,
+                mw.guild_id,
+                COALESCE(g.name, mw.guild_id) AS guild_name,
+                COALESCE((
+                    SELECT COUNT(*)::bigint FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'warn'
+                ), 0) AS total_warns,
+                COALESCE((
+                    SELECT COUNT(*)::bigint FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'mute'
+                ), 0) AS total_mutes,
+                COALESCE((
+                    SELECT COUNT(*)::bigint FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id AND i.action = 'ban'
+                ), 0) AS total_bans,
+                ucp.points AS conduct_points,
+                cc.max_points AS max_conduct_points,
+                (
+                    SELECT MAX(i.created_at) FROM infractions i
+                    WHERE i.guild_id = mw.guild_id AND i.user_id = mw.user_id
+                ) AS last_incident_at,
+                COALESCE((
+                    SELECT COUNT(*)::bigint
+                    FROM security_events se,
+                         jsonb_array_elements_text(se.user_ids) AS u(user_id)
+                    WHERE se.guild_id = mw.guild_id AND u.user_id = mw.user_id
+                ), 0) AS security_events_count,
+                mw.created_at AS first_seen_at
+            FROM manual_watched_users mw
+            LEFT JOIN guilds g ON g.guild_id = mw.guild_id
+            LEFT JOIN user_conduct_points ucp
+                ON ucp.guild_id = mw.guild_id AND ucp.user_id = mw.user_id
+            LEFT JOIN conduct_config cc ON cc.guild_id = mw.guild_id
+            WHERE ($1::text IS NULL OR mw.guild_id = $1)
+            ORDER BY mw.created_at DESC
             LIMIT $2 OFFSET $3
         "#;
 
