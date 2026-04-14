@@ -22,11 +22,19 @@ const {
   totalCount,
   closing,
   cleaningAll,
+  historyChannels,
+  historyLoading,
   fetchChannels,
+  fetchHistory,
   closeChannel,
   closeAllDisplayed,
 } = useVoiceChannels();
-useRealtimeRefresh(["voice_channel_created", "voice_channel_closed", "voice_channel_updated", "voice_invite_created", "voice_invite_used", "voice_invite_revoked"], fetchChannels);
+useRealtimeRefresh(
+  ["voice_channel_created", "voice_channel_closed", "voice_channel_updated", "voice_invite_created", "voice_invite_used", "voice_invite_revoked"],
+  async () => {
+    await Promise.all([fetchChannels(), fetchHistory()]);
+  },
+);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
 const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
 
@@ -197,6 +205,45 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
         @update:current-page="currentPage = $event"
         @update:per-page="perPage = $event"
       />
+
+      <!-- ======================================== -->
+      <!-- Historique (salons fermes)              -->
+      <!-- ======================================== -->
+      <section class="history-section">
+        <h2 class="history-title">
+          Historique
+          <span class="history-count">{{ historyChannels.length }}</span>
+        </h2>
+        <p class="history-subtitle">Salons vocaux fermes / archives</p>
+
+        <div v-if="historyLoading" class="loading">Chargement de l'historique...</div>
+        <div v-else-if="historyChannels.length === 0" class="empty">
+          Aucun salon dans l'historique
+        </div>
+        <table v-else class="data-table history-table">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Proprietaire</th>
+              <th>Type</th>
+              <th>Creation</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="ch in historyChannels"
+              :key="ch.id"
+              class="clickable"
+              @click="selectChannel(ch.channel_id)"
+            >
+              <td>{{ ch.channel_name }}</td>
+              <td>{{ ch.owner_name }}</td>
+              <td><AppBadge :label="ch.kind" :variant="kindVariant(ch.kind)" /></td>
+              <td>{{ fmt(ch.created_at) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
     </div>
   </div>
 </template>
@@ -397,5 +444,44 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   border-bottom: 1px solid var(--border);
   align-items: center;
   font-size: 13px;
+}
+
+.history-section {
+  margin-top: 40px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+}
+
+.history-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.history-count {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+}
+
+.history-subtitle {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin: 0 0 16px;
+}
+
+.history-table {
+  opacity: 0.85;
+}
+
+.history-table tbody tr:hover {
+  opacity: 1;
 }
 </style>

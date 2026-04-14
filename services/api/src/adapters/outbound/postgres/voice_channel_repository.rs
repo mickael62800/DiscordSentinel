@@ -242,6 +242,22 @@ impl VoiceChannelRepository for PgVoiceChannelRepository {
         Ok(rows.into_iter().map(VoiceChannel::from).collect())
     }
 
+    async fn find_closed_by_guild(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError> {
+        let rows = sqlx::query_as::<_, VoiceChannelRow>(
+            "SELECT * FROM voice_channels \
+             WHERE guild_id = $1 AND channel_status = 'closed' \
+             ORDER BY closed_at DESC NULLS LAST, created_at DESC \
+             LIMIT $2",
+        )
+        .bind(guild_id)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(VoiceChannel::from).collect())
+    }
+
     async fn find_by_channel_id(&self, channel_id: &str) -> Result<Option<VoiceChannel>, DomainError> {
         let row = sqlx::query_as::<_, VoiceChannelRow>(
             "SELECT * FROM voice_channels WHERE channel_id = $1 AND channel_status = 'open'",

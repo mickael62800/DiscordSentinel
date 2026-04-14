@@ -82,6 +82,20 @@ pub async fn list_channels(
     Ok(map_to_dtos(page))
 }
 
+/// GET /api/voice-channels/{guild_id}/history — historique des salons fermes.
+pub async fn list_history_channels(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Query(params): Query<PaginationQuery>,
+) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
+    let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 100, 500);
+    let channels = state
+        .voice_channels_uc
+        .list_history_channels(&guild_id, limit)
+        .await?;
+    Ok(map_to_dtos(channels))
+}
+
 pub async fn get_channel_detail(
     State(state): State<AppState>,
     Path(channel_id): Path<String>,

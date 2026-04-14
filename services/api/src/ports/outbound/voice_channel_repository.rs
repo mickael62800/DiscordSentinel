@@ -10,6 +10,9 @@ pub trait VoiceChannelRepository: Send + Sync {
     // Channels
     async fn find_all(&self) -> Result<Vec<VoiceChannel>, DomainError>;
     async fn find_all_by_guild(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError>;
+    /// Historique : salons `channel_status = 'closed'` d'une guild, tries
+    /// par `closed_at` DESC, limites a `limit` entrees.
+    async fn find_closed_by_guild(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError>;
     async fn find_by_channel_id(&self, channel_id: &str) -> Result<Option<VoiceChannel>, DomainError>;
     async fn find_by_id(&self, id: Uuid) -> Result<Option<VoiceChannel>, DomainError>;
     async fn save(&self, channel: &VoiceChannel) -> Result<(), DomainError>;

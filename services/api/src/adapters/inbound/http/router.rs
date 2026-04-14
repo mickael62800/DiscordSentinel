@@ -156,6 +156,7 @@ fn voice_channel_routes() -> Router<AppState> {
     Router::new()
         .route("/_all", get(handlers::voice_channels::list_all_channels))
         .route("/{guild_id}", get(handlers::voice_channels::list_channels))
+        .route("/{guild_id}/history", get(handlers::voice_channels::list_history_channels))
         .route("/", post(handlers::voice_channels::create_channel))
         .route(
             "/by-channel/{channel_id}",

@@ -93,6 +93,8 @@ pub struct CreateThemeCommand {
 pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError>;
     async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError>;
+    /// Historique : salons fermes d'une guild, limites a `limit`.
+    async fn list_history_channels(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError>;
     async fn get_channel_detail(&self, channel_id: &str) -> Result<VoiceChannelDetail, DomainError>;
     async fn create_channel(&self, cmd: CreateVoiceChannelCommand) -> Result<VoiceChannel, DomainError>;
     async fn close_channel(&self, channel_id: &str) -> Result<(), DomainError>;

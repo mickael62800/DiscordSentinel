@@ -123,6 +123,12 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         Ok(channels)
     }
 
+    async fn list_history_channels(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError> {
+        // Historique : pas de cache — donnees moins sollicitees et
+        // fraicheur preferable.
+        self.repo.find_closed_by_guild(guild_id, limit).await
+    }
+
     async fn get_channel_detail(&self, channel_id: &str) -> Result<VoiceChannelDetail, DomainError> {
         let cache_key = format!("voice_channel:{channel_id}");
 

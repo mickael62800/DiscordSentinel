@@ -1,9 +1,17 @@
 import { httpGet, httpPatch } from "@/api/http";
 import type { VoiceChannel, VoiceChannelDetail } from "@/types";
+import { q } from "./_query";
 
 export const voiceChannelsService = {
   getAll(guildId?: string | null): Promise<VoiceChannel[]> {
     return httpGet(guildId ? `/api/voice-channels/${guildId}` : `/api/voice-channels/_all`);
+  },
+  /**
+   * Historique des salons fermes (channel_status = 'closed').
+   * Limite par defaut backend : 100, max 500.
+   */
+  getHistory(guildId: string, limit?: number): Promise<VoiceChannel[]> {
+    return httpGet(`/api/voice-channels/${guildId}/history${q({ limit })}`);
   },
   getDetail(channelId: string): Promise<VoiceChannelDetail> {
     return httpGet(`/api/voice-channels/by-channel/${channelId}`);

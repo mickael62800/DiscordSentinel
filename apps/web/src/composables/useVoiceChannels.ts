@@ -1,16 +1,40 @@
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import type { VoiceChannel, VoiceChannelDetail } from "../types";
 import { useGuildFetch } from "./useGuildFetch";
+import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
 import { voiceChannelsService } from "@/services/voiceChannelsService";
 
 export function useVoiceChannels() {
   const { success, error: showError } = useToast();
+  const { selectedGuildId } = useGuildSelector();
   const { data: channels, loading, error, refresh: fetchChannels } = useGuildFetch<VoiceChannel[]>(
     (guildId) => voiceChannelsService.getAll(guildId),
     [],
     { label: "canaux vocaux" },
   );
+
+  const historyChannels = ref<VoiceChannel[]>([]);
+  const historyLoading = ref(false);
+
+  async function fetchHistory() {
+    if (!selectedGuildId.value) {
+      historyChannels.value = [];
+      return;
+    }
+    historyLoading.value = true;
+    try {
+      historyChannels.value = await voiceChannelsService.getHistory(selectedGuildId.value, 100);
+    } catch (e) {
+      console.error("Erreur chargement historique salons vocaux:", e);
+      historyChannels.value = [];
+    } finally {
+      historyLoading.value = false;
+    }
+  }
+
+  // Charge l'historique au demarrage et au changement de guild.
+  watch(selectedGuildId, () => { fetchHistory(); }, { immediate: true });
 
   const filterKind = ref("all");
   const closing = ref<string | null>(null);
@@ -29,7 +53,7 @@ export function useVoiceChannels() {
     closing.value = channelId;
     try {
       await voiceChannelsService.close(channelId);
-      await fetchChannels();
+      await Promise.all([fetchChannels(), fetchHistory()]);
       success("Salon ferme et retire de la liste.");
       return true;
     } catch (e) {
@@ -45,8 +69,6 @@ export function useVoiceChannels() {
     cleaningAll.value = true;
     let success_count = 0;
     try {
-      // Sequentiel pour eviter de sature le backend. On ferme dans l'ordre
-      // affiche et on refetch a la fin.
       for (const ch of [...filteredChannels.value]) {
         try {
           await voiceChannelsService.close(ch.channel_id);
@@ -55,7 +77,7 @@ export function useVoiceChannels() {
           console.warn(`Echec fermeture ${ch.channel_id}:`, e);
         }
       }
-      await fetchChannels();
+      await Promise.all([fetchChannels(), fetchHistory()]);
       success(`${success_count} salon(s) ferme(s).`);
     } finally {
       cleaningAll.value = false;
@@ -74,7 +96,10 @@ export function useVoiceChannels() {
     totalCount,
     closing,
     cleaningAll,
+    historyChannels,
+    historyLoading,
     fetchChannels,
+    fetchHistory,
     closeChannel,
     closeAllDisplayed,
   };
