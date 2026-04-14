@@ -217,6 +217,7 @@ function handleReset() {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-width: 0; /* evite qu'un contenu long force l'expansion au-dela de la col */
 }
 
 .rule-card.disabled {
@@ -321,6 +322,12 @@ function handleReset() {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px 14px;
+}
+
+@media (max-width: 480px) {
+  .thresholds-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .error-msg {

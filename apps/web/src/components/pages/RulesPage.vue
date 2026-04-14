@@ -58,8 +58,22 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 
 .rules-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  /* Pas d'auto-fill (qui pouvait tomber a 5-6 colonnes ecrasees) :
+     max 3 cols sur ecrans larges, 2 au milieu, 1 en mobile. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+@media (max-width: 1300px) {
+  .rules-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 780px) {
+  .rules-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .loading,
