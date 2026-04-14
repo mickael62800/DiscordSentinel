@@ -1,0 +1,70 @@
+// Config persistante (API url / key + tokens bots) en localStorage pour la version web.
+// Remplace ConfigStore (keyring OS) du desktop.
+
+const K_API = "ds.api.config";
+const K_DISCORD = "ds.discord.config";
+const K_DISCORD_USER = "ds.discord.user";
+const K_BOT_TOKENS = "ds.bot.tokens";
+
+export interface ApiConfig { api_url: string; api_key: string }
+export interface DiscordConfig { client_id: string; client_secret: string }
+export interface DiscordUser { id: string; username: string; avatar?: string | null; global_name?: string | null }
+
+export function getApiConfig(): ApiConfig | null {
+  const raw = localStorage.getItem(K_API);
+  return raw ? JSON.parse(raw) : null;
+}
+export function setApiConfig(cfg: ApiConfig) {
+  localStorage.setItem(K_API, JSON.stringify(cfg));
+}
+export function clearApiConfig() {
+  localStorage.removeItem(K_API);
+}
+
+export function getDiscordConfig(): DiscordConfig | null {
+  const raw = localStorage.getItem(K_DISCORD);
+  return raw ? JSON.parse(raw) : null;
+}
+export function setDiscordConfig(cfg: DiscordConfig) {
+  localStorage.setItem(K_DISCORD, JSON.stringify(cfg));
+}
+export function clearDiscordConfig() {
+  localStorage.removeItem(K_DISCORD);
+}
+
+export function getDiscordUser(): DiscordUser | null {
+  const raw = localStorage.getItem(K_DISCORD_USER);
+  return raw ? JSON.parse(raw) : null;
+}
+export function setDiscordUser(u: DiscordUser | null) {
+  if (u) localStorage.setItem(K_DISCORD_USER, JSON.stringify(u));
+  else localStorage.removeItem(K_DISCORD_USER);
+}
+
+interface BotTokens { [name: string]: string }
+function readBotTokens(): BotTokens {
+  const raw = localStorage.getItem(K_BOT_TOKENS);
+  return raw ? JSON.parse(raw) : {};
+}
+function writeBotTokens(t: BotTokens) {
+  localStorage.setItem(K_BOT_TOKENS, JSON.stringify(t));
+}
+export function saveBotToken(name: string, token: string) {
+  const t = readBotTokens();
+  t[name] = token;
+  writeBotTokens(t);
+}
+export function deleteBotToken(name: string) {
+  const t = readBotTokens();
+  delete t[name];
+  writeBotTokens(t);
+}
+export function listBotTokens(): Array<[string, boolean]> {
+  return Object.keys(readBotTokens()).map((k) => [k, true] as [string, boolean]);
+}
+
+// Token Discord OAuth (renseigne apres callback OAuth) envoye en header X-Discord-Token.
+const K_DISCORD_TOKEN = "ds.discord.token";
+export function getDiscordToken(): string { return localStorage.getItem(K_DISCORD_TOKEN) ?? ""; }
+export function setDiscordToken(t: string) { localStorage.setItem(K_DISCORD_TOKEN, t); }
+export function clearDiscordToken() { localStorage.removeItem(K_DISCORD_TOKEN); }
