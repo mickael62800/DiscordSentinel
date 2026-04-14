@@ -58,14 +58,13 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 
 .rules-grid {
   display: grid;
-  /* 3 cols au-dessus de 1600px, 2 cols au milieu, 1 en mobile.
-     Avant : breakpoint 1300px qui laissait 3 cols tasses de 1300 a
-     1810px, ce qui ecrasait les cartes sur la plupart des laptops. */
+  /* 3 cols uniquement sur tres grands ecrans (>=1900px), sinon 2 cols.
+     En dessous de 900px, 1 col. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
-@media (max-width: 1600px) {
+@media (max-width: 1900px) {
   .rules-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
