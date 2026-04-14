@@ -1063,11 +1063,13 @@ impl ApiClient {
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
+        duration_seconds: i64,
     ) -> Result<(), String> {
         let req = proto_coude::BuyInsuranceRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
             is_scam,
+            duration_seconds,
         };
         let mut client = self.grpc.coude_inventory();
         self.grpc

@@ -99,8 +99,11 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
+        duration_seconds: i64,
     ) -> Result<(), DomainError> {
-        self.repo.buy_insurance(guild_id, user_id, is_scam).await
+        self.repo
+            .buy_insurance(guild_id, user_id, is_scam, duration_seconds)
+            .await
     }
 
     async fn get_active_insurance(

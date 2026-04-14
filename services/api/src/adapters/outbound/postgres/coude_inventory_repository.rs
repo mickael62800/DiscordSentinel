@@ -251,14 +251,18 @@ impl CoudeInventoryRepository for PgCoudeInventoryRepository {
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
+        duration_seconds: i64,
     ) -> Result<(), DomainError> {
+        // 0 = defaut historique 1h (3600s) pour retrocompat.
+        let secs = if duration_seconds <= 0 { 3600 } else { duration_seconds };
         sqlx::query(
             r#"INSERT INTO coude_insurances (guild_id, user_id, is_scam, expires_at)
-               VALUES ($1, $2, $3, NOW() + INTERVAL '1 hour')"#,
+               VALUES ($1, $2, $3, NOW() + make_interval(secs => $4))"#,
         )
         .bind(guild_id)
         .bind(user_id)
         .bind(is_scam)
+        .bind(secs as f64)
         .execute(&self.pool)
         .await
         .map_err(pg_err)?;

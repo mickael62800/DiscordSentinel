@@ -123,7 +123,7 @@ pub async fn buy_insurance(
 ) -> Result<StatusCode, ApiError> {
     state
         .coude_inventory_uc
-        .buy_insurance(&guild_id, &dto.user_id, dto.is_scam)
+        .buy_insurance(&guild_id, &dto.user_id, dto.is_scam, dto.duration_seconds)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }

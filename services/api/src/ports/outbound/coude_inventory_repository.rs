@@ -63,12 +63,14 @@ pub trait CoudeInventoryRepository: Send + Sync {
 
     // ── Assurances ──
 
-    /// Crée une nouvelle assurance avec une durée fixe (1h) comptée depuis `NOW()`.
+    /// Crée une nouvelle assurance avec une durée en secondes comptée
+    /// depuis `NOW()`. `duration_seconds <= 0` → fallback 3600s (1h).
     async fn buy_insurance(
         &self,
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
+        duration_seconds: i64,
     ) -> Result<(), DomainError>;
 
     async fn get_active_insurance(

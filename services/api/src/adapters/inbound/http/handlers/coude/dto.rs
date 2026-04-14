@@ -582,6 +582,9 @@ impl From<CoudeInsurance> for InsuranceDto {
 pub struct BuyInsuranceDto {
     pub user_id: String,
     pub is_scam: bool,
+    /// Duree en secondes. 0 ou absent = defaut 3600 (1h) pour retrocompat.
+    #[serde(default)]
+    pub duration_seconds: i64,
 }
 
 // ══════════════════════════════════════════════════════════════════════

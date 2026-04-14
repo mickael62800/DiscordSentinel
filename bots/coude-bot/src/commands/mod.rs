@@ -8,6 +8,7 @@ pub mod donner;
 pub mod hp;
 pub mod leaderboard;
 pub mod pari;
+pub mod potion;
 pub mod prime;
 pub mod profil;
 pub mod refuser;
@@ -29,6 +30,7 @@ pub fn all() -> Vec<CreateCommand> {
         prime::register(),
         leaderboard::register(),
         pari::register(),
+        potion::register(),
         voler::register(),
         assurance::register(),
         train::register(),

@@ -61,6 +61,7 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
+        duration_seconds: i64,
     ) -> Result<(), DomainError>;
 
     async fn get_active_insurance(

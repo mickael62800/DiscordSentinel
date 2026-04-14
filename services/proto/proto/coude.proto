@@ -463,6 +463,9 @@ message BuyInsuranceRequest {
   string guild_id = 1;
   string user_id = 2;
   bool is_scam = 3;
+  // Duree en secondes. 0 ou absent = defaut 3600 (1h) pour
+  // retrocompat. Valeurs typiques : 86400 (1j), 604800 (1s), 2592000 (30j).
+  int64 duration_seconds = 4;
 }
 
 message ExpireInsuranceRequest {

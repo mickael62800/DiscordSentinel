@@ -88,6 +88,7 @@ impl EventHandler for Handler {
                     "donner" => commands::donner::handle(&ctx, &command).await,
                     "hp" => commands::hp::handle(&ctx, &command).await,
                     "repos" => commands::repos::handle(&ctx, &command).await,
+                    "potion" => commands::potion::handle(&ctx, &command).await,
                     "saison" => commands::saison::handle(&ctx, &command).await,
                     "reset-stats" => commands::reset_stats::handle(&ctx, &command).await,
                     "resume" => commands::resume::handle(&ctx, &command).await,
