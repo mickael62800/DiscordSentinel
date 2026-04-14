@@ -232,7 +232,15 @@ function rolesCount(roles: unknown): number {
       <div v-if="selectedMember" class="detail-panel">
         <div class="panel-top-actions">
           <button
-            v-if="isWatched(selectedMember.member.user_id)"
+            v-if="!isWatched(selectedMember.member.user_id)"
+            class="watch-top-btn"
+            :disabled="watchAction"
+            @click="toggleWatch"
+          >
+            + Surveiller
+          </button>
+          <button
+            v-else
             class="unwatch-top-btn"
             :disabled="watchAction"
             @click="unwatch"
@@ -690,6 +698,29 @@ function rolesCount(roles: unknown): number {
 }
 
 .unwatch-top-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.watch-top-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--warning);
+  border-radius: 8px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.watch-top-btn:hover:not(:disabled) {
+  background: var(--warning);
+  color: #0a0a0a;
+}
+
+.watch-top-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
