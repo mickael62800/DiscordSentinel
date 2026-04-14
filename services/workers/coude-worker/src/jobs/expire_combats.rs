@@ -24,18 +24,23 @@ struct ExpiredCombat {
 /// - La mise de l'attaquant est remboursee (pas de penalite)
 /// - Les paris sur ce combat sont rembourses
 pub async fn run(pool: &PgPool) -> Result<(), String> {
-    // Lire la duree d'expiration par guild (defaut 24h = 86400s)
-    // On utilise le min de toutes les guilds pour la requete globale,
-    // puis on verifie individuellement par guild
+    // Delai d'expiration configurable par guild via la cle
+    // `combat_expiry_hours` dans bot_guild_config (bot_name='coude-worker').
+    // Defaut : 24h. Avant, le code lisait `combat_expire_secs` avec
+    // `bot_name='coude'` qui n'existe dans AUCUN schema, donc la valeur
+    // editee depuis l'UI n'etait jamais prise en compte (migration 121).
     let combats = sqlx::query_as::<_, ExpiredCombat>(
         r#"
         SELECT c.id, c.guild_id, c.channel_id, c.attacker_id, c.attacker_name, c.defender_id, c.defender_name, c.mise
         FROM coude_combats c
-        LEFT JOIN bot_guild_config cfg ON cfg.guild_id = c.guild_id AND cfg.bot_name = 'coude' AND cfg.config_key = 'combat_expire_secs'
+        LEFT JOIN bot_guild_config cfg
+            ON cfg.guild_id = c.guild_id
+            AND cfg.bot_name = 'coude-worker'
+            AND cfg.config_key = 'combat_expiry_hours'
         WHERE c.status = 'pending'
-          AND c.created_at < NOW() - MAKE_INTERVAL(secs := COALESCE(
+          AND c.created_at < NOW() - MAKE_INTERVAL(hours := COALESCE(
                 CASE WHEN cfg.config_value ~ '^\d+$' THEN cfg.config_value::int ELSE NULL END,
-                86400
+                24
               ))
         "#,
     )
