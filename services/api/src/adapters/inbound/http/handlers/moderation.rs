@@ -770,7 +770,13 @@ pub async fn get_modstats(
     Ok(Json(dtos))
 }
 
-/// DELETE /api/moderation/actions/{id} — supprime une action (unwarn).
+/// DELETE /api/moderation/actions/{id} — annule une action.
+///
+/// Comportement selon le type d'action :
+/// - `ban*`  : appelle Discord API pour **unban** l'utilisateur puis supprime la ligne.
+/// - `mute*` / `timeout` : appelle Discord API pour **retirer le timeout**
+///   (`communication_disabled_until = null`) puis supprime la ligne.
+/// - `warn` / autre : supprime juste la ligne (pas d'effet Discord natif).
 pub async fn delete_action(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -779,24 +785,65 @@ pub async fn delete_action(
     let uuid = uuid::Uuid::parse_str(&id)
         .map_err(|_| ApiError(crate::domain::errors::DomainError::ValidationError("ID invalide".into())))?;
 
-    // RBAC : lookup du guild_id avant la suppression.
-    if rbac.is_some() {
-        let gid: Option<(String,)> = sqlx::query_as(
-            "SELECT guild_id FROM moderation_actions WHERE id = $1",
-        )
-        .bind(uuid)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("fetch action guild_id: {e}"))))?;
-        if let Some((guild_id,)) = gid {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &guild_id,
-                Role::Moderator,
-                "moderator+ requis pour supprimer une action",
-            )
-            .await?;
+    // Fetch l'action pour le gate RBAC + l'eventuel unban Discord.
+    // SQL direct car find_by_id n'est pas expose sur le use case.
+    let row: Option<(String, String, String, String)> = sqlx::query_as(
+        "SELECT guild_id, target_id, target_name, action_type \
+         FROM moderation_actions WHERE id = $1",
+    )
+    .bind(uuid)
+    .fetch_optional(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("fetch action: {e}"))))?;
+
+    let Some((guild_id, target_id, target_name, action_type)) = row else {
+        return Err(ApiError(crate::domain::errors::DomainError::NotFound("Action introuvable".into())));
+    };
+
+    // Gate RBAC : moderator+ sur la guild concernee.
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ requis pour annuler une action",
+    )
+    .await?;
+
+    // Reversal Discord : selon le type d'action, on effectue l'action
+    // inverse AVANT de supprimer la ligne. Best-effort : une erreur Discord
+    // ne bloque pas la suppression en DB (on log et on continue pour que
+    // l'UI reste coherente).
+    let lower = action_type.to_lowercase();
+    if lower.starts_with("ban") {
+        match state.discord_api.unban_user(&guild_id, &target_id).await {
+            Ok(()) => tracing::info!(
+                guild_id = %guild_id,
+                target_id = %target_id,
+                target_name = %target_name,
+                "Unban Discord applique lors de l'annulation d'une action ban"
+            ),
+            Err(e) => tracing::warn!(
+                error = %e,
+                guild_id = %guild_id,
+                target_id = %target_id,
+                "Echec unban Discord lors de l'annulation — suppression DB quand meme"
+            ),
+        }
+    } else if lower.starts_with("mute") || lower == "timeout" {
+        match state.discord_api.remove_timeout(&guild_id, &target_id).await {
+            Ok(()) => tracing::info!(
+                guild_id = %guild_id,
+                target_id = %target_id,
+                target_name = %target_name,
+                "Timeout Discord retire lors de l'annulation d'une action mute/timeout"
+            ),
+            Err(e) => tracing::warn!(
+                error = %e,
+                guild_id = %guild_id,
+                target_id = %target_id,
+                "Echec remove_timeout Discord lors de l'annulation — suppression DB quand meme"
+            ),
         }
     }
 

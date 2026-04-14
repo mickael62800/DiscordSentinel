@@ -15,12 +15,16 @@ export function useInfractions() {
   const deleting = ref(false);
   const purging = ref(false);
 
-  async function deleteInfraction(id: string) {
+  async function deleteInfraction(id: string, source: "detection" | "action" = "detection") {
     deleting.value = true;
     try {
-      await infractionsService.remove(id);
+      await infractionsService.remove(id, source);
       await fetchInfractions();
-      success("Infraction supprimee avec succes.");
+      if (source === "action") {
+        success("Action annulee (unban Discord applique si ban).");
+      } else {
+        success("Infraction supprimee avec succes.");
+      }
     } catch (e) {
       console.error("Erreur lors de la suppression de l'infraction :", e);
       showError("Erreur lors de la suppression de l'infraction.");

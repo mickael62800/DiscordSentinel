@@ -358,6 +358,44 @@ impl DiscordApiService {
         Ok(())
     }
 
+    /// Retire le timeout (mute) d'un membre en mettant
+    /// `communication_disabled_until` a null via PATCH /guilds/{guild_id}/members/{user_id}.
+    ///
+    /// Si le membre n'a pas de timeout actif, Discord accepte quand meme la
+    /// requete (no-op). Un 404 (user pas dans la guild) est tolere comme un
+    /// succes logique — on veut juste qu'il n'y ait plus de timeout actif.
+    pub async fn remove_timeout(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        self.ensure_configured()?;
+
+        let url = format!(
+            "https://discord.com/api/v10/guilds/{}/members/{}",
+            guild_id, user_id
+        );
+
+        let resp = self
+            .client
+            .patch(&url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .json(&serde_json::json!({ "communication_disabled_until": null }))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        let status = resp.status();
+        if !status.is_success() && status.as_u16() != 404 {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord remove_timeout failed ({status}): {body}"
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Phase 2 B — Recupere la liste des guilds auxquelles un user appartient.
     /// Utilise le `access_token` OAuth2 (Bearer) du user, PAS le bot token.
     /// Endpoint Discord : `GET /users/@me/guilds` (scope `identify` ou `guilds`).

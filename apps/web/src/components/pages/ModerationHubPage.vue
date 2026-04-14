@@ -153,15 +153,31 @@ const infractionsColumns: TableColumn[] = [
   { key: "actions", label: "" },
 ];
 
-async function onDeleteInfraction(id: string) {
-  const ok = await confirm({ message: "Annuler cette infraction ? Cette action est irreversible." });
+async function onDeleteInfraction(row: Record<string, unknown>) {
+  const id = row.id as string;
+  const source = (row.source as "detection" | "action" | undefined) ?? "detection";
+  const actionType = String(row.infraction_type ?? "").toLowerCase();
+  const isBan = source === "action" && actionType.startsWith("ban");
+  const isMute = source === "action" && (actionType.startsWith("mute") || actionType === "timeout");
+
+  let message: string;
+  if (isBan) {
+    message = "Annuler ce BAN ? L'utilisateur sera debanni du serveur Discord et la ligne supprimee de la BDD. Cette action est irreversible.";
+  } else if (isMute) {
+    message = "Annuler ce MUTE ? Le timeout sera retire sur Discord et la ligne supprimee de la BDD. Cette action est irreversible.";
+  } else if (source === "action") {
+    message = "Annuler cette action appliquee ? La ligne sera supprimee de la BDD. Cette action est irreversible.";
+  } else {
+    message = "Annuler cette detection ? Elle sera supprimee de la BDD. Cette action est irreversible.";
+  }
+
+  const ok = await confirm({ message });
   if (!ok) return;
   try {
-    await deleteInfraction(id);
-    success("Infraction supprimee avec succes");
+    await deleteInfraction(id, source);
   } catch (e) {
     console.error("Erreur suppression infraction:", e);
-    showError("Erreur lors de la suppression de l'infraction");
+    showError("Erreur lors de la suppression");
   }
 }
 
@@ -427,11 +443,28 @@ async function handleActionSubmit() {
             <span class="user-id">{{ (row as Record<string, unknown>).user_id }}</span>
           </div>
         </template>
-        <template #cell-infraction_type="{ value }">
-          <AppBadge
-            :label="infractionTypeLabel(String(value))"
-            :variant="isDetection(String(value)) ? 'default' : infractionTypeVariant(String(value))"
-          />
+        <template #cell-infraction_type="{ row, value }">
+          <div class="type-cell">
+            <AppBadge
+              :label="infractionTypeLabel(String(value))"
+              :variant="isDetection(String(value)) ? 'default' : infractionTypeVariant(String(value))"
+            />
+            <span
+              v-if="(row as Record<string, unknown>).source === 'detection'
+                    && !isDetection(String(value))"
+              class="source-chip proposal"
+              title="Detection AutoMod : proposition, pas encore appliquee"
+            >
+              Proposition
+            </span>
+            <span
+              v-else-if="(row as Record<string, unknown>).source === 'action'"
+              class="source-chip applied"
+              title="Sanction effectivement appliquee par un moderateur ou un bot"
+            >
+              Applique
+            </span>
+          </div>
         </template>
         <template #cell-created_at="{ value }">
           <span class="mono">{{ fmt(String(value)) }}</span>
@@ -440,8 +473,8 @@ async function handleActionSubmit() {
           <button
             class="cancel-btn"
             :disabled="deleting"
-            title="Annuler cette infraction"
-            @click.stop="onDeleteInfraction((row as Record<string, unknown>).id as string)"
+            title="Annuler cette entree (si ban applique, unban Discord inclus)"
+            @click.stop="onDeleteInfraction(row as Record<string, unknown>)"
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M3 6h18" />
@@ -878,6 +911,36 @@ async function handleActionSubmit() {
   display: flex;
   flex-direction: column;
   gap: 2px;
+}
+
+.type-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.source-chip {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.source-chip.proposal {
+  color: #fee75c;
+  border-color: rgba(254, 231, 92, 0.5);
+  background-color: rgba(254, 231, 92, 0.08);
+}
+
+.source-chip.applied {
+  color: #57f287;
+  border-color: rgba(87, 242, 135, 0.5);
+  background-color: rgba(87, 242, 135, 0.08);
 }
 
 .mono {

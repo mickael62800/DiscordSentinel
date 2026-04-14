@@ -87,6 +87,9 @@ pub struct DashboardInfractionDto {
     pub reason: String,
     pub created_at: String,
     pub moderator: String,
+    /// "detection" = detection automod (propose, non appliquee)
+    /// "action"    = sanction effectivement appliquee (bot ou moderateur)
+    pub source: String,
 }
 
 impl From<Infraction> for DashboardInfractionDto {
@@ -100,6 +103,7 @@ impl From<Infraction> for DashboardInfractionDto {
             reason: inf.reason,
             created_at: inf.created_at.to_rfc3339(),
             moderator: "AutoMod".to_string(),
+            source: "detection".to_string(),
         }
     }
 }
@@ -115,6 +119,7 @@ impl From<crate::domain::entities::ModerationAction> for DashboardInfractionDto 
             reason: action.reason,
             created_at: action.created_at.to_rfc3339(),
             moderator: action.moderator_name,
+            source: "action".to_string(),
         }
     }
 }

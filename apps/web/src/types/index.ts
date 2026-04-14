@@ -81,6 +81,11 @@ export interface Infraction {
   score?: number;
   created_at: string;
   moderator: string;
+  /**
+   * "detection" = proposition automod (table `infractions`).
+   * "action"    = sanction appliquee (table `moderation_actions`).
+   */
+  source?: "detection" | "action";
 }
 
 export interface ConfirmedBan {

@@ -6,7 +6,16 @@ export const infractionsService = {
   getAll(guildId?: string | null): Promise<Infraction[]> {
     return httpGet(`/api/infractions${q({ guild_id: guildId ?? null })}`);
   },
-  remove(id: string): Promise<void> {
+  /**
+   * Supprime une ligne du journal. Selon la source :
+   * - "detection" → DELETE /api/infractions/{id} (table infractions, automod)
+   * - "action"    → DELETE /api/moderation/actions/{id} (table moderation_actions,
+   *                 applique aussi un unban Discord si c'etait un ban)
+   */
+  remove(id: string, source: "detection" | "action" = "detection"): Promise<void> {
+    if (source === "action") {
+      return httpDelete(`/api/moderation/actions/${id}`);
+    }
     return httpDelete(`/api/infractions/${id}`);
   },
   /**
