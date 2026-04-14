@@ -387,17 +387,29 @@ function rolesCount(roles: unknown): number {
           <div v-if="detailTab === 'surveillance'" class="tab-content">
             <div v-if="dossierLoading" class="loading">Chargement...</div>
             <template v-else>
-              <!-- Watch actions -->
+              <!-- Watch actions : utilise isWatched (watchedSet) et non
+                   pas `dossier` qui est toujours rempli apres fetch, meme
+                   pour les non-surveilles. -->
               <div class="watch-actions">
-                <button v-if="!dossier" class="watch-btn add" :disabled="watchAction" @click="toggleWatch">
+                <button
+                  v-if="!isWatched(selectedMember.member.user_id)"
+                  class="watch-btn add"
+                  :disabled="watchAction"
+                  @click="toggleWatch"
+                >
                   + Mettre sous surveillance
                 </button>
-                <button v-else class="watch-btn remove" :disabled="watchAction" @click="unwatch">
+                <button
+                  v-else
+                  class="watch-btn remove"
+                  :disabled="watchAction"
+                  @click="unwatch"
+                >
                   Retirer de la surveillance
                 </button>
               </div>
 
-              <template v-if="dossier">
+              <template v-if="isWatched(selectedMember.member.user_id) && dossier">
                 <!-- Dossier summary -->
                 <div class="dossier-summary">
                   <div class="summary-card">
