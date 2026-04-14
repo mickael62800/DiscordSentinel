@@ -42,16 +42,24 @@ impl EventHandler for Handler {
             data.insert::<GuildIdsKey>(guild_ids);
         }
 
-        if let Err(e) = serenity::model::application::Command::set_global_commands(
-            &ctx.http,
-            commands::all(),
-        )
-        .await
-        {
-            error!(error = %e, "Impossible d'enregistrer les slash commands");
-        } else {
-            info!("Slash commands enregistrees : coude, profil, shop, prime, leaderboard, pari, voler, assurance, train");
+        // Enregistrement per-guild : propagation INSTANTANEE (contrairement
+        // a set_global_commands qui peut prendre jusqu'a 1h). A chaque
+        // redemarrage, la liste est re-ecrasee sur chaque guild connectee.
+        let cmds_count = commands::all().len();
+        for guild in ready.guilds.iter() {
+            if let Err(e) = guild.id.set_commands(&ctx.http, commands::all()).await {
+                error!(
+                    guild_id = %guild.id,
+                    error = %e,
+                    "Impossible d'enregistrer les slash commands pour cette guild"
+                );
+            }
         }
+        info!(
+            count = cmds_count,
+            guilds = ready.guilds.len(),
+            "Slash commands enregistrees per-guild : coude, profil, shop, prime, leaderboard, pari, potion, voler, assurance, train, classe, donner, hp, repos, saison, reset-stats, resume"
+        );
 
         // Daily chaos background task
         let ctx_clone = ctx.clone();
