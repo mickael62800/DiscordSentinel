@@ -6,6 +6,7 @@ use serenity::all::{
 
 use crate::game::classes;
 use crate::game::progression;
+use crate::game::shop;
 use crate::GameApiKey;
 use crate::handler::load_guild_config;
 
@@ -66,6 +67,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    // Inventaire + assurance active (best-effort : une erreur ne bloque pas l'affichage du profil).
+    let inventory = api
+        .get_inventory(&guild_id, &target.id.to_string())
+        .await
+        .unwrap_or_default();
+    let active_insurance = api
+        .get_active_insurance(&guild_id, &target.id.to_string())
+        .await
+        .ok()
+        .flatten();
+
     let class = classes::get_class(player.class.as_deref().unwrap_or("bourrin"));
     let title = progression::title_for_level(player.level);
 
@@ -73,16 +85,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let effective_def = class.base_def + (player.level - 1) * class.def_growth + player.def;
     let hp = progression::display_hp(effective_def);
 
-    let xp_needed = if player.level >= progression::MAX_LEVEL {
-        0
-    } else {
-        progression::xp_for_level(player.level)
-    };
-
     let xp_display = if player.level >= progression::MAX_LEVEL {
         "MAX".to_string()
     } else {
-        format!("{} / {}", player.xp, xp_needed)
+        format!("{} / {}", player.xp, progression::xp_for_level(player.level + 1))
     };
 
     let class_name_cap = {
@@ -93,7 +99,51 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let embed = CreateEmbed::new()
+    // Format inventaire : emoji + nom (x N) par ligne, trie par item_key.
+    let inventory_field = if inventory.is_empty() {
+        "_Aucun objet_".to_string()
+    } else {
+        let mut items = inventory;
+        items.sort_by(|a, b| a.item_key.cmp(&b.item_key));
+        items
+            .iter()
+            .filter(|i| i.quantity > 0)
+            .map(|i| match shop::get_item(&i.item_key) {
+                Some(def) => format!("{} **{}** x{}", def.emoji, def.name, i.quantity),
+                None => format!("\u{2753} {} x{}", i.item_key, i.quantity),
+            })
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    let inventory_field = if inventory_field.is_empty() {
+        "_Aucun objet_".to_string()
+    } else {
+        inventory_field
+    };
+
+    // Format assurance active : duree restante (expires_at est une string
+    // RFC3339, on la parse pour calculer le delta avec now).
+    let insurance_field = active_insurance.and_then(|ins| {
+        chrono::DateTime::parse_from_rfc3339(&ins.expires_at)
+            .ok()
+            .map(|expires| {
+                let remaining = expires
+                    .with_timezone(&chrono::Utc)
+                    .signed_duration_since(chrono::Utc::now());
+                let remaining_str = if remaining.num_days() >= 1 {
+                    format!("{}j {}h", remaining.num_days(), remaining.num_hours() % 24)
+                } else if remaining.num_hours() >= 1 {
+                    format!("{}h {}m", remaining.num_hours(), remaining.num_minutes() % 60)
+                } else if remaining.num_minutes() >= 1 {
+                    format!("{}m", remaining.num_minutes())
+                } else {
+                    "<1m".to_string()
+                };
+                format!("\u{1f6e1}\u{fe0f} Active — expire dans **{}**", remaining_str)
+            })
+    });
+
+    let mut embed = CreateEmbed::new()
         .title(format!(
             "\u{2694}\u{fe0f} {} — {} Niv.{} \u{300c}{}\u{300d}",
             target.name, class_name_cap, player.level, title
@@ -132,8 +182,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             format!("{}", player.total_stolen),
             true,
         )
+        .field("\u{1f3d2} Inventaire", inventory_field, false)
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
+
+    if let Some(ins_text) = insurance_field {
+        embed = embed.field("\u{1f6e1}\u{fe0f} Assurance", ins_text, false);
+    }
 
     if let Err(e) = command
         .create_response(
