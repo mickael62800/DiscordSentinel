@@ -154,14 +154,10 @@ export function useMembers() {
 
   async function removeFromWatch(userId: string) {
     if (!selectedGuildId.value) return;
-    try {
-      await watchedUsersService.remove(selectedGuildId.value, userId);
-      watchedUsers.value = watchedUsers.value.filter((u) => u.user_id !== userId);
-      success("Utilisateur retire de la surveillance.");
-    } catch (e) {
-      console.error("Erreur lors du retrait de la surveillance :", e);
-      showError("Erreur lors du retrait de la surveillance.");
-    }
+    // On laisse l'erreur remonter : le caller (MembersPage.unwatch) affiche
+    // lui-meme le toast de succes/erreur, sinon on avait un double toast.
+    await watchedUsersService.remove(selectedGuildId.value, userId);
+    watchedUsers.value = watchedUsers.value.filter((u) => u.user_id !== userId);
   }
 
   function closeMember() {
