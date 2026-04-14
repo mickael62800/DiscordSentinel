@@ -571,6 +571,11 @@ function backToList() {
   margin: 0 auto 20px;
   max-width: 900px;
   width: 100%;
+  padding: 24px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
 }
 
 .message {
@@ -580,7 +585,7 @@ function backToList() {
 }
 
 .message--user {
-  background-color: var(--bg-card);
+  background-color: var(--bg-primary);
   border: 1px solid var(--border);
   align-self: flex-start;
 }
