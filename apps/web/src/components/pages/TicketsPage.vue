@@ -568,13 +568,15 @@ function backToList() {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  margin-bottom: 20px;
+  margin: 0 auto 20px;
+  max-width: 900px;
+  width: 100%;
 }
 
 .message {
   padding: 16px;
   border-radius: 12px;
-  max-width: 80%;
+  max-width: 75%;
 }
 
 .message--user {
@@ -620,6 +622,9 @@ function backToList() {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .reply-box textarea {
@@ -665,6 +670,9 @@ function backToList() {
   background-color: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 12px;
+  max-width: 900px;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .empty {
