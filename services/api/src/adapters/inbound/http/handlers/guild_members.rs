@@ -7,7 +7,7 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::{GuildMember, MemberSummary};
 use crate::domain::errors::DomainError;
@@ -130,6 +130,191 @@ pub async fn update_member(
 pub struct SyncMembersPayload {
     pub guild_id: String,
     pub members: Vec<GuildMember>,
+}
+
+/// POST /api/members/{guild_id}/{user_id}/reset — nettoie TOUTES les donnees
+/// de moderation d'un membre sur une guild en une seule transaction.
+///
+/// Supprime :
+/// - infractions (table `infractions`)
+/// - actions de moderation (table `moderation_actions`, colonne target_id)
+/// - points de conduite + historique (`user_conduct_points`, `conduct_points_log`)
+/// - strikes (`user_strikes`)
+/// - notes moderateurs (`user_notes`)
+/// - surveillance manuelle (`manual_watched_users`)
+/// - rappels de sanction (`sanction_reminders`, par target_id)
+///
+/// **Operation irreversible**, gatee derriere `Role::Admin` + bypass superadmin.
+/// Tout se fait dans une transaction atomique : en cas d'erreur sur un DELETE,
+/// on rollback et on retourne l'erreur — l'etat DB reste coherent.
+pub async fn reset_member(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Admin,
+        "admin+ requis pour reinitialiser un membre",
+    )
+    .await?;
+
+    let mut tx = state
+        .pg_pool
+        .begin()
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("begin tx reset: {e}"))))?;
+
+    // Helper pour exec un DELETE et renvoyer rows_affected.
+    async fn del(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        sql: &str,
+        guild_id: &str,
+        user_id: &str,
+        tag: &str,
+    ) -> Result<u64, ApiError> {
+        let res = sqlx::query(sql)
+            .bind(guild_id)
+            .bind(user_id)
+            .execute(&mut **tx)
+            .await
+            .map_err(|e| ApiError(DomainError::Internal(format!("reset_member {tag}: {e}"))))?;
+        Ok(res.rows_affected())
+    }
+
+    let mut totals = serde_json::Map::new();
+
+    totals.insert(
+        "infractions".into(),
+        del(
+            &mut tx,
+            "DELETE FROM infractions WHERE guild_id = $1 AND user_id = $2",
+            &guild_id,
+            &user_id,
+            "infractions",
+        )
+        .await?
+        .into(),
+    );
+
+    totals.insert(
+        "moderation_actions".into(),
+        del(
+            &mut tx,
+            "DELETE FROM moderation_actions WHERE guild_id = $1 AND target_id = $2",
+            &guild_id,
+            &user_id,
+            "moderation_actions",
+        )
+        .await?
+        .into(),
+    );
+
+    totals.insert(
+        "conduct_points".into(),
+        del(
+            &mut tx,
+            "DELETE FROM user_conduct_points WHERE guild_id = $1 AND user_id = $2",
+            &guild_id,
+            &user_id,
+            "user_conduct_points",
+        )
+        .await?
+        .into(),
+    );
+
+    totals.insert(
+        "conduct_log".into(),
+        del(
+            &mut tx,
+            "DELETE FROM conduct_points_log WHERE guild_id = $1 AND user_id = $2",
+            &guild_id,
+            &user_id,
+            "conduct_points_log",
+        )
+        .await?
+        .into(),
+    );
+
+    totals.insert(
+        "strikes".into(),
+        del(
+            &mut tx,
+            "DELETE FROM user_strikes WHERE guild_id = $1 AND user_id = $2",
+            &guild_id,
+            &user_id,
+            "user_strikes",
+        )
+        .await?
+        .into(),
+    );
+
+    totals.insert(
+        "notes".into(),
+        del(
+            &mut tx,
+            "DELETE FROM user_notes WHERE guild_id = $1 AND user_id = $2",
+            &guild_id,
+            &user_id,
+            "user_notes",
+        )
+        .await?
+        .into(),
+    );
+
+    totals.insert(
+        "manual_watched".into(),
+        del(
+            &mut tx,
+            "DELETE FROM manual_watched_users WHERE guild_id = $1 AND user_id = $2",
+            &guild_id,
+            &user_id,
+            "manual_watched_users",
+        )
+        .await?
+        .into(),
+    );
+
+    totals.insert(
+        "sanction_reminders".into(),
+        del(
+            &mut tx,
+            "DELETE FROM sanction_reminders WHERE guild_id = $1 AND target_id = $2",
+            &guild_id,
+            &user_id,
+            "sanction_reminders",
+        )
+        .await?
+        .into(),
+    );
+
+    tx.commit()
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("commit tx reset: {e}"))))?;
+
+    tracing::info!(
+        guild_id = %guild_id,
+        user_id = %user_id,
+        "reset_member effectue"
+    );
+
+    state.broadcaster.broadcast(
+        "member_reset",
+        serde_json::json!({
+            "guild_id": &guild_id,
+            "user_id": &user_id,
+            "totals": &totals,
+        }),
+    );
+
+    Ok(Json(serde_json::json!({
+        "status": "ok",
+        "guild_id": guild_id,
+        "user_id": user_id,
+        "totals": totals,
+    })))
 }
 
 #[derive(Deserialize)]

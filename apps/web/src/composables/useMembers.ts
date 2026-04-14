@@ -160,6 +160,14 @@ export function useMembers() {
     watchedUsers.value = watchedUsers.value.filter((u) => u.user_id !== userId);
   }
 
+  async function resetMember(userId: string): Promise<Record<string, number>> {
+    if (!selectedGuildId.value) throw new Error("Aucun serveur selectionne");
+    const result = await membersService.resetMember(selectedGuildId.value, userId);
+    // Refresh interne : retire du watchedSet si present.
+    watchedUsers.value = watchedUsers.value.filter((u) => u.user_id !== userId);
+    return result.totals;
+  }
+
   function closeMember() {
     selectedMember.value = null;
     dossier.value = null;
@@ -174,6 +182,6 @@ export function useMembers() {
     dossier, dossierLoading,
     isWatched,
     fetchMembers, fetchConductConfig, selectMember, fetchConductDetail,
-    adjustPoints, fetchDossier, addToWatch, removeFromWatch, closeMember,
+    adjustPoints, fetchDossier, addToWatch, removeFromWatch, resetMember, closeMember,
   };
 }

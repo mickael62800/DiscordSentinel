@@ -38,6 +38,7 @@ const {
   fetchDossier,
   addToWatch,
   removeFromWatch,
+  resetMember,
   closeMember,
 } = useMembers();
 
@@ -136,6 +137,55 @@ async function unwatch() {
     showError("Erreur lors du retrait de la surveillance");
   } finally {
     watchAction.value = false;
+  }
+}
+
+const resetting = ref(false);
+
+async function handleReset() {
+  if (!selectedMember.value) return;
+  const member = selectedMember.value.member;
+  const username = member.display_name || member.username;
+  const ok1 = await confirmDialog({
+    title: "⚠️ Reinitialiser tout",
+    message:
+      `Supprimer DEFINITIVEMENT toutes les donnees de moderation pour ${username} ?\n\n` +
+      "Cela efface :\n" +
+      "• Infractions\n" +
+      "• Actions de moderation (warns/mutes/bans)\n" +
+      "• Points de conduite + historique\n" +
+      "• Strikes\n" +
+      "• Notes moderateurs\n" +
+      "• Surveillance\n" +
+      "• Rappels de sanction\n\n" +
+      "Cette action est IRREVERSIBLE.",
+  });
+  if (!ok1) return;
+  const ok2 = await confirmDialog({
+    title: "Derniere confirmation",
+    message: `Vraiment reinitialiser ${username} ? Tape OK pour confirmer.`,
+  });
+  if (!ok2) return;
+  resetting.value = true;
+  try {
+    const totals = await resetMember(member.user_id);
+    const summary = Object.entries(totals)
+      .filter(([, n]) => n > 0)
+      .map(([k, n]) => `${k}: ${n}`)
+      .join(", ");
+    success(`Membre reinitialise (${summary || "rien a supprimer"}).`);
+    // Refresh du membre affiche + du dossier.
+    await selectMember(member.user_id);
+    if (detailTab.value === "surveillance") {
+      await fetchDossier(member.user_id);
+    } else if (detailTab.value === "conduite") {
+      await fetchConductDetail(member.user_id);
+    }
+  } catch (e) {
+    console.error("Erreur reset membre:", e);
+    showError("Erreur lors de la reinitialisation du membre");
+  } finally {
+    resetting.value = false;
   }
 }
 
@@ -246,6 +296,14 @@ function rolesCount(roles: unknown): number {
             @click="unwatch"
           >
             Retirer surveillance
+          </button>
+          <button
+            class="reset-top-btn"
+            :disabled="resetting"
+            title="Supprimer toutes les donnees de moderation de ce membre (irreversible)"
+            @click="handleReset"
+          >
+            {{ resetting ? "Nettoyage…" : "Tout reinitialiser" }}
           </button>
           <button class="close-btn" @click="closeMember">&times;</button>
         </div>
@@ -721,6 +779,29 @@ function rolesCount(roles: unknown): number {
 }
 
 .watch-top-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.reset-top-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--danger);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.reset-top-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.reset-top-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
 }
