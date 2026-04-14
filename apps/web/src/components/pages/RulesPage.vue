@@ -58,19 +58,20 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 
 .rules-grid {
   display: grid;
-  /* Pas d'auto-fill (qui pouvait tomber a 5-6 colonnes ecrasees) :
-     max 3 cols sur ecrans larges, 2 au milieu, 1 en mobile. */
+  /* 3 cols au-dessus de 1600px, 2 cols au milieu, 1 en mobile.
+     Avant : breakpoint 1300px qui laissait 3 cols tasses de 1300 a
+     1810px, ce qui ecrasait les cartes sur la plupart des laptops. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 
-@media (max-width: 1300px) {
+@media (max-width: 1600px) {
   .rules-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@media (max-width: 780px) {
+@media (max-width: 900px) {
   .rules-grid {
     grid-template-columns: 1fr;
   }

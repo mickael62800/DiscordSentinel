@@ -233,18 +233,25 @@ function handleReset() {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .rule-title {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .rule-title h3 {
   font-size: 16px;
   font-weight: 600;
   margin: 0;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .rule-description {
@@ -340,11 +347,14 @@ function handleReset() {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .actions {
   display: inline-flex;
   gap: 6px;
+  flex-wrap: wrap;
 }
 
 .save-btn {
