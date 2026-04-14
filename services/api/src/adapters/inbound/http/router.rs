@@ -50,6 +50,8 @@ fn build_cors(allowed_origins: &str) -> CorsLayer {
             header::CONTENT_TYPE,
             header::AUTHORIZATION,
             header::HeaderName::from_static("x-request-id"),
+            header::HeaderName::from_static("x-discord-token"),
+            header::HeaderName::from_static("x-api-key"),
         ])
         .max_age(std::time::Duration::from_secs(3600))
 }
