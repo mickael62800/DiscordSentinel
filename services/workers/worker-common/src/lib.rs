@@ -87,24 +87,48 @@ pub async fn send_lifecycle_log(api_url: &str, worker_name: &str, level: &str, m
 // ── Heartbeat ──
 
 /// Demarre un heartbeat periodique vers l'API.
+///
+/// La route `/api/bots/heartbeat` cote API est protegee par l'auth_middleware,
+/// on doit donc envoyer l'`API_KEY` en header `Authorization: Bearer` — sinon
+/// l'API retourne 401 silencieusement (reqwest::send() considere un 401 comme
+/// un succes reseau, donc le worker ne log meme pas l'erreur). L'API_KEY est
+/// lue depuis l'env au demarrage du heartbeat.
 pub fn start_heartbeat(api_url: String, worker_name: &'static str) {
     let interval: u64 = std::env::var("HEARTBEAT_INTERVAL")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(DEFAULT_HEARTBEAT_INTERVAL_SECS);
 
+    let api_key = std::env::var("API_KEY").unwrap_or_default();
+    if api_key.is_empty() {
+        warn!(
+            worker = worker_name,
+            "API_KEY non definie — les heartbeats seront rejetes avec 401"
+        );
+    }
+
     tokio::spawn(async move {
         let client = reqwest::Client::new();
         let url = format!("{}/api/bots/heartbeat", api_url);
 
         loop {
-            if let Err(e) = client
+            let req = client
                 .post(&url)
-                .json(&serde_json::json!({ "name": worker_name }))
-                .send()
-                .await
-            {
-                warn!(error = %e, worker = worker_name, "Heartbeat echoue");
+                .bearer_auth(&api_key)
+                .json(&serde_json::json!({ "name": worker_name }));
+
+            match req.send().await {
+                Ok(resp) if resp.status().is_success() => {}
+                Ok(resp) => {
+                    warn!(
+                        status = %resp.status(),
+                        worker = worker_name,
+                        "Heartbeat rejete par l'API"
+                    );
+                }
+                Err(e) => {
+                    warn!(error = %e, worker = worker_name, "Heartbeat echoue");
+                }
             }
 
             tokio::time::sleep(Duration::from_secs(interval)).await;

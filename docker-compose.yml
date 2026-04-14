@@ -195,6 +195,7 @@ services:
       # Phase 4 B — Redis requis pour publier les events sanction_expiry_reminder
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
       postgres:
@@ -211,6 +212,7 @@ services:
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       RUST_LOG: info
     depends_on:
       postgres:
@@ -225,6 +227,7 @@ services:
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       MONITOR_CHECK_INTERVAL: ${MONITOR_CHECK_INTERVAL:-30}
       RUST_LOG: info
     depends_on:
@@ -241,6 +244,7 @@ services:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       ANALYTICS_CACHE_REFRESH: ${ANALYTICS_CACHE_REFRESH:-300}
       DASHBOARD_CACHE_REFRESH: ${DASHBOARD_CACHE_REFRESH:-600}
       VOICE_STATS_CACHE_REFRESH: ${VOICE_STATS_CACHE_REFRESH:-3600}
@@ -283,6 +287,7 @@ services:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       TEMP_ROLES_SCAN_INTERVAL: ${TEMP_ROLES_SCAN_INTERVAL:-60}
       RUST_LOG: info
     depends_on:
@@ -302,6 +307,7 @@ services:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       APPEAL_SLA_SCAN_INTERVAL: ${APPEAL_SLA_SCAN_INTERVAL:-120}
       RUST_LOG: info
     depends_on:
@@ -320,6 +326,7 @@ services:
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       EXPORT_SCAN_INTERVAL: ${EXPORT_SCAN_INTERVAL:-5}
       RUST_LOG: info
     depends_on:
@@ -337,6 +344,7 @@ services:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       AUDIT_CACHE_REFRESH_INTERVAL: ${AUDIT_CACHE_REFRESH_INTERVAL:-60}
       RUST_LOG: info
     depends_on:
@@ -356,6 +364,7 @@ services:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       BLACKJACK_CLEANUP_SCAN_INTERVAL: ${BLACKJACK_CLEANUP_SCAN_INTERVAL:-60}
       RUST_LOG: info
     depends_on:
@@ -374,6 +383,7 @@ services:
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       # Reutilise le token moderation-bot (doit avoir VIEW_AUDIT_LOG sur toutes
       # les guilds a sync)
       MODERATION_DISCORD_TOKEN: ${MODERATION_DISCORD_TOKEN:-}
@@ -392,6 +402,7 @@ services:
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       VOICE_SESSIONS_RETENTION_DAYS: ${VOICE_SESSIONS_RETENTION_DAYS:-90}
       LOGS_RETENTION_DAYS: ${LOGS_RETENTION_DAYS:-30}
       CLOSED_TICKETS_RETENTION_DAYS: ${CLOSED_TICKETS_RETENTION_DAYS:-180}
@@ -691,6 +702,7 @@ services:
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
+      API_KEY: ${API_KEY:-}
       COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
       BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
       COUDE_DISCORD_TOKEN: ${COUDE_DISCORD_TOKEN}
