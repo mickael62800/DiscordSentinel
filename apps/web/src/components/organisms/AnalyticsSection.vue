@@ -1,45 +1,25 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { useAnalytics } from "../../composables/useAnalytics";
+import { computed, toRef } from "vue";
+import { useAnalytics } from "@/composables/useAnalytics";
 import ErrorState from "../atoms/ErrorState.vue";
 import { Line, Bar, Doughnut } from "vue-chartjs";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from "chart.js";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
+const props = defineProps<{ days: number }>();
+const daysRef = toRef(props, "days");
+
+const { analytics, loading, error, fetchAnalytics } = useAnalytics(
+  computed({
+    get: () => daysRef.value,
+    set: () => {},
+  }),
 );
 
-const { analytics, loading, error, days, fetchAnalytics } = useAnalytics();
+defineExpose({ refresh: fetchAnalytics });
 
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      labels: { color: "#9495b0", font: { size: 11 } },
-    },
-  },
+  plugins: { legend: { labels: { color: "#9495b0", font: { size: 11 } } } },
   scales: {
     x: {
       ticks: { color: "#9495b0", font: { size: 10 } },
@@ -53,7 +33,6 @@ const chartOptions = {
   },
 };
 
-// ── Moderation Trend (Line) ──
 const trendData = computed(() => {
   if (!analytics.value) return null;
   const t = analytics.value.moderation_trend;
@@ -63,15 +42,14 @@ const trendData = computed(() => {
       return `${date.getDate()}/${date.getMonth() + 1}`;
     }),
     datasets: [
-      { label: "Avertissements", data: t.map((d) => d.warns), borderColor: "#5bc0eb", backgroundColor: "var(--info-bg)", fill: true, tension: 0.3 },
-      { label: "Suppressions", data: t.map((d) => d.deletes), borderColor: "#ffa500", backgroundColor: "rgba(255,165,0,0.1)", fill: true, tension: 0.3 },
-      { label: "Sourdines", data: t.map((d) => d.mutes), borderColor: "#fee75c", backgroundColor: "var(--warning-bg)", fill: true, tension: 0.3 },
-      { label: "Bannissements", data: t.map((d) => d.bans), borderColor: "#ed4245", backgroundColor: "var(--danger-bg)", fill: true, tension: 0.3 },
+      { label: "Avertissements", data: t.map((d) => d.warns), borderColor: "#5bc0eb", backgroundColor: "rgba(91, 192, 235, 0.15)", fill: true, tension: 0.3 },
+      { label: "Suppressions", data: t.map((d) => d.deletes), borderColor: "#ffa500", backgroundColor: "rgba(255, 165, 0, 0.15)", fill: true, tension: 0.3 },
+      { label: "Sourdines", data: t.map((d) => d.mutes), borderColor: "#fee75c", backgroundColor: "rgba(254, 231, 92, 0.15)", fill: true, tension: 0.3 },
+      { label: "Bannissements", data: t.map((d) => d.bans), borderColor: "#ed4245", backgroundColor: "rgba(237, 66, 69, 0.15)", fill: true, tension: 0.3 },
     ],
   };
 });
 
-// ── Action Distribution (Doughnut) ──
 const actionColors: Record<string, string> = {
   warn: "#5bc0eb",
   delete: "#ffa500",
@@ -84,11 +62,13 @@ const distributionData = computed(() => {
   const d = analytics.value.action_distribution;
   return {
     labels: d.map((a) => a.action),
-    datasets: [{
-      data: d.map((a) => a.count),
-      backgroundColor: d.map((a) => actionColors[a.action] || "#888"),
-      borderWidth: 0,
-    }],
+    datasets: [
+      {
+        data: d.map((a) => a.count),
+        backgroundColor: d.map((a) => actionColors[a.action] || "#888"),
+        borderWidth: 0,
+      },
+    ],
   };
 });
 
@@ -103,7 +83,6 @@ const doughnutOptions = {
   },
 };
 
-// ── Top Infractors (Horizontal Bar) ──
 const topInfractorsData = computed(() => {
   if (!analytics.value) return null;
   const t = analytics.value.top_infractors;
@@ -131,37 +110,61 @@ const stackedBarOptions = {
   },
 };
 
-// ── Peak Hours (Bar) ──
 const peakHoursData = computed(() => {
   if (!analytics.value) return null;
   const p = [...analytics.value.peak_hours].sort((a, b) => a.hour - b.hour);
   return {
     labels: p.map((h) => h.label),
     datasets: [
-      {
-        label: "Messages (moy.)",
-        data: p.map((h) => h.avg_messages),
-        backgroundColor: "rgba(88, 101, 242, 0.7)",
-      },
-      {
-        label: "Infractions (moy.)",
-        data: p.map((h) => h.avg_infractions),
-        backgroundColor: "rgba(237, 66, 69, 0.7)",
-      },
+      { label: "Messages (moy.)", data: p.map((h) => h.avg_messages), backgroundColor: "rgba(88, 101, 242, 0.7)" },
+      { label: "Infractions (moy.)", data: p.map((h) => h.avg_infractions), backgroundColor: "rgba(237, 66, 69, 0.7)" },
     ],
   };
 });
 
-// ── Heatmap (rendered as table) ──
+// ── Infractions par jour de la semaine (Bar empile) ──
+// Agrege les warns/mutes/bans de moderation_trend par jour de la semaine.
+// Complement naturel de la heatmap d'activite : l'une montre quand les gens
+// parlent, l'autre quel jour genere le plus de moderation.
+const weekdayInfractionsData = computed(() => {
+  if (!analytics.value) return null;
+  const dayNames = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+  const warnSums = [0, 0, 0, 0, 0, 0, 0];
+  const muteSums = [0, 0, 0, 0, 0, 0, 0];
+  const banSums = [0, 0, 0, 0, 0, 0, 0];
+  for (const t of analytics.value.moderation_trend) {
+    const d = new Date(t.day).getDay();
+    warnSums[d] += t.warns;
+    muteSums[d] += t.mutes;
+    banSums[d] += t.bans;
+  }
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return {
+    labels: order.map((i) => dayNames[i]),
+    datasets: [
+      { label: "Avertissements", data: order.map((i) => warnSums[i]), backgroundColor: "#5bc0eb" },
+      { label: "Sourdines", data: order.map((i) => muteSums[i]), backgroundColor: "#fee75c" },
+      { label: "Bannissements", data: order.map((i) => banSums[i]), backgroundColor: "#ed4245" },
+    ],
+  };
+});
+
+const weekdayBarOptions = {
+  ...chartOptions,
+  scales: {
+    x: { ...chartOptions.scales.x, stacked: true },
+    y: { ...chartOptions.scales.y, stacked: true },
+  },
+};
+
 const heatmapGrid = computed(() => {
   if (!analytics.value) return null;
   const points = analytics.value.heatmap;
   if (points.length === 0) return null;
 
-  const dayNames = ["Lundi", "Mardi", "Mercredi", "Jeudi", "Vendredi", "Samedi", "Dimanche"];
+  const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   const hours = Array.from({ length: 24 }, (_, i) => i);
 
-  // Build lookup
   const lookup = new Map<string, number>();
   let maxVal = 1;
   for (const p of points) {
@@ -181,30 +184,20 @@ function heatColor(value: number, max: number): string {
 </script>
 
 <template>
-  <div class="analytics-page">
-    <div class="analytics-header">
-      <h1>Analytics</h1>
-      <div class="period-selector">
-        <button :class="['period-btn', { active: days === 7 }]" @click="days = 7">7j</button>
-        <button :class="['period-btn', { active: days === 14 }]" @click="days = 14">14j</button>
-        <button :class="['period-btn', { active: days === 30 }]" @click="days = 30">30j</button>
-        <button :class="['period-btn', { active: days === 90 }]" @click="days = 90">90j</button>
-      </div>
-    </div>
+  <section class="dash-section">
+    <h2 class="section-title">Analytics de moderation</h2>
 
     <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchAnalytics" />
     <div v-else-if="loading" class="loading">Chargement des analytics...</div>
 
     <div v-else-if="analytics" class="analytics-grid">
-      <!-- Moderation Trend -->
-      <div class="chart-card chart-card--wide">
+      <div class="chart-card">
         <h3>Tendance de moderation</h3>
         <div class="chart-container">
           <Line v-if="trendData" :data="trendData" :options="chartOptions" />
         </div>
       </div>
 
-      <!-- Action Distribution -->
       <div class="chart-card">
         <h3>Repartition des actions</h3>
         <div class="chart-container chart-container--small">
@@ -220,7 +213,6 @@ function heatColor(value: number, max: number): string {
         </div>
       </div>
 
-      <!-- Top Infractors -->
       <div class="chart-card">
         <h3>Top infracteurs</h3>
         <div class="chart-container">
@@ -228,16 +220,14 @@ function heatColor(value: number, max: number): string {
         </div>
       </div>
 
-      <!-- Peak Hours -->
-      <div class="chart-card chart-card--wide">
+      <div class="chart-card">
         <h3>Activite par heure</h3>
         <div class="chart-container">
           <Bar v-if="peakHoursData" :data="peakHoursData" :options="chartOptions" />
         </div>
       </div>
 
-      <!-- Heatmap -->
-      <div v-if="heatmapGrid" class="chart-card chart-card--wide">
+      <div v-if="heatmapGrid" class="chart-card">
         <h3>Heatmap activite (messages)</h3>
         <div class="heatmap-wrapper">
           <table class="heatmap-table">
@@ -262,54 +252,33 @@ function heatColor(value: number, max: number): string {
           </table>
         </div>
       </div>
+
+      <div class="chart-card">
+        <h3>Infractions par jour de la semaine</h3>
+        <div class="chart-container">
+          <Bar v-if="weekdayInfractionsData" :data="weekdayInfractionsData" :options="weekdayBarOptions" />
+        </div>
+      </div>
     </div>
 
     <div v-else class="empty">Pas de donnees analytics disponibles.</div>
-  </div>
+  </section>
 </template>
 
 <style scoped>
-.analytics-page {
-  padding: 0;
+.dash-section {
+  margin-bottom: 32px;
 }
 
-.analytics-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-}
-
-.analytics-header h1 {
-  margin: 0;
-}
-
-.period-selector {
-  display: flex;
-  gap: 4px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px;
-}
-
-.period-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  background: none;
+.section-title {
+  font-size: 14px;
+  font-weight: 700;
   color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.period-btn.active {
-  background-color: var(--accent);
-  color: white;
-}
-
-.period-btn:hover:not(.active) {
-  background-color: var(--bg-hover);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 14px 2px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
 }
 
 .analytics-grid {
@@ -325,9 +294,7 @@ function heatColor(value: number, max: number): string {
   padding: 20px;
 }
 
-.chart-card--wide {
-  grid-column: 1 / -1;
-}
+.chart-card--wide { grid-column: 1 / -1; }
 
 .chart-card h3 {
   font-size: 13px;
@@ -349,7 +316,6 @@ function heatColor(value: number, max: number): string {
   margin: 0 auto;
 }
 
-/* Distribution details */
 .distribution-details {
   margin-top: 16px;
   display: flex;
@@ -387,41 +353,42 @@ function heatColor(value: number, max: number): string {
   text-align: right;
 }
 
-/* Heatmap table */
-.heatmap-wrapper {
-  overflow-x: auto;
-}
+.heatmap-wrapper { width: 100%; }
 
 .heatmap-table {
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 2px;
   width: 100%;
+  /* fixed layout : la premiere ligne dicte les largeurs de colonne,
+     le reste de la table s'aligne dessus. Sans ca, les cellules vides
+     restent a leur taille minimum et la table ne remplit pas la carte. */
+  table-layout: fixed;
 }
 
 .heatmap-hour {
-  font-size: 10px;
+  font-size: 9px;
   color: var(--text-secondary);
-  padding: 2px 0;
+  padding: 1px 0;
   text-align: center;
-  min-width: 28px;
 }
 
 .heatmap-day {
   font-size: 11px;
   color: var(--text-secondary);
-  padding-right: 8px;
+  padding-right: 6px;
   white-space: nowrap;
   text-align: right;
+  width: 36px;
 }
 
 .heatmap-cell {
-  width: 28px;
-  height: 22px;
+  height: 24px;
   border-radius: 3px;
-  border: 1px solid var(--bg-card);
   cursor: default;
 }
 
-.loading, .empty {
+.loading,
+.empty {
   color: var(--text-secondary);
   padding: 40px;
   text-align: center;

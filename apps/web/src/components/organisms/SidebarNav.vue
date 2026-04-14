@@ -18,7 +18,6 @@ const { guilds, selectedGuildId, fetchGuilds, selectGuild } = useGuildSelector()
 
 const generalItems = [
   { path: "/", label: "Tableau de bord", icon: "grid" },
-  { path: "/analytics", label: "Analytiques", icon: "trending-up" },
 ];
 
 const moderationItems = [

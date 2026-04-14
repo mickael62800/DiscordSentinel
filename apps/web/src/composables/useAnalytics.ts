@@ -1,16 +1,19 @@
-import { ref, watch } from "vue";
+import { ref, watch, type Ref } from "vue";
 import type { FullAnalytics } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
-import { useRealtimeRefresh } from "./useRealtimeRefresh";
 import { useToast } from "./useToast";
 import { analyticsService } from "@/services/analyticsService";
 
-export function useAnalytics() {
+/**
+ * Si `externalDays` est fourni, utilise ce ref comme source unique
+ * (partage avec d'autres sections). Sinon, ref interne.
+ */
+export function useAnalytics(externalDays?: Ref<number>) {
   const { error: showError } = useToast();
   const analytics = ref<FullAnalytics | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
-  const days = ref(30);
+  const days = externalDays ?? ref(30);
   const { guildIdFilter } = useGuildSelector();
 
   async function fetchAnalytics() {
@@ -28,12 +31,6 @@ export function useAnalytics() {
   }
 
   watch([guildIdFilter, days], fetchAnalytics, { immediate: true });
-
-  useRealtimeRefresh(
-    ["infraction_new", "moderation_action"],
-    fetchAnalytics,
-    { debounceMs: 10000 },
-  );
 
   return { analytics, loading, error, days, fetchAnalytics };
 }
