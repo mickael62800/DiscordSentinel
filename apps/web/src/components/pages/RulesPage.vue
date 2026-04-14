@@ -58,8 +58,9 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
 
 .rules-grid {
   display: grid;
-  /* 3 cols uniquement sur tres grands ecrans (>=1900px), sinon 2 cols.
-     En dessous de 900px, 1 col. */
+  /* 3 cols >=1900px, 2 cols 1400-1900px, 1 col <1400px.
+     Les cartes contiennent un formulaire dense (5 sliders + labels),
+     en dessous de 700px de largeur effective ca devient illisible. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
@@ -70,7 +71,7 @@ async function handleToggle(rule: Parameters<typeof toggleRule>[0]) {
   }
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1400px) {
   .rules-grid {
     grid-template-columns: 1fr;
   }
