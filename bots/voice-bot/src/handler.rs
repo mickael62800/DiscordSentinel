@@ -8,7 +8,7 @@ use serenity::model::gateway::Ready;
 use serenity::model::id::ChannelId;
 use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
-use tracing::info;
+use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
@@ -68,6 +68,100 @@ impl TypeMapKey for SessionCardKey {
     type Value = Arc<DashMap<ChannelId, crate::session_card::SessionCard>>;
 }
 
+/// Au demarrage du bot, recharge les salons vocaux ouverts depuis la
+/// DB et verifie leur existence cote Discord :
+/// - Si le salon existe toujours → repopule les maps locales
+///   (`VoiceOwnerMapKey`, `TextToVoiceMapKey`, `MembersToVoiceMapKey`)
+///   pour que `check_and_delete_empty` puisse a nouveau les detecter
+///   comme "temp".
+/// - Si le salon n'existe plus (404 Discord) → appelle l'API pour le
+///   marquer `closed` en BDD (nettoyage des fantomes laisses par un
+///   crash ou un redemarrage).
+async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
+    // Collecter toutes les refs dont on a besoin en un seul lock read.
+    let (api, voice_owner, text_to_voice, members_to_voice) = {
+        let data = ctx.data.read().await;
+        let api = match crate::api_client::ApiClient::from_data(&data) {
+            Some(a) => a,
+            None => {
+                warn!("reconcile_voice_channels: ApiClient absent, skip");
+                return;
+            }
+        };
+        let voice_owner: Option<Arc<DashMap<ChannelId, serenity::model::id::UserId>>> =
+            data.get::<VoiceOwnerMapKey>().cloned();
+        let text_to_voice: Option<Arc<DashMap<ChannelId, ChannelId>>> =
+            data.get::<TextToVoiceMapKey>().cloned();
+        let members_to_voice: Option<Arc<DashMap<ChannelId, ChannelId>>> =
+            data.get::<MembersToVoiceMapKey>().cloned();
+        (api, voice_owner, text_to_voice, members_to_voice)
+    };
+
+    let mut reloaded = 0usize;
+    let mut ghosts_closed = 0usize;
+
+    for guild in &ready.guilds {
+        let guild_id_str = guild.id.to_string();
+        let channels = match api.list_channels(&guild_id_str).await {
+            Ok(list) => list,
+            Err(e) => {
+                warn!(error = %e, guild_id = %guild_id_str, "reconcile: echec list_channels");
+                continue;
+            }
+        };
+
+        for ch in channels {
+            let voice_cid = match ch.channel_id.parse::<u64>() {
+                Ok(n) => ChannelId::new(n),
+                Err(_) => continue,
+            };
+
+            // Verifier l'existence du salon cote Discord (404 = fantome).
+            let exists = voice_cid.to_channel(&ctx.http).await.is_ok();
+            if !exists {
+                if let Err(e) = api.delete_channel(&ch.channel_id).await {
+                    warn!(
+                        error = %e,
+                        channel_id = %ch.channel_id,
+                        "reconcile: echec close_channel fantome"
+                    );
+                } else {
+                    ghosts_closed += 1;
+                }
+                continue;
+            }
+
+            // Le salon existe → repopuler les maps locales.
+            if let Some(ref map) = voice_owner {
+                if let Ok(owner_id) = ch.owner_id.parse::<u64>() {
+                    map.insert(voice_cid, serenity::model::id::UserId::new(owner_id));
+                }
+            }
+            if let Some(ref map) = text_to_voice {
+                if let Some(text_id_str) = ch.text_channel_id.as_deref() {
+                    if let Ok(n) = text_id_str.parse::<u64>() {
+                        map.insert(ChannelId::new(n), voice_cid);
+                    }
+                }
+            }
+            if let Some(ref map) = members_to_voice {
+                if let Some(members_id_str) = ch.members_channel_id.as_deref() {
+                    if let Ok(n) = members_id_str.parse::<u64>() {
+                        map.insert(ChannelId::new(n), voice_cid);
+                    }
+                }
+            }
+            reloaded += 1;
+        }
+    }
+
+    info!(
+        reloaded,
+        ghosts_closed,
+        "reconcile_voice_channels termine"
+    );
+}
+
 pub struct Handler;
 
 #[async_trait]
@@ -75,6 +169,11 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         info!(bot = %ready.user.name, "Voice bot connecte");
         register_guilds(&ctx, &ready).await;
+
+        // Reconciliation des salons vocaux : recharger la map locale
+        // depuis la DB et fermer les lignes dont le salon Discord
+        // n'existe plus (fantomes laisses par un crash / redemarrage).
+        reconcile_voice_channels(&ctx, &ready).await;
 
         // Lancer le sweep AFK en arriere-plan
         crate::tasks::spawn_afk_sweep(ctx.clone());
