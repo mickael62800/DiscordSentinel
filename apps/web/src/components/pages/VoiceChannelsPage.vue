@@ -3,17 +3,53 @@ import { ref } from "vue";
 import { useVoiceChannels, useVoiceChannelDetail } from "../../composables/useVoiceChannels";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
+import { useConfirm } from "../../composables/useConfirm";
 import AppBadge from "../atoms/AppBadge.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
 
 const { formatShortDateTime: fmt } = useFormatDate();
+const { confirm: confirmDialog } = useConfirm();
 
-const { filteredChannels, loading, error, filterKind, publicCount, privateCount, totalCount, fetchChannels } = useVoiceChannels();
+const {
+  filteredChannels,
+  loading,
+  error,
+  filterKind,
+  publicCount,
+  privateCount,
+  totalCount,
+  closing,
+  cleaningAll,
+  fetchChannels,
+  closeChannel,
+  closeAllDisplayed,
+} = useVoiceChannels();
 useRealtimeRefresh(["voice_channel_created", "voice_channel_closed", "voice_channel_updated", "voice_invite_created", "voice_invite_used", "voice_invite_revoked"], fetchChannels);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
 const { detail, loading: detailLoading, fetchDetail } = useVoiceChannelDetail();
+
+async function handleCloseChannel(channelId: string, channelName: string) {
+  const ok = await confirmDialog({
+    title: "Fermer le salon",
+    message: `Fermer "${channelName}" ?\n\nLa ligne sera marquee comme fermee en BDD et ne s'affichera plus ici. Aucune action cote Discord.`,
+  });
+  if (!ok) return;
+  await closeChannel(channelId);
+}
+
+async function handleCleanupAll() {
+  const ok = await confirmDialog({
+    title: "Nettoyer tous les salons affiches",
+    message:
+      `Fermer ${filteredChannels.value.length} salon(s) actuellement affiches ?\n\n` +
+      "Utile pour nettoyer les lignes fantomes laissees par un bot qui a crash " +
+      "ou redemarre. Aucune action cote Discord, uniquement en BDD.",
+  });
+  if (!ok) return;
+  await closeAllDisplayed();
+}
 
 const selectedId = ref<string | null>(null);
 
@@ -103,6 +139,15 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           <option value="public">Public</option>
           <option value="private">Prive</option>
         </select>
+        <button
+          v-if="filteredChannels.length > 0"
+          class="cleanup-btn"
+          :disabled="cleaningAll"
+          title="Ferme tous les salons affiches en BDD (nettoyage des fantomes)"
+          @click="handleCleanupAll"
+        >
+          {{ cleaningAll ? "Nettoyage…" : `Nettoyer tout (${filteredChannels.length})` }}
+        </button>
       </div>
 
       <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchChannels" />
@@ -118,6 +163,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
             <th>Verrouille</th>
             <th>File d'attente</th>
             <th>Creation</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -129,6 +175,16 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
             <td>{{ ch.locked ? 'Oui' : 'Non' }}</td>
             <td>{{ ch.queue_enabled ? 'Oui' : 'Non' }}</td>
             <td>{{ fmt(ch.created_at) }}</td>
+            <td @click.stop>
+              <button
+                class="close-row-btn"
+                :disabled="closing === ch.channel_id"
+                title="Fermer ce salon en BDD"
+                @click="handleCloseChannel(ch.channel_id, ch.channel_name)"
+              >
+                {{ closing === ch.channel_id ? "…" : "Fermer" }}
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -194,6 +250,52 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.cleanup-btn {
+  margin-left: auto;
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.cleanup-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.cleanup-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.close-row-btn {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.close-row-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.close-row-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .filter-row {
