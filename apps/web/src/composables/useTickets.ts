@@ -1,7 +1,7 @@
 import { ref, computed, onMounted } from "vue";
 import type { Ticket, TicketDetail } from "../types";
 import { useToast } from "./useToast";
-import { ticketsService } from "@/services/ticketsService";
+import { ticketsService, type BulkDeleteParams } from "@/services/ticketsService";
 
 export function useTickets() {
   const { error: showError } = useToast();
@@ -9,12 +9,42 @@ export function useTickets() {
   const loading = ref(true);
   const filterStatus = ref("all");
   const filterPriority = ref("all");
+  const filterAuthor = ref("");
+  const filterFrom = ref("");
+  const filterTo = ref("");
+  const bulkDeleting = ref(false);
 
-  const filteredTickets = computed(() => tickets.value.filter((t) => {
-    if (filterStatus.value !== "all" && t.status !== filterStatus.value) return false;
-    if (filterPriority.value !== "all" && t.priority !== filterPriority.value) return false;
-    return true;
-  }));
+  const filteredTickets = computed(() =>
+    tickets.value.filter((t) => {
+      if (filterStatus.value !== "all" && t.status !== filterStatus.value) return false;
+      if (filterPriority.value !== "all" && t.priority !== filterPriority.value) return false;
+      if (filterAuthor.value.trim()) {
+        const q = filterAuthor.value.trim().toLowerCase();
+        const matchId = String(t.author_id ?? "").toLowerCase().includes(q);
+        const matchName = String(t.author_name ?? "").toLowerCase().includes(q);
+        if (!matchId && !matchName) return false;
+      }
+      if (filterFrom.value) {
+        const from = new Date(filterFrom.value).getTime();
+        if (new Date(t.created_at).getTime() < from) return false;
+      }
+      if (filterTo.value) {
+        // inclusive fin de journee
+        const to = new Date(filterTo.value).getTime() + 86400000;
+        if (new Date(t.created_at).getTime() >= to) return false;
+      }
+      return true;
+    }),
+  );
+
+  const hasActiveFilters = computed(
+    () =>
+      filterStatus.value !== "all" ||
+      filterPriority.value !== "all" ||
+      filterAuthor.value.trim() !== "" ||
+      filterFrom.value !== "" ||
+      filterTo.value !== "",
+  );
 
   const openCount = computed(() => tickets.value.filter((t) => t.status === "open").length);
   const pendingCount = computed(() => tickets.value.filter((t) => t.status === "pending").length);
@@ -35,9 +65,45 @@ export function useTickets() {
     }
   }
 
+  async function bulkDelete(params: BulkDeleteParams): Promise<number> {
+    bulkDeleting.value = true;
+    try {
+      const result = await ticketsService.bulkDelete(params);
+      await fetchTickets();
+      return result.deleted;
+    } finally {
+      bulkDeleting.value = false;
+    }
+  }
+
+  function resetFilters() {
+    filterStatus.value = "all";
+    filterPriority.value = "all";
+    filterAuthor.value = "";
+    filterFrom.value = "";
+    filterTo.value = "";
+  }
+
   onMounted(fetchTickets);
 
-  return { tickets, filteredTickets, loading, error, filterStatus, filterPriority, openCount, pendingCount, fetchTickets };
+  return {
+    tickets,
+    filteredTickets,
+    loading,
+    error,
+    filterStatus,
+    filterPriority,
+    filterAuthor,
+    filterFrom,
+    filterTo,
+    hasActiveFilters,
+    openCount,
+    pendingCount,
+    bulkDeleting,
+    fetchTickets,
+    bulkDelete,
+    resetFilters,
+  };
 }
 
 export function useTicketDetail() {

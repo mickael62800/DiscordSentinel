@@ -100,6 +100,7 @@ fn bot_routes_standard() -> Router<AppState> {
 fn ticket_routes() -> Router<AppState> {
     Router::new()
         .route("/", get(handlers::tickets::list_tickets).post(handlers::tickets::create_ticket))
+        .route("/bulk", delete(handlers::tickets::bulk_delete_tickets))
         .route("/{id}", get(handlers::tickets::get_ticket_detail))
         .route("/{id}/messages", post(handlers::tickets::reply_ticket))
         .route("/{id}/close", patch(handlers::tickets::close_ticket))
