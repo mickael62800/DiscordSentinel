@@ -21,10 +21,12 @@ import BlackjackPage from "../components/pages/BlackjackPage.vue";
 import WalletPage from "../components/pages/WalletPage.vue";
 import RbacPage from "../components/pages/RbacPage.vue";
 import SettingsPage from "../components/pages/SettingsPage.vue";
+import AuthCallbackPage from "../components/pages/AuthCallbackPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
   { path: "/login", name: "login", component: LoginPage, meta: { public: true } },
+  { path: "/auth/callback", name: "auth-callback", component: AuthCallbackPage, meta: { public: true } },
   { path: "/", name: "dashboard", component: DashboardPage },
   { path: "/logs", name: "logs", component: LogsPage },
   { path: "/moderation", name: "moderation", component: ModerationHubPage },

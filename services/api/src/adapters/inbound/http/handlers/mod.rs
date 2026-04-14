@@ -36,3 +36,4 @@ pub mod wallet;
 pub mod blackjack;
 pub mod games;
 pub mod welcome;
+pub mod oauth;

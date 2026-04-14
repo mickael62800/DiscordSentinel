@@ -18,6 +18,16 @@ pub struct AppConfig {
     /// endpoints globaux (non scoped par guild). Format : comma-separated.
     /// Ex: `SUPERADMIN_USER_IDS=123456789012345678,234567890123456789`
     pub superadmin_user_ids: Vec<String>,
+    /// OAuth Discord — client_id de l'application Discord (visible cote serveur).
+    pub discord_oauth_client_id: String,
+    /// OAuth Discord — client_secret (jamais expose au front).
+    pub discord_oauth_client_secret: String,
+    /// OAuth Discord — URI de callback enregistree dans le portail Discord.
+    /// Ex: `http://192.168.1.15:3000/auth/discord/callback`.
+    pub discord_oauth_redirect_uri: String,
+    /// URL de base du front web (ou rediriger apres callback OAuth).
+    /// Ex: `http://192.168.1.15:5180`.
+    pub web_front_url: String,
 }
 
 impl AppConfig {
@@ -72,6 +82,10 @@ impl AppConfig {
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect(),
+            discord_oauth_client_id: std::env::var("DISCORD_CLIENT_ID").unwrap_or_default(),
+            discord_oauth_client_secret: std::env::var("DISCORD_CLIENT_SECRET").unwrap_or_default(),
+            discord_oauth_redirect_uri: std::env::var("DISCORD_REDIRECT_URI").unwrap_or_default(),
+            web_front_url: std::env::var("WEB_FRONT_URL").unwrap_or_default(),
         }
     }
 

@@ -550,7 +550,11 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
     // ajouter une couche basic auth via reverse proxy.
     let public = Router::new()
         .route("/health", get(handlers::health::health))
-        .route("/metrics", get(metrics_handler));
+        .route("/metrics", get(metrics_handler))
+        // OAuth Discord web : publiques car pas de token prealable.
+        // Le state CSRF + l'echange code cote serveur protegent le flux.
+        .route("/auth/discord/authorize", get(handlers::oauth::authorize))
+        .route("/auth/discord/callback", get(handlers::oauth::callback));
 
     // TraceLayer configure pour inclure le request_id dans chaque span
     let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {

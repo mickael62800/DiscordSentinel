@@ -21,7 +21,10 @@ export const useAuthStore = defineStore("auth", () => {
     if (initialized.value) return;
     initialized.value = true;
 
-    hasConfig.value = configService.hasDiscordConfig();
+    // hasConfig = uniquement la config API (URL + cle). Le OAuth Discord
+    // est desormais gere cote backend, le front n'a plus besoin de
+    // client_id/client_secret localement.
+    hasConfig.value = configService.getApiConfig() !== null;
     if (!hasConfig.value) return;
 
     try {

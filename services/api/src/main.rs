@@ -348,6 +348,10 @@ async fn main() {
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),
         superadmin_user_ids: Arc::new(config.superadmin_user_ids.clone()),
+        discord_oauth_client_id: config.discord_oauth_client_id.clone(),
+        discord_oauth_client_secret: config.discord_oauth_client_secret.clone(),
+        discord_oauth_redirect_uri: config.discord_oauth_redirect_uri.clone(),
+        web_front_url: config.web_front_url.clone(),
     };
 
     let api_log_repo = state.log_repo.clone();

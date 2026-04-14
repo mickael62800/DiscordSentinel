@@ -67,4 +67,9 @@ pub struct AppState {
     /// Phase 7 B — Liste des Discord user_ids superadmin (env SUPERADMIN_USER_IDS).
     /// Utilisee pour gater les endpoints globaux non scoped par guild (ex: /purge/logs).
     pub superadmin_user_ids: Arc<Vec<String>>,
+    /// OAuth Discord — credentials cote serveur (jamais exposes au front).
+    pub discord_oauth_client_id: String,
+    pub discord_oauth_client_secret: String,
+    pub discord_oauth_redirect_uri: String,
+    pub web_front_url: String,
 }
