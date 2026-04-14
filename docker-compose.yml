@@ -146,6 +146,9 @@ services:
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
       WEB_FRONT_URL: ${WEB_FRONT_URL:-}
+      # Liste (comma-separated) des Discord user_ids superadmin — bypassent
+      # toutes les gates RBAC (y compris owner) sur toutes les guilds.
+      SUPERADMIN_USER_IDS: ${SUPERADMIN_USER_IDS:-}
       AUTOMOD_DISCORD_TOKEN: ${AUTOMOD_DISCORD_TOKEN}
       VISION_MODEL_PATH: /models/vision/vision_sentinel.onnx
       TEXT_MODEL_PATH: /models/text/text_sentinel.onnx
