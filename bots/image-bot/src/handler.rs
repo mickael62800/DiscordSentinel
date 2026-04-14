@@ -349,12 +349,40 @@ async fn process_image_attachment(
                 }
             }
 
+            // Log backend (desktop app) pour toutes les detections avec action != None.
             if response.action != Action::None {
                 base.send_log("warn", guild_id, &format!(
                     "Image detectee — {} par {} : {:?} ({})",
                     response.action.as_str(), msg.author.name,
                     response.classifications, response.reason.as_deref().unwrap_or("Automod")
                 ));
+            }
+
+            // Embed riche dans le salon de logs Discord (comme automod-bot).
+            // Poste meme si action == None, pour que les mods voient les
+            // images analysees mais non modérées (faux positifs potentiels,
+            // contenu ambigu). Filtre : on ne poste que si au moins un
+            // classifier est > 5% pour eviter le spam d'images 100% safe.
+            let log_channel_id = BaseApiClient::config_u64(&guild_config, "log_channel_id", 0);
+            let max_confidence = response
+                .classifications
+                .iter()
+                .map(|c| c.confidence)
+                .fold(0.0_f32, f32::max);
+            let should_post_card = log_channel_id != 0
+                && (response.action != Action::None || max_confidence > 0.05);
+            if should_post_card {
+                send_image_review_card(
+                    ctx,
+                    msg,
+                    &response.action,
+                    response.reason.as_deref(),
+                    &response.classifications,
+                    image_url,
+                    filename,
+                    log_channel_id,
+                )
+                .await;
             }
 
             if let Err(e) = execute_action(
@@ -468,6 +496,100 @@ pub(crate) fn format_classifications(classifications: &[Classification]) -> Stri
         .map(|c| format!("{} ({:.0}%)", c.label, c.confidence * 100.0))
         .collect::<Vec<_>>()
         .join(", ")
+}
+
+/// Poste dans le salon de logs configure une carte de review image (meme
+/// style que l'automod-bot) : embed riche avec user, action, classifications,
+/// raison, preview de l'image, lien vers le message d'origine.
+async fn send_image_review_card(
+    ctx: &Context,
+    msg: &Message,
+    action: &Action,
+    reason: Option<&str>,
+    classifications: &[Classification],
+    image_url: &str,
+    filename: &str,
+    log_channel_id: u64,
+) {
+    let (title, color) = match action {
+        Action::None => ("\u{1f50d} Image analysee", 0x95a5a6_u32),
+        Action::Warn => ("\u{26a0}\u{fe0f} Image — Avertissement", 0xf1c40f),
+        Action::Delete => ("\u{1f5d1}\u{fe0f} Image supprimee", 0xe67e22),
+        Action::Mute => ("\u{1f507} Image — Mute", 0xe74c3c),
+        Action::Ban => ("\u{1f528} Image — Ban", 0x992d22),
+    };
+
+    let guild_id_str = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let channel_id_str = msg.channel_id.to_string();
+    let message_id_str = msg.id.to_string();
+
+    // Top 3 classifications triees par confiance descendante, formatees
+    // avec une petite barre visuelle pour etre parlant d'un coup d'oeil.
+    let mut sorted: Vec<&Classification> = classifications.iter().collect();
+    sorted.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap_or(std::cmp::Ordering::Equal));
+    let top = sorted.iter().take(3);
+    let classif_text = if classifications.is_empty() {
+        "Aucune classification retournee".to_string()
+    } else {
+        top.map(|c| {
+            let pct = (c.confidence * 100.0).round() as i32;
+            let filled = (pct / 10).clamp(0, 10) as usize;
+            let bar_full = "\u{2588}".repeat(filled);
+            let bar_empty = "\u{2591}".repeat(10 - filled);
+            format!("`{}{}` **{}** — {}%", bar_full, bar_empty, c.label, pct)
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+    };
+
+    let max_confidence = sorted.first().map(|c| c.confidence).unwrap_or(0.0);
+    let score_pct = (max_confidence * 100.0).round() as i32;
+
+    // Lien direct vers le message d'origine pour que le mod puisse y sauter.
+    let jump_url = if !guild_id_str.is_empty() {
+        format!("https://discord.com/channels/{}/{}/{}", guild_id_str, channel_id_str, message_id_str)
+    } else {
+        format!("https://discord.com/channels/@me/{}/{}", channel_id_str, message_id_str)
+    };
+
+    let reason_text = reason.unwrap_or("(aucune raison retournee par le modele)");
+
+    let embed = serenity::builder::CreateEmbed::new()
+        .title(title)
+        .color(color)
+        .field("\u{1f464} Utilisateur", format!("<@{}> (`{}`)", msg.author.id, msg.author.name), true)
+        .field("\u{1f4ac} Salon", format!("<#{}>", msg.channel_id), true)
+        .field("\u{1f3af} Score max", format!("{}%", score_pct), true)
+        .field("\u{1f5bc}\u{fe0f} Fichier", format!("`{}`", filename), true)
+        .field("\u{1f3f7}\u{fe0f} Classifications", classif_text, false)
+        .field("\u{1f916} Raison IA", reason_text, false)
+        .field("\u{1f517} Message", format!("[Aller au message]({})", jump_url), false)
+        .image(image_url)
+        .thumbnail(msg.author.face())
+        .footer(serenity::builder::CreateEmbedFooter::new(
+            "Image Bot | Sentinel — detection vision",
+        ))
+        .timestamp(serenity::model::Timestamp::now());
+
+    let builder = serenity::builder::CreateMessage::new().embed(embed);
+
+    match serenity::model::id::ChannelId::new(log_channel_id)
+        .send_message(&ctx.http, builder)
+        .await
+    {
+        Ok(_) => info!(
+            user = %msg.author.name,
+            action = ?action,
+            score = score_pct,
+            log_channel = log_channel_id,
+            "Carte de log image envoyee"
+        ),
+        Err(e) => warn!(
+            error = %e,
+            log_channel = log_channel_id,
+            "Echec envoi carte log image — verifier que le bot a acces au salon"
+        ),
+    }
 }
 
 /// Construit un embed d'action sur image avec les champs communs.
