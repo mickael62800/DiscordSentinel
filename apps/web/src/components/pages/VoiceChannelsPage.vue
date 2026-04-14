@@ -300,6 +300,10 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
 
 .filter-row {
   margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .filter-select {
