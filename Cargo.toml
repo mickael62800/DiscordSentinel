@@ -106,9 +106,13 @@ doc_lazy_continuation = "allow"
 empty_line_after_doc_comments = "allow"
 type_complexity = "allow"
 
-# ── Profil release partagé (Phase 1 quick wins) ──
+# ── Profil release partagé ──
+# lto = "thin" + codegen-units = 16 : compilation ~40-60% plus rapide
+# que fat LTO / codegen-units = 1, pour une perte runtime < 5% sur charge
+# I/O-bound typique de nos bots/workers/api. Le link final API passe de
+# plusieurs minutes à quelques dizaines de secondes.
 [profile.release]
-lto = "fat"
-codegen-units = 1
+lto = "thin"
+codegen-units = 16
 strip = true
 # panic = "unwind" (défaut) pour isoler les paniques par task tokio
