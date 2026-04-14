@@ -86,6 +86,8 @@ export interface Infraction {
    * "action"    = sanction appliquee (table `moderation_actions`).
    */
   source?: "detection" | "action";
+  /** Duree en secondes (mute/timeout/ban temporaire). */
+  duration?: number;
 }
 
 export interface ConfirmedBan {

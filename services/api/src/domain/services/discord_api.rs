@@ -396,6 +396,50 @@ impl DiscordApiService {
         Ok(())
     }
 
+    /// Applique un timeout (mute Discord) sur un membre pour une duree donnee
+    /// en secondes, via PATCH /guilds/{guild_id}/members/{user_id} avec
+    /// `communication_disabled_until = now + duration`.
+    ///
+    /// Discord limite le timeout a 28 jours max — on clamp automatiquement.
+    pub async fn apply_timeout(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        duration_seconds: u64,
+    ) -> Result<(), DomainError> {
+        self.ensure_configured()?;
+
+        // Discord max : 28 jours (2 419 200 secondes).
+        const MAX_TIMEOUT_SECS: u64 = 28 * 24 * 3600;
+        let dur = duration_seconds.min(MAX_TIMEOUT_SECS);
+        let until = chrono::Utc::now() + chrono::Duration::seconds(dur as i64);
+        let until_str = until.to_rfc3339();
+
+        let url = format!(
+            "https://discord.com/api/v10/guilds/{}/members/{}",
+            guild_id, user_id
+        );
+
+        let resp = self
+            .client
+            .patch(&url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .json(&serde_json::json!({ "communication_disabled_until": until_str }))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord apply_timeout failed ({status}): {body}"
+            )));
+        }
+
+        Ok(())
+    }
+
     /// Phase 2 B — Recupere la liste des guilds auxquelles un user appartient.
     /// Utilise le `access_token` OAuth2 (Bearer) du user, PAS le bot token.
     /// Endpoint Discord : `GET /users/@me/guilds` (scope `identify` ou `guilds`).

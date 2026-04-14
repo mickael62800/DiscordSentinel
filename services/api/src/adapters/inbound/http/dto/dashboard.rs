@@ -90,6 +90,9 @@ pub struct DashboardInfractionDto {
     /// "detection" = detection automod (propose, non appliquee)
     /// "action"    = sanction effectivement appliquee (bot ou moderateur)
     pub source: String,
+    /// Duree en secondes (pour mute/timeout/ban temporaire). None sinon.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub duration: Option<u64>,
 }
 
 impl From<Infraction> for DashboardInfractionDto {
@@ -104,6 +107,7 @@ impl From<Infraction> for DashboardInfractionDto {
             created_at: inf.created_at.to_rfc3339(),
             moderator: "AutoMod".to_string(),
             source: "detection".to_string(),
+            duration: inf.duration,
         }
     }
 }
@@ -120,6 +124,7 @@ impl From<crate::domain::entities::ModerationAction> for DashboardInfractionDto 
             created_at: action.created_at.to_rfc3339(),
             moderator: action.moderator_name,
             source: "action".to_string(),
+            duration: action.duration,
         }
     }
 }

@@ -45,11 +45,18 @@ useRealtimeRefresh(["infraction_new", "strike_added", "conduct_points_changed"],
 const journalSearch = ref("");
 const journalType = ref<string>("all");
 const journalModerator = ref<string>("all");
+const journalStatus = ref<"all" | "detection" | "action">("all");
 const journalDateFrom = ref<string>("");
 const journalDateTo = ref<string>("");
 // Les detections AutoMod sans sanction ("none" / "") polluent le journal :
 // masquees par defaut, decochable pour tout voir.
 const hideDetections = ref(true);
+
+const statusOptions = [
+  { value: "all", label: "Tous les statuts" },
+  { value: "detection", label: "Propositions" },
+  { value: "action", label: "Appliquees" },
+];
 
 function isDetection(type: string | null | undefined): boolean {
   const t = String(type ?? "").toLowerCase();
@@ -110,6 +117,11 @@ const filteredInfractions = computed<Infraction[]>(() => {
     rows = rows.filter((i) => i.moderator === journalModerator.value);
   }
 
+  // Filtre statut (proposition / appliquee)
+  if (journalStatus.value !== "all") {
+    rows = rows.filter((i) => (i.source ?? "detection") === journalStatus.value);
+  }
+
   // Filtre date
   if (journalDateFrom.value) {
     const from = new Date(journalDateFrom.value).getTime();
@@ -130,6 +142,7 @@ function resetFilters() {
   journalSearch.value = "";
   journalType.value = "all";
   journalModerator.value = "all";
+  journalStatus.value = "all";
   journalDateFrom.value = "";
   journalDateTo.value = "";
   hideDetections.value = true;
@@ -139,6 +152,7 @@ const hasActiveFilters = computed(() =>
   journalSearch.value !== "" ||
   journalType.value !== "all" ||
   journalModerator.value !== "all" ||
+  journalStatus.value !== "all" ||
   journalDateFrom.value !== "" ||
   journalDateTo.value !== "" ||
   !hideDetections.value,
@@ -147,6 +161,7 @@ const hasActiveFilters = computed(() =>
 const infractionsColumns: TableColumn[] = [
   { key: "username", label: "Utilisateur" },
   { key: "infraction_type", label: "Type" },
+  { key: "source", label: "Choix" },
   { key: "reason", label: "Raison" },
   { key: "moderator", label: "Moderateur" },
   { key: "created_at", label: "Date" },
@@ -178,6 +193,71 @@ async function onDeleteInfraction(row: Record<string, unknown>) {
   } catch (e) {
     console.error("Erreur suppression infraction:", e);
     showError("Erreur lors de la suppression");
+  }
+}
+
+// --- Appliquer une detection (transformer en action effective) ---
+const applying = ref(false);
+
+async function onApplyDetection(row: Record<string, unknown>) {
+  const id = row.id as string;
+  const actionType = String(row.infraction_type ?? "").toLowerCase();
+  const guildId = String(row.server ?? "");
+  const userId = String(row.user_id ?? "");
+  const username = String(row.username ?? userId);
+  const reason = String(row.reason ?? "Applique depuis le panneau admin");
+
+  if (!guildId || !userId) {
+    showError("Guild ou user manquant sur cette detection");
+    return;
+  }
+
+  const isBan = actionType === "ban";
+  const isMute = actionType === "mute" || actionType === "timeout";
+  const isWarn = actionType === "warn";
+  const duration = typeof row.duration === "number" ? (row.duration as number) : undefined;
+
+  const label = isBan ? "BAN" : isMute ? "MUTE" : isWarn ? "AVERTISSEMENT" : actionType.toUpperCase();
+  const detail = isBan
+    ? "L'utilisateur sera effectivement banni du serveur Discord."
+    : isMute
+      ? `Un timeout Discord sera applique (${duration ?? 3600}s) et l'action sera loguee en DB.`
+      : "Un avertissement sera enregistre en DB.";
+
+  const ok = await confirm({
+    message: `Appliquer ${label} a ${username} ?\n\n${detail}\n\nRaison : ${reason}`,
+  });
+  if (!ok) return;
+
+  applying.value = true;
+  try {
+    const { moderationService } = await import("@/services/moderationService");
+    if (isBan) {
+      await moderationService.executeBan(guildId, userId, reason);
+    } else if (isMute) {
+      await moderationService.executeMute(guildId, userId, reason, duration, username);
+    } else {
+      // warn / autre : juste logger l'action en DB (pas d'effet Discord).
+      await logAction({
+        guildId,
+        channelId: "web-panel",
+        moderatorId: "web-admin",
+        moderatorName: "Web Admin",
+        targetId: userId,
+        targetName: username,
+        actionType,
+        reason,
+        gravity: "medium",
+      });
+    }
+    // Supprime la detection d'origine pour eviter le doublon visuel.
+    await deleteInfraction(id, "detection");
+    success(`${label} applique a ${username}`);
+  } catch (e) {
+    console.error("Erreur apply detection:", e);
+    showError("Erreur lors de l'application de la detection");
+  } finally {
+    applying.value = false;
   }
 }
 
@@ -379,6 +459,10 @@ async function handleActionSubmit() {
             <AppSelect v-model="journalModerator" :options="moderatorOptions" />
           </div>
           <div class="filter-field">
+            <label>Statut</label>
+            <AppSelect v-model="journalStatus" :options="statusOptions" />
+          </div>
+          <div class="filter-field">
             <label>Du</label>
             <input v-model="journalDateFrom" type="date" class="date-input" />
           </div>
@@ -443,48 +527,63 @@ async function handleActionSubmit() {
             <span class="user-id">{{ (row as Record<string, unknown>).user_id }}</span>
           </div>
         </template>
-        <template #cell-infraction_type="{ row, value }">
-          <div class="type-cell">
-            <AppBadge
-              :label="infractionTypeLabel(String(value))"
-              :variant="isDetection(String(value)) ? 'default' : infractionTypeVariant(String(value))"
-            />
-            <span
-              v-if="(row as Record<string, unknown>).source === 'detection'
-                    && !isDetection(String(value))"
-              class="source-chip proposal"
-              title="Detection AutoMod : proposition, pas encore appliquee"
-            >
-              Proposition
-            </span>
-            <span
-              v-else-if="(row as Record<string, unknown>).source === 'action'"
-              class="source-chip applied"
-              title="Sanction effectivement appliquee par un moderateur ou un bot"
-            >
-              Applique
-            </span>
-          </div>
+        <template #cell-infraction_type="{ value }">
+          <AppBadge
+            :label="infractionTypeLabel(String(value))"
+            :variant="isDetection(String(value)) ? 'default' : infractionTypeVariant(String(value))"
+          />
+        </template>
+        <template #cell-source="{ row, value }">
+          <span
+            v-if="value === 'detection' && !isDetection(String((row as Record<string, unknown>).infraction_type))"
+            class="source-chip proposal"
+            title="Detection AutoMod : proposition, pas encore appliquee"
+          >
+            Proposition
+          </span>
+          <span
+            v-else-if="value === 'action'"
+            class="source-chip applied"
+            title="Sanction effectivement appliquee par un moderateur ou un bot"
+          >
+            Applique
+          </span>
+          <span v-else class="source-chip neutral">—</span>
         </template>
         <template #cell-created_at="{ value }">
           <span class="mono">{{ fmt(String(value)) }}</span>
         </template>
         <template #cell-actions="{ row }">
-          <button
-            class="cancel-btn"
-            :disabled="deleting"
-            title="Annuler cette entree (si ban applique, unban Discord inclus)"
-            @click.stop="onDeleteInfraction(row as Record<string, unknown>)"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 6h18" />
-              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-              <path d="M10 11v6" />
-              <path d="M14 11v6" />
-            </svg>
-            <span>Annuler</span>
-          </button>
+          <div class="action-buttons">
+            <button
+              v-if="(row as Record<string, unknown>).source === 'detection'
+                    && !isDetection(String((row as Record<string, unknown>).infraction_type))"
+              class="apply-btn"
+              :disabled="applying"
+              title="Appliquer cette proposition (ban/mute/warn)"
+              @click.stop="onApplyDetection(row as Record<string, unknown>)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              <span>Appliquer</span>
+            </button>
+            <button
+              class="cancel-btn"
+              :disabled="deleting"
+              title="Annuler cette entree (si ban applique, unban Discord inclus)"
+              @click.stop="onDeleteInfraction(row as Record<string, unknown>)"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18" />
+                <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                <path d="M10 11v6" />
+                <path d="M14 11v6" />
+              </svg>
+              <span>Annuler</span>
+            </button>
+          </div>
         </template>
       </DataTable>
     </div>
@@ -778,18 +877,18 @@ async function handleActionSubmit() {
 
 .filters-grid {
   display: grid;
-  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr;
   gap: 12px;
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
   .filters-grid {
-    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
   .filter-search { grid-column: 1 / -1; }
 }
 
-@media (max-width: 700px) {
+@media (max-width: 800px) {
   .filters-grid { grid-template-columns: 1fr; }
 }
 
@@ -913,19 +1012,13 @@ async function handleActionSubmit() {
   gap: 2px;
 }
 
-.type-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
 .source-chip {
-  font-size: 10px;
+  display: inline-block;
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.3px;
-  padding: 2px 7px;
+  padding: 3px 10px;
   border-radius: 10px;
   border: 1px solid;
   white-space: nowrap;
@@ -943,9 +1036,56 @@ async function handleActionSubmit() {
   background-color: rgba(87, 242, 135, 0.08);
 }
 
+.source-chip.neutral {
+  color: var(--text-secondary);
+  border-color: var(--border);
+  background-color: transparent;
+  font-weight: 400;
+}
+
 .mono {
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
   font-size: 12px;
+}
+
+.action-buttons {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: transparent;
+  color: #57f287;
+  border: 1px solid #57f287;
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.apply-btn:hover:not(:disabled) {
+  background-color: #57f287;
+  color: #0a0a0a;
+}
+
+.apply-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.apply-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 .cancel-btn {

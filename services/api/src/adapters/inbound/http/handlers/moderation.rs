@@ -209,6 +209,76 @@ pub async fn execute_ban(
 }
 
 #[derive(Debug, Deserialize)]
+pub struct ExecuteMuteDto {
+    pub guild_id: String,
+    pub user_id: String,
+    pub reason: String,
+    /// Duree du timeout en secondes. Defaut : 1h. Max : 28 jours (clamp cote Discord).
+    #[serde(default)]
+    pub duration: Option<u64>,
+    /// Nom d'affichage optionnel (stocke dans moderation_actions.target_name).
+    #[serde(default)]
+    pub target_name: Option<String>,
+}
+
+/// POST /api/moderation/execute-mute — applique un timeout Discord + log l'action
+pub async fn execute_mute(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Json(dto): Json<ExecuteMuteDto>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
+    validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
+    validation::validate_reason(&dto.reason).map_err(ApiError)?;
+
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &dto.guild_id,
+        Role::Moderator,
+        "moderator+ requis pour executer un mute",
+    )
+    .await?;
+
+    let duration = dto.duration.unwrap_or(3600); // defaut : 1 heure
+    state
+        .discord_api
+        .apply_timeout(&dto.guild_id, &dto.user_id, duration)
+        .await
+        .map_err(ApiError)?;
+
+    let target_name = dto.target_name.unwrap_or_else(|| dto.user_id.clone());
+    let command = crate::ports::inbound::LogModerationCommand {
+        guild_id: dto.guild_id.clone(),
+        channel_id: String::new(),
+        moderator_id: "web-panel".into(),
+        moderator_name: "Web Admin".into(),
+        target_id: dto.user_id.clone(),
+        target_name: target_name.clone(),
+        action_type: "mute".into(),
+        reason: dto.reason.clone(),
+        gravity: None,
+        duration: Some(duration),
+    };
+    state.moderation_uc.log_action(command).await?;
+
+    state.broadcaster.broadcast(
+        "moderation_action",
+        serde_json::json!({
+            "action_type": "mute",
+            "target_id": &dto.user_id,
+            "target_name": &target_name,
+            "moderator_name": "Web Admin",
+            "guild_id": &dto.guild_id,
+            "reason": &dto.reason,
+            "duration": duration,
+        }),
+    );
+
+    Ok(ok_response())
+}
+
+#[derive(Debug, Deserialize)]
 pub struct ExecuteUnbanDto {
     pub guild_id: String,
     pub user_id: String,

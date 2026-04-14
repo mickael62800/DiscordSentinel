@@ -141,6 +141,7 @@ fn moderation_routes() -> Router<AppState> {
         .route("/bans", get(handlers::moderation::list_bans))
         .route("/execute-ban", post(handlers::moderation::execute_ban))
         .route("/execute-unban", post(handlers::moderation::execute_unban))
+        .route("/execute-mute", post(handlers::moderation::execute_mute))
         .route("/history/{guild_id}/{user_id}", get(handlers::moderation::get_history))
         .route("/modstats/{guild_id}", get(handlers::moderation::get_modstats))
         .route("/evidence", post(handlers::moderation::add_evidence))

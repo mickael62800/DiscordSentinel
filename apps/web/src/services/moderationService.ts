@@ -22,6 +22,25 @@ export const moderationService = {
   executeUnban(guildId: string, userId: string): Promise<unknown> {
     return httpPost("/api/moderation/execute-unban", { guild_id: guildId, user_id: userId });
   },
+  /**
+   * Applique un timeout Discord + log l'action. Duree en secondes (defaut
+   * backend = 3600 / 1h, max Discord = 28 jours).
+   */
+  executeMute(
+    guildId: string,
+    userId: string,
+    reason: string,
+    duration?: number,
+    targetName?: string,
+  ): Promise<unknown> {
+    return httpPost("/api/moderation/execute-mute", {
+      guild_id: guildId,
+      user_id: userId,
+      reason,
+      duration,
+      target_name: targetName,
+    });
+  },
   getConfirmedBans(guildId?: string | null): Promise<ConfirmedBan[]> {
     return httpGet(`/api/moderation/bans${q({ guild_id: guildId ?? null })}`);
   },
