@@ -323,6 +323,17 @@ pub async fn check_role_for_guild(
     let Some(axum::Extension(ctx)) = rbac else {
         return Ok(());
     };
+
+    // Bypass global : un superadmin (defini via SUPERADMIN_USER_IDS) passe
+    // toutes les gates RBAC par guild, quel que soit son role en DB.
+    if state
+        .superadmin_user_ids
+        .iter()
+        .any(|id| id == &ctx.discord_user_id)
+    {
+        return Ok(());
+    }
+
     match require_role_for_guild(state, ctx, guild_id, required).await {
         Ok(()) => Ok(()),
         Err(StatusCode::SERVICE_UNAVAILABLE) => Err(ApiError(DomainError::Internal(

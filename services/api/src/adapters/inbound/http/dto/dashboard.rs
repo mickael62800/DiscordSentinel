@@ -104,6 +104,21 @@ impl From<Infraction> for DashboardInfractionDto {
     }
 }
 
+impl From<crate::domain::entities::ModerationAction> for DashboardInfractionDto {
+    fn from(action: crate::domain::entities::ModerationAction) -> Self {
+        Self {
+            id: action.id.to_string(),
+            user_id: action.target_id,
+            username: action.target_name,
+            server: action.guild_id,
+            infraction_type: action.action_type,
+            reason: action.reason,
+            created_at: action.created_at.to_rfc3339(),
+            moderator: action.moderator_name,
+        }
+    }
+}
+
 // ── Rule DTO (format desktop) ──
 // Le desktop attend : id, name, enabled, rule_type, action, description
 

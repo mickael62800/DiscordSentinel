@@ -1,35 +1,147 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, computed, watch } from "vue";
 import { useToast } from "../../composables/useToast";
-
-const { success, error: showError } = useToast();
-
-// --- Tab state ---
-const activeTab = ref<"journal" | "bans" | "actions">("journal");
-
-// --- Journal (infractions) ---
 import { useInfractions } from "../../composables/useInfractions";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
-import { useSearch } from "../../composables/useSearch";
 import type { TableColumn, Infraction, ConfirmedBan, GuildMember } from "../../types";
 import DataTable from "../organisms/DataTable.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppInput from "../atoms/AppInput.vue";
+import AppSelect from "../atoms/AppSelect.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import BanModal from "../molecules/BanModal.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppButton from "../atoms/AppButton.vue";
 import FormField from "../atoms/FormField.vue";
-import { infractionTypeVariant, actionVariant } from "../../utils/variants";
+import { infractionTypeVariant } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
+import { useBans } from "../../composables/useBans";
+import { useConfirm } from "../../composables/useConfirm";
+import { useModeration } from "../../composables/useModeration";
+import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useGuildMembers } from "../../composables/useGuildMembers";
 
+const { success, error: showError } = useToast();
 const { formatShortDateTime: fmt } = useFormatDate();
-const { infractions, loading: infractionsLoading, error: infractionsError, fetchInfractions, deleting, deleteInfraction } = useInfractions();
-useRealtimeRefresh(["infraction_new", "strike_added", "conduct_points_changed"], fetchInfractions);
-const { search: infractionsSearch, filtered: filteredInfractions } = useSearch<Infraction>(
+const { confirm } = useConfirm();
+
+// --- Tabs ---
+const activeTab = ref<"journal" | "bans">("journal");
+
+// --- Journal : donnees + filtres ---
+const {
   infractions,
-  ["username", "user_id", "reason", "infraction_type", "moderator", "server", "created_at"],
+  loading: infractionsLoading,
+  error: infractionsError,
+  fetchInfractions,
+  deleting,
+  deleteInfraction,
+  purging,
+  purgeAll,
+} = useInfractions();
+useRealtimeRefresh(["infraction_new", "strike_added", "conduct_points_changed"], fetchInfractions);
+
+const journalSearch = ref("");
+const journalType = ref<string>("all");
+const journalModerator = ref<string>("all");
+const journalDateFrom = ref<string>("");
+const journalDateTo = ref<string>("");
+// Les detections AutoMod sans sanction ("none" / "") polluent le journal :
+// masquees par defaut, decochable pour tout voir.
+const hideDetections = ref(true);
+
+function isDetection(type: string | null | undefined): boolean {
+  const t = String(type ?? "").toLowerCase();
+  return t === "" || t === "none" || t === "detection";
+}
+
+function infractionTypeLabel(type: string | null | undefined): string {
+  return isDetection(type) ? "Detection" : String(type);
+}
+
+// Listes distinctes derivees des infractions pour peupler les selects
+const moderatorOptions = computed(() => {
+  const set = new Set<string>();
+  for (const inf of infractions.value ?? []) {
+    if (inf.moderator) set.add(inf.moderator);
+  }
+  return [
+    { value: "all", label: "Tous les moderateurs" },
+    ...Array.from(set).sort().map((m) => ({ value: m, label: m })),
+  ];
+});
+
+const typeOptions = computed(() => {
+  const set = new Set<string>();
+  for (const inf of infractions.value ?? []) {
+    if (inf.infraction_type) set.add(inf.infraction_type);
+  }
+  return [
+    { value: "all", label: "Tous les types" },
+    ...Array.from(set).sort().map((t) => ({ value: t, label: t })),
+  ];
+});
+
+const filteredInfractions = computed<Infraction[]>(() => {
+  let rows = (infractions.value ?? []).slice();
+
+  // Masquage des detections AutoMod sans sanction
+  if (hideDetections.value) {
+    rows = rows.filter((i) => !isDetection(i.infraction_type));
+  }
+
+  // Filtre texte
+  const q = journalSearch.value.trim().toLowerCase();
+  if (q) {
+    rows = rows.filter((i) =>
+      [i.username, i.user_id, i.reason, i.infraction_type, i.moderator, i.server]
+        .some((f) => String(f ?? "").toLowerCase().includes(q)),
+    );
+  }
+
+  // Filtre type
+  if (journalType.value !== "all") {
+    rows = rows.filter((i) => i.infraction_type === journalType.value);
+  }
+
+  // Filtre moderateur
+  if (journalModerator.value !== "all") {
+    rows = rows.filter((i) => i.moderator === journalModerator.value);
+  }
+
+  // Filtre date
+  if (journalDateFrom.value) {
+    const from = new Date(journalDateFrom.value).getTime();
+    rows = rows.filter((i) => new Date(i.created_at).getTime() >= from);
+  }
+  if (journalDateTo.value) {
+    const to = new Date(journalDateTo.value).getTime() + 86400000; // inclusif fin de journee
+    rows = rows.filter((i) => new Date(i.created_at).getTime() < to);
+  }
+
+  // Tri par date desc
+  rows.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+  return rows;
+});
+
+function resetFilters() {
+  journalSearch.value = "";
+  journalType.value = "all";
+  journalModerator.value = "all";
+  journalDateFrom.value = "";
+  journalDateTo.value = "";
+  hideDetections.value = true;
+}
+
+const hasActiveFilters = computed(() =>
+  journalSearch.value !== "" ||
+  journalType.value !== "all" ||
+  journalModerator.value !== "all" ||
+  journalDateFrom.value !== "" ||
+  journalDateTo.value !== "" ||
+  !hideDetections.value,
 );
 
 const infractionsColumns: TableColumn[] = [
@@ -43,25 +155,41 @@ const infractionsColumns: TableColumn[] = [
 
 async function onDeleteInfraction(id: string) {
   const ok = await confirm({ message: "Annuler cette infraction ? Cette action est irreversible." });
-  if (ok) {
-    try {
-      await deleteInfraction(id);
-      success("Infraction supprimee avec succes");
-    } catch (e) {
-      console.error("Erreur suppression infraction:", e);
-      showError("Erreur lors de la suppression de l'infraction");
-    }
+  if (!ok) return;
+  try {
+    await deleteInfraction(id);
+    success("Infraction supprimee avec succes");
+  } catch (e) {
+    console.error("Erreur suppression infraction:", e);
+    showError("Erreur lors de la suppression de l'infraction");
   }
 }
 
-// --- Bans ---
-import { useBans } from "../../composables/useBans";
-import { useConfirm } from "../../composables/useConfirm";
+async function onPurgeAll() {
+  const guildId = selectedGuildId.value;
+  if (!guildId) {
+    showError("Selectionnez d'abord un serveur pour purger.");
+    return;
+  }
+  const total = infractions.value?.length ?? 0;
+  const ok1 = await confirm({
+    message: `⚠️ SUPPRESSION DB ⚠️\n\nVous etes sur le point de supprimer DEFINITIVEMENT ${total} infraction(s) de la base de donnees pour ce serveur.\n\nCette action est IRREVERSIBLE.\n\nContinuer ?`,
+  });
+  if (!ok1) return;
+  const ok2 = await confirm({
+    message: "Derniere confirmation : toutes les infractions seront effacees en base. Vraiment proceder ?",
+  });
+  if (!ok2) return;
+  try {
+    await purgeAll(guildId);
+  } catch {
+    // toast deja affiche par le composable
+  }
+}
 
-const { confirm } = useConfirm();
+// --- Bans (inchange) ---
 const banModalRef = ref<InstanceType<typeof BanModal> | null>(null);
 const unbanError = ref<string | null>(null);
-
 const banModalVisible = ref(false);
 const banModalTarget = ref<Infraction | null>(null);
 
@@ -83,12 +211,10 @@ function openBanModal(proposal: Infraction) {
   banModalTarget.value = proposal;
   banModalVisible.value = true;
 }
-
 function closeBanModal() {
   banModalVisible.value = false;
   banModalTarget.value = null;
 }
-
 async function onBanConfirm(reason: string) {
   if (!banModalTarget.value) return;
   const proposal = banModalTarget.value;
@@ -100,7 +226,6 @@ async function onBanConfirm(reason: string) {
     banModalRef.value?.setError(String(e));
   }
 }
-
 async function handleUnban(ban: ConfirmedBan) {
   unbanError.value = null;
   const ok = await confirm({ message: `Debannir ${ban.target_name} (${ban.target_id}) ?` });
@@ -112,88 +237,86 @@ async function handleUnban(ban: ConfirmedBan) {
   }
 }
 
-// --- Actions (moderation) ---
-import { useModeration } from "../../composables/useModeration";
-import { useGuildSelector } from "../../composables/useGuildSelector";
-import { useGuildMembers } from "../../composables/useGuildMembers";
-
-const { submitting, history, historyLoading, logAction, fetchHistory } = useModeration();
+// --- Selecteur de guild + modale "Nouvelle action" ---
 const { selectedGuildId } = useGuildSelector();
+const { submitting, logAction } = useModeration();
 const { searchMembers } = useGuildMembers();
 
-const guildId = ref(selectedGuildId.value || "");
-const targetId = ref("");
-const targetName = ref("");
+const actionModalVisible = ref(false);
+const actionGuildId = ref(selectedGuildId.value || "");
+const actionTargetId = ref("");
+const actionTargetName = ref("");
 const actionType = ref("warn");
-const reason = ref("");
-const gravity = ref("medium");
-const duration = ref<number | undefined>(undefined);
-const actionSuccess = ref<string | null>(null);
+const actionReason = ref("");
+const actionGravity = ref("medium");
+const actionDuration = ref<number | undefined>(undefined);
 const actionError = ref<string | null>(null);
-
-const lookupGuildId = ref(selectedGuildId.value || "");
-const lookupUserId = ref("");
-
-const targetSearch = ref("");
-const suggestions = ref<GuildMember[]>([]);
-const showSuggestions = ref(false);
-
-function onTargetSearchInput() {
-  suggestions.value = searchMembers(targetSearch.value);
-  showSuggestions.value = suggestions.value.length > 0;
-}
-
-function selectMember(member: GuildMember) {
-  targetId.value = member.id;
-  targetName.value = member.display_name || member.username;
-  targetSearch.value = member.display_name || member.username;
-  showSuggestions.value = false;
-}
-
-function onTargetSearchBlur() {
-  setTimeout(() => { showSuggestions.value = false; }, 200);
-}
+const actionSearch = ref("");
+const actionSuggestions = ref<GuildMember[]>([]);
+const actionShowSuggestions = ref(false);
 
 watch(selectedGuildId, (newId) => {
-  if (newId) {
-    guildId.value = newId;
-    lookupGuildId.value = newId;
-  }
+  if (newId) actionGuildId.value = newId;
 });
 
-async function handleSubmit() {
-  if (!guildId.value || !targetId.value || !targetName.value || !reason.value) {
-    actionError.value = "L'ID du serveur, l'ID de la cible, le nom de la cible et la raison sont requis.";
+function openActionModal() {
+  actionError.value = null;
+  actionModalVisible.value = true;
+}
+
+function closeActionModal() {
+  actionModalVisible.value = false;
+  actionTargetId.value = "";
+  actionTargetName.value = "";
+  actionReason.value = "";
+  actionDuration.value = undefined;
+  actionSearch.value = "";
+  actionSuggestions.value = [];
+  actionShowSuggestions.value = false;
+  actionError.value = null;
+}
+
+function onActionSearchInput() {
+  actionSuggestions.value = searchMembers(actionSearch.value);
+  actionShowSuggestions.value = actionSuggestions.value.length > 0;
+}
+
+function selectActionMember(member: GuildMember) {
+  actionTargetId.value = member.id;
+  actionTargetName.value = member.display_name || member.username;
+  actionSearch.value = member.display_name || member.username;
+  actionShowSuggestions.value = false;
+}
+
+function onActionSearchBlur() {
+  setTimeout(() => { actionShowSuggestions.value = false; }, 200);
+}
+
+async function handleActionSubmit() {
+  if (!actionGuildId.value || !actionTargetId.value || !actionTargetName.value || !actionReason.value) {
+    actionError.value = "L'ID du serveur, la cible et la raison sont requis.";
     return;
   }
   actionError.value = null;
-  actionSuccess.value = null;
   try {
     const result = await logAction({
-      guildId: guildId.value,
-      channelId: "desktop-app",
-      moderatorId: "desktop-admin",
-      moderatorName: "Desktop Admin",
-      targetId: targetId.value,
-      targetName: targetName.value,
+      guildId: actionGuildId.value,
+      channelId: "web-panel",
+      moderatorId: "web-admin",
+      moderatorName: "Web Admin",
+      targetId: actionTargetId.value,
+      targetName: actionTargetName.value,
       actionType: actionType.value,
-      reason: reason.value,
-      gravity: gravity.value,
-      duration: actionType.value === "mute" || actionType.value === "ban" ? duration.value : undefined,
+      reason: actionReason.value,
+      gravity: actionGravity.value,
+      duration: actionType.value === "mute" || actionType.value === "ban" ? actionDuration.value : undefined,
     });
-    actionSuccess.value = `${result.action_type} applique a ${result.target_name}`;
-    targetId.value = "";
-    targetName.value = "";
-    reason.value = "";
-    duration.value = undefined;
+    success(`${result.action_type} applique a ${result.target_name}`);
+    await fetchInfractions();
+    closeActionModal();
   } catch (e) {
     actionError.value = String(e);
   }
-}
-
-async function handleLookup() {
-  if (!lookupGuildId.value || !lookupUserId.value) return;
-  await fetchHistory(lookupGuildId.value, lookupUserId.value);
 }
 </script>
 
@@ -201,7 +324,7 @@ async function handleLookup() {
   <div class="moderation-hub">
     <h1>Moderation</h1>
 
-    <!-- Tab bar -->
+    <!-- Tab bar (2 onglets) -->
     <div class="hub-tabs">
       <button
         :class="['hub-tab', { active: activeTab === 'journal' }]"
@@ -215,33 +338,88 @@ async function handleLookup() {
       >
         Bannissements
       </button>
-      <button
-        :class="['hub-tab', { active: activeTab === 'actions' }]"
-        @click="activeTab = 'actions'"
-      >
-        Actions
-      </button>
     </div>
 
     <!-- ============================================ -->
-    <!-- TAB 1: Journal (infractions)                 -->
+    <!-- JOURNAL                                      -->
     <!-- ============================================ -->
     <div v-if="activeTab === 'journal'" class="tab-content">
-      <div class="toolbar">
-        <AppInput
-          v-model="infractionsSearch"
-          placeholder="Rechercher dans tous les champs..."
-        />
+      <!-- Filtres + bouton action -->
+      <div class="journal-toolbar">
+        <div class="filters-grid">
+          <div class="filter-field filter-search">
+            <label>Recherche</label>
+            <AppInput
+              v-model="journalSearch"
+              placeholder="Utilisateur, ID, raison, serveur…"
+            />
+          </div>
+          <div class="filter-field">
+            <label>Type</label>
+            <AppSelect v-model="journalType" :options="typeOptions" />
+          </div>
+          <div class="filter-field">
+            <label>Moderateur</label>
+            <AppSelect v-model="journalModerator" :options="moderatorOptions" />
+          </div>
+          <div class="filter-field">
+            <label>Du</label>
+            <input v-model="journalDateFrom" type="date" class="date-input" />
+          </div>
+          <div class="filter-field">
+            <label>Au</label>
+            <input v-model="journalDateTo" type="date" class="date-input" />
+          </div>
+        </div>
+
+        <div class="toolbar-right">
+          <label class="toggle-filter">
+            <input v-model="hideDetections" type="checkbox" />
+            <span>Masquer les detections AutoMod</span>
+          </label>
+          <button
+            v-if="hasActiveFilters"
+            class="reset-btn"
+            @click="resetFilters"
+            title="Reinitialiser les filtres"
+          >
+            Reinitialiser
+          </button>
+          <button
+            class="purge-btn"
+            :disabled="purging || !selectedGuildId"
+            :title="selectedGuildId ? 'Supprimer toutes les infractions de la BDD' : 'Selectionnez un serveur'"
+            @click="onPurgeAll"
+          >
+            {{ purging ? "Suppression…" : "Tout supprimer (DB)" }}
+          </button>
+          <AppButton variant="primary" @click="openActionModal">
+            + Nouvelle action
+          </AppButton>
+        </div>
       </div>
 
-      <ErrorState v-if="infractionsError" :message="infractionsError" :retryable="true" @retry="fetchInfractions" />
+      <div class="result-count">
+        <strong>{{ filteredInfractions.length }}</strong>
+        infraction{{ filteredInfractions.length > 1 ? "s" : "" }}
+        <span v-if="filteredInfractions.length !== (infractions?.length ?? 0)" class="result-total">
+          sur {{ infractions?.length ?? 0 }}
+        </span>
+      </div>
+
+      <ErrorState
+        v-if="infractionsError"
+        :message="infractionsError"
+        :retryable="true"
+        @retry="fetchInfractions"
+      />
       <LoadingState v-else-if="infractionsLoading" />
 
       <DataTable
         v-else
         :columns="infractionsColumns"
         :rows="(filteredInfractions as unknown as Record<string, unknown>[])"
-        empty-message="Aucune infraction"
+        empty-message="Aucune infraction ne correspond aux filtres"
       >
         <template #cell-username="{ row }">
           <div class="user-cell">
@@ -250,26 +428,36 @@ async function handleLookup() {
           </div>
         </template>
         <template #cell-infraction_type="{ value }">
-          <AppBadge :label="String(value)" :variant="infractionTypeVariant(String(value))" />
+          <AppBadge
+            :label="infractionTypeLabel(String(value))"
+            :variant="isDetection(String(value)) ? 'default' : infractionTypeVariant(String(value))"
+          />
         </template>
         <template #cell-created_at="{ value }">
           <span class="mono">{{ fmt(String(value)) }}</span>
         </template>
         <template #cell-actions="{ row }">
-          <AppButton
-            variant="secondary"
-            size="small"
+          <button
+            class="cancel-btn"
             :disabled="deleting"
+            title="Annuler cette infraction"
             @click.stop="onDeleteInfraction((row as Record<string, unknown>).id as string)"
           >
-            Annuler
-          </AppButton>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 6h18" />
+              <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+              <path d="M10 11v6" />
+              <path d="M14 11v6" />
+            </svg>
+            <span>Annuler</span>
+          </button>
         </template>
       </DataTable>
     </div>
 
     <!-- ============================================ -->
-    <!-- TAB 2: Bannissements                         -->
+    <!-- BANNISSEMENTS (inchange)                     -->
     <!-- ============================================ -->
     <div v-if="activeTab === 'bans'" class="tab-content">
       <div class="filters">
@@ -286,7 +474,6 @@ async function handleLookup() {
       <LoadingState v-if="bansLoading" />
 
       <div v-else class="bans-columns">
-        <!-- Colonne gauche : Bannis effectifs -->
         <div class="bans-column">
           <div class="column-header">
             <h2>Bannis</h2>
@@ -338,7 +525,6 @@ async function handleLookup() {
           </div>
         </div>
 
-        <!-- Colonne droite : Propositions de ban -->
         <div class="bans-column">
           <div class="column-header">
             <h2>A bannir</h2>
@@ -395,63 +581,64 @@ async function handleLookup() {
     </div>
 
     <!-- ============================================ -->
-    <!-- TAB 3: Actions (moderation)                  -->
+    <!-- MODALE "Nouvelle action"                     -->
     <!-- ============================================ -->
-    <div v-if="activeTab === 'actions'" class="tab-content">
-      <div class="mod-grid">
-        <!-- Action form -->
-        <div class="mod-card">
-          <h2>Appliquer une action</h2>
-          <form class="action-form" @submit.prevent="handleSubmit">
-            <div class="form-row">
-              <FormField label="ID du serveur">
-                <input v-model="guildId" type="text" placeholder="ID du serveur" />
-              </FormField>
-            </div>
-            <div class="form-row">
-              <FormField label="Utilisateur cible">
-                <div class="autocomplete-wrapper">
-                  <input
-                    v-model="targetSearch"
-                    type="text"
-                    placeholder="Rechercher un membre ou entrer un ID..."
-                    @input="onTargetSearchInput"
-                    @focus="onTargetSearchInput"
-                    @blur="onTargetSearchBlur"
-                    autocomplete="off"
-                  />
-                  <div v-if="showSuggestions" class="autocomplete-list">
-                    <div
-                      v-for="member in suggestions"
-                      :key="member.id"
-                      class="autocomplete-item"
-                      @mousedown="selectMember(member)"
-                    >
-                      <img
-                        v-if="member.avatar_url"
-                        :src="member.avatar_url"
-                        class="autocomplete-avatar"
-                      />
-                      <div v-else class="autocomplete-avatar-placeholder">
-                        {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
-                      </div>
-                      <div class="autocomplete-info">
-                        <span class="autocomplete-name">{{ member.display_name || member.username }}</span>
-                        <span class="autocomplete-id">{{ member.id }}</span>
-                      </div>
+    <div v-if="actionModalVisible" class="modal-overlay" @click.self="closeActionModal">
+      <div class="modal-content action-modal">
+        <div class="modal-header">
+          <h3>Nouvelle action de moderation</h3>
+          <button class="modal-close" @click="closeActionModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form class="action-form" @submit.prevent="handleActionSubmit">
+            <FormField label="ID du serveur">
+              <input v-model="actionGuildId" type="text" placeholder="ID du serveur" />
+            </FormField>
+
+            <FormField label="Utilisateur cible">
+              <div class="autocomplete-wrapper">
+                <input
+                  v-model="actionSearch"
+                  type="text"
+                  placeholder="Rechercher un membre ou saisir un ID…"
+                  @input="onActionSearchInput"
+                  @focus="onActionSearchInput"
+                  @blur="onActionSearchBlur"
+                  autocomplete="off"
+                />
+                <div v-if="actionShowSuggestions" class="autocomplete-list">
+                  <div
+                    v-for="member in actionSuggestions"
+                    :key="member.id"
+                    class="autocomplete-item"
+                    @mousedown="selectActionMember(member)"
+                  >
+                    <img
+                      v-if="member.avatar_url"
+                      :src="member.avatar_url"
+                      class="autocomplete-avatar"
+                    />
+                    <div v-else class="autocomplete-avatar-placeholder">
+                      {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
+                    </div>
+                    <div class="autocomplete-info">
+                      <span class="autocomplete-name">{{ member.display_name || member.username }}</span>
+                      <span class="autocomplete-id">{{ member.id }}</span>
                     </div>
                   </div>
                 </div>
-              </FormField>
-            </div>
+              </div>
+            </FormField>
+
             <div class="form-row two-col">
-              <FormField label="ID de l'utilisateur cible">
-                <input v-model="targetId" type="text" placeholder="ID auto-rempli ou saisie manuelle" />
+              <FormField label="ID cible">
+                <input v-model="actionTargetId" type="text" placeholder="Auto ou manuel" />
               </FormField>
-              <FormField label="Nom de l'utilisateur cible">
-                <input v-model="targetName" type="text" placeholder="Auto-rempli ou saisie manuelle" />
+              <FormField label="Nom cible">
+                <input v-model="actionTargetName" type="text" placeholder="Auto ou manuel" />
               </FormField>
             </div>
+
             <div class="form-row two-col">
               <FormField label="Action">
                 <select v-model="actionType">
@@ -461,7 +648,7 @@ async function handleLookup() {
                 </select>
               </FormField>
               <FormField label="Gravite">
-                <select v-model="gravity">
+                <select v-model="actionGravity">
                   <option value="low">Faible</option>
                   <option value="medium">Moyen</option>
                   <option value="high">Eleve</option>
@@ -469,59 +656,31 @@ async function handleLookup() {
                 </select>
               </FormField>
             </div>
-            <div v-if="actionType === 'mute' || actionType === 'ban'" class="form-row">
-              <FormField label="Duree (secondes) — laisser vide pour permanent">
-                <input v-model.number="duration" type="number" placeholder="600 = 10min, 3600 = 1h" :min="0" />
-              </FormField>
-            </div>
+
+            <FormField
+              v-if="actionType === 'mute' || actionType === 'ban'"
+              label="Duree (secondes) — vide = permanent"
+            >
+              <input
+                v-model.number="actionDuration"
+                type="number"
+                placeholder="600 = 10min, 3600 = 1h"
+                :min="0"
+              />
+            </FormField>
+
             <FormField label="Raison">
-              <textarea v-model="reason" rows="2" placeholder="Pourquoi cette action est-elle prise ?"></textarea>
+              <textarea v-model="actionReason" rows="3" placeholder="Pourquoi cette action ?"></textarea>
             </FormField>
 
             <p v-if="actionError" class="error-msg">{{ actionError }}</p>
-            <p v-if="actionSuccess" class="success-msg">{{ actionSuccess }}</p>
-
-            <AppButton variant="primary" class="submit-btn" :disabled="submitting">
-              {{ submitting ? "Application..." : `Appliquer ${actionType}` }}
-            </AppButton>
           </form>
         </div>
-
-        <!-- History lookup -->
-        <div class="mod-card">
-          <h2>Historique de l'utilisateur</h2>
-          <div class="lookup-form">
-            <div class="form-row two-col">
-              <FormField label="ID du serveur">
-                <input v-model="lookupGuildId" type="text" placeholder="ID du serveur" />
-              </FormField>
-              <FormField label="ID de l'utilisateur">
-                <input v-model="lookupUserId" type="text" placeholder="ID utilisateur Discord" />
-              </FormField>
-            </div>
-            <AppButton variant="primary" :disabled="historyLoading" @click="handleLookup">
-              {{ historyLoading ? "Chargement..." : "Rechercher" }}
-            </AppButton>
-          </div>
-
-          <div v-if="history" class="history-result">
-            <div class="history-header">
-              <span class="history-name">{{ history.target_name }}</span>
-              <span class="history-id">{{ history.target_id }}</span>
-            </div>
-            <div class="history-stats">
-              <div class="stat"><span class="stat-num info">{{ history.total_warns }}</span> avertissements</div>
-              <div class="stat"><span class="stat-num warning">{{ history.total_mutes }}</span> sourdines</div>
-              <div class="stat"><span class="stat-num danger">{{ history.total_bans }}</span> bannissements</div>
-            </div>
-            <div v-if="history.actions.length > 0" class="history-actions">
-              <div v-for="action in history.actions" :key="action.id" class="history-action">
-                <AppBadge :label="action.action_type" :variant="actionVariant(action.action_type)" />
-                <span class="action-reason">{{ action.reason }}</span>
-              </div>
-            </div>
-            <div v-else class="empty-small">Aucune action enregistree</div>
-          </div>
+        <div class="modal-footer">
+          <button class="modal-cancel" @click="closeActionModal">Annuler</button>
+          <AppButton variant="primary" :disabled="submitting" @click="handleActionSubmit">
+            {{ submitting ? "Application…" : `Appliquer ${actionType}` }}
+          </AppButton>
         </div>
       </div>
     </div>
@@ -572,14 +731,147 @@ async function handleLookup() {
   to { opacity: 1; }
 }
 
-/* ---- Journal (infractions) ---- */
-.toolbar {
+/* ---- Journal toolbar + filters ---- */
+.journal-toolbar {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
   margin-bottom: 16px;
+  padding: 16px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
 }
 
-.toolbar input {
-  max-width: 360px;
+.filters-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 1200px) {
+  .filters-grid {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+  .filter-search { grid-column: 1 / -1; }
+}
+
+@media (max-width: 700px) {
+  .filters-grid { grid-template-columns: 1fr; }
+}
+
+.filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.filter-field label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 0.3px;
+}
+
+.date-input {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  color-scheme: dark;
+}
+
+.date-input:focus {
+  border-color: var(--accent);
+}
+
+.toolbar-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toggle-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-filter input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+.toggle-filter:hover {
+  color: var(--text-primary);
+}
+
+.reset-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.reset-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--accent);
+}
+
+.purge-btn {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.purge-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.purge-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.result-count {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  padding: 0 4px;
+}
+
+.result-count strong {
+  color: var(--text-primary);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.result-total {
+  opacity: 0.7;
 }
 
 .user-cell {
@@ -591,6 +883,38 @@ async function handleLookup() {
 .mono {
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
   font-size: 12px;
+}
+
+.cancel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background-color: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.cancel-btn:hover:not(:disabled) {
+  background-color: var(--danger);
+  color: white;
+}
+
+.cancel-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cancel-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
 }
 
 /* ---- Bans ---- */
@@ -625,6 +949,10 @@ async function handleLookup() {
   grid-template-columns: 1fr 1fr;
   gap: 24px;
   align-items: start;
+}
+
+@media (max-width: 900px) {
+  .bans-columns { grid-template-columns: 1fr; }
 }
 
 .column-header {
@@ -797,7 +1125,7 @@ async function handleLookup() {
   margin-bottom: 12px;
 }
 
-/* ---- Ban modal ---- */
+/* ---- Modale "Nouvelle action" ---- */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -806,6 +1134,7 @@ async function handleLookup() {
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  padding: 20px;
 }
 
 .modal-content {
@@ -813,8 +1142,15 @@ async function handleLookup() {
   border: 1px solid var(--border);
   border-radius: 12px;
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.action-modal {
+  overflow: hidden;
 }
 
 .modal-header {
@@ -835,7 +1171,7 @@ async function handleLookup() {
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 24px;
+  font-size: 26px;
   cursor: pointer;
   line-height: 1;
 }
@@ -846,47 +1182,7 @@ async function handleLookup() {
 
 .modal-body {
   padding: 20px;
-}
-
-.modal-user {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px;
-  background: var(--bg-hover);
-  border-radius: 8px;
-}
-
-.modal-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-secondary);
-  margin-bottom: 8px;
-}
-
-.modal-textarea {
-  width: 100%;
-  background: var(--bg-input, var(--bg-card));
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  color: var(--text-primary);
-  font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
-  outline: none;
-  transition: border-color 0.2s;
-}
-
-.modal-textarea:focus {
-  border-color: var(--accent);
-}
-
-.modal-textarea::placeholder {
-  color: var(--text-secondary);
-  opacity: 0.6;
+  overflow-y: auto;
 }
 
 .modal-footer {
@@ -913,31 +1209,8 @@ async function handleLookup() {
   background: var(--bg-hover);
 }
 
-/* ---- Actions (moderation) ---- */
-.mod-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-}
-
-@media (max-width: 1100px) {
-  .mod-grid { grid-template-columns: 1fr; }
-}
-
-.mod-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
-}
-
-.mod-card h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 20px;
-}
-
-.action-form, .lookup-form {
+/* ---- Action form ---- */
+.action-form {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -946,7 +1219,9 @@ async function handleLookup() {
 .form-row { display: flex; gap: 12px; }
 .form-row.two-col > :deep(.form-field) { flex: 1; }
 
-:deep(.form-field) input, :deep(.form-field) select, :deep(.form-field) textarea {
+:deep(.form-field) input,
+:deep(.form-field) select,
+:deep(.form-field) textarea {
   width: 100%;
   background-color: var(--bg-primary);
   border: 1px solid var(--border);
@@ -958,77 +1233,15 @@ async function handleLookup() {
   outline: none;
 }
 
-:deep(.form-field) input:focus, :deep(.form-field) select:focus, :deep(.form-field) textarea:focus {
+:deep(.form-field) input:focus,
+:deep(.form-field) select:focus,
+:deep(.form-field) textarea:focus {
   border-color: var(--accent);
 }
 
 :deep(.form-field) textarea { resize: vertical; }
 
 .error-msg { color: var(--danger); font-size: 13px; }
-.success-msg { color: var(--success); font-size: 13px; }
-
-.submit-btn { width: 100%; margin-top: 4px; }
-
-/* History */
-.history-result { margin-top: 20px; }
-
-.history-header {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.history-name { font-weight: 600; font-size: 16px; }
-.history-id { font-size: 11px; color: var(--text-secondary); font-family: monospace; }
-
-.history-stats {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.stat {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.stat-num {
-  font-weight: 700;
-  font-size: 18px;
-  margin-right: 4px;
-}
-
-.stat-num.info { color: var(--info); }
-.stat-num.warning { color: var(--warning); }
-.stat-num.danger { color: var(--danger); }
-
-.history-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.history-action {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background-color: var(--bg-primary);
-  border-radius: 8px;
-}
-
-.action-reason {
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.empty-small {
-  color: var(--text-secondary);
-  font-size: 13px;
-  text-align: center;
-  padding: 16px;
-}
 
 /* Autocomplete */
 .autocomplete-wrapper {

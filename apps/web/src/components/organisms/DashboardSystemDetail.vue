@@ -214,8 +214,6 @@ function formatMemory(mb: number): string {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 320px;
-  overflow-y: auto;
 }
 
 .empty-list {

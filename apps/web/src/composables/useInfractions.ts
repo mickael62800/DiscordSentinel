@@ -13,6 +13,7 @@ export function useInfractions() {
 
   const { success, error: showError } = useToast();
   const deleting = ref(false);
+  const purging = ref(false);
 
   async function deleteInfraction(id: string) {
     deleting.value = true;
@@ -28,5 +29,21 @@ export function useInfractions() {
     }
   }
 
-  return { infractions, loading, error, fetchInfractions, deleting, deleteInfraction };
+  async function purgeAll(guildId: string): Promise<number> {
+    purging.value = true;
+    try {
+      const result = await infractionsService.purgeAll(guildId);
+      await fetchInfractions();
+      success(`${result.deleted} infraction(s) supprimee(s) de la BDD.`);
+      return result.deleted;
+    } catch (e) {
+      console.error("Erreur lors de la purge des infractions :", e);
+      showError("Erreur lors de la purge des infractions.");
+      throw e;
+    } finally {
+      purging.value = false;
+    }
+  }
+
+  return { infractions, loading, error, fetchInfractions, deleting, deleteInfraction, purging, purgeAll };
 }

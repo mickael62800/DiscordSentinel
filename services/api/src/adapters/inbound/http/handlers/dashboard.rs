@@ -89,7 +89,16 @@ pub async fn create_log(
     Ok(StatusCode::CREATED)
 }
 
-/// GET /api/infractions — infractions (filtrable par guild_id)
+/// GET /api/infractions — journal unifie (detections automod + actions moderees)
+///
+/// Depuis le refactor du panneau web, cet endpoint agrege :
+/// - Table `infractions` : detections automatisees (automod texte/image/conduit).
+///   Le champ `moderator` y est hardcode a "AutoMod" car la table ne stocke pas
+///   l'identite du composant qui a detecte.
+/// - Table `moderation_actions` : sanctions prises (warn/mute/ban/unban) avec
+///   leur moderator_name reel (bot, worker ou utilisateur humain via le panneau).
+///
+/// Resultat : le journal affiche maintenant la vraie diversite de moderateurs.
 pub async fn get_all_infractions(
     State(state): State<AppState>,
     Query(params): Query<GuildFilterParams>,
@@ -106,12 +115,24 @@ pub async fn get_all_infractions(
         }
         None => state.infractions_uc.list_all_infractions(200, 0).await?,
     };
-    Ok(Json(
-        infractions
-            .into_iter()
-            .map(DashboardInfractionDto::from)
-            .collect(),
-    ))
+
+    let actions = state
+        .moderation_uc
+        .list_actions(params.guild_id.as_deref(), 200)
+        .await
+        .unwrap_or_default();
+
+    let mut merged: Vec<DashboardInfractionDto> = infractions
+        .into_iter()
+        .map(DashboardInfractionDto::from)
+        .chain(actions.into_iter().map(DashboardInfractionDto::from))
+        .collect();
+
+    // Tri global par created_at DESC — les deux sources ont deja trie mais le
+    // merge les melange.
+    merged.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+
+    Ok(Json(merged))
 }
 
 /// GET /api/rules — règles (filtrable par guild_id)

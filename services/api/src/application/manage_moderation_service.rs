@@ -169,6 +169,10 @@ impl ManageModerationUseCase for ManageModerationService {
         self.repo.find_bans(guild_id, limit, offset).await
     }
 
+    async fn list_actions(&self, guild_id: Option<&str>, limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
+        self.repo.find_all_for_guild(guild_id, limit).await
+    }
+
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError> {
         self.repo.delete_bans_for_user(guild_id, target_id).await?;
         let cache_key = format!("modhistory:{guild_id}:{target_id}");

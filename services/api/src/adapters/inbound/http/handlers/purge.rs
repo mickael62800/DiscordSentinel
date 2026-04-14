@@ -22,15 +22,16 @@ pub struct PurgeLogsDto {
     pub days: i32,
 }
 
-/// DELETE /api/purge/infractions — purge infractions older than X days for a guild
+/// DELETE /api/purge/infractions — purge infractions plus vieilles que X jours
+/// pour une guild. `days = 0` signifie "tout supprimer" (pas de filtre de date).
 pub async fn purge_infractions(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
-    if dto.days < 1 {
-        return Err(ApiError(DomainError::ValidationError("days doit etre >= 1".into())));
+    if dto.days < 0 {
+        return Err(ApiError(DomainError::ValidationError("days doit etre >= 0".into())));
     }
 
     // Phase 7 B — Gate RBAC : owner requis pour une purge massive.

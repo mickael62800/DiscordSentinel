@@ -106,10 +106,31 @@ impl ModerationRepository for PgModerationRepository {
     }
 
     async fn find_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
+        // Retourne les utilisateurs ACTUELLEMENT bannis, pas l'historique.
+        //
+        // `moderation_actions` est un journal append-only : un user qui a ete
+        // banni → debanni → rebanni aura 3 lignes. On veut afficher 1 carte
+        // par user avec l'etat courant.
+        //
+        // Algo : pour chaque (guild_id, target_id), garder la ligne la plus
+        // recente (ban* ou unban), puis ne garder que celles dont action_type
+        // commence par 'ban' (donc l'utilisateur est actuellement banni).
+        //
+        // `DISTINCT ON (guild_id, target_id)` + `ORDER BY ..., created_at DESC`
+        // donne la ligne la plus recente par user en O(n log n).
         let rows = match guild_id {
             Some(gid) => {
                 sqlx::query_as::<_, ActionRow>(
-                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' AND guild_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3",
+                    "SELECT * FROM ( \
+                        SELECT DISTINCT ON (guild_id, target_id) * \
+                        FROM moderation_actions \
+                        WHERE guild_id = $1 \
+                          AND (action_type LIKE 'ban%' OR action_type = 'unban') \
+                        ORDER BY guild_id, target_id, created_at DESC \
+                     ) latest \
+                     WHERE action_type LIKE 'ban%' \
+                     ORDER BY created_at DESC \
+                     LIMIT $2 OFFSET $3",
                 )
                 .bind(gid)
                 .bind(limit)
@@ -119,10 +140,43 @@ impl ModerationRepository for PgModerationRepository {
             }
             None => {
                 sqlx::query_as::<_, ActionRow>(
-                    "SELECT * FROM moderation_actions WHERE action_type LIKE 'ban%' ORDER BY created_at DESC LIMIT $1 OFFSET $2",
+                    "SELECT * FROM ( \
+                        SELECT DISTINCT ON (guild_id, target_id) * \
+                        FROM moderation_actions \
+                        WHERE action_type LIKE 'ban%' OR action_type = 'unban' \
+                        ORDER BY guild_id, target_id, created_at DESC \
+                     ) latest \
+                     WHERE action_type LIKE 'ban%' \
+                     ORDER BY created_at DESC \
+                     LIMIT $1 OFFSET $2",
                 )
                 .bind(limit)
                 .bind(offset)
+                .fetch_all(&self.pool)
+                .await
+            }
+        }
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(ModerationAction::from).collect())
+    }
+
+    async fn find_all_for_guild(&self, guild_id: Option<&str>, limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
+        let rows = match guild_id {
+            Some(gid) => {
+                sqlx::query_as::<_, ActionRow>(
+                    "SELECT * FROM moderation_actions WHERE guild_id = $1 ORDER BY created_at DESC LIMIT $2",
+                )
+                .bind(gid)
+                .bind(limit)
+                .fetch_all(&self.pool)
+                .await
+            }
+            None => {
+                sqlx::query_as::<_, ActionRow>(
+                    "SELECT * FROM moderation_actions ORDER BY created_at DESC LIMIT $1",
+                )
+                .bind(limit)
                 .fetch_all(&self.pool)
                 .await
             }

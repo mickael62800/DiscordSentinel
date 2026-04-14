@@ -40,6 +40,8 @@ pub trait ManageModerationUseCase: Send + Sync {
     }
     async fn get_history(&self, guild_id: &str, target_id: &str) -> Result<UserModerationHistory, DomainError>;
     async fn list_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError>;
+    /// Liste toutes les actions de moderation pour une guild (journal unifie).
+    async fn list_actions(&self, guild_id: Option<&str>, limit: i64) -> Result<Vec<ModerationAction>, DomainError>;
     async fn delete_bans_for_user(&self, guild_id: &str, target_id: &str) -> Result<(), DomainError>;
     /// Supprime une action de moderation par son ID (unwarn, annulation).
     async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError>;

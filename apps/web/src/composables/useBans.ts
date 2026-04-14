@@ -22,7 +22,10 @@ export function useBans() {
         infractionsService.getAll(guildId),
         moderationService.getConfirmedBans(guildId),
       ]);
+      // Le backend retourne deja les utilisateurs actuellement bannis
+      // (deduplique par target_id, derniere action = ban, pas un unban).
       confirmedBans.value = bans;
+
       const bannedIds = new Set(bans.map((b) => `${b.guild_id}:${b.target_id}`));
       const allBanProposals = infractions.filter((i) => i.infraction_type === "ban");
       const seen = new Set<string>();
