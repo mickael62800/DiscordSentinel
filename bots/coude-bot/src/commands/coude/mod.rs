@@ -495,10 +495,12 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
         }
     };
 
-    // Attaque surprise : auto-resolve direct
+    // Attaque surprise : auto-resolve direct.
+    // Important : poster l'embed d'annonce PUIS l'embed de resultat retourne
+    // par resolve_combat_internal. Avant, la valeur de retour etait ignoree
+    // et le combat semblait ne pas avoir eu lieu (seule l'annonce s'affichait).
     if special_opt == Some("surprise") {
         drop(data);
-        super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await;
         let _ = component
             .channel_id
             .send_message(
@@ -506,16 +508,38 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                 CreateMessage::new().embed(build_surprise_embed(attacker_user.id, target.id)),
             )
             .await;
-        edit_component_message(ctx, component, "\u{2705} Defi surprise lance !").await;
+        match super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await {
+            Some(embed) => {
+                if let Err(e) = component
+                    .channel_id
+                    .send_message(&ctx.http, CreateMessage::new().embed(embed))
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec post embed resultat combat surprise");
+                }
+                edit_component_message(ctx, component, "\u{2705} Defi surprise resolu !").await;
+            }
+            None => {
+                tracing::error!(
+                    combat_id = %combat.id,
+                    "resolve_combat_internal a retourne None pour un combat surprise"
+                );
+                edit_component_message(
+                    ctx,
+                    component,
+                    "\u{26a0}\u{fe0f} Defi surprise lance mais la resolution a echoue (voir logs bot).",
+                )
+                .await;
+            }
+        }
         return;
     }
 
-    // Bloodbath : auto-accept
+    // Bloodbath : auto-accept — meme correction que surprise.
     let events = api.get_active_events(&guild_id).await.unwrap_or_default();
     let bloodbath = events.iter().any(|e| e.event_type == "bloodbath");
     if bloodbath {
         drop(data);
-        super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await;
         let _ = component
             .channel_id
             .send_message(
@@ -523,7 +547,30 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                 CreateMessage::new().embed(build_bloodbath_embed(attacker_user.id, target.id)),
             )
             .await;
-        edit_component_message(ctx, component, "\u{2705} Defi Bloodbath lance !").await;
+        match super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await {
+            Some(embed) => {
+                if let Err(e) = component
+                    .channel_id
+                    .send_message(&ctx.http, CreateMessage::new().embed(embed))
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec post embed resultat combat bloodbath");
+                }
+                edit_component_message(ctx, component, "\u{2705} Defi Bloodbath resolu !").await;
+            }
+            None => {
+                tracing::error!(
+                    combat_id = %combat.id,
+                    "resolve_combat_internal a retourne None pour un combat bloodbath"
+                );
+                edit_component_message(
+                    ctx,
+                    component,
+                    "\u{26a0}\u{fe0f} Defi Bloodbath lance mais la resolution a echoue.",
+                )
+                .await;
+            }
+        }
         return;
     }
 

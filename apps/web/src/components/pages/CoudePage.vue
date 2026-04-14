@@ -17,7 +17,10 @@ const { confirm } = useConfirm();
 const { success, error: toastError } = useToast();
 
 const activeTab = ref<"combats" | "players">("combats");
-const statusFilter = ref<string>("pending");
+// Default : "active" = pending + betting (les combats reellement en cours).
+// Les autres statuts DB : accepted (termine), betting (paris ouverts),
+// pending (en attente d'acceptation), refused, expired.
+const statusFilter = ref<string>("active");
 const combats = ref<CoudeCombat[]>([]);
 const players = ref<CoudePlayer[]>([]);
 const loading = ref(false);
@@ -28,21 +31,26 @@ const sortKey = ref<"wins" | "winrate" | "level" | "chaos" | "stolen">("wins");
 
 const statusLabels: Record<string, string> = {
   pending: "En attente",
+  betting: "Paris ouverts",
   accepted: "Termine",
   refused: "Refuse",
   expired: "Expire",
+  active: "En cours",
   all: "Toutes",
 };
 
 const statusIcons: Record<string, string> = {
   pending: "⏳",
+  betting: "🎲",
   accepted: "✅",
   refused: "🚫",
   expired: "⏰",
 };
 
 const statusOptions = [
-  { value: "pending", label: "⏳ En attente" },
+  { value: "active", label: "🔥 En cours (pending + betting)" },
+  { value: "pending", label: "⏳ En attente d'acceptation" },
+  { value: "betting", label: "🎲 Paris ouverts" },
   { value: "accepted", label: "✅ Termines" },
   { value: "refused", label: "🚫 Refuses" },
   { value: "expired", label: "⏰ Expires" },
@@ -58,8 +66,20 @@ async function fetchCombats() {
   loading.value = true;
   error.value = null;
   try {
-    const status = statusFilter.value === "all" ? null : statusFilter.value;
-    combats.value = await coudeService.getCombats(selectedGuildId.value, status);
+    if (statusFilter.value === "active") {
+      // "En cours" = pending + betting. Backend n'accepte qu'un seul
+      // statut par requete, on fait 2 appels en parallele et on merge.
+      const [pending, betting] = await Promise.all([
+        coudeService.getCombats(selectedGuildId.value, "pending"),
+        coudeService.getCombats(selectedGuildId.value, "betting"),
+      ]);
+      combats.value = [...pending, ...betting].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+    } else {
+      const status = statusFilter.value === "all" ? null : statusFilter.value;
+      combats.value = await coudeService.getCombats(selectedGuildId.value, status);
+    }
   } catch (e) {
     error.value = String(e);
   } finally {
@@ -109,8 +129,10 @@ function statusClass(status: string): string {
   }
 }
 
-// Stats combats
-const statsActiveCombats = computed(() => combats.value.filter(c => c.status === "pending").length);
+// Stats combats — "actifs" = pending + betting (vraiment en cours).
+const statsActiveCombats = computed(() =>
+  combats.value.filter((c) => c.status === "pending" || c.status === "betting").length,
+);
 const statsTotalMises = computed(() => combats.value.reduce((s, c) => s + c.mise, 0));
 const statsTotalTransferred = computed(() =>
   combats.value.reduce((s, c) => s + (c.coins_transferred ?? 0), 0),

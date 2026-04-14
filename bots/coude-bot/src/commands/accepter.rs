@@ -163,7 +163,23 @@ pub async fn resolve_combat_internal(
         .await
     {
         Ok(Some(p)) => p,
-        _ => return None,
+        Ok(None) => {
+            tracing::error!(
+                combat_id = %combat_record.id,
+                attacker_id = %combat_record.attacker_id,
+                "resolve_combat_internal: attaquant introuvable en DB"
+            );
+            return None;
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                combat_id = %combat_record.id,
+                attacker_id = %combat_record.attacker_id,
+                "resolve_combat_internal: erreur API get_player attaquant"
+            );
+            return None;
+        }
     };
 
     let defender = match api
@@ -171,7 +187,23 @@ pub async fn resolve_combat_internal(
         .await
     {
         Ok(Some(p)) => p,
-        _ => return None,
+        Ok(None) => {
+            tracing::error!(
+                combat_id = %combat_record.id,
+                defender_id = %combat_record.defender_id,
+                "resolve_combat_internal: defenseur introuvable en DB"
+            );
+            return None;
+        }
+        Err(e) => {
+            tracing::error!(
+                error = %e,
+                combat_id = %combat_record.id,
+                defender_id = %combat_record.defender_id,
+                "resolve_combat_internal: erreur API get_player defenseur"
+            );
+            return None;
+        }
     };
 
     let events = api
