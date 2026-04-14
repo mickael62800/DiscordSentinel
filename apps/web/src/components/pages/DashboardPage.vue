@@ -109,6 +109,8 @@ const periods = computed(() => [7, 14, 30, 90]);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
   margin-bottom: 24px;
 }
 
@@ -120,6 +122,7 @@ const periods = computed(() => [7, 14, 30, 90]);
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .period-selector {

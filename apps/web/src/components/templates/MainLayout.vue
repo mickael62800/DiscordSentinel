@@ -42,5 +42,18 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 32px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .main-content {
+    padding: 20px 16px;
+  }
+}
+
+@media (max-width: 600px) {
+  .main-content {
+    padding: 16px 12px;
+  }
 }
 </style>

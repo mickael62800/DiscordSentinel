@@ -338,8 +338,22 @@ const membersChartData = computed(() => ({
 
 .charts-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  /* 3 colonnes sur ecrans larges, 2 colonnes au milieu, 1 sur mobile.
+     minmax(0, 1fr) empeche les cells de deborder leur largeur. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+@media (max-width: 1300px) {
+  .charts-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .charts-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .chart-card {
@@ -347,6 +361,7 @@ const membersChartData = computed(() => ({
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
+  min-width: 0; /* empeche l'expansion due au contenu */
 }
 
 .chart-card--wide { grid-column: 1 / -1; }

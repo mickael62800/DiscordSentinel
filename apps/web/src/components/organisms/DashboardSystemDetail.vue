@@ -172,7 +172,8 @@ function formatMemory(mb: number): string {
 
 .detail-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* 3 colonnes au-dela de ~1000px, 2 entre 600-1000, 1 en dessous. */
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 16px;
 }
 
@@ -181,6 +182,7 @@ function formatMemory(mb: number): string {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 18px 20px;
+  min-width: 0;
 }
 
 .card-header {

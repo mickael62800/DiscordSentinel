@@ -283,8 +283,20 @@ function heatColor(value: number, max: number): string {
 
 .analytics-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+@media (max-width: 1300px) {
+  .analytics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 800px) {
+  .analytics-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .chart-card {
@@ -292,6 +304,7 @@ function heatColor(value: number, max: number): string {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 20px;
+  min-width: 0;
 }
 
 .chart-card--wide { grid-column: 1 / -1; }
