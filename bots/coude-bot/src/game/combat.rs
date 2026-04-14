@@ -242,9 +242,15 @@ pub fn resolve_combat(
     let atk_name = format!("<@{}>", attacker.user_id);
     let def_name = format!("<@{}>", defender.user_id);
 
-    // ── Explosion: early exit, both lose 50% of mise ──
-    if defender_special == Some("explosion") {
+    // ── Explosion : early exit, les deux joueurs perdent 50% de la mise.
+    // Peut etre utilise par l'attaquant OU le defenseur.
+    if special == Some("explosion") || defender_special == Some("explosion") {
         let lost = (mise as f64 * 0.5) as i64;
+        let caster_name = if special == Some("explosion") {
+            &atk_name
+        } else {
+            &def_name
+        };
         return CombatResult {
             winner_id: None,
             loser_id: None,
@@ -261,7 +267,7 @@ pub fn resolve_combat(
             vol_coins: 0,
             message: format!(
                 "\u{1f4a3} **EXPLOSION !** {} active une bombe ! Les deux perdent **{} coins** !",
-                def_name, lost
+                caster_name, lost
             ),
             is_giant_killer: false,
             attacker_class_revealed: None,

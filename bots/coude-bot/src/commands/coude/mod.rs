@@ -54,7 +54,8 @@ pub fn register() -> CreateCommand {
                 .add_string_choice("Poison", "poison")
                 .add_string_choice("Mindgame", "mindgame")
                 .add_string_choice("Bouclier", "bouclier")
-                .add_string_choice("Antidote", "antidote"),
+                .add_string_choice("Antidote", "antidote")
+                .add_string_choice("Explosion", "explosion"),
         )
 }
 

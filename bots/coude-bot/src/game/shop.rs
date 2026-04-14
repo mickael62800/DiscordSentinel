@@ -101,6 +101,40 @@ pub const SHOP_ITEMS: &[ShopItem] = &[
         description: "Immunise contre le poison pendant 1 combat",
         category: "defense",
     },
+    // ── Anti-vol (passifs, consommes sur un blocage reussi) ──
+    ShopItem {
+        key: "chien_garde",
+        name: "Chien de garde",
+        emoji: "\u{1f415}",
+        price: 200,
+        description: "25% de chance de bloquer un vol (consomme au blocage)",
+        category: "anti_vol",
+    },
+    ShopItem {
+        key: "camera_surveillance",
+        name: "Camera de surveillance",
+        emoji: "\u{1f4f9}",
+        price: 350,
+        description: "40% de chance de bloquer un vol (consomme au blocage)",
+        category: "anti_vol",
+    },
+    ShopItem {
+        key: "coffre_fort",
+        name: "Coffre-fort",
+        emoji: "\u{1f512}",
+        price: 600,
+        description: "60% de chance de bloquer un vol (consomme au blocage)",
+        category: "anti_vol",
+    },
+];
+
+/// Liste des items anti-vol tries par efficacite decroissante.
+/// Utilise par la logique de vol pour choisir le meilleur item a
+/// declencher quand quelqu'un tente de voler la cible.
+pub const ANTI_THEFT_ITEMS: &[(&str, u32)] = &[
+    ("coffre_fort", 60),
+    ("camera_surveillance", 40),
+    ("chien_garde", 25),
 ];
 
 pub fn get_item(key: &str) -> Option<&'static ShopItem> {

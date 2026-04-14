@@ -7,11 +7,51 @@ use serenity::all::{
 };
 use std::time::Duration;
 
-use crate::game::progression;
+use crate::api_client::ApiClient;
+use crate::game::{progression, shop};
 use crate::GameApiKey;
 use crate::handler::load_guild_config;
 
 pub const STEAL_DEFEND_PREFIX: &str = "steal_defend:";
+
+/// Malus applique au roll du defenseur quand il est AFK (n'a pas clique
+/// sur le bouton "Se defendre !"). Represente le fait qu'il ne reagit
+/// pas a l'alerte.
+const AFK_DEFENDER_MALUS: i32 = 8;
+
+/// Verifie les items anti-vol de la cible et en declenche un si possible.
+///
+/// Retourne `Some((item_key, item_name))` si un item a bloque le vol
+/// (auquel cas il a ete consomme via `use_item`). Sinon `None`.
+///
+/// Note : on evite de garder un `ThreadRng` (pas `Send`) au-dela d'un
+/// `await` en rollant dans un bloc scope, puis en l'oubliant avant d'appeler
+/// l'API.
+async fn try_trigger_protection(
+    api: &ApiClient,
+    guild_id: &str,
+    target_id: &str,
+) -> Option<(String, String)> {
+    for (key, pct) in shop::ANTI_THEFT_ITEMS {
+        let has = api.has_item(guild_id, target_id, key).await.unwrap_or(false);
+        if !has {
+            continue;
+        }
+        // Roll dans un bloc scope pour que le ThreadRng soit drop avant l'await.
+        let triggered = {
+            let mut rng = rand::thread_rng();
+            let roll: u32 = rng.gen_range(1..=100);
+            roll <= *pct
+        };
+        if triggered {
+            // Consomme l'item et retourne son info pour affichage.
+            let _ = api.use_item(guild_id, target_id, key).await;
+            let name = shop::get_item(key).map(|i| i.name.to_string()).unwrap_or_else(|| key.to_string());
+            return Some((key.to_string(), name));
+        }
+    }
+    None
+}
 
 const STEAL_SUCCESS_AFK: &[&str] = &[
     "\u{1f4b0} {voleur} a fait les poches de {victime} pendant sa sieste ! (-{montant} coins)",
@@ -288,66 +328,44 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
 
-        // Timeout: theft succeeds automatically (AFK steal)
+        // Timeout : la victime est AFK. On simule un combat de vol comme
+        // si elle se defendait, mais avec un malus sur son roll. Les items
+        // anti-vol peuvent toujours declencher.
         let data = ctx_clone.data.read().await;
         let api = data.get::<GameApiKey>().unwrap();
 
-        // Re-fetch target to get current coins
+        let thief_player = match api
+            .get_or_create_player(&guild_id_clone, &thief_id_clone, "")
+            .await
+        {
+            Ok(p) => p,
+            Err(e) => {
+                tracing::warn!(error = %e, "Echec API get_or_create_player thief (timeout vol)");
+                return;
+            }
+        };
+
         let target_player = match api
             .get_or_create_player(&guild_id_clone, &target_id_clone, "")
             .await
         {
             Ok(p) => p,
             Err(e) => {
-                tracing::warn!(error = %e, "Echec API get_or_create_player (timeout vol)");
+                tracing::warn!(error = %e, "Echec API get_or_create_player target (timeout vol)");
                 return;
             }
         };
 
-        // Steal 10-15% of target's coins
-        let steal_pct: f64 = {
-            let mut rng = rand::thread_rng();
-            rng.gen_range(10.0..=15.0) / 100.0
-        };
-        let stolen = ((target_player.coins as f64 * steal_pct) as i64).max(1);
-
-        // Record the theft
-        if let Err(e) = api
-            .record_steal(&guild_id_clone, &thief_id_clone, &target_id_clone, stolen)
-            .await
-        {
-            tracing::warn!(error = %e, "Echec API record_steal (timeout vol)");
-            return;
-        }
-
-        // XP for successful theft
-        let mut xp_line = String::new();
-        if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-            api.add_xp(&guild_id_clone, &thief_id_clone, 5).await
-        {
-            xp_line.push_str("\n\u{2b06}\u{fe0f} +5 XP pour le voleur");
-            if leveled_up {
-                let title = progression::title_for_level(new_level);
-                xp_line.push_str(&format!(
-                    "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
-                    new_level, title, stat_points
-                ));
-            }
-        }
-
-        let msg_text = format_msg(
-            pick_random(STEAL_SUCCESS_AFK),
-            &format!("<@{}>", thief_id_clone),
-            &format!("<@{}>", target_id_clone),
-            stolen,
-        );
-
-        let result_embed = CreateEmbed::new()
-            .title("\u{1f4b0} Vol reussi !")
-            .description(format!("{}{}", msg_text, xp_line))
-            .color(0x57F287)
-            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
-            .timestamp(serenity::model::Timestamp::now());
+        let result_embed = resolve_steal_attempt(
+            api,
+            &guild_id_clone,
+            &thief_id_clone,
+            &target_id_clone,
+            &thief_player,
+            &target_player,
+            true, // AFK
+        )
+        .await;
 
         // Edit the original alert message to show result (remove button)
         if let Err(e) = msg_channel_id
@@ -363,6 +381,174 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             tracing::warn!(error = %e, "Echec edit_message (timeout vol)");
         }
     });
+}
+
+/// Resout une tentative de vol. Centralise la logique pour les deux
+/// chemins (clic "Se defendre" ou timeout AFK).
+///
+/// - `afk = true` → malus de `AFK_DEFENDER_MALUS` sur le roll du
+///   defenseur, plage de coins voles 10-15% (moins que le defendu actif).
+/// - `afk = false` → roll normal, plage 15-25%.
+///
+/// Dans les deux cas, les items anti-vol de la cible peuvent bloquer
+/// le vol apres le roll (un item tire sa chance et se consume au blocage).
+async fn resolve_steal_attempt(
+    api: &ApiClient,
+    guild_id: &str,
+    thief_id: &str,
+    target_id: &str,
+    thief_player: &crate::api_client::Player,
+    target_player: &crate::api_client::Player,
+    afk: bool,
+) -> CreateEmbed {
+    use rand::Rng;
+
+    // Roll d20 + bonus
+    let (thief_roll, target_roll): (i32, i32) = {
+        let mut rng = rand::thread_rng();
+        (rng.gen_range(1..=20), rng.gen_range(1..=20))
+    };
+    let thief_bonus = if thief_player.class.as_deref() == Some("fourbe") {
+        4
+    } else {
+        0
+    };
+    let mut target_bonus = target_player.def / 10;
+    if afk {
+        target_bonus -= AFK_DEFENDER_MALUS;
+    }
+    let thief_total = thief_roll + thief_bonus;
+    let target_total = target_roll + target_bonus;
+
+    let roll_detail = format!(
+        "\n\n\u{1f3b2} Voleur: {} (d20: {} + bonus: {}) vs Victime: {} (d20: {} + DEF bonus: {}{})",
+        thief_total,
+        thief_roll,
+        thief_bonus,
+        target_total,
+        target_roll,
+        target_bonus + if afk { AFK_DEFENDER_MALUS } else { 0 },
+        if afk {
+            format!(" - AFK: {}", AFK_DEFENDER_MALUS)
+        } else {
+            String::new()
+        },
+    );
+
+    if thief_total > target_total {
+        // Le voleur a gagne le roll — mais un item anti-vol peut encore
+        // bloquer le vol (et se consommer).
+        if let Some((_key, name)) = try_trigger_protection(api, guild_id, target_id).await {
+            let block_msg = format!(
+                "\u{1f6e1}\u{fe0f} <@{}> avait un **{}** qui a bloque la tentative de vol de <@{}> !\n\
+                 L'item est consomme.",
+                target_id, name, thief_id
+            );
+            // La victime gagne +3 XP comme pour une defense reussie.
+            let mut xp_line = String::new();
+            if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
+                api.add_xp(guild_id, target_id, 3).await
+            {
+                xp_line.push_str(&format!("\n\u{2b06}\u{fe0f} +3 XP pour <@{}>", target_id));
+                if leveled_up {
+                    let title = progression::title_for_level(new_level);
+                    xp_line.push_str(&format!(
+                        "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
+                        new_level, title, stat_points
+                    ));
+                }
+            }
+            return CreateEmbed::new()
+                .title("\u{1f6e1}\u{fe0f} Vol bloque !")
+                .description(format!("{}{}{}", block_msg, roll_detail, xp_line))
+                .color(0x3498DB)
+                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+                .timestamp(serenity::model::Timestamp::now());
+        }
+
+        // Pas de protection : le vol reussit.
+        // AFK : 10-15% | defendu : 15-25%.
+        let steal_pct: f64 = {
+            let mut rng = rand::thread_rng();
+            if afk {
+                rng.gen_range(10.0..=15.0) / 100.0
+            } else {
+                rng.gen_range(15.0..=25.0) / 100.0
+            }
+        };
+        let stolen = ((target_player.coins as f64 * steal_pct) as i64).max(1);
+
+        if let Err(e) = api
+            .record_steal(guild_id, thief_id, target_id, stolen)
+            .await
+        {
+            tracing::warn!(error = %e, "Echec API record_steal");
+        }
+
+        let mut xp_line = String::new();
+        if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
+            api.add_xp(guild_id, thief_id, 5).await
+        {
+            xp_line.push_str("\n\u{2b06}\u{fe0f} +5 XP pour le voleur");
+            if leveled_up {
+                let title = progression::title_for_level(new_level);
+                xp_line.push_str(&format!(
+                    "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
+                    new_level, title, stat_points
+                ));
+            }
+        }
+
+        let template = if afk { STEAL_SUCCESS_AFK } else { STEAL_SUCCESS_FIGHT };
+        let msg_text = format_msg(
+            pick_random(template),
+            &format!("<@{}>", thief_id),
+            &format!("<@{}>", target_id),
+            stolen,
+        );
+
+        CreateEmbed::new()
+            .title("\u{1f4b0} Vol reussi !")
+            .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
+            .color(0x57F287)
+            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .timestamp(serenity::model::Timestamp::now())
+    } else {
+        // Vol echoue : le voleur perd 15% de ses coins, victime +3 XP.
+        let lost = ((thief_player.coins as f64 * 0.15) as i64).max(1);
+
+        if let Err(e) = api.record_coins_lost(guild_id, thief_id, lost).await {
+            tracing::warn!(error = %e, "Echec API record_coins_lost vol");
+        }
+
+        let mut xp_line = String::new();
+        if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
+            api.add_xp(guild_id, target_id, 3).await
+        {
+            xp_line.push_str(&format!("\n\u{2b06}\u{fe0f} +3 XP pour <@{}>", target_id));
+            if leveled_up {
+                let title = progression::title_for_level(new_level);
+                xp_line.push_str(&format!(
+                    "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
+                    new_level, title, stat_points
+                ));
+            }
+        }
+
+        let msg_text = format_msg(
+            pick_random(STEAL_FAIL),
+            &format!("<@{}>", thief_id),
+            &format!("<@{}>", target_id),
+            lost,
+        );
+
+        CreateEmbed::new()
+            .title("\u{1f6a8} Vol rate !")
+            .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
+            .color(0xED4245)
+            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .timestamp(serenity::model::Timestamp::now())
+    }
 }
 
 /// Handle the defend button click from a steal attempt.
@@ -421,123 +607,16 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    // Both roll 1d20 with bonuses
-    let (thief_roll, target_roll): (i32, i32) = {
-        let mut rng = rand::thread_rng();
-        (rng.gen_range(1..=20), rng.gen_range(1..=20))
-    };
-
-    // Thief bonus: +4 if class fourbe
-    let thief_bonus = if thief_player.class.as_deref() == Some("fourbe") {
-        4
-    } else {
-        0
-    };
-
-    // Victim bonus: DEF / 10
-    let target_bonus = target_player.def / 10;
-
-    let thief_total = thief_roll + thief_bonus;
-    let target_total = target_roll + target_bonus;
-
-    let (embed, _success) = if thief_total > target_total {
-        // Theft succeeds: steal 15-25% of target's coins
-        let steal_pct: f64 = {
-            let mut rng = rand::thread_rng();
-            rng.gen_range(15.0..=25.0) / 100.0
-        };
-        let stolen = ((target_player.coins as f64 * steal_pct) as i64).max(1);
-
-        // Record the theft
-        if let Err(e) = api
-            .record_steal(guild_id, thief_id, target_id, stolen)
-            .await
-        {
-            reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
-            return;
-        }
-
-        // XP for successful theft
-        let mut xp_line = String::new();
-        if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-            api.add_xp(guild_id, thief_id, 5).await
-        {
-            xp_line.push_str("\n\u{2b06}\u{fe0f} +5 XP pour le voleur");
-            if leveled_up {
-                let title = progression::title_for_level(new_level);
-                xp_line.push_str(&format!(
-                    "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
-                    new_level, title, stat_points
-                ));
-            }
-        }
-
-        let msg_text = format_msg(
-            pick_random(STEAL_SUCCESS_FIGHT),
-            &format!("<@{}>", thief_id),
-            &format!("<@{}>", target_id),
-            stolen,
-        );
-
-        let roll_detail = format!(
-            "\n\n\u{1f3b2} Voleur: {} (d20: {} + bonus: {}) vs Victime: {} (d20: {} + DEF bonus: {})",
-            thief_total, thief_roll, thief_bonus, target_total, target_roll, target_bonus
-        );
-
-        (
-            CreateEmbed::new()
-                .title("\u{1f4b0} Vol reussi !")
-                .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
-                .color(0x57F287)
-                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
-                .timestamp(serenity::model::Timestamp::now()),
-            true,
-        )
-    } else {
-        // Theft fails: thief loses 15% of OWN coins, identity revealed, victim +3 XP
-        let lost = ((thief_player.coins as f64 * 0.15) as i64).max(1);
-
-        if let Err(e) = api.record_coins_lost(guild_id, thief_id, lost).await {
-            tracing::warn!(error = %e, "Echec API record_coins_lost vol");
-        }
-
-        // Victim gets +3 XP
-        let mut xp_line = String::new();
-        if let Ok((_new_xp, new_level, leveled_up, stat_points)) =
-            api.add_xp(guild_id, target_id, 3).await
-        {
-            xp_line.push_str(&format!("\n\u{2b06}\u{fe0f} +3 XP pour <@{}>", target_id));
-            if leveled_up {
-                let title = progression::title_for_level(new_level);
-                xp_line.push_str(&format!(
-                    "\n\u{1f31f} **LEVEL UP !** Niveau **{}** \u{300c}{}\u{300d} ! (+{} points de stats)",
-                    new_level, title, stat_points
-                ));
-            }
-        }
-
-        let msg_text = format_msg(
-            pick_random(STEAL_FAIL),
-            &format!("<@{}>", thief_id),
-            &format!("<@{}>", target_id),
-            lost,
-        );
-
-        let roll_detail = format!(
-            "\n\n\u{1f3b2} Voleur: {} (d20: {} + bonus: {}) vs Victime: {} (d20: {} + DEF bonus: {})",
-            thief_total, thief_roll, thief_bonus, target_total, target_roll, target_bonus
-        );
-
-        (
-            CreateEmbed::new()
-                .title("\u{1f6a8} Vol rate !")
-                .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
-                .color(0xED4245)
-                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
-                .timestamp(serenity::model::Timestamp::now()),
-            false,
-        )
-    };
+    let embed = resolve_steal_attempt(
+        api,
+        guild_id,
+        thief_id,
+        target_id,
+        &thief_player,
+        &target_player,
+        false, // defense active
+    )
+    .await;
 
     // Acknowledge the interaction by updating the original message
     if let Err(e) = component
