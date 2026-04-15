@@ -166,6 +166,10 @@ fn coude_player_to_proto(p: CoudePlayer) -> proto::CoudePlayer {
         season: p.season,
         created_at: p.created_at.to_rfc3339(),
         updated_at: p.updated_at.to_rfc3339(),
+        // Fix bug /repos : champs indispensables aux checks cooldown cote bot.
+        repos_last_used: p.repos_last_used.map(|d| d.to_rfc3339()),
+        hp_last_regen: p.hp_last_regen.map(|d| d.to_rfc3339()),
+        class_changed_at: p.class_changed_at.map(|d| d.to_rfc3339()),
     }
 }
 

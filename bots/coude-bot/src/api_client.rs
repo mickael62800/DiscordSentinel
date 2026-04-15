@@ -2044,11 +2044,13 @@ fn proto_player_to_dto(p: proto_coude::CoudePlayer) -> Player {
         def: p.def,
         class: p.class,
         title: p.title,
-        class_changed_at: None,
+        // Fix bug /repos : sans ces champs le check cooldown cote bot
+        // lisait toujours None et le joueur pouvait spam la commande.
+        class_changed_at: p.class_changed_at,
         hp_current: Some(p.hp_current),
         hp_max: Some(p.hp_max),
-        hp_last_regen: None,
-        repos_last_used: None,
+        hp_last_regen: p.hp_last_regen,
+        repos_last_used: p.repos_last_used,
         season: Some(p.season),
         created_at: p.created_at,
         updated_at: p.updated_at,

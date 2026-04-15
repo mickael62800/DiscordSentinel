@@ -99,6 +99,12 @@ message CoudePlayer {
   int32 season = 24;
   string created_at = 25;
   string updated_at = 26;
+  // Fix bug /repos : ces timestamps etaient absents du proto, donc le
+  // check cooldown cote bot lisait toujours None et le joueur pouvait
+  // spam /repos. Ajoutes en tag 27-29.
+  optional string repos_last_used = 27;
+  optional string hp_last_regen = 28;
+  optional string class_changed_at = 29;
 }
 
 message XpProgress {
