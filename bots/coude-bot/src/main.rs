@@ -8,7 +8,6 @@ pub mod api_client;
 mod channel_check;
 mod commands;
 mod config;
-mod db;
 mod game;
 pub mod guild_config;
 mod handler;
