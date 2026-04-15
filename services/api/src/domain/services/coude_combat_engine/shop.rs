@@ -11,7 +11,9 @@ pub struct ShopItem {
     ///   infliger plus de degats ou desavantager l'adversaire.
     /// - `"defense"` : items defensifs ou de soin (potions, bouclier,
     ///   antidote, explosion qui est une carte "defender only").
-    /// Le split /shop attaque vs /shop defense lit ce champ.
+    /// - `"braquage"` : items consommables pour /braquage, chacun
+    ///   apporte +5 % de chance au roll. Consommes tous a la tentative.
+    /// Le split /shop attaque / defense / braquage lit ce champ.
     pub category: &'static str,
 }
 
@@ -122,6 +124,83 @@ pub const SHOP_ITEMS: &[ShopItem] = &[
     // Ils s'achetent desormais via `/protection` et sont invisibles
     // aux voleurs. Le shop ne les expose plus — un vieux stock eventuel
     // dans `coude_inventory` est mis a 0 par la migration 125.
+
+    // ── Phase 10 : items de braquage (consommables) ──
+    // Chacun apporte +5 % de chance au roll /braquage. Tous les items
+    // presents dans l'inventaire sont consommes a la tentative (reussie
+    // ou ratee). Source de verite : `domain::entities::coude_heist`.
+    ShopItem {
+        key: "masque_braquage",
+        name: "Masque de braquage",
+        emoji: "\u{1f3ad}",
+        price: 100,
+        description: "+5 % /braquage. Consomme a la tentative.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "pied_de_biche",
+        name: "Pied-de-biche",
+        emoji: "\u{1f528}",
+        price: 150,
+        description: "+5 % /braquage. Force les portes arriere.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "crochet_vault",
+        name: "Crochet de vault",
+        emoji: "\u{1f513}",
+        price: 220,
+        description: "+5 % /braquage. Plus discret que l'explosif.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "plan_coffre",
+        name: "Plan du coffre",
+        emoji: "\u{1f5fa}\u{fe0f}",
+        price: 320,
+        description: "+5 % /braquage. La moitie du boulot est deja fait.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "fumigene_diversion",
+        name: "Fumigene de diversion",
+        emoji: "\u{1f4a8}",
+        price: 450,
+        description: "+5 % /braquage. Sors discret.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "explosif",
+        name: "Explosif",
+        emoji: "\u{1f4a3}",
+        price: 600,
+        description: "+5 % /braquage. La methode directe.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "hacker_kit",
+        name: "Hacker kit",
+        emoji: "\u{1f4be}",
+        price: 800,
+        description: "+5 % /braquage. Bypass total des alarmes.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "drone_espion",
+        name: "Drone espion",
+        emoji: "\u{1f681}",
+        price: 1000,
+        description: "+5 % /braquage. Reperage aerien avant le coup.",
+        category: "braquage",
+    },
+    ShopItem {
+        key: "equipe_de_pros",
+        name: "Equipe de pros",
+        emoji: "\u{1f46a}",
+        price: 1500,
+        description: "+5 % /braquage. Tu n'es plus seul sur le coup.",
+        category: "braquage",
+    },
 ];
 
 /// Liste des items anti-vol tries par efficacite decroissante.

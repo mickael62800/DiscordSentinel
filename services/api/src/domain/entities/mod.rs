@@ -111,3 +111,11 @@ pub use coude_taunt::{
     build_taunt_event, crossed_threshold, nickname_suffix_for, CoudeTauntsConfig, StreakKind,
     TauntEvent, TAUNT_THRESHOLDS,
 };
+
+mod coude_heist;
+pub use coude_heist::{
+    compute_success_chance, find_heist_tool, CoudeHeistAttempt, CoudePrisonState, HeistOutcome,
+    HeistToolDef, HEIST_BASE_SUCCESS_PERCENT, HEIST_COOLDOWN_DAYS, HEIST_GAIN_MAX_PERCENT,
+    HEIST_GAIN_MIN_PERCENT, HEIST_ITEM_BONUS_PERCENT, HEIST_MAX_SUCCESS_PERCENT,
+    HEIST_PRISON_HOURS, HEIST_TOOLS,
+};

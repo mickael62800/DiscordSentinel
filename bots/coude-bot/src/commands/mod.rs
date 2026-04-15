@@ -2,6 +2,7 @@ pub mod accepter;
 pub mod annuler;
 pub mod assurance;
 pub mod boost_voleur;
+pub mod braquage;
 pub mod cagnotte;
 pub mod classe;
 pub mod coude;
@@ -51,5 +52,6 @@ pub fn all() -> Vec<CreateCommand> {
         boost_voleur::register(),
         no_taunts::register(),
         taunts_channel::register(),
+        braquage::register(),
     ]
 }

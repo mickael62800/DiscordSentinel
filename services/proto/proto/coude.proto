@@ -680,6 +680,11 @@ service CoudeSocialService {
   rpc SetTauntsChannel(SetTauntsChannelRequest) returns (Empty);
   rpc SetTauntsEnabled(SetTauntsEnabledRequest) returns (Empty);
   rpc SetTauntsOptOut(SetTauntsOptOutRequest) returns (Empty);
+
+  // Phase 10 : systeme de braquage de la caisse communautaire.
+  rpc AttemptHeist(UserInGuildRequest) returns (HeistResult);
+  rpc GetHeistCooldown(UserInGuildRequest) returns (HeistCooldownState);
+  rpc GetPrisonStatus(UserInGuildRequest) returns (PrisonStatusState);
 }
 
 message GetCashboxRequest {
@@ -914,4 +919,28 @@ message SetTauntsOptOutRequest {
   string guild_id = 1;
   string user_id = 2;
   bool opted_out = 3;
+}
+
+// ── Phase 10 : braquage ──
+
+message HeistResult {
+  bool success = 1;
+  uint32 chance_percent = 2;
+  int64 cashbox_total_before = 3;
+  int64 amount_stolen = 4;
+  repeated string tools_consumed = 5;
+  // Si !success : timestamp RFC3339 de liberation de prison.
+  optional string prison_released_at = 6;
+}
+
+message HeistCooldownState {
+  bool ready = 1;
+  optional string next_attempt_at = 2;
+  optional bool last_success = 3;
+}
+
+message PrisonStatusState {
+  bool in_prison = 1;
+  optional string released_at = 2;
+  optional string reason = 3;
 }

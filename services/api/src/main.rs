@@ -305,6 +305,12 @@ async fn main() {
             coude_player_repo.clone(),
         ));
 
+    // Phase 10 — braquage (depend de cashbox_repo, inventory_uc, wallet_repo).
+    let coude_heist_repo: Arc<dyn sentinel_api::ports::outbound::CoudeHeistRepository> =
+        Arc::new(sentinel_api::adapters::outbound::postgres::PgCoudeHeistRepository::new(
+            pg_pool.clone(),
+        ));
+
     // Phase 2 refacto : use case dedie qui orchestre la resolution batch des
     // combats betting. Remplacera coude-worker/src/jobs/resolve_betting.rs
     // en Phase 3.
@@ -336,6 +342,16 @@ async fn main() {
             coude_cashbox_repo.clone(),
             wallet_repo.clone(),
         ));
+
+    // Phase 10 — heist UC (depend de cashbox_repo + inventory_uc + wallet_repo).
+    let coude_heist_uc: Arc<dyn sentinel_api::ports::inbound::ManageCoudeHeistUseCase> =
+        Arc::new(sentinel_api::application::ManageCoudeHeistService::new(
+            coude_heist_repo.clone(),
+            coude_cashbox_repo.clone(),
+            coude_inventory_uc.clone(),
+            wallet_repo.clone(),
+        ));
+
     let coude_steal_protection_repo: Arc<
         dyn sentinel_api::ports::outbound::CoudeStealProtectionRepository,
     > = Arc::new(
@@ -440,6 +456,7 @@ async fn main() {
         coude_steal_protections_uc,
         coude_steal_boosts_uc,
         coude_taunts_uc,
+        coude_heist_uc,
         broadcaster,
         job_client,
         discord_api,

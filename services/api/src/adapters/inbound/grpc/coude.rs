@@ -1113,6 +1113,7 @@ pub struct CoudeSocialGrpc {
     pub catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
     pub cashbox_uc: Arc<dyn crate::ports::inbound::ManageCoudeCashboxUseCase>,
     pub taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase>,
+    pub heist_uc: Arc<dyn crate::ports::inbound::ManageCoudeHeistUseCase>,
 }
 
 fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
@@ -1470,6 +1471,62 @@ impl CoudeSocialService for CoudeSocialGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))
+    }
+
+    // ── Phase 10 : braquage ──
+
+    async fn attempt_heist(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::HeistResult>, Status> {
+        let req = request.into_inner();
+        let outcome = self
+            .heist_uc
+            .attempt_heist(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::HeistResult {
+            success: outcome.success,
+            chance_percent: outcome.chance_percent,
+            cashbox_total_before: outcome.cashbox_total_before,
+            amount_stolen: outcome.amount_stolen,
+            tools_consumed: outcome.tools_consumed,
+            prison_released_at: outcome.prison_released_at.map(|d| d.to_rfc3339()),
+        }))
+    }
+
+    async fn get_heist_cooldown(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::HeistCooldownState>, Status> {
+        let req = request.into_inner();
+        let status = self
+            .heist_uc
+            .get_cooldown_status(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::HeistCooldownState {
+            ready: status.ready,
+            next_attempt_at: status.next_attempt_at.map(|d| d.to_rfc3339()),
+            last_success: status.last_success,
+        }))
+    }
+
+    async fn get_prison_status(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::PrisonStatusState>, Status> {
+        let req = request.into_inner();
+        let status = self
+            .heist_uc
+            .get_prison_status(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::PrisonStatusState {
+            in_prison: status.in_prison,
+            released_at: status.released_at.map(|d| d.to_rfc3339()),
+            reason: status.reason,
+        }))
     }
 }
 

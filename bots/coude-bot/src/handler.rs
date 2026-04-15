@@ -99,6 +99,15 @@ impl EventHandler for Handler {
             Interaction::Command(command) => {
                 let cmd_name = command.data.name.clone();
 
+                // Phase 10 : prison check avant dispatch. Si le joueur est
+                // en prison (echec /braquage), les commandes gameplay sont
+                // bloquees avec un message ephemeral et on return direct.
+                // Les commandes passives (profil, leaderboard, cagnotte…)
+                // ne sont pas dans la whitelist et passent.
+                if crate::prison_check::check_and_reply_if_in_prison(&ctx, &command).await {
+                    return;
+                }
+
                 match cmd_name.as_str() {
                     "coude" => commands::coude::handle(&ctx, &command).await,
                     "profil" => commands::profil::handle(&ctx, &command).await,
@@ -122,6 +131,7 @@ impl EventHandler for Handler {
                     "boost-voleur" => commands::boost_voleur::handle(&ctx, &command).await,
                     "no-taunts" => commands::no_taunts::handle(&ctx, &command).await,
                     "taunts-channel" => commands::taunts_channel::handle(&ctx, &command).await,
+                    "braquage" => commands::braquage::handle(&ctx, &command).await,
                     _ => {}
                 }
             }

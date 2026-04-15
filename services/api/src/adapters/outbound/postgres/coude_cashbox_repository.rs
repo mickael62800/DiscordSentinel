@@ -135,6 +135,51 @@ impl CoudeCashboxRepository for PgCoudeCashboxRepository {
         Ok(())
     }
 
+    async fn withdraw(
+        &self,
+        guild_id: &str,
+        amount: i64,
+    ) -> Result<i64, DomainError> {
+        if amount <= 0 {
+            return Ok(0);
+        }
+        // Transaction : SELECT FOR UPDATE puis UPDATE avec clamp a 0.
+        // Retourne le montant effectivement retire (peut etre < amount
+        // si la caisse etait trop petite).
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+
+        let row: Option<(i64,)> = sqlx::query_as(
+            "SELECT balance FROM coude_cashbox WHERE guild_id = $1 FOR UPDATE",
+        )
+        .bind(guild_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        let balance = row.map(|(v,)| v).unwrap_or(0);
+        if balance <= 0 {
+            tx.commit().await.map_err(pg_err)?;
+            return Ok(0);
+        }
+
+        let actual = amount.min(balance);
+
+        sqlx::query(
+            r#"UPDATE coude_cashbox
+               SET balance = balance - $2,
+                   updated_at = NOW()
+               WHERE guild_id = $1"#,
+        )
+        .bind(guild_id)
+        .bind(actual)
+        .execute(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+
+        tx.commit().await.map_err(pg_err)?;
+        Ok(actual)
+    }
+
     async fn claim_all_for_redistribution(
         &self,
         guild_id: &str,

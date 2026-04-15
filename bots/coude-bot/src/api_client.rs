@@ -123,6 +123,35 @@ pub struct TauntEvent {
     pub streak_value: i32,
 }
 
+// ── Phase 10 : braquage ──
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct HeistResult {
+    pub success: bool,
+    pub chance_percent: u32,
+    pub cashbox_total_before: i64,
+    pub amount_stolen: i64,
+    pub tools_consumed: Vec<String>,
+    pub prison_released_at: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct HeistCooldown {
+    pub ready: bool,
+    pub next_attempt_at: Option<String>,
+    pub last_success: Option<bool>,
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct PrisonStatus {
+    pub in_prison: bool,
+    pub released_at: Option<String>,
+    pub reason: Option<String>,
+}
+
 fn taunt_event_from_proto(e: proto_coude::TauntEvent) -> TauntEvent {
     TauntEvent {
         channel_id: e.channel_id,
@@ -1630,6 +1659,79 @@ impl ApiClient {
             .guarded(|| async move { client.set_taunts_channel(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 10 : braquage de la caisse
+    // ══════════════════════════════════════════════════════════════════
+
+    pub async fn attempt_heist(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<HeistResult, String> {
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.attempt_heist(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(HeistResult {
+            success: r.success,
+            chance_percent: r.chance_percent,
+            cashbox_total_before: r.cashbox_total_before,
+            amount_stolen: r.amount_stolen,
+            tools_consumed: r.tools_consumed,
+            prison_released_at: r.prison_released_at,
+        })
+    }
+
+    pub async fn get_heist_cooldown(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<HeistCooldown, String> {
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.get_heist_cooldown(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(HeistCooldown {
+            ready: r.ready,
+            next_attempt_at: r.next_attempt_at,
+            last_success: r.last_success,
+        })
+    }
+
+    pub async fn get_prison_status(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<PrisonStatus, String> {
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.get_prison_status(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(PrisonStatus {
+            in_prison: r.in_prison,
+            released_at: r.released_at,
+            reason: r.reason,
+        })
     }
 
     // ══════════════════════════════════════════════════════════════════

@@ -1,0 +1,245 @@
+//! Impl du systeme de braquage (Phase 10).
+//!
+//! Orchestre :
+//! - cooldown hebdo (coude_heist_repo.last_attempt)
+//! - prison (coude_heist_repo.get_prison / send_to_prison)
+//! - inventaire d'outils (coude_inventory_uc.list_inventory)
+//! - caisse communautaire (cashbox_repo.claim_all_for_redistribution
+//!   adapte, ou lecture + deposit negative — on choisit un claim
+//!   partiel custom ici)
+//! - wallet du joueur (wallet_repo.credit/debit)
+//! - consommation des outils (inventory_uc.use_item)
+
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use chrono::{Duration as ChronoDuration, Utc};
+use rand::Rng;
+use tracing::{info, warn};
+
+use crate::domain::entities::{
+    compute_success_chance, HeistOutcome, HEIST_COOLDOWN_DAYS, HEIST_GAIN_MAX_PERCENT,
+    HEIST_GAIN_MIN_PERCENT, HEIST_PRISON_HOURS, HEIST_TOOLS,
+};
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::manage_coude_heist::{
+    HeistCooldownStatus, ManageCoudeHeistUseCase, PrisonStatusInfo,
+};
+use crate::ports::inbound::ManageCoudeInventoryUseCase;
+use crate::ports::outbound::{
+    CoudeCashboxRepository, CoudeHeistRepository, WalletRepository,
+};
+
+pub struct ManageCoudeHeistService {
+    heist_repo: Arc<dyn CoudeHeistRepository>,
+    cashbox_repo: Arc<dyn CoudeCashboxRepository>,
+    inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
+    wallet_repo: Arc<dyn WalletRepository>,
+}
+
+impl ManageCoudeHeistService {
+    pub fn new(
+        heist_repo: Arc<dyn CoudeHeistRepository>,
+        cashbox_repo: Arc<dyn CoudeCashboxRepository>,
+        inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
+        wallet_repo: Arc<dyn WalletRepository>,
+    ) -> Self {
+        Self {
+            heist_repo,
+            cashbox_repo,
+            inventory_uc,
+            wallet_repo,
+        }
+    }
+}
+
+#[async_trait]
+impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
+    async fn get_cooldown_status(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<HeistCooldownStatus, DomainError> {
+        let last = self.heist_repo.last_attempt(guild_id, user_id).await?;
+        let Some(last) = last else {
+            return Ok(HeistCooldownStatus {
+                ready: true,
+                next_attempt_at: None,
+                last_success: None,
+            });
+        };
+        let next = last.attempted_at + ChronoDuration::days(HEIST_COOLDOWN_DAYS);
+        let ready = Utc::now() >= next;
+        Ok(HeistCooldownStatus {
+            ready,
+            next_attempt_at: Some(next),
+            last_success: Some(last.success),
+        })
+    }
+
+    async fn get_prison_status(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<PrisonStatusInfo, DomainError> {
+        let state = self.heist_repo.get_prison(guild_id, user_id).await?;
+        let Some(state) = state else {
+            return Ok(PrisonStatusInfo {
+                in_prison: false,
+                released_at: None,
+                reason: None,
+            });
+        };
+        let in_prison = state.released_at > Utc::now();
+        Ok(PrisonStatusInfo {
+            in_prison,
+            released_at: Some(state.released_at),
+            reason: Some(state.reason),
+        })
+    }
+
+    async fn attempt_heist(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<HeistOutcome, DomainError> {
+        // 1. Check prison
+        let prison = self.get_prison_status(guild_id, user_id).await?;
+        if prison.in_prison {
+            return Err(DomainError::Forbidden(
+                "Tu es en prison ! Impossible de braquer avant liberation.".into(),
+            ));
+        }
+
+        // 2. Check cooldown hebdo
+        let cooldown = self.get_cooldown_status(guild_id, user_id).await?;
+        if !cooldown.ready {
+            return Err(DomainError::Forbidden(format!(
+                "Cooldown {} jours non ecoule.",
+                HEIST_COOLDOWN_DAYS
+            )));
+        }
+
+        // 3. Charger la caisse : on veut juste lire le solde pour savoir
+        //    s'il vaut le coup de tenter (sinon abort). On ne vide pas
+        //    tout : meme sur succes, on ne prend qu'un % aleatoire.
+        let cashbox = self.cashbox_repo.get_or_create(guild_id).await?;
+        if cashbox.balance <= 0 {
+            return Err(DomainError::Forbidden(
+                "La caisse est vide, inutile de tenter.".into(),
+            ));
+        }
+
+        // 4. Lister les outils de braquage actifs dans l'inventaire.
+        //    Chaque tool key present (quantity > 0) compte une fois.
+        let inventory = self
+            .inventory_uc
+            .list_inventory(guild_id, user_id)
+            .await?;
+        let tool_keys: Vec<String> = inventory
+            .iter()
+            .filter(|i| i.quantity > 0)
+            .map(|i| i.item_key.clone())
+            .filter(|k| HEIST_TOOLS.iter().any(|t| t.key == k.as_str()))
+            .collect();
+
+        // 5. Calcule la chance effective (domain pur).
+        let chance = compute_success_chance(&tool_keys);
+
+        // 6. Roll + decide. On scope ThreadRng pour rester Send.
+        let (success, gain_percent) = {
+            let mut rng = rand::thread_rng();
+            let roll: u32 = rng.gen_range(1..=100);
+            let success = roll <= chance;
+            let gain: u32 = rng.gen_range(HEIST_GAIN_MIN_PERCENT..=HEIST_GAIN_MAX_PERCENT);
+            (success, gain)
+        };
+
+        // 7. Consomme TOUS les outils de braquage actifs (quel que soit
+        //    le resultat — c'est le cout d'entree du braquage).
+        for key in &tool_keys {
+            if let Err(e) = self.inventory_uc.use_item(guild_id, user_id, key).await {
+                warn!(error = %e, tool = %key, "Echec use_item heist tool");
+            }
+        }
+
+        // 8. Calcule le montant vole (capture instantane, la caisse peut
+        //    bouger entre get_or_create et le prelevement — acceptable :
+        //    on prend gain % du solde courant).
+        let amount_stolen: i64 = if success {
+            let refreshed = self.cashbox_repo.get_or_create(guild_id).await?;
+            let balance = refreshed.balance.max(0);
+            ((balance as f64) * (gain_percent as f64) / 100.0).floor() as i64
+        } else {
+            0
+        };
+
+        if success && amount_stolen > 0 {
+            // Prelever de la caisse : on utilise un deposit negatif ? Non,
+            // la signature refuse amount <= 0. On passe par une methode
+            // dedie ? Pour rester minimal, on fait directement une UPDATE
+            // via le repo : mais on n'a pas de `withdraw` methode. On
+            // recourre donc a un hack temporaire : on fait un claim_all
+            // puis on re-deposit la difference. C'est atomique cote DB
+            // mais moche. Alternative propre : ajouter une methode
+            // withdraw au CoudeCashboxRepository. Faisons-le.
+            self.cashbox_repo
+                .withdraw(guild_id, amount_stolen)
+                .await?;
+
+            // Credit le wallet du joueur
+            self.wallet_repo
+                .credit(
+                    guild_id,
+                    user_id,
+                    amount_stolen,
+                    "coude_heist_success",
+                    "Braquage de la caisse reussi",
+                )
+                .await?;
+        }
+
+        // 9. Log la tentative (pour le cooldown)
+        let _ = self
+            .heist_repo
+            .record_attempt(
+                guild_id,
+                user_id,
+                success,
+                amount_stolen,
+                chance as i32,
+                &tool_keys,
+            )
+            .await?;
+
+        // 10. Si echec → prison 24h.
+        let prison_released_at = if !success {
+            let released = Utc::now() + ChronoDuration::hours(HEIST_PRISON_HOURS);
+            self.heist_repo
+                .send_to_prison(guild_id, user_id, released, "heist_failed")
+                .await?;
+            Some(released)
+        } else {
+            None
+        };
+
+        info!(
+            guild_id,
+            user_id,
+            success,
+            chance,
+            amount_stolen,
+            tools = tool_keys.len(),
+            "Heist attempt resolved"
+        );
+
+        Ok(HeistOutcome {
+            success,
+            chance_percent: chance,
+            cashbox_total_before: cashbox.balance,
+            amount_stolen,
+            tools_consumed: tool_keys,
+            prison_released_at,
+        })
+    }
+}

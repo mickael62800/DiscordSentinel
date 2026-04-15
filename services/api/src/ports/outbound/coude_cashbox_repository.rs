@@ -29,6 +29,17 @@ pub trait CoudeCashboxRepository: Send + Sync {
         guild_id: &str,
     ) -> Result<i64, DomainError>;
 
+    /// Retire un montant de la caisse (Phase 10 /braquage). Clamp au
+    /// solde courant — jamais de balance negative. Retourne le montant
+    /// effectivement retire (peut etre < `amount` si la caisse etait
+    /// moins grosse). `total_collected` n'est PAS incremente (c'est une
+    /// sortie, pas une entree).
+    async fn withdraw(
+        &self,
+        guild_id: &str,
+        amount: i64,
+    ) -> Result<i64, DomainError>;
+
     /// Persiste une redistribution terminee + entries gagnantes dans l'audit.
     async fn record_redistribution(
         &self,

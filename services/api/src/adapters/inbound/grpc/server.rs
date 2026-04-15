@@ -110,6 +110,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         uc: state.coude_social_uc.clone(),
         catalog_uc: state.coude_catalog_uc.clone(),
         taunts_uc: state.coude_taunts_uc.clone(),
+        heist_uc: state.coude_heist_uc.clone(),
         cashbox_uc: state.coude_cashbox_uc.clone(),
     };
     let roles = RolePanelsGrpc {

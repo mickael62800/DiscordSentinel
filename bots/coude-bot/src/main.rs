@@ -12,6 +12,7 @@ mod config;
 pub mod guild_config;
 mod handler;
 pub mod interaction_helper;
+pub mod prison_check;
 pub mod taunts_dispatch;
 
 use std::sync::Arc;
