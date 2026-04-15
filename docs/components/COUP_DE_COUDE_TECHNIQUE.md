@@ -23,6 +23,7 @@ ajouter / modifier des fonctionnalités sans rien casser.
 | **9C** | Boost voleur en abonnements + `/boost-voleur` | idem |
 | **9D** | Railleries automatiques streak 3/5/10 + `/no-taunts` + rename Discord | idem |
 | **9E** | Page web admin railleries + channel picker | idem |
+| **10** | Braquage hebdomadaire + prison + 9 outils consommables | [Phase 10 addendum](#phase-10-addendum) |
 
 ---
 
@@ -1159,6 +1160,144 @@ modifier le code et redéployer.
 - **Cagnotte "max winners"** : fixé à 20. Une caisse très grosse
   (ex. 100 k) donnera donc au max 20 gagnants, soit ~5 k moyenne, ce
   qui est volontaire (effet loterie).
+
+---
+
+## Phase 10 addendum
+
+Système `/braquage` : une fois par semaine, un joueur peut tenter
+de siphonner la caisse communautaire. Taux de base très faible (5 %),
+boost par items consommables achetés via `/shop braquage`. En cas
+d'échec, le joueur est envoyé en **prison** 24 h et ne peut plus
+jouer à rien.
+
+### Vue d'ensemble
+
+```
+   /shop braquage acheter:<tool>
+               │
+               ▼
+    inventaire joueur (coude_inventory)
+               │ liste au moment du braquage
+               ▼
+         /braquage
+               │
+    ┌──────────┼───────────┐
+    │          │           │
+    ▼          ▼           ▼
+coude_heist  cashbox    coude_inventory
+_attempts    withdraw   (use_item x N)
+    │
+    │ si echec
+    ▼
+ coude_prison  ←─── prison_check.rs (middleware bot)
+    │                       ▲
+    │                       │ bloque /coude /voler /pari /prime etc.
+```
+
+### Règles gameplay
+
+| Paramètre | Valeur | Source |
+|---|---|---|
+| Cooldown | 7 jours | `HEIST_COOLDOWN_DAYS` |
+| Chance de base | 5 % | `HEIST_BASE_SUCCESS_PERCENT` |
+| Bonus par item | +5 % | `HEIST_ITEM_BONUS_PERCENT` |
+| Cap maximum | 50 % | `HEIST_MAX_SUCCESS_PERCENT` |
+| Gain sur succès | 30-75 % (aléatoire) | `HEIST_GAIN_MIN_PERCENT`/`_MAX_` |
+| Prison sur échec | 24 h | `HEIST_PRISON_HOURS` |
+
+Toutes les constantes vivent dans
+`services/api/src/domain/entities/coude_heist.rs` avec note
+« Choix d'architecture » — hardcodées à cause du catalogue de 9
+items spécifiquement calibré pour atteindre 50 % avec tous les
+items (5 + 9 × 5 = 50).
+
+### Fichiers clés
+
+- **`migrations/128_coude_heist.sql`** — 2 tables : `coude_heist_attempts`
+  (log + cooldown) et `coude_prison` (état prison par user).
+- **`domain/entities/coude_heist.rs`** — constantes + catalogue 9
+  outils (`HEIST_TOOLS`) + `compute_success_chance` pur (testé) +
+  types `HeistOutcome`, `CoudeHeistAttempt`, `CoudePrisonState`.
+- **`ports/outbound/coude_heist_repository.rs`** — trait avec
+  `last_attempt` (cooldown), `record_attempt`, `get_prison`,
+  `send_to_prison`.
+- **`adapters/outbound/postgres/coude_heist_repository.rs`** — impl
+  Postgres (UPSERT sur coude_prison, INSERT simple sur attempts).
+- **`ports/outbound/coude_cashbox_repository.rs`** étendu avec
+  `withdraw(guild_id, amount)` : transaction SELECT FOR UPDATE +
+  UPDATE clamp à 0. Utilisé par le braquage pour décrémenter la
+  caisse sans passer par `claim_all_for_redistribution` (qui vide
+  tout).
+- **`ports/inbound/manage_coude_heist.rs`** — use case avec
+  `get_cooldown_status`, `get_prison_status`, `attempt_heist`.
+- **`application/manage_coude_heist_service.rs`** — orchestre :
+  1. check prison (error si en prison)
+  2. check cooldown 7j
+  3. check caisse non-vide
+  4. liste inventory, filtre sur `HEIST_TOOLS`, dedup
+  5. `compute_success_chance` (domain pur)
+  6. roll aléatoire + gain aléatoire 30-75 %
+  7. consomme tous les outils (`use_item`) quel que soit le résultat
+  8. si succès : `cashbox.withdraw` puis `wallet.credit`
+  9. log via `record_attempt`
+  10. si échec : `send_to_prison`
+- **`adapters/inbound/grpc/coude.rs`** — 3 handlers : `AttemptHeist`,
+  `GetHeistCooldown`, `GetPrisonStatus`.
+
+### Bot side
+
+- **`commands/braquage.rs`** — commande slash thin : defer public,
+  `attempt_heist` API call, affichage embed (or sur succès, rouge
+  sur échec avec date de libération prison).
+- **`commands/shop_cmd.rs`** — 3e sous-commande `/shop braquage`
+  ajoutée avec les 9 outils dans les string_choices.
+- **`domain/services/coude_combat_engine/shop.rs`** — 9 items
+  ajoutés à `SHOP_ITEMS` avec `category = "braquage"`.
+- **`prison_check.rs`** — middleware bot appelé depuis `handler.rs`
+  AVANT le dispatch des slash commands. Whitelist de commandes
+  bloquées en prison (tout le gameplay : coude, voler, pari, prime,
+  potion, shop, protection, boost-voleur, train, classe, donner,
+  repos, reset-stats, braquage). Les commandes passives (profil,
+  cagnotte, leaderboard, etc.) passent. Fail-open si l'API est
+  down.
+
+### Décisions d'architecture
+
+- **Constantes hardcodées** : cf. note sur les autres phases. Le
+  catalogue 9 items + le cap 50 % + la grille 5 % sont couplés — on
+  ne peut pas changer un paramètre sans rebalancer tout. Redéployer
+  pour tuner.
+- **Prison check côté bot** (pas côté API) : on fait un pré-check
+  via `GetPrisonStatus` RPC avant le dispatch, au lieu d'enforcer
+  dans chaque use case. Justifié par :
+  - La prison est transversale (15+ commandes concernées), y mettre
+    un check dans chaque use case multiplierait le code.
+  - Le RPC `GetPrisonStatus` est super simple (1 SELECT) donc pas
+    de coût notable.
+  - Fail-open : si l'API est down, on laisse jouer (UX > strictness).
+  - L'API reste l'autorité finale : elle enforce quand même la
+    prison pour `/braquage` directement dans `attempt_heist`.
+- **Items consommés même en échec** : coût d'entrée du braquage.
+  Sans ça, le joueur pourrait spammer sans risquer ses items.
+- **Pas de logique "choisir quels items utiliser"** : le service
+  consomme TOUS les items de braquage dans l'inventaire. Le joueur
+  décide quand braquer, pas avec quoi. Simplifie énormément la
+  commande (pas de UI multi-select).
+
+### Limitations connues
+
+- **Une seule tentative par semaine même sur succès** : le cooldown
+  s'applique toujours. Tu ne peux pas "profiter" d'une caisse qui
+  grossit vite.
+- **Pas de feedback avant tentative** : le joueur ne voit pas sa
+  chance calculée avant de lancer `/braquage`. On pourrait ajouter
+  une sous-commande `/braquage check` qui affiche la chance sans
+  consommer — follow-up possible.
+- **Prison non appelable par admin** : pas de commande
+  `/admin-prison` pour libérer manuellement un joueur. Il faut
+  passer par un UPDATE SQL direct en cas de besoin. Follow-up si
+  nécessaire.
 
 ---
 

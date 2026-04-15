@@ -277,10 +277,21 @@ catastrophiques — c'est ce qui donne au jeu son côté "chaotique".
 
 ---
 
-## 🏪 Le shop (`/shop`)
+## 🏪 Le shop (`/shop attaque | defense | braquage`)
 
-**`/shop`** sans argument affiche le catalogue + ton inventaire.
-**`/shop acheter:<item>`** achète un objet avec tes coins.
+Le shop est divisé en **3 sous-commandes** par catégorie. Chacune
+affiche la liste filtrée des items et accepte un argument optionnel
+`acheter:<item>` pour acheter directement.
+
+- **`/shop attaque`** — items offensifs (rage, mindgame, double coup,
+  poison, surprise, coup traître)
+- **`/shop defense`** — potions, antidote, bouclier, explosion (qui
+  est une carte defender-only)
+- **`/shop braquage`** — outils consommables pour `/braquage` (voir la
+  section dédiée)
+
+Chaque catégorie affiche aussi ton inventaire filtré pour que tu voies
+ce que tu as déjà.
 
 ### Items offensifs (consommés à l'usage en combat)
 
@@ -452,6 +463,75 @@ joué au moins un combat ou un vol dans les 7 derniers jours).
 
 > 💡 **Tu contribues en dépensant**, tu gagnes en **jouant**. Les
 > joueurs qui lurkent sans risquer un combat ne touchent rien.
+
+---
+
+## 🎭 Le braquage (`/braquage`)
+
+**Phase 10.** Une fois par semaine, tu peux tenter le **gros coup** sur la
+caisse communautaire (la même cagnotte que `/cagnotte`). Très peu de
+chances de réussir sans préparation, mais la récompense peut être
+énorme.
+
+### Principe
+
+```
+/braquage
+```
+
+- **Taux de base** : 5 %
+- **Chaque outil consommable** dans ton inventaire ajoute **+5 %** au roll
+- **Cap maximum** : 50 % (avec les 9 outils activés)
+- **Cooldown** : 1 fois par **7 jours** par joueur
+- Les **outils sont consommés** quel que soit le résultat (succès ou échec)
+
+### Succès
+
+Tu empoches **30 à 75 %** aléatoire du solde courant de la caisse →
+crédit direct sur ton wallet. Un message doré est posté dans le salon
+activités.
+
+### Échec 💀
+
+Tu es envoyé en **PRISON pour 24 heures**. Pendant ce temps **aucune
+commande gameplay n'est utilisable** :
+
+- ❌ `/coude`, `/voler`, `/pari`, `/prime`, `/braquage`
+- ❌ `/shop`, `/potion`, `/protection`, `/boost-voleur`
+- ❌ `/train`, `/classe`, `/donner`, `/repos`, `/reset-stats`
+
+Seules les commandes passives restent accessibles : `/profil`,
+`/cagnotte`, `/leaderboard`, `/hp`, `/saison`, `/resume`,
+`/refuser`, `/annuler`.
+
+### Les outils de braquage (9 items consommables)
+
+Achetables via **`/shop braquage acheter:<item>`** :
+
+| Outil | Bonus | Prix |
+|---|---|---|
+| 🎭 **Masque de braquage** | +5 % | 100 coins |
+| 🔨 **Pied-de-biche** | +5 % | 150 coins |
+| 🔓 **Crochet de vault** | +5 % | 220 coins |
+| 🗺️ **Plan du coffre** | +5 % | 320 coins |
+| 💨 **Fumigène de diversion** | +5 % | 450 coins |
+| 💣 **Explosif** | +5 % | 600 coins |
+| 💾 **Hacker kit** | +5 % | 800 coins |
+| 🚁 **Drone espion** | +5 % | 1000 coins |
+| 👪 **Équipe de pros** | +5 % | 1500 coins |
+
+> Les 9 outils + les 5 % de base = **50 %** max. Les doublons ne
+> comptent qu'une fois (achète chaque outil UNE fois pour maximiser).
+
+### Stratégie
+
+- Le **ROI est quasi-garanti** si tu achètes les 9 outils et que la
+  caisse est grosse : 50 % de chance × 30-75 % d'une grosse caisse
+  donne une espérance très rentable sur le long terme.
+- **Mais** : un échec = 24 h sans jouer + tous les outils perdus. Si
+  tu comptais sur la saison en cours, ça peut te coûter cher.
+- Conseil : attends que la caisse soit **grosse** (`/cagnotte` pour
+  vérifier) avant de tenter, pour maximiser le gain si tu réussis.
 
 ---
 
@@ -685,6 +765,13 @@ A : Oui, intégralement. Pas de perte sur refus.
 | `/cagnotte` | État de la caisse communautaire + date redistribution |
 | `/no-taunts etat:<on\|off>` | Opt-in/out des railleries automatiques te concernant |
 
+### Joueur — Phase 10 (braquage)
+
+| Commande | Description |
+|---|---|
+| `/braquage` | Tente le gros coup sur la caisse (1×/sem, base 5 %, prison 24 h sur échec) |
+| `/shop braquage [acheter:<item>]` | Achat des 9 outils consommables qui boostent le roll |
+
 ### Admin
 
 | Commande | Description |
@@ -699,6 +786,6 @@ la doc technique.
 
 **Bon combat, et que les rolls te soient favorables ! ⚔️**
 
-*Dernière mise à jour : 15 avril 2026 — Phase 9 complète (caisse
-communautaire, protections/boosts en abonnements temps-base,
-railleries automatiques sur streaks 3/5/10).*
+*Dernière mise à jour : 15 avril 2026 — Phase 9 (caisse + protections
++ boosts + railleries) et Phase 10 (braquage hebdomadaire + prison +
+9 outils consommables).*
