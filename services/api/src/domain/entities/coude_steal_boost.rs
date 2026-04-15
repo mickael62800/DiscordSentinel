@@ -37,6 +37,10 @@ pub struct StealBoostItemDef {
 /// Catalogue des 5 items de boost voleur, tries par puissance croissante.
 /// Le bot les affiche via `/boost-voleur` dans cet ordre ; la resolution
 /// de vol somme tous les items actifs (pas de priorite, cumul complet).
+///
+/// **Choix d'architecture** : cf note sur `STEAL_PROTECTION_ITEMS` —
+/// prix hardcodes, grille validee a la conception. Modifier ici puis
+/// redeployer.
 pub const STEAL_BOOST_ITEMS: &[StealBoostItemDef] = &[
     StealBoostItemDef {
         key: "crochet",

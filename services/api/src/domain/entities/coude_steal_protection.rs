@@ -94,6 +94,13 @@ pub struct StealProtectionItemDef {
 /// Catalogue des 8 items de protection disponibles, tries par efficacite
 /// croissante. Le shop bot affiche cette liste ; le moteur de vol iter
 /// en ordre decroissant pour que les meilleurs items rollent en premier.
+///
+/// **Choix d'architecture** : les prix sont hardcodes et non per-guild
+/// configurables. La grille a ete validee a la conception, et rendre
+/// chaque prix editable par admin apporterait surtout de la complexite
+/// sans valeur gameplay reelle. Pour ajuster, modifier le code ici puis
+/// redeployer. Les durees (1/3/5/7j) et leur grille de remise sont dans
+/// l'enum `StealProtectionDuration` pour la meme raison.
 pub const STEAL_PROTECTION_ITEMS: &[StealProtectionItemDef] = &[
     StealProtectionItemDef {
         key: "chien_garde",

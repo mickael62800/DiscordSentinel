@@ -13,6 +13,15 @@ use rand::Rng;
 
 /// Seuils auxquels on declenche un taunt. Toute nouvelle valeur de
 /// streak qui matche un seuil provoque un `TauntEvent`.
+///
+/// **Choix d'architecture** : hardcode a [3, 5, 10]. Ces trois valeurs
+/// sont un sweet spot gameplay (premiere raillerie atteignable mais
+/// pas triviale, escalade claire, plafond legendaire rare) et les
+/// rendre per-guild configurables demanderait de refactorer
+/// `build_taunt_event` pour accepter les seuils en parametre. Les
+/// catalogues de messages et suffixes sont eux aussi ecrits pour ces
+/// paliers specifiques, donc un override runtime n'apporterait rien
+/// sans une grosse refacto parallele.
 pub const TAUNT_THRESHOLDS: &[i32] = &[3, 5, 10];
 
 /// Type de serie trackee.

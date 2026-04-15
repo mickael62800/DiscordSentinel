@@ -27,6 +27,14 @@ pub struct DiscordUser {
     pub avatar: Option<String>,
 }
 
+/// Phase 9 Part E — Salon texte d'une guild (pour channel picker web).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct DiscordChannel {
+    pub id: String,
+    pub name: String,
+    pub position: i64,
+}
+
 /// Service pour les appels a l'API Discord.
 /// Centralise la logique d'interaction avec Discord (ban, unban, etc.)
 pub struct DiscordApiService {
@@ -54,6 +62,56 @@ impl DiscordApiService {
             ));
         }
         Ok(())
+    }
+
+    /// Liste les salons texte d'un serveur Discord (id + name).
+    /// Phase 9 Part E : utilise par la page web de config des railleries
+    /// pour afficher un dropdown au lieu d'un input ID.
+    pub async fn list_text_channels(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<DiscordChannel>, DomainError> {
+        self.ensure_configured()?;
+
+        let url = format!("https://discord.com/api/v10/guilds/{}/channels", guild_id);
+        let resp = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .send()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord list channels failed ({status}): {body}"
+            )));
+        }
+
+        // Type 0 = GUILD_TEXT, type 5 = GUILD_ANNOUNCEMENT. On inclut les
+        // deux, les autres (voice, stage, forum, category, thread) sont
+        // filtres.
+        let raw: Vec<serde_json::Value> = resp
+            .json()
+            .await
+            .map_err(|e| DomainError::Internal(format!("Discord list channels parse: {e}")))?;
+        let mut channels: Vec<DiscordChannel> = raw
+            .into_iter()
+            .filter_map(|c| {
+                let ty = c.get("type").and_then(|v| v.as_u64()).unwrap_or(999);
+                if ty != 0 && ty != 5 {
+                    return None;
+                }
+                let id = c.get("id").and_then(|v| v.as_str())?.to_string();
+                let name = c.get("name").and_then(|v| v.as_str())?.to_string();
+                let position = c.get("position").and_then(|v| v.as_i64()).unwrap_or(0);
+                Some(DiscordChannel { id, name, position })
+            })
+            .collect();
+        channels.sort_by_key(|c| c.position);
+        Ok(channels)
     }
 
     /// Bannir un utilisateur d'un serveur Discord.

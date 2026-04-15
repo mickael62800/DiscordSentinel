@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue";
+import { ref, computed, onMounted, watch } from "vue";
 import {
   coudeService,
   type TauntsConfig,
 } from "@/services/coudeService";
+import { guildsService, type DiscordTextChannel } from "@/services/guildsService";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useToast } from "../../composables/useToast";
 import { useConfirm } from "../../composables/useConfirm";
 import AppButton from "../atoms/AppButton.vue";
-import AppInput from "../atoms/AppInput.vue";
+import AppSelect from "../atoms/AppSelect.vue";
 import AppToggle from "../atoms/AppToggle.vue";
 import FormField from "../atoms/FormField.vue";
 import LoadingState from "../atoms/LoadingState.vue";
@@ -20,6 +21,7 @@ const { success, error: toastError } = useToast();
 const { confirm } = useConfirm();
 
 const config = ref<TauntsConfig | null>(null);
+const channels = ref<DiscordTextChannel[]>([]);
 const channelInput = ref("");
 const enabledInput = ref(true);
 const loading = ref(false);
@@ -27,13 +29,22 @@ const saving = ref(false);
 const error = ref<string | null>(null);
 const removing = ref<string | null>(null);
 
+const channelOptions = computed(() => [
+  { value: "", label: "— Aucun (desactive) —" },
+  ...channels.value.map((c) => ({ value: c.id, label: `# ${c.name}` })),
+]);
+
 async function fetchConfig() {
   if (!selectedGuildId.value) return;
   loading.value = true;
   error.value = null;
   try {
-    const cfg = await coudeService.getTauntsConfig(selectedGuildId.value);
+    const [cfg, chans] = await Promise.all([
+      coudeService.getTauntsConfig(selectedGuildId.value),
+      guildsService.getTextChannels(selectedGuildId.value),
+    ]);
     config.value = cfg;
+    channels.value = chans;
     channelInput.value = cfg.channel_id ?? "";
     enabledInput.value = cfg.enabled;
   } catch (e) {
@@ -45,17 +56,10 @@ async function fetchConfig() {
 
 async function save() {
   if (!selectedGuildId.value) return;
-  // Validation minimale : channel_id doit etre un ID Discord valide (snowflake numerique)
-  // si l'utilisateur en fournit un. Vide => None = feature desactivee.
-  const trimmed = channelInput.value.trim();
-  if (trimmed.length > 0 && !/^\d{17,20}$/.test(trimmed)) {
-    toastError("ID de salon invalide (snowflake attendu, 17-20 chiffres).");
-    return;
-  }
   saving.value = true;
   try {
     await coudeService.updateTauntsConfig(selectedGuildId.value, {
-      channel_id: trimmed.length > 0 ? trimmed : null,
+      channel_id: channelInput.value.length > 0 ? channelInput.value : null,
       enabled: enabledInput.value,
     });
     success("Config railleries sauvegardee.");
@@ -112,9 +116,9 @@ watch(selectedGuildId, () => {
 
       <FormField
         label="Salon des railleries"
-        hint="ID du salon Discord. Active le mode developpeur sur Discord et clic droit sur un salon → Copier l'ID. Laisser vide pour desactiver."
+        hint="Choisir un salon texte. Selectionner « Aucun » desactive la feature."
       >
-        <AppInput v-model="channelInput" placeholder="ex. 123456789012345678" />
+        <AppSelect v-model="channelInput" :options="channelOptions" />
       </FormField>
 
       <FormField label="Active">

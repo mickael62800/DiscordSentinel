@@ -520,6 +520,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .nest("/api/members", member_routes())
         // Guild members (direct Discord API)
         .route("/api/guilds/{guild_id}/members", get(handlers::guild_members::list_members))
+        // Guild text channels (direct Discord API, Phase 9 Part E)
+        .route("/api/guilds/{guild_id}/channels", get(handlers::guild_channels::list_text_channels))
         // User activity (surveillance)
         .route("/api/user-activity", post(handlers::user_activity::create_activity))
         .route("/api/user-activity/{guild_id}/{user_id}", get(handlers::user_activity::get_activity))

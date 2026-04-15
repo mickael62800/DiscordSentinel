@@ -34,8 +34,15 @@ use crate::ports::outbound::{CoudeCashboxRepository, WalletRepository};
 
 /// Nombre max de gagnants par redistribution. Au-dela, on ne cape pas
 /// strictement : on met la valeur en env var lors de l'init ou on cape ici.
+///
+/// **Choix d'architecture** : hardcode. 20 gagnants maximum garantit
+/// des gains individuels visibles meme pour une caisse modeste (>= 1
+/// coin par gagnant a partir de 20c dans la caisse). Le rendre
+/// configurable apporte peu ; pour tuner, modifier ici et redeployer.
 const MAX_WINNERS: usize = 20;
-/// Fenetre de joueurs "actifs" (jours).
+/// Fenetre de joueurs "actifs" (jours). Hardcode pour les memes raisons
+/// que `MAX_WINNERS` — 7 jours couvre un cycle hebdo de redistribution
+/// et filtre correctement les lurkers sans exclure les joueurs reguliers.
 const ACTIVE_WINDOW_DAYS: i64 = 7;
 
 pub struct ManageCoudeCashboxService {

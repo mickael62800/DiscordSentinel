@@ -20,7 +20,10 @@ use tonic::Request;
 use tracing::{error, info, warn};
 
 use sentinel_proto::coude::v1::coude_combats_service_client::CoudeCombatsServiceClient;
-use sentinel_proto::coude::v1::{Empty as ProtoEmpty, ResolvedBettingCombat};
+use sentinel_proto::coude::v1::{Empty as ProtoEmpty, ResolvedBettingCombat, TauntEvent};
+
+/// Limite Discord sur le nickname (32 chars).
+const DISCORD_NICKNAME_MAX: usize = 32;
 
 /// Signature conservee pour ne pas casser scheduler.rs. `pool` n'est plus
 /// utilise mais on le garde pour compatibilite avec le trait periodique.
@@ -62,6 +65,14 @@ pub async fn run(_pool: &PgPool, _api_url: &str, bot_token: &str) -> Result<(), 
             combat.is_draw,
         )
         .await;
+
+        // Phase 9 Part D — dispatch des taunts emis par l'API. Le worker
+        // ne contient toujours aucune logique metier : l'API a deja cuisine
+        // le channel_id, le message et le nickname_suffix. On se contente
+        // de poster + renommer via l'API REST Discord brute.
+        for ev in &combat.taunt_events {
+            dispatch_taunt_event(bot_token, &combat.guild_id, ev).await;
+        }
     }
 
     Ok(())
@@ -152,5 +163,112 @@ async fn post_result_to_discord(
         .await
     {
         warn!(error = %e, channel_id, "Echec post resultat combat Discord (fallback)");
+    }
+}
+
+/// Phase 9 Part D — Dispatche un TauntEvent : post du message + rename
+/// du pseudo. Zero logique metier : tout (channel_id, message, suffixe)
+/// est deja cuisine par l'API cote resolve_betting_batch_service.
+async fn dispatch_taunt_event(bot_token: &str, guild_id: &str, ev: &TauntEvent) {
+    let client = reqwest::Client::new();
+
+    // 1) Post du message de raillerie dans le salon dedie.
+    let color: u32 = match ev.streak_kind.as_str() {
+        "win" => 0xF1C40F,
+        "loss" => 0xE74C3C,
+        "steal_victim" => 0x9B59B6,
+        _ => 0x95A5A6,
+    };
+    let post_url = format!(
+        "https://discord.com/api/v10/channels/{}/messages",
+        ev.channel_id
+    );
+    if let Err(e) = client
+        .post(&post_url)
+        .header("Authorization", format!("Bot {}", bot_token))
+        .json(&serde_json::json!({
+            "embeds": [{
+                "title": "🔥 Raillerie automatique",
+                "description": ev.message,
+                "color": color,
+                "footer": { "text": format!("Serie : {} × {}", ev.streak_kind, ev.streak_value) },
+            }]
+        }))
+        .send()
+        .await
+    {
+        warn!(error = %e, channel_id = %ev.channel_id, "Echec post taunt message (worker)");
+    }
+
+    // 2) Rename : recupere le nickname courant, applique le suffixe en
+    //    tronquant le base pour rester sous 32 chars. On lit d'abord le
+    //    member pour connaitre son display_name actuel.
+    let member_url = format!(
+        "https://discord.com/api/v10/guilds/{}/members/{}",
+        guild_id, ev.target_user_id
+    );
+    let current = match client
+        .get(&member_url)
+        .header("Authorization", format!("Bot {}", bot_token))
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => match r.json::<serde_json::Value>().await {
+            Ok(json) => json
+                .get("nick")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| {
+                    json.get("user")
+                        .and_then(|u| u.get("global_name"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                })
+                .or_else(|| {
+                    json.get("user")
+                        .and_then(|u| u.get("username"))
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string())
+                }),
+            Err(e) => {
+                warn!(error = %e, "parse member JSON taunt");
+                return;
+            }
+        },
+        Ok(r) => {
+            warn!(status = %r.status(), "GET member non-ok (taunt)");
+            return;
+        }
+        Err(e) => {
+            warn!(error = %e, "GET member failed (taunt)");
+            return;
+        }
+    };
+    let Some(current_name) = current else {
+        warn!(user_id = %ev.target_user_id, "Pas de nom de base pour rename taunt");
+        return;
+    };
+
+    // Idempotence : si deja suffixe, on ne refait rien.
+    if current_name.ends_with(&ev.nickname_suffix) {
+        return;
+    }
+    let suffix_len = ev.nickname_suffix.chars().count();
+    let max_base = DISCORD_NICKNAME_MAX.saturating_sub(suffix_len);
+    let base: String = current_name.chars().take(max_base).collect();
+    let new_nick = format!("{}{}", base, ev.nickname_suffix);
+
+    let patch_url = format!(
+        "https://discord.com/api/v10/guilds/{}/members/{}",
+        guild_id, ev.target_user_id
+    );
+    if let Err(e) = client
+        .patch(&patch_url)
+        .header("Authorization", format!("Bot {}", bot_token))
+        .json(&serde_json::json!({ "nick": new_nick }))
+        .send()
+        .await
+    {
+        warn!(error = %e, user_id = %ev.target_user_id, new_nick, "Echec rename member (taunt worker)");
     }
 }
