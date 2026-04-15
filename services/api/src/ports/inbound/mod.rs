@@ -31,6 +31,8 @@ pub use manage_tickets::{
     UpdateTicketChannelCommand,
 };
 pub use manage_audit_logs::{CreateAuditLogCommand, ManageAuditLogsUseCase};
+pub mod resolve_betting_batch;
+pub use resolve_betting_batch::{ResolveBettingBatchUseCase, ResolvedBettingCombatOutput};
 pub use manage_role_panels::ManageRolePanelsUseCase;
 pub use manage_levels::ManageLevelsUseCase;
 pub use manage_watched_users::ManageWatchedUsersUseCase;

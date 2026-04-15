@@ -44,8 +44,10 @@ impl From<LeaderboardRow> for CoudeLeaderboardEntry {
 struct EventRow {
     id: Uuid,
     guild_id: String,
+    event_type: String,
     active: bool,
     expires_at: DateTime<Utc>,
+    #[sqlx(rename = "started_at")]
     created_at: DateTime<Utc>,
 }
 
@@ -54,6 +56,7 @@ impl From<EventRow> for CoudeEvent {
         Self {
             id: r.id,
             guild_id: r.guild_id,
+            event_type: r.event_type,
             active: r.active,
             expires_at: r.expires_at,
             created_at: r.created_at,
@@ -163,7 +166,7 @@ impl CoudeSocialRepository for PgCoudeSocialRepository {
 
     async fn list_active_events(&self, guild_id: &str) -> Result<Vec<CoudeEvent>, DomainError> {
         let rows: Vec<EventRow> = sqlx::query_as(
-            r#"SELECT id, guild_id, active, expires_at, created_at
+            r#"SELECT id, guild_id, event_type, active, expires_at, started_at
                FROM coude_events
                WHERE guild_id = $1 AND active = TRUE AND expires_at > NOW()"#,
         )

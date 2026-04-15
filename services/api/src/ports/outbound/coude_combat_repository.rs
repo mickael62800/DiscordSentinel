@@ -35,6 +35,27 @@ pub trait CoudeCombatRepository: Send + Sync {
 
     async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError>;
 
+    /// Phase 2 refacto : reclame atomiquement les combats en phase `betting`
+    /// dont le delai de paris est ecoule, en les passant a `resolving`.
+    /// Utilise `FOR UPDATE SKIP LOCKED` pour eviter le double traitement si
+    /// plusieurs instances du batch runner tournent concurremment.
+    ///
+    /// Le delai par guild est lu depuis `bot_guild_config` (`bet_delay_secs`)
+    /// avec fallback sur `default_delay_secs`.
+    async fn claim_due_betting_combats(
+        &self,
+        default_delay_secs: i64,
+    ) -> Result<Vec<CoudeCombat>, DomainError>;
+
+    /// Phase 2 refacto : reclame les combats bloques en `resolving` depuis
+    /// plus de `stuck_threshold_secs` (typiquement 120s). Ces combats ont
+    /// probablement crashe un tick precedent. On les touche (accepted_at =
+    /// NOW()) pour prevenir le double-traitement si le tick reussit apres.
+    async fn claim_stuck_resolving_combats(
+        &self,
+        stuck_threshold_secs: i64,
+    ) -> Result<Vec<CoudeCombat>, DomainError>;
+
     /// Récupère le combat actuellement en phase de paris auquel `user_id`
     /// participe (en tant qu'attaquant OU défenseur). Utilisé par le flow
     /// "place_bet" pour récupérer le combat de référence d'un participant.

@@ -280,10 +280,10 @@ async fn main() {
     let blackjack_repo = Arc::new(PgBlackjackRepository::new(pg_pool.clone()));
     let blackjack_svc = Arc::new(BlackjackService::new(blackjack_repo, wallet_repo.clone()));
     let coude_player_repo = Arc::new(PgCoudePlayerRepository::new(pg_pool.clone()));
-    let coude_players_uc = Arc::new(ManageCoudePlayersService::new(coude_player_repo));
+    let coude_players_uc = Arc::new(ManageCoudePlayersService::new(coude_player_repo.clone()));
     let coude_combat_repo = Arc::new(PgCoudeCombatRepository::new(pg_pool.clone()));
     let coude_combats_uc: Arc<dyn sentinel_api::ports::inbound::ManageCoudeCombatsUseCase> =
-        Arc::new(ManageCoudeCombatsService::new(coude_combat_repo));
+        Arc::new(ManageCoudeCombatsService::new(coude_combat_repo.clone()));
     let coude_bet_repo = Arc::new(PgCoudeBetRepository::new(pg_pool.clone()));
     let coude_bets_uc = Arc::new(ManageCoudeBetsService::new(coude_bet_repo, coude_combats_uc.clone()));
     let coude_economy_repo = Arc::new(PgCoudeEconomyRepository::new(pg_pool.clone()));
@@ -292,6 +292,19 @@ async fn main() {
     let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));
     let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
     let coude_social_uc = Arc::new(ManageCoudeSocialService::new(coude_social_repo));
+
+    // Phase 2 refacto : use case dedie qui orchestre la resolution batch des
+    // combats betting. Remplacera coude-worker/src/jobs/resolve_betting.rs
+    // en Phase 3.
+    let resolve_betting_batch_uc: Arc<dyn sentinel_api::ports::inbound::ResolveBettingBatchUseCase> =
+        Arc::new(sentinel_api::application::ResolveBettingBatchService::new(
+            coude_combat_repo.clone(),
+            coude_player_repo.clone(),
+            wallet_repo.clone(),
+            coude_bets_uc.clone(),
+            coude_inventory_uc.clone(),
+            coude_social_uc.clone(),
+        ));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),
@@ -352,6 +365,7 @@ async fn main() {
         coude_economy_uc,
         coude_inventory_uc,
         coude_social_uc,
+        resolve_betting_batch_uc,
         broadcaster,
         job_client,
         discord_api,

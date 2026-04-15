@@ -53,6 +53,7 @@ pub struct AppState {
     pub coude_economy_uc: Arc<dyn ManageCoudeEconomyUseCase>,
     pub coude_inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     pub coude_social_uc: Arc<dyn ManageCoudeSocialUseCase>,
+    pub resolve_betting_batch_uc: Arc<dyn crate::ports::inbound::ResolveBettingBatchUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

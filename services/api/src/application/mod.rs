@@ -57,3 +57,6 @@ pub use manage_coude_inventory_service::ManageCoudeInventoryService;
 
 mod manage_coude_social_service;
 pub use manage_coude_social_service::ManageCoudeSocialService;
+
+mod resolve_betting_batch_service;
+pub use resolve_betting_batch_service::ResolveBettingBatchService;

@@ -44,6 +44,7 @@ pub struct CoudeLeaderboardEntry {
 pub struct CoudeEvent {
     pub id: Uuid,
     pub guild_id: String,
+    pub event_type: String,
     pub active: bool,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,

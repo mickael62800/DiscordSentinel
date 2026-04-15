@@ -171,6 +171,7 @@ fn xp_progress_to_proto(x: XpProgress) -> proto::XpProgress {
 
 pub struct CoudeCombatsGrpc {
     pub uc: Arc<dyn ManageCoudeCombatsUseCase>,
+    pub resolve_batch_uc: Arc<dyn crate::ports::inbound::ResolveBettingBatchUseCase>,
 }
 
 fn combat_to_proto(c: CoudeCombat) -> proto::CoudeCombat {
@@ -374,6 +375,32 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))
+    }
+
+    async fn resolve_betting_batch(
+        &self,
+        _request: Request<proto::Empty>,
+    ) -> Result<Response<proto::ResolvedBettingBatch>, Status> {
+        let out = self
+            .resolve_batch_uc
+            .resolve_batch()
+            .await
+            .map_err(domain_to_status)?;
+        let combats = out
+            .into_iter()
+            .map(|c| proto::ResolvedBettingCombat {
+                combat_id: c.combat_id,
+                guild_id: c.guild_id,
+                channel_id: c.channel_id,
+                message_id: c.message_id,
+                result_message: c.result_message,
+                winner_id: c.winner_id,
+                loser_id: c.loser_id,
+                coins_transferred: c.coins_transferred,
+                is_draw: c.is_draw,
+            })
+            .collect();
+        Ok(Response::new(proto::ResolvedBettingBatch { combats }))
     }
 }
 
@@ -1242,7 +1269,7 @@ mod tests {
     fn event_to_proto_mapping() {
         let id = Uuid::new_v4();
         let e = CoudeEvent {
-            id, guild_id: "g".into(), active: true,
+            id, guild_id: "g".into(), event_type: "happy_hour".into(), active: true,
             expires_at: ts(), created_at: ts(),
         };
         let pr = event_to_proto(e);

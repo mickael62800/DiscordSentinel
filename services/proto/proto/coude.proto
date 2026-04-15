@@ -112,6 +112,27 @@ service CoudeCombatsService {
   rpc SetBetting(SetBettingRequest) returns (SetBettingResponse);
   rpc Expire(ExpireCombatRequest) returns (Empty);
   rpc SetDefenderSpecial(SetDefenderSpecialRequest) returns (Empty);
+  // Phase 2 refacto : worker → API. Reclame atomiquement les combats en
+  // phase betting dont le delai est ecoule + les stuck, resout tout avec
+  // le coude_combat_engine et retourne les metadonnees Discord pour que
+  // le worker poste les resultats.
+  rpc ResolveBettingBatch(Empty) returns (ResolvedBettingBatch);
+}
+
+message ResolvedBettingCombat {
+  string combat_id = 1;
+  string guild_id = 2;
+  optional string channel_id = 3;
+  optional string message_id = 4;
+  string result_message = 5;
+  optional string winner_id = 6;
+  optional string loser_id = 7;
+  int64 coins_transferred = 8;
+  bool is_draw = 9;
+}
+
+message ResolvedBettingBatch {
+  repeated ResolvedBettingCombat combats = 1;
 }
 
 message CoudeCombat {

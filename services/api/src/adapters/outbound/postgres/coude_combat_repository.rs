@@ -223,6 +223,68 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    async fn claim_due_betting_combats(
+        &self,
+        default_delay_secs: i64,
+    ) -> Result<Vec<CoudeCombat>, DomainError> {
+        // Phase 2 : SQL deplacee depuis coude-worker/src/jobs/resolve_betting.rs.
+        // Le delai par guild est lu depuis bot_guild_config (bot_name =
+        // 'coude-worker', config_key = 'bet_delay_secs'), avec fallback sur
+        // le parametre default_delay_secs (typiquement 300s).
+        // FOR UPDATE SKIP LOCKED → deux batchs concurrents ne traiteront
+        // jamais le meme combat.
+        let sql = format!(
+            r#"UPDATE coude_combats SET status = 'resolving'
+               WHERE id IN (
+                   SELECT c.id FROM coude_combats c
+                   LEFT JOIN bot_guild_config cfg
+                       ON cfg.guild_id = c.guild_id
+                       AND cfg.bot_name = 'coude-worker'
+                       AND cfg.config_key = 'bet_delay_secs'
+                   WHERE c.status = 'betting'
+                     AND c.accepted_at < NOW() - (COALESCE(
+                           CASE WHEN cfg.config_value ~ '^\d+$' THEN cfg.config_value::int ELSE NULL END,
+                           $1
+                         ) * INTERVAL '1 second')
+                   FOR UPDATE OF c SKIP LOCKED
+               )
+               RETURNING {cols}"#,
+            cols = COMBAT_COLUMNS
+        );
+        let rows: Vec<CombatRow> = sqlx::query_as(&sql)
+            .bind(default_delay_secs)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn claim_stuck_resolving_combats(
+        &self,
+        stuck_threshold_secs: i64,
+    ) -> Result<Vec<CoudeCombat>, DomainError> {
+        // Phase 2 : SQL deplacee depuis coude-worker/src/jobs/resolve_betting.rs.
+        // Touche accepted_at a NOW() pour empecher qu'un tick ulterieur
+        // reprenne le combat avant que le tick courant ait termine.
+        let sql = format!(
+            r#"UPDATE coude_combats SET accepted_at = NOW()
+               WHERE id IN (
+                   SELECT id FROM coude_combats
+                   WHERE status = 'resolving'
+                     AND accepted_at < NOW() - ($1 * INTERVAL '1 second')
+                   FOR UPDATE SKIP LOCKED
+               )
+               RETURNING {cols}"#,
+            cols = COMBAT_COLUMNS
+        );
+        let rows: Vec<CombatRow> = sqlx::query_as(&sql)
+            .bind(stuck_threshold_secs)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
         let sql = format!(
             r#"INSERT INTO coude_combats

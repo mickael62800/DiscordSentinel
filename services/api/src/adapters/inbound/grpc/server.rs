@@ -91,6 +91,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     // Phase 7A.opt F.1 — 5 services coude supplementaires.
     let coude_combats = CoudeCombatsGrpc {
         uc: state.coude_combats_uc.clone(),
+        resolve_batch_uc: state.resolve_betting_batch_uc.clone(),
     };
     let coude_bets = CoudeBetsGrpc {
         uc: state.coude_bets_uc.clone(),
