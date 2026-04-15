@@ -122,6 +122,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Defer ephemeral : /voler enchaine 5 appels API (count_steal, cooldown,
+    // get player x2, set_cooldown) avant de repondre. Sans defer, Discord
+    // coupait l'interaction a 3s.
+    if !crate::interaction_helper::defer_ephemeral(ctx, command).await {
+        return;
+    }
+
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
@@ -130,7 +137,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if max_daily > 0 {
         let today_count = api.count_steal_today(&guild_id, &thief_id).await.unwrap_or(0);
         if today_count >= max_daily {
-            reply_ephemeral(
+            crate::interaction_helper::followup_text(
                 ctx,
                 command,
                 &format!("Tu as atteint la limite de {} vols par jour !", max_daily),
@@ -152,7 +159,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             if remaining > 0 {
                 let mins = remaining / 60;
                 let secs = remaining % 60;
-                reply_ephemeral(
+                crate::interaction_helper::followup_text(
                     ctx,
                     command,
                     &format!(
@@ -166,7 +173,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Ok(None) => {}
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     }
@@ -178,7 +185,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -186,13 +193,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let target_user = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
         Err(_) => {
-            reply_ephemeral(ctx, command, "Utilisateur introuvable.").await;
+            crate::interaction_helper::followup_text(ctx, command, "Utilisateur introuvable.").await;
             return;
         }
     };
 
     if target_user.bot {
-        reply_ephemeral(ctx, command, "Tu ne peux pas voler un bot !").await;
+        crate::interaction_helper::followup_text(ctx, command, "Tu ne peux pas voler un bot !").await;
         return;
     }
 
@@ -202,13 +209,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
 
     if target_player.coins < 10 {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!(
@@ -225,7 +232,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .set_cooldown(&guild_id, &thief_id, "voler", config.steal_cooldown_secs())
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
@@ -255,21 +262,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let row = CreateActionRow::Buttons(vec![defend_btn]);
 
-    // Repondre en ephemere au voleur pour confirmer
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content("\u{1f575}\u{fe0f} Tentative de vol lancee... Reste discret !")
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-        return;
-    }
+    // Confirme au voleur via followup ephemeral (on a defer plus haut).
+    crate::interaction_helper::followup_text(
+        ctx,
+        command,
+        "\u{1f575}\u{fe0f} Tentative de vol lancee... Reste discret !",
+    )
+    .await;
 
     // Poster le message public avec le bouton dans le salon d'activites
     let activity_channel = config.channel_activites();

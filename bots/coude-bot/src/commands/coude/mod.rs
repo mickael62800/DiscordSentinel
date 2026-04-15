@@ -127,6 +127,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Defer ephemeral : /coude enchaine jusqu'a 5 appels API avant de
+    // montrer le preconfirm. Sans defer, Discord coupait l'interaction.
+    if !crate::interaction_helper::defer_ephemeral(ctx, command).await {
+        return;
+    }
+
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
     let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
@@ -138,7 +144,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -149,7 +155,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -161,7 +167,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let hp_max_now = attacker.hp_max.unwrap_or(100);
     let hp_pct_now = if hp_max_now > 0 { (hp_current_now * 100) / hp_max_now } else { 0 };
     if hp_pct_now < 10 {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!(
@@ -180,7 +186,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         catalog.matchmaking_handicap(attacker.level, defender_player.level);
 
     if blocked {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!(
@@ -195,7 +201,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Verifier la mise (limites depuis la config)
     if mise < config.min_bet() {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!("La mise minimum est de {} coins.", config.min_bet()),
@@ -204,7 +210,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
     if mise > config.max_bet() {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!("La mise maximum est de {} coins.", config.max_bet()),
@@ -213,7 +219,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
     if attacker.coins < mise {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!(
@@ -230,7 +236,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .get_pending_combat_for_attacker(&guild_id, &command.user.id.to_string())
         .await
     {
-        reply_ephemeral(ctx, command, "Tu as deja un defi en attente !").await;
+        crate::interaction_helper::followup_text(ctx, command, "Tu as deja un defi en attente !").await;
         return;
     }
 
@@ -244,12 +250,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         {
             Ok(h) => h,
             Err(e) => {
-                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+                crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
                 return;
             }
         };
         if !has {
-            reply_ephemeral(
+            crate::interaction_helper::followup_text(
                 ctx,
                 command,
                 &format!("Tu n'as pas l'objet **{}** dans ton inventaire !", item_key),
@@ -279,12 +285,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // et l'attaquant ne peut rien gagner — duel deséquilibré).
     // Avertissement : si le defenseur a moins que la mise, on previent que le
     // gain sera cap sur son solde reel.
+    // Refetch defender pour avoir ses coins a jour (il a pu changer
+    // entre le premier fetch et maintenant). On reutilise defender_player
+    // pour les checks plus simples si besoin de perf, mais ici la row
+    // coins peut avoir bouge.
     let defender_coins_warn = match api
         .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
         .await
     {
         Ok(def) if def.coins <= 0 => {
-            reply_ephemeral(
+            crate::interaction_helper::followup_text(
                 ctx,
                 command,
                 &format!(
@@ -347,19 +357,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             )),
     ]);
 
+    // Followup ephemeral avec embed + components (on a defer plus haut).
     if let Err(e) = command
-        .create_response(
+        .create_followup(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(confirm_embed)
-                    .components(vec![row])
-                    .ephemeral(true),
-            ),
+            serenity::all::CreateInteractionResponseFollowup::new()
+                .embed(confirm_embed)
+                .components(vec![row])
+                .ephemeral(true),
         )
         .await
     {
-        tracing::warn!(error = %e, "Echec response Discord preconfirm");
+        tracing::warn!(error = %e, "Echec followup Discord preconfirm");
     }
 }
 

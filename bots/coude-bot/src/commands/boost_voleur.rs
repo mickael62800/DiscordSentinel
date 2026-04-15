@@ -123,6 +123,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .map(|i| i.label)
         .unwrap_or(item_key.as_str());
 
+    // Defer ephemeral : 4 appels API avant la reponse.
+    if !crate::interaction_helper::defer_ephemeral(ctx, command).await {
+        return;
+    }
+
     let data = ctx.data.read().await;
     let api = match data.get::<GameApiKey>() {
         Some(a) => a,
@@ -132,7 +137,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let cost = match api.price_steal_boost(&item_key, duration).await {
         Ok(c) => c,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -143,12 +148,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
     if player.coins < cost {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!(
@@ -164,7 +169,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     if let Err(e) = api.update_player_coins(&guild_id, &user_id, -cost).await {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
@@ -177,7 +182,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             if let Err(e2) = api.update_player_coins(&guild_id, &user_id, cost).await {
                 tracing::warn!(error = %e2, "Echec remboursement boost apres echec souscription");
             }
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -208,19 +213,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ))
         .timestamp(serenity::model::Timestamp::now());
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord boost-voleur");
-    }
+    crate::interaction_helper::followup_embed_ephemeral(ctx, command, embed).await;
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
