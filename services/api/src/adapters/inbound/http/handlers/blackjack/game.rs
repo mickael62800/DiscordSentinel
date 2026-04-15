@@ -149,6 +149,34 @@ pub async fn list_games(
     Ok(Json(games.iter().map(to_dto).collect()))
 }
 
+/// DELETE /api/blackjack/admin/{guild_id}/purge
+/// Vide totalement toutes les tables blackjack pour une guild donnee.
+/// Double-check cote frontend obligatoire.
+pub async fn purge_all(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    use crate::domain::errors::DomainError;
+
+    let games = sqlx::query("DELETE FROM blackjack_games WHERE guild_id = $1")
+        .bind(&guild_id)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("purge blackjack_games: {e}"))))?;
+
+    // blackjack_table_players est en CASCADE sur blackjack_tables.
+    let tables = sqlx::query("DELETE FROM blackjack_tables WHERE guild_id = $1")
+        .bind(&guild_id)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("purge blackjack_tables: {e}"))))?;
+
+    Ok(Json(serde_json::json!({
+        "deleted_games": games.rows_affected(),
+        "deleted_tables": tables.rows_affected(),
+    })))
+}
+
 /// DELETE /api/blackjack/games/{game_id}
 pub async fn cancel_game(
     State(state): State<AppState>,

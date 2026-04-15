@@ -406,17 +406,38 @@ pub async fn ai_start_training(
     batch_size: u32,
     learning_rate: f64,
     validation_split: f64,
+    early_stopping_patience: Option<u32>,
+    use_class_weights: Option<bool>,
+    use_mixed_precision: Option<bool>,
+    run_lr_finder: Option<bool>,
+    label_smoothing: Option<f64>,
+    weight_decay: Option<f64>,
+    warmup_ratio: Option<f64>,
+    max_length: Option<u32>,
+    neutral_cap: Option<u32>,
 ) -> Result<serde_json::Value, String> {
     let base = ai_base_url(&adapter);
+    let mut payload = serde_json::json!({
+        "model_type": model_type,
+        "epochs": epochs,
+        "batch_size": batch_size,
+        "learning_rate": learning_rate,
+        "validation_split": validation_split,
+    });
+    let obj = payload.as_object_mut().unwrap();
+    if let Some(v) = early_stopping_patience { obj.insert("early_stopping_patience".into(), v.into()); }
+    if let Some(v) = use_class_weights { obj.insert("use_class_weights".into(), v.into()); }
+    if let Some(v) = use_mixed_precision { obj.insert("use_mixed_precision".into(), v.into()); }
+    if let Some(v) = run_lr_finder { obj.insert("run_lr_finder".into(), v.into()); }
+    if let Some(v) = label_smoothing { obj.insert("label_smoothing".into(), v.into()); }
+    if let Some(v) = weight_decay { obj.insert("weight_decay".into(), v.into()); }
+    if let Some(v) = warmup_ratio { obj.insert("warmup_ratio".into(), v.into()); }
+    if let Some(v) = max_length { obj.insert("max_length".into(), v.into()); }
+    if let Some(v) = neutral_cap { obj.insert("neutral_cap".into(), v.into()); }
+
     let resp = reqwest::Client::new()
         .post(format!("{}/api/ai/training/start", base))
-        .json(&serde_json::json!({
-            "model_type": model_type,
-            "epochs": epochs,
-            "batch_size": batch_size,
-            "learning_rate": learning_rate,
-            "validation_split": validation_split,
-        }))
+        .json(&payload)
         .send().await.map_err(|e| format!("AI API indisponible: {e}"))?;
     if !resp.status().is_success() {
         return Err(format!("Erreur training: {}", resp.status()));

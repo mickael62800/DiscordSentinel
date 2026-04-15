@@ -1,0 +1,34 @@
+model:
+  name: "text-sentinel"
+  backbone: "camembert-base"
+  num_classes: 5
+  max_length: 128
+
+training:
+  epochs: 20
+  batch_size: 64
+  learning_rate: 0.00003
+  weight_decay: 0.01
+  scheduler: "linear_warmup"
+  warmup_ratio: 0.1
+  early_stopping_patience: 3
+  label_smoothing: 0.1
+
+data:
+  train_split: 0.80
+  val_split: 0.10
+  test_split: 0.10
+  num_workers: 4
+
+classes:
+  0: "neutral"
+  1: "anger"
+  2: "rage"
+  3: "threat"
+  4: "harassment"
+
+export:
+  format: "onnx"
+  opset_version: 17
+  dynamic_axes: true
+  simplify: true

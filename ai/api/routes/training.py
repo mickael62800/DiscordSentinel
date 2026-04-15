@@ -158,6 +158,11 @@ class TrainingRequest(BaseModel):
     use_class_weights: bool = True
     use_mixed_precision: bool = True
     run_lr_finder: bool = False
+    label_smoothing: float | None = Field(default=None, ge=0.0, le=0.5, description="Label smoothing (None = valeur du YAML)")
+    weight_decay: float = Field(default=0.01, ge=0.0, le=0.5, description="Weight decay AdamW (L2)")
+    warmup_ratio: float = Field(default=0.1, ge=0.0, le=0.5, description="Ratio de warmup du scheduler lineaire")
+    max_length: int | None = Field(default=None, ge=16, le=512, description="Longueur max de tokens (None = valeur du YAML)")
+    neutral_cap: int = Field(default=0, ge=0, description="Plafond de samples neutral cote train (0 = desactive)")
 
 
 class TrainingResponse(BaseModel):
@@ -495,10 +500,14 @@ def _train_text(req: TrainingRequest) -> None:
         state.phase = f"chargement modele ({device}{'+ AMP' if use_amp else ''})"
 
         backbone = config["model"]["backbone"]
-        max_length = config["model"]["max_length"]
+        max_length = req.max_length if req.max_length is not None else config["model"]["max_length"]
         num_classes = config["model"]["num_classes"]
         class_names = [config["classes"][i] for i in range(num_classes)]
-        label_smoothing = config.get("training", {}).get("label_smoothing", 0.0)
+        label_smoothing = (
+            req.label_smoothing
+            if req.label_smoothing is not None
+            else config.get("training", {}).get("label_smoothing", 0.0)
+        )
         tokenizer = AutoTokenizer.from_pretrained(backbone)
 
         dataset_dir = AI_ROOT / "training" / "text" / "datasets"
@@ -513,12 +522,27 @@ def _train_text(req: TrainingRequest) -> None:
         # Split stratifie train/val/test
         state.phase = "preparation donnees"
         test_ratio = config.get("data", {}).get("test_split", 0.1)
+        # Pre-calcul des labels pour eviter de re-tokenizer pendant le split + cap
+        all_labels = [dataset[i]["labels"] for i in range(len(dataset))]
         train_indices, val_indices, test_indices = _create_stratified_splits(
             len(dataset),
-            lambda i: dataset[i]["labels"],
+            lambda i: all_labels[i],
             req.validation_split,
             test_ratio,
         )
+
+        # Plafond neutral cote train (undersampling)
+        if req.neutral_cap > 0:
+            import random as _rnd
+            _rnd.seed(42)
+            neutral_idx = [i for i in train_indices if all_labels[i] == 0]
+            other_idx = [i for i in train_indices if all_labels[i] != 0]
+            if len(neutral_idx) > req.neutral_cap:
+                _rnd.shuffle(neutral_idx)
+                neutral_idx = neutral_idx[:req.neutral_cap]
+                logger.info("Neutral plafonne de %d a %d cote train", len(train_indices) - len(other_idx), req.neutral_cap)
+            train_indices = other_idx + neutral_idx
+            _rnd.shuffle(train_indices)
 
         train_set = Subset(dataset, train_indices)
         val_set = Subset(dataset, val_indices)
@@ -552,7 +576,7 @@ def _train_text(req: TrainingRequest) -> None:
             backbone, num_labels=num_classes
         ).to(device)
 
-        optimizer = torch.optim.AdamW(model.parameters(), lr=req.learning_rate, weight_decay=0.01)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=req.learning_rate, weight_decay=req.weight_decay)
 
         # LR Finder
         if req.run_lr_finder:
@@ -565,7 +589,7 @@ def _train_text(req: TrainingRequest) -> None:
                 logger.info("LR range test: LR suggere = %.2e", suggested_lr)
 
         total_steps = len(train_loader) * req.epochs
-        scheduler = get_linear_schedule_with_warmup(optimizer, int(total_steps * 0.1), total_steps)
+        scheduler = get_linear_schedule_with_warmup(optimizer, int(total_steps * req.warmup_ratio), total_steps)
 
         early_stopping = EarlyStopping(patience=req.early_stopping_patience, mode="min")
 

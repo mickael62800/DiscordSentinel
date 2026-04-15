@@ -60,6 +60,7 @@ def compute_metrics(
         "macro_recall": round(macro_r / num_classes, 4),
         "macro_f1": round(macro_f1 / num_classes, 4),
         "per_class": per_class,
+        "class_names": list(class_names),
     }
 
 

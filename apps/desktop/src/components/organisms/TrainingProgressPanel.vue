@@ -17,6 +17,58 @@ const emit = defineEmits<{
   stop: [];
 }>();
 
+const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
+
+// Ordre canonique hardcode en fallback (le bridge Tauri alphabetise les
+// cles du dict JSON, donc Object.keys(per_class) donne un mauvais ordre).
+// Correspond aux index de classe du backend (train_config.yaml).
+const CANONICAL_ORDER: Record<ModelType, string[]> = {
+  "image-classification": ["safe", "nsfw", "illicit"],
+  "text-sentiment": ["neutral", "anger", "rage", "threat", "harassment"],
+};
+
+const classNames = computed(() => {
+  const fm = props.status.final_metrics;
+  if (fm?.class_names && fm.class_names.length > 0) return fm.class_names;
+  // Fallback 1 : ordre canonique connu selon le type de modele
+  const mt = props.status.model_type;
+  if (mt && CANONICAL_ORDER[mt]) {
+    const canonical = CANONICAL_ORDER[mt];
+    // Verifier que toutes les classes canoniques existent dans per_class
+    if (fm?.per_class && canonical.every((n) => n in fm.per_class)) {
+      return canonical;
+    }
+  }
+  // Fallback 2 : ordre des cles du dict (probablement alphabetique)
+  if (fm?.per_class) return Object.keys(fm.per_class);
+  return [];
+});
+
+const perClassRows = computed(() => {
+  const fm = props.status.final_metrics;
+  if (!fm?.per_class) return [];
+  // Utiliser class_names comme ordre canonique (le bridge Tauri
+  // alphabetise sinon les cles du dict JSON)
+  return classNames.value
+    .map((name) => {
+      const m = fm.per_class[name];
+      if (!m) return null;
+      return {
+        name,
+        precision: m.precision,
+        recall: m.recall,
+        f1: m.f1,
+        support: m.support,
+      };
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null);
+});
+
+const hasConfusion = computed(() => {
+  const cm = props.status.final_metrics?.confusion_matrix;
+  return Array.isArray(cm) && cm.length > 0 && Array.isArray(cm[0]) && cm[0].length > 0;
+});
+
 const progressPercent = computed(() => {
   if (!props.status.total_epochs) return 0;
   const epochProgress = props.status.total_batches
@@ -149,6 +201,79 @@ const batchPercent = computed(() => {
         Un entrainement est deja en cours sur un autre modele.
       </p>
       <p v-else>Pret a lancer l'entrainement.</p>
+    </div>
+
+    <!-- Metriques finales (visibles apres un entrainement termine) -->
+    <div
+      v-if="status.final_metrics && status.model_type === activeTab"
+      class="final-metrics"
+    >
+      <h4>Metriques finales (test set)</h4>
+
+      <div class="macro-grid">
+        <div class="macro-cell">
+          <div class="macro-label">Accuracy</div>
+          <div class="macro-value">{{ pct(status.final_metrics.accuracy) }}</div>
+        </div>
+        <div class="macro-cell">
+          <div class="macro-label">Macro F1</div>
+          <div class="macro-value">{{ pct(status.final_metrics.macro_f1) }}</div>
+        </div>
+        <div class="macro-cell">
+          <div class="macro-label">Macro Precision</div>
+          <div class="macro-value">{{ pct(status.final_metrics.macro_precision) }}</div>
+        </div>
+        <div class="macro-cell">
+          <div class="macro-label">Macro Recall</div>
+          <div class="macro-value">{{ pct(status.final_metrics.macro_recall) }}</div>
+        </div>
+      </div>
+
+      <table class="per-class-table">
+        <thead>
+          <tr>
+            <th>Classe</th>
+            <th>Precision</th>
+            <th>Recall</th>
+            <th>F1</th>
+            <th>Support</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in perClassRows" :key="row.name">
+            <td class="class-name">{{ row.name }}</td>
+            <td :class="{ weak: row.precision < 0.7 }">{{ pct(row.precision) }}</td>
+            <td :class="{ weak: row.recall < 0.7 }">{{ pct(row.recall) }}</td>
+            <td :class="{ weak: row.f1 < 0.7 }">{{ pct(row.f1) }}</td>
+            <td>{{ row.support }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <details v-if="hasConfusion" class="confusion-details">
+        <summary>Matrice de confusion</summary>
+        <table class="confusion-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th v-for="cn in classNames" :key="'h-' + cn">{{ cn }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, i) in status.final_metrics.confusion_matrix" :key="'r-' + i">
+              <th>{{ classNames[i] || i }}</th>
+              <td
+                v-for="(cell, j) in row"
+                :key="'c-' + i + '-' + j"
+                :class="{ diagonal: i === j }"
+              >
+                {{ cell }}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="confusion-hint">Lignes = vraie classe, colonnes = predite. Diagonale en vert = correct.</p>
+      </details>
     </div>
   </section>
 </template>
@@ -388,5 +513,120 @@ const batchPercent = computed(() => {
 .btn-danger {
   background: #ef4444;
   color: white;
+}
+
+/* ── Metriques finales ── */
+.final-metrics {
+  margin-top: 1.5rem;
+  padding: 1.25rem;
+  background: rgba(124, 58, 237, 0.05);
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  border-radius: 10px;
+}
+
+.final-metrics h4 {
+  margin: 0 0 1rem;
+  font-size: 0.95rem;
+  color: var(--accent, #7c3aed);
+}
+
+.macro-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+}
+
+.macro-cell {
+  background: rgba(255, 255, 255, 0.03);
+  padding: 0.75rem;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.macro-label {
+  font-size: 0.75rem;
+  opacity: 0.7;
+  margin-bottom: 0.25rem;
+}
+
+.macro-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.per-class-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.per-class-table th,
+.per-class-table td {
+  padding: 0.5rem 0.75rem;
+  text-align: right;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.per-class-table th {
+  font-weight: 500;
+  opacity: 0.7;
+  text-align: right;
+}
+
+.per-class-table th:first-child,
+.per-class-table td:first-child {
+  text-align: left;
+}
+
+.per-class-table .class-name {
+  font-weight: 500;
+}
+
+.per-class-table td.weak {
+  color: #f59e0b;
+}
+
+.confusion-details {
+  margin-top: 0.5rem;
+}
+
+.confusion-details summary {
+  cursor: pointer;
+  font-size: 0.85rem;
+  opacity: 0.8;
+  padding: 0.25rem 0;
+}
+
+.confusion-table {
+  border-collapse: collapse;
+  font-size: 0.8rem;
+  margin-top: 0.75rem;
+}
+
+.confusion-table th,
+.confusion-table td {
+  padding: 0.35rem 0.6rem;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.confusion-table th {
+  font-weight: 500;
+  opacity: 0.7;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.confusion-table td.diagonal {
+  background: rgba(34, 197, 94, 0.15);
+  color: #4ade80;
+  font-weight: 600;
+}
+
+.confusion-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.75rem;
+  opacity: 0.6;
 }
 </style>

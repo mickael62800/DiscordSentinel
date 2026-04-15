@@ -184,6 +184,59 @@ pub async fn expire_combat(
     Ok(StatusCode::NO_CONTENT)
 }
 
+/// DELETE /api/coude/{guild_id}/purge
+/// Vide totalement toutes les tables Coup de Coude pour une guild donnee.
+/// Double-check cote frontend obligatoire.
+pub async fn purge_all(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state,
+        &rbac,
+        &guild_id,
+        Role::Moderator,
+        "moderator+ pour purger les donnees coude",
+    )
+    .await?;
+
+    let mut tx = state
+        .pg_pool
+        .begin()
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("begin tx: {e}"))))?;
+
+    // Ordre : tables filles d'abord (meme si la plupart ont CASCADE).
+    let mut totals = serde_json::Map::new();
+    for table in &[
+        "coude_insurances",
+        "coude_bets",
+        "coude_combats",
+        "coude_primes",
+        "coude_inventory",
+        "coude_events",
+        "coude_players",
+    ] {
+        let sql = format!("DELETE FROM {table} WHERE guild_id = $1");
+        let res = sqlx::query(&sql)
+            .bind(&guild_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError(DomainError::Internal(format!("purge {table}: {e}"))))?;
+        totals.insert(
+            (*table).to_string(),
+            serde_json::Value::from(res.rows_affected()),
+        );
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("commit tx: {e}"))))?;
+
+    Ok(Json(serde_json::Value::Object(totals)))
+}
+
 /// POST /api/coude/combats/{combat_id}/defender-special
 pub async fn set_defender_special(
     State(state): State<AppState>,

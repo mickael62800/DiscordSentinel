@@ -9,4 +9,7 @@ export const blackjackService = {
   cancelGame(gameId: string): Promise<void> {
     return httpDelete(`/api/blackjack/admin/games/${gameId}`);
   },
+  purgeAll(guildId: string): Promise<{ deleted_games: number; deleted_tables: number }> {
+    return httpDelete(`/api/blackjack/admin/${guildId}/purge`);
+  },
 };

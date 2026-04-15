@@ -44,6 +44,7 @@ members = [
 
     # Desktop
     "apps/desktop/src-tauri",
+    "apps/ai-trainer/src-tauri",
 ]
 
 [workspace.package]

@@ -9,6 +9,32 @@ export interface TrainingConfig {
   batch_size: number;
   learning_rate: number;
   validation_split: number;
+  early_stopping_patience?: number;
+  use_class_weights?: boolean;
+  use_mixed_precision?: boolean;
+  run_lr_finder?: boolean;
+  label_smoothing?: number;
+  weight_decay?: number;
+  warmup_ratio?: number;
+  max_length?: number;
+  neutral_cap?: number;
+}
+
+export interface PerClassMetrics {
+  precision: number;
+  recall: number;
+  f1: number;
+  support: number;
+}
+
+export interface FinalMetrics {
+  accuracy: number;
+  macro_precision: number;
+  macro_recall: number;
+  macro_f1: number;
+  per_class: Record<string, PerClassMetrics>;
+  confusion_matrix?: number[][];
+  class_names?: string[];
 }
 
 export interface TrainingStatus {
@@ -28,6 +54,7 @@ export interface TrainingStatus {
   batch_accuracy: number;
   early_stopped: boolean;
   best_epoch: number;
+  final_metrics: FinalMetrics | null;
 }
 
 export interface DatasetInfo {
@@ -70,6 +97,7 @@ const status = ref<TrainingStatus>({
   batch_accuracy: 0,
   early_stopped: false,
   best_epoch: 0,
+  final_metrics: null,
 });
 const datasets = ref<DatasetInfo[]>([]);
 const loading = ref(false);
@@ -136,6 +164,7 @@ async function startTraining(config: TrainingConfig) {
     batch_accuracy: 0,
     early_stopped: false,
     best_epoch: 0,
+    final_metrics: null,
   };
   try {
     await invoke("ai_start_training", {
@@ -144,6 +173,15 @@ async function startTraining(config: TrainingConfig) {
       batchSize: config.batch_size,
       learningRate: config.learning_rate,
       validationSplit: config.validation_split,
+      earlyStoppingPatience: config.early_stopping_patience,
+      useClassWeights: config.use_class_weights,
+      useMixedPrecision: config.use_mixed_precision,
+      runLrFinder: config.run_lr_finder,
+      labelSmoothing: config.label_smoothing,
+      weightDecay: config.weight_decay,
+      warmupRatio: config.warmup_ratio,
+      maxLength: config.max_length,
+      neutralCap: config.neutral_cap,
     });
     startPolling();
   } catch (e) {

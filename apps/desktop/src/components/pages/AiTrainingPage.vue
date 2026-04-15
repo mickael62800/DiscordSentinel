@@ -36,6 +36,15 @@ const epochs = ref(10);
 const batchSize = ref(32);
 const learningRate = ref(0.001);
 const validationSplit = ref(0.2);
+const earlyStoppingPatience = ref(3);
+const useClassWeights = ref(true);
+const useMixedPrecision = ref(true);
+const runLrFinder = ref(false);
+const labelSmoothing = ref(0.1);
+const weightDecay = ref(0.01);
+const warmupRatio = ref(0.1);
+const maxLength = ref(128);
+const neutralCap = ref(0);
 
 const trainingConfig = computed<TrainingConfig>(() => ({
   model_type: activeTab.value,
@@ -43,6 +52,15 @@ const trainingConfig = computed<TrainingConfig>(() => ({
   batch_size: batchSize.value,
   learning_rate: learningRate.value,
   validation_split: validationSplit.value,
+  early_stopping_patience: earlyStoppingPatience.value,
+  use_class_weights: useClassWeights.value,
+  use_mixed_precision: useMixedPrecision.value,
+  run_lr_finder: runLrFinder.value,
+  label_smoothing: labelSmoothing.value,
+  weight_decay: weightDecay.value,
+  warmup_ratio: warmupRatio.value,
+  max_length: maxLength.value,
+  neutral_cap: neutralCap.value,
 }));
 
 const activeDataset = computed(() =>
@@ -130,16 +148,16 @@ onMounted(async () => {
         <!-- Description du modele -->
         <section class="model-info">
           <template v-if="activeTab === 'text-sentiment'">
-            <h2>DistilBERT — Sentiment / Toxicite</h2>
+            <h2>CamemBERT — Sentiment / Toxicite</h2>
             <p>
-              Fine-tuning d'un modele DistilBERT pour detecter la colere, les menaces,
-              le harcelement et le spam dans les messages Discord. Utilise par
-              <strong>automod-bot</strong> pour la moderation automatique du texte.
+              Fine-tuning d'un modele CamemBERT (138 Go de francais natif) pour detecter
+              la colere, la rage, les menaces et le harcelement dans les messages Discord.
+              Utilise par <strong>automod-bot</strong> pour la moderation automatique du texte.
             </p>
             <div class="model-tags">
               <span class="tag">NLP</span>
-              <span class="tag">DistilBERT</span>
-              <span class="tag">Classification multi-label</span>
+              <span class="tag">CamemBERT</span>
+              <span class="tag">Classification multi-classe</span>
               <span class="tag">ONNX</span>
             </div>
           </template>
@@ -174,7 +192,7 @@ onMounted(async () => {
           <div class="params-grid">
             <div class="param">
               <label>Epochs</label>
-              <input type="number" v-model.number="epochs" min="1" max="100" :disabled="status.running" />
+              <input type="number" v-model.number="epochs" min="1" max="200" :disabled="status.running" />
             </div>
             <div class="param">
               <label>Batch size</label>
@@ -187,7 +205,7 @@ onMounted(async () => {
                 v-model.number="learningRate"
                 min="0.00001"
                 max="0.1"
-                step="0.0001"
+                step="0.00001"
                 :disabled="status.running"
               />
             </div>
@@ -202,6 +220,100 @@ onMounted(async () => {
                 :disabled="status.running"
               />
             </div>
+            <div class="param">
+              <label title="Nombre d'epochs sans amelioration avant arret automatique">
+                Early stopping patience
+              </label>
+              <input
+                type="number"
+                v-model.number="earlyStoppingPatience"
+                min="0"
+                max="50"
+                :disabled="status.running"
+              />
+            </div>
+            <div class="param">
+              <label title="Longueur max de tokens par message (Discord: 96-128 suffit)">
+                Max length (tokens)
+              </label>
+              <input
+                type="number"
+                v-model.number="maxLength"
+                min="16"
+                max="512"
+                step="16"
+                :disabled="status.running"
+              />
+            </div>
+            <div class="param">
+              <label title="Regularisation L2 AdamW (0.01 standard fine-tuning)">
+                Weight decay
+              </label>
+              <input
+                type="number"
+                v-model.number="weightDecay"
+                min="0"
+                max="0.5"
+                step="0.005"
+                :disabled="status.running"
+              />
+            </div>
+            <div class="param">
+              <label title="Label smoothing (0.1 = standard, evite l'overconfidence)">
+                Label smoothing
+              </label>
+              <input
+                type="number"
+                v-model.number="labelSmoothing"
+                min="0"
+                max="0.5"
+                step="0.05"
+                :disabled="status.running"
+              />
+            </div>
+            <div class="param">
+              <label title="Ratio d'epochs pour la montee progressive du learning rate au debut">
+                Warmup ratio
+              </label>
+              <input
+                type="number"
+                v-model.number="warmupRatio"
+                min="0"
+                max="0.5"
+                step="0.05"
+                :disabled="status.running"
+              />
+            </div>
+            <div class="param">
+              <label title="Plafond de samples neutral cote train (0 = aucun, undersampling sinon)">
+                Neutral cap (0 = off)
+              </label>
+              <input
+                type="number"
+                v-model.number="neutralCap"
+                min="0"
+                step="1000"
+                :disabled="status.running"
+              />
+            </div>
+          </div>
+
+          <div class="toggle-row">
+            <label class="toggle">
+              <input type="checkbox" v-model="useClassWeights" :disabled="status.running" />
+              <span>Class weights (inverse freq)</span>
+              <small>Compense le desequilibre neutral/threat</small>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="useMixedPrecision" :disabled="status.running" />
+              <span>Mixed precision (fp16)</span>
+              <small>2x plus rapide sur GPU CUDA</small>
+            </label>
+            <label class="toggle">
+              <input type="checkbox" v-model="runLrFinder" :disabled="status.running" />
+              <span>LR range test</span>
+              <small>Trouve le LR optimal avant l'entrainement</small>
+            </label>
           </div>
         </section>
 
@@ -427,6 +539,52 @@ onMounted(async () => {
 .param input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.toggle-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border, #333);
+}
+
+.toggle {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--bg-primary, #161622);
+  border: 1px solid var(--border, #333);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.toggle:hover {
+  border-color: var(--accent, #7c3aed);
+}
+
+.toggle input[type="checkbox"] {
+  margin-right: 6px;
+  accent-color: var(--accent, #7c3aed);
+}
+
+.toggle span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.toggle small {
+  font-size: 0.72rem;
+  color: var(--text-secondary, #888);
+  padding-left: 20px;
+}
+
+.toggle input:disabled + span {
+  opacity: 0.5;
 }
 
 /* Export */

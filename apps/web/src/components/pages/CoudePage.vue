@@ -26,6 +26,33 @@ const players = ref<CoudePlayer[]>([]);
 const loading = ref(false);
 const error = ref<string | null>(null);
 const cancelling = ref<string | null>(null);
+const purging = ref(false);
+
+async function handlePurgeAll() {
+  if (!selectedGuildId.value) return;
+  const ok1 = await confirm({
+    title: "Reset total Coup de Coude",
+    message:
+      "Supprimer DEFINITIVEMENT toutes les donnees Coup de Coude (joueurs, combats, paris, assurances, inventaire, primes) pour cette guild ?",
+  });
+  if (!ok1) return;
+  const ok2 = await confirm({
+    title: "Confirmation finale",
+    message: "Cette action est IRREVERSIBLE. Tout sera remis a zero.",
+  });
+  if (!ok2) return;
+  purging.value = true;
+  try {
+    const res = await coudeService.purgeAll(selectedGuildId.value);
+    const total = Object.values(res).reduce((a, b) => a + b, 0);
+    success(`${total} ligne(s) supprimee(s).`);
+    await Promise.all([fetchCombats(), fetchPlayers()]);
+  } catch (e) {
+    toastError(String(e));
+  } finally {
+    purging.value = false;
+  }
+}
 const expandedRow = ref<string | null>(null);
 const sortKey = ref<"wins" | "winrate" | "level" | "chaos" | "stolen">("wins");
 
@@ -219,13 +246,23 @@ onMounted(() => fetchCombats());
           Les coins sont geres via la page <strong>Wallet</strong>.
         </p>
       </div>
-      <AppButton
-        variant="secondary"
-        @click="activeTab === 'combats' ? fetchCombats() : fetchPlayers()"
-        :disabled="loading"
-      >
-        ↻ Rafraichir
-      </AppButton>
+      <div class="hero-actions">
+        <AppButton
+          variant="secondary"
+          @click="activeTab === 'combats' ? fetchCombats() : fetchPlayers()"
+          :disabled="loading"
+        >
+          ↻ Rafraichir
+        </AppButton>
+        <button
+          class="danger-btn"
+          :disabled="purging"
+          @click="handlePurgeAll"
+          title="Supprime DEFINITIVEMENT toutes les donnees coude de cette guild"
+        >
+          {{ purging ? "Purge…" : "🗑 Reset total" }}
+        </button>
+      </div>
     </header>
 
     <!-- Tab switcher -->
@@ -659,6 +696,32 @@ onMounted(() => fetchCombats());
   padding-bottom: 16px;
   border-bottom: 1px solid var(--border);
 }
+
+.hero-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.danger-btn {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.danger-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.danger-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .hero-title {
   display: flex;
