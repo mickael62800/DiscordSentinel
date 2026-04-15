@@ -16,6 +16,7 @@ import AuditPage from "../components/pages/AuditPage.vue";
 import IaConfigPage from "../components/pages/IaConfigPage.vue";
 import MembersPage from "../components/pages/MembersPage.vue";
 import CoudePage from "../components/pages/CoudePage.vue";
+import CoudeTauntsConfigPage from "../components/pages/CoudeTauntsConfigPage.vue";
 import BlackjackPage from "../components/pages/BlackjackPage.vue";
 import WalletPage from "../components/pages/WalletPage.vue";
 import RbacPage from "../components/pages/RbacPage.vue";
@@ -43,6 +44,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/audit", name: "audit", component: AuditPage },
   { path: "/ia-config", name: "ia-config", component: IaConfigPage },
   { path: "/coude", name: "coude", component: CoudePage },
+  { path: "/coude/taunts", name: "coude-taunts", component: CoudeTauntsConfigPage },
   { path: "/blackjack", name: "blackjack", component: BlackjackPage },
   { path: "/wallet", name: "wallet", component: WalletPage },
   { path: "/rbac", name: "rbac", component: RbacPage },

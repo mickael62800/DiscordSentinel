@@ -93,6 +93,19 @@ impl CoudeTauntsRepository for PgCoudeTauntsRepository {
         Ok(row.is_some())
     }
 
+    async fn list_opt_outs(&self, guild_id: &str) -> Result<Vec<String>, DomainError> {
+        let rows: Vec<(String,)> = sqlx::query_as(
+            r#"SELECT user_id FROM coude_taunts_opt_outs
+               WHERE guild_id = $1
+               ORDER BY created_at DESC"#,
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(rows.into_iter().map(|(u,)| u).collect())
+    }
+
     async fn set_opt_out(
         &self,
         guild_id: &str,

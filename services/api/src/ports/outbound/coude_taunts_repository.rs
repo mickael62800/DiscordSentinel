@@ -23,6 +23,9 @@ pub trait CoudeTauntsRepository: Send + Sync {
     /// True si le joueur est opted out des taunts.
     async fn is_opted_out(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
 
+    /// Liste tous les user_ids opt-out d'une guild (pour la page admin).
+    async fn list_opt_outs(&self, guild_id: &str) -> Result<Vec<String>, DomainError>;
+
     /// Set / clear l'opt-out d'un joueur.
     async fn set_opt_out(
         &self,

@@ -72,4 +72,6 @@ pub trait ManageCoudeTauntsUseCase: Send + Sync {
     ) -> Result<(), DomainError>;
 
     async fn is_opted_out(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
+
+    async fn list_opt_outs(&self, guild_id: &str) -> Result<Vec<String>, DomainError>;
 }

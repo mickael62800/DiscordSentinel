@@ -88,6 +88,7 @@ fn bot_routes_standard() -> Router<AppState> {
         // collision avec les routes dynamiques /api/blackjack/{game_id}/*).
         .route("/api/blackjack/admin/{guild_id}/games", get(handlers::blackjack::list_games))
         .route("/api/blackjack/admin/games/{game_id}", delete(handlers::blackjack::cancel_game))
+        .route("/api/blackjack/admin/{guild_id}/purge", delete(handlers::blackjack::purge_all))
         // Blackjack tables (multijoueur)
         .route("/api/blackjack/tables", post(handlers::blackjack::create_table))
         .route("/api/blackjack/tables/{table_id}/join", post(handlers::blackjack::join_table))
@@ -240,6 +241,7 @@ fn coude_routes() -> Router<AppState> {
         // Existing
         .route("/{guild_id}/combats", get(handlers::coude::list_combats))
         .route("/{guild_id}/players", get(handlers::coude::list_players))
+        .route("/{guild_id}/purge", delete(handlers::coude::purge_all))
         .route("/combats/{combat_id}", delete(handlers::coude::cancel_combat))
         .route("/players/{guild_id}/{user_id}/coins", patch(handlers::coude::adjust_coins))
         // Player CRUD
@@ -311,6 +313,15 @@ fn coude_routes() -> Router<AppState> {
         // HP
         .route("/{guild_id}/players/{user_id}/hp", post(handlers::coude::update_hp))
         .route("/{guild_id}/players/{user_id}/repos", post(handlers::coude::repos))
+        // Phase 9 Part E : config railleries (admin web UI)
+        .route(
+            "/{guild_id}/config/taunts",
+            get(handlers::coude::get_taunts_config).put(handlers::coude::update_taunts_config),
+        )
+        .route(
+            "/{guild_id}/config/taunts/opt-outs/{user_id}",
+            delete(handlers::coude::remove_taunts_opt_out),
+        )
 }
 
 fn game_routes() -> Router<AppState> {

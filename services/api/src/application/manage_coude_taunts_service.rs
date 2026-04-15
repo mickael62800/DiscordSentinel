@@ -131,4 +131,8 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
     async fn is_opted_out(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError> {
         self.taunts_repo.is_opted_out(guild_id, user_id).await
     }
+
+    async fn list_opt_outs(&self, guild_id: &str) -> Result<Vec<String>, DomainError> {
+        self.taunts_repo.list_opt_outs(guild_id).await
+    }
 }
