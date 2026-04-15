@@ -794,6 +794,7 @@ mod tests {
     impl VoiceChannelRepository for MockVoiceRepo {
         async fn find_all(&self) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
         async fn find_all_by_guild(&self, _: &str) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
+        async fn find_closed_by_guild(&self, _: &str, _: i64) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
         async fn find_by_channel_id(&self, _: &str) -> Result<Option<VoiceChannel>, DomainError> {
             Ok(self.channel.lock().unwrap().clone())
         }
