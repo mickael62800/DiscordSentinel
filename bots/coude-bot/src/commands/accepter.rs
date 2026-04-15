@@ -1,6 +1,6 @@
 use serenity::all::{
     ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage,
+    CreateInteractionResponseFollowup, CreateMessage,
 };
 use serenity::model::id::ChannelId;
 
@@ -16,17 +16,29 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         None => return,
     };
 
+    // Defer update message : acknowledge le bouton et garde le message
+    // tel quel pendant qu'on fait les API calls (get_combat, expire_combat
+    // si besoin, set_combat_betting). Sans ca, Discord coupait apres 3s
+    // et affichait "L'interaction a echoue".
+    if let Err(e) = component
+        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+        .await
+    {
+        tracing::warn!(error = %e, "Echec defer accepter button");
+        return;
+    }
+
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
     let combat_record = match api.get_combat(&combat_id).await {
         Ok(Some(c)) => c,
         Ok(None) => {
-            reply_ephemeral(ctx, component, "Combat introuvable.").await;
+            followup_ephemeral(ctx, component, "Combat introuvable.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            followup_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -36,20 +48,20 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     // par hasard le meme Discord id que le defenseur de guild A.
     if let Some(gid) = component.guild_id {
         if gid.to_string() != combat_record.guild_id {
-            reply_ephemeral(ctx, component, "Ce combat n'appartient pas a cette guild.").await;
+            followup_ephemeral(ctx, component, "Ce combat n'appartient pas a cette guild.").await;
             return;
         }
     }
 
     // Verifier que c'est bien le defenseur qui clique
     if component.user.id.to_string() != combat_record.defender_id {
-        reply_ephemeral(ctx, component, "Seul le defenseur peut accepter le defi !").await;
+        followup_ephemeral(ctx, component, "Seul le defenseur peut accepter le defi !").await;
         return;
     }
 
     // Verifier le statut
     if combat_record.status != "pending" {
-        reply_ephemeral(ctx, component, "Ce combat n'est plus en attente.").await;
+        followup_ephemeral(ctx, component, "Ce combat n'est plus en attente.").await;
         return;
     }
 
@@ -72,7 +84,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             tracing::warn!(error = %e, "Echec API expire_combat");
         }
         let expire_label = if expire_secs >= 3600 { format!("{}h", expire_secs / 3600) } else { format!("{}min", expire_secs / 60) };
-        reply_ephemeral(ctx, component, &format!("Ce defi a expire ! ({})", expire_label)).await;
+        followup_ephemeral(ctx, component, &format!("Ce defi a expire ! ({})", expire_label)).await;
         return;
     }
 
@@ -85,11 +97,11 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 
     match api.set_combat_betting(&combat_id, &message_id).await {
         Ok(false) => {
-            reply_ephemeral(ctx, component, "Ce combat n'est plus en attente.").await;
+            followup_ephemeral(ctx, component, "Ce combat n'est plus en attente.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            followup_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
         Ok(true) => {}
@@ -112,18 +124,18 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 
+    // Edit du message original : on enleve les boutons et on met le nouveau
+    // embed. Comme on a Ack au debut, le message reste intact jusqu'ici.
+    // On edit directement via http le message avec son id.
+    let edit_msg = serenity::all::EditMessage::new()
+        .embed(waiting_embed)
+        .components(vec![]);
     if let Err(e) = component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::UpdateMessage(
-                CreateInteractionResponseMessage::new()
-                    .embed(waiting_embed)
-                    .components(vec![]),
-            ),
-        )
+        .channel_id
+        .edit_message(&ctx.http, component.message.id, edit_msg)
         .await
     {
-        tracing::warn!(error = %e, "Echec response Discord");
+        tracing::warn!(error = %e, "Echec edit message defi accepte");
     }
 
     // Notification dans le salon notifications
@@ -197,18 +209,17 @@ pub async fn resolve_combat_internal(
     Some(embed)
 }
 
-async fn reply_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
+/// Followup ephemeral apres un Acknowledge (on a defer au debut).
+async fn followup_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
     if let Err(e) = component
-        .create_response(
+        .create_followup(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
+            CreateInteractionResponseFollowup::new()
+                .content(content)
+                .ephemeral(true),
         )
         .await
     {
-        tracing::warn!(error = %e, "Echec response Discord");
+        tracing::warn!(error = %e, "Echec followup Discord accepter");
     }
 }

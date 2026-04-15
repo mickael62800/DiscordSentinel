@@ -74,6 +74,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
+    // Defer public : 5 appels API (get_player x2, update_coins,
+    // create_prime, get_active_primes).
+    if !crate::interaction_helper::defer_response(ctx, command).await {
+        return;
+    }
+
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
@@ -83,13 +89,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
 
     if player.coins < amount {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!("Pas assez de coins ! Tu as {} coins.", player.coins),
@@ -111,7 +117,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .update_player_coins(&guild_id, &command.user.id.to_string(), -amount)
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
@@ -127,7 +133,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
         return;
     }
 
@@ -153,7 +159,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 
-    crate::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
+    crate::channel_check::post_activity_followup(ctx, command, config.channel_activites(), embed).await;
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {

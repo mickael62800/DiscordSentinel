@@ -1,6 +1,6 @@
 use serenity::all::{
     CommandInteraction, Context, CreateEmbed, CreateInteractionResponse,
-    CreateInteractionResponseMessage, CreateMessage,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage, CreateMessage,
 };
 
 /// Verifie que la commande est utilisee dans le bon salon.
@@ -87,6 +87,45 @@ pub async fn post_activity(
                 ),
             ).await {
                 tracing::warn!(error = %e, "Echec response Discord");
+            }
+        }
+    }
+}
+
+/// Variante de `post_activity` pour les commandes qui ont deja defer
+/// l'interaction. Utilise `create_followup` au lieu de `create_response`.
+pub async fn post_activity_followup(
+    ctx: &Context,
+    command: &CommandInteraction,
+    activity_channel: Option<String>,
+    embed: CreateEmbed,
+) {
+    match activity_channel.and_then(|id| id.parse::<u64>().ok()) {
+        Some(ch_id) => {
+            let channel = serenity::model::id::ChannelId::new(ch_id);
+            if let Err(e) = channel.send_message(
+                &ctx.http,
+                CreateMessage::new().embed(embed),
+            ).await {
+                tracing::warn!(error = %e, "Echec send_message salon activites (followup)");
+            }
+            // Followup ephemeral pour confirmer au joueur
+            if let Err(e) = command.create_followup(
+                &ctx.http,
+                CreateInteractionResponseFollowup::new()
+                    .content(format!("Resultat poste dans <#{}>.", ch_id))
+                    .ephemeral(true),
+            ).await {
+                tracing::warn!(error = %e, "Echec followup Discord");
+            }
+        }
+        None => {
+            // Pas de salon configure → followup ici avec l'embed public
+            if let Err(e) = command.create_followup(
+                &ctx.http,
+                CreateInteractionResponseFollowup::new().embed(embed),
+            ).await {
+                tracing::warn!(error = %e, "Echec followup Discord");
             }
         }
     }

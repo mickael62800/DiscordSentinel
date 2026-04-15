@@ -74,6 +74,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Defer public : 3 appels API (get_player, get_betting_combat, place_bet)
+    // avant la reponse — borderline 3s sans defer.
+    if !crate::interaction_helper::defer_response(ctx, command).await {
+        return;
+    }
+
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
@@ -84,13 +90,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
 
     if bettor.coins < mise {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             &format!(
@@ -109,7 +115,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(Some(c)) => c,
         Ok(None) => {
-            reply_ephemeral(
+            crate::interaction_helper::followup_text(
                 ctx,
                 command,
                 &format!("<@{}> n'a aucun combat ouvert aux paris !", target_id),
@@ -118,14 +124,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            crate::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
 
     // Verifier que le parieur n'est ni attaquant ni defenseur
     if bettor_id == combat.attacker_id || bettor_id == combat.defender_id {
-        reply_ephemeral(
+        crate::interaction_helper::followup_text(
             ctx,
             command,
             "Tu ne peux pas parier sur un combat dans lequel tu participes !",
@@ -149,7 +155,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur pari : {e}")).await;
+        crate::interaction_helper::followup_text(ctx, command, &format!("Erreur pari : {e}")).await;
         return;
     }
 
@@ -163,17 +169,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
         .timestamp(serenity::model::Timestamp::now());
 
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
+    crate::interaction_helper::followup_embed(ctx, command, embed).await;
 }
 
 async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
