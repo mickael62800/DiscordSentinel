@@ -1,0 +1,41 @@
+//! Use case pour la resolution instantanee d'un combat (attaque surprise,
+//! bloodbath event, defense via item). Port inbound.
+//!
+//! Phase 7 refacto : appele par coude-bot via gRPC. Le bot ne fait plus
+//! que poster le resultat sur Discord — toute la logique metier (combat
+//! engine, wallet, stats, XP, primes, paris, assurance) vit ici.
+
+use async_trait::async_trait;
+use uuid::Uuid;
+
+use crate::domain::errors::DomainError;
+
+/// Champ d'un embed Discord construit cote API, pret a etre affiche par le bot.
+/// Le bot se contente de faire `embed.field(name, value, inline)`.
+#[derive(Debug, Clone)]
+pub struct ResolvedCombatEmbedField {
+    pub name: String,
+    pub value: String,
+    pub inline: bool,
+}
+
+/// Sortie complete : tout ce que le bot doit savoir pour construire l'embed
+/// de resultat. Aucune logique cote bot.
+#[derive(Debug, Clone)]
+pub struct ResolveCombatNowOutput {
+    pub combat_id: String,
+    pub title: String,
+    pub description: String,
+    /// Couleur hex de l'embed (0x57F287 = vert, 0x9B59B6 = violet chaos/draw).
+    pub color: u32,
+    pub fields: Vec<ResolvedCombatEmbedField>,
+}
+
+#[async_trait]
+pub trait ResolveCombatNowUseCase: Send + Sync {
+    /// Resout instantanement un combat deja cree (pending) : combat engine,
+    /// wallet, stats, XP, primes, paris, assurance. Utilise pour les attaques
+    /// surprise, bloodbath, et defense via item (tout ce qui court-circuite
+    /// la phase de paris).
+    async fn resolve_now(&self, combat_id: Uuid) -> Result<ResolveCombatNowOutput, DomainError>;
+}

@@ -312,6 +312,16 @@ async fn main() {
             wallet_repo.clone(),
             coude_bets_uc.clone(),
         ));
+    let resolve_combat_now_uc: Arc<dyn sentinel_api::ports::inbound::ResolveCombatNowUseCase> =
+        Arc::new(sentinel_api::application::ResolveCombatNowService::new(
+            coude_combat_repo.clone(),
+            coude_combats_uc.clone(),
+            coude_players_uc.clone() as Arc<dyn sentinel_api::ports::inbound::ManageCoudePlayersUseCase>,
+            wallet_repo.clone(),
+            coude_bets_uc.clone(),
+            coude_inventory_uc.clone(),
+            coude_social_uc.clone(),
+        ));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),
@@ -374,6 +384,7 @@ async fn main() {
         coude_social_uc,
         resolve_betting_batch_uc,
         expire_combats_batch_uc,
+        resolve_combat_now_uc,
         broadcaster,
         job_client,
         discord_api,

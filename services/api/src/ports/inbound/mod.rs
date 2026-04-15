@@ -35,6 +35,10 @@ pub mod resolve_betting_batch;
 pub use resolve_betting_batch::{ResolveBettingBatchUseCase, ResolvedBettingCombatOutput};
 pub mod expire_combats_batch;
 pub use expire_combats_batch::{ExpireCombatsBatchUseCase, ExpiredCombatOutput};
+pub mod resolve_combat_now;
+pub use resolve_combat_now::{
+    ResolveCombatNowUseCase, ResolveCombatNowOutput, ResolvedCombatEmbedField,
+};
 pub use manage_role_panels::ManageRolePanelsUseCase;
 pub use manage_levels::ManageLevelsUseCase;
 pub use manage_watched_users::ManageWatchedUsersUseCase;

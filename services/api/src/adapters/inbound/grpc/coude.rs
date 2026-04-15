@@ -186,6 +186,7 @@ pub struct CoudeCombatsGrpc {
     pub uc: Arc<dyn ManageCoudeCombatsUseCase>,
     pub resolve_batch_uc: Arc<dyn crate::ports::inbound::ResolveBettingBatchUseCase>,
     pub expire_batch_uc: Arc<dyn crate::ports::inbound::ExpireCombatsBatchUseCase>,
+    pub resolve_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase>,
 }
 
 fn combat_to_proto(c: CoudeCombat) -> proto::CoudeCombat {
@@ -438,6 +439,35 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
             })
             .collect();
         Ok(Response::new(proto::ExpiredCombatsBatch { combats }))
+    }
+
+    async fn resolve_combat_now(
+        &self,
+        request: Request<proto::ResolveCombatNowRequest>,
+    ) -> Result<Response<proto::ResolvedCombatNowResponse>, Status> {
+        let req = request.into_inner();
+        let id = parse_uuid(&req.combat_id)?;
+        let out = self
+            .resolve_now_uc
+            .resolve_now(id)
+            .await
+            .map_err(domain_to_status)?;
+        let fields = out
+            .fields
+            .into_iter()
+            .map(|f| proto::ResolvedCombatEmbedField {
+                name: f.name,
+                value: f.value,
+                inline: f.inline,
+            })
+            .collect();
+        Ok(Response::new(proto::ResolvedCombatNowResponse {
+            combat_id: out.combat_id,
+            title: out.title,
+            description: out.description,
+            color: out.color,
+            fields,
+        }))
     }
 }
 

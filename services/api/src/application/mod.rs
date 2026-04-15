@@ -63,3 +63,6 @@ pub use resolve_betting_batch_service::ResolveBettingBatchService;
 
 mod expire_combats_batch_service;
 pub use expire_combats_batch_service::ExpireCombatsBatchService;
+
+mod resolve_combat_now_service;
+pub use resolve_combat_now_service::ResolveCombatNowService;

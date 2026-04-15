@@ -3,7 +3,6 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::game::combat;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
@@ -75,7 +74,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let hp_max = combat::calculate_hp_max(&player);
+    // hp_max est maintenu par l'API (recalcule a chaque combat + sur
+    // spend_stat_point). Fallback 100 si jamais Option::None.
+    let hp_max = player.hp_max.unwrap_or(100);
     let hp_current = player.hp_current.unwrap_or(hp_max).min(hp_max);
 
     // Barre de vie visuelle (20 segments for more granularity)

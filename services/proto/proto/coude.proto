@@ -132,6 +132,27 @@ service CoudeCombatsService {
   rpc ResolveBettingBatch(Empty) returns (ResolvedBettingBatch);
   // Phase 4 : tick batch expiration combats pending (appele par coude-worker).
   rpc ExpireCombatsBatch(Empty) returns (ExpiredCombatsBatch);
+  // Phase 7 : resolution instantanee d'un combat (surprise / bloodbath /
+  // defense via item). Retourne un embed pret a poster par le bot.
+  rpc ResolveCombatNow(ResolveCombatNowRequest) returns (ResolvedCombatNowResponse);
+}
+
+message ResolveCombatNowRequest {
+  string combat_id = 1;
+}
+
+message ResolvedCombatEmbedField {
+  string name = 1;
+  string value = 2;
+  bool inline = 3;
+}
+
+message ResolvedCombatNowResponse {
+  string combat_id = 1;
+  string title = 2;
+  string description = 3;
+  uint32 color = 4;
+  repeated ResolvedCombatEmbedField fields = 5;
 }
 
 message ExpiredCombat {

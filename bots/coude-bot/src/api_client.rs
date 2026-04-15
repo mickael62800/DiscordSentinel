@@ -90,6 +90,24 @@ pub struct Combat {
     pub resolved_at: Option<String>,
 }
 
+/// Phase 7 : donnees d'embed pretes a poster, retournees par
+/// `resolve_combat_now`. Le bot les transforme en `CreateEmbed` sans aucune
+/// logique metier supplementaire.
+#[derive(Debug, Clone)]
+pub struct ResolvedCombatEmbed {
+    pub title: String,
+    pub description: String,
+    pub color: u32,
+    pub fields: Vec<ResolvedCombatEmbedField>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ResolvedCombatEmbedField {
+    pub name: String,
+    pub value: String,
+    pub inline: bool,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct WalletTransaction {
@@ -754,6 +772,40 @@ impl ApiClient {
             .guarded(|| async move { client.resolve(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
+    }
+
+    /// Phase 7 : resolution instantanee d'un combat (surprise / bloodbath /
+    /// defense via item). L'API applique toute la logique metier et retourne
+    /// un embed pret a poster.
+    pub async fn resolve_combat_now(
+        &self,
+        combat_id: &str,
+    ) -> Result<ResolvedCombatEmbed, String> {
+        let req = proto_coude::ResolveCombatNowRequest {
+            combat_id: combat_id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        let resp = self
+            .grpc
+            .guarded(|| async move {
+                client.resolve_combat_now(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(ResolvedCombatEmbed {
+            title: resp.title,
+            description: resp.description,
+            color: resp.color,
+            fields: resp
+                .fields
+                .into_iter()
+                .map(|f| ResolvedCombatEmbedField {
+                    name: f.name,
+                    value: f.value,
+                    inline: f.inline,
+                })
+                .collect(),
+        })
     }
 
     pub async fn set_combat_betting(&self, id: &str, message_id: &str) -> Result<bool, String> {
