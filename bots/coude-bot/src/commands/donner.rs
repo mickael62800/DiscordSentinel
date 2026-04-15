@@ -233,14 +233,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
 
-        // Debit separe de la taxe (gold sink : les coins sont juste
-        // retires du donor, personne ne les recoit). Best-effort : si ce
-        // debit echoue, le donor n'a pas paye la taxe mais le destinataire
-        // a bien recu son montant. Pas de coins perdus, juste un manque
-        // a gagner pour le sink.
+        // Debit separe de la taxe, puis depot dans la caisse communautaire
+        // (Phase 9 : la taxe n'est plus un gold sink, elle alimente la caisse
+        // qui sera redistribuee aux joueurs actifs chaque semaine).
         if tax > 0 {
-            if let Err(e) = api.update_player_coins(&guild_id, &donor_id, -tax).await {
-                tracing::warn!(error = %e, donor = %donor_id, tax, "Echec debit taxe donner (donor non taxe)");
+            let taxed = api.update_player_coins(&guild_id, &donor_id, -tax).await;
+            match taxed {
+                Ok(_) => {
+                    if let Err(e) = api
+                        .deposit_cashbox(
+                            &guild_id,
+                            tax,
+                            crate::api_client::CashboxDepositSource::DonationTax,
+                        )
+                        .await
+                    {
+                        tracing::warn!(error = %e, guild_id, "Echec deposit cashbox donner");
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(error = %e, donor = %donor_id, tax, "Echec debit taxe donner (donor non taxe)");
+                }
             }
         }
 

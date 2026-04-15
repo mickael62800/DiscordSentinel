@@ -44,6 +44,8 @@ pub use manage_coude_catalog::{
     AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, ManageCoudeCatalogUseCase,
     MatchmakingBucket, ShopItemInfo,
 };
+pub mod manage_coude_cashbox;
+pub use manage_coude_cashbox::{ManageCoudeCashboxUseCase, RedistributionOutcome};
 pub use manage_role_panels::ManageRolePanelsUseCase;
 pub use manage_levels::ManageLevelsUseCase;
 pub use manage_watched_users::ManageWatchedUsersUseCase;

@@ -100,6 +100,7 @@ impl EventHandler for Handler {
                     "saison" => commands::saison::handle(&ctx, &command).await,
                     "reset-stats" => commands::reset_stats::handle(&ctx, &command).await,
                     "resume" => commands::resume::handle(&ctx, &command).await,
+                    "cagnotte" => commands::cagnotte::handle(&ctx, &command).await,
                     _ => {}
                 }
             }

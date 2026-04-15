@@ -10,12 +10,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
+use crate::domain::entities::CashboxSource;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::expire_combats_batch::{
     ExpireCombatsBatchUseCase, ExpiredCombatOutput,
 };
 use crate::ports::inbound::ManageCoudeBetsUseCase;
-use crate::ports::outbound::{CoudeCombatRepository, CoudePlayerRepository, WalletRepository};
+use crate::ports::outbound::{
+    CoudeCashboxRepository, CoudeCombatRepository, CoudePlayerRepository, WalletRepository,
+};
 
 /// 24h par defaut, override par guild via bot_guild_config.
 const DEFAULT_EXPIRY_HOURS: i64 = 24;
@@ -24,6 +27,7 @@ pub struct ExpireCombatsBatchService {
     combat_repo: Arc<dyn CoudeCombatRepository>,
     player_repo: Arc<dyn CoudePlayerRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
+    cashbox_repo: Arc<dyn CoudeCashboxRepository>,
     bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
 }
 
@@ -32,9 +36,10 @@ impl ExpireCombatsBatchService {
         combat_repo: Arc<dyn CoudeCombatRepository>,
         player_repo: Arc<dyn CoudePlayerRepository>,
         wallet_repo: Arc<dyn WalletRepository>,
+        cashbox_repo: Arc<dyn CoudeCashboxRepository>,
         bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
     ) -> Self {
-        Self { combat_repo, player_repo, wallet_repo, bets_uc }
+        Self { combat_repo, player_repo, wallet_repo, cashbox_repo, bets_uc }
     }
 }
 
@@ -53,7 +58,7 @@ impl ExpireCombatsBatchUseCase for ExpireCombatsBatchService {
             let penalty = ((combat.mise as f64 * 0.20).max(1.0)) as i64;
             let desc = format!("Penalite lachete combat {}", combat.id);
 
-            if let Err(e) = self
+            let debit_ok = match self
                 .wallet_repo
                 .debit(
                     &combat.guild_id,
@@ -64,7 +69,22 @@ impl ExpireCombatsBatchUseCase for ExpireCombatsBatchService {
                 )
                 .await
             {
-                warn!(error = %e, combat_id = %combat.id, "Echec debit penalite defenseur");
+                Ok(_) => true,
+                Err(e) => {
+                    warn!(error = %e, combat_id = %combat.id, "Echec debit penalite defenseur");
+                    false
+                }
+            };
+
+            if debit_ok {
+                // Phase 9 : la penalite de lachete alimente la caisse communautaire.
+                if let Err(e) = self
+                    .cashbox_repo
+                    .deposit(&combat.guild_id, penalty, CashboxSource::CowardicePenalty)
+                    .await
+                {
+                    warn!(error = %e, combat_id = %combat.id, "Echec deposit cashbox penalite");
+                }
             }
 
             if let Err(e) = self

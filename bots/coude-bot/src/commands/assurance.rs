@@ -176,6 +176,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Phase 9 : le cout de l'assurance alimente la caisse communautaire.
+    // Best-effort : si le deposit echoue, on garde l'assurance (le joueur
+    // a deja paye, pas question de lui faire perdre son abonnement).
+    if let Err(e) = api
+        .deposit_cashbox(
+            &guild_id,
+            total_cost,
+            crate::api_client::CashboxDepositSource::InsurancePurchase,
+        )
+        .await
+    {
+        tracing::warn!(error = %e, guild_id, "Echec deposit cashbox assurance");
+    }
+
     let description = if is_scam {
         format!(
             "\u{1f6e1}\u{fe0f} <@{}> a souscrit une **Assurance Coup de Coude** pour **{}** !\n\n\

@@ -72,3 +72,6 @@ pub use coude_inventory_repository::CoudeInventoryRepository;
 
 mod coude_social_repository;
 pub use coude_social_repository::CoudeSocialRepository;
+
+mod coude_cashbox_repository;
+pub use coude_cashbox_repository::CoudeCashboxRepository;

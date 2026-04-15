@@ -199,6 +199,17 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
             reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
+        // Phase 9 : le cout de changement de classe alimente la caisse.
+        if let Err(e) = api
+            .deposit_cashbox(
+                &guild_id,
+                500,
+                crate::api_client::CashboxDepositSource::ClassChangeCost,
+            )
+            .await
+        {
+            tracing::warn!(error = %e, guild_id, "Echec deposit cashbox classe");
+        }
     }
 
     // Changer la classe

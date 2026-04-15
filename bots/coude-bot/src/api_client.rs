@@ -226,6 +226,49 @@ pub struct CurrentSeason {
     pub days_remaining: i64,
 }
 
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct Cashbox {
+    pub guild_id: String,
+    pub balance: i64,
+    pub total_collected: i64,
+    pub total_redistributed: i64,
+    pub last_redistribution_at: Option<String>,
+}
+
+/// Source d'un depot dans la caisse. Miroir cote bot de l'enum proto,
+/// pour que les commandes n'aient pas a importer les types generes.
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
+pub enum CashboxDepositSource {
+    ShopPurchase,
+    InsurancePurchase,
+    ProtectionPurchase,
+    BoostPurchase,
+    ClassChangeCost,
+    ResetStatsCost,
+    DonationTax,
+    CowardicePenalty,
+    BetCommission,
+}
+
+impl CashboxDepositSource {
+    fn as_proto(self) -> proto_coude::CashboxDepositSource {
+        use proto_coude::CashboxDepositSource as P;
+        match self {
+            Self::ShopPurchase => P::CashboxSourceShopPurchase,
+            Self::InsurancePurchase => P::CashboxSourceInsurancePurchase,
+            Self::ProtectionPurchase => P::CashboxSourceProtectionPurchase,
+            Self::BoostPurchase => P::CashboxSourceBoostPurchase,
+            Self::ClassChangeCost => P::CashboxSourceClassChangeCost,
+            Self::ResetStatsCost => P::CashboxSourceResetStatsCost,
+            Self::DonationTax => P::CashboxSourceDonationTax,
+            Self::CowardicePenalty => P::CashboxSourceCowardicePenalty,
+            Self::BetCommission => P::CashboxSourceBetCommission,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 struct CowardiceResponse {
@@ -1409,6 +1452,50 @@ impl ApiClient {
                 created_at: e.created_at,
             })
             .collect())
+    }
+
+    // Phase 9 — Cagnotte communautaire.
+    pub async fn get_cashbox(&self, guild_id: &str) -> Result<Cashbox, String> {
+        let req = proto_coude::GetCashboxRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let r = self
+            .grpc
+            .guarded(|| async move { client.get_cashbox(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(Cashbox {
+            guild_id: r.guild_id,
+            balance: r.balance,
+            total_collected: r.total_collected,
+            total_redistributed: r.total_redistributed,
+            last_redistribution_at: r.last_redistribution_at,
+        })
+    }
+
+    /// Depose un montant dans la caisse communautaire. Best-effort :
+    /// une erreur est journalisee mais ne bloque pas l'appelant, pour
+    /// que l'achat principal n'echoue pas si la caisse est indisponible.
+    pub async fn deposit_cashbox(
+        &self,
+        guild_id: &str,
+        amount: i64,
+        source: CashboxDepositSource,
+    ) -> Result<(), String> {
+        if amount <= 0 {
+            return Ok(());
+        }
+        let req = proto_coude::DepositCashboxRequest {
+            guild_id: guild_id.to_string(),
+            amount,
+            source: source.as_proto() as i32,
+        };
+        let mut client = self.grpc.coude_social();
+        self.grpc
+            .guarded(|| async move { client.deposit_cashbox(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     // ══════════════════════════════════════════════════════════════════

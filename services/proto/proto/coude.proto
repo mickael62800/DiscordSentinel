@@ -556,6 +556,69 @@ service CoudeSocialService {
   // Phase 8 : retourne toutes les donnees statiques Coude (classes, shop,
   // progression, matchmaking). Le bot appelle au boot et cache en memoire.
   rpc GetCatalog(Empty) returns (CoudeCatalogResponse);
+  // Phase 9 : caisse communautaire (retour "cagnotte").
+  rpc GetCashbox(GetCashboxRequest) returns (CoudeCashboxState);
+  rpc RedistributeCashbox(GetCashboxRequest) returns (RedistributeCashboxResponse);
+  rpc DepositCashbox(DepositCashboxRequest) returns (Empty);
+  // Worker hebdo : redistribue toutes les caisses eligibles (> N jours
+  // depuis le dernier passage). Le worker tick regulierement mais l'API
+  // decide quelles guilds sont dues.
+  rpc RedistributeDueCashboxes(RedistributeDueRequest) returns (RedistributeDueResponse);
+}
+
+message GetCashboxRequest {
+  string guild_id = 1;
+}
+
+message CoudeCashboxState {
+  string guild_id = 1;
+  int64 balance = 2;
+  int64 total_collected = 3;
+  int64 total_redistributed = 4;
+  optional string last_redistribution_at = 5;
+}
+
+message RedistributeCashboxResponse {
+  bool executed = 1;
+  optional string redistribution_id = 2;
+  int64 total_amount = 3;
+  repeated CashboxWinner winners = 4;
+  string guild_id = 5;
+}
+
+message CashboxWinner {
+  string user_id = 1;
+  string username = 2;
+  int64 amount_won = 3;
+}
+
+// Source du depot dans la caisse. Correspond 1:1 a l'enum domain
+// CashboxSource cote API.
+enum CashboxDepositSource {
+  CASHBOX_SOURCE_UNSPECIFIED = 0;
+  CASHBOX_SOURCE_SHOP_PURCHASE = 1;
+  CASHBOX_SOURCE_INSURANCE_PURCHASE = 2;
+  CASHBOX_SOURCE_PROTECTION_PURCHASE = 3;
+  CASHBOX_SOURCE_BOOST_PURCHASE = 4;
+  CASHBOX_SOURCE_CLASS_CHANGE_COST = 5;
+  CASHBOX_SOURCE_RESET_STATS_COST = 6;
+  CASHBOX_SOURCE_DONATION_TAX = 7;
+  CASHBOX_SOURCE_COWARDICE_PENALTY = 8;
+  CASHBOX_SOURCE_BET_COMMISSION = 9;
+}
+
+message DepositCashboxRequest {
+  string guild_id = 1;
+  int64 amount = 2;
+  CashboxDepositSource source = 3;
+}
+
+message RedistributeDueRequest {
+  int64 min_days_since_last = 1;
+}
+
+message RedistributeDueResponse {
+  repeated RedistributeCashboxResponse redistributed = 1;
 }
 
 message CoudeCatalogResponse {

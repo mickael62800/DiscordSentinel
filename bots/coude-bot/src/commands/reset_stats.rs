@@ -72,6 +72,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Phase 9 : le cout du reset alimente la caisse communautaire.
+    if let Err(e) = api
+        .deposit_cashbox(
+            &guild_id,
+            RESET_COST,
+            crate::api_client::CashboxDepositSource::ResetStatsCost,
+        )
+        .await
+    {
+        tracing::warn!(error = %e, guild_id, "Echec deposit cashbox reset_stats");
+    }
+
     let class = catalog.get_class(player.class.as_deref().unwrap_or("bourrin"));
 
     let embed = CreateEmbed::new()

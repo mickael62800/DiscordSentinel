@@ -1,5 +1,11 @@
 /// Intervalle par defaut pour la verification des combats expires (secondes).
 const DEFAULT_COMBAT_EXPIRY_CHECK_SECS: u64 = 86400; // 24h
+/// Tick du worker cashbox : 1h par defaut. L'API filtre elle-meme les guilds
+/// dues (>= 7 jours depuis la derniere redistribution), donc ticker souvent
+/// ne cause aucune sur-redistribution.
+const DEFAULT_CASHBOX_TICK_SECS: u64 = 3600;
+/// Fenetre minimum entre deux redistributions d'une meme guild.
+const DEFAULT_CASHBOX_MIN_DAYS: u64 = 7;
 
 #[derive(Clone)]
 pub struct WorkerConfig {
@@ -9,6 +15,8 @@ pub struct WorkerConfig {
     pub discord_bot_token: String,
     pub betting_check_secs: u64,
     pub hp_regen_tick_secs: u64,
+    pub cashbox_tick_secs: u64,
+    pub cashbox_min_days: u64,
 }
 
 impl WorkerConfig {
@@ -22,6 +30,8 @@ impl WorkerConfig {
             discord_bot_token: std::env::var("COUDE_DISCORD_TOKEN").unwrap_or_default(),
             betting_check_secs: load_env("BETTING_CHECK_SECS", 30),
             hp_regen_tick_secs: load_env("HP_REGEN_TICK_SECS", 300),
+            cashbox_tick_secs: load_env("CASHBOX_TICK_SECS", DEFAULT_CASHBOX_TICK_SECS),
+            cashbox_min_days: load_env("CASHBOX_MIN_DAYS", DEFAULT_CASHBOX_MIN_DAYS),
         }
     }
 
@@ -30,6 +40,8 @@ impl WorkerConfig {
         self.combat_expiry_check_secs = config_or_env(db, "combat_expiry_check_secs", "COMBAT_EXPIRY_CHECK_SECS", 86400);
         self.betting_check_secs = config_or_env(db, "betting_check_secs", "BETTING_CHECK_SECS", 30);
         self.hp_regen_tick_secs = config_or_env(db, "hp_regen_tick_secs", "HP_REGEN_TICK_SECS", 300);
+        self.cashbox_tick_secs = config_or_env(db, "cashbox_tick_secs", "CASHBOX_TICK_SECS", DEFAULT_CASHBOX_TICK_SECS);
+        self.cashbox_min_days = config_or_env(db, "cashbox_min_days", "CASHBOX_MIN_DAYS", DEFAULT_CASHBOX_MIN_DAYS);
     }
 }
 

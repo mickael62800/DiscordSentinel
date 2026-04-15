@@ -905,6 +905,7 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
 pub struct CoudeSocialGrpc {
     pub uc: Arc<dyn ManageCoudeSocialUseCase>,
     pub catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
+    pub cashbox_uc: Arc<dyn crate::ports::inbound::ManageCoudeCashboxUseCase>,
 }
 
 fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
@@ -1108,6 +1109,118 @@ impl CoudeSocialService for CoudeSocialGrpc {
             hp_base: cat.hp_base,
             hp_per_def: cat.hp_per_def,
         }))
+    }
+
+    async fn get_cashbox(
+        &self,
+        request: Request<proto::GetCashboxRequest>,
+    ) -> Result<Response<proto::CoudeCashboxState>, Status> {
+        let guild_id = request.into_inner().guild_id;
+        let cb = self
+            .cashbox_uc
+            .get_cashbox(&guild_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::CoudeCashboxState {
+            guild_id: cb.guild_id,
+            balance: cb.balance,
+            total_collected: cb.total_collected,
+            total_redistributed: cb.total_redistributed,
+            last_redistribution_at: cb.last_redistribution_at.map(|dt| dt.to_rfc3339()),
+        }))
+    }
+
+    async fn redistribute_cashbox(
+        &self,
+        request: Request<proto::GetCashboxRequest>,
+    ) -> Result<Response<proto::RedistributeCashboxResponse>, Status> {
+        let guild_id = request.into_inner().guild_id;
+        let outcome = self
+            .cashbox_uc
+            .redistribute_weekly(&guild_id)
+            .await
+            .map_err(domain_to_status)?;
+        match outcome {
+            None => Ok(Response::new(proto::RedistributeCashboxResponse {
+                executed: false,
+                redistribution_id: None,
+                total_amount: 0,
+                winners: vec![],
+                guild_id,
+            })),
+            Some(o) => Ok(Response::new(redistribution_to_proto(guild_id, o))),
+        }
+    }
+
+    async fn redistribute_due_cashboxes(
+        &self,
+        request: Request<proto::RedistributeDueRequest>,
+    ) -> Result<Response<proto::RedistributeDueResponse>, Status> {
+        let min_days = request.into_inner().min_days_since_last.max(0);
+        let results = self
+            .cashbox_uc
+            .redistribute_due_guilds(min_days)
+            .await
+            .map_err(domain_to_status)?;
+        let redistributed = results
+            .into_iter()
+            .map(|(guild_id, outcome)| redistribution_to_proto(guild_id, outcome))
+            .collect();
+        Ok(Response::new(proto::RedistributeDueResponse { redistributed }))
+    }
+
+    async fn deposit_cashbox(
+        &self,
+        request: Request<proto::DepositCashboxRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        let source = proto_source_to_domain(req.source)
+            .ok_or_else(|| Status::invalid_argument("source invalide"))?;
+        self.cashbox_uc
+            .deposit(&req.guild_id, req.amount, source)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+}
+
+fn redistribution_to_proto(
+    guild_id: String,
+    outcome: crate::ports::inbound::RedistributionOutcome,
+) -> proto::RedistributeCashboxResponse {
+    proto::RedistributeCashboxResponse {
+        executed: true,
+        redistribution_id: Some(outcome.redistribution_id.to_string()),
+        total_amount: outcome.total_amount,
+        winners: outcome
+            .winners
+            .into_iter()
+            .map(|(user_id, username, amount_won)| proto::CashboxWinner {
+                user_id,
+                username,
+                amount_won,
+            })
+            .collect(),
+        guild_id,
+    }
+}
+
+fn proto_source_to_domain(
+    source: i32,
+) -> Option<crate::domain::entities::CashboxSource> {
+    use crate::domain::entities::CashboxSource;
+    use proto::CashboxDepositSource as P;
+    match P::try_from(source).ok()? {
+        P::CashboxSourceUnspecified => None,
+        P::CashboxSourceShopPurchase => Some(CashboxSource::ShopPurchase),
+        P::CashboxSourceInsurancePurchase => Some(CashboxSource::InsurancePurchase),
+        P::CashboxSourceProtectionPurchase => Some(CashboxSource::ProtectionPurchase),
+        P::CashboxSourceBoostPurchase => Some(CashboxSource::BoostPurchase),
+        P::CashboxSourceClassChangeCost => Some(CashboxSource::ClassChangeCost),
+        P::CashboxSourceResetStatsCost => Some(CashboxSource::ResetStatsCost),
+        P::CashboxSourceDonationTax => Some(CashboxSource::DonationTax),
+        P::CashboxSourceCowardicePenalty => Some(CashboxSource::CowardicePenalty),
+        P::CashboxSourceBetCommission => Some(CashboxSource::BetCommission),
     }
 }
 

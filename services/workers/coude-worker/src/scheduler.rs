@@ -41,13 +41,32 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
     }
 
     // Job 3 : regen passive des HP (taux degressif par palier)
+    {
+        let api = api_url.clone();
+        spawn_periodic(
+            "hp_regen",
+            config.hp_regen_tick_secs,
+            pool.clone(),
+            shutdown.clone(),
+            api,
+            "coude-worker",
+            |pool| Box::pin(async move { jobs::hp_regen::run(&pool).await }),
+        );
+    }
+
+    // Job 4 : redistribution hebdo des caisses communautaires (Phase 9).
+    // Le worker tick regulierement mais l'API filtre elle-meme les guilds
+    // dues (> cashbox_min_days jours depuis la derniere redistribution).
+    let min_days = config.cashbox_min_days as i64;
     spawn_periodic(
-        "hp_regen",
-        config.hp_regen_tick_secs,
+        "redistribute_cashbox",
+        config.cashbox_tick_secs,
         pool,
         shutdown,
         api_url,
         "coude-worker",
-        |pool| Box::pin(async move { jobs::hp_regen::run(&pool).await }),
+        move |pool| {
+            Box::pin(async move { jobs::redistribute_cashbox::run(&pool, min_days).await })
+        },
     );
 }

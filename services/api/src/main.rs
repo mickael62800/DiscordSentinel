@@ -305,15 +305,24 @@ async fn main() {
             coude_inventory_uc.clone(),
             coude_social_uc.clone(),
         ));
+    let coude_cashbox_repo: Arc<dyn sentinel_api::ports::outbound::CoudeCashboxRepository> = Arc::new(
+        sentinel_api::adapters::outbound::postgres::PgCoudeCashboxRepository::new(pg_pool.clone()),
+    );
     let expire_combats_batch_uc: Arc<dyn sentinel_api::ports::inbound::ExpireCombatsBatchUseCase> =
         Arc::new(sentinel_api::application::ExpireCombatsBatchService::new(
             coude_combat_repo.clone(),
             coude_player_repo.clone(),
             wallet_repo.clone(),
+            coude_cashbox_repo.clone(),
             coude_bets_uc.clone(),
         ));
     let coude_catalog_uc: Arc<dyn sentinel_api::ports::inbound::ManageCoudeCatalogUseCase> =
         Arc::new(sentinel_api::application::ManageCoudeCatalogService::new());
+    let coude_cashbox_uc: Arc<dyn sentinel_api::ports::inbound::ManageCoudeCashboxUseCase> =
+        Arc::new(sentinel_api::application::ManageCoudeCashboxService::new(
+            coude_cashbox_repo.clone(),
+            wallet_repo.clone(),
+        ));
     let resolve_combat_now_uc: Arc<dyn sentinel_api::ports::inbound::ResolveCombatNowUseCase> =
         Arc::new(sentinel_api::application::ResolveCombatNowService::new(
             coude_combat_repo.clone(),
@@ -388,6 +397,7 @@ async fn main() {
         expire_combats_batch_uc,
         resolve_combat_now_uc,
         coude_catalog_uc,
+        coude_cashbox_uc,
         broadcaster,
         job_client,
         discord_api,

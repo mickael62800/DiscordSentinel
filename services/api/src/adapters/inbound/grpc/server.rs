@@ -107,6 +107,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let coude_social = CoudeSocialGrpc {
         uc: state.coude_social_uc.clone(),
         catalog_uc: state.coude_catalog_uc.clone(),
+        cashbox_uc: state.coude_cashbox_uc.clone(),
     };
     let roles = RolePanelsGrpc {
         uc: state.role_panels_uc.clone(),

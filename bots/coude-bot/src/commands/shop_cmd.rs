@@ -123,6 +123,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 return;
             }
 
+            // Phase 9 : le cout du shop alimente la caisse communautaire.
+            if let Err(e) = api
+                .deposit_cashbox(
+                    &guild_id,
+                    price,
+                    crate::api_client::CashboxDepositSource::ShopPurchase,
+                )
+                .await
+            {
+                tracing::warn!(error = %e, guild_id, "Echec deposit cashbox shop");
+            }
+
             let embed = CreateEmbed::new()
                 .title(format!("{} Achat reussi !", item.emoji))
                 .description(format!(

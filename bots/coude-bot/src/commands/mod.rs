@@ -1,6 +1,7 @@
 pub mod accepter;
 pub mod annuler;
 pub mod assurance;
+pub mod cagnotte;
 pub mod classe;
 pub mod coude;
 pub mod defend_item;
@@ -41,5 +42,6 @@ pub fn all() -> Vec<CreateCommand> {
         saison::register(),
         reset_stats::register(),
         resume::register(),
+        cagnotte::register(),
     ]
 }

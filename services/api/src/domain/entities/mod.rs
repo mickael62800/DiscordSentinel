@@ -88,3 +88,8 @@ mod coude_social;
 pub use coude_social::{
     CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, LeaderboardCategory, NewDailyChaos,
 };
+
+mod coude_cashbox;
+pub use coude_cashbox::{
+    CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
+};
