@@ -29,28 +29,38 @@ const cancelling = ref<string | null>(null);
 const expandedRow = ref<string | null>(null);
 const sortKey = ref<"wins" | "winrate" | "level" | "chaos" | "stolen">("wins");
 
+// Etats reels du backend (coude_combats.status) :
+//  - pending   : cree, defenseur pas encore repondu
+//  - betting   : defenseur a accepte, phase paris ouverte (set_betting)
+//  - resolving : worker en train de resoudre (transient)
+//  - accepted  : combat termine (naming legacy, c'est la valeur finale ecrite
+//                par le worker a la resolution)
+//  - refused   : defenseur a refuse
+//  - expired   : TTL depasse, ou annule manuellement
 const statusLabels: Record<string, string> = {
   pending: "En attente",
   betting: "Paris ouverts",
+  resolving: "Resolution…",
   accepted: "Termine",
   refused: "Refuse",
   expired: "Expire",
-  active: "En cours",
+  active: "En attente",
   all: "Toutes",
 };
 
 const statusIcons: Record<string, string> = {
   pending: "⏳",
   betting: "🎲",
+  resolving: "⚙️",
   accepted: "✅",
   refused: "🚫",
   expired: "⏰",
 };
 
 const statusOptions = [
-  { value: "active", label: "🔥 En cours (pending + betting)" },
-  { value: "pending", label: "⏳ En attente d'acceptation" },
+  { value: "active", label: "⏳ En attente d'acceptation" },
   { value: "betting", label: "🎲 Paris ouverts" },
+  { value: "resolving", label: "⚙️ En cours de resolution" },
   { value: "accepted", label: "✅ Termines" },
   { value: "refused", label: "🚫 Refuses" },
   { value: "expired", label: "⏰ Expires" },
@@ -67,15 +77,10 @@ async function fetchCombats() {
   error.value = null;
   try {
     if (statusFilter.value === "active") {
-      // "En cours" = pending + betting. Backend n'accepte qu'un seul
-      // statut par requete, on fait 2 appels en parallele et on merge.
-      const [pending, betting] = await Promise.all([
-        coudeService.getCombats(selectedGuildId.value, "pending"),
-        coudeService.getCombats(selectedGuildId.value, "betting"),
-      ]);
-      combats.value = [...pending, ...betting].sort(
-        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
-      );
+      // "En cours" = defender n'a pas encore accepte → pending uniquement.
+      // Les autres statuts transients (accepted, betting) sont brefs et vont
+      // rapidement vers resolved, donc ils ne polluent pas "En cours".
+      combats.value = await coudeService.getCombats(selectedGuildId.value, "pending");
     } else {
       const status = statusFilter.value === "all" ? null : statusFilter.value;
       combats.value = await coudeService.getCombats(selectedGuildId.value, status);
@@ -129,9 +134,9 @@ function statusClass(status: string): string {
   }
 }
 
-// Stats combats — "actifs" = pending + betting (vraiment en cours).
+// Stats combats — "actifs" = pending (defender pas encore accepte).
 const statsActiveCombats = computed(() =>
-  combats.value.filter((c) => c.status === "pending" || c.status === "betting").length,
+  combats.value.filter((c) => c.status === "pending").length,
 );
 const statsTotalMises = computed(() => combats.value.reduce((s, c) => s + c.mise, 0));
 const statsTotalTransferred = computed(() =>

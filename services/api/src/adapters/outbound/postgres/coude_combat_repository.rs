@@ -90,63 +90,40 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
         status: Option<&str>,
         limit: i64,
     ) -> Result<Vec<CoudeCombat>, DomainError> {
-        // Le SELECT joint avec coude_players pour rafraîchir attacker_name/defender_name
-        // (les usernames stockés sur le combat sont figés à la création).
-        let sql_with_status = r#"
-            SELECT
-                c.id,
-                c.guild_id,
-                c.channel_id,
-                c.attacker_id,
-                COALESCE(pa.username, c.attacker_name) AS attacker_name,
-                c.defender_id,
-                COALESCE(pd.username, c.defender_name) AS defender_name,
-                c.mise, c.status, c.winner_id, c.attacker_roll, c.defender_roll,
-                c.chaos_event, c.special_attack, c.defender_special, c.coins_transferred,
-                c.result_message, c.message_id,
-                c.created_at, c.accepted_at, c.resolved_at
-            FROM coude_combats c
-            LEFT JOIN coude_players pa ON pa.guild_id = c.guild_id AND pa.user_id = c.attacker_id
-            LEFT JOIN coude_players pd ON pd.guild_id = c.guild_id AND pd.user_id = c.defender_id
-            WHERE c.guild_id = $1 AND c.status = $2
-            ORDER BY c.created_at DESC
-            LIMIT $3
-        "#;
-        let sql_no_status = r#"
-            SELECT
-                c.id,
-                c.guild_id,
-                c.channel_id,
-                c.attacker_id,
-                COALESCE(pa.username, c.attacker_name) AS attacker_name,
-                c.defender_id,
-                COALESCE(pd.username, c.defender_name) AS defender_name,
-                c.mise, c.status, c.winner_id, c.attacker_roll, c.defender_roll,
-                c.chaos_event, c.special_attack, c.defender_special, c.coins_transferred,
-                c.result_message, c.message_id,
-                c.created_at, c.accepted_at, c.resolved_at
-            FROM coude_combats c
-            LEFT JOIN coude_players pa ON pa.guild_id = c.guild_id AND pa.user_id = c.attacker_id
-            LEFT JOIN coude_players pd ON pd.guild_id = c.guild_id AND pd.user_id = c.defender_id
-            WHERE c.guild_id = $1
-            ORDER BY c.created_at DESC
-            LIMIT $2
-        "#;
-
+        // On lit directement les colonnes gelees a la creation du combat.
+        // Pas de JOIN sur coude_players : le fallback COALESCE causait la
+        // disparition des noms lorsque la ligne player etait absente ou
+        // avait un username vide.
         let rows: Vec<CombatRow> = match status {
-            Some(s) => sqlx::query_as(sql_with_status)
-                .bind(guild_id)
-                .bind(s)
-                .bind(limit)
-                .fetch_all(&self.pool)
-                .await
-                .map_err(pg_err)?,
-            None => sqlx::query_as(sql_no_status)
-                .bind(guild_id)
-                .bind(limit)
-                .fetch_all(&self.pool)
-                .await
-                .map_err(pg_err)?,
+            Some(s) => {
+                let sql = format!(
+                    "SELECT {cols} FROM coude_combats \
+                     WHERE guild_id = $1 AND status = $2 \
+                     ORDER BY created_at DESC LIMIT $3",
+                    cols = COMBAT_COLUMNS
+                );
+                sqlx::query_as(&sql)
+                    .bind(guild_id)
+                    .bind(s)
+                    .bind(limit)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(pg_err)?
+            }
+            None => {
+                let sql = format!(
+                    "SELECT {cols} FROM coude_combats \
+                     WHERE guild_id = $1 \
+                     ORDER BY created_at DESC LIMIT $2",
+                    cols = COMBAT_COLUMNS
+                );
+                sqlx::query_as(&sql)
+                    .bind(guild_id)
+                    .bind(limit)
+                    .fetch_all(&self.pool)
+                    .await
+                    .map_err(pg_err)?
+            }
         };
         Ok(rows.into_iter().map(Into::into).collect())
     }
