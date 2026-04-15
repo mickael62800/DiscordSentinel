@@ -93,3 +93,9 @@ mod coude_cashbox;
 pub use coude_cashbox::{
     CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
 };
+
+mod coude_steal_protection;
+pub use coude_steal_protection::{
+    find_protection_item, CoudeStealProtection, StealProtectionDuration, StealProtectionItemDef,
+    STEAL_PROTECTION_ITEMS,
+};

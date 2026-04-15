@@ -12,6 +12,7 @@ pub mod pari;
 pub mod potion;
 pub mod prime;
 pub mod profil;
+pub mod protection;
 pub mod refuser;
 pub mod repos;
 pub mod reset_stats;
@@ -43,5 +44,6 @@ pub fn all() -> Vec<CreateCommand> {
         reset_stats::register(),
         resume::register(),
         cagnotte::register(),
+        protection::register(),
     ]
 }

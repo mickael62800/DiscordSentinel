@@ -75,3 +75,6 @@ pub use coude_social_repository::PgCoudeSocialRepository;
 
 mod coude_cashbox_repository;
 pub use coude_cashbox_repository::PgCoudeCashboxRepository;
+
+mod coude_steal_protection_repository;
+pub use coude_steal_protection_repository::PgCoudeStealProtectionRepository;

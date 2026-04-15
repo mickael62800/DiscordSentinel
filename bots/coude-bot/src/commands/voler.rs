@@ -19,44 +19,25 @@ pub const STEAL_DEFEND_PREFIX: &str = "steal_defend:";
 /// pas a l'alerte.
 const AFK_DEFENDER_MALUS: i32 = 8;
 
-/// Verifie les items anti-vol de la cible et en declenche un si possible.
+/// Verifie si la cible a une protection anti-vol active (Phase 9 Part B).
 ///
-/// Retourne `Some((item_key, item_name))` si un item a bloque le vol
-/// (auquel cas il a ete consomme via `use_item`). Sinon `None`.
-///
-/// Note : on evite de garder un `ThreadRng` (pas `Send`) au-dela d'un
-/// `await` en rollant dans un bloc scope, puis en l'oubliant avant d'appeler
-/// l'API.
+/// Depuis le refactor en abonnements temps-base, ce check est delegue a
+/// l'API : elle liste les protections actives, roll les dés, et retourne
+/// celle qui a bloque (ou None). Le bot ne fait qu'afficher le resultat.
+/// Les items NE SONT PLUS consommes — c'est un abonnement.
 async fn try_trigger_protection(
     api: &ApiClient,
-    catalog: &CatalogCache,
     guild_id: &str,
     target_id: &str,
 ) -> Option<(String, String)> {
-    for item in &catalog.anti_theft_items {
-        let key = item.key.clone();
-        let pct = item.block_chance_percent;
-        let has = api.has_item(guild_id, target_id, &key).await.unwrap_or(false);
-        if !has {
-            continue;
-        }
-        // Roll dans un bloc scope pour que le ThreadRng soit drop avant l'await.
-        let triggered = {
-            let mut rng = rand::thread_rng();
-            let roll: u32 = rng.gen_range(1..=100);
-            roll <= pct
-        };
-        if triggered {
-            // Consomme l'item et retourne son info pour affichage.
-            let _ = api.use_item(guild_id, target_id, &key).await;
-            let name = catalog
-                .get_item(&key)
-                .map(|i| i.name.clone())
-                .unwrap_or_else(|| key.clone());
-            return Some((key, name));
+    match api.try_trigger_steal_protection(guild_id, target_id).await {
+        Ok(Some(trigger)) => Some((trigger.item_key, trigger.item_name)),
+        Ok(None) => None,
+        Err(e) => {
+            tracing::warn!(error = %e, "Echec try_trigger_steal_protection API");
+            None
         }
     }
-    None
 }
 
 const STEAL_SUCCESS_AFK: &[&str] = &[
@@ -445,12 +426,12 @@ async fn resolve_steal_attempt(
     );
 
     if thief_total > target_total {
-        // Le voleur a gagne le roll — mais un item anti-vol peut encore
-        // bloquer le vol (et se consommer).
-        if let Some((_key, name)) = try_trigger_protection(api, catalog, guild_id, target_id).await {
+        // Le voleur a gagne le roll — mais une protection active peut
+        // encore bloquer le vol (Phase 9 Part B : abonnements temps-base,
+        // plus de consommation d'item).
+        if let Some((_key, name)) = try_trigger_protection(api, guild_id, target_id).await {
             let block_msg = format!(
-                "\u{1f6e1}\u{fe0f} <@{}> avait un **{}** qui a bloque la tentative de vol de <@{}> !\n\
-                 L'item est consomme.",
+                "\u{1f6e1}\u{fe0f} <@{}> etait protege par **{}** qui a bloque la tentative de vol de <@{}> !",
                 target_id, name, thief_id
             );
             // La victime gagne +3 XP comme pour une defense reussie.

@@ -46,6 +46,10 @@ pub use manage_coude_catalog::{
 };
 pub mod manage_coude_cashbox;
 pub use manage_coude_cashbox::{ManageCoudeCashboxUseCase, RedistributionOutcome};
+pub mod manage_coude_steal_protections;
+pub use manage_coude_steal_protections::{
+    ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
+};
 pub use manage_role_panels::ManageRolePanelsUseCase;
 pub use manage_levels::ManageLevelsUseCase;
 pub use manage_watched_users::ManageWatchedUsersUseCase;

@@ -58,6 +58,8 @@ pub struct AppState {
     pub resolve_combat_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase>,
     pub coude_catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
     pub coude_cashbox_uc: Arc<dyn crate::ports::inbound::ManageCoudeCashboxUseCase>,
+    pub coude_steal_protections_uc:
+        Arc<dyn crate::ports::inbound::ManageCoudeStealProtectionsUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

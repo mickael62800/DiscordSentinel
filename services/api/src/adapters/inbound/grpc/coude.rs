@@ -714,6 +714,7 @@ impl CoudeEconomyService for CoudeEconomyGrpc {
 
 pub struct CoudeInventoryGrpc {
     pub uc: Arc<dyn ManageCoudeInventoryUseCase>,
+    pub steal_protections_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealProtectionsUseCase>,
 }
 
 fn inventory_item_to_proto(i: CoudeInventoryItem) -> proto::CoudeInventoryItem {
@@ -895,6 +896,108 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))
+    }
+
+    // ── Phase 9 Part B : abonnements anti-vol ──
+
+    async fn list_active_steal_protections(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::StealProtectionList>, Status> {
+        let req = request.into_inner();
+        let list = self
+            .steal_protections_uc
+            .list_active(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::StealProtectionList {
+            protections: list.into_iter().map(steal_protection_to_proto).collect(),
+        }))
+    }
+
+    async fn price_steal_protection(
+        &self,
+        request: Request<proto::PriceStealProtectionRequest>,
+    ) -> Result<Response<proto::Int64Value>, Status> {
+        let req = request.into_inner();
+        let duration = proto_steal_duration_to_domain(req.duration)
+            .ok_or_else(|| Status::invalid_argument("duree invalide"))?;
+        let price = self
+            .steal_protections_uc
+            .price_for(&req.item_key, duration)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Int64Value { value: price }))
+    }
+
+    async fn buy_steal_protection(
+        &self,
+        request: Request<proto::BuyStealProtectionRequest>,
+    ) -> Result<Response<proto::BuyStealProtectionResponse>, Status> {
+        let req = request.into_inner();
+        let duration = proto_steal_duration_to_domain(req.duration)
+            .ok_or_else(|| Status::invalid_argument("duree invalide"))?;
+        let cost = self
+            .steal_protections_uc
+            .price_for(&req.item_key, duration)
+            .await
+            .map_err(domain_to_status)?;
+        let expires_at = self
+            .steal_protections_uc
+            .subscribe(&req.guild_id, &req.user_id, &req.item_key, duration)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::BuyStealProtectionResponse {
+            expires_at: expires_at.to_rfc3339(),
+            cost,
+        }))
+    }
+
+    async fn try_trigger_steal_protection(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::MaybeStealProtectionTrigger>, Status> {
+        let req = request.into_inner();
+        let trigger = self
+            .steal_protections_uc
+            .try_trigger(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::MaybeStealProtectionTrigger {
+            trigger: trigger.map(|t| proto::StealProtectionTrigger {
+                item_key: t.item_key,
+                item_name: t.item_name,
+                rolled_value: t.rolled_value,
+                block_chance_percent: t.block_chance_percent,
+            }),
+        }))
+    }
+}
+
+fn steal_protection_to_proto(
+    p: crate::domain::entities::CoudeStealProtection,
+) -> proto::CoudeStealProtection {
+    proto::CoudeStealProtection {
+        id: p.id.to_string(),
+        guild_id: p.guild_id,
+        user_id: p.user_id,
+        item_key: p.item_key,
+        expires_at: p.expires_at.to_rfc3339(),
+        created_at: p.created_at.to_rfc3339(),
+    }
+}
+
+fn proto_steal_duration_to_domain(
+    v: i32,
+) -> Option<crate::domain::entities::StealProtectionDuration> {
+    use crate::domain::entities::StealProtectionDuration as D;
+    use proto::StealProtectionDurationKind as P;
+    match P::try_from(v).ok()? {
+        P::StealProtectionDurationUnspecified => None,
+        P::StealProtectionDurationOneDay => Some(D::OneDay),
+        P::StealProtectionDurationThreeDays => Some(D::ThreeDays),
+        P::StealProtectionDurationFiveDays => Some(D::FiveDays),
+        P::StealProtectionDurationSevenDays => Some(D::SevenDays),
     }
 }
 

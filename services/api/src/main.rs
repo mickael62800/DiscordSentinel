@@ -323,6 +323,20 @@ async fn main() {
             coude_cashbox_repo.clone(),
             wallet_repo.clone(),
         ));
+    let coude_steal_protection_repo: Arc<
+        dyn sentinel_api::ports::outbound::CoudeStealProtectionRepository,
+    > = Arc::new(
+        sentinel_api::adapters::outbound::postgres::PgCoudeStealProtectionRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+    let coude_steal_protections_uc: Arc<
+        dyn sentinel_api::ports::inbound::ManageCoudeStealProtectionsUseCase,
+    > = Arc::new(
+        sentinel_api::application::ManageCoudeStealProtectionsService::new(
+            coude_steal_protection_repo,
+        ),
+    );
     let resolve_combat_now_uc: Arc<dyn sentinel_api::ports::inbound::ResolveCombatNowUseCase> =
         Arc::new(sentinel_api::application::ResolveCombatNowService::new(
             coude_combat_repo.clone(),
@@ -398,6 +412,7 @@ async fn main() {
         resolve_combat_now_uc,
         coude_catalog_uc,
         coude_cashbox_uc,
+        coude_steal_protections_uc,
         broadcaster,
         job_client,
         discord_api,

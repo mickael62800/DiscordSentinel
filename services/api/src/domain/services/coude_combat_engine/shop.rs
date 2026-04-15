@@ -101,41 +101,21 @@ pub const SHOP_ITEMS: &[ShopItem] = &[
         description: "Immunise contre le poison pendant 1 combat",
         category: "defense",
     },
-    // ── Anti-vol (passifs, consommes sur un blocage reussi) ──
-    ShopItem {
-        key: "chien_garde",
-        name: "Chien de garde",
-        emoji: "\u{1f415}",
-        price: 200,
-        description: "25% de chance de bloquer un vol (consomme au blocage)",
-        category: "anti_vol",
-    },
-    ShopItem {
-        key: "camera_surveillance",
-        name: "Camera de surveillance",
-        emoji: "\u{1f4f9}",
-        price: 350,
-        description: "40% de chance de bloquer un vol (consomme au blocage)",
-        category: "anti_vol",
-    },
-    ShopItem {
-        key: "coffre_fort",
-        name: "Coffre-fort",
-        emoji: "\u{1f512}",
-        price: 600,
-        description: "60% de chance de bloquer un vol (consomme au blocage)",
-        category: "anti_vol",
-    },
+    // Phase 9 Part B : les items anti-vol historiques
+    // (chien_garde / camera_surveillance / coffre_fort) ont ete migres
+    // vers un modele d'abonnement temps-base dans `coude_steal_protection`.
+    // Ils s'achetent desormais via `/protection` et sont invisibles
+    // aux voleurs. Le shop ne les expose plus — un vieux stock eventuel
+    // dans `coude_inventory` est mis a 0 par la migration 125.
 ];
 
 /// Liste des items anti-vol tries par efficacite decroissante.
-/// Utilise par la logique de vol pour choisir le meilleur item a
-/// declencher quand quelqu'un tente de voler la cible.
-pub const ANTI_THEFT_ITEMS: &[(&str, u32)] = &[
-    ("coffre_fort", 60),
-    ("camera_surveillance", 40),
-    ("chien_garde", 25),
-];
+///
+/// DEPRECATED Phase 9 Part B : conserve vide pour retrocompat avec les
+/// callers qui iter dessus. Toute la logique anti-vol passe maintenant
+/// par le domain `coude_steal_protection` et le RPC
+/// `TryTriggerStealProtection` cote API.
+pub const ANTI_THEFT_ITEMS: &[(&str, u32)] = &[];
 
 pub fn get_item(key: &str) -> Option<&'static ShopItem> {
     SHOP_ITEMS.iter().find(|i| i.key == key)

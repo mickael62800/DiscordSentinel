@@ -103,6 +103,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     };
     let coude_inventory = CoudeInventoryGrpc {
         uc: state.coude_inventory_uc.clone(),
+        steal_protections_uc: state.coude_steal_protections_uc.clone(),
     };
     let coude_social = CoudeSocialGrpc {
         uc: state.coude_social_uc.clone(),
