@@ -774,6 +774,85 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
+    /// Phase 8 : recupere le catalogue complet Coude (classes, shop,
+    /// progression, matchmaking). Appele une fois au boot du bot, cache en
+    /// memoire dans la TypeMap. Le bot ne contient plus aucune donnee
+    /// metier en dur — tout vient de l'API.
+    pub async fn get_catalog(&self) -> Result<crate::catalog::CatalogCache, String> {
+        let req = proto_coude::Empty {};
+        let mut client = self.grpc.coude_social();
+        let resp = self
+            .grpc
+            .guarded(|| async move {
+                client.get_catalog(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(crate::catalog::CatalogCache {
+            classes: resp
+                .classes
+                .into_iter()
+                .map(|c| crate::catalog::ClassInfo {
+                    name: c.name,
+                    emoji: c.emoji,
+                    base_atk: c.base_atk,
+                    base_def: c.base_def,
+                    atk_growth: c.atk_growth,
+                    def_growth: c.def_growth,
+                    dodge_chance: c.dodge_chance,
+                    steal_bonus: c.steal_bonus,
+                    description: c.description,
+                    passif_key: c.passif_key,
+                    passif_description: c.passif_description,
+                    passif_reveal: c.passif_reveal,
+                })
+                .collect(),
+            shop_items: resp
+                .shop_items
+                .into_iter()
+                .map(|i| crate::catalog::ShopItemInfo {
+                    key: i.key,
+                    name: i.name,
+                    emoji: i.emoji,
+                    price: i.price,
+                    description: i.description,
+                    category: i.category,
+                    heal_amount: i.heal_amount,
+                })
+                .collect(),
+            level_table: resp
+                .level_table
+                .into_iter()
+                .map(|l| crate::catalog::LevelEntry {
+                    level: l.level,
+                    title: l.title,
+                    xp_cumul: l.xp_cumul,
+                })
+                .collect(),
+            matchmaking_buckets: resp
+                .matchmaking_buckets
+                .into_iter()
+                .map(|b| crate::catalog::MatchmakingBucket {
+                    gap_min: b.gap_min,
+                    gap_max: b.gap_max,
+                    handicap: b.handicap,
+                    blocked: b.blocked,
+                })
+                .collect(),
+            anti_theft_items: resp
+                .anti_theft_items
+                .into_iter()
+                .map(|a| crate::catalog::AntiTheftItem {
+                    key: a.key,
+                    block_chance_percent: a.block_chance_percent,
+                })
+                .collect(),
+            max_level: resp.max_level,
+            hp_base: resp.hp_base,
+            hp_per_def: resp.hp_per_def,
+        })
+    }
+
     /// Phase 7 : resolution instantanee d'un combat (surprise / bloodbath /
     /// defense via item). L'API applique toute la logique metier et retourne
     /// un embed pret a poster.

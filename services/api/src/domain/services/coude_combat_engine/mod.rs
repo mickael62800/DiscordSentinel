@@ -1,29 +1,30 @@
-//! Moteur de combat Coup de Coude — copie autonome du moteur utilise par
-//! `bots/coude-bot/src/game/*` pour que le worker puisse resoudre les
-//! combats en phase betting avec la logique complete (rounds, HP, classes,
-//! chaos, items) au lieu d'un simple random.
+//! Moteur de combat Coup de Coude + donnees metier (catalogues, progression).
 //!
-//! ## Pourquoi un duplicate
+//! ## Phase 8 — source unique de verite
 //!
-//! L'ideal serait de partager ce moteur via un crate commun, mais :
-//! - Il ne depend de rien de non-trivial (rand uniquement, pas d'I/O)
-//! - Le porter dans `sentinel-shared` amenerait beaucoup de code non utile
-//!   a cote bot (chaos/classes/progression)
-//! - Un crate dedie `coude-domain` serait plus propre mais c'est du refactor
-//!   Pour eviter la duplication, le moteur cote bot doit etre garde en
-//!   synchro manuelle (c'est une contrainte acceptable vu qu'il bouge peu)
+//! Tout le metier Coude vit ici (domain layer, pur, sans IO) :
+//! - `combat` : moteur de resolution multi-rounds
+//! - `classes` : catalogue des classes (stats, passifs)
+//! - `shop` : catalogue des items
+//! - `progression` : formules XP / level / handicap / titres
+//! - `chaos` : evenements chaos + roll aleatoire
 //!
-//! ## Adaptations par rapport a `bots/coude-bot/src/game/`
+//! Le bot et le worker n'ont plus aucune copie locale de ces donnees.
+//! Ils recuperent le catalogue via le RPC `CoudeCatalogService.GetCatalog`
+//! au boot, puis font des lookups sur le cache.
 //!
-//! - Le type `Player` du bot (defini dans `api_client.rs`) est remplace par
-//!   `PlayerLite` (meme champs essentiels mais sans dependance serenity)
-//! - Le type `ServerEvent` du bot devient `ServerEventLite`
-//! - Pour le reste (chaos/classes/progression), copie identique.
+//! ## Ajouter un nouvel item / classe / chaos event
+//!
+//! 1. Editer le fichier approprie ici
+//! 2. Rebuild l'API, le bot recuperera automatiquement la nouvelle version
+//!    au prochain boot (ou via un refresh du catalog si on l'ajoute)
+//! 3. Zero code cote bot a toucher sauf si l'effet combat est nouveau
 
 pub mod chaos;
 pub mod classes;
 pub mod combat;
 pub mod progression;
+pub mod shop;
 
 pub use combat::resolve_combat;
 

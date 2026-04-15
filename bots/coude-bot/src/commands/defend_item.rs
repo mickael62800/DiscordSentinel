@@ -4,7 +4,7 @@ use serenity::all::{
     CreateSelectMenuOption,
 };
 
-use crate::game::shop;
+use crate::catalog::CatalogCacheKey;
 use crate::GameApiKey;
 
 pub const DEFEND_PREFIX: &str = "coude_defend:";
@@ -34,6 +34,7 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     // Verifier le combat
     let combat_record = match api.get_combat(combat_id_str).await {
@@ -78,7 +79,7 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
     for item_key in DEFENSIVE_ITEMS {
         let has = inventory.iter().any(|i| i.item_key == *item_key && i.quantity > 0);
         if has {
-            if let Some(shop_item) = shop::get_item(item_key) {
+            if let Some(shop_item) = catalog.get_item(item_key) {
                 let qty = inventory
                     .iter()
                     .find(|i| i.item_key == *item_key)
@@ -89,7 +90,7 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
                         format!("{} {} (x{})", shop_item.emoji, shop_item.name, qty),
                         *item_key,
                     )
-                    .description(shop_item.description),
+                    .description(shop_item.description.clone()),
                 );
             }
         }

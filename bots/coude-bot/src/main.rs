@@ -5,10 +5,10 @@
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 pub mod api_client;
+pub mod catalog;
 mod channel_check;
 mod commands;
 mod config;
-mod game;
 pub mod guild_config;
 mod handler;
 
@@ -58,6 +58,25 @@ async fn main() {
 
     let api_client = api_client::ApiClient::new(Arc::clone(&base_api), Arc::clone(&grpc));
 
+    // Phase 8 : fetch du catalogue Coude (classes, shop, progression) depuis
+    // l'API. Le bot ne contient plus aucune donnee metier en dur — tout vient
+    // de l'API via ce RPC au boot. Si l'API est down, on sort (fail fast).
+    let catalog = match api_client.get_catalog().await {
+        Ok(c) => {
+            info!(
+                classes = c.classes.len(),
+                items = c.shop_items.len(),
+                levels = c.level_table.len(),
+                "Catalogue Coude recupere depuis l'API"
+            );
+            Arc::new(c)
+        }
+        Err(e) => {
+            eprintln!("Erreur fatale: impossible de recuperer le catalogue Coude depuis l'API: {e}");
+            std::process::exit(1);
+        }
+    };
+
     let mut client = Client::builder(config.base().discord_token.as_str(), intents)
         .event_handler(Handler)
         .cache_settings(sentinel_shared::cache_settings::minimal())
@@ -69,6 +88,7 @@ async fn main() {
         data.insert::<ApiClientKey>(Arc::clone(&base_api));
         data.insert::<GrpcClientKey>(Arc::clone(&grpc));
         data.insert::<GameApiKey>(api_client);
+        data.insert::<catalog::CatalogCacheKey>(catalog);
     }
 
     // Heartbeat via shared

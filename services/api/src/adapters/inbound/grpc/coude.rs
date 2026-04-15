@@ -904,6 +904,7 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
 
 pub struct CoudeSocialGrpc {
     pub uc: Arc<dyn ManageCoudeSocialUseCase>,
+    pub catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
 }
 
 fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
@@ -1033,6 +1034,80 @@ impl CoudeSocialService for CoudeSocialGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(current_season_to_proto(s)))
+    }
+
+    async fn get_catalog(
+        &self,
+        _request: Request<proto::Empty>,
+    ) -> Result<Response<proto::CoudeCatalogResponse>, Status> {
+        let cat = self
+            .catalog_uc
+            .get_catalog()
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::CoudeCatalogResponse {
+            classes: cat
+                .classes
+                .into_iter()
+                .map(|c| proto::ClassInfo {
+                    name: c.name,
+                    emoji: c.emoji,
+                    base_atk: c.base_atk,
+                    base_def: c.base_def,
+                    atk_growth: c.atk_growth,
+                    def_growth: c.def_growth,
+                    dodge_chance: c.dodge_chance,
+                    steal_bonus: c.steal_bonus,
+                    description: c.description,
+                    passif_key: c.passif_key,
+                    passif_description: c.passif_description,
+                    passif_reveal: c.passif_reveal,
+                })
+                .collect(),
+            shop_items: cat
+                .shop_items
+                .into_iter()
+                .map(|i| proto::ShopItemInfo {
+                    key: i.key,
+                    name: i.name,
+                    emoji: i.emoji,
+                    price: i.price,
+                    description: i.description,
+                    category: i.category,
+                    heal_amount: i.heal_amount,
+                })
+                .collect(),
+            level_table: cat
+                .level_table
+                .into_iter()
+                .map(|l| proto::LevelEntry {
+                    level: l.level,
+                    title: l.title,
+                    xp_cumul: l.xp_cumul,
+                })
+                .collect(),
+            matchmaking_buckets: cat
+                .matchmaking_buckets
+                .into_iter()
+                .map(|b| proto::MatchmakingBucket {
+                    gap_min: b.gap_min,
+                    gap_max: b.gap_max,
+                    handicap: b.handicap,
+                    blocked: b.blocked,
+                })
+                .collect(),
+            anti_theft_items: cat
+                .anti_theft_items
+                .into_iter()
+                .map(|a| proto::AntiTheftItem {
+                    key: a.key,
+                    block_chance_percent: a.block_chance_percent,
+                })
+                .collect(),
+            max_level: cat.max_level,
+            hp_base: cat.hp_base,
+            hp_per_def: cat.hp_per_def,
+        }))
     }
 }
 

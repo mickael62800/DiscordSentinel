@@ -553,6 +553,63 @@ service CoudeSocialService {
   rpc ListActiveEvents(ListActiveEventsRequest) returns (EventList);
   rpc LogDailyChaos(LogDailyChaosRequest) returns (Empty);
   rpc CurrentSeason(CurrentSeasonRequest) returns (CoudeCurrentSeason);
+  // Phase 8 : retourne toutes les donnees statiques Coude (classes, shop,
+  // progression, matchmaking). Le bot appelle au boot et cache en memoire.
+  rpc GetCatalog(Empty) returns (CoudeCatalogResponse);
+}
+
+message CoudeCatalogResponse {
+  repeated ClassInfo classes = 1;
+  repeated ShopItemInfo shop_items = 2;
+  repeated LevelEntry level_table = 3;
+  repeated MatchmakingBucket matchmaking_buckets = 4;
+  repeated AntiTheftItem anti_theft_items = 5;
+  int32 max_level = 6;
+  int32 hp_base = 7;
+  int32 hp_per_def = 8;
+}
+
+message ClassInfo {
+  string name = 1;
+  string emoji = 2;
+  int32 base_atk = 3;
+  int32 base_def = 4;
+  int32 atk_growth = 5;
+  int32 def_growth = 6;
+  double dodge_chance = 7;
+  double steal_bonus = 8;
+  string description = 9;
+  string passif_key = 10;
+  string passif_description = 11;
+  string passif_reveal = 12;
+}
+
+message ShopItemInfo {
+  string key = 1;
+  string name = 2;
+  string emoji = 3;
+  int64 price = 4;
+  string description = 5;
+  string category = 6;
+  int32 heal_amount = 7;
+}
+
+message LevelEntry {
+  int32 level = 1;
+  string title = 2;
+  int64 xp_cumul = 3;
+}
+
+message MatchmakingBucket {
+  int32 gap_min = 1;
+  int32 gap_max = 2;
+  double handicap = 3;
+  bool blocked = 4;
+}
+
+message AntiTheftItem {
+  string key = 1;
+  uint32 block_chance_percent = 2;
 }
 
 message CheckCooldownRequest {

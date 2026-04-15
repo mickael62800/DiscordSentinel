@@ -4,9 +4,7 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::game::classes;
-use crate::game::progression;
-use crate::game::shop;
+use crate::catalog::CatalogCacheKey;
 use crate::GameApiKey;
 use crate::handler::load_guild_config;
 
@@ -58,6 +56,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     let player = match api.get_or_create_player(&guild_id, &target.id.to_string(), &target.name).await {
         Ok(p) => p,
@@ -78,17 +77,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .ok()
         .flatten();
 
-    let class = classes::get_class(player.class.as_deref().unwrap_or("bourrin"));
-    let title = progression::title_for_level(player.level);
+    let class = catalog.get_class(player.class.as_deref().unwrap_or("bourrin"));
+    let title = catalog.title_for_level(player.level).to_string();
 
     let effective_atk = class.base_atk + (player.level - 1) * class.atk_growth + player.atk;
     let effective_def = class.base_def + (player.level - 1) * class.def_growth + player.def;
-    let hp = progression::display_hp(effective_def);
+    let hp = catalog.display_hp(effective_def);
 
-    let xp_display = if player.level >= progression::MAX_LEVEL {
+    let xp_display = if player.level >= catalog.max_level {
         "MAX".to_string()
     } else {
-        format!("{} / {}", player.xp, progression::xp_for_level(player.level + 1))
+        format!("{} / {}", player.xp, catalog.xp_for_level(player.level + 1))
     };
 
     let class_name_cap = {
@@ -108,7 +107,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         items
             .iter()
             .filter(|i| i.quantity > 0)
-            .map(|i| match shop::get_item(&i.item_key) {
+            .map(|i| match catalog.get_item(&i.item_key) {
                 Some(def) => format!("{} **{}** x{}", def.emoji, def.name, i.quantity),
                 None => format!("\u{2753} {} x{}", i.item_key, i.quantity),
             })

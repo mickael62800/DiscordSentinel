@@ -3,7 +3,7 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::game::classes;
+use crate::catalog::CatalogCacheKey;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
@@ -31,6 +31,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = match data.get::<GameApiKey>() {
         Some(a) => a,
+        None => return,
+    };
+    let catalog = match data.get::<CatalogCacheKey>() {
+        Some(c) => c.clone(),
         None => return,
     };
 
@@ -68,7 +72,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let class = classes::get_class(player.class.as_deref().unwrap_or("bourrin"));
+    let class = catalog.get_class(player.class.as_deref().unwrap_or("bourrin"));
 
     let embed = CreateEmbed::new()
         .title("\u{1f504} Stats remises a zero !")

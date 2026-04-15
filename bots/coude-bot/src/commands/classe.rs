@@ -4,7 +4,7 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::game::classes;
+use crate::catalog::CatalogCacheKey;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
@@ -34,6 +34,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let data = ctx.data.read().await;
     let api = match data.get::<GameApiKey>() {
         Some(a) => a,
+        None => return,
+    };
+    let catalog = match data.get::<CatalogCacheKey>() {
+        Some(c) => c.clone(),
         None => return,
     };
 
@@ -74,8 +78,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     }
 
-    // Afficher le menu de selection
-    let current_class_info = classes::get_class(current_class);
+    // Afficher le menu de selection — tout vient du catalog cache.
+    let current_class_info = catalog.get_class(current_class);
 
     let mut description = format!(
         "Classe actuelle : {} **{}** — {}\n\n",
@@ -90,29 +94,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     description.push_str("Choisis ta classe :");
 
-    let embed = CreateEmbed::new()
+    let mut embed = CreateEmbed::new()
         .title("\u{2694}\u{fe0f} Choix de Classe")
-        .description(&description)
-        .field(
-            format!("{} Bourrin", classes::CLASS_BOURRIN.emoji),
-            format!("ATK {} | DEF {} | {}", classes::CLASS_BOURRIN.base_atk, classes::CLASS_BOURRIN.base_def, classes::CLASS_BOURRIN.passif_description),
+        .description(&description);
+    for c in &catalog.classes {
+        embed = embed.field(
+            format!("{} {}", c.emoji, capitalize(&c.name)),
+            format!("ATK {} | DEF {} | {}", c.base_atk, c.base_def, c.passif_description),
             false,
-        )
-        .field(
-            format!("{} Agile", classes::CLASS_AGILE.emoji),
-            format!("ATK {} | DEF {} | {}", classes::CLASS_AGILE.base_atk, classes::CLASS_AGILE.base_def, classes::CLASS_AGILE.passif_description),
-            false,
-        )
-        .field(
-            format!("{} Fourbe", classes::CLASS_FOURBE.emoji),
-            format!("ATK {} | DEF {} | {}", classes::CLASS_FOURBE.base_atk, classes::CLASS_FOURBE.base_def, classes::CLASS_FOURBE.passif_description),
-            false,
-        )
-        .field(
-            format!("{} Tank", classes::CLASS_TANK.emoji),
-            format!("ATK {} | DEF {} | {}", classes::CLASS_TANK.base_atk, classes::CLASS_TANK.base_def, classes::CLASS_TANK.passif_description),
-            false,
-        )
+        );
+    }
+    let embed = embed
         .color(0x3498DB)
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"));
 
@@ -157,10 +149,21 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
         None => return,
     };
 
-    if !classes::is_valid_class(&class_name) {
+    let guild_id_early = match component.guild_id {
+        Some(id) => id.to_string(),
+        None => return,
+    };
+    let data_early = ctx.data.read().await;
+    let catalog_early = match data_early.get::<CatalogCacheKey>() {
+        Some(c) => c.clone(),
+        None => return,
+    };
+    drop(data_early);
+    if !catalog_early.classes.iter().any(|c| c.name == class_name) {
         reply_component_ephemeral(ctx, component, "Classe invalide.").await;
         return;
     }
+    let _ = guild_id_early; // supprime via shadowing ci-dessous
 
     let guild_id = match component.guild_id {
         Some(id) => id.to_string(),
@@ -204,7 +207,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
-    let class_info = classes::get_class(&class_name);
+    let class_info = catalog_early.get_class(&class_name);
 
     let cost_msg = if has_chosen { " (-500 coins)" } else { " (gratuit)" };
 
@@ -256,4 +259,12 @@ async fn reply_component_ephemeral(ctx: &Context, component: &ComponentInteracti
         )
         .await
         .ok();
+}
+
+fn capitalize(s: &str) -> String {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) => c.to_uppercase().collect::<String>() + chars.as_str(),
+        None => String::new(),
+    }
 }

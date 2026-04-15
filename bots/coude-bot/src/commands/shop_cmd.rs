@@ -4,7 +4,7 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::game::shop::{self, SHOP_ITEMS};
+use crate::catalog::CatalogCacheKey;
 use crate::GameApiKey;
 use crate::handler::load_guild_config;
 
@@ -54,12 +54,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     match buy_key {
         Some(key) => {
             // Achat d'un objet
-            let item = match shop::get_item(&key) {
-                Some(i) => i,
+            let item = match catalog.get_item(&key) {
+                Some(i) => i.clone(),
                 None => {
                     reply_ephemeral(ctx, command, "Objet inconnu.").await;
                     return;
@@ -77,7 +78,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 }
             };
 
-            let price = config.shop_price(item.key);
+            let price = config.shop_price(&item.key);
 
             if player.coins < price {
                 reply_ephemeral(
@@ -138,8 +139,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             // Afficher la boutique avec les prix depuis la config
             let mut desc = String::from("Utilise `/shop acheter:<item>` pour acheter !\n\n");
 
-            for item in SHOP_ITEMS {
-                let price = config.shop_price(item.key);
+            for item in &catalog.shop_items {
+                let price = config.shop_price(&item.key);
                 desc.push_str(&format!(
                     "{} **{}** — **{} coins**\n> _{}_\n\n",
                     item.emoji, item.name, price, item.description
@@ -155,7 +156,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             if !inventory.is_empty() {
                 desc.push_str("---\n\u{1f392} **Ton inventaire :**\n");
                 for inv_item in &inventory {
-                    let label = shop::get_item(&inv_item.item_key)
+                    let label = catalog
+                        .get_item(&inv_item.item_key)
                         .map(|i| format!("{} {}", i.emoji, i.name))
                         .unwrap_or_else(|| inv_item.item_key.clone());
                     desc.push_str(&format!("  {} x{}\n", label, inv_item.quantity));

@@ -13,7 +13,7 @@ use serenity::all::{
     EditInteractionResponse, UserId,
 };
 
-use crate::game::progression;
+use crate::catalog::CatalogCacheKey;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
@@ -129,6 +129,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     // Creer/recuperer les joueurs
     let attacker = match api
@@ -176,7 +177,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Matchmaking check (handicap sera recalcule apres la confirmation)
     let level_gap = (attacker.level - defender_player.level).abs();
     let (_handicap, blocked) =
-        progression::matchmaking_handicap(attacker.level, defender_player.level);
+        catalog.matchmaking_handicap(attacker.level, defender_player.level);
 
     if blocked {
         reply_ephemeral(
@@ -403,6 +404,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     // Re-fetch attacker pour check coins a jour (un vol/combat a pu passer
     // entre le /coude et le clic sur Confirmer).
@@ -468,7 +470,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
         }
     };
 
-    let (handicap, _blocked) = progression::matchmaking_handicap(attacker.level, defender_player.level);
+    let (handicap, _blocked) = catalog.matchmaking_handicap(attacker.level, defender_player.level);
 
     // Consommer l'item SEULEMENT ici (apres confirm).
     if special != "-" {

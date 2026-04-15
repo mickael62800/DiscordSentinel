@@ -10,7 +10,7 @@ use serenity::all::{
     CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use crate::game::shop;
+use crate::catalog::CatalogCacheKey;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
@@ -62,21 +62,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    if !shop::is_potion(&potion_key) {
-        reply_ephemeral(ctx, command, "Cet objet n'est pas une potion utilisable.").await;
-        return;
-    }
-
-    let heal_amount = shop::potion_heal_amount(&potion_key);
-    if heal_amount <= 0 {
-        reply_ephemeral(ctx, command, "Potion invalide.").await;
-        return;
-    }
-
     let user_id = command.user.id.to_string();
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
+
+    if !catalog.is_potion(&potion_key) {
+        reply_ephemeral(ctx, command, "Cet objet n'est pas une potion utilisable.").await;
+        return;
+    }
+
+    let heal_amount = catalog.potion_heal_amount(&potion_key);
+    if heal_amount <= 0 {
+        reply_ephemeral(ctx, command, "Potion invalide.").await;
+        return;
+    }
 
     // Charger le player pour connaitre HP actuels
     let player = match api
@@ -107,9 +108,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     match api.has_item(&guild_id, &user_id, &potion_key).await {
         Ok(true) => {}
         Ok(false) => {
-            let name = shop::get_item(&potion_key)
-                .map(|i| i.name)
-                .unwrap_or("cette potion");
+            let name = catalog
+                .get_item(&potion_key)
+                .map(|i| i.name.clone())
+                .unwrap_or_else(|| "cette potion".into());
             reply_ephemeral(
                 ctx,
                 command,
@@ -140,8 +142,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let item = shop::get_item(&potion_key);
-    let (emoji, name) = item.map(|i| (i.emoji, i.name)).unwrap_or(("\u{1f9ea}", "Potion"));
+    let item = catalog.get_item(&potion_key);
+    let (emoji, name) = item
+        .map(|i| (i.emoji.clone(), i.name.clone()))
+        .unwrap_or_else(|| ("\u{1f9ea}".into(), "Potion".into()));
 
     let embed = CreateEmbed::new()
         .title(format!("{} Potion utilisee !", emoji))

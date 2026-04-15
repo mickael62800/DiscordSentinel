@@ -4,7 +4,7 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::game::shop;
+use crate::catalog::CatalogCacheKey;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
@@ -121,6 +121,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     // Ensure both players exist
     let donor = match api
@@ -271,7 +272,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         let qty = quantite as i32;
 
         // Verify item exists in shop
-        let item = match shop::get_item(item_key) {
+        let item = match catalog.get_item(item_key) {
             Some(i) => i,
             None => {
                 reply_ephemeral(ctx, command, "Objet inconnu.").await;

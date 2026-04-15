@@ -4,8 +4,7 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use crate::game::classes;
-use crate::game::progression;
+use crate::catalog::CatalogCacheKey;
 use crate::GameApiKey;
 use crate::handler::load_guild_config;
 
@@ -60,6 +59,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
+    let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     // Verifier que le joueur existe
     let player = match api
@@ -97,10 +97,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let class = classes::get_class(updated.class.as_deref().unwrap_or("bourrin"));
+    let class = catalog.get_class(updated.class.as_deref().unwrap_or("bourrin"));
     let effective_atk = class.base_atk + (updated.level - 1) * class.atk_growth + updated.atk;
     let effective_def = class.base_def + (updated.level - 1) * class.def_growth + updated.def;
-    let hp = progression::display_hp(effective_def);
+    let hp = catalog.display_hp(effective_def);
 
     let stat_label = if db_stat == "atk" { "ATK" } else { "DEF" };
     let stat_emoji = if db_stat == "atk" { "\u{2694}\u{fe0f}" } else { "\u{1f6e1}\u{fe0f}" };

@@ -312,6 +312,8 @@ async fn main() {
             wallet_repo.clone(),
             coude_bets_uc.clone(),
         ));
+    let coude_catalog_uc: Arc<dyn sentinel_api::ports::inbound::ManageCoudeCatalogUseCase> =
+        Arc::new(sentinel_api::application::ManageCoudeCatalogService::new());
     let resolve_combat_now_uc: Arc<dyn sentinel_api::ports::inbound::ResolveCombatNowUseCase> =
         Arc::new(sentinel_api::application::ResolveCombatNowService::new(
             coude_combat_repo.clone(),
@@ -385,6 +387,7 @@ async fn main() {
         resolve_betting_batch_uc,
         expire_combats_batch_uc,
         resolve_combat_now_uc,
+        coude_catalog_uc,
         broadcaster,
         job_client,
         discord_api,
