@@ -63,10 +63,36 @@ pub fn register() -> CreateCommand {
         .add_string_choice("Bouclier (250)", "bouclier"),
     );
 
+    // Sous-commande braquage (Phase 10) — items consommables pour
+    // /braquage. Chacun donne +5 % au roll (cap 50 % avec les 9).
+    let braquage = CreateCommandOption::new(
+        CommandOptionType::SubCommand,
+        "braquage",
+        "Items consommables pour /braquage (cap 50% avec les 9)",
+    )
+    .add_sub_option(
+        CreateCommandOption::new(
+            CommandOptionType::String,
+            "acheter",
+            "Item a acheter (facultatif)",
+        )
+        .required(false)
+        .add_string_choice("Masque (100)", "masque_braquage")
+        .add_string_choice("Pied-de-biche (150)", "pied_de_biche")
+        .add_string_choice("Crochet de vault (220)", "crochet_vault")
+        .add_string_choice("Plan du coffre (320)", "plan_coffre")
+        .add_string_choice("Fumigene de diversion (450)", "fumigene_diversion")
+        .add_string_choice("Explosif (600)", "explosif")
+        .add_string_choice("Hacker kit (800)", "hacker_kit")
+        .add_string_choice("Drone espion (1000)", "drone_espion")
+        .add_string_choice("Equipe de pros (1500)", "equipe_de_pros"),
+    );
+
     CreateCommand::new("shop")
-        .description("Boutique Coup de Coude — attaque ou defense")
+        .description("Boutique Coup de Coude — attaque, defense ou braquage")
         .add_option(attaque)
         .add_option(defense)
+        .add_option(braquage)
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -78,15 +104,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    // Detecte la sous-commande choisie (attaque ou defense) et l'argument
-    // optionnel `acheter`.
+    // Detecte la sous-commande choisie (attaque/defense/braquage) et
+    // l'argument optionnel `acheter`.
     let (category, buy_key) = match extract_subcommand(&command.data.options) {
         Some(p) => p,
         None => {
             reply_ephemeral(
                 ctx,
                 command,
-                "Choisis une sous-commande : `/shop attaque` ou `/shop defense`.",
+                "Choisis une sous-commande : `/shop attaque`, `/shop defense` ou `/shop braquage`.",
             )
             .await;
             return;
@@ -220,6 +246,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             let title = match category {
                 "attaque" => "\u{2694}\u{fe0f} Boutique — Attaque",
                 "defense" => "\u{1f6e1}\u{fe0f} Boutique — Defense",
+                "braquage" => "\u{1f3ad} Boutique — Braquage",
                 _ => "\u{1f6d2} Boutique Coup de Coude",
             };
 
@@ -304,6 +331,7 @@ fn extract_subcommand(options: &[CommandDataOption]) -> Option<(&'static str, Op
         let category: &'static str = match opt.name.as_str() {
             "attaque" => "attaque",
             "defense" => "defense",
+            "braquage" => "braquage",
             _ => continue,
         };
         let buy_key = match &opt.value {
@@ -323,8 +351,9 @@ fn extract_subcommand(options: &[CommandDataOption]) -> Option<(&'static str, Op
 
 fn category_color(category: &str) -> u32 {
     match category {
-        "attaque" => 0xE74C3C, // rouge
-        "defense" => 0x3498DB, // bleu
+        "attaque" => 0xE74C3C,  // rouge
+        "defense" => 0x3498DB,  // bleu
+        "braquage" => 0xFFD700, // or
         _ => 0x95A5A6,
     }
 }
