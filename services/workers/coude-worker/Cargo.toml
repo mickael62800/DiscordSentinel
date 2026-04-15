@@ -16,6 +16,8 @@ dotenvy = { workspace = true }
 uuid = { workspace = true }
 chrono = { workspace = true }
 rand = { workspace = true }
+tonic = { workspace = true }
+sentinel-proto = { workspace = true }
 sentinel-worker-common = { path = "../worker-common" }
 
 # Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS uniquement,
