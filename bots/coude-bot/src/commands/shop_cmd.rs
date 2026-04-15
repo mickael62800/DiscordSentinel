@@ -1,31 +1,72 @@
+//! Commande /shop avec sous-commandes attaque / defense.
+//!
+//! `/shop attaque` liste les items offensifs, `/shop defense` liste les
+//! items defensifs et soins. Chaque sous-commande accepte un argument
+//! optionnel `acheter:<item>` qui permet d'acheter directement, avec
+//! les choices filtrees sur la categorie correspondante.
+//!
+//! La categorisation vit dans le domain API (`shop.rs::ShopItem.category`).
+//! Le bot filtre la liste cachee du catalog.
+
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
+    CreateCommand, CreateCommandOption, CreateEmbed, CreateEmbedFooter,
+    CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
 use crate::catalog::CatalogCacheKey;
-use crate::GameApiKey;
 use crate::handler::load_guild_config;
+use crate::GameApiKey;
 
 pub fn register() -> CreateCommand {
-    CreateCommand::new("shop")
-        .description("Boutique Coup de Coude")
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::String, "acheter", "Objet a acheter")
-                .required(false)
-                .add_string_choice("Potion de Soin (80)", "potion_soin")
-                .add_string_choice("Rage (100)", "rage")
-                .add_string_choice("Mindgame (150)", "mindgame")
-                .add_string_choice("Antidote (150)", "antidote")
-                .add_string_choice("Explosion (200)", "explosion")
-                .add_string_choice("Potion Majeure (200)", "potion_majeure")
-                .add_string_choice("Double Coup (250)", "double_coup")
-                .add_string_choice("Bouclier (250)", "bouclier")
-                .add_string_choice("Attaque Surprise (300)", "surprise")
-                .add_string_choice("Poison (300)", "poison")
-                .add_string_choice("Coup Traitre (350)", "coup_traitre"),
+    // Sous-commande attaque — liste des items offensifs.
+    // Les choices sont hardcodes ici parce que Discord exige un set
+    // statique a l'enregistrement de la slash command ; la source de
+    // verite reste le domain cote API, on synchronise manuellement.
+    let attaque = CreateCommandOption::new(
+        CommandOptionType::SubCommand,
+        "attaque",
+        "Items offensifs (rage, mindgame, poison, surprise, coup traitre, double coup)",
+    )
+    .add_sub_option(
+        CreateCommandOption::new(
+            CommandOptionType::String,
+            "acheter",
+            "Item a acheter (facultatif : laisse vide pour juste voir la liste)",
         )
+        .required(false)
+        .add_string_choice("Rage (100)", "rage")
+        .add_string_choice("Mindgame (150)", "mindgame")
+        .add_string_choice("Double Coup (250)", "double_coup")
+        .add_string_choice("Poison (300)", "poison")
+        .add_string_choice("Attaque Surprise (300)", "surprise")
+        .add_string_choice("Coup Traitre (350)", "coup_traitre"),
+    );
+
+    // Sous-commande defense — potions, antidote, bouclier, explosion.
+    let defense = CreateCommandOption::new(
+        CommandOptionType::SubCommand,
+        "defense",
+        "Items defensifs et soins (potions, antidote, bouclier, explosion)",
+    )
+    .add_sub_option(
+        CreateCommandOption::new(
+            CommandOptionType::String,
+            "acheter",
+            "Item a acheter (facultatif)",
+        )
+        .required(false)
+        .add_string_choice("Potion de Soin (80)", "potion_soin")
+        .add_string_choice("Antidote (150)", "antidote")
+        .add_string_choice("Potion Majeure (200)", "potion_majeure")
+        .add_string_choice("Explosion (200)", "explosion")
+        .add_string_choice("Bouclier (250)", "bouclier"),
+    );
+
+    CreateCommand::new("shop")
+        .description("Boutique Coup de Coude — attaque ou defense")
+        .add_option(attaque)
+        .add_option(defense)
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -37,15 +78,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let buy_key = command
-        .data
-        .options
-        .iter()
-        .find(|o| o.name == "acheter")
-        .and_then(|o| match &o.value {
-            CommandDataOptionValue::String(s) => Some(s.clone()),
-            _ => None,
-        });
+    // Detecte la sous-commande choisie (attaque ou defense) et l'argument
+    // optionnel `acheter`.
+    let (category, buy_key) = match extract_subcommand(&command.data.options) {
+        Some(p) => p,
+        None => {
+            reply_ephemeral(
+                ctx,
+                command,
+                "Choisis une sous-commande : `/shop attaque` ou `/shop defense`.",
+            )
+            .await;
+            return;
+        }
+    };
 
     let config = load_guild_config(ctx, &guild_id).await;
     if !crate::channel_check::check_channel(ctx, command, config.channel_profil()).await {
@@ -58,7 +104,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     match buy_key {
         Some(key) => {
-            // Achat d'un objet
+            // ── Chemin achat ──
             let item = match catalog.get_item(&key) {
                 Some(i) => i.clone(),
                 None => {
@@ -66,6 +112,23 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     return;
                 }
             };
+
+            // Safety : empeche d'acheter un item d'une autre categorie
+            // via un copier-coller de choice. L'API ne connait pas la
+            // notion de "categorie du shop" — c'est une regle UI,
+            // documentee comme telle.
+            if item.category != category {
+                reply_ephemeral(
+                    ctx,
+                    command,
+                    &format!(
+                        "Cet item n'est pas dans la categorie **{}**. Utilise la bonne sous-commande.",
+                        category
+                    ),
+                )
+                .await;
+                return;
+            }
 
             let player = match api
                 .get_or_create_player(&guild_id, &command.user.id.to_string(), &command.user.name)
@@ -102,8 +165,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 return;
             }
 
-            // Ajouter l'item — rollback coins si l'ajout echoue, sinon le
-            // joueur perd ses coins sans rien recevoir.
+            // Ajouter l'item — rollback si l'add_item echoue.
             if let Err(e) = api
                 .add_item(&guild_id, &command.user.id.to_string(), &key)
                 .await
@@ -123,7 +185,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 return;
             }
 
-            // Phase 9 : le cout du shop alimente la caisse communautaire.
+            // Phase 9 : depot caisse communautaire.
             if let Err(e) = api
                 .deposit_cashbox(
                     &guild_id,
@@ -141,33 +203,70 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     "<@{}> a achete **{} {}** pour **{} coins** !\n\n_{}_",
                     command.user.id, item.emoji, item.name, price, item.description
                 ))
-                .color(0x3498DB)
+                .color(category_color(category))
                 .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
                 .timestamp(serenity::model::Timestamp::now());
 
-            crate::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
+            crate::channel_check::post_activity(
+                ctx,
+                command,
+                config.channel_activites(),
+                embed,
+            )
+            .await;
         }
         None => {
-            // Afficher la boutique avec les prix depuis la config
-            let mut desc = String::from("Utilise `/shop acheter:<item>` pour acheter !\n\n");
+            // ── Chemin affichage : liste filtree par categorie ──
+            let title = match category {
+                "attaque" => "\u{2694}\u{fe0f} Boutique — Attaque",
+                "defense" => "\u{1f6e1}\u{fe0f} Boutique — Defense",
+                _ => "\u{1f6d2} Boutique Coup de Coude",
+            };
 
-            for item in &catalog.shop_items {
-                let price = config.shop_price(&item.key);
-                desc.push_str(&format!(
-                    "{} **{}** — **{} coins**\n> _{}_\n\n",
-                    item.emoji, item.name, price, item.description
-                ));
+            let intro = format!(
+                "Utilise `/shop {} acheter:<item>` pour acheter !\n\n",
+                category
+            );
+            let mut desc = intro;
+
+            let items: Vec<_> = catalog
+                .shop_items
+                .iter()
+                .filter(|i| i.category == category)
+                .collect();
+
+            if items.is_empty() {
+                desc.push_str("_Aucun item dans cette categorie._\n\n");
+            } else {
+                for item in &items {
+                    let price = config.shop_price(&item.key);
+                    desc.push_str(&format!(
+                        "{} **{}** — **{} coins**\n> _{}_\n\n",
+                        item.emoji, item.name, price, item.description
+                    ));
+                }
             }
 
-            // Afficher l'inventaire du joueur
+            // Inventaire : on affiche seulement les items de cette categorie
+            // pour que la vue soit coherente avec la sous-commande choisie.
             let inventory = api
                 .get_inventory(&guild_id, &command.user.id.to_string())
                 .await
                 .unwrap_or_default();
 
-            if !inventory.is_empty() {
-                desc.push_str("---\n\u{1f392} **Ton inventaire :**\n");
-                for inv_item in &inventory {
+            let inv_in_cat: Vec<_> = inventory
+                .iter()
+                .filter(|inv_item| {
+                    catalog
+                        .get_item(&inv_item.item_key)
+                        .map(|def| def.category == category)
+                        .unwrap_or(false)
+                })
+                .collect();
+
+            if !inv_in_cat.is_empty() {
+                desc.push_str("---\n\u{1f392} **Ton inventaire (categorie) :**\n");
+                for inv_item in &inv_in_cat {
                     let label = catalog
                         .get_item(&inv_item.item_key)
                         .map(|i| format!("{} {}", i.emoji, i.name))
@@ -177,9 +276,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
 
             let embed = CreateEmbed::new()
-                .title("\u{1f6d2} Boutique Coup de Coude")
+                .title(title)
                 .description(desc)
-                .color(0x3498DB)
+                .color(category_color(category))
                 .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
                 .timestamp(serenity::model::Timestamp::now());
 
@@ -195,6 +294,38 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 tracing::warn!(error = %e, "Echec response Discord");
             }
         }
+    }
+}
+
+/// Extrait `(category, buy_key)` depuis la sous-commande choisie.
+/// Retourne `None` si aucune sous-commande valide n'a ete donnee.
+fn extract_subcommand(options: &[CommandDataOption]) -> Option<(&'static str, Option<String>)> {
+    for opt in options {
+        let category: &'static str = match opt.name.as_str() {
+            "attaque" => "attaque",
+            "defense" => "defense",
+            _ => continue,
+        };
+        let buy_key = match &opt.value {
+            CommandDataOptionValue::SubCommand(sub_opts) => sub_opts
+                .iter()
+                .find(|s| s.name == "acheter")
+                .and_then(|s| match &s.value {
+                    CommandDataOptionValue::String(v) => Some(v.clone()),
+                    _ => None,
+                }),
+            _ => None,
+        };
+        return Some((category, buy_key));
+    }
+    None
+}
+
+fn category_color(category: &str) -> u32 {
+    match category {
+        "attaque" => 0xE74C3C, // rouge
+        "defense" => 0x3498DB, // bleu
+        _ => 0x95A5A6,
     }
 }
 

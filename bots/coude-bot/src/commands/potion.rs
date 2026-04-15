@@ -7,7 +7,8 @@
 
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
-    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
+    CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
 };
 
 use crate::catalog::CatalogCacheKey;
@@ -33,13 +34,30 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id.to_string(),
         None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
+            reply_ephemeral_pre_defer(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
 
     let config = load_guild_config(ctx, &guild_id).await;
     if !crate::channel_check::check_channel(ctx, command, config.channel_profil()).await {
+        return;
+    }
+
+    // Defer immediat : on enchaine 3 appels API (get_player, has_item,
+    // use_item, update_hp). Sans defer, Discord coupe l'interaction
+    // apres 3s et affiche un "L'interaction a echoue" — ce que le
+    // joueur voyait comme une "erreur". Le defer nous donne 15 min.
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(false),
+            ),
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec defer potion");
         return;
     }
 
@@ -57,7 +75,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let potion_key = match potion_key {
         Some(k) => k,
         None => {
-            reply_ephemeral(ctx, command, "Type de potion manquant.").await;
+            followup_info(ctx, command, "Type de potion manquant.").await;
             return;
         }
     };
@@ -69,13 +87,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let catalog = data.get::<CatalogCacheKey>().unwrap().clone();
 
     if !catalog.is_potion(&potion_key) {
-        reply_ephemeral(ctx, command, "Cet objet n'est pas une potion utilisable.").await;
+        followup_info(ctx, command, "Cet objet n'est pas une potion utilisable.").await;
         return;
     }
 
     let heal_amount = catalog.potion_heal_amount(&potion_key);
     if heal_amount <= 0 {
-        reply_ephemeral(ctx, command, "Potion invalide.").await;
+        followup_info(ctx, command, "Potion invalide.").await;
         return;
     }
 
@@ -86,7 +104,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            followup_info(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -95,10 +113,31 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let hp_current = player.hp_current.unwrap_or(hp_max);
 
     if hp_current >= hp_max {
-        reply_ephemeral(
+        followup_info(
             ctx,
             command,
-            "Tu es deja a pleine sante ! Inutile de gaspiller une potion.",
+            "\u{2764}\u{fe0f} Tu es deja a pleine sante ! Inutile de gaspiller une potion.",
+        )
+        .await;
+        return;
+    }
+
+    // Protection anti-gaspillage : si la potion heal beaucoup plus que
+    // le manque de HP (ex. potion_majeure +80 alors qu'il manque 10 HP),
+    // on refuse l'usage et on propose la plus petite.
+    let hp_missing = hp_max - hp_current;
+    if heal_amount > hp_missing * 3 && heal_amount > 40 {
+        let item_name = catalog
+            .get_item(&potion_key)
+            .map(|i| i.name.clone())
+            .unwrap_or_else(|| "cette potion".into());
+        followup_info(
+            ctx,
+            command,
+            &format!(
+                "\u{26a0}\u{fe0f} Gaspillage ! Il ne te manque que **{}** HP, la **{}** en heal {}. Utilise une Potion de Soin (+30) ou attends davantage avant de l'utiliser.",
+                hp_missing, item_name, heal_amount
+            ),
         )
         .await;
         return;
@@ -112,7 +151,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .get_item(&potion_key)
                 .map(|i| i.name.clone())
                 .unwrap_or_else(|| "cette potion".into());
-            reply_ephemeral(
+            followup_info(
                 ctx,
                 command,
                 &format!("Tu n'as pas de **{}** dans ton inventaire !", name),
@@ -121,14 +160,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            followup_info(ctx, command, &format!("Erreur API : {e}")).await;
             return;
         }
     }
 
     // Consommer l'item
     if let Err(e) = api.use_item(&guild_id, &user_id, &potion_key).await {
-        reply_ephemeral(ctx, command, &format!("Erreur API (use_item) : {e}")).await;
+        followup_info(ctx, command, &format!("Erreur API (use_item) : {e}")).await;
         return;
     }
 
@@ -138,7 +177,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Mettre a jour les HP
     if let Err(e) = api.update_hp(&guild_id, &user_id, new_hp, hp_max).await {
-        reply_ephemeral(ctx, command, &format!("Erreur API (update_hp) : {e}")).await;
+        followup_info(ctx, command, &format!("Erreur API (update_hp) : {e}")).await;
         return;
     }
 
@@ -159,19 +198,34 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command
-        .create_response(
+        .create_followup(
             &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().embed(embed),
-            ),
+            CreateInteractionResponseFollowup::new().embed(embed),
         )
         .await
     {
-        tracing::warn!(error = %e, "Echec response Discord potion");
+        tracing::warn!(error = %e, "Echec followup Discord potion");
     }
 }
 
-async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
+/// Followup ephemeral apres defer (utilise quand le defer a deja ete fait).
+async fn followup_info(ctx: &Context, command: &CommandInteraction, content: &str) {
+    if let Err(e) = command
+        .create_followup(
+            &ctx.http,
+            CreateInteractionResponseFollowup::new()
+                .content(content)
+                .ephemeral(true),
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec followup Discord potion");
+    }
+}
+
+/// Reply ephemeral AVANT le defer (utilise pour les cas "commande invalide"
+/// ou le channel check qui faillit avant d'arriver au defer).
+async fn reply_ephemeral_pre_defer(ctx: &Context, command: &CommandInteraction, content: &str) {
     if let Err(e) = command
         .create_response(
             &ctx.http,
@@ -183,6 +237,7 @@ async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &
         )
         .await
     {
-        tracing::warn!(error = %e, "Echec response Discord potion");
+        tracing::warn!(error = %e, "Echec response Discord potion (pre-defer)");
     }
 }
+
