@@ -715,6 +715,7 @@ impl CoudeEconomyService for CoudeEconomyGrpc {
 pub struct CoudeInventoryGrpc {
     pub uc: Arc<dyn ManageCoudeInventoryUseCase>,
     pub steal_protections_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealProtectionsUseCase>,
+    pub steal_boosts_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealBoostsUseCase>,
 }
 
 fn inventory_item_to_proto(i: CoudeInventoryItem) -> proto::CoudeInventoryItem {
@@ -971,6 +972,87 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
                 block_chance_percent: t.block_chance_percent,
             }),
         }))
+    }
+
+    // ── Phase 9 Part C : boost voleur ──
+
+    async fn list_active_steal_boosts(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::StealBoostList>, Status> {
+        let req = request.into_inner();
+        let list = self
+            .steal_boosts_uc
+            .list_active(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::StealBoostList {
+            boosts: list.into_iter().map(steal_boost_to_proto).collect(),
+        }))
+    }
+
+    async fn price_steal_boost(
+        &self,
+        request: Request<proto::PriceStealBoostRequest>,
+    ) -> Result<Response<proto::Int64Value>, Status> {
+        let req = request.into_inner();
+        let duration = proto_steal_duration_to_domain(req.duration)
+            .ok_or_else(|| Status::invalid_argument("duree invalide"))?;
+        let price = self
+            .steal_boosts_uc
+            .price_for(&req.item_key, duration)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Int64Value { value: price }))
+    }
+
+    async fn buy_steal_boost(
+        &self,
+        request: Request<proto::BuyStealBoostRequest>,
+    ) -> Result<Response<proto::BuyStealBoostResponse>, Status> {
+        let req = request.into_inner();
+        let duration = proto_steal_duration_to_domain(req.duration)
+            .ok_or_else(|| Status::invalid_argument("duree invalide"))?;
+        let cost = self
+            .steal_boosts_uc
+            .price_for(&req.item_key, duration)
+            .await
+            .map_err(domain_to_status)?;
+        let expires_at = self
+            .steal_boosts_uc
+            .subscribe(&req.guild_id, &req.user_id, &req.item_key, duration)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::BuyStealBoostResponse {
+            expires_at: expires_at.to_rfc3339(),
+            cost,
+        }))
+    }
+
+    async fn get_steal_boost_total(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::Int64Value>, Status> {
+        let req = request.into_inner();
+        let total = self
+            .steal_boosts_uc
+            .total_bonus(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Int64Value {
+            value: total as i64,
+        }))
+    }
+}
+
+fn steal_boost_to_proto(b: crate::domain::entities::CoudeStealBoost) -> proto::CoudeStealBoost {
+    proto::CoudeStealBoost {
+        id: b.id.to_string(),
+        guild_id: b.guild_id,
+        user_id: b.user_id,
+        item_key: b.item_key,
+        expires_at: b.expires_at.to_rfc3339(),
+        created_at: b.created_at.to_rfc3339(),
     }
 }
 

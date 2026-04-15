@@ -398,11 +398,18 @@ async fn resolve_steal_attempt(
         let mut rng = rand::thread_rng();
         (rng.gen_range(1..=20), rng.gen_range(1..=20))
     };
-    let thief_bonus = if thief_player.class.as_deref() == Some("fourbe") {
+    let class_bonus = if thief_player.class.as_deref() == Some("fourbe") {
         4
     } else {
         0
     };
+    // Phase 9 Part C : somme des items de boost voleur actifs.
+    let boost_bonus = api
+        .get_steal_boost_total(guild_id, thief_id)
+        .await
+        .unwrap_or(0);
+    let thief_bonus = class_bonus + boost_bonus;
+
     let mut target_bonus = target_player.def / 10;
     if afk {
         target_bonus -= AFK_DEFENDER_MALUS;
@@ -410,11 +417,22 @@ async fn resolve_steal_attempt(
     let thief_total = thief_roll + thief_bonus;
     let target_total = target_roll + target_bonus;
 
+    // Detail du roll : on explicite le boost_bonus separement seulement
+    // s'il est non nul, pour ne pas leaker quand le voleur n'a rien
+    // depense (afficher toujours "+boost: 0" donnerait l'info aux
+    // curieux).
+    let thief_detail = if boost_bonus > 0 {
+        format!(
+            "d20: {} + class: {} + boost: {}",
+            thief_roll, class_bonus, boost_bonus
+        )
+    } else {
+        format!("d20: {} + bonus: {}", thief_roll, class_bonus)
+    };
     let roll_detail = format!(
-        "\n\n\u{1f3b2} Voleur: {} (d20: {} + bonus: {}) vs Victime: {} (d20: {} + DEF bonus: {}{})",
+        "\n\n\u{1f3b2} Voleur: {} ({}) vs Victime: {} (d20: {} + DEF bonus: {}{})",
         thief_total,
-        thief_roll,
-        thief_bonus,
+        thief_detail,
         target_total,
         target_roll,
         target_bonus + if afk { AFK_DEFENDER_MALUS } else { 0 },

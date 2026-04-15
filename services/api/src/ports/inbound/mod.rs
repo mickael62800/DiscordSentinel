@@ -50,6 +50,8 @@ pub mod manage_coude_steal_protections;
 pub use manage_coude_steal_protections::{
     ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
 };
+pub mod manage_coude_steal_boosts;
+pub use manage_coude_steal_boosts::ManageCoudeStealBoostsUseCase;
 pub use manage_role_panels::ManageRolePanelsUseCase;
 pub use manage_levels::ManageLevelsUseCase;
 pub use manage_watched_users::ManageWatchedUsersUseCase;

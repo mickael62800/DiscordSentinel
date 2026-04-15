@@ -337,6 +337,17 @@ async fn main() {
             coude_steal_protection_repo,
         ),
     );
+    let coude_steal_boost_repo: Arc<dyn sentinel_api::ports::outbound::CoudeStealBoostRepository> =
+        Arc::new(
+            sentinel_api::adapters::outbound::postgres::PgCoudeStealBoostRepository::new(
+                pg_pool.clone(),
+            ),
+        );
+    let coude_steal_boosts_uc: Arc<
+        dyn sentinel_api::ports::inbound::ManageCoudeStealBoostsUseCase,
+    > = Arc::new(sentinel_api::application::ManageCoudeStealBoostsService::new(
+        coude_steal_boost_repo,
+    ));
     let resolve_combat_now_uc: Arc<dyn sentinel_api::ports::inbound::ResolveCombatNowUseCase> =
         Arc::new(sentinel_api::application::ResolveCombatNowService::new(
             coude_combat_repo.clone(),
@@ -413,6 +424,7 @@ async fn main() {
         coude_catalog_uc,
         coude_cashbox_uc,
         coude_steal_protections_uc,
+        coude_steal_boosts_uc,
         broadcaster,
         job_client,
         discord_api,

@@ -75,3 +75,6 @@ pub use manage_coude_cashbox_service::ManageCoudeCashboxService;
 
 mod manage_coude_steal_protections_service;
 pub use manage_coude_steal_protections_service::ManageCoudeStealProtectionsService;
+
+mod manage_coude_steal_boosts_service;
+pub use manage_coude_steal_boosts_service::ManageCoudeStealBoostsService;

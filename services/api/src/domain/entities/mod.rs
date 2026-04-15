@@ -99,3 +99,9 @@ pub use coude_steal_protection::{
     find_protection_item, CoudeStealProtection, StealProtectionDuration, StealProtectionItemDef,
     STEAL_PROTECTION_ITEMS,
 };
+
+mod coude_steal_boost;
+pub use coude_steal_boost::{
+    find_boost_item, sum_roll_bonus_for_active_keys, CoudeStealBoost, StealBoostDuration,
+    StealBoostItemDef, STEAL_BOOST_ITEMS,
+};

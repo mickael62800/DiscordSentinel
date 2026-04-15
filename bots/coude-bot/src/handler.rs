@@ -102,6 +102,7 @@ impl EventHandler for Handler {
                     "resume" => commands::resume::handle(&ctx, &command).await,
                     "cagnotte" => commands::cagnotte::handle(&ctx, &command).await,
                     "protection" => commands::protection::handle(&ctx, &command).await,
+                    "boost-voleur" => commands::boost_voleur::handle(&ctx, &command).await,
                     _ => {}
                 }
             }

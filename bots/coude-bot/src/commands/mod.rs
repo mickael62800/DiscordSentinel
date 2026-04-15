@@ -1,6 +1,7 @@
 pub mod accepter;
 pub mod annuler;
 pub mod assurance;
+pub mod boost_voleur;
 pub mod cagnotte;
 pub mod classe;
 pub mod coude;
@@ -45,5 +46,6 @@ pub fn all() -> Vec<CreateCommand> {
         resume::register(),
         cagnotte::register(),
         protection::register(),
+        boost_voleur::register(),
     ]
 }
