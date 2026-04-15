@@ -1888,4 +1888,6 @@ pub(in crate::api_client) fn grpc_err_to_string(e: GrpcCallError) -> String {
 
 // ── Sous-modules (refactor god-object api_client.rs) ──
 mod heist;
-mod phase9;
+mod steal_protections;
+mod steal_boosts;
+mod taunts;
