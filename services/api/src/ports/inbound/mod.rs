@@ -30,7 +30,7 @@ pub use manage_tickets::{
     AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
     UpdateTicketChannelCommand,
 };
-pub use manage_audit_logs::ManageAuditLogsUseCase;
+pub use manage_audit_logs::{CreateAuditLogCommand, ManageAuditLogsUseCase};
 pub use manage_role_panels::ManageRolePanelsUseCase;
 pub use manage_levels::ManageLevelsUseCase;
 pub use manage_watched_users::ManageWatchedUsersUseCase;

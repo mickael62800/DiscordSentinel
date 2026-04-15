@@ -233,24 +233,34 @@ async fn main() {
     let rules_uc = Arc::new(ManageRulesService::new(rule_repo.clone(), cache.clone()));
     let infractions_uc = Arc::new(ManageInfractionsService::new(infraction_repo.clone()));
     let tickets_uc = Arc::new(ManageTicketsService::new(ticket_repo.clone(), cache.clone()));
-    let security_uc = Arc::new(ManageSecurityService::new(security_repo.clone(), cache.clone()));
-    // Note : la creation de moderation_uc est differee plus bas pour pouvoir
-    // injecter strikes_uc via with_strikes_uc (log_action_with_strike).
-    let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone(), redis_client.clone()));
-    let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone()));
     // Phase 5C — Batch writes : idem que log_repo, pour les audit events.
+    // Phase 1 dual-write : creation deplacee plus tot pour pouvoir injecter
+    // audit_logs_uc dans security_uc et moderation_uc.
     let audit_log_repo = Arc::new(BatchedPgAuditLogRepository::new(
         pg_pool.clone(),
         BatchWriterConfig::default(),
     ));
     let audit_logs_uc = Arc::new(ManageAuditLogsService::new(audit_log_repo));
+
+    let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
+    let security_uc = Arc::new(
+        ManageSecurityService::new(
+            security_repo.clone(),
+            cache.clone(),
+            watched_user_repo.clone(),
+        )
+        .with_audit_logs_uc(audit_logs_uc.clone() as Arc<dyn sentinel_api::ports::inbound::ManageAuditLogsUseCase>),
+    );
+    // Note : la creation de moderation_uc est differee plus bas pour pouvoir
+    // injecter strikes_uc via with_strikes_uc (log_action_with_strike).
+    let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone(), redis_client.clone()));
+    let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone()));
     let role_panel_repo = Arc::new(PgRolePanelRepository::new(pg_pool.clone()));
     let role_panels_uc = Arc::new(ManageRolePanelsService::new(role_panel_repo));
     let analytics_repo = Arc::new(PgAnalyticsRepository::new(pg_pool.clone()));
     let daily_activity_repo = Arc::new(PgDailyActivityRepository::new(pg_pool.clone()));
     let level_repo = Arc::new(PgLevelRepository::new(pg_pool.clone()));
     let levels_uc = Arc::new(ManageLevelsService::new(level_repo));
-    let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
     let notes_uc = Arc::new(ManageNotesService::new(notes_repo));
     let reminders_uc = Arc::new(ManageRemindersService::new(reminder_repo));
     let strikes_uc = Arc::new(ManageStrikesService::new(strike_repo.clone()));
@@ -261,7 +271,8 @@ async fn main() {
             cache.clone(),
             conduct_uc.clone(),
         )
-        .with_strikes_uc(strikes_uc.clone() as Arc<dyn sentinel_api::ports::inbound::ManageStrikesUseCase>),
+        .with_strikes_uc(strikes_uc.clone() as Arc<dyn sentinel_api::ports::inbound::ManageStrikesUseCase>)
+        .with_audit_logs_uc(audit_logs_uc.clone() as Arc<dyn sentinel_api::ports::inbound::ManageAuditLogsUseCase>),
     );
     let member_repo = Arc::new(PgMemberRepository::new(pg_pool.clone()));
     let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));

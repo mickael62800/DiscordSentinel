@@ -29,7 +29,8 @@ use std::collections::HashSet;
 
 use crate::adapters::inbound::http::state::AppState;
 
-const USER_GUILDS_CACHE_TTL_SECS: u64 = 300;
+const USER_GUILDS_CACHE_TTL_SECS: u64 = 3600; // 1 h : cache "live"
+const USER_GUILDS_STALE_TTL_SECS: u64 = 86_400; // 24 h : fallback stale en cas de 429 Discord
 const DISCORD_TOKEN_HEADER: &str = "x-discord-token";
 
 pub async fn guild_auth_middleware(
@@ -92,12 +93,16 @@ async fn get_or_fetch_user_guilds(
     state: &AppState,
     access_token: &str,
 ) -> Result<HashSet<String>, String> {
-    // Cle de cache : hash du token (eviter de stocker le token en clair).
-    let cache_key = format!("user_guilds:{}", short_hash(access_token));
+    // Cles de cache : hash du token (eviter de stocker le token en clair).
+    // Deux entrees : live (1h, autoritative) + stale (24h, fallback en cas de
+    // panne/rate-limit Discord).
+    let key_hash = short_hash(access_token);
+    let live_key = format!("user_guilds:{}", key_hash);
+    let stale_key = format!("user_guilds_stale:{}", key_hash);
 
-    // Tenter le cache Redis
+    // Tenter le cache live Redis
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Ok(cached) = conn.get::<_, String>(&cache_key).await {
+        if let Ok(cached) = conn.get::<_, String>(&live_key).await {
             if let Ok(set) = serde_json::from_str::<HashSet<String>>(&cached) {
                 return Ok(set);
             }
@@ -105,23 +110,40 @@ async fn get_or_fetch_user_guilds(
     }
 
     // Fallback Discord API
-    let guilds = state
-        .discord_api
-        .get_user_guilds(access_token)
-        .await
-        .map_err(|e| format!("Discord API: {e}"))?;
-    let set: HashSet<String> = guilds.into_iter().map(|g| g.id).collect();
+    match state.discord_api.get_user_guilds(access_token).await {
+        Ok(guilds) => {
+            let set: HashSet<String> = guilds.into_iter().map(|g| g.id).collect();
 
-    // Cacher le resultat (best-effort)
-    if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
-        if let Ok(serialized) = serde_json::to_string(&set) {
-            let _: Result<(), _> = conn
-                .set_ex(&cache_key, serialized, USER_GUILDS_CACHE_TTL_SECS)
-                .await;
+            // Cacher live + stale (best-effort)
+            if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+                if let Ok(serialized) = serde_json::to_string(&set) {
+                    let _: Result<(), _> = conn
+                        .set_ex(&live_key, serialized.clone(), USER_GUILDS_CACHE_TTL_SECS)
+                        .await;
+                    let _: Result<(), _> = conn
+                        .set_ex(&stale_key, serialized, USER_GUILDS_STALE_TTL_SECS)
+                        .await;
+                }
+            }
+
+            Ok(set)
+        }
+        Err(e) => {
+            // Discord en panne / rate-limit : tenter le cache stale.
+            if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+                if let Ok(cached) = conn.get::<_, String>(&stale_key).await {
+                    if let Ok(set) = serde_json::from_str::<HashSet<String>>(&cached) {
+                        tracing::warn!(
+                            error = %e,
+                            "guild_auth: Discord indisponible, fallback sur cache stale"
+                        );
+                        return Ok(set);
+                    }
+                }
+            }
+            Err(format!("Discord API: {e}"))
         }
     }
-
-    Ok(set)
 }
 
 /// Hash court non-cryptographique pour deriver une cle de cache du token.

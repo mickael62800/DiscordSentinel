@@ -1,12 +1,14 @@
-use axum::extract::{Query, State};
-use axum::Json;
+use axum::extract::{Path, Query, State};
+use axum::{Extension, Json};
 
 use crate::adapters::inbound::http::dto::audit_logs::{
     AuditLogQueryParams, AuditLogResponseDto, CreateAuditLogDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
 
 pub async fn create_audit_log(
@@ -15,6 +17,27 @@ pub async fn create_audit_log(
 ) -> Result<Json<AuditLogResponseDto>, ApiError> {
     let log = state.audit_logs_uc.create(dto.into()).await?;
     Ok(single_dto(log))
+}
+
+/// DELETE /api/audit-logs/{guild_id} — purge totale des audit logs d'une guild.
+pub async fn purge_audit_logs(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state, &rbac, &guild_id, Role::Moderator,
+        "moderator+ pour purger les audit logs",
+    )
+    .await?;
+
+    let res = sqlx::query("DELETE FROM audit_logs WHERE guild_id = $1")
+        .bind(&guild_id)
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("purge audit logs: {e}"))))?;
+
+    Ok(Json(serde_json::json!({ "deleted": res.rows_affected() })))
 }
 
 pub async fn list_audit_logs(

@@ -6,8 +6,9 @@ use uuid::Uuid;
 use crate::domain::entities::{ModerationAction, UserModerationHistory};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::{
-    AddStrikeCommand, DeductPointsCommand, LoggedModerationAction, LogModerationCommand,
-    ManageConductUseCase, ManageModerationUseCase, ManageStrikesUseCase,
+    AddStrikeCommand, CreateAuditLogCommand, DeductPointsCommand, LoggedModerationAction,
+    LogModerationCommand, ManageAuditLogsUseCase, ManageConductUseCase, ManageModerationUseCase,
+    ManageStrikesUseCase,
 };
 use tracing::warn;
 
@@ -21,6 +22,7 @@ pub struct ManageModerationService {
     cache: Arc<dyn CachePort>,
     conduct_uc: Arc<dyn ManageConductUseCase>,
     strikes_uc: Option<Arc<dyn ManageStrikesUseCase>>,
+    audit_logs_uc: Option<Arc<dyn ManageAuditLogsUseCase>>,
 }
 
 impl ManageModerationService {
@@ -30,7 +32,7 @@ impl ManageModerationService {
         cache: Arc<dyn CachePort>,
         conduct_uc: Arc<dyn ManageConductUseCase>,
     ) -> Self {
-        Self { repo, strike_repo, cache, conduct_uc, strikes_uc: None }
+        Self { repo, strike_repo, cache, conduct_uc, strikes_uc: None, audit_logs_uc: None }
     }
 
     /// Injecte le use case strikes (optionnel — active `log_action_with_strike`).
@@ -39,6 +41,13 @@ impl ManageModerationService {
     /// appele dans main.rs).
     pub fn with_strikes_uc(mut self, strikes_uc: Arc<dyn ManageStrikesUseCase>) -> Self {
         self.strikes_uc = Some(strikes_uc);
+        self
+    }
+
+    /// Injecte le use case audit logs (Phase 1 dual-write : chaque action de
+    /// moderation est aussi loggee dans audit_logs avec event_type `mod_<action>`).
+    pub fn with_audit_logs_uc(mut self, audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>) -> Self {
+        self.audit_logs_uc = Some(audit_logs_uc);
         self
     }
 }
@@ -65,10 +74,38 @@ impl ManageModerationUseCase for ManageModerationService {
             created_at: chrono::Utc::now(),
         };
 
+        // Phase 4 : repo.save() est un no-op (legacy) — la persistence est
+        // gardee uniquement par audit_logs_uc.create. On retourne une erreur
+        // dure si audit_logs_uc n'est pas configure (mauvais wiring).
         self.repo.save(&action).await?;
 
+        let uc = self.audit_logs_uc.as_ref().ok_or_else(|| {
+            DomainError::Internal(
+                "audit_logs_uc non injecte dans ManageModerationService".into(),
+            )
+        })?;
+        let event_type = format!("mod_{}", action.action_type);
+        let details = serde_json::json!({
+            "reason": action.reason,
+            "gravity": action.gravity.as_ref().map(|g| g.as_str()),
+            "duration_secs": action.duration,
+            "action_id": action.id.to_string(),
+        });
+        let audit_cmd = CreateAuditLogCommand {
+            guild_id: action.guild_id.clone(),
+            event_type,
+            actor_id: Some(action.moderator_id.clone()),
+            actor_name: Some(action.moderator_name.clone()),
+            target_id: Some(action.target_id.clone()),
+            target_name: Some(action.target_name.clone()),
+            channel_id: Some(action.channel_id.clone()),
+            channel_name: None,
+            details,
+        };
+        uc.create(audit_cmd).await?;
+
         // Invalidate history cache for this user
-        let cache_key = format!("modhistory:{}:{}", cmd.guild_id, cmd.target_id);
+        let cache_key = format!("modhistory:{}:{}", action.guild_id, action.target_id);
         if let Err(e) = self.cache.invalidate(&cache_key).await {
             warn!(error = %e, cache_key = %cache_key, "Echec invalidation cache mod history");
         }

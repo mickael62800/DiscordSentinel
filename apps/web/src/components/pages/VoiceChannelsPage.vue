@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useVoiceChannels, useVoiceChannelDetail } from "../../composables/useVoiceChannels";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
@@ -60,6 +60,41 @@ useRealtimeRefresh(
   },
 );
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedChannels } = usePagination(filteredChannels);
+
+const historyFilterKind = ref<"all" | "public" | "private">("all");
+const historySearch = ref("");
+const historyFrom = ref("");
+const historyTo = ref("");
+
+const filteredHistory = computed(() => {
+  const q = historySearch.value.trim().toLowerCase();
+  const from = historyFrom.value ? new Date(historyFrom.value).getTime() : null;
+  const to = historyTo.value ? new Date(historyTo.value).getTime() + 86_400_000 : null;
+  return historyChannels.value.filter((c) => {
+    if (historyFilterKind.value !== "all" && c.kind !== historyFilterKind.value) return false;
+    if (q && !c.channel_name.toLowerCase().includes(q) && !c.owner_name.toLowerCase().includes(q)) return false;
+    const created = new Date(c.created_at).getTime();
+    if (from !== null && created < from) return false;
+    if (to !== null && created >= to) return false;
+    return true;
+  });
+});
+
+function resetHistoryFilters() {
+  historyFilterKind.value = "all";
+  historySearch.value = "";
+  historyFrom.value = "";
+  historyTo.value = "";
+}
+
+const {
+  currentPage: historyPage,
+  perPage: historyPerPage,
+  totalItems: historyTotal,
+  totalPages: historyTotalPages,
+  paginatedItems: paginatedHistory,
+} = usePagination(filteredHistory);
+
 const { detail, events, loading: detailLoading, eventsLoading, fetchDetail } = useVoiceChannelDetail();
 
 function eventLabel(type: string): string {
@@ -301,9 +336,29 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           </button>
         </div>
 
+        <div class="filter-row history-filters">
+          <select v-model="historyFilterKind" class="filter-select">
+            <option value="all">Tous les types</option>
+            <option value="public">Public</option>
+            <option value="private">Prive</option>
+          </select>
+          <input
+            v-model="historySearch"
+            type="search"
+            placeholder="Rechercher nom ou proprietaire…"
+            class="filter-input"
+          />
+          <input v-model="historyFrom" type="date" class="filter-input" title="Date de debut" />
+          <input v-model="historyTo" type="date" class="filter-input" title="Date de fin" />
+          <button class="reset-btn" type="button" @click="resetHistoryFilters">Reinitialiser</button>
+        </div>
+
         <div v-if="historyLoading" class="loading">Chargement de l'historique...</div>
         <div v-else-if="historyChannels.length === 0" class="empty">
           Aucun salon dans l'historique
+        </div>
+        <div v-else-if="filteredHistory.length === 0" class="empty">
+          Aucun salon ne correspond aux filtres
         </div>
         <table v-else class="data-table history-table">
           <thead>
@@ -317,7 +372,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
           </thead>
           <tbody>
             <tr
-              v-for="ch in historyChannels"
+              v-for="ch in paginatedHistory"
               :key="ch.id"
               class="clickable"
               @click="selectChannel(ch.channel_id)"
@@ -339,6 +394,15 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
             </tr>
           </tbody>
         </table>
+        <PaginationBar
+          v-if="filteredHistory.length > 0"
+          :current-page="historyPage"
+          :total-pages="historyTotalPages"
+          :total-items="historyTotal"
+          :per-page="historyPerPage"
+          @update:current-page="historyPage = $event"
+          @update:per-page="historyPerPage = $event"
+        />
       </section>
     </div>
   </div>
@@ -449,13 +513,38 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   flex-wrap: wrap;
 }
 
-.filter-select {
+.filter-select,
+.filter-input {
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg-secondary);
   color: var(--text-primary);
   font-size: 13px;
+}
+
+.filter-input {
+  min-width: 180px;
+}
+
+.reset-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.reset-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.history-filters {
+  margin-top: 4px;
+  margin-bottom: 16px;
 }
 
 .data-table {

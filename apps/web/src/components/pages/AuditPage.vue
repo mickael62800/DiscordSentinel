@@ -1,7 +1,11 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useAuditLogs } from "../../composables/useAuditLogs";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
 import { usePagination } from "../../composables/usePagination";
+import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useConfirm } from "../../composables/useConfirm";
+import { useToast } from "../../composables/useToast";
 import AppBadge from "../atoms/AppBadge.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
@@ -9,11 +13,44 @@ import PaginationBar from "../molecules/PaginationBar.vue";
 import AuditEventDetail from "../molecules/AuditEventDetail.vue";
 import { eventVariant, eventLabel, eventIcon } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
+import { auditLogsService } from "@/services/auditLogsService";
 
 const { formatShortDateTime: fmt } = useFormatDate();
-const { filteredLogs, eventTypes, loading, filterEventType, searchQuery, fetchLogs } = useAuditLogs();
+const { logs, filteredLogs, eventTypes, loading, filterEventType, searchQuery, fetchLogs } = useAuditLogs();
+const { selectedGuildId } = useGuildSelector();
+const { confirm: confirmDialog } = useConfirm();
+const { success: toastOk, error: toastErr } = useToast();
+const purging = ref(false);
+
 useRealtimeRefresh(["log_entry_created"], fetchLogs);
 const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedLogs } = usePagination(filteredLogs, 30);
+
+async function handlePurgeAll() {
+  if (!selectedGuildId.value) return;
+  const ok1 = await confirmDialog({
+    title: "Vider le journal d'audit",
+    message:
+      `Supprimer définitivement les ${logs.value.length} entrée(s) du journal d'audit ?\n\n` +
+      "Toutes les traces (joins, leaves, modifications, modération) seront effacées de la BDD.",
+  });
+  if (!ok1) return;
+  const ok2 = await confirmDialog({
+    title: "Confirmation finale",
+    message: "Cette action est IRRÉVERSIBLE. Confirmer la suppression totale ?",
+  });
+  if (!ok2) return;
+  purging.value = true;
+  try {
+    const res = await auditLogsService.purge(selectedGuildId.value);
+    toastOk(`${res.deleted} entrée(s) supprimée(s).`);
+    await fetchLogs();
+  } catch (e) {
+    console.error("Erreur purge audit logs:", e);
+    toastErr("Erreur lors du nettoyage du journal d'audit.");
+  } finally {
+    purging.value = false;
+  }
+}
 </script>
 
 <template>
@@ -28,11 +65,20 @@ const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedL
         placeholder="Rechercher par nom, salon..."
       />
       <select v-model="filterEventType" class="event-select">
-        <option value="">Tous les evenements</option>
+        <option value="">Tous les évènements</option>
         <option v-for="t in eventTypes" :key="t" :value="t">
           {{ eventLabel(t) }}
         </option>
       </select>
+      <button
+        v-if="logs.length > 0"
+        class="purge-btn"
+        :disabled="purging"
+        title="Supprime totalement le journal d'audit en BDD"
+        @click="handlePurgeAll"
+      >
+        {{ purging ? "Nettoyage…" : `Tout supprimer (${logs.length})` }}
+      </button>
     </div>
 
     <LoadingState v-if="loading" />
@@ -121,6 +167,26 @@ const { currentPage, perPage, totalItems, totalPages, paginatedItems: paginatedL
   outline: none;
   border-color: var(--accent);
 }
+
+.purge-btn {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.purge-btn:hover:not(:disabled) {
+  background: var(--danger);
+  color: white;
+}
+
+.purge-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .audit-list {
   display: flex;

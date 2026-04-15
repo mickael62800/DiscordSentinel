@@ -112,6 +112,7 @@ fn ticket_routes() -> Router<AppState> {
 fn security_routes() -> Router<AppState> {
     Router::new()
         .route("/events", post(handlers::security::report_event).get(handlers::security::list_events))
+        .route("/events/{guild_id}", delete(handlers::security::purge_events))
 }
 
 fn reminders_routes() -> Router<AppState> {
@@ -400,6 +401,7 @@ pub fn build_for_test(state: AppState) -> Router {
         .nest("/api", dashboard_routes())
         .route("/api/charts/activity", get(handlers::dashboard_charts::get_activity_trend))
         .route("/api/audit-logs", get(handlers::audit_logs::list_audit_logs).post(handlers::audit_logs::create_audit_log))
+        .route("/api/audit-logs/{guild_id}", delete(handlers::audit_logs::purge_audit_logs))
         .route("/api/watched-users", get(handlers::watched_users::list_watched_users).post(handlers::watched_users::add_watched_user))
         .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier).delete(handlers::watched_users::remove_watched_user))
         .route("/api/discord-roles/{guild_id}", get(handlers::discord_roles::list_roles))
@@ -482,6 +484,7 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/api/charts/activity", get(handlers::dashboard_charts::get_activity_trend))
         // Audit logs
         .route("/api/audit-logs", get(handlers::audit_logs::list_audit_logs).post(handlers::audit_logs::create_audit_log))
+        .route("/api/audit-logs/{guild_id}", delete(handlers::audit_logs::purge_audit_logs))
         // Watched users
         .route("/api/watched-users", get(handlers::watched_users::list_watched_users).post(handlers::watched_users::add_watched_user))
         .route("/api/watched-users/{guild_id}/{user_id}", get(handlers::watched_users::get_user_dossier).delete(handlers::watched_users::remove_watched_user))

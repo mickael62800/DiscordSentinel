@@ -139,20 +139,70 @@ export function eventVariant(type: string): BadgeVariant {
 
 export function eventLabel(type: string): string {
   const labels: Record<string, string> = {
-    message_delete: "Message supprime",
-    message_edit: "Message edite",
-    member_join: "Membre rejoint",
-    member_leave: "Membre parti",
+    // Messages
+    message_delete: "Message supprimé",
+    message_edit: "Message édité",
+    message_pin: "Message épinglé",
+    message_unpin: "Message désépinglé",
+    // Membres
+    member_join: "Arrivée d'un membre",
+    member_leave: "Départ d'un membre",
     member_ban: "Membre banni",
-    member_unban: "Membre debanni",
-    member_roles_update: "Roles modifies",
-    voice_join: "Rejoint vocal",
-    voice_leave: "Quitte vocal",
-    voice_move: "Change de vocal",
-    channel_create: "Salon cree",
-    channel_delete: "Salon supprime",
+    member_unban: "Membre débanni",
+    member_kick: "Membre expulsé",
+    member_timeout: "Membre mis en sourdine",
+    member_untimeout: "Sourdine retirée",
+    member_update: "Profil modifié",
+    member_nickname_update: "Pseudo modifié",
+    member_roles_update: "Rôles modifiés",
+    // Vocal
+    voice_join: "Entrée en vocal",
+    voice_leave: "Sortie de vocal",
+    voice_move: "Changement de salon vocal",
+    voice_mute: "Micro coupé",
+    voice_unmute: "Micro réactivé",
+    voice_deafen: "Casque coupé",
+    voice_undeafen: "Casque réactivé",
+    voice_channel_created: "Salon vocal créé",
+    voice_channel_updated: "Salon vocal modifié",
+    voice_channel_closed: "Salon vocal fermé",
+    // Salons
+    channel_create: "Salon créé",
+    channel_delete: "Salon supprimé",
+    channel_update: "Salon modifié",
+    // Rôles
+    role_create: "Rôle créé",
+    role_delete: "Rôle supprimé",
+    role_update: "Rôle modifié",
+    // Modération
+    moderation_action: "Action de modération",
+    warn_added: "Avertissement ajouté",
+    strike_added: "Strike ajouté",
+    // Sécurité
+    raid_detected: "Raid détecté",
+    suspicious_account: "Compte suspect",
+    mass_ban: "Bannissement en masse",
+    alt_account: "Compte alternatif suspect",
+    // Tickets
+    ticket_create: "Ticket créé",
+    ticket_close: "Ticket fermé",
+    ticket_assign: "Ticket assigné",
+    // Invites
+    invite_create: "Invitation créée",
+    invite_delete: "Invitation supprimée",
+    invite_use: "Invitation utilisée",
   };
-  return labels[type] ?? type;
+  return labels[type] ?? humanize(type);
+}
+
+/**
+ * Fallback : transforme un event_type inconnu en libellé lisible.
+ * `member_ban_xyz` → `Member ban xyz`
+ */
+function humanize(type: string): string {
+  const cleaned = type.replace(/_/g, " ").trim();
+  if (!cleaned) return type;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
 }
 
 export function eventIcon(type: string): string {

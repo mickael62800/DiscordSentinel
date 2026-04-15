@@ -2,6 +2,7 @@ import { ref, computed } from "vue";
 import type { AuditLog } from "../types";
 import { useGuildFetch } from "./useGuildFetch";
 import { auditLogsService } from "@/services/auditLogsService";
+import { eventLabel } from "../utils/variants";
 
 export function useAuditLogs() {
   const { data: logs, loading, error, refresh: fetchLogs } = useGuildFetch<AuditLog[]>(
@@ -28,7 +29,9 @@ export function useAuditLogs() {
 
   const eventTypes = computed(() => {
     const types = new Set(logs.value.map((l) => l.event_type));
-    return Array.from(types).sort();
+    return Array.from(types).sort((a, b) =>
+      eventLabel(a).localeCompare(eventLabel(b), "fr", { sensitivity: "base" }),
+    );
   });
 
   return { logs, filteredLogs, eventTypes, loading, error, filterEventType, searchQuery, fetchLogs };

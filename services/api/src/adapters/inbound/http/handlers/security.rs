@@ -1,13 +1,15 @@
-use axum::extract::{Query, State};
-use axum::Json;
+use axum::extract::{Path, Query, State};
+use axum::{Extension, Json};
 
 use crate::adapters::inbound::http::dto::security::{
     ReportEventDto, SecurityEventResponseDto, SecurityQueryParams,
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
+use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use crate::domain::errors::DomainError;
 
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
 pub async fn report_event(
@@ -38,6 +40,51 @@ pub async fn report_event(
     );
 
     Ok(single_dto(event))
+}
+
+/// DELETE /api/security/events/{guild_id}
+/// Purge tous les evenements de securite d'une guild + les manual_watched_users
+/// crees automatiquement par ces evenements.
+pub async fn purge_events(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    check_role_for_guild(
+        &state, &rbac, &guild_id, Role::Moderator,
+        "moderator+ pour purger les evenements de securite",
+    )
+    .await?;
+
+    // Phase 4 : on supprime depuis audit_logs (la table security_events est
+    // deprecated, plus de writes). On vire aussi les anciennes lignes legacy.
+    let events_audit = sqlx::query(
+        "DELETE FROM audit_logs WHERE guild_id = $1 AND event_type LIKE 'security_%'",
+    )
+    .bind(&guild_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("purge audit security: {e}"))))?;
+
+    let _ = sqlx::query("DELETE FROM security_events WHERE guild_id = $1")
+        .bind(&guild_id)
+        .execute(&state.pg_pool)
+        .await;
+
+    let events = events_audit;
+
+    let watched = sqlx::query(
+        "DELETE FROM manual_watched_users WHERE guild_id = $1 AND added_by = 'security_event'",
+    )
+    .bind(&guild_id)
+    .execute(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("purge auto watch: {e}"))))?;
+
+    Ok(Json(serde_json::json!({
+        "deleted_events": events.rows_affected(),
+        "deleted_watches": watched.rows_affected(),
+    })))
 }
 
 /// GET /api/security/events — lister les événements de sécurité

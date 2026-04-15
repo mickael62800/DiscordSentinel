@@ -7,19 +7,34 @@ use tracing::warn;
 
 use crate::domain::entities::SecurityEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{ManageSecurityUseCase, ReportSecurityEventCommand};
-use crate::ports::outbound::{CachePort, SecurityEventRepository};
+use crate::ports::inbound::{
+    CreateAuditLogCommand, ManageAuditLogsUseCase, ManageSecurityUseCase, ReportSecurityEventCommand,
+};
+use crate::ports::outbound::{CachePort, SecurityEventRepository, WatchedUserRepository};
 
 const EVENTS_TTL: u64 = 60; // 1 minute
 
 pub struct ManageSecurityService {
     repo: Arc<dyn SecurityEventRepository>,
     cache: Arc<dyn CachePort>,
+    watched_repo: Arc<dyn WatchedUserRepository>,
+    audit_logs_uc: Option<Arc<dyn ManageAuditLogsUseCase>>,
 }
 
 impl ManageSecurityService {
-    pub fn new(repo: Arc<dyn SecurityEventRepository>, cache: Arc<dyn CachePort>) -> Self {
-        Self { repo, cache }
+    pub fn new(
+        repo: Arc<dyn SecurityEventRepository>,
+        cache: Arc<dyn CachePort>,
+        watched_repo: Arc<dyn WatchedUserRepository>,
+    ) -> Self {
+        Self { repo, cache, watched_repo, audit_logs_uc: None }
+    }
+
+    /// Phase 1 dual-write : copie chaque evenement de securite dans audit_logs
+    /// avec event_type `security_<event_type>`.
+    pub fn with_audit_logs_uc(mut self, audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>) -> Self {
+        self.audit_logs_uc = Some(audit_logs_uc);
+        self
     }
 }
 
@@ -39,7 +54,50 @@ impl ManageSecurityUseCase for ManageSecurityService {
             created_at: chrono::Utc::now(),
         };
 
+        // Phase 4 : repo.save() est un no-op. La persistence est portee par
+        // audit_logs_uc.create. Erreur dure si non injecte.
         self.repo.save(&event).await?;
+
+        let uc = self.audit_logs_uc.as_ref().ok_or_else(|| {
+            DomainError::Internal(
+                "audit_logs_uc non injecte dans ManageSecurityService".into(),
+            )
+        })?;
+        let event_type_str = format!("security_{}", event.event_type);
+        let details = serde_json::json!({
+            "severity": event.severity,
+            "description": event.description,
+            "user_ids": event.user_ids,
+            "event_id": event.id.to_string(),
+        });
+        let (target_id, target_name) = match event.user_ids.as_slice() {
+            [single] => (Some(single.clone()), Some(single.clone())),
+            _ => (None, None),
+        };
+        let cmd = CreateAuditLogCommand {
+            guild_id: event.guild_id.clone(),
+            event_type: event_type_str,
+            actor_id: None,
+            actor_name: None,
+            target_id,
+            target_name,
+            channel_id: None,
+            channel_name: None,
+            details,
+        };
+        uc.create(cmd).await?;
+
+        // Auto-surveillance : place chaque user concerne en manual watch.
+        for uid in &event.user_ids {
+            let reason = format!("Auto: {} ({})", event.event_type, event.severity);
+            if let Err(e) = self
+                .watched_repo
+                .add_manual_watch(&event.guild_id, uid, uid, &reason, "security_event")
+                .await
+            {
+                warn!(error = %e, guild_id = %event.guild_id, user_id = %uid, "Echec auto-surveillance");
+            }
+        }
 
         // Invalidate events cache
         if let Err(e) = self.cache.invalidate("security:all").await {

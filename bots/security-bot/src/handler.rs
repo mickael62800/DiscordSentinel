@@ -422,6 +422,13 @@ impl EventHandler for Handler {
         }
 
         // ── 2. Verification compte suspect ──
+        // Skip les bots : leur date de creation est souvent recente (ajout
+        // recent au serveur) mais c'est normal — ce ne sont pas des comptes
+        // suspects au sens raid/fake.
+        if user.bot {
+            return;
+        }
+
         let per_guild_checker = AccountChecker::new(min_account_age);
         let checker = if guild_config.contains_key("min_account_age_secs") {
             &per_guild_checker
