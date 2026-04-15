@@ -95,10 +95,17 @@ impl BlackjackRepository for PgBlackjackRepository {
     }
 
     async fn get_active(&self, guild_id: &str, user_id: &str) -> Result<Option<BlackjackGame>, DomainError> {
+        // Une partie est reellement "active" uniquement si :
+        //  - status = 'playing' ET finished_at IS NULL (pas un blackjack naturel)
+        //  - created_at dans les 30 dernieres minutes (au-dela, on considere
+        //    la partie abandonnee suite a crash bot/timeout Discord — ne doit
+        //    pas bloquer eternellement le user)
         let row = sqlx::query_as::<_, BlackjackRow>(
             "SELECT id, guild_id, user_id, username, bet, player_hand, dealer_hand, deck, status, player_score, dealer_score, doubled, payout, created_at, finished_at
              FROM blackjack_games
-             WHERE guild_id = $1 AND user_id = $2 AND status IN ('playing', 'player_blackjack')
+             WHERE guild_id = $1 AND user_id = $2 \
+               AND status = 'playing' AND finished_at IS NULL \
+               AND created_at > NOW() - INTERVAL '30 minutes'
              ORDER BY created_at DESC
              LIMIT 1"
         )
