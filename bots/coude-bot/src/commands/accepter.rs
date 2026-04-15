@@ -35,6 +35,16 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
+    // Verifier que le clic vient bien de la guild ou le combat a ete cree.
+    // Garde-fou cross-guild si un combat_id fuit et qu'un user de guild B a
+    // par hasard le meme Discord id que le defenseur de guild A.
+    if let Some(gid) = component.guild_id {
+        if gid.to_string() != combat_record.guild_id {
+            reply_ephemeral(ctx, component, "Ce combat n'appartient pas a cette guild.").await;
+            return;
+        }
+    }
+
     // Verifier que c'est bien le defenseur qui clique
     if component.user.id.to_string() != combat_record.defender_id {
         reply_ephemeral(ctx, component, "Seul le defenseur peut accepter le defi !").await;

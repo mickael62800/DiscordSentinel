@@ -56,13 +56,15 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
     ) -> Result<i64, DomainError>;
 
     // ── Assurances ──
+    /// Retourne `true` si l'assurance a ete creee, `false` si une assurance
+    /// active existait deja (dans quel cas l'appelant doit rembourser).
     async fn buy_insurance(
         &self,
         guild_id: &str,
         user_id: &str,
         is_scam: bool,
         duration_seconds: i64,
-    ) -> Result<(), DomainError>;
+    ) -> Result<bool, DomainError>;
 
     async fn get_active_insurance(
         &self,

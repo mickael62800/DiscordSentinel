@@ -252,21 +252,30 @@ impl CoudeInventoryRepository for PgCoudeInventoryRepository {
         user_id: &str,
         is_scam: bool,
         duration_seconds: i64,
-    ) -> Result<(), DomainError> {
+    ) -> Result<bool, DomainError> {
         // 0 = defaut historique 1h (3600s) pour retrocompat.
         let secs = if duration_seconds <= 0 { 3600 } else { duration_seconds };
-        sqlx::query(
+        // Atomique : INSERT uniquement si aucune assurance active. Evite la
+        // race ou deux /assurance simultanees passent le check get_active et
+        // creent chacune une ligne (coins perdus pour la 2e).
+        let inserted = sqlx::query_scalar::<_, Uuid>(
             r#"INSERT INTO coude_insurances (guild_id, user_id, is_scam, expires_at)
-               VALUES ($1, $2, $3, NOW() + make_interval(secs => $4))"#,
+               SELECT $1, $2, $3, NOW() + make_interval(secs => $4)
+               WHERE NOT EXISTS (
+                   SELECT 1 FROM coude_insurances
+                    WHERE guild_id = $1 AND user_id = $2
+                      AND active = TRUE AND expires_at > NOW()
+               )
+               RETURNING id"#,
         )
         .bind(guild_id)
         .bind(user_id)
         .bind(is_scam)
         .bind(secs as f64)
-        .execute(&self.pool)
+        .fetch_optional(&self.pool)
         .await
         .map_err(pg_err)?;
-        Ok(())
+        Ok(inserted.is_some())
     }
 
     async fn get_active_insurance(

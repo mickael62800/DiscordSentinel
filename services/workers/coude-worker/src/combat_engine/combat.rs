@@ -300,13 +300,17 @@ pub fn resolve_combat(
         let mut atk_atk_round = atk_atk;
         let mut def_atk_round = def_atk;
 
-        // Bourrin: Berserker — ATK +25% when HP < 30%
-        if atk_class.name == "bourrin" && atk_hp < (atk_hp_max as f64 * 0.3) as i32 {
+        // Bourrin: Berserker — ATK +25% when HP <= 30%
+        // (inclusif pour eviter l'off-by-one : a exactement 30% le passif
+        // s'active, coherent avec le 50% / 25% inclusifs des autres seuils).
+        let atk_berserker_threshold = (atk_hp_max as f64 * 0.3).ceil() as i32;
+        let def_berserker_threshold = (def_hp_max as f64 * 0.3).ceil() as i32;
+        if atk_class.name == "bourrin" && atk_hp <= atk_berserker_threshold {
             atk_atk_round = (atk_atk_round as f64 * 1.25) as i32;
             atk_passif = Some("berserker".to_string());
             attacker_class_revealed = Some("bourrin".to_string());
         }
-        if def_class.name == "bourrin" && def_hp < (def_hp_max as f64 * 0.3) as i32 {
+        if def_class.name == "bourrin" && def_hp <= def_berserker_threshold {
             def_atk_round = (def_atk_round as f64 * 1.25) as i32;
             def_passif = Some("berserker".to_string());
             defender_class_revealed = Some("bourrin".to_string());
@@ -317,19 +321,35 @@ pub fn resolve_combat(
         let mut def_dmg = calc_damage(def_roll, def_atk_round, atk_def);
 
         // ── Tank: Blindage — reduce damage taken by 5 flat (after formula) ──
-        if atk_class.name == "tank" {
-            def_dmg = (def_dmg - 5).max(1);
-            if atk_passif.is_none() {
-                atk_passif = Some("blindage".to_string());
+        // Exception : Tank vs Tank → les deux blindages s'annulent sinon on se
+        // retrouve avec 1 dmg/round chacun et un timeout garanti (draw/accident).
+        let tank_mirror = atk_class.name == "tank" && def_class.name == "tank";
+        if !tank_mirror {
+            if atk_class.name == "tank" {
+                def_dmg = (def_dmg - 5).max(1);
+                if atk_passif.is_none() {
+                    atk_passif = Some("blindage".to_string());
+                }
+                attacker_class_revealed = Some("tank".to_string());
             }
+            if def_class.name == "tank" {
+                atk_dmg = (atk_dmg - 5).max(1);
+                if def_passif.is_none() {
+                    def_passif = Some("blindage".to_string());
+                }
+                defender_class_revealed = Some("tank".to_string());
+            }
+        } else {
+            // Mirror match : on revele quand meme les classes pour la tension
+            // mais aucun passif ne s'applique.
             attacker_class_revealed = Some("tank".to_string());
-        }
-        if def_class.name == "tank" {
-            atk_dmg = (atk_dmg - 5).max(1);
-            if def_passif.is_none() {
-                def_passif = Some("blindage".to_string());
-            }
             defender_class_revealed = Some("tank".to_string());
+            if atk_passif.is_none() {
+                atk_passif = Some("tank_mirror".to_string());
+            }
+            if def_passif.is_none() {
+                def_passif = Some("tank_mirror".to_string());
+            }
         }
 
         // ── Agile: Esquive — dodge chance per round ──
@@ -633,8 +653,11 @@ pub fn resolve_combat(
     }
 
     // ── Winner path ──
-    let mut coins_won = (mise as f64 * win_pct) as i64;
-    let coins_lost = (mise as f64 * lose_pct) as i64;
+    // Tous les calculs utilisent saturating_* pour eviter overflow/wrap sur
+    // des mises proches de i64::MAX. Les coins sont clamp a [1, i64::MAX].
+    let mise_f = mise as f64;
+    let mut coins_won: i64 = ((mise_f * win_pct).clamp(0.0, i64::MAX as f64)) as i64;
+    let coins_lost: i64 = ((mise_f * lose_pct).clamp(0.0, i64::MAX as f64)) as i64;
 
     if coins_won < 1 {
         coins_won = 1;
@@ -656,18 +679,18 @@ pub fn resolve_combat(
         def_class.name
     };
     let w_class = classes::get_class(winner_class_name);
-    let stolen_bonus_val = if w_class.steal_bonus > 0.0 {
-        (mise as f64 * w_class.steal_bonus) as i64
+    let stolen_bonus_val: i64 = if w_class.steal_bonus > 0.0 {
+        ((mise_f * w_class.steal_bonus).clamp(0.0, i64::MAX as f64)) as i64
     } else {
         0
     };
-    coins_won += stolen_bonus_val;
+    coins_won = coins_won.saturating_add(stolen_bonus_val);
 
     // Cowardice penalty
-    coins_won = (coins_won as f64 * winner_coward) as i64;
+    coins_won = ((coins_won as f64 * winner_coward).clamp(0.0, i64::MAX as f64)) as i64;
 
-    // Happy hour
-    coins_won *= multiplier;
+    // Happy hour (multiplier est un i64 entier, typiquement 1 ou 2).
+    coins_won = coins_won.saturating_mul(multiplier);
 
     // ── Build final message ──
     let winner_name = if winner_id.as_deref() == Some(&attacker.user_id) {

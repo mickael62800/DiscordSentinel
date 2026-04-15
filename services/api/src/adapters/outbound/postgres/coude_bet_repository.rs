@@ -69,6 +69,28 @@ impl CoudeBetRepository for PgCoudeBetRepository {
     async fn place(&self, new: NewCoudeBet) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
+        // Lock la row combat et re-verifie le status AVANT tout debit. Evite
+        // la race : service-layer check, puis worker passe en 'resolving',
+        // puis on debite le parieur sans que le pari puisse etre resolu.
+        // Si worker detient deja le lock sur coude_combats (FOR UPDATE SKIP
+        // LOCKED), on attend — sauf que worker utilise SKIP LOCKED donc on
+        // n'est JAMAIS bloque (c'est le worker qui skip si on lock).
+        let combat_status: Option<(String,)> = sqlx::query_as(
+            "SELECT status FROM coude_combats WHERE id = $1 FOR UPDATE",
+        )
+        .bind(new.combat_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(pg_err)?;
+        let combat_status = combat_status
+            .ok_or_else(|| DomainError::NotFound("Combat introuvable".into()))?
+            .0;
+        if combat_status != "betting" {
+            return Err(DomainError::ValidationError(format!(
+                "Les paris ne sont pas ouverts pour ce combat (status: {combat_status})"
+            )));
+        }
+
         // Phase 8 : le solde vit dans user_wallets (wallet partage).
         // Avant, cette fn lisait+debitait coude_players.coins (colonne legacy),
         // ce qui faisait tourner tout le systeme de paris sur un solde

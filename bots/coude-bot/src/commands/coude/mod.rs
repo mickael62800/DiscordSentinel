@@ -274,6 +274,34 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ""
     };
 
+    // Blocage : impossible de defier un joueur a 0 coin (il n'a rien a perdre,
+    // et l'attaquant ne peut rien gagner — duel deséquilibré).
+    // Avertissement : si le defenseur a moins que la mise, on previent que le
+    // gain sera cap sur son solde reel.
+    let defender_coins_warn = match api
+        .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
+        .await
+    {
+        Ok(def) if def.coins <= 0 => {
+            reply_ephemeral(
+                ctx,
+                command,
+                &format!(
+                    "Impossible de defier <@{}> : ce joueur n'a aucun coin. Pas de duel sans enjeu !",
+                    target.id
+                ),
+            )
+            .await;
+            return;
+        }
+        Ok(def) if def.coins < mise => format!(
+            "\n\n\u{26a0}\u{fe0f} **<@{}> n'a que {} coins !** Si tu gagnes, tu ne recupereras que **{} coins** (pas {}). Si tu perds, tu perdras bien les {} coins mises.",
+            target.id, def.coins, def.coins, mise, mise
+        ),
+        _ => String::new(),
+    };
+    let hp_warn = format!("{}{}", hp_warn, defender_coins_warn);
+
     let special_suffix = special
         .as_deref()
         .map(|s| format!(" | Special : **{}**", s))

@@ -764,10 +764,15 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
         request: Request<proto::BuyInsuranceRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        self.uc
+        let inserted = self.uc
             .buy_insurance(&req.guild_id, &req.user_id, req.is_scam, req.duration_seconds)
             .await
             .map_err(domain_to_status)?;
+        if !inserted {
+            return Err(Status::already_exists(
+                "Une assurance active existe deja pour ce joueur",
+            ));
+        }
         Ok(Response::new(proto::Empty {}))
     }
 

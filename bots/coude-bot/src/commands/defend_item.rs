@@ -29,6 +29,9 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
         None => return,
     };
 
+    // Capture le message_id du defi pour pouvoir l'editer apres resolution.
+    let challenge_message_id = component.message.id.to_string();
+
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
@@ -44,6 +47,14 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
             return;
         }
     };
+
+    // Garde cross-guild : le combat doit appartenir a la guild d'ou vient le clic.
+    if let Some(gid) = component.guild_id {
+        if gid.to_string() != combat_record.guild_id {
+            reply_ephemeral(ctx, component, "Ce combat n'appartient pas a cette guild.").await;
+            return;
+        }
+    }
 
     // Verifier que c'est le defenseur
     if component.user.id.to_string() != combat_record.defender_id {
@@ -101,8 +112,9 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
             .description("Affronter a mains nues"),
     );
 
+    // custom_id format : coude_defend_select:{combat_id}|{challenge_message_id}
     let select = CreateSelectMenu::new(
-        format!("{}{}",  DEFEND_SELECT_PREFIX, combat_id_str),
+        format!("{}{}|{}", DEFEND_SELECT_PREFIX, combat_id_str, challenge_message_id),
         CreateSelectMenuKind::String { options },
     )
     .placeholder("Choisis un objet pour te defendre...");
@@ -127,9 +139,14 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
 
 /// Gere la selection d'un objet defensif → accepte le combat avec l'objet.
 pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteraction) {
-    let combat_id_str = match component.data.custom_id.strip_prefix(DEFEND_SELECT_PREFIX) {
+    let rest = match component.data.custom_id.strip_prefix(DEFEND_SELECT_PREFIX) {
         Some(id) => id,
         None => return,
+    };
+    // Parse "combat_id|challenge_message_id" — fallback retrocompat si seul combat_id.
+    let (combat_id_str, challenge_message_id_opt): (&str, Option<&str>) = match rest.split_once('|') {
+        Some((cid, mid)) => (cid, Some(mid)),
+        None => (rest, None),
     };
 
     let selected_item = match &component.data.kind {
@@ -153,6 +170,14 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
             return;
         }
     };
+
+    // Garde cross-guild
+    if let Some(gid) = component.guild_id {
+        if gid.to_string() != combat_record.guild_id {
+            reply_ephemeral(ctx, component, "Ce combat n'appartient pas a cette guild.").await;
+            return;
+        }
+    }
 
     if component.user.id.to_string() != combat_record.defender_id {
         reply_ephemeral(ctx, component, "Seul le defenseur peut faire ca !").await;
@@ -196,16 +221,43 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
         super::accepter::resolve_combat_internal(ctx, &combat_record, component.channel_id).await;
 
     if let Some(embed) = result_embed {
-        // Poster le resultat dans le channel (pas en update car le select etait ephemeral)
-        if let Err(e) = component
-            .channel_id
-            .send_message(
-                &ctx.http,
-                serenity::all::CreateMessage::new().embed(embed),
-            )
-            .await
-        {
-            tracing::warn!(error = %e, "Echec send_message resultat combat");
+        // Editer le message de defi original pour afficher le resultat et
+        // retirer les boutons : empeche le defenseur de recliquer "Accepter"
+        // apres la resolution instantanee par item.
+        let mut edited = false;
+        if let Some(mid_str) = challenge_message_id_opt {
+            if let Ok(mid) = mid_str.parse::<u64>() {
+                let msg_id = serenity::model::id::MessageId::new(mid);
+                match component
+                    .channel_id
+                    .edit_message(
+                        &ctx.http,
+                        msg_id,
+                        serenity::all::EditMessage::new()
+                            .embed(embed.clone())
+                            .components(vec![]),
+                    )
+                    .await
+                {
+                    Ok(_) => edited = true,
+                    Err(e) => tracing::warn!(error = %e, "Echec edit message defi original"),
+                }
+            }
+        }
+
+        // Fallback : si l'edit a echoue ou si on n'a pas le message_id
+        // (compat legacy), on poste le resultat comme un nouveau message.
+        if !edited {
+            if let Err(e) = component
+                .channel_id
+                .send_message(
+                    &ctx.http,
+                    serenity::all::CreateMessage::new().embed(embed),
+                )
+                .await
+            {
+                tracing::warn!(error = %e, "Echec send_message resultat combat");
+            }
         }
     }
 }

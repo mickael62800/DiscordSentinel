@@ -221,18 +221,25 @@ async fn resolve_single(
         .find_map(|r| r.chaos_event)
         .map(|ce| ce.key().to_string());
 
-    // ── Draw path ──
+    // ── Draw path (inclut l'explosion) ──
     if result.winner_id.is_none() {
+        // Explosion : les deux joueurs perdent coins_lost_by_loser chacun.
+        // Pour l'egalite normale, coins_lost_by_loser est 0. Le draw path
+        // couvrait les 2 cas mais sans debiter les coins pour l'explosion.
+        let explosion_loss = result.coins_lost_by_loser;
+
         sqlx::query(
             r#"UPDATE coude_combats
                SET status = 'accepted', winner_id = NULL,
                    attacker_roll = $2, defender_roll = $3,
-                   chaos_event = $4, result_message = $5, resolved_at = NOW()
+                   coins_transferred = $4, chaos_event = $5,
+                   result_message = $6, resolved_at = NOW()
                WHERE id = $1"#,
         )
         .bind(combat.id)
         .bind(first_atk_roll)
         .bind(first_def_roll)
+        .bind(explosion_loss)
         .bind(chaos_event_key.as_deref())
         .bind(&result.message)
         .execute(pool)
@@ -243,6 +250,33 @@ async fn resolve_single(
         update_player_hp(pool, &combat.guild_id, &combat.attacker_id, result.attacker_hp_final.max(0), result.attacker_hp_max).await;
         update_player_hp(pool, &combat.guild_id, &combat.defender_id, result.defender_hp_final.max(0), result.defender_hp_max).await;
 
+        // Debiter les 2 joueurs pour l'explosion (50% mise chacun).
+        if explosion_loss > 0 {
+            let desc = format!("Explosion combat {}", combat.id);
+            debit_and_log(pool, &combat.guild_id, &combat.attacker_id, explosion_loss, "coude_combat_explosion", &desc).await;
+            debit_and_log(pool, &combat.guild_id, &combat.defender_id, explosion_loss, "coude_combat_explosion", &desc).await;
+
+            if let Err(e) = sqlx::query(
+                "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
+                 WHERE guild_id = $1 AND user_id = $2",
+            )
+            .bind(&combat.guild_id).bind(&combat.attacker_id).bind(explosion_loss)
+            .execute(pool).await {
+                warn!(error = %e, "Echec update total_lost attacker explosion");
+            }
+            if let Err(e) = sqlx::query(
+                "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
+                 WHERE guild_id = $1 AND user_id = $2",
+            )
+            .bind(&combat.guild_id).bind(&combat.defender_id).bind(explosion_loss)
+            .execute(pool).await {
+                warn!(error = %e, "Echec update total_lost defender explosion");
+            }
+        }
+
+        // Rembourser les paris : egalite/explosion = personne ne gagne, rembourse tout.
+        refund_all_bets(pool, combat.id).await;
+
         post_result_to_discord(
             bot_token,
             &combat.channel_id,
@@ -251,15 +285,30 @@ async fn resolve_single(
         )
         .await;
 
-        info!(combat_id = %combat.id, rounds = result.total_rounds, "Combat resolu: egalite");
+        info!(combat_id = %combat.id, rounds = result.total_rounds, explosion_loss, "Combat resolu: egalite/explosion");
         return Ok(());
     }
 
     // ── Winner path ──
     let winner_id = result.winner_id.clone().unwrap();
     let loser_id = result.loser_id.clone().unwrap();
-    let coins_transferred = result.coins_won;
-    let coins_lost = result.coins_lost_by_loser;
+
+    // Cap le transfert sur le solde reel du perdant pour ne pas creer de
+    // coins ex-nihilo (le debit utilise GREATEST(0, coins-X), donc sans cap
+    // ici le gagnant recevrait plus que ce que le perdant possede).
+    let loser_balance: i64 = sqlx::query_scalar(
+        "SELECT COALESCE(coins, 0) FROM user_wallets WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(&combat.guild_id)
+    .bind(&loser_id)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten()
+    .unwrap_or(0);
+
+    let coins_transferred = result.coins_won.min(loser_balance);
+    let coins_lost = result.coins_lost_by_loser.min(loser_balance);
 
     sqlx::query(
         r#"UPDATE coude_combats
@@ -281,21 +330,25 @@ async fn resolve_single(
     .map_err(|e| format!("resolve combat: {e}"))?;
 
     // ── Stats dans coude_players (sans toucher coins) ──
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "UPDATE coude_players SET total_wins = total_wins + 1,
          total_earned = total_earned + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id).bind(&winner_id).bind(coins_transferred)
-    .execute(pool).await;
+    .execute(pool).await {
+        warn!(error = %e, winner_id, "Echec update total_wins/total_earned");
+    }
 
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "UPDATE coude_players SET total_losses = total_losses + 1,
          total_lost = total_lost + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id).bind(&loser_id).bind(coins_lost)
-    .execute(pool).await;
+    .execute(pool).await {
+        warn!(error = %e, loser_id, "Echec update total_losses/total_lost");
+    }
 
     // ── Transferer les coins dans user_wallets (wallet partage) ──
     let combat_desc = format!("Combat {} vs {}", winner_id, loser_id);
@@ -307,41 +360,64 @@ async fn resolve_single(
     update_player_hp(pool, &combat.guild_id, &combat.defender_id, result.defender_hp_final.max(0), result.defender_hp_max).await;
 
     // ── Vol bonus chaos "Vol" ──
+    // Cap sur le solde restant du perdant : apres le debit principal, il peut
+    // rester 0 coins. On ne cree pas de coins ex-nihilo.
     if result.vol_coins > 0 {
-        // Stats coude_players
-        let _ = sqlx::query(
-            "UPDATE coude_players SET total_stolen = total_stolen + $3,
-             updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+        let loser_balance_after: i64 = sqlx::query_scalar(
+            "SELECT COALESCE(coins, 0) FROM user_wallets WHERE guild_id = $1 AND user_id = $2",
         )
-        .bind(&combat.guild_id).bind(&winner_id).bind(result.vol_coins)
-        .execute(pool).await;
-        // Coins wallet
-        credit_and_log(pool, &combat.guild_id, &winner_id, result.vol_coins, true, "coude_combat_vol_bonus", "Bonus chaos vol").await;
+        .bind(&combat.guild_id)
+        .bind(&loser_id)
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or(0);
+
+        let vol_coins_capped = result.vol_coins.min(loser_balance_after);
+        if vol_coins_capped > 0 {
+            // Debit du perdant AVANT credit du gagnant pour eviter la duplication.
+            debit_and_log(pool, &combat.guild_id, &loser_id, vol_coins_capped, "coude_combat_vol_victim", "Victime vol chaos").await;
+            credit_and_log(pool, &combat.guild_id, &winner_id, vol_coins_capped, true, "coude_combat_vol_bonus", "Bonus chaos vol").await;
+
+            if let Err(e) = sqlx::query(
+                "UPDATE coude_players SET total_stolen = total_stolen + $3,
+                 updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
+            )
+            .bind(&combat.guild_id).bind(&winner_id).bind(vol_coins_capped)
+            .execute(pool).await {
+                warn!(error = %e, winner_id, "Echec update total_stolen");
+            }
+        }
     }
 
     // ── Chaos events count ──
     if result.chaos_events_count > 0 {
-        let _ = sqlx::query(
+        if let Err(e) = sqlx::query(
             "UPDATE coude_players SET chaos_events = chaos_events + 1, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(&combat.guild_id)
         .bind(&combat.attacker_id)
         .execute(pool)
-        .await;
-        let _ = sqlx::query(
+        .await {
+            warn!(error = %e, "Echec update chaos_events attacker");
+        }
+        if let Err(e) = sqlx::query(
             "UPDATE coude_players SET chaos_events = chaos_events + 1, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
         )
         .bind(&combat.guild_id)
         .bind(&combat.defender_id)
         .execute(pool)
-        .await;
+        .await {
+            warn!(error = %e, "Echec update chaos_events defender");
+        }
     }
 
     // ── XP ──
     let xp_winner: i64 = if result.is_giant_killer { 30 } else { 15 };
-    let _ = sqlx::query(
+    if let Err(e) = sqlx::query(
         "UPDATE coude_players SET xp = xp + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
@@ -349,15 +425,19 @@ async fn resolve_single(
     .bind(&winner_id)
     .bind(xp_winner)
     .execute(pool)
-    .await;
-    let _ = sqlx::query(
+    .await {
+        warn!(error = %e, winner_id, "Echec update xp winner");
+    }
+    if let Err(e) = sqlx::query(
         "UPDATE coude_players SET xp = xp + 5, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(&combat.guild_id)
     .bind(&loser_id)
     .execute(pool)
-    .await;
+    .await {
+        warn!(error = %e, loser_id, "Echec update xp loser");
+    }
 
     // ── Resoudre les paris (parieurs gagnants/perdants) ──
     let bet_results = resolve_bets(pool, combat.id, &winner_id).await;
@@ -367,12 +447,14 @@ async fn resolve_single(
         let combat_bonus = bet_results.total_lost_by_bettors / 10;
         if combat_bonus > 0 {
             // Stats coude_players
-            let _ = sqlx::query(
+            if let Err(e) = sqlx::query(
                 "UPDATE coude_players SET total_earned = total_earned + $3,
                  updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
             )
             .bind(&combat.guild_id).bind(&winner_id).bind(combat_bonus)
-            .execute(pool).await;
+            .execute(pool).await {
+                warn!(error = %e, winner_id, "Echec update total_earned bet_bonus");
+            }
             // Coins wallet
             credit_and_log(pool, &combat.guild_id, &winner_id, combat_bonus, true, "coude_combat_bet_bonus", "Bonus 10% paris perdants").await;
         }
@@ -402,10 +484,22 @@ async fn resolve_single(
 
     info!(
         combat_id = %combat.id,
-        winner = %winner_id,
+        guild_id = %combat.guild_id,
+        winner_id = %winner_id,
+        loser_id = %loser_id,
+        attacker_id = %combat.attacker_id,
+        defender_id = %combat.defender_id,
+        mise = combat.mise,
+        coins_transferred = coins_transferred,
+        coins_lost = coins_lost,
+        vol_coins = result.vol_coins,
+        stolen_bonus = result.stolen_bonus,
         rounds = result.total_rounds,
-        chaos = result.chaos_events_count,
-        "Combat betting resolu par le moteur multi-rounds"
+        chaos_events = result.chaos_events_count,
+        is_giant_killer = result.is_giant_killer,
+        attacker_hp_final = result.attacker_hp_final,
+        defender_hp_final = result.defender_hp_final,
+        "Combat betting resolu"
     );
 
     Ok(())
@@ -459,24 +553,77 @@ async fn resolve_bets(pool: &PgPool, combat_id: Uuid, winner_id: &str) -> BetRes
 
     for bet in &bets {
         if bet.backed_id == winner_id {
-            let payout = bet.amount * 2;
+            let payout = bet.amount.saturating_mul(2);
             let desc = format!("Pari gagne combat {}", combat_id);
             credit_and_log(pool, &bet.guild_id, &bet.bettor_id, payout, false, "coude_bet_win_worker", &desc).await;
-            let _ = sqlx::query("UPDATE coude_bets SET won = true, payout = $2 WHERE id = $1")
+            if let Err(e) = sqlx::query("UPDATE coude_bets SET won = true, payout = $2 WHERE id = $1")
                 .bind(bet.id)
                 .bind(payout)
                 .execute(pool)
-                .await;
+                .await
+            {
+                warn!(error = %e, bet_id = %bet.id, "Echec mark bet won");
+            }
         } else {
-            total_lost_by_bettors += bet.amount;
-            let _ = sqlx::query("UPDATE coude_bets SET won = false, payout = 0 WHERE id = $1")
+            total_lost_by_bettors = total_lost_by_bettors.saturating_add(bet.amount);
+            if let Err(e) = sqlx::query("UPDATE coude_bets SET won = false, payout = 0 WHERE id = $1")
                 .bind(bet.id)
                 .execute(pool)
-                .await;
+                .await
+            {
+                warn!(error = %e, bet_id = %bet.id, "Echec mark bet lost");
+            }
         }
     }
 
     BetResult { total_lost_by_bettors }
+}
+
+/// Rembourse TOUS les paris d'un combat (egalite, explosion, refused, expired).
+/// Chaque parieur recupere son amount dans user_wallets et le bet est marque
+/// won = false, payout = 0 pour eviter un refund double.
+async fn refund_all_bets(pool: &PgPool, combat_id: Uuid) {
+    #[derive(sqlx::FromRow)]
+    struct RefundBet {
+        id: Uuid,
+        guild_id: String,
+        bettor_id: String,
+        amount: i64,
+    }
+
+    let bets = match sqlx::query_as::<_, RefundBet>(
+        "SELECT id, guild_id, bettor_id, amount FROM coude_bets
+         WHERE combat_id = $1 AND payout IS NULL",
+    )
+    .bind(combat_id)
+    .fetch_all(pool)
+    .await
+    {
+        Ok(b) => b,
+        Err(e) => {
+            warn!(error = %e, combat_id = %combat_id, "Echec chargement paris pour refund");
+            return;
+        }
+    };
+
+    if bets.is_empty() {
+        return;
+    }
+
+    let desc = format!("Refund pari combat {} (egalite/explosion)", combat_id);
+    for bet in &bets {
+        credit_and_log(pool, &bet.guild_id, &bet.bettor_id, bet.amount, false, "coude_bet_refund", &desc).await;
+        if let Err(e) = sqlx::query(
+            "UPDATE coude_bets SET won = false, payout = $2 WHERE id = $1",
+        )
+        .bind(bet.id)
+        .bind(bet.amount)
+        .execute(pool)
+        .await {
+            warn!(error = %e, bet_id = %bet.id, "Echec mark bet refunded");
+        }
+    }
+    info!(combat_id = %combat_id, refunded = bets.len(), "Paris rembourses");
 }
 
 async fn post_result_to_discord(

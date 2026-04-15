@@ -36,6 +36,11 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     // ont effectivement gagne au moins 1 HP, sinon la fraction serait
     // perdue a chaque tick (le joueur en haut palier avec 10 HP/h et un
     // tick de 5 min gagnerait 0.83 HP -> flooror a 0 -> jamais de regen).
+    //
+    // Exclusion : on skip les joueurs avec un combat en cours (pending /
+    // betting / resolving) sinon le regen peut ecraser un hp_current frais
+    // pose par une resolution de combat concurrente. Le joueur recupere
+    // naturellement son HP au prochain tick apres la fin du combat.
     let result = sqlx::query(
         r#"
         WITH regen AS (
@@ -50,9 +55,15 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
                         ELSE $4::float8
                     END) * EXTRACT(EPOCH FROM (NOW() - hp_last_regen)) / 3600.0
                 )::int AS amount
-            FROM coude_players
+            FROM coude_players p
             WHERE hp_current < hp_max
               AND hp_last_regen IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM coude_combats c
+                  WHERE c.guild_id = p.guild_id
+                    AND (c.attacker_id = p.user_id OR c.defender_id = p.user_id)
+                    AND c.status IN ('pending', 'betting', 'resolving')
+              )
         )
         UPDATE coude_players p
         SET hp_current = LEAST(p.hp_max, p.hp_current + r.amount),

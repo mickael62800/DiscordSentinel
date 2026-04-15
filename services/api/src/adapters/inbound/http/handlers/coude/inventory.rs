@@ -121,10 +121,15 @@ pub async fn buy_insurance(
     Path(guild_id): Path<String>,
     Json(dto): Json<BuyInsuranceDto>,
 ) -> Result<StatusCode, ApiError> {
-    state
+    let inserted = state
         .coude_inventory_uc
         .buy_insurance(&guild_id, &dto.user_id, dto.is_scam, dto.duration_seconds)
         .await?;
+    if !inserted {
+        return Err(ApiError(crate::domain::errors::DomainError::Conflict(
+            "Une assurance active existe deja pour ce joueur".into(),
+        )));
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
