@@ -15,7 +15,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::{Duration as ChronoDuration, Utc};
 use rand::Rng;
-use tracing::{info, warn};
+use tracing::info;
 
 use crate::domain::entities::{
     compute_success_chance, HeistOutcome, HEIST_COOLDOWN_DAYS, HEIST_GAIN_MAX_PERCENT,
@@ -157,10 +157,11 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
 
         // 7. Consomme TOUS les outils de braquage actifs (quel que soit
         //    le resultat — c'est le cout d'entree du braquage).
+        // Propagation d'erreur : si la consommation echoue (ex. DB
+        // indispo), on ne continue pas le braquage — sinon on risque
+        // de debiter la cashbox sans debiter les outils.
         for key in &tool_keys {
-            if let Err(e) = self.inventory_uc.use_item(guild_id, user_id, key).await {
-                warn!(error = %e, tool = %key, "Echec use_item heist tool");
-            }
+            self.inventory_uc.use_item(guild_id, user_id, key).await?;
         }
 
         // 8. Calcule le montant vole (capture instantane, la caisse peut
@@ -169,7 +170,10 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
         let amount_stolen: i64 = if success {
             let refreshed = self.cashbox_repo.get_or_create(guild_id).await?;
             let balance = refreshed.balance.max(0);
-            ((balance as f64) * (gain_percent as f64) / 100.0).floor() as i64
+            // Arithmetique i128 pour eviter perte de precision f64 sur
+            // gros soldes (> 2^53) et tout risque d'overflow i64 sur
+            // balance * gain_percent.
+            ((balance as i128) * (gain_percent as i128) / 100) as i64
         } else {
             0
         };

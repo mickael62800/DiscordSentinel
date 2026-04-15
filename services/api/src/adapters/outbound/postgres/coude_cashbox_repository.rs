@@ -229,6 +229,9 @@ impl CoudeCashboxRepository for PgCoudeCashboxRepository {
     ) -> Result<Uuid, DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
+        let winners_count = i32::try_from(entries.len())
+            .map_err(|_| DomainError::ValidationError("Trop de gagnants".into()))?;
+
         let row: (Uuid,) = sqlx::query_as(
             r#"INSERT INTO coude_cashbox_redistributions
                  (guild_id, total_amount, winners_count)
@@ -237,23 +240,35 @@ impl CoudeCashboxRepository for PgCoudeCashboxRepository {
         )
         .bind(guild_id)
         .bind(total_amount)
-        .bind(entries.len() as i32)
+        .bind(winners_count)
         .fetch_one(&mut *tx)
         .await
         .map_err(pg_err)?;
 
         let redistribution_id = row.0;
 
-        for (user_id, username, amount_won) in &entries {
+        // Batch insert via UNNEST — une seule requete au lieu de N.
+        if !entries.is_empty() {
+            let (user_ids, usernames, amounts): (Vec<_>, Vec<_>, Vec<_>) = entries
+                .iter()
+                .map(|(u, n, a)| (u.as_str(), n.as_str(), *a))
+                .fold((Vec::new(), Vec::new(), Vec::new()), |mut acc, (u, n, a)| {
+                    acc.0.push(u);
+                    acc.1.push(n);
+                    acc.2.push(a);
+                    acc
+                });
             sqlx::query(
                 r#"INSERT INTO coude_cashbox_redistribution_entries
                      (redistribution_id, user_id, username, amount_won)
-                   VALUES ($1, $2, $3, $4)"#,
+                   SELECT $1, u.user_id, u.username, u.amount_won
+                   FROM UNNEST($2::text[], $3::text[], $4::bigint[])
+                        AS u(user_id, username, amount_won)"#,
             )
             .bind(redistribution_id)
-            .bind(user_id)
-            .bind(username)
-            .bind(amount_won)
+            .bind(&user_ids)
+            .bind(&usernames)
+            .bind(&amounts)
             .execute(&mut *tx)
             .await
             .map_err(pg_err)?;
