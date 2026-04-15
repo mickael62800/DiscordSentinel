@@ -130,4 +130,14 @@ pub trait ManageCoudePlayersUseCase: Send + Sync {
     ) -> Result<(), DomainError>;
 
     async fn full_heal(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+
+    /// Phase 4 : tick batch de regeneration passive des HP. Retourne le nombre
+    /// de joueurs mis a jour.
+    async fn regen_hp_tick(
+        &self,
+        rate_0_25: f64,
+        rate_25_50: f64,
+        rate_50_75: f64,
+        rate_75_100: f64,
+    ) -> Result<u64, DomainError>;
 }

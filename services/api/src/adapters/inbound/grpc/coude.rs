@@ -123,6 +123,19 @@ impl CoudePlayerService for CoudePlayerGrpc {
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))
     }
+
+    async fn hp_regen_tick(
+        &self,
+        request: Request<proto::HpRegenTickRequest>,
+    ) -> Result<Response<proto::HpRegenTickResponse>, Status> {
+        let req = request.into_inner();
+        let updated = self
+            .players_uc
+            .regen_hp_tick(req.rate_0_25, req.rate_25_50, req.rate_50_75, req.rate_75_100)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::HpRegenTickResponse { updated }))
+    }
 }
 
 fn coude_player_to_proto(p: CoudePlayer) -> proto::CoudePlayer {
@@ -172,6 +185,7 @@ fn xp_progress_to_proto(x: XpProgress) -> proto::XpProgress {
 pub struct CoudeCombatsGrpc {
     pub uc: Arc<dyn ManageCoudeCombatsUseCase>,
     pub resolve_batch_uc: Arc<dyn crate::ports::inbound::ResolveBettingBatchUseCase>,
+    pub expire_batch_uc: Arc<dyn crate::ports::inbound::ExpireCombatsBatchUseCase>,
 }
 
 fn combat_to_proto(c: CoudeCombat) -> proto::CoudeCombat {
@@ -401,6 +415,29 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
             })
             .collect();
         Ok(Response::new(proto::ResolvedBettingBatch { combats }))
+    }
+
+    async fn expire_combats_batch(
+        &self,
+        _request: Request<proto::Empty>,
+    ) -> Result<Response<proto::ExpiredCombatsBatch>, Status> {
+        let out = self
+            .expire_batch_uc
+            .expire_batch()
+            .await
+            .map_err(domain_to_status)?;
+        let combats = out
+            .into_iter()
+            .map(|c| proto::ExpiredCombat {
+                combat_id: c.combat_id,
+                guild_id: c.guild_id,
+                channel_id: c.channel_id,
+                defender_id: c.defender_id,
+                defender_name: c.defender_name,
+                penalty: c.penalty,
+            })
+            .collect();
+        Ok(Response::new(proto::ExpiredCombatsBatch { combats }))
     }
 }
 

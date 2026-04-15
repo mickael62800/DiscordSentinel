@@ -60,3 +60,6 @@ pub use manage_coude_social_service::ManageCoudeSocialService;
 
 mod resolve_betting_batch_service;
 pub use resolve_betting_batch_service::ResolveBettingBatchService;
+
+mod expire_combats_batch_service;
+pub use expire_combats_batch_service::ExpireCombatsBatchService;

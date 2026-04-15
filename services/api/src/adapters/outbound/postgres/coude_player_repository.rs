@@ -676,4 +676,57 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         .map_err(pg_err)?;
         Ok(())
     }
+
+    async fn regen_hp_tick(
+        &self,
+        rate_0_25: f64,
+        rate_25_50: f64,
+        rate_50_75: f64,
+        rate_75_100: f64,
+    ) -> Result<u64, DomainError> {
+        // Phase 4 : SQL migree depuis coude-worker/src/jobs/hp_regen.rs.
+        // Exclut les joueurs avec un combat actif via NOT EXISTS.
+        let result = sqlx::query(
+            r#"
+            WITH regen AS (
+                SELECT
+                    guild_id,
+                    user_id,
+                    FLOOR(
+                        (CASE
+                            WHEN hp_current * 4 < hp_max THEN $1::float8
+                            WHEN hp_current * 2 < hp_max THEN $2::float8
+                            WHEN hp_current * 4 < hp_max * 3 THEN $3::float8
+                            ELSE $4::float8
+                        END) * EXTRACT(EPOCH FROM (NOW() - hp_last_regen)) / 3600.0
+                    )::int AS amount
+                FROM coude_players p
+                WHERE hp_current < hp_max
+                  AND hp_last_regen IS NOT NULL
+                  AND NOT EXISTS (
+                      SELECT 1 FROM coude_combats c
+                      WHERE c.guild_id = p.guild_id
+                        AND (c.attacker_id = p.user_id OR c.defender_id = p.user_id)
+                        AND c.status IN ('pending', 'betting', 'resolving')
+                  )
+            )
+            UPDATE coude_players p
+            SET hp_current = LEAST(p.hp_max, p.hp_current + r.amount),
+                hp_last_regen = NOW(),
+                updated_at = NOW()
+            FROM regen r
+            WHERE p.guild_id = r.guild_id
+              AND p.user_id = r.user_id
+              AND r.amount > 0
+            "#,
+        )
+        .bind(rate_0_25)
+        .bind(rate_25_50)
+        .bind(rate_50_75)
+        .bind(rate_75_100)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(result.rows_affected())
+    }
 }

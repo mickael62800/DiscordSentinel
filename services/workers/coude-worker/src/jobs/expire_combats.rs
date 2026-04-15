@@ -1,168 +1,63 @@
+//! Expiration batch des combats pending.
+//!
+//! Phase 4 refacto : thin. Toute la logique metier (claim atomique, debit
+//! penalite, increment cowardice, refund paris) vit dans l'API via
+//! `ExpireCombatsBatchUseCase` exposee par le RPC
+//! `CoudeCombatsService.ExpireCombatsBatch`.
+
 use sqlx::PgPool;
-use tracing::{info, warn};
-use uuid::Uuid;
+use tonic::transport::{Channel, Endpoint};
+use tonic::metadata::MetadataValue;
+use tonic::Request;
+use tracing::{error, info, warn};
 
-use crate::jobs::wallet_log::{credit_and_log, debit_and_log};
+use sentinel_proto::coude::v1::coude_combats_service_client::CoudeCombatsServiceClient;
+use sentinel_proto::coude::v1::Empty as ProtoEmpty;
 
-/// Modele leger pour les combats expires.
-#[derive(Debug, sqlx::FromRow)]
-#[allow(dead_code)]
-struct ExpiredCombat {
-    pub id: Uuid,
-    pub guild_id: String,
-    pub channel_id: String,
-    pub attacker_id: String,
-    pub attacker_name: String,
-    pub defender_id: String,
-    pub defender_name: String,
-    pub mise: i64,
-}
+pub async fn run(_pool: &PgPool) -> Result<(), String> {
+    let url = std::env::var("GRPC_API_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
+    let api_key = std::env::var("API_KEY").unwrap_or_default();
 
-/// Expire les combats en attente dont la duree configuree est depassee.
-/// - Le defenseur perd 20% de la mise
-/// - Le compteur de lachete du defenseur est incremente
-/// - La mise de l'attaquant est remboursee (pas de penalite)
-/// - Les paris sur ce combat sont rembourses
-pub async fn run(pool: &PgPool) -> Result<(), String> {
-    // Delai d'expiration configurable par guild via la cle
-    // `combat_expiry_hours` dans bot_guild_config (bot_name='coude-worker').
-    // Defaut : 24h. Avant, le code lisait `combat_expire_secs` avec
-    // `bot_name='coude'` qui n'existe dans AUCUN schema, donc la valeur
-    // editee depuis l'UI n'etait jamais prise en compte (migration 121).
-    let combats = sqlx::query_as::<_, ExpiredCombat>(
-        r#"
-        SELECT c.id, c.guild_id, c.channel_id, c.attacker_id, c.attacker_name, c.defender_id, c.defender_name, c.mise
-        FROM coude_combats c
-        LEFT JOIN bot_guild_config cfg
-            ON cfg.guild_id = c.guild_id
-            AND cfg.bot_name = 'coude-worker'
-            AND cfg.config_key = 'combat_expiry_hours'
-        WHERE c.status = 'pending'
-          AND c.created_at < NOW() - MAKE_INTERVAL(hours := COALESCE(
-                CASE WHEN cfg.config_value ~ '^\d+$' THEN cfg.config_value::int ELSE NULL END,
-                24
-              ))
-        "#,
-    )
-    .fetch_all(pool)
-    .await
-    .map_err(|e| format!("Erreur requete combats expires: {e}"))?;
+    let channel: Channel = Endpoint::from_shared(url.clone())
+        .map_err(|e| format!("invalid GRPC_API_URL {url}: {e}"))?
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .timeout(std::time::Duration::from_secs(30))
+        .connect()
+        .await
+        .map_err(|e| format!("connect gRPC {url}: {e}"))?;
 
-    if combats.is_empty() {
-        return Ok(());
-    }
+    let auth: MetadataValue<_> = format!("Bearer {api_key}")
+        .parse()
+        .map_err(|e| format!("invalid api_key: {e}"))?;
 
-    info!(count = combats.len(), "Combats expires trouves");
+    let mut client = CoudeCombatsServiceClient::with_interceptor(
+        channel,
+        move |mut req: Request<()>| {
+            req.metadata_mut().insert("authorization", auth.clone());
+            Ok(req)
+        },
+    );
 
-    let mut errors = Vec::new();
-
-    for combat in &combats {
-        if let Err(e) = expire_single_combat(pool, combat).await {
-            warn!(
-                combat_id = %combat.id,
-                error = %e,
-                "Erreur expiration combat"
-            );
-            errors.push(format!("combat {}: {}", combat.id, e));
+    match client.expire_combats_batch(Request::new(ProtoEmpty {})).await {
+        Ok(resp) => {
+            let combats = resp.into_inner().combats;
+            if !combats.is_empty() {
+                info!(count = combats.len(), "Combats expires resolus par l'API");
+                for c in &combats {
+                    warn!(
+                        combat_id = %c.combat_id,
+                        defender = %c.defender_name,
+                        penalty = c.penalty,
+                        "Combat expire (timeout defenseur)"
+                    );
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            error!(error = %e, "Echec appel ExpireCombatsBatch gRPC");
+            Err(format!("expire_combats_batch RPC: {e}"))
         }
     }
-
-    info!(
-        total = combats.len(),
-        errors = errors.len(),
-        "Expiration combats terminee"
-    );
-
-    if errors.is_empty() {
-        Ok(())
-    } else {
-        Err(format!("Erreurs partielles: {}", errors.join("; ")))
-    }
-}
-
-async fn expire_single_combat(pool: &PgPool, combat: &ExpiredCombat) -> Result<(), String> {
-    // 1. Marquer le combat comme expire
-    sqlx::query("UPDATE coude_combats SET status = 'expired', resolved_at = NOW() WHERE id = $1")
-        .bind(combat.id)
-        .execute(pool)
-        .await
-        .map_err(|e| format!("expire combat: {e}"))?;
-
-    // 2. Penalite pour le defenseur : 20% de la mise
-    let penalty = (combat.mise as f64 * 0.20).max(1.0) as i64;
-
-    // Phase 8 : coins sur user_wallets (wallet partage), stats sur coude_players.
-    let desc = format!("Penalite lachete combat {}", combat.id);
-    debit_and_log(pool, &combat.guild_id, &combat.defender_id, penalty, "coude_combat_expire_penalty", &desc).await;
-
-    sqlx::query(
-        "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
-         WHERE guild_id = $1 AND user_id = $2",
-    )
-    .bind(&combat.guild_id)
-    .bind(&combat.defender_id)
-    .bind(penalty)
-    .execute(pool)
-    .await
-    .map_err(|e| format!("penalite defenseur stats: {e}"))?;
-
-    // 3. Incrementer la lachete du defenseur
-    sqlx::query(
-        "UPDATE coude_players SET cowardice_count = cowardice_count + 1, updated_at = NOW() WHERE guild_id = $1 AND user_id = $2",
-    )
-    .bind(&combat.guild_id)
-    .bind(&combat.defender_id)
-    .execute(pool)
-    .await
-    .map_err(|e| format!("increment lachete: {e}"))?;
-
-    // 4. Rembourser les paris sur ce combat
-    refund_combat_bets(pool, combat.id).await?;
-
-    info!(
-        combat_id = %combat.id,
-        defender = %combat.defender_name,
-        penalty = penalty,
-        "Combat expire: {} n'a pas repondu en 24h -> -{} coins + lachete",
-        combat.defender_name,
-        penalty
-    );
-
-    Ok(())
-}
-
-async fn refund_combat_bets(pool: &PgPool, combat_id: Uuid) -> Result<(), String> {
-    // Recuperer les paris pour ce combat
-    let bets: Vec<(Uuid, String, String, i64)> = sqlx::query_as(
-        "SELECT id, guild_id, bettor_id, amount FROM coude_bets WHERE combat_id = $1",
-    )
-    .bind(combat_id)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| format!("get bets: {e}"))?;
-
-    if bets.is_empty() {
-        return Ok(());
-    }
-
-    // Rembourser chaque parieur sur le wallet partage (Phase 8).
-    for (_bet_id, guild_id, bettor_id, amount) in &bets {
-        let desc = format!("Remboursement pari combat expire {}", combat_id);
-        credit_and_log(pool, guild_id, bettor_id, *amount, false, "coude_bet_expire_refund", &desc).await;
-    }
-
-    // Marquer les paris comme rembourses
-    sqlx::query("UPDATE coude_bets SET won = false, payout = amount WHERE combat_id = $1")
-        .bind(combat_id)
-        .execute(pool)
-        .await
-        .map_err(|e| format!("update bets: {e}"))?;
-
-    info!(
-        combat_id = %combat_id,
-        refunded = bets.len(),
-        "Paris rembourses pour combat expire"
-    );
-
-    Ok(())
 }

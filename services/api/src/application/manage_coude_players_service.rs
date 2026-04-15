@@ -257,4 +257,16 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
     async fn full_heal(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError> {
         self.repo.full_heal(guild_id, user_id).await
     }
+
+    async fn regen_hp_tick(
+        &self,
+        rate_0_25: f64,
+        rate_25_50: f64,
+        rate_50_75: f64,
+        rate_75_100: f64,
+    ) -> Result<u64, DomainError> {
+        self.repo
+            .regen_hp_tick(rate_0_25, rate_25_50, rate_50_75, rate_75_100)
+            .await
+    }
 }

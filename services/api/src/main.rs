@@ -305,6 +305,13 @@ async fn main() {
             coude_inventory_uc.clone(),
             coude_social_uc.clone(),
         ));
+    let expire_combats_batch_uc: Arc<dyn sentinel_api::ports::inbound::ExpireCombatsBatchUseCase> =
+        Arc::new(sentinel_api::application::ExpireCombatsBatchService::new(
+            coude_combat_repo.clone(),
+            coude_player_repo.clone(),
+            wallet_repo.clone(),
+            coude_bets_uc.clone(),
+        ));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),
@@ -366,6 +373,7 @@ async fn main() {
         coude_inventory_uc,
         coude_social_uc,
         resolve_betting_batch_uc,
+        expire_combats_batch_uc,
         broadcaster,
         job_client,
         discord_api,

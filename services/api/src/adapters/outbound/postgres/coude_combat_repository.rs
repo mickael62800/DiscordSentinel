@@ -259,6 +259,40 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
+    async fn claim_expired_pending_combats(
+        &self,
+        default_expiry_hours: i64,
+    ) -> Result<Vec<CoudeCombat>, DomainError> {
+        // Phase 4 : SQL migree depuis coude-worker/src/jobs/expire_combats.rs.
+        // Delai par guild lu depuis bot_guild_config (coude-worker /
+        // combat_expiry_hours), fallback sur default_expiry_hours (24h).
+        // UPDATE atomique avec FOR UPDATE SKIP LOCKED.
+        let sql = format!(
+            r#"UPDATE coude_combats SET status = 'expired', resolved_at = NOW()
+               WHERE id IN (
+                   SELECT c.id FROM coude_combats c
+                   LEFT JOIN bot_guild_config cfg
+                       ON cfg.guild_id = c.guild_id
+                       AND cfg.bot_name = 'coude-worker'
+                       AND cfg.config_key = 'combat_expiry_hours'
+                   WHERE c.status = 'pending'
+                     AND c.created_at < NOW() - MAKE_INTERVAL(hours := COALESCE(
+                           CASE WHEN cfg.config_value ~ '^\d+$' THEN cfg.config_value::int ELSE NULL END,
+                           $1::int
+                         ))
+                   FOR UPDATE OF c SKIP LOCKED
+               )
+               RETURNING {cols}"#,
+            cols = COMBAT_COLUMNS
+        );
+        let rows: Vec<CombatRow> = sqlx::query_as(&sql)
+            .bind(default_expiry_hours)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
     async fn claim_stuck_resolving_combats(
         &self,
         stuck_threshold_secs: i64,

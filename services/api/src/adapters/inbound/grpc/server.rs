@@ -92,6 +92,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let coude_combats = CoudeCombatsGrpc {
         uc: state.coude_combats_uc.clone(),
         resolve_batch_uc: state.resolve_betting_batch_uc.clone(),
+        expire_batch_uc: state.expire_combats_batch_uc.clone(),
     };
     let coude_bets = CoudeBetsGrpc {
         uc: state.coude_bets_uc.clone(),

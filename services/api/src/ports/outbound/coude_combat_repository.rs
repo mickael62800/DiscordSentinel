@@ -56,6 +56,15 @@ pub trait CoudeCombatRepository: Send + Sync {
         stuck_threshold_secs: i64,
     ) -> Result<Vec<CoudeCombat>, DomainError>;
 
+    /// Phase 4 : claim atomique des combats pending dont le delai d'expiration
+    /// est ecoule. Passe status a 'expired' en une seule requete avec
+    /// FOR UPDATE SKIP LOCKED. Le delai est lu depuis bot_guild_config
+    /// (coude-worker / combat_expiry_hours) avec fallback sur default.
+    async fn claim_expired_pending_combats(
+        &self,
+        default_expiry_hours: i64,
+    ) -> Result<Vec<CoudeCombat>, DomainError>;
+
     /// Récupère le combat actuellement en phase de paris auquel `user_id`
     /// participe (en tant qu'attaquant OU défenseur). Utilisé par le flow
     /// "place_bet" pour récupérer le combat de référence d'un participant.

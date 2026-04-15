@@ -154,5 +154,18 @@ pub trait CoudePlayerRepository: Send + Sync {
         guild_id: &str,
         user_id: &str,
     ) -> Result<(), DomainError>;
+
+    /// Phase 4 refacto : tick de regeneration passive des HP. Regen degressive
+    /// par palier de % HP courant (0-25% / 25-50% / 50-75% / 75-100%) avec
+    /// les taux fournis en HP/h. Exclut les joueurs avec un combat actif
+    /// (pending/betting/resolving) pour eviter d'ecraser un hp_current frais.
+    /// Retourne le nombre de joueurs mis a jour.
+    async fn regen_hp_tick(
+        &self,
+        rate_0_25: f64,
+        rate_25_50: f64,
+        rate_50_75: f64,
+        rate_75_100: f64,
+    ) -> Result<u64, DomainError>;
 }
 

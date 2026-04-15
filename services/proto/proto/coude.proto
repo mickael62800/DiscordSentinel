@@ -19,6 +19,19 @@ service CoudePlayerService {
   rpc AddXp(AddXpRequest) returns (XpProgress);
   rpc AdjustCoins(AdjustCoinsRequest) returns (Empty);
   rpc UpdateHp(UpdateHpRequest) returns (Empty);
+  // Phase 4 : tick batch regeneration passive des HP (appele par coude-worker).
+  rpc HpRegenTick(HpRegenTickRequest) returns (HpRegenTickResponse);
+}
+
+message HpRegenTickRequest {
+  double rate_0_25 = 1;
+  double rate_25_50 = 2;
+  double rate_50_75 = 3;
+  double rate_75_100 = 4;
+}
+
+message HpRegenTickResponse {
+  uint64 updated = 1;
 }
 
 message Empty {}
@@ -117,6 +130,21 @@ service CoudeCombatsService {
   // le coude_combat_engine et retourne les metadonnees Discord pour que
   // le worker poste les resultats.
   rpc ResolveBettingBatch(Empty) returns (ResolvedBettingBatch);
+  // Phase 4 : tick batch expiration combats pending (appele par coude-worker).
+  rpc ExpireCombatsBatch(Empty) returns (ExpiredCombatsBatch);
+}
+
+message ExpiredCombat {
+  string combat_id = 1;
+  string guild_id = 2;
+  string channel_id = 3;
+  string defender_id = 4;
+  string defender_name = 5;
+  int64 penalty = 6;
+}
+
+message ExpiredCombatsBatch {
+  repeated ExpiredCombat combats = 1;
 }
 
 message ResolvedBettingCombat {
