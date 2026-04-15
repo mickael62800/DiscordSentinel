@@ -1,5 +1,8 @@
 # Plan de refacto Coup de Coude : centraliser la logique dans l'API
 
+> **✅ TERMINÉ le 15/04/2026** (commits 2c90f72 → b7a7843). Voir section
+> « État final » en bas du document pour le récap et la métrique finale.
+
 ## Constat (audit du 15/04/2026)
 
 Actuellement la logique métier et l'accès SQL du jeu Coup de Coude sont éparpillés dans 3 endroits :
@@ -189,3 +192,82 @@ Chaque phase est déployable indépendamment. Après chaque phase : rebuild + te
 2. **Phase 5** (vérification bot SQL-free) — confirme que le bot est déjà propre.
 3. **Phase 2 + 3** (combat engine + resolve_betting dans l'API) — le gros morceau, principal bénéfice architectural.
 4. **Phase 4** (hp_regen) — petit, peu d'impact, à faire en dernier.
+
+---
+
+## État final (15/04/2026, session unique)
+
+Toutes les phases ont été bouclées dans une seule session. Récap des commits :
+
+| Phase | Commit | Δ lignes | Contenu |
+|---|---|---|---|
+| 0 | `2c90f72` | -1399 | Dead code `coude-bot/db.rs` + deps `sqlx`/`uuid` retirées |
+| 1 | `084d855` | +1175 | `coude_combat_engine` dans `domain/services/` + 5 tests unit |
+| 2 | `6c56713` | +645 | `ResolveBettingBatchUseCase` : ports + service + gRPC + wiring |
+| 3 | `402ceb2` | -1715 | Worker `resolve_betting.rs` thin (683 → 156 lignes) |
+| 4 | `b7a7843` | +117 nets | `HpRegenTick` + `ExpireCombatsBatch` RPCs, jobs worker thin |
+| 5+6 | — | 0 | Déjà couvert par les phases précédentes |
+
+**Worker `jobs/` : 1563 → 309 lignes (-80%).**
+
+### Architecture atteinte
+
+```
+┌────────────┐  gRPC  ┌──────────────────────────────────┐
+│ coude-bot  │───────▶│            API (hexagonal)       │
+│   0 SQL    │        │                                  │
+└────────────┘        │  domain/services/                │
+                      │    coude_combat_engine/          │ ← pur
+┌────────────┐  gRPC  │  application/                    │
+│coude-worker│───────▶│    resolve_betting_batch_service │ ← orchestration
+│  0 SQL     │        │    expire_combats_batch_service  │
+│  métier    │        │  ports/inbound/                  │
+└─────┬──────┘        │    resolve_betting_batch         │
+      │               │    expire_combats_batch          │
+      └─ Discord IO   │  ports/outbound/                 │
+         (post result)│    coude_combat_repository       │
+                      │    coude_player_repository       │
+                      │    wallet_repository             │
+                      │  adapters/outbound/postgres/     │ ← SQL
+                      │  adapters/inbound/grpc/          │
+                      └──────────────────────────────────┘
+```
+
+### Règles hexagonales respectées
+
+- **Domain** (`coude_combat_engine`) : pur CPU, zéro `sqlx`/`async`/`tokio`/`reqwest`
+- **Application** (services) : orchestration via ports uniquement, zéro SQL inline
+- **Ports inbound** : traits + DTOs métier
+- **Ports outbound** : traits repos
+- **Adapters** : seul endroit où `sqlx::query` apparaît
+
+### sqlx résiduel dans le worker (documenté)
+
+Le worker garde la dep `sqlx` **uniquement** pour :
+- `main.rs` : `create_pg_pool` au boot (lecture config globale via `load_worker_config`)
+- `scheduler.rs` : signature `PgPool` imposée par `spawn_periodic` de `worker-common`
+- `jobs/*.rs::run(_pool: &PgPool)` : paramètre ignoré, imposé par la même signature
+
+**Zéro SQL métier** n'est plus exécuté par le worker. Tous les tick-jobs
+font un appel gRPC et postent sur Discord (pour `resolve_betting` uniquement).
+
+Pour éliminer complètement `sqlx`, il faudrait migrer `load_worker_config`
+et `spawn_periodic` vers une API `/api/workers/config` — effort cross-workers
+(12 workers concernés), pas fait dans cette session car scope creep.
+
+### Tests
+
+- 28 tests coude verts côté API (dont 5 nouveaux sur `combat_engine`)
+- `cargo check -p coude-bot` ok
+- `cargo check -p sentinel-coude-worker` ok
+- `cargo check -p sentinel-api` ok
+
+### Déploiement
+
+```bash
+docker compose build api coude-bot coude-worker && \
+  docker compose up -d --force-recreate api coude-bot coude-worker
+```
+
+La migration `123_add_coins_check_constraints.sql` (CHECK constraints
+wallet) s'applique automatiquement au boot de l'API.
