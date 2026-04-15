@@ -24,7 +24,7 @@ use crate::ports::inbound::resolve_combat_now::{
 };
 use crate::ports::inbound::{
     ManageCoudeBetsUseCase, ManageCoudeCombatsUseCase, ManageCoudeInventoryUseCase,
-    ManageCoudePlayersUseCase, ManageCoudeSocialUseCase,
+    ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
 };
 use crate::ports::outbound::{CoudeCombatRepository, WalletRepository};
 
@@ -36,6 +36,7 @@ pub struct ResolveCombatNowService {
     bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     social_uc: Arc<dyn ManageCoudeSocialUseCase>,
+    taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
 }
 
 impl ResolveCombatNowService {
@@ -47,6 +48,7 @@ impl ResolveCombatNowService {
         bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
         social_uc: Arc<dyn ManageCoudeSocialUseCase>,
+        taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     ) -> Self {
         Self {
             combat_repo,
@@ -56,6 +58,7 @@ impl ResolveCombatNowService {
             bets_uc,
             inventory_uc,
             social_uc,
+            taunts_uc,
         }
     }
 }
@@ -452,12 +455,45 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             });
         }
 
+        // Phase 9 Part D : track streaks + collecte taunt events.
+        let mut taunt_events = Vec::new();
+        match (&result.winner_id, &result.loser_id) {
+            (Some(winner_id), Some(loser_id)) => {
+                if let Ok(Some(ev)) = self
+                    .taunts_uc
+                    .on_player_won(&combat.guild_id, winner_id)
+                    .await
+                {
+                    taunt_events.push(ev);
+                }
+                if let Ok(Some(ev)) = self
+                    .taunts_uc
+                    .on_player_lost(&combat.guild_id, loser_id)
+                    .await
+                {
+                    taunt_events.push(ev);
+                }
+            }
+            _ => {
+                // Draw : reset les deux streaks de combat.
+                let _ = self
+                    .taunts_uc
+                    .on_player_drew(&combat.guild_id, &combat.attacker_id)
+                    .await;
+                let _ = self
+                    .taunts_uc
+                    .on_player_drew(&combat.guild_id, &combat.defender_id)
+                    .await;
+            }
+        }
+
         Ok(ResolveCombatNowOutput {
             combat_id: combat.id.to_string(),
             title: "\u{2694}\u{fe0f} Resultat du Coup de Coude !".into(),
             description: result.message,
             color: title_color,
             fields,
+            taunt_events,
         })
     }
 }

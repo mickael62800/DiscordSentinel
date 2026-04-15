@@ -186,6 +186,14 @@ pub async fn resolve_combat_internal(
         embed = embed.field(f.name, f.value, f.inline);
     }
 
+    // Phase 9 Part D : dispatch les taunt events (100% IO, zero logique).
+    if !resp.taunt_events.is_empty() {
+        if let Ok(guild_id) = combat_record.guild_id.parse::<u64>() {
+            let gid = serenity::all::GuildId::new(guild_id);
+            crate::taunts_dispatch::dispatch_all(ctx, gid, &resp.taunt_events).await;
+        }
+    }
+
     Some(embed)
 }
 

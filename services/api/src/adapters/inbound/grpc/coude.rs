@@ -413,6 +413,7 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
                 loser_id: c.loser_id,
                 coins_transferred: c.coins_transferred,
                 is_draw: c.is_draw,
+                taunt_events: c.taunt_events.into_iter().map(taunt_event_to_proto).collect(),
             })
             .collect();
         Ok(Response::new(proto::ResolvedBettingBatch { combats }))
@@ -467,7 +468,23 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
             description: out.description,
             color: out.color,
             fields,
+            taunt_events: out
+                .taunt_events
+                .into_iter()
+                .map(taunt_event_to_proto)
+                .collect(),
         }))
+    }
+}
+
+fn taunt_event_to_proto(e: crate::domain::entities::TauntEvent) -> proto::TauntEvent {
+    proto::TauntEvent {
+        channel_id: e.channel_id,
+        target_user_id: e.target_user_id,
+        message: e.message,
+        nickname_suffix: e.nickname_suffix,
+        streak_kind: e.streak_kind.to_string(),
+        streak_value: e.streak_value,
     }
 }
 
@@ -1091,6 +1108,7 @@ pub struct CoudeSocialGrpc {
     pub uc: Arc<dyn ManageCoudeSocialUseCase>,
     pub catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
     pub cashbox_uc: Arc<dyn crate::ports::inbound::ManageCoudeCashboxUseCase>,
+    pub taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase>,
 }
 
 fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
@@ -1363,6 +1381,88 @@ impl CoudeSocialService for CoudeSocialGrpc {
             .ok_or_else(|| Status::invalid_argument("source invalide"))?;
         self.cashbox_uc
             .deposit(&req.guild_id, req.amount, source)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    // ── Phase 9 Part D : railleries ──
+
+    async fn track_steal_victim(
+        &self,
+        request: Request<proto::TrackStealVictimRequest>,
+    ) -> Result<Response<proto::MaybeTauntEvent>, Status> {
+        let req = request.into_inner();
+        let ev = self
+            .taunts_uc
+            .on_player_stolen_from(&req.guild_id, &req.victim_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::MaybeTauntEvent {
+            event: ev.map(taunt_event_to_proto),
+        }))
+    }
+
+    async fn track_steal_defended(
+        &self,
+        request: Request<proto::UserInGuildRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        self.taunts_uc
+            .on_player_defended_steal(&req.guild_id, &req.user_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    async fn get_taunts_config(
+        &self,
+        request: Request<proto::GetTauntsConfigRequest>,
+    ) -> Result<Response<proto::TauntsConfigState>, Status> {
+        let req = request.into_inner();
+        let cfg = self
+            .taunts_uc
+            .get_config(&req.guild_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::TauntsConfigState {
+            guild_id: cfg.guild_id,
+            channel_id: cfg.channel_id,
+            enabled: cfg.enabled,
+        }))
+    }
+
+    async fn set_taunts_channel(
+        &self,
+        request: Request<proto::SetTauntsChannelRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        self.taunts_uc
+            .set_channel(&req.guild_id, req.channel_id.as_deref())
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    async fn set_taunts_enabled(
+        &self,
+        request: Request<proto::SetTauntsEnabledRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        self.taunts_uc
+            .set_enabled(&req.guild_id, req.enabled)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::Empty {}))
+    }
+
+    async fn set_taunts_opt_out(
+        &self,
+        request: Request<proto::SetTauntsOptOutRequest>,
+    ) -> Result<Response<proto::Empty>, Status> {
+        let req = request.into_inner();
+        self.taunts_uc
+            .set_opt_out(&req.guild_id, &req.user_id, req.opted_out)
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))

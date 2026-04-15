@@ -8,6 +8,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::domain::entities::TauntEvent;
 use crate::domain::errors::DomainError;
 
 /// Champ d'un embed Discord construit cote API, pret a etre affiche par le bot.
@@ -29,6 +30,9 @@ pub struct ResolveCombatNowOutput {
     /// Couleur hex de l'embed (0x57F287 = vert, 0x9B59B6 = violet chaos/draw).
     pub color: u32,
     pub fields: Vec<ResolvedCombatEmbedField>,
+    /// Phase 9 Part D : events de raillerie si un joueur a franchi un
+    /// palier de streak sur ce combat. Le bot les poste tels quels.
+    pub taunt_events: Vec<TauntEvent>,
 }
 
 #[async_trait]

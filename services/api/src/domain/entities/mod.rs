@@ -105,3 +105,9 @@ pub use coude_steal_boost::{
     find_boost_item, sum_roll_bonus_for_active_keys, CoudeStealBoost, StealBoostDuration,
     StealBoostItemDef, STEAL_BOOST_ITEMS,
 };
+
+mod coude_taunt;
+pub use coude_taunt::{
+    build_taunt_event, crossed_threshold, nickname_suffix_for, CoudeTauntsConfig, StreakKind,
+    TauntEvent, TAUNT_THRESHOLDS,
+};

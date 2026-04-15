@@ -153,6 +153,9 @@ message ResolvedCombatNowResponse {
   string description = 3;
   uint32 color = 4;
   repeated ResolvedCombatEmbedField fields = 5;
+  // Phase 9 Part D : events de raillerie si un palier de streak a ete
+  // franchi. Le bot les poste tels quels dans le channel fourni.
+  repeated TauntEvent taunt_events = 6;
 }
 
 message ExpiredCombat {
@@ -178,6 +181,8 @@ message ResolvedBettingCombat {
   optional string loser_id = 7;
   int64 coins_transferred = 8;
   bool is_draw = 9;
+  // Phase 9 Part D : events de raillerie.
+  repeated TauntEvent taunt_events = 10;
 }
 
 message ResolvedBettingBatch {
@@ -661,6 +666,14 @@ service CoudeSocialService {
   // depuis le dernier passage). Le worker tick regulierement mais l'API
   // decide quelles guilds sont dues.
   rpc RedistributeDueCashboxes(RedistributeDueRequest) returns (RedistributeDueResponse);
+
+  // Phase 9 Part D : railleries automatiques sur streaks.
+  rpc TrackStealVictim(TrackStealVictimRequest) returns (MaybeTauntEvent);
+  rpc TrackStealDefended(UserInGuildRequest) returns (Empty);
+  rpc GetTauntsConfig(GetTauntsConfigRequest) returns (TauntsConfigState);
+  rpc SetTauntsChannel(SetTauntsChannelRequest) returns (Empty);
+  rpc SetTauntsEnabled(SetTauntsEnabledRequest) returns (Empty);
+  rpc SetTauntsOptOut(SetTauntsOptOutRequest) returns (Empty);
 }
 
 message GetCashboxRequest {
@@ -849,4 +862,50 @@ message CoudeCurrentSeason {
   string started_at = 2;
   string ends_at = 3;
   int64 days_remaining = 4;
+}
+
+// ── Phase 9 Part D : railleries automatiques ──
+
+message TauntEvent {
+  string channel_id = 1;
+  string target_user_id = 2;
+  string message = 3;
+  string nickname_suffix = 4;
+  string streak_kind = 5;
+  int32 streak_value = 6;
+}
+
+message MaybeTauntEvent {
+  optional TauntEvent event = 1;
+}
+
+message TrackStealVictimRequest {
+  string guild_id = 1;
+  string victim_id = 2;
+}
+
+message GetTauntsConfigRequest {
+  string guild_id = 1;
+}
+
+message TauntsConfigState {
+  string guild_id = 1;
+  optional string channel_id = 2;
+  bool enabled = 3;
+}
+
+message SetTauntsChannelRequest {
+  string guild_id = 1;
+  optional string channel_id = 2;
+}
+
+message SetTauntsEnabledRequest {
+  string guild_id = 1;
+  bool enabled = 2;
+}
+
+message SetTauntsOptOutRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  bool opted_out = 3;
 }

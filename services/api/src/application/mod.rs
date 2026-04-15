@@ -78,3 +78,6 @@ pub use manage_coude_steal_protections_service::ManageCoudeStealProtectionsServi
 
 mod manage_coude_steal_boosts_service;
 pub use manage_coude_steal_boosts_service::ManageCoudeStealBoostsService;
+
+mod manage_coude_taunts_service;
+pub use manage_coude_taunts_service::ManageCoudeTauntsService;

@@ -26,7 +26,10 @@ use crate::domain::services::coude_combat_engine::{
 use crate::ports::inbound::resolve_betting_batch::{
     ResolveBettingBatchUseCase, ResolvedBettingCombatOutput,
 };
-use crate::ports::inbound::{ManageCoudeBetsUseCase, ManageCoudeInventoryUseCase, ManageCoudeSocialUseCase};
+use crate::ports::inbound::{
+    ManageCoudeBetsUseCase, ManageCoudeInventoryUseCase, ManageCoudeSocialUseCase,
+    ManageCoudeTauntsUseCase,
+};
 use crate::ports::outbound::{CoudeCombatRepository, CoudePlayerRepository, WalletRepository};
 
 /// Delai de paris par defaut (5 min), override par guild via bot_guild_config.
@@ -41,6 +44,7 @@ pub struct ResolveBettingBatchService {
     bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     social_uc: Arc<dyn ManageCoudeSocialUseCase>,
+    taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
 }
 
 impl ResolveBettingBatchService {
@@ -51,6 +55,7 @@ impl ResolveBettingBatchService {
         bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
         social_uc: Arc<dyn ManageCoudeSocialUseCase>,
+        taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     ) -> Self {
         Self {
             combat_repo,
@@ -59,6 +64,7 @@ impl ResolveBettingBatchService {
             bets_uc,
             inventory_uc,
             social_uc,
+            taunts_uc,
         }
     }
 
@@ -206,6 +212,23 @@ impl ResolveBettingBatchService {
                 warn!(error = %e, combat_id = %combat.id, "Echec refund paris egalite/explosion");
             }
 
+            // Phase 9 Part D : egalite → reset les streaks de combat des
+            // deux joueurs. Pas de taunt event pour un draw.
+            if let Err(e) = self
+                .taunts_uc
+                .on_player_drew(&combat.guild_id, &combat.attacker_id)
+                .await
+            {
+                warn!(error = %e, "Echec reset streaks attacker draw");
+            }
+            if let Err(e) = self
+                .taunts_uc
+                .on_player_drew(&combat.guild_id, &combat.defender_id)
+                .await
+            {
+                warn!(error = %e, "Echec reset streaks defender draw");
+            }
+
             return Ok(ResolvedBettingCombatOutput {
                 combat_id: combat.id.to_string(),
                 guild_id: combat.guild_id.clone(),
@@ -216,6 +239,7 @@ impl ResolveBettingBatchService {
                 loser_id: None,
                 coins_transferred: explosion_loss,
                 is_draw: true,
+                taunt_events: vec![],
             });
         }
 
@@ -394,6 +418,27 @@ impl ResolveBettingBatchService {
             result.message
         };
 
+        // Phase 9 Part D : track streaks et collecte les taunt events.
+        let mut taunt_events = Vec::new();
+        match self
+            .taunts_uc
+            .on_player_won(&combat.guild_id, &winner_id)
+            .await
+        {
+            Ok(Some(ev)) => taunt_events.push(ev),
+            Ok(None) => {}
+            Err(e) => warn!(error = %e, "Echec on_player_won"),
+        }
+        match self
+            .taunts_uc
+            .on_player_lost(&combat.guild_id, &loser_id)
+            .await
+        {
+            Ok(Some(ev)) => taunt_events.push(ev),
+            Ok(None) => {}
+            Err(e) => warn!(error = %e, "Echec on_player_lost"),
+        }
+
         Ok(ResolvedBettingCombatOutput {
             combat_id: combat.id.to_string(),
             guild_id: combat.guild_id.clone(),
@@ -404,6 +449,7 @@ impl ResolveBettingBatchService {
             loser_id: Some(loser_id),
             coins_transferred,
             is_draw: false,
+            taunt_events,
         })
     }
 }

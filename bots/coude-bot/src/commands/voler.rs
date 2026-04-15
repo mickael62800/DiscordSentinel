@@ -344,7 +344,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
         };
 
-        let result_embed = resolve_steal_attempt(
+        let (result_embed, taunt_events) = resolve_steal_attempt(
             api,
             &catalog_timeout,
             &guild_id_clone,
@@ -369,6 +369,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         {
             tracing::warn!(error = %e, "Echec edit_message (timeout vol)");
         }
+
+        // Phase 9 Part D : dispatch les taunt events (IO pur).
+        if !taunt_events.is_empty() {
+            if let Ok(guild_id_u64) = guild_id_clone.parse::<u64>() {
+                let gid = serenity::all::GuildId::new(guild_id_u64);
+                crate::taunts_dispatch::dispatch_all(&ctx_clone, gid, &taunt_events).await;
+            }
+        }
     });
 }
 
@@ -390,7 +398,7 @@ async fn resolve_steal_attempt(
     thief_player: &crate::api_client::Player,
     target_player: &crate::api_client::Player,
     afk: bool,
-) -> CreateEmbed {
+) -> (CreateEmbed, Vec<crate::api_client::TauntEvent>) {
     use rand::Rng;
 
     // Roll d20 + bonus
@@ -443,11 +451,18 @@ async fn resolve_steal_attempt(
         },
     );
 
+    let mut taunt_events: Vec<crate::api_client::TauntEvent> = Vec::new();
+
     if thief_total > target_total {
         // Le voleur a gagne le roll — mais une protection active peut
         // encore bloquer le vol (Phase 9 Part B : abonnements temps-base,
         // plus de consommation d'item).
         if let Some((_key, name)) = try_trigger_protection(api, guild_id, target_id).await {
+            // Phase 9 Part D : blocage reussi → reset le victim streak.
+            if let Err(e) = api.track_steal_defended(guild_id, target_id).await {
+                tracing::warn!(error = %e, "Echec track_steal_defended");
+            }
+
             let block_msg = format!(
                 "\u{1f6e1}\u{fe0f} <@{}> etait protege par **{}** qui a bloque la tentative de vol de <@{}> !",
                 target_id, name, thief_id
@@ -466,12 +481,13 @@ async fn resolve_steal_attempt(
                     ));
                 }
             }
-            return CreateEmbed::new()
+            let embed = CreateEmbed::new()
                 .title("\u{1f6e1}\u{fe0f} Vol bloque !")
                 .description(format!("{}{}{}", block_msg, roll_detail, xp_line))
                 .color(0x3498DB)
                 .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
                 .timestamp(serenity::model::Timestamp::now());
+            return (embed, taunt_events);
         }
 
         // Pas de protection : le vol reussit.
@@ -491,6 +507,13 @@ async fn resolve_steal_attempt(
             .await
         {
             tracing::warn!(error = %e, "Echec API record_steal");
+        }
+
+        // Phase 9 Part D : incremente le victim streak + collecte taunt event.
+        match api.track_steal_victim(guild_id, target_id).await {
+            Ok(Some(ev)) => taunt_events.push(ev),
+            Ok(None) => {}
+            Err(e) => tracing::warn!(error = %e, "Echec track_steal_victim"),
         }
 
         let mut xp_line = String::new();
@@ -515,18 +538,24 @@ async fn resolve_steal_attempt(
             stolen,
         );
 
-        CreateEmbed::new()
+        let embed = CreateEmbed::new()
             .title("\u{1f4b0} Vol reussi !")
             .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
             .color(0x57F287)
             .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
-            .timestamp(serenity::model::Timestamp::now())
+            .timestamp(serenity::model::Timestamp::now());
+        (embed, taunt_events)
     } else {
         // Vol echoue : le voleur perd 15% de ses coins, victime +3 XP.
         let lost = ((thief_player.coins as f64 * 0.15) as i64).max(1);
 
         if let Err(e) = api.record_coins_lost(guild_id, thief_id, lost).await {
             tracing::warn!(error = %e, "Echec API record_coins_lost vol");
+        }
+
+        // Phase 9 Part D : vol rate = victime a "resiste", reset son streak.
+        if let Err(e) = api.track_steal_defended(guild_id, target_id).await {
+            tracing::warn!(error = %e, "Echec track_steal_defended (fail path)");
         }
 
         let mut xp_line = String::new();
@@ -550,12 +579,13 @@ async fn resolve_steal_attempt(
             lost,
         );
 
-        CreateEmbed::new()
+        let embed = CreateEmbed::new()
             .title("\u{1f6a8} Vol rate !")
             .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
             .color(0xED4245)
             .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
-            .timestamp(serenity::model::Timestamp::now())
+            .timestamp(serenity::model::Timestamp::now());
+        (embed, taunt_events)
     }
 }
 
@@ -616,7 +646,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    let embed = resolve_steal_attempt(
+    let (embed, taunt_events) = resolve_steal_attempt(
         api,
         &catalog_defend,
         guild_id,
@@ -641,6 +671,17 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         .await
     {
         tracing::warn!(error = %e, "Echec response Discord (defend vol)");
+    }
+
+    // Drop le data guard avant le dispatch async (il lock TypeMap).
+    drop(data);
+
+    // Phase 9 Part D : dispatch IO pur.
+    if !taunt_events.is_empty() {
+        if let Ok(guild_id_u64) = guild_id.parse::<u64>() {
+            let gid = serenity::all::GuildId::new(guild_id_u64);
+            crate::taunts_dispatch::dispatch_all(ctx, gid, &taunt_events).await;
+        }
     }
 }
 

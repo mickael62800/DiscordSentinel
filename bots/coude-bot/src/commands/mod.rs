@@ -9,6 +9,7 @@ pub mod defend_item;
 pub mod donner;
 pub mod hp;
 pub mod leaderboard;
+pub mod no_taunts;
 pub mod pari;
 pub mod potion;
 pub mod prime;
@@ -20,6 +21,7 @@ pub mod reset_stats;
 pub mod resume;
 pub mod saison;
 pub mod shop_cmd;
+pub mod taunts_channel;
 pub mod train;
 pub mod voler;
 
@@ -47,5 +49,7 @@ pub fn all() -> Vec<CreateCommand> {
         cagnotte::register(),
         protection::register(),
         boost_voleur::register(),
+        no_taunts::register(),
+        taunts_channel::register(),
     ]
 }

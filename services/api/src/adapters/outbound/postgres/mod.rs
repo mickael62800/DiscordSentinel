@@ -81,3 +81,6 @@ pub use coude_steal_protection_repository::PgCoudeStealProtectionRepository;
 
 mod coude_steal_boost_repository;
 pub use coude_steal_boost_repository::PgCoudeStealBoostRepository;
+
+mod coude_taunts_repository;
+pub use coude_taunts_repository::PgCoudeTauntsRepository;

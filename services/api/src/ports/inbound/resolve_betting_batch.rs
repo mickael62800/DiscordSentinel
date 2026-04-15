@@ -18,6 +18,7 @@
 
 use async_trait::async_trait;
 
+use crate::domain::entities::TauntEvent;
 use crate::domain::errors::DomainError;
 
 /// Sortie retournee pour chaque combat resolu.
@@ -34,6 +35,11 @@ pub struct ResolvedBettingCombatOutput {
     pub loser_id: Option<String>,
     pub coins_transferred: i64,
     pub is_draw: bool,
+    /// Phase 9 Part D : si un joueur a franchi un palier de streak suite
+    /// a ce combat, l'API remplit ce vecteur (0 a 2 events, typiquement
+    /// un pour le gagnant ET un pour le perdant si les deux atteignent
+    /// un seuil sur le meme combat).
+    pub taunt_events: Vec<TauntEvent>,
 }
 
 #[async_trait]

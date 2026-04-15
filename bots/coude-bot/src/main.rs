@@ -11,6 +11,7 @@ mod commands;
 mod config;
 pub mod guild_config;
 mod handler;
+pub mod taunts_dispatch;
 
 use std::sync::Arc;
 

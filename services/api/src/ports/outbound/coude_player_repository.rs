@@ -125,6 +125,47 @@ pub trait CoudePlayerRepository: Send + Sync {
         lost: i64,
     ) -> Result<bool, DomainError>;
 
+    // ── Streaks (Phase 9 Part D) ──
+    //
+    // Mis a jour apres record_win/record_loss/record_draw, en dehors
+    // de leur transaction (impact faible, 1 UPDATE supplementaire).
+    // Retourne la nouvelle valeur, ou None si le joueur n'existe pas.
+
+    /// Incremente `current_win_streak` et remet `current_loss_streak` a 0.
+    async fn touch_win_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError>;
+
+    /// Incremente `current_loss_streak` et remet `current_win_streak` a 0.
+    async fn touch_loss_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError>;
+
+    /// Remet a 0 les deux streaks de combat (draw).
+    async fn reset_combat_streaks(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError>;
+
+    /// Incremente `current_steal_victim_streak`. Retourne la nouvelle valeur.
+    async fn touch_steal_victim_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError>;
+
+    /// Remet a 0 `current_steal_victim_streak` (blocage reussi).
+    async fn reset_steal_victim_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError>;
+
     /// Incrémente le compteur de couardise et retourne sa nouvelle valeur.
     async fn increment_cowardice(
         &self,

@@ -99,6 +99,8 @@ pub struct ResolvedCombatEmbed {
     pub description: String,
     pub color: u32,
     pub fields: Vec<ResolvedCombatEmbedField>,
+    /// Phase 9 Part D : railleries a poster apres l'embed.
+    pub taunt_events: Vec<TauntEvent>,
 }
 
 #[derive(Debug, Clone)]
@@ -106,6 +108,30 @@ pub struct ResolvedCombatEmbedField {
     pub name: String,
     pub value: String,
     pub inline: bool,
+}
+
+/// Phase 9 Part D — Raillerie cuisinee cote API, pretes a poster tel quel.
+/// Le bot ne fait que poster + renommer.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct TauntEvent {
+    pub channel_id: String,
+    pub target_user_id: String,
+    pub message: String,
+    pub nickname_suffix: String,
+    pub streak_kind: String,
+    pub streak_value: i32,
+}
+
+fn taunt_event_from_proto(e: proto_coude::TauntEvent) -> TauntEvent {
+    TauntEvent {
+        channel_id: e.channel_id,
+        target_user_id: e.target_user_id,
+        message: e.message,
+        nickname_suffix: e.nickname_suffix,
+        streak_kind: e.streak_kind,
+        streak_value: e.streak_value,
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -991,6 +1017,7 @@ impl ApiClient {
                     inline: f.inline,
                 })
                 .collect(),
+            taunt_events: resp.taunt_events.into_iter().map(taunt_event_from_proto).collect(),
         })
     }
 
@@ -1526,6 +1553,83 @@ impl ApiClient {
             .await
             .map_err(grpc_err_to_string)?;
         Ok(r.value as i32)
+    }
+
+    // ══════════════════════════════════════════════════════════════════
+    // Phase 9 Part D : railleries
+    // ══════════════════════════════════════════════════════════════════
+
+    /// Tracke un vol reussi : incremente le steal_victim_streak de la
+    /// victime et retourne un TauntEvent si un palier est franchi.
+    pub async fn track_steal_victim(
+        &self,
+        guild_id: &str,
+        victim_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let req = proto_coude::TrackStealVictimRequest {
+            guild_id: guild_id.to_string(),
+            victim_id: victim_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.track_steal_victim(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(r.event.map(taunt_event_from_proto))
+    }
+
+    /// Reset le steal_victim_streak (protection a bloque).
+    pub async fn track_steal_defended(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), String> {
+        let req = proto_coude::UserInGuildRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+        };
+        let mut client = self.grpc.coude_social();
+        self.grpc
+            .guarded(|| async move { client.track_steal_defended(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
+    }
+
+    pub async fn set_taunts_opt_out(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        opted_out: bool,
+    ) -> Result<(), String> {
+        let req = proto_coude::SetTauntsOptOutRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            opted_out,
+        };
+        let mut client = self.grpc.coude_social();
+        self.grpc
+            .guarded(|| async move { client.set_taunts_opt_out(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
+    }
+
+    pub async fn set_taunts_channel(
+        &self,
+        guild_id: &str,
+        channel_id: Option<&str>,
+    ) -> Result<(), String> {
+        let req = proto_coude::SetTauntsChannelRequest {
+            guild_id: guild_id.to_string(),
+            channel_id: channel_id.map(|s| s.to_string()),
+        };
+        let mut client = self.grpc.coude_social();
+        self.grpc
+            .guarded(|| async move { client.set_taunts_channel(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
     }
 
     // ══════════════════════════════════════════════════════════════════

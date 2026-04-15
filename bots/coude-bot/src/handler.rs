@@ -103,6 +103,8 @@ impl EventHandler for Handler {
                     "cagnotte" => commands::cagnotte::handle(&ctx, &command).await,
                     "protection" => commands::protection::handle(&ctx, &command).await,
                     "boost-voleur" => commands::boost_voleur::handle(&ctx, &command).await,
+                    "no-taunts" => commands::no_taunts::handle(&ctx, &command).await,
+                    "taunts-channel" => commands::taunts_channel::handle(&ctx, &command).await,
                     _ => {}
                 }
             }

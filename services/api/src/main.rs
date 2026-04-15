@@ -293,6 +293,18 @@ async fn main() {
     let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
     let coude_social_uc = Arc::new(ManageCoudeSocialService::new(coude_social_repo));
 
+    // Phase 9 Part D — railleries (cree en amont : utilise par les deux
+    // services de resolution de combat).
+    let coude_taunts_repo: Arc<dyn sentinel_api::ports::outbound::CoudeTauntsRepository> =
+        Arc::new(sentinel_api::adapters::outbound::postgres::PgCoudeTauntsRepository::new(
+            pg_pool.clone(),
+        ));
+    let coude_taunts_uc: Arc<dyn sentinel_api::ports::inbound::ManageCoudeTauntsUseCase> =
+        Arc::new(sentinel_api::application::ManageCoudeTauntsService::new(
+            coude_taunts_repo,
+            coude_player_repo.clone(),
+        ));
+
     // Phase 2 refacto : use case dedie qui orchestre la resolution batch des
     // combats betting. Remplacera coude-worker/src/jobs/resolve_betting.rs
     // en Phase 3.
@@ -304,6 +316,7 @@ async fn main() {
             coude_bets_uc.clone(),
             coude_inventory_uc.clone(),
             coude_social_uc.clone(),
+            coude_taunts_uc.clone(),
         ));
     let coude_cashbox_repo: Arc<dyn sentinel_api::ports::outbound::CoudeCashboxRepository> = Arc::new(
         sentinel_api::adapters::outbound::postgres::PgCoudeCashboxRepository::new(pg_pool.clone()),
@@ -357,6 +370,7 @@ async fn main() {
             coude_bets_uc.clone(),
             coude_inventory_uc.clone(),
             coude_social_uc.clone(),
+            coude_taunts_uc.clone(),
         ));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
@@ -425,6 +439,7 @@ async fn main() {
         coude_cashbox_uc,
         coude_steal_protections_uc,
         coude_steal_boosts_uc,
+        coude_taunts_uc,
         broadcaster,
         job_client,
         discord_api,
