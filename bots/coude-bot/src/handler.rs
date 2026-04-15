@@ -42,6 +42,23 @@ impl EventHandler for Handler {
             data.insert::<GuildIdsKey>(guild_ids);
         }
 
+        // Clean up any lingering global commands. Historiquement, coude-bot
+        // a pu etre deploye avec set_global_commands a un moment ; ces
+        // commandes globales persistent cote Discord jusqu'a ce qu'on les
+        // efface explicitement, ce qui creait des doublons (global +
+        // per-guild affiches en parallele). On force un vec![] global au
+        // boot pour garantir que seules les commandes per-guild vivent.
+        if let Err(e) = serenity::model::application::Command::set_global_commands(
+            &ctx.http,
+            vec![],
+        )
+        .await
+        {
+            warn!(error = %e, "Echec nettoyage des commandes globales (non-bloquant)");
+        } else {
+            info!("Commandes globales nettoyees (dedoublonnage).");
+        }
+
         // Enregistrement per-guild : propagation INSTANTANEE (contrairement
         // a set_global_commands qui peut prendre jusqu'a 1h). A chaque
         // redemarrage, la liste est re-ecrasee sur chaque guild connectee.
