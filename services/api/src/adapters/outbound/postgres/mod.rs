@@ -90,3 +90,6 @@ pub use coude_heist_repository::PgCoudeHeistRepository;
 
 mod user_activity_repository;
 pub use user_activity_repository::PgUserActivityRepository;
+
+mod welcome_config_repository;
+pub use welcome_config_repository::PgWelcomeConfigRepository;

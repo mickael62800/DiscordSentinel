@@ -117,7 +117,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         discord_role_repo: state.discord_role_repo.clone(),
     };
     let welcome = WelcomeGrpc {
-        pg_pool: state.pg_pool.clone(),
+        repo: state.welcome_config_repo.clone(),
     };
     let community = CommunityGrpc {
         pg_pool: state.pg_pool.clone(),

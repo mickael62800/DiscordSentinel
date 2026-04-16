@@ -72,6 +72,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub discord_bot_token: String,
     pub user_activity_repo: Arc<dyn crate::ports::outbound::UserActivityRepository>,
+    pub welcome_config_repo: Arc<dyn crate::ports::outbound::WelcomeConfigRepository>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

@@ -18,7 +18,7 @@ use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgCoudeBetRepository, PgCoudeCombatRepository, PgCoudeEconomyRepository, PgCoudeInventoryRepository, PgCoudePlayerRepository, PgCoudeSocialRepository, PgGuildRepository, PgInfractionRepository,
     PgMemberRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgUserActivityRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository,
+    PgAnalyticsRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgIaConfigRepository, PgLevelRepository, PgNotesRepository, PgReminderRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgUserActivityRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository, PgWelcomeConfigRepository,
 };
 use sentinel_api::adapters::outbound::batching::{
     BatchWriterConfig, BatchedPgAuditLogRepository, BatchedPgLogRepository,
@@ -243,6 +243,7 @@ async fn main() {
     let audit_logs_uc = Arc::new(ManageAuditLogsService::new(audit_log_repo));
 
     let user_activity_repo: Arc<dyn sentinel_api::ports::outbound::UserActivityRepository> = Arc::new(PgUserActivityRepository::new(pg_pool.clone()));
+    let welcome_config_repo: Arc<dyn sentinel_api::ports::outbound::WelcomeConfigRepository> = Arc::new(PgWelcomeConfigRepository::new(pg_pool.clone()));
     let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
     let security_uc = Arc::new(
         ManageSecurityService::new(
@@ -472,6 +473,7 @@ async fn main() {
         api_key: config.api_key.clone(),
         discord_bot_token: config.discord_bot_token.clone(),
         user_activity_repo: user_activity_repo.clone(),
+        welcome_config_repo: welcome_config_repo.clone(),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

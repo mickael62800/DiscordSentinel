@@ -224,7 +224,9 @@ impl EventHandler for Handler {
             if let Some(counter_ch) = &config.counter_channel_id {
                 if let Ok(c) = counter_ch.parse::<u64>() {
                     let name = config.counter_format.replace("{count}", &member_count.to_string());
-                    let _ = ChannelId::new(c).edit(&ctx.http, EditChannel::new().name(&name)).await;
+                    if let Err(e) = ChannelId::new(c).edit(&ctx.http, EditChannel::new().name(&name)).await {
+                        warn!(error = %e, "Echec mise a jour compteur");
+                    }
                 }
             }
         }
