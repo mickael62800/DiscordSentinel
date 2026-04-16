@@ -78,7 +78,7 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     );
 
     // 3. Appel gRPC a l'API pour executer l'export (zero logique metier ici).
-    let result = call_export_api(&job.guild_id, &job.job_type, &job.format).await;
+    let result = call_export_api(&job.guild_id, &job.job_type, &job.format, &job.filters).await;
 
     // 4. Persister le resultat
     match result {
@@ -130,6 +130,7 @@ async fn call_export_api(
     guild_id: &str,
     job_type: &str,
     format: &str,
+    filters: &serde_json::Value,
 ) -> Result<(String, usize), String> {
     let grpc_url = std::env::var("GRPC_API_URL")
         .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
@@ -146,7 +147,7 @@ async fn call_export_api(
         guild_id: guild_id.to_string(),
         job_type: job_type.to_string(),
         format: format.to_string(),
-        filters_json: String::new(),
+        filters_json: filters.to_string(),
         max_rows: MAX_ROWS_PER_EXPORT,
     });
     if let Ok(v) = api_key.parse::<MetadataValue<_>>() {
