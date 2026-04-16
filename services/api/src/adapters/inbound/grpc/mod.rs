@@ -11,6 +11,7 @@ pub mod automod;
 pub mod blackjack;
 pub mod community;
 pub mod coude;
+pub mod export;
 pub mod errors;
 pub mod images;
 pub mod members;

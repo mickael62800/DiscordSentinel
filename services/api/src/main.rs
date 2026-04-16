@@ -474,6 +474,7 @@ async fn main() {
         discord_bot_token: config.discord_bot_token.clone(),
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_repo: welcome_config_repo.clone(),
+        export_uc: Arc::new(sentinel_api::application::ExportService::new(pg_pool.clone())),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

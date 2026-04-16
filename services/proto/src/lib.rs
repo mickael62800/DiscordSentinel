@@ -93,3 +93,9 @@ pub mod community {
         tonic::include_proto!("sentinel.community.v1");
     }
 }
+
+pub mod export {
+    pub mod v1 {
+        tonic::include_proto!("sentinel.export.v1");
+    }
+}

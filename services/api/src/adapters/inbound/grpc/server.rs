@@ -24,6 +24,7 @@ use tracing::{error, info};
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
 use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackServiceServer;
 use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
+use sentinel_proto::export::v1::export_service_server::ExportServiceServer;
 use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsServiceServer;
 use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsServiceServer;
 use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyServiceServer;
@@ -57,6 +58,7 @@ use crate::adapters::inbound::grpc::security::SecurityGrpc;
 use crate::adapters::inbound::grpc::stats::StatsGrpc;
 use crate::adapters::inbound::grpc::tickets::TicketsGrpc;
 use crate::adapters::inbound::grpc::voice::VoiceChannelsGrpc;
+use crate::adapters::inbound::grpc::export::ExportGrpc;
 use crate::adapters::inbound::grpc::welcome::WelcomeGrpc;
 use crate::adapters::inbound::http::state::AppState;
 
@@ -119,6 +121,9 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let welcome = WelcomeGrpc {
         repo: state.welcome_config_repo.clone(),
     };
+    let export = ExportGrpc {
+        uc: state.export_uc.clone(),
+    };
     let community = CommunityGrpc {
         pg_pool: state.pg_pool.clone(),
     };
@@ -170,6 +175,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     let images_svc = svc!(ImagesServiceServer, images);
     // Phase 7A.opt F.3/F.4 — nouveaux services.
     let welcome_svc = svc!(WelcomeServiceServer, welcome);
+    let export_svc = svc!(ExportServiceServer, export);
     let community_svc = svc!(CommunityServiceServer, community);
 
     // tonic-health : expose `grpc.health.v1.Health` + marque chaque service
@@ -230,6 +236,9 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .set_serving::<WelcomeServiceServer<WelcomeGrpc>>()
         .await;
     health_reporter
+        .set_serving::<ExportServiceServer<ExportGrpc>>()
+        .await;
+    health_reporter
         .set_serving::<CommunityServiceServer<CommunityGrpc>>()
         .await;
 
@@ -250,6 +259,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .add_service(voice_svc)
         .add_service(images_svc)
         .add_service(welcome_svc)
+        .add_service(export_svc)
         .add_service(community_svc)
         .add_service(coude_combats_svc)
         .add_service(coude_bets_svc)

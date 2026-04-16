@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "proto/common.proto",
                 "proto/community.proto",
                 "proto/coude.proto",
+                "proto/export.proto",
                 "proto/images.proto",
                 "proto/members.proto",
                 "proto/moderation.proto",

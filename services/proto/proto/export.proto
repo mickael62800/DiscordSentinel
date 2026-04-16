@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package sentinel.export.v1;
+
+// Le worker claim le job, l'API execute la query + serialisation.
+service ExportService {
+  rpc ExecuteExport(ExecuteExportRequest) returns (ExecuteExportResponse);
+}
+
+message ExecuteExportRequest {
+  string guild_id = 1;
+  // "infractions" | "audit_logs" | "moderation_actions"
+  string job_type = 2;
+  // "csv" | "json"
+  string format = 3;
+  string filters_json = 4;
+  int64 max_rows = 5;
+}
+
+message ExecuteExportResponse {
+  string data = 1;
+  uint64 row_count = 2;
+}

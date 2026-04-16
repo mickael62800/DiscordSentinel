@@ -73,6 +73,7 @@ pub struct AppState {
     pub discord_bot_token: String,
     pub user_activity_repo: Arc<dyn crate::ports::outbound::UserActivityRepository>,
     pub welcome_config_repo: Arc<dyn crate::ports::outbound::WelcomeConfigRepository>,
+    pub export_uc: Arc<dyn crate::application::ExecuteExportUseCase>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,
