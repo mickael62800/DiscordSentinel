@@ -4,10 +4,10 @@ use uuid::Uuid;
 
 use sentinel_worker_common::is_worker_enabled;
 
-/// Intervalle SQL pour le mode weekly.
-const WEEKLY_INTERVAL: &str = "7 days";
-/// Intervalle SQL pour le mode monthly (approximation 30 jours).
-const MONTHLY_INTERVAL: &str = "30 days";
+/// Jours pour le mode weekly.
+const WEEKLY_DAYS: i32 = 7;
+/// Jours pour le mode monthly.
+const MONTHLY_DAYS: i32 = 30;
 /// Nombre max de rappels traites par batch.
 #[allow(dead_code)]
 const REMINDERS_BATCH_SIZE: i64 = 50;
@@ -31,9 +31,9 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     let mut total = 0u64;
 
     for interval in &["weekly", "monthly"] {
-        let interval_expr = match *interval {
-            "weekly" => WEEKLY_INTERVAL,
-            "monthly" => MONTHLY_INTERVAL,
+        let interval_days: i32 = match *interval {
+            "weekly" => WEEKLY_DAYS,
+            "monthly" => MONTHLY_DAYS,
             _ => continue,
         };
 
@@ -52,17 +52,15 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
             }
 
             // Trouver les utilisateurs dont la regen est due
-            let query = format!(
+            let users: Vec<UserPoints> = sqlx::query_as::<_, UserPoints>(
                 "SELECT guild_id, user_id, points FROM user_conduct_points \
-                 WHERE guild_id = $1 AND last_regen_at + INTERVAL '{}' <= NOW()",
-                interval_expr
-            );
-
-            let users: Vec<UserPoints> = sqlx::query_as::<_, UserPoints>(&query)
-                .bind(&config.guild_id)
-                .fetch_all(pool)
-                .await
-                .map_err(|e| format!("Query users: {e}"))?;
+                 WHERE guild_id = $1 AND last_regen_at + make_interval(days => $2) <= NOW()",
+            )
+            .bind(&config.guild_id)
+            .bind(interval_days)
+            .fetch_all(pool)
+            .await
+            .map_err(|e| format!("Query users: {e}"))?;
 
             for user in &users {
                 let new_points = user.points + config.regen_amount;

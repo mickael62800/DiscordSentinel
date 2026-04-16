@@ -37,16 +37,22 @@ struct PendingReminder {
 /// de connexion gateway. Le pattern XADD→bot consumer est le meme que pour
 /// `temp-roles-worker`.
 pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
+    // Claim atomique : UPDATE + RETURNING evite la race condition
+    // multi-worker (pas de double XADD).
     let reminders = sqlx::query_as::<_, PendingReminder>(
-        "SELECT id, guild_id, moderator_id, moderator_name, target_id, target_name, action_type, reason, expires_at
-         FROM sanction_reminders
-         WHERE status = 'pending' AND remind_at <= NOW()
-         ORDER BY remind_at ASC
-         LIMIT 50"
+        "UPDATE sanction_reminders SET status = 'sent'
+         WHERE id IN (
+             SELECT id FROM sanction_reminders
+             WHERE status = 'pending' AND remind_at <= NOW()
+             ORDER BY remind_at ASC
+             LIMIT 50
+             FOR UPDATE SKIP LOCKED
+         )
+         RETURNING id, guild_id, moderator_id, moderator_name, target_id, target_name, action_type, reason, expires_at"
     )
     .fetch_all(pool)
     .await
-    .map_err(|e| format!("Query pending reminders: {e}"))?;
+    .map_err(|e| format!("Claim pending reminders: {e}"))?;
 
     if reminders.is_empty() {
         debug!("Aucun rappel a envoyer");
@@ -63,12 +69,7 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
             continue;
         }
 
-        // Marquer comme envoye AVANT de tenter le broadcast (evite les doublons)
-        sqlx::query("UPDATE sanction_reminders SET status = 'sent' WHERE id = $1")
-            .bind(reminder.id)
-            .execute(pool)
-            .await
-            .map_err(|e| format!("Mark reminder sent: {e}"))?;
+        // Status deja 'sent' via le claim atomique ci-dessus.
 
         let time_left = reminder.expires_at.signed_duration_since(Utc::now());
         let minutes_left = time_left.num_minutes().max(0);
