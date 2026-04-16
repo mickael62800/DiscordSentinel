@@ -79,17 +79,28 @@ async fn main() {
 
     spawn_heartbeat(api.clone());
 
-    // Background task: rapport hebdomadaire (toutes les heures, check si lundi 8h-9h UTC)
+    // Background task: rapport hebdomadaire (toutes les heures, check jour/heure config)
     if config.weekly_report_enabled {
+        let report_day = match config.weekly_report_day {
+            1 => time::Weekday::Monday,
+            2 => time::Weekday::Tuesday,
+            3 => time::Weekday::Wednesday,
+            4 => time::Weekday::Thursday,
+            5 => time::Weekday::Friday,
+            6 => time::Weekday::Saturday,
+            7 => time::Weekday::Sunday,
+            _ => time::Weekday::Monday,
+        };
+        let report_hour = config.weekly_report_hour;
         let data_for_report = Arc::clone(&client.data);
         let http_for_report = Arc::clone(&client.http);
         let api_for_report = Arc::clone(&api);
         tokio::spawn(async move {
-            // Si on demarre un lundi apres 8h, marquer le rapport comme deja envoye
-            // pour eviter un doublon au restart
+            // Si on demarre le jour du rapport apres l'heure prevue,
+            // marquer comme deja envoye pour eviter un doublon au restart.
             let mut last_report_week: Option<u8> = {
                 let now = time::OffsetDateTime::now_utc();
-                if now.weekday() == time::Weekday::Monday && now.hour() >= 8 {
+                if now.weekday() == report_day && now.hour() >= report_hour {
                     Some(now.iso_week())
                 } else {
                     None
@@ -104,8 +115,7 @@ async fn main() {
                 let hour = now.hour();
                 let week = now.iso_week();
 
-                // Lundi entre 8h et 9h UTC, une seule fois par semaine
-                if weekday != time::Weekday::Monday || hour != 8 {
+                if weekday != report_day || hour != report_hour {
                     continue;
                 }
                 if last_report_week == Some(week) {

@@ -28,10 +28,10 @@ pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &V
         _ => return,
     };
 
-    let voice_msg = match event_type {
-        "voice_join" => format!("{} a rejoint le salon vocal {}", user_name, new_channel.unwrap()),
-        "voice_leave" => format!("{} a quitte le salon vocal {}", user_name, old_channel.unwrap()),
-        "voice_move" => format!("{} a change de salon vocal {} -> {}", user_name, old_channel.unwrap(), new_channel.unwrap()),
+    let voice_msg = match (event_type, old_channel, new_channel) {
+        ("voice_join", _, Some(ch)) => format!("{} a rejoint le salon vocal {}", user_name, ch),
+        ("voice_leave", Some(ch), _) => format!("{} a quitte le salon vocal {}", user_name, ch),
+        ("voice_move", Some(old), Some(new)) => format!("{} a change de salon vocal {} -> {}", user_name, old, new),
         _ => String::new(),
     };
     Handler::log(ctx, "info", &gid, &voice_msg).await;

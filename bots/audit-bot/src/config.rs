@@ -9,6 +9,10 @@ pub struct Config {
     pub anomaly_mass_delete_threshold: usize,
     pub anomaly_mass_role_threshold: usize,
     pub weekly_report_enabled: bool,
+    /// Jour du rapport hebdo (1=lundi .. 7=dimanche). Default: 1 (lundi).
+    pub weekly_report_day: u8,
+    /// Heure UTC du rapport hebdo (0-23). Default: 8.
+    pub weekly_report_hour: u8,
 }
 
 impl Config {
@@ -21,6 +25,8 @@ impl Config {
             anomaly_mass_delete_threshold: load_env("ANOMALY_MASS_DELETE", 20),
             anomaly_mass_role_threshold: load_env("ANOMALY_MASS_ROLE", 10),
             weekly_report_enabled: load_env_bool("WEEKLY_REPORT_ENABLED", true),
+            weekly_report_day: load_env("WEEKLY_REPORT_DAY", 1),
+            weekly_report_hour: load_env("WEEKLY_REPORT_HOUR", 8),
         }
     }
 }

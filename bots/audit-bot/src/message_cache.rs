@@ -30,18 +30,21 @@ impl MessageCache {
 
     /// Stocke un message dans le cache.
     pub fn store(&self, guild_id: GuildId, message_id: MessageId, cached: CachedMessage) {
-        // Eviction si on depasse la limite (verifier AVANT de prendre le lock counts)
+        // Eviction si on depasse la limite : trier par MessageId croissant
+        // (snowflake Discord = plus petit ID = plus vieux message).
         let current_count = self.counts.get(&guild_id).map(|c| *c).unwrap_or(0);
         if current_count >= self.max_per_guild {
-            let to_remove: Vec<(GuildId, MessageId)> = self
+            let evict_count = self.max_per_guild / 10;
+            let mut guild_keys: Vec<(GuildId, MessageId)> = self
                 .cache
                 .iter()
                 .filter(|e| e.key().0 == guild_id)
-                .take(self.max_per_guild / 10) // Evicter 10%
                 .map(|e| *e.key())
                 .collect();
+            guild_keys.sort_by_key(|k| k.1);
+            let to_remove = &guild_keys[..evict_count.min(guild_keys.len())];
 
-            for key in &to_remove {
+            for key in to_remove {
                 self.cache.remove(key);
             }
             if let Some(mut count) = self.counts.get_mut(&guild_id) {
@@ -56,14 +59,15 @@ impl MessageCache {
         // Garde de securite globale : empecher le cache de depasser 2x la limite
         if *count > self.max_per_guild * 2 {
             let excess = *count - self.max_per_guild;
-            let to_remove: Vec<(GuildId, MessageId)> = self
+            let mut guild_keys: Vec<(GuildId, MessageId)> = self
                 .cache
                 .iter()
                 .filter(|e| e.key().0 == guild_id)
-                .take(excess)
                 .map(|e| *e.key())
                 .collect();
-            for key in &to_remove {
+            guild_keys.sort_by_key(|k| k.1);
+            let to_remove = &guild_keys[..excess.min(guild_keys.len())];
+            for key in to_remove {
                 self.cache.remove(key);
             }
             *count = count.saturating_sub(to_remove.len());
