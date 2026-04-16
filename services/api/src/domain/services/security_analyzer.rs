@@ -223,4 +223,28 @@ mod tests {
         let now = chrono::Utc::now().timestamp();
         assert!(!is_account_suspicious(now - 100000, 86400)); // 27h old, min 24h
     }
+
+    #[test]
+    fn raid_analysis_single_join_no_raid() {
+        let joins = vec![JoinInfo { username: "solo".into(), has_avatar: true, account_created_timestamp: 1000 }];
+        assert_eq!(analyze_joins(&joins, 2, 3600).score, 0);
+    }
+
+    #[test]
+    fn similar_names_single_name() {
+        assert!(!has_similar_usernames(&["only".into()], 2));
+    }
+
+    #[test]
+    fn alt_detection_creation_near() {
+        let bans = vec![BannedUserInfo { username: "zzzzz".into(), account_created_timestamp: 5000 }];
+        let result = check_alt_account("completely_different", 5500, &bans, 1, 3600);
+        assert!(result.creation_near_banned.is_some());
+    }
+
+    #[test]
+    fn suspicious_account_future_timestamp() {
+        let future = chrono::Utc::now().timestamp() + 3600;
+        assert!(is_account_suspicious(future, 86400)); // future = suspect
+    }
 }

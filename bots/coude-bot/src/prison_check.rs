@@ -172,3 +172,48 @@ pub async fn check_component_in_prison(
 
     true
 }
+
+/// Helper testable : retourne true si le custom_id est bloque en prison.
+pub fn is_button_blocked(custom_id: &str) -> bool {
+    BLOCKED_BUTTON_PREFIXES.iter().any(|p| custom_id.starts_with(p))
+}
+
+/// Helper testable : retourne true si la commande est bloquee en prison.
+pub fn is_command_blocked(cmd_name: &str) -> bool {
+    BLOCKED_IN_PRISON.iter().any(|c| *c == cmd_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn coude_is_blocked() { assert!(is_command_blocked("coude")); }
+    #[test]
+    fn voler_is_blocked() { assert!(is_command_blocked("voler")); }
+    #[test]
+    fn braquage_is_blocked() { assert!(is_command_blocked("braquage")); }
+    #[test]
+    fn profil_not_blocked() { assert!(!is_command_blocked("profil")); }
+    #[test]
+    fn leaderboard_not_blocked() { assert!(!is_command_blocked("leaderboard")); }
+    #[test]
+    fn hp_not_blocked() { assert!(!is_command_blocked("hp")); }
+
+    #[test]
+    fn accept_button_blocked() { assert!(is_button_blocked("coude_accept:123")); }
+    #[test]
+    fn preconfirm_ok_blocked() { assert!(is_button_blocked("coude_prec_ok|456")); }
+    #[test]
+    fn defend_blocked() { assert!(is_button_blocked("coude_defend:789")); }
+    #[test]
+    fn steal_defend_blocked() { assert!(is_button_blocked("steal_defend:abc")); }
+    #[test]
+    fn refuse_not_blocked() { assert!(!is_button_blocked("coude_refuse:123")); }
+    #[test]
+    fn cancel_not_blocked() { assert!(!is_button_blocked("coude_cancel:123")); }
+    #[test]
+    fn class_not_blocked() { assert!(!is_button_blocked("class_select:tank")); }
+    #[test]
+    fn random_not_blocked() { assert!(!is_button_blocked("some_other_button")); }
+}
