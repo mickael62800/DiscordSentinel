@@ -4,6 +4,8 @@ use serenity::async_trait;
 use serenity::model::application::Interaction;
 use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
+use serenity::model::guild::Member;
+use serenity::model::id::GuildId;
 use serenity::prelude::*;
 use tracing::info;
 
@@ -28,6 +30,8 @@ impl EventHandler for Handler {
         let mut commands = Vec::new();
         commands.extend(modules::cleanup::register_commands());
         commands.extend(modules::games::register_commands());
+        commands.extend(modules::roles::register_commands());
+        commands.extend(modules::audit::register_commands());
 
         if let Err(e) = serenity::model::application::Command::set_global_commands(
             &ctx.http,
@@ -45,8 +49,21 @@ impl EventHandler for Handler {
         if msg.author.bot {
             return;
         }
-        // Games : detection mentions #Jeu
         modules::games::on_message(&ctx, &msg).await;
+    }
+
+    async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
+        modules::welcome::on_member_add(&ctx, &new_member).await;
+    }
+
+    async fn guild_member_removal(
+        &self,
+        ctx: Context,
+        guild_id: GuildId,
+        user: serenity::model::user::User,
+        _member: Option<Member>,
+    ) {
+        modules::welcome::on_member_remove(&ctx, guild_id, &user).await;
     }
 
     async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
@@ -56,6 +73,8 @@ impl EventHandler for Handler {
                 match name {
                     "purge" | "cleanup" => modules::cleanup::handle_command(&ctx, &command).await,
                     "game" => modules::games::handle_command(&ctx, &command).await,
+                    "roles-panel" => modules::roles::handle_command(&ctx, &command).await,
+                    "audit" => modules::audit::handle_command(&ctx, &command).await,
                     _ => {}
                 }
             }
