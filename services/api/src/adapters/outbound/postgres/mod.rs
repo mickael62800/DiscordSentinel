@@ -110,3 +110,6 @@ pub use review_repository::PgReviewRepository;
 
 mod modstats_repository;
 pub use modstats_repository::PgModstatsRepository;
+
+mod game_repository;
+pub use game_repository::PgGameRepository;

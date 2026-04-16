@@ -102,3 +102,6 @@ pub use review_repository::{ReviewEntry, ReviewRepository};
 
 mod modstats_repository;
 pub use modstats_repository::{ModeratorStat, ModstatsRepository};
+
+mod game_repository;
+pub use game_repository::{Game, GameRepository};

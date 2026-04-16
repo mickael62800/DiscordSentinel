@@ -10,13 +10,19 @@ use crate::domain::errors::DomainError;
 
 // ── DTOs ──
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct GameDto {
     pub id: String,
     pub guild_id: String,
     pub game_name: String,
     pub created_by: String,
     pub created_at: String,
+}
+
+impl From<crate::ports::outbound::Game> for GameDto {
+    fn from(g: crate::ports::outbound::Game) -> Self {
+        Self { id: g.id, guild_id: g.guild_id, game_name: g.game_name, created_by: g.created_by, created_at: g.created_at }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -31,31 +37,21 @@ pub struct SubscribeDto {
     pub user_id: String,
 }
 
-#[derive(Debug, Serialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct SubscriberDto {
     pub user_id: String,
 }
 
-// ── Games CRUD ──
+// ── Games CRUD (via GameRepository) ──
 
-/// GET /api/games/{guild_id}
 pub async fn list_games(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<GameDto>>, ApiError> {
-    let games = sqlx::query_as::<_, GameDto>(
-        r#"SELECT id::text, guild_id, game_name, created_by, created_at::text
-           FROM games WHERE guild_id = $1 ORDER BY game_name"#,
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
-    Ok(Json(games))
+    let games = state.game_repo.list(&guild_id).await?;
+    Ok(Json(games.into_iter().map(Into::into).collect()))
 }
 
-/// POST /api/games
 pub async fn create_game(
     State(state): State<AppState>,
     Json(dto): Json<CreateGameDto>,
@@ -67,145 +63,64 @@ pub async fn create_game(
     if name.len() > 100 {
         return Err(DomainError::ValidationError("Le nom du jeu ne peut pas depasser 100 caracteres".into()).into());
     }
-
-    let game = sqlx::query_as::<_, GameDto>(
-        r#"INSERT INTO games (guild_id, game_name, created_by)
-           VALUES ($1, $2, $3)
-           RETURNING id::text, guild_id, game_name, created_by, created_at::text"#,
-    )
-    .bind(&dto.guild_id)
-    .bind(&name)
-    .bind(&dto.created_by)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        if e.to_string().contains("idx_games_guild_name") {
-            ApiError::from(DomainError::Conflict("Un jeu avec ce nom existe deja".into()))
-        } else {
-            ApiError::from(DomainError::Internal(e.to_string()))
-        }
-    })?;
-
-    Ok(Json(game))
+    let game = state.game_repo.create(&dto.guild_id, &name, &dto.created_by).await?;
+    Ok(Json(game.into()))
 }
 
-/// DELETE /api/games/{guild_id}/{game_id}
 pub async fn delete_game(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     Path((guild_id, game_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    // Phase 7 B — Gate RBAC : admin+ pour supprimer une game configuree.
     if let Some(Extension(ctx)) = rbac {
         require_role(&ctx, Role::Admin)
             .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour supprimer une game".into())))?;
     }
-    let result = sqlx::query("DELETE FROM games WHERE guild_id = $1 AND id = $2::uuid")
-        .bind(&guild_id)
-        .bind(&game_id)
-        .execute(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
-    if result.rows_affected() == 0 {
+    if !state.game_repo.delete(&guild_id, &game_id).await? {
         return Err(DomainError::NotFound("Jeu introuvable".into()).into());
     }
-
     Ok(StatusCode::NO_CONTENT)
 }
 
 // ── Subscriptions ──
 
-/// POST /api/games/{guild_id}/{game_id}/subscribe
 pub async fn subscribe(
     State(state): State<AppState>,
     Path((guild_id, game_id)): Path<(String, String)>,
     Json(dto): Json<SubscribeDto>,
 ) -> Result<StatusCode, ApiError> {
-    sqlx::query(
-        r#"INSERT INTO game_subscriptions (guild_id, game_id, user_id)
-           VALUES ($1, $2::uuid, $3)
-           ON CONFLICT (game_id, user_id) DO NOTHING"#,
-    )
-    .bind(&guild_id)
-    .bind(&game_id)
-    .bind(&dto.user_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
+    state.game_repo.subscribe(&guild_id, &game_id, &dto.user_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// DELETE /api/games/{guild_id}/{game_id}/subscribe/{user_id}
 pub async fn unsubscribe(
     State(state): State<AppState>,
     Path((guild_id, game_id, user_id)): Path<(String, String, String)>,
 ) -> Result<StatusCode, ApiError> {
-    sqlx::query(
-        "DELETE FROM game_subscriptions WHERE guild_id = $1 AND game_id = $2::uuid AND user_id = $3",
-    )
-    .bind(&guild_id)
-    .bind(&game_id)
-    .bind(&user_id)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
+    state.game_repo.unsubscribe(&guild_id, &game_id, &user_id).await?;
     Ok(StatusCode::NO_CONTENT)
 }
 
-/// GET /api/games/{guild_id}/{game_id}/subscribers
 pub async fn get_subscribers(
     State(state): State<AppState>,
     Path((_guild_id, game_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<SubscriberDto>>, ApiError> {
-    let subs = sqlx::query_as::<_, SubscriberDto>(
-        "SELECT user_id FROM game_subscriptions WHERE game_id = $1::uuid",
-    )
-    .bind(&game_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
-    Ok(Json(subs))
+    let subs = state.game_repo.get_subscribers(&game_id).await?;
+    Ok(Json(subs.into_iter().map(|u| SubscriberDto { user_id: u }).collect()))
 }
 
-/// GET /api/games/{guild_id}/by-name/{game_name}
 pub async fn get_game_by_name(
     State(state): State<AppState>,
     Path((guild_id, game_name)): Path<(String, String)>,
 ) -> Result<Json<Option<GameDto>>, ApiError> {
-    let game = sqlx::query_as::<_, GameDto>(
-        r#"SELECT id::text, guild_id, game_name, created_by, created_at::text
-           FROM games WHERE guild_id = $1 AND LOWER(game_name) = LOWER($2)"#,
-    )
-    .bind(&guild_id)
-    .bind(&game_name)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
-    Ok(Json(game))
+    let game = state.game_repo.find_by_name(&guild_id, &game_name).await?;
+    Ok(Json(game.map(Into::into)))
 }
 
-/// GET /api/games/{guild_id}/user/{user_id}
 pub async fn get_user_games(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<Vec<GameDto>>, ApiError> {
-    let games = sqlx::query_as::<_, GameDto>(
-        r#"SELECT g.id::text, g.guild_id, g.game_name, g.created_by, g.created_at::text
-           FROM games g
-           INNER JOIN game_subscriptions gs ON gs.game_id = g.id
-           WHERE g.guild_id = $1 AND gs.user_id = $2
-           ORDER BY g.game_name"#,
-    )
-    .bind(&guild_id)
-    .bind(&user_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
-    Ok(Json(games))
+    let games = state.game_repo.get_user_games(&guild_id, &user_id).await?;
+    Ok(Json(games.into_iter().map(Into::into).collect()))
 }
