@@ -8,7 +8,7 @@ use tracing::{info, warn};
 use sentinel_shared::embeds::{success_embed, info_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use crate::api_client::GameApiClient;
+use super::api_client::GameApiClient;
 
 pub fn all() -> Vec<CreateCommand> {
     vec![register()]

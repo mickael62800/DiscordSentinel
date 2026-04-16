@@ -8,7 +8,7 @@ use sentinel_shared::discord_helpers::reply_ephemeral_embed;
 use sentinel_shared::embeds::{success_embed, moderate_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use crate::api_client::ApiClient;
+use super::api_client::ApiClient;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("cleanup")

@@ -28,7 +28,7 @@ async fn main() {
         .init();
 
     let config = Config::from_env();
-    info!(api_url = %config.base().api_base_url(), "Demarrage de Sentinel Bot (unifie)");
+    info!("Demarrage de Sentinel Bot (unifie)");
 
     let api = Arc::new(sentinel_shared::api_client::BaseApiClient::new(&config, "sentinel-bot"));
 
@@ -45,7 +45,7 @@ async fn main() {
         | GatewayIntents::GUILD_MEMBERS
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
-        | GatewayIntents::GUILD_BANS;
+        | GatewayIntents::GUILD_MODERATION;
 
     let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
