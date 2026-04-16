@@ -30,7 +30,8 @@ pub struct ActivityQuery {
     pub offset: Option<u32>,
 }
 
-/// POST /api/user-activity — enregistrer un evenement d'activite
+/// POST /api/user-activity — enregistrer un evenement d'activite.
+/// Passe par le repository (plus de SQL direct dans le handler).
 pub async fn create_activity(
     State(state): State<AppState>,
     Json(dto): Json<CreateActivityDto>,
@@ -47,25 +48,7 @@ pub async fn create_activity(
         created_at: chrono::Utc::now(),
     };
 
-    sqlx::query(
-        r#"
-        INSERT INTO user_activity_log (id, guild_id, user_id, event_type, channel_id, channel_name, content, metadata, created_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-        "#,
-    )
-    .bind(activity.id)
-    .bind(&activity.guild_id)
-    .bind(&activity.user_id)
-    .bind(&activity.event_type)
-    .bind(&activity.channel_id)
-    .bind(&activity.channel_name)
-    .bind(&activity.content)
-    .bind(&activity.metadata)
-    .bind(activity.created_at)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(|e| crate::domain::errors::DomainError::Internal(e.to_string()))?;
-
+    state.user_activity_repo.create(&activity).await?;
     Ok(ok_response())
 }
 
@@ -78,71 +61,9 @@ pub async fn get_activity(
     let limit = params.limit.unwrap_or(50).min(200) as i64;
     let offset = params.offset.unwrap_or(0) as i64;
 
-    let rows = if let Some(ref event_type) = params.event_type {
-        sqlx::query_as::<_, ActivityRow>(
-            r#"
-            SELECT id, guild_id, user_id, event_type, channel_id, channel_name, content, metadata, created_at
-            FROM user_activity_log
-            WHERE guild_id = $1 AND user_id = $2 AND event_type = $3
-            ORDER BY created_at DESC
-            LIMIT $4 OFFSET $5
-            "#,
-        )
-        .bind(&guild_id)
-        .bind(&user_id)
-        .bind(event_type)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&state.pg_pool)
-        .await
-    } else {
-        sqlx::query_as::<_, ActivityRow>(
-            r#"
-            SELECT id, guild_id, user_id, event_type, channel_id, channel_name, content, metadata, created_at
-            FROM user_activity_log
-            WHERE guild_id = $1 AND user_id = $2
-            ORDER BY created_at DESC
-            LIMIT $3 OFFSET $4
-            "#,
-        )
-        .bind(&guild_id)
-        .bind(&user_id)
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(&state.pg_pool)
-        .await
-    }
-    .map_err(|e| crate::domain::errors::DomainError::Internal(e.to_string()))?;
-
-    let activities: Vec<UserActivity> = rows.into_iter().map(|r| r.into()).collect();
+    let activities = state
+        .user_activity_repo
+        .list(&guild_id, &user_id, params.event_type.as_deref(), limit, offset)
+        .await?;
     Ok(Json(activities))
-}
-
-#[derive(sqlx::FromRow)]
-struct ActivityRow {
-    id: uuid::Uuid,
-    guild_id: String,
-    user_id: String,
-    event_type: String,
-    channel_id: Option<String>,
-    channel_name: Option<String>,
-    content: Option<String>,
-    metadata: serde_json::Value,
-    created_at: chrono::DateTime<chrono::Utc>,
-}
-
-impl From<ActivityRow> for UserActivity {
-    fn from(r: ActivityRow) -> Self {
-        Self {
-            id: r.id,
-            guild_id: r.guild_id,
-            user_id: r.user_id,
-            event_type: r.event_type,
-            channel_id: r.channel_id,
-            channel_name: r.channel_name,
-            content: r.content,
-            metadata: r.metadata,
-            created_at: r.created_at,
-        }
-    }
 }

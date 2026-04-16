@@ -19,7 +19,8 @@ pub async fn create_audit_log(
     Ok(single_dto(log))
 }
 
-/// DELETE /api/audit-logs/{guild_id} — purge totale des audit logs d'une guild.
+/// DELETE /api/audit-logs/{guild_id} — purge les audit logs d'une guild
+/// anterieurs a 0 jours (= tout). Passe par le use case, pas de SQL direct.
 pub async fn purge_audit_logs(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -31,19 +32,19 @@ pub async fn purge_audit_logs(
     )
     .await?;
 
-    let res = sqlx::query("DELETE FROM audit_logs WHERE guild_id = $1")
-        .bind(&guild_id)
-        .execute(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("purge audit logs: {e}"))))?;
-
-    Ok(Json(serde_json::json!({ "deleted": res.rows_affected() })))
+    let deleted = state.audit_logs_uc.delete_older_than_days(&guild_id, 0).await?;
+    Ok(Json(serde_json::json!({ "deleted": deleted })))
 }
 
 pub async fn list_audit_logs(
     State(state): State<AppState>,
     Query(params): Query<AuditLogQueryParams>,
 ) -> Result<Json<Vec<AuditLogResponseDto>>, ApiError> {
+    // Securite : guild_id obligatoire pour eviter une fuite inter-guild.
+    let guild_id = params.guild_id.ok_or_else(|| {
+        ApiError(DomainError::ValidationError("guild_id est obligatoire".into()))
+    })?;
+
     let filters = AuditLogFilters {
         event_type: params.event_type,
         actor_id: params.actor_id,
@@ -54,7 +55,7 @@ pub async fn list_audit_logs(
 
     let logs = state
         .audit_logs_uc
-        .list(params.guild_id.as_deref(), filters)
+        .list(Some(&guild_id), filters)
         .await?;
     Ok(map_to_dtos(logs))
 }

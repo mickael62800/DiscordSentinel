@@ -71,6 +71,7 @@ pub struct AppState {
     pub api_key: String,
     #[allow(dead_code)]
     pub discord_bot_token: String,
+    pub user_activity_repo: Arc<dyn crate::ports::outbound::UserActivityRepository>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

@@ -87,3 +87,6 @@ pub use coude_taunts_repository::CoudeTauntsRepository;
 
 mod coude_heist_repository;
 pub use coude_heist_repository::CoudeHeistRepository;
+
+mod user_activity_repository;
+pub use user_activity_repository::UserActivityRepository;
