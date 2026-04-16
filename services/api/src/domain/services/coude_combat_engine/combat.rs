@@ -631,6 +631,18 @@ pub fn resolve_combat(
         }
         final_msg.push_str(pick_random(COMBAT_DRAW));
 
+        if chaos_count > 0 {
+            let chaos_list: Vec<String> = rounds
+                .iter()
+                .filter_map(|r| r.chaos_event.as_ref().map(|ce| format!("{} {}", ce.emoji(), ce.label())))
+                .collect();
+            final_msg.push_str(&format!(
+                "\n\n\u{1f300} **Chaos ({})** : {}",
+                chaos_count,
+                chaos_list.join(", ")
+            ));
+        }
+
         return CombatResult {
             winner_id: None,
             loser_id: None,
@@ -778,6 +790,19 @@ pub fn resolve_combat(
                 def_name, handicap_pct
             ));
         }
+    }
+
+    // Resume chaos en fin de combat pour visibilite.
+    if chaos_count > 0 {
+        let chaos_list: Vec<String> = rounds
+            .iter()
+            .filter_map(|r| r.chaos_event.as_ref().map(|ce| format!("{} {}", ce.emoji(), ce.label())))
+            .collect();
+        final_msg.push_str(&format!(
+            "\n\n\u{1f300} **Chaos ({})** : {}",
+            chaos_count,
+            chaos_list.join(", ")
+        ));
     }
 
     CombatResult {

@@ -3,9 +3,10 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tracing::debug;
 
 use crate::domain::entities::{
-    build_taunt_event, CoudeTauntsConfig, StreakKind, TauntEvent,
+    build_taunt_event, crossed_threshold, CoudeTauntsConfig, StreakKind, TauntEvent,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
@@ -37,16 +38,37 @@ impl ManageCoudeTauntsService {
         new_streak: Option<i32>,
     ) -> Result<Option<TauntEvent>, DomainError> {
         let Some(new_streak) = new_streak else {
+            debug!(guild_id, user_id, kind = kind.as_str(), "taunt: joueur introuvable (streak None)");
             return Ok(None);
         };
-        // Lecture config + opt-out. Une absence de row cote config donne
-        // enabled=true sans channel → pas d'event.
+
+        // Diagnostic : log la streak a chaque touch pour tracer la progression.
+        debug!(guild_id, user_id, kind = kind.as_str(), new_streak, "taunt: streak updated");
+
+        // Pas un seuil (3/5/10) → pas de taunt, pas besoin de charger la config.
+        if crossed_threshold(new_streak).is_none() {
+            return Ok(None);
+        }
+
         let config = self.taunts_repo.get_or_init_config(guild_id).await?;
-        if !config.enabled || config.channel_id.is_none() {
+        if !config.enabled {
+            debug!(guild_id, "taunt: config disabled pour cette guild");
+            return Ok(None);
+        }
+        if config.channel_id.is_none() {
+            debug!(guild_id, "taunt: pas de channel_id configure");
             return Ok(None);
         }
         let opted_out = self.taunts_repo.is_opted_out(guild_id, user_id).await?;
-        Ok(build_taunt_event(&config, user_id, kind, new_streak, opted_out))
+        if opted_out {
+            debug!(guild_id, user_id, "taunt: joueur a opt-out");
+            return Ok(None);
+        }
+        let event = build_taunt_event(&config, user_id, kind, new_streak, opted_out);
+        if event.is_some() {
+            debug!(guild_id, user_id, kind = kind.as_str(), new_streak, "taunt: event emis !");
+        }
+        Ok(event)
     }
 }
 
