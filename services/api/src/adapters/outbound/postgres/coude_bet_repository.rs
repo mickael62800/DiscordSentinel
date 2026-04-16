@@ -5,6 +5,8 @@ use uuid::Uuid;
 use crate::adapters::outbound::postgres::wallet_tx_log::log_wallet_tx;
 use crate::domain::entities::{BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary};
 use crate::domain::errors::DomainError;
+
+use super::pg_err;
 use crate::ports::outbound::CoudeBetRepository;
 
 pub struct PgCoudeBetRepository {
@@ -46,9 +48,6 @@ impl From<BetRow> for CoudeBet {
     }
 }
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(e.to_string())
-}
 
 #[async_trait]
 impl CoudeBetRepository for PgCoudeBetRepository {

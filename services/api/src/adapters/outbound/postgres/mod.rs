@@ -1,3 +1,11 @@
+use crate::domain::errors::DomainError;
+
+/// Helper centralise : convertit une erreur sqlx en DomainError::Internal.
+/// Utilise par tous les repositories Postgres.
+pub(crate) fn pg_err(e: sqlx::Error) -> DomainError {
+    DomainError::Internal(e.to_string())
+}
+
 mod bot_config_repository;
 mod conduct_repository;
 mod guild_repository;

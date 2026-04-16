@@ -5,6 +5,8 @@ use uuid::Uuid;
 
 use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
 use crate::domain::errors::DomainError;
+
+use super::pg_err;
 use crate::ports::outbound::CoudeCombatRepository;
 
 pub struct PgCoudeCombatRepository {
@@ -78,9 +80,6 @@ impl From<CombatRow> for CoudeCombat {
     }
 }
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(e.to_string())
-}
 
 #[async_trait]
 impl CoudeCombatRepository for PgCoudeCombatRepository {

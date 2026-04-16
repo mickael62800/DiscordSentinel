@@ -4,6 +4,8 @@ use sqlx::PgPool;
 
 use crate::domain::entities::{CombatStat, CoudePlayer, XpProgress};
 use crate::domain::errors::DomainError;
+
+use crate::adapters::outbound::postgres::pg_err;
 use crate::domain::value_objects::CoudeClass;
 use crate::ports::outbound::CoudePlayerRepository;
 
@@ -104,9 +106,6 @@ impl From<PlayerRow> for CoudePlayer {
     }
 }
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(e.to_string())
-}
 
 mod coins;
 mod combat_stats;

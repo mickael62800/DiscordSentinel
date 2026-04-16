@@ -7,6 +7,8 @@ use crate::domain::entities::{
     CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
 };
 use crate::domain::errors::DomainError;
+
+use super::pg_err;
 use crate::ports::outbound::CoudeInventoryRepository;
 
 pub struct PgCoudeInventoryRepository {
@@ -19,9 +21,6 @@ impl PgCoudeInventoryRepository {
     }
 }
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(e.to_string())
-}
 
 #[derive(sqlx::FromRow)]
 struct InventoryRow {
