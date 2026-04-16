@@ -10,6 +10,13 @@ use sentinel_shared::discord_helpers::{defer_ephemeral, followup_ephemeral_embed
 use sentinel_shared::embeds::{success_embed, moderate_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
+/// Limite Discord : bulk_delete ne fonctionne que sur les messages < 14 jours.
+const DISCORD_BULK_DELETE_MAX_AGE_SECS: i64 = 14 * 24 * 60 * 60;
+/// Taille de batch pour bulk_delete Discord (max 100 par appel API Discord).
+const DISCORD_BULK_DELETE_BATCH: usize = 100;
+/// Delai entre suppressions individuelles (rate limit Discord).
+const DISCORD_DELETE_RATE_LIMIT_MS: u64 = 300;
+
 pub fn register() -> CreateCommand {
     CreateCommand::new("purge")
         .description("Supprimer des messages dans le salon")
@@ -308,7 +315,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     // Separer les messages recents (< 14 jours) des anciens
     let now = chrono_now_unix();
-    let fourteen_days_secs: i64 = 14 * 24 * 60 * 60;
+    let fourteen_days_secs = DISCORD_BULK_DELETE_MAX_AGE_SECS;
 
     let mut recent_ids: Vec<MessageId> = Vec::new();
     let mut old_ids: Vec<MessageId> = Vec::new();
@@ -327,7 +334,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let mut errors = 0u64;
 
     // Suppression en masse des messages recents (par lots de 100)
-    for chunk in recent_ids.chunks(100) {
+    for chunk in recent_ids.chunks(DISCORD_BULK_DELETE_BATCH) {
         if chunk.len() == 1 {
             // bulk_delete requiert au moins 2 messages
             if let Err(e) = channel_id.delete_message(&ctx.http, chunk[0]).await {
@@ -349,7 +356,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                         } else {
                             deleted += 1;
                         }
-                        tokio::time::sleep(Duration::from_millis(300)).await;
+                        tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
                     }
                 }
             }
@@ -365,7 +372,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             deleted += 1;
         }
         // Rate limit
-        tokio::time::sleep(Duration::from_millis(300)).await;
+        tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
     }
 
     // Reponse embed
@@ -431,13 +438,13 @@ fn chrono_now_unix() -> i64 {
 async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64, u64) {
     let mut deleted: u64 = 0;
     let mut errors: u64 = 0;
-    let fourteen_days_secs: i64 = 14 * 24 * 60 * 60;
+    let fourteen_days_secs = DISCORD_BULK_DELETE_MAX_AGE_SECS;
     // Garde-fou : eviter une boucle infinie si un message refuse systematiquement de mourir
     let mut empty_streak = 0u32;
 
     loop {
         let messages = match channel_id
-            .messages(&ctx.http, GetMessages::new().limit(100))
+            .messages(&ctx.http, GetMessages::new().limit(DISCORD_BULK_DELETE_BATCH as u8))
             .await
         {
             Ok(m) => m,
@@ -463,7 +470,7 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
             }
         }
 
-        for chunk in recent_ids.chunks(100) {
+        for chunk in recent_ids.chunks(DISCORD_BULK_DELETE_BATCH) {
             if chunk.len() == 1 {
                 if let Err(e) = channel_id.delete_message(&ctx.http, chunk[0]).await {
                     error!(error = %e, "Erreur delete individuel (purge all)");
@@ -483,7 +490,7 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
                             } else {
                                 deleted += 1;
                             }
-                            tokio::time::sleep(Duration::from_millis(300)).await;
+                            tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
                         }
                     }
                 }
@@ -497,7 +504,7 @@ async fn purge_all(ctx: &Context, channel_id: serenity::all::ChannelId) -> (u64,
             } else {
                 deleted += 1;
             }
-            tokio::time::sleep(Duration::from_millis(300)).await;
+            tokio::time::sleep(Duration::from_millis(DISCORD_DELETE_RATE_LIMIT_MS)).await;
         }
 
         if deleted == before {
