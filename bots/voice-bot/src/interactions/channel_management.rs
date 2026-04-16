@@ -463,15 +463,7 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
         return;
     }
 
-    // Rename the Discord voice channel
-    let edit = EditChannel::new().name(&new_name);
-    if let Err(e) = voice_channel_id.edit(&ctx.http, edit).await {
-        error!(error = %e, "Erreur rename Discord");
-        super::respond_ephemeral_modal(ctx, modal, "Erreur lors du renommage.").await;
-        return;
-    }
-
-    // Also rename the category if it exists
+    // Rename la categorie Discord (le vocal garde son nom d'origine).
     {
         let data = ctx.data.read().await;
         let Some(api) = ApiClient::from_data(&data) else {
@@ -483,10 +475,18 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
                 if let Ok(cat_id) = cat_id_str.parse::<u64>() {
                     let cat_edit = EditChannel::new().name(&new_name);
                     if let Err(e) = ChannelId::new(cat_id).edit(&ctx.http, cat_edit).await {
-                        tracing::warn!(error = %e, "failed to rename category");
+                        error!(error = %e, "Erreur rename categorie Discord");
+                        super::respond_ephemeral_modal(ctx, modal, "Erreur lors du renommage.").await;
+                        return;
                     }
                 }
+            } else {
+                super::respond_ephemeral_modal(ctx, modal, "Pas de categorie associee.").await;
+                return;
             }
+        } else {
+            super::respond_ephemeral_modal(ctx, modal, "Salon introuvable.").await;
+            return;
         }
     }
 

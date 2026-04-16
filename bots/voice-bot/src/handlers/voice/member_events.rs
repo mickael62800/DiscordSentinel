@@ -154,13 +154,13 @@ pub async fn handle_voice_state_update(
 /// transfere automatiquement l'ownership au premier membre restant. Evite
 /// qu'un salon devienne orphelin sans possibilite de reprise.
 ///
-/// Au lieu de transferer silencieusement, on poste un message interactif
-/// dans le salon membres (visible par tous) demandant qui veut reprendre.
-/// Le premier qui clique sur le bouton devient le nouveau owner.
-/// L'ancien owner est downgrade (retrait MANAGE_CHANNELS + acces panel).
+/// Logique :
+/// 1. S'il existe un co-admin present dans le vocal → transfert direct.
+/// 2. Sinon → poste un bouton "Reprendre le salon" dans le panel membres.
+/// L'ancien owner est toujours downgrade (retrait MANAGE_CHANNELS + panel).
 async fn maybe_auto_transfer_ownership(
     ctx: &Context,
-    _guild_id: GuildId,
+    guild_id: GuildId,
     voice_channel_id: ChannelId,
     leaving_user: UserId,
 ) {
@@ -207,7 +207,16 @@ async fn maybe_auto_transfer_ownership(
         }
     }
 
-    // Poster la candidature dans le salon membres (visible par tous).
+    // Chercher un co-admin present dans le vocal → transfert direct.
+    let co_admin_candidate = find_co_admin_in_voice(ctx, guild_id, voice_channel_id, leaving_user).await;
+
+    if let Some(new_owner) = co_admin_candidate {
+        // Transfert direct au co-admin.
+        do_direct_transfer(ctx, voice_channel_id, new_owner, text_channel_id).await;
+        return;
+    }
+
+    // Aucun co-admin → poster le bouton candidature dans le panel membres.
     let members_channel_id = {
         let data = ctx.data.read().await;
         data.get::<crate::handler::MembersToVoiceMapKey>().and_then(|map| {
@@ -247,6 +256,128 @@ async fn maybe_auto_transfer_ownership(
         voice = %voice_channel_id,
         old_owner = %leaving_user,
         "Ownership en attente de candidature (owner a quitte)"
+    );
+}
+
+/// Cherche un co-admin present dans le vocal (hors l'owner qui part).
+async fn find_co_admin_in_voice(
+    ctx: &Context,
+    guild_id: GuildId,
+    voice_channel_id: ChannelId,
+    leaving_user: UserId,
+) -> Option<UserId> {
+    // 1. Fetch la liste des co-admins depuis l'API.
+    let co_admin_ids: Vec<u64> = {
+        let data = ctx.data.read().await;
+        let api = crate::api_client::ApiClient::from_data(&data)?;
+        match api.get_channel_co_admins(&voice_channel_id.get().to_string()).await {
+            Ok(ids) => ids.iter().filter_map(|s| s.parse().ok()).collect(),
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to fetch co-admins for auto-transfer");
+                return None;
+            }
+        }
+    };
+    if co_admin_ids.is_empty() {
+        return None;
+    }
+
+    // 2. Trouver le premier co-admin present dans le vocal.
+    ctx.cache.guild(guild_id).and_then(|guild| {
+        guild
+            .voice_states
+            .values()
+            .filter(|vs| vs.channel_id == Some(voice_channel_id) && vs.user_id != leaving_user)
+            .map(|vs| vs.user_id)
+            .find(|uid| co_admin_ids.contains(&uid.get()))
+    })
+}
+
+/// Transfert direct au nouveau owner (co-admin) : API + permissions + notification.
+async fn do_direct_transfer(
+    ctx: &Context,
+    voice_channel_id: ChannelId,
+    new_owner: UserId,
+    text_channel_id: Option<ChannelId>,
+) {
+    let new_owner_name = new_owner
+        .to_user(&ctx.http)
+        .await
+        .map(|u| u.name)
+        .unwrap_or_else(|_| new_owner.to_string());
+
+    // API : persister le transfert.
+    {
+        let data = ctx.data.read().await;
+        if let Some(api) = crate::api_client::ApiClient::from_data(&data) {
+            let req = crate::api_client::TransferOwnershipRequest {
+                new_owner_id: new_owner.get().to_string(),
+                new_owner_name: new_owner_name.clone(),
+            };
+            if let Err(e) = api
+                .transfer_ownership(&voice_channel_id.get().to_string(), &req)
+                .await
+            {
+                tracing::warn!(error = %e, "Erreur API transfer co-admin");
+            }
+        }
+        if let Some(map) = data.get::<crate::handler::VoiceOwnerMapKey>() {
+            map.insert(voice_channel_id, new_owner);
+        }
+    }
+
+    // Permissions Discord sur le vocal.
+    let owner_perm = serenity::model::channel::PermissionOverwrite {
+        allow: serenity::model::Permissions::CONNECT
+            | serenity::model::Permissions::VIEW_CHANNEL
+            | serenity::model::Permissions::SPEAK
+            | serenity::model::Permissions::MOVE_MEMBERS
+            | serenity::model::Permissions::MUTE_MEMBERS
+            | serenity::model::Permissions::DEAFEN_MEMBERS
+            | serenity::model::Permissions::MANAGE_CHANNELS,
+        deny: serenity::model::Permissions::empty(),
+        kind: serenity::model::channel::PermissionOverwriteType::Member(new_owner),
+    };
+    if let Err(e) = voice_channel_id.create_permission(&ctx.http, owner_perm).await {
+        tracing::warn!(error = %e, "failed to grant co-admin owner permission");
+    }
+
+    // Permissions panel admin texte.
+    if let Some(tid) = text_channel_id {
+        let text_perm = serenity::model::channel::PermissionOverwrite {
+            allow: serenity::model::Permissions::VIEW_CHANNEL
+                | serenity::model::Permissions::SEND_MESSAGES
+                | serenity::model::Permissions::READ_MESSAGE_HISTORY,
+            deny: serenity::model::Permissions::empty(),
+            kind: serenity::model::channel::PermissionOverwriteType::Member(new_owner),
+        };
+        if let Err(e) = tid.create_permission(&ctx.http, text_perm).await {
+            tracing::warn!(error = %e, "failed to grant co-admin admin panel access");
+        }
+
+        // Notification dans le panel admin.
+        let embed = serenity::builder::CreateEmbed::new()
+            .title("\u{1f504} Co-admin promu proprietaire")
+            .description(format!(
+                "L'ancien proprietaire a quitte le vocal.\n\
+                 <@{}> (co-admin) a ete automatiquement promu.",
+                new_owner.get()
+            ))
+            .color(0x3498db)
+            .timestamp(serenity::model::Timestamp::now());
+
+        if let Err(e) = tid
+            .send_message(&ctx.http, serenity::builder::CreateMessage::new().embed(embed))
+            .await
+        {
+            tracing::warn!(error = %e, "failed to send co-admin promotion notification");
+        }
+    }
+
+    tracing::info!(
+        voice = %voice_channel_id,
+        new_owner = %new_owner,
+        "Co-admin promu automatiquement"
     );
 }
 

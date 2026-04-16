@@ -266,6 +266,23 @@ impl ApiClient {
         Ok(resp.channel.map(proto_to_response))
     }
 
+    /// Retourne le channel + la liste des co-admins (user_ids).
+    pub async fn get_channel_co_admins(
+        &self,
+        channel_id: &str,
+    ) -> Result<Vec<String>, String> {
+        let req = proto::GetChannelRequest {
+            channel_id: channel_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        let resp = g
+            .guarded(|| async move { client.get_channel(req).await.map(|r| r.into_inner()) })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(resp.co_admins.into_iter().map(|ca| ca.user_id).collect())
+    }
+
     // ── Transfer ──
 
     pub async fn transfer_ownership(

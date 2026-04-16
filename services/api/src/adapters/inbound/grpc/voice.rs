@@ -103,11 +103,23 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
     ) -> Result<Response<proto::GetChannelResponse>, Status> {
         let req = request.into_inner();
         match self.uc.get_channel_detail(&req.channel_id).await {
-            Ok(detail) => Ok(Response::new(proto::GetChannelResponse {
-                channel: Some(voice_channel_to_proto(detail.channel)),
-            })),
+            Ok(detail) => {
+                let co_admins = detail
+                    .co_admins
+                    .iter()
+                    .map(|ca| proto::CoAdmin {
+                        user_id: ca.user_id.clone(),
+                        user_name: ca.user_name.clone(),
+                    })
+                    .collect();
+                Ok(Response::new(proto::GetChannelResponse {
+                    channel: Some(voice_channel_to_proto(detail.channel)),
+                    co_admins,
+                }))
+            }
             Err(DomainError::NotFound(_)) => Ok(Response::new(proto::GetChannelResponse {
                 channel: None,
+                co_admins: vec![],
             })),
             Err(e) => Err(domain_to_status(e)),
         }

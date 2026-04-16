@@ -37,6 +37,12 @@ message GetChannelRequest {
 // `channel` absent si introuvable (parite avec HTTP 404).
 message GetChannelResponse {
   optional VoiceChannel channel = 1;
+  repeated CoAdmin co_admins = 2;
+}
+
+message CoAdmin {
+  string user_id = 1;
+  string user_name = 2;
 }
 
 message CreateChannelRequest {
