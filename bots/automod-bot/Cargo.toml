@@ -19,6 +19,8 @@ time = "0.3"
 tracing-subscriber = { workspace = true }
 regex = "1"
 dashmap = { workspace = true }
+base64 = "0.22"
+redis = { version = "0.27", features = ["tokio-comp"] }
 
 # Phase 1 — Quick wins : jemalloc en allocateur global (Linux/macOS uniquement,
 # pas supporte sur MSVC Windows). Gain typique : -15 % RAM residente sur les

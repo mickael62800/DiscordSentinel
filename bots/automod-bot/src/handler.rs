@@ -8,7 +8,7 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::model::id::{ChannelId, MessageId, UserId};
 use serenity::prelude::*;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
@@ -1208,8 +1208,9 @@ async fn execute_action(
     Ok(())
 }
 
-/// Analyse les images attachees a un message via l'API gRPC.
-/// Zero logique metier : telechargement + appel API + execution action retournee.
+/// Analyse les images attachees a un message via le ai-worker (async).
+/// Flow : telecharge image → soumet job AI via HTTP → attend resultat Redis → execute action.
+/// Ne bloque PAS l'API (l'inference est faite par le ai-worker en background).
 async fn analyze_message_images(
     ctx: &Context,
     msg: &Message,
@@ -1217,7 +1218,6 @@ async fn analyze_message_images(
     _log_channel_id: u64,
     colors: &EmbedColors,
 ) {
-    // Collecter les URLs d'images depuis les attachments.
     let image_urls: Vec<String> = msg
         .attachments
         .iter()
@@ -1235,19 +1235,16 @@ async fn analyze_message_images(
     }
 
     let data = ctx.data.read().await;
-    let (Some(base), Some(grpc)) = (
-        data.get::<sentinel_shared::heartbeat::ApiClientKey>(),
-        data.get::<sentinel_shared::grpc_client::GrpcClientKey>(),
-    ) else {
+    let Some(base) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() else {
         return;
     };
-    let api = crate::api_client::ApiClient::new(Arc::clone(base), Arc::clone(grpc));
 
     let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let http_client = reqwest::Client::new();
+    let api_url = base.base_url().to_string();
 
     for url in &image_urls {
-        // Telecharger l'image depuis Discord (IO pur, pas de logique).
+        // 1. Telecharger l'image depuis Discord.
         let bytes = match http_client.get(url).send().await {
             Ok(resp) if resp.status().is_success() => match resp.bytes().await {
                 Ok(b) => b.to_vec(),
@@ -1257,44 +1254,104 @@ async fn analyze_message_images(
             Err(e) => { warn!(error = %e, url, "Echec download image"); continue; }
         };
 
-        // Limiter la taille (14 Mo max).
         if bytes.len() > 14 * 1024 * 1024 {
             continue;
         }
 
-        // Appel API — l'API decide de l'action (zero logique ici).
-        let response = match api
-            .analyze_image(
-                &guild_id,
-                &msg.channel_id.to_string(),
-                &msg.author.id.to_string(),
-                &msg.author.name,
-                &msg.id.to_string(),
-                bytes,
-            )
+        // 2. Soumettre un job AI via l'API (non-bloquant, queue DB).
+        let payload = serde_json::json!({
+            "guild_id": guild_id,
+            "channel_id": msg.channel_id.to_string(),
+            "user_id": msg.author.id.to_string(),
+            "username": msg.author.name,
+            "message_id": msg.id.to_string(),
+            "image_base64": base64_encode(&bytes),
+        });
+
+        let submit_resp = match http_client
+            .post(format!("{api_url}/api/ai/jobs"))
+            .json(&serde_json::json!({
+                "guild_id": guild_id,
+                "job_type": "analyze_image",
+                "input_payload": payload,
+            }))
+            .send()
             .await
         {
             Ok(r) => r,
-            Err(e) => { warn!(error = %e, "Echec analyse image API"); continue; }
+            Err(e) => { warn!(error = %e, "Echec soumission job AI image"); continue; }
         };
 
-        if response.action == crate::api_client::Action::None {
+        if !submit_resp.status().is_success() {
+            warn!(status = %submit_resp.status(), "Job AI image refuse par l'API");
             continue;
         }
 
-        let reason = response.reason.as_deref().unwrap_or("Image detectee");
-        info!(
-            user = %msg.author.name,
-            action = ?response.action,
-            reason,
-            "Image moderation action"
-        );
+        let job_resp: serde_json::Value = match submit_resp.json().await {
+            Ok(v) => v,
+            Err(e) => { warn!(error = %e, "Echec parse reponse job AI"); continue; }
+        };
 
-        if let Err(e) = execute_action(ctx, msg, &response.action, Some(reason), mute_duration_secs, colors).await {
-            warn!(error = %e, "Echec execution action image");
+        let job_id = match job_resp.get("job_id").and_then(|v| v.as_str()) {
+            Some(id) => id.to_string(),
+            None => { warn!("job_id absent de la reponse"); continue; }
+        };
+
+        // 3. Attendre le resultat via Redis (pub/sub avec timeout 30s).
+        let redis_key = format!("ai_result:{job_id}");
+        let result = wait_for_ai_result(base, &redis_key).await;
+
+        let Some(result_json) = result else {
+            debug!(job_id, "Pas de resultat AI dans le delai (image)");
+            continue;
+        };
+
+        // 4. Extraire l'action retournee par l'API.
+        let action_str = result_json.get("action").and_then(|v| v.as_str()).unwrap_or("none");
+        let reason = result_json.get("reason").and_then(|v| v.as_str()).unwrap_or("Image detectee");
+
+        let action = match action_str {
+            "warn" => crate::api_client::Action::Warn,
+            "delete" => crate::api_client::Action::Delete,
+            "mute" => crate::api_client::Action::Mute,
+            "ban" => crate::api_client::Action::Ban,
+            _ => crate::api_client::Action::None,
+        };
+
+        if action == crate::api_client::Action::None {
+            continue;
         }
 
-        // Une seule action par message suffit (l'image la plus severe gagne).
+        info!(user = %msg.author.name, action = ?action, reason, "Image moderation (via ai-worker)");
+        if let Err(e) = execute_action(ctx, msg, &action, Some(reason), mute_duration_secs, colors).await {
+            warn!(error = %e, "Echec execution action image");
+        }
         break;
     }
+}
+
+/// Encode bytes en base64.
+fn base64_encode(bytes: &[u8]) -> String {
+    use base64::Engine;
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+/// Attend le resultat d'un job AI via Redis GET (poll 1s, timeout 30s).
+async fn wait_for_ai_result(
+    _base: &sentinel_shared::api_client::BaseApiClient,
+    redis_key: &str,
+) -> Option<serde_json::Value> {
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379".into());
+    let client = redis::Client::open(redis_url.as_str()).ok()?;
+    let mut conn = client.get_multiplexed_async_connection().await.ok()?;
+
+    // Poll toutes les secondes pendant 30s max.
+    for _ in 0..30 {
+        let val: Option<String> = redis::AsyncCommands::get(&mut conn, redis_key).await.ok()?;
+        if let Some(json_str) = val {
+            return serde_json::from_str(&json_str).ok();
+        }
+        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+    }
+    None
 }
