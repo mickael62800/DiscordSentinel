@@ -9,5 +9,5 @@ mod text_tokenizer;
 pub use discord_api::{DiscordApiService, DiscordChannel, DiscordMember, DiscordUser};
 pub use inference_limiter::InferenceRateLimiter;
 pub use inference_service::{InferenceClassification, InferenceService};
-pub use scoring_service::ScoringService;
+pub use scoring_service::{resolve_thresholds, ScoringService};
 pub use text_tokenizer::TextTokenizer;

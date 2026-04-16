@@ -122,7 +122,7 @@ fn default_weight(flag: &FlagType) -> f64 {
 
 /// Résout les seuils depuis les règles. Si plusieurs règles existent,
 /// on prend les seuils les plus bas (les plus strictes) pour chaque niveau.
-fn resolve_thresholds(rules: &[Rule]) -> (f64, f64, f64, f64) {
+pub fn resolve_thresholds(rules: &[Rule]) -> (f64, f64, f64, f64) {
     let enabled: Vec<&Rule> = rules.iter().filter(|r| r.enabled).collect();
 
     if enabled.is_empty() {

@@ -154,14 +154,16 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
             triggered.push(flag_type.as_str());
         }
 
-        // Determiner l'action
-        let (action, duration) = if total_score >= 9.0 {
+        // Seuils depuis les rules (configurables per-guild), pas hardcodes.
+        let (t_warn, t_delete, t_mute, t_ban) =
+            crate::domain::services::resolve_thresholds(&rules);
+        let (action, duration) = if total_score >= t_ban {
             (Action::Ban, None)
-        } else if total_score >= 6.0 {
+        } else if total_score >= t_mute {
             (Action::Mute, Some(600))
-        } else if total_score >= 4.0 {
+        } else if total_score >= t_delete {
             (Action::Delete, None)
-        } else if total_score >= 2.0 {
+        } else if total_score >= t_warn {
             (Action::Warn, None)
         } else {
             (Action::None, None)
