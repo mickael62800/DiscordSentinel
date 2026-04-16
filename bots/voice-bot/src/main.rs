@@ -30,7 +30,8 @@ use crate::config::Config;
 use crate::api_client::VoiceConfigResponse;
 use crate::handler::{
     AfkTrackerKey, ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
-    SessionCardKey, TextToVoiceMapKey, VoiceConfigKey, VoiceOwnerMapKey, VoteTrackerKey,
+    SessionCardKey, TextToVoiceMapKey, ThemeCacheKey, VoiceConfigKey, VoiceOwnerMapKey,
+    VoteTrackerKey,
 };
 use crate::state::{AfkTracker, CooldownTracker, FloodTracker, VoteTracker};
 
@@ -164,6 +165,18 @@ async fn main() {
         }
     };
 
+    // Charger les themes vocaux depuis l'API (member_limit par kind).
+    let themes = match voice_api.list_themes(&guild_id_str).await {
+        Ok(t) => {
+            info!(count = t.len(), "Themes vocaux charges depuis l'API");
+            Arc::new(t)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Impossible de charger les themes, defaults vides");
+            Arc::new(vec![])
+        }
+    };
+
     let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .cache_settings(sentinel_shared::cache_settings::full())
@@ -183,6 +196,7 @@ async fn main() {
         data.insert::<VoiceOwnerMapKey>(voice_owner);
         data.insert::<AfkTrackerKey>(Arc::new(AfkTracker::new()));
         data.insert::<VoiceConfigKey>(voice_config);
+        data.insert::<ThemeCacheKey>(themes);
         data.insert::<SessionCardKey>(Arc::new(DashMap::new()));
     }
 

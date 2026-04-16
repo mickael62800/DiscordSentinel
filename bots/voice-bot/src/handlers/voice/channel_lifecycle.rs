@@ -56,8 +56,15 @@ pub(super) async fn create_temp_channel(
         format!("Salon de {display_name}")
     };
     let everyone_role = guild_id.everyone_role();
-    // user_limit par defaut : 10 pour les salons de jeu, 0 (illimite) sinon
-    let default_user_limit: u32 = if kind == "game" { 10 } else { 0 };
+    // user_limit par defaut : lu depuis le theme API si present, sinon 0.
+    let default_user_limit: u32 = {
+        let data = ctx.data.read().await;
+        data.get::<crate::handler::ThemeCacheKey>()
+            .and_then(|themes| {
+                themes.iter().find(|t| t.name == kind).and_then(|t| t.member_limit)
+            })
+            .unwrap_or(0) as u32
+    };
 
     // Lire la categorie ancre depuis la config guild. Si configuree, on
     // lira sa position ACTUELLE depuis le cache Discord pour placer le
@@ -667,7 +674,7 @@ async fn send_control_panel(
     )
     .placeholder("Inviter des membres dans le salon")
     .min_values(1)
-    .max_values(10);
+    .max_values(25);
 
     let message = CreateMessage::new().embed(embed).components(vec![
         CreateActionRow::Buttons(row1),

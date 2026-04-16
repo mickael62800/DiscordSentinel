@@ -13,7 +13,7 @@ use tracing::{info, warn};
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
-use crate::api_client::VoiceConfigResponse;
+use crate::api_client::{VoiceConfigResponse, VoiceThemeResponse};
 use crate::config::Config;
 use crate::state::{AfkTracker, CooldownTracker, FloodTracker, VoteTracker};
 
@@ -66,6 +66,12 @@ impl TypeMapKey for AfkTrackerKey {
 pub struct VoiceConfigKey;
 impl TypeMapKey for VoiceConfigKey {
     type Value = VoiceConfigResponse;
+}
+
+/// Cache des themes vocaux par nom (ex: "game" -> member_limit 10).
+pub struct ThemeCacheKey;
+impl TypeMapKey for ThemeCacheKey {
+    type Value = Arc<Vec<VoiceThemeResponse>>;
 }
 
 /// Carte live de session vocale dans le salon de logs.

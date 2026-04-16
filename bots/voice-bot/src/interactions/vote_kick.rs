@@ -58,6 +58,11 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
         None
     };
 
+    // ARCHITECTURE: exception documentee — la presence de l'owner dans le
+    // voice channel vient de la cache serenity (voice_states), qui n'est
+    // pas accessible cote API sans que le bot la pousse. Faire un RPC juste
+    // pour appliquer la regle "owner present -> pas de vote" couterait plus
+    // cher qu'il ne rapporte. Ref: docs/VOICE_BOT_REFACTOR.md#v7.
     if is_private {
         if let Some(owner_id) = owner {
             let admin_present = component.guild_id
