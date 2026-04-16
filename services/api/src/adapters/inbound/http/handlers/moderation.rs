@@ -441,38 +441,18 @@ pub async fn add_evidence(
     validation::validate_discord_id("uploaded_by", &dto.uploaded_by).map_err(ApiError)?;
     let description = dto.description.as_ref().map(|d| d.chars().take(500).collect::<String>());
 
-    #[derive(sqlx::FromRow)]
-    struct Row {
-        id: uuid::Uuid,
-        uploaded_at: chrono::DateTime<chrono::Utc>,
-    }
-
-    let row: Row = sqlx::query_as::<_, Row>(
-        "INSERT INTO moderation_evidence (action_id, url, description, uploaded_by, uploaded_by_name) \
-         VALUES ($1, $2, $3, $4, $5) \
-         RETURNING id, uploaded_at",
-    )
-    .bind(action_uuid)
-    .bind(&dto.url)
-    .bind(&description)
-    .bind(&dto.uploaded_by)
-    .bind(&dto.uploaded_by_name)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        ApiError(crate::domain::errors::DomainError::Internal(format!(
-            "insert evidence: {e}"
-        )))
-    })?;
+    let entry = state.evidence_repo
+        .add(action_uuid, &dto.url, description.as_deref(), &dto.uploaded_by, &dto.uploaded_by_name)
+        .await?;
 
     Ok(Json(EvidenceEntryDto {
-        id: row.id.to_string(),
+        id: entry.id.to_string(),
         action_id: dto.action_id,
-        url: dto.url,
-        description,
+        url: entry.url,
+        description: entry.description,
         uploaded_by: dto.uploaded_by,
         uploaded_by_name: dto.uploaded_by_name,
-        uploaded_at: row.uploaded_at.to_rfc3339(),
+        uploaded_at: entry.uploaded_at.to_rfc3339(),
     }))
 }
 
@@ -489,41 +469,17 @@ pub async fn list_evidence(
         ))
     })?;
 
-    #[derive(sqlx::FromRow)]
-    struct Row {
-        id: uuid::Uuid,
-        url: String,
-        description: Option<String>,
-        uploaded_by: String,
-        uploaded_by_name: String,
-        uploaded_at: chrono::DateTime<chrono::Utc>,
-    }
-
-    let rows: Vec<Row> = sqlx::query_as::<_, Row>(
-        "SELECT id, url, description, uploaded_by, uploaded_by_name, uploaded_at \
-         FROM moderation_evidence \
-         WHERE action_id = $1 \
-         ORDER BY uploaded_at ASC",
-    )
-    .bind(action_uuid)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        ApiError(crate::domain::errors::DomainError::Internal(format!(
-            "list evidence: {e}"
-        )))
-    })?;
-
-    let dtos = rows
+    let entries = state.evidence_repo.list(action_uuid).await?;
+    let dtos = entries
         .into_iter()
-        .map(|r| EvidenceEntryDto {
-            id: r.id.to_string(),
+        .map(|e| EvidenceEntryDto {
+            id: e.id.to_string(),
             action_id: action_id.clone(),
-            url: r.url,
-            description: r.description,
-            uploaded_by: r.uploaded_by,
-            uploaded_by_name: r.uploaded_by_name,
-            uploaded_at: r.uploaded_at.to_rfc3339(),
+            url: e.url,
+            description: e.description,
+            uploaded_by: e.uploaded_by,
+            uploaded_by_name: e.uploaded_by_name,
+            uploaded_at: e.uploaded_at.to_rfc3339(),
         })
         .collect();
 

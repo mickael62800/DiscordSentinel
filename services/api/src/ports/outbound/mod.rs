@@ -93,3 +93,12 @@ pub use user_activity_repository::UserActivityRepository;
 
 mod welcome_config_repository;
 pub use welcome_config_repository::{WelcomeConfigData, WelcomeConfigRepository};
+
+mod evidence_repository;
+pub use evidence_repository::{EvidenceEntry, EvidenceRepository};
+
+mod review_repository;
+pub use review_repository::{ReviewEntry, ReviewRepository};
+
+mod modstats_repository;
+pub use modstats_repository::{ModeratorStat, ModstatsRepository};

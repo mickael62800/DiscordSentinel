@@ -101,3 +101,12 @@ pub use user_activity_repository::PgUserActivityRepository;
 
 mod welcome_config_repository;
 pub use welcome_config_repository::PgWelcomeConfigRepository;
+
+mod evidence_repository;
+pub use evidence_repository::PgEvidenceRepository;
+
+mod review_repository;
+pub use review_repository::PgReviewRepository;
+
+mod modstats_repository;
+pub use modstats_repository::PgModstatsRepository;
