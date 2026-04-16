@@ -38,20 +38,21 @@ pub async fn create_name_history(
     // Validation
     validation::validate_guild_user_path(&dto.guild_id, &dto.user_id).map_err(ApiError)?;
 
-    sqlx::query(
-        "INSERT INTO audit_logs (guild_id, event_type, target_id, target_name, details) \
-         VALUES ($1, 'member_nickname_history', $2, $3, $4)",
-    )
-    .bind(&dto.guild_id)
-    .bind(&dto.user_id)
-    .bind(&dto.new_name)
-    .bind(serde_json::json!({
-        "old_name": dto.old_name,
-        "new_name": dto.new_name,
-    }))
-    .execute(&state.pg_pool)
-    .await
-    .inspect_err(|e| warn!(error = %e, user_id = %dto.user_id, "Echec insert name_history"))
+    state.audit_logs_uc.create(crate::ports::inbound::CreateAuditLogCommand {
+        guild_id: dto.guild_id,
+        event_type: "member_nickname_history".into(),
+        actor_id: None,
+        actor_name: None,
+        target_id: Some(dto.user_id.clone()),
+        target_name: Some(dto.new_name.clone()),
+        channel_id: None,
+        channel_name: None,
+        details: serde_json::json!({
+            "old_name": dto.old_name,
+            "new_name": dto.new_name,
+        }),
+    }).await
+    .inspect_err(|e| warn!(error = %e, "Echec insert name_history"))
     .ok();
 
     Ok(ok_response())
@@ -114,36 +115,13 @@ pub async fn update_ticket_sla(
     Path(id): Path<String>,
     Json(dto): Json<UpdateTicketSlaDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    // Construire le SET dynamiquement selon les champs presents
-    if let Some(ref fr) = dto.first_response_at {
-        sqlx::query("UPDATE tickets SET first_response_at = $1, updated_at = NOW() WHERE id = $2::uuid")
-            .bind(fr)
-            .bind(&id)
-            .execute(&state.pg_pool)
-            .await
-            .inspect_err(|e| warn!(error = %e, ticket_id = %id, "Echec update first_response_at"))
-            .ok();
-    }
-
-    if let Some(ref ra) = dto.resolved_at {
-        sqlx::query("UPDATE tickets SET resolved_at = $1, updated_at = NOW() WHERE id = $2::uuid")
-            .bind(ra)
-            .bind(&id)
-            .execute(&state.pg_pool)
-            .await
-            .inspect_err(|e| warn!(error = %e, ticket_id = %id, "Echec update resolved_at"))
-            .ok();
-    }
-
-    if let Some(rating) = dto.satisfaction_rating {
-        sqlx::query("UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() WHERE id = $2::uuid")
-            .bind(rating)
-            .bind(&id)
-            .execute(&state.pg_pool)
-            .await
-            .inspect_err(|e| warn!(error = %e, ticket_id = %id, "Echec update satisfaction_rating"))
-            .ok();
-    }
+    let uuid = uuid::Uuid::parse_str(&id)
+        .map_err(|_| ApiError(DomainError::ValidationError("ticket id invalide".into())))?;
+    state.tickets_uc
+        .update_sla(uuid, dto.first_response_at.as_deref(), dto.resolved_at.as_deref(), dto.satisfaction_rating)
+        .await
+        .inspect_err(|e| warn!(error = %e, ticket_id = %id, "Echec update_sla"))
+        .ok();
 
     Ok(ok_response())
 }
