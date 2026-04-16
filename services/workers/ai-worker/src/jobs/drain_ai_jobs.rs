@@ -184,10 +184,17 @@ async fn publish_result(redis: &redis::Client, job_id: Uuid, payload: &serde_jso
         }
     };
 
-    if let Ok(mut conn) = redis.get_multiplexed_async_connection().await {
-        // Pub/sub temps reel pour les listeners (bots qui veulent reagir vite)
-        let _: Result<(), _> = conn.publish::<_, _, ()>(&channel, &serialized).await;
-        // Set avec TTL pour les bots qui se reveillent en retard
-        let _: Result<(), _> = conn.set_ex(&key, &serialized, REDIS_RESULT_TTL_SECS).await;
+    match redis.get_multiplexed_async_connection().await {
+        Ok(mut conn) => {
+            if let Err(e) = conn.publish::<_, _, ()>(&channel, &serialized).await {
+                tracing::warn!(error = %e, channel, "Echec Redis publish resultat AI");
+            }
+            if let Err(e) = conn.set_ex::<_, _, ()>(&key, &serialized, REDIS_RESULT_TTL_SECS).await {
+                tracing::warn!(error = %e, key, "Echec Redis set_ex resultat AI");
+            }
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Echec connexion Redis pour publier resultat AI");
+        }
     }
 }
