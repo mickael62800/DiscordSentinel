@@ -33,4 +33,5 @@ pub struct WelcomeConfigData {
 #[async_trait]
 pub trait WelcomeConfigRepository: Send + Sync {
     async fn get_config(&self, guild_id: &str) -> Result<WelcomeConfigData, DomainError>;
+    async fn save_config(&self, guild_id: &str, data: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError>;
 }

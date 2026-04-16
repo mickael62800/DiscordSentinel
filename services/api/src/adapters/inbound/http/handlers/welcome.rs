@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::errors::DomainError;
+use crate::ports::outbound::WelcomeConfigData;
 
-#[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Serialize)]
 pub struct WelcomeConfigDto {
     pub guild_id: String,
     pub welcome_enabled: bool,
@@ -30,6 +30,24 @@ pub struct WelcomeConfigDto {
     pub anniversary_channel_id: Option<String>,
     pub anniversary_message: String,
     pub rejoin_message: String,
+}
+
+impl From<WelcomeConfigData> for WelcomeConfigDto {
+    fn from(c: WelcomeConfigData) -> Self {
+        Self {
+            guild_id: c.guild_id, welcome_enabled: c.welcome_enabled,
+            welcome_channel_id: c.welcome_channel_id, welcome_message: c.welcome_message,
+            welcome_embed_color: c.welcome_embed_color, welcome_dm_enabled: c.welcome_dm_enabled,
+            welcome_dm_message: c.welcome_dm_message, leave_enabled: c.leave_enabled,
+            leave_channel_id: c.leave_channel_id, leave_message: c.leave_message,
+            rules_enabled: c.rules_enabled, rules_channel_id: c.rules_channel_id,
+            rules_message: c.rules_message, rules_role_id: c.rules_role_id,
+            rules_button_label: c.rules_button_label, counter_enabled: c.counter_enabled,
+            counter_channel_id: c.counter_channel_id, counter_format: c.counter_format,
+            anniversary_enabled: c.anniversary_enabled, anniversary_channel_id: c.anniversary_channel_id,
+            anniversary_message: c.anniversary_message, rejoin_message: c.rejoin_message,
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -62,43 +80,8 @@ pub async fn get_config(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
-    let config = sqlx::query_as::<_, WelcomeConfigDto>(
-        "SELECT guild_id, welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_color, \
-         welcome_dm_enabled, welcome_dm_message, leave_enabled, leave_channel_id, leave_message, \
-         rules_enabled, rules_channel_id, rules_message, rules_role_id, rules_button_label, \
-         counter_enabled, counter_channel_id, counter_format, \
-         anniversary_enabled, anniversary_channel_id, anniversary_message, rejoin_message \
-         FROM welcome_config WHERE guild_id = $1",
-    )
-    .bind(&guild_id)
-    .fetch_optional(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
-
-    Ok(Json(config.unwrap_or(WelcomeConfigDto {
-        guild_id: guild_id.clone(),
-        welcome_enabled: true,
-        welcome_channel_id: None,
-        welcome_message: "Bienvenue {user} sur **{server}** ! Tu es le **{count}e** membre.".into(),
-        welcome_embed_color: "3498db".into(),
-        welcome_dm_enabled: false,
-        welcome_dm_message: "Bienvenue sur **{server}** !".into(),
-        leave_enabled: true,
-        leave_channel_id: None,
-        leave_message: "{user} nous a quittes. Nous sommes maintenant **{count}** membres.".into(),
-        rules_enabled: false,
-        rules_channel_id: None,
-        rules_message: "Lis les regles et clique sur le bouton pour acceder au serveur.".into(),
-        rules_role_id: None,
-        rules_button_label: "J'accepte les regles".into(),
-        counter_enabled: false,
-        counter_channel_id: None,
-        counter_format: "Membres : {count}".into(),
-        anniversary_enabled: false,
-        anniversary_channel_id: None,
-        anniversary_message: "Felicitations {user}, ca fait **{years} an(s)** que tu es sur **{server}** !".into(),
-        rejoin_message: "Content de te revoir {user} ! Tu nous avais manque.".into(),
-    })))
+    let config = state.welcome_config_repo.get_config(&guild_id).await?;
+    Ok(Json(config.into()))
 }
 
 /// PUT /api/welcome/{guild_id}
@@ -107,76 +90,30 @@ pub async fn save_config(
     Path(guild_id): Path<String>,
     Json(dto): Json<SaveWelcomeConfigDto>,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
-    let config = sqlx::query_as::<_, WelcomeConfigDto>(
-        r#"INSERT INTO welcome_config (guild_id,
-            welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_color,
-            welcome_dm_enabled, welcome_dm_message,
-            leave_enabled, leave_channel_id, leave_message,
-            rules_enabled, rules_channel_id, rules_message, rules_role_id, rules_button_label,
-            counter_enabled, counter_channel_id, counter_format,
-            anniversary_enabled, anniversary_channel_id, anniversary_message, rejoin_message)
-           VALUES ($1,
-            COALESCE($2, true), $3, COALESCE($4, 'Bienvenue {user} sur **{server}** !'), COALESCE($5, '3498db'),
-            COALESCE($6, false), COALESCE($7, 'Bienvenue sur **{server}** !'),
-            COALESCE($8, true), $9, COALESCE($10, '{user} nous a quittes.'),
-            COALESCE($11, false), $12, COALESCE($13, 'Lis les regles.'), $14, COALESCE($15, 'J''accepte les regles'),
-            COALESCE($16, false), $17, COALESCE($18, 'Membres : {count}'),
-            COALESCE($19, false), $20, COALESCE($21, 'Felicitations {user} !'),
-            COALESCE($22, 'Content de te revoir {user} !'))
-           ON CONFLICT (guild_id) DO UPDATE SET
-            welcome_enabled = COALESCE($2, welcome_config.welcome_enabled),
-            welcome_channel_id = COALESCE($3, welcome_config.welcome_channel_id),
-            welcome_message = COALESCE($4, welcome_config.welcome_message),
-            welcome_embed_color = COALESCE($5, welcome_config.welcome_embed_color),
-            welcome_dm_enabled = COALESCE($6, welcome_config.welcome_dm_enabled),
-            welcome_dm_message = COALESCE($7, welcome_config.welcome_dm_message),
-            leave_enabled = COALESCE($8, welcome_config.leave_enabled),
-            leave_channel_id = COALESCE($9, welcome_config.leave_channel_id),
-            leave_message = COALESCE($10, welcome_config.leave_message),
-            rules_enabled = COALESCE($11, welcome_config.rules_enabled),
-            rules_channel_id = COALESCE($12, welcome_config.rules_channel_id),
-            rules_message = COALESCE($13, welcome_config.rules_message),
-            rules_role_id = COALESCE($14, welcome_config.rules_role_id),
-            rules_button_label = COALESCE($15, welcome_config.rules_button_label),
-            counter_enabled = COALESCE($16, welcome_config.counter_enabled),
-            counter_channel_id = COALESCE($17, welcome_config.counter_channel_id),
-            counter_format = COALESCE($18, welcome_config.counter_format),
-            anniversary_enabled = COALESCE($19, welcome_config.anniversary_enabled),
-            anniversary_channel_id = COALESCE($20, welcome_config.anniversary_channel_id),
-            anniversary_message = COALESCE($21, welcome_config.anniversary_message),
-            rejoin_message = COALESCE($22, welcome_config.rejoin_message),
-            updated_at = NOW()
-           RETURNING guild_id, welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_color,
-            welcome_dm_enabled, welcome_dm_message, leave_enabled, leave_channel_id, leave_message,
-            rules_enabled, rules_channel_id, rules_message, rules_role_id, rules_button_label,
-            counter_enabled, counter_channel_id, counter_format,
-            anniversary_enabled, anniversary_channel_id, anniversary_message, rejoin_message"#,
-    )
-    .bind(&guild_id)
-    .bind(dto.welcome_enabled)
-    .bind(&dto.welcome_channel_id)
-    .bind(&dto.welcome_message)
-    .bind(&dto.welcome_embed_color)
-    .bind(dto.welcome_dm_enabled)
-    .bind(&dto.welcome_dm_message)
-    .bind(dto.leave_enabled)
-    .bind(&dto.leave_channel_id)
-    .bind(&dto.leave_message)
-    .bind(dto.rules_enabled)
-    .bind(&dto.rules_channel_id)
-    .bind(&dto.rules_message)
-    .bind(&dto.rules_role_id)
-    .bind(&dto.rules_button_label)
-    .bind(dto.counter_enabled)
-    .bind(&dto.counter_channel_id)
-    .bind(&dto.counter_format)
-    .bind(dto.anniversary_enabled)
-    .bind(&dto.anniversary_channel_id)
-    .bind(&dto.anniversary_message)
-    .bind(&dto.rejoin_message)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| ApiError::from(DomainError::Internal(e.to_string())))?;
+    // Merge : lire la config actuelle puis appliquer les champs presents.
+    let mut current = state.welcome_config_repo.get_config(&guild_id).await?;
+    if let Some(v) = dto.welcome_enabled { current.welcome_enabled = v; }
+    if let Some(v) = dto.welcome_channel_id { current.welcome_channel_id = Some(v); }
+    if let Some(v) = dto.welcome_message { current.welcome_message = v; }
+    if let Some(v) = dto.welcome_embed_color { current.welcome_embed_color = v; }
+    if let Some(v) = dto.welcome_dm_enabled { current.welcome_dm_enabled = v; }
+    if let Some(v) = dto.welcome_dm_message { current.welcome_dm_message = v; }
+    if let Some(v) = dto.leave_enabled { current.leave_enabled = v; }
+    if let Some(v) = dto.leave_channel_id { current.leave_channel_id = Some(v); }
+    if let Some(v) = dto.leave_message { current.leave_message = v; }
+    if let Some(v) = dto.rules_enabled { current.rules_enabled = v; }
+    if let Some(v) = dto.rules_channel_id { current.rules_channel_id = Some(v); }
+    if let Some(v) = dto.rules_message { current.rules_message = v; }
+    if let Some(v) = dto.rules_role_id { current.rules_role_id = Some(v); }
+    if let Some(v) = dto.rules_button_label { current.rules_button_label = v; }
+    if let Some(v) = dto.counter_enabled { current.counter_enabled = v; }
+    if let Some(v) = dto.counter_channel_id { current.counter_channel_id = Some(v); }
+    if let Some(v) = dto.counter_format { current.counter_format = v; }
+    if let Some(v) = dto.anniversary_enabled { current.anniversary_enabled = v; }
+    if let Some(v) = dto.anniversary_channel_id { current.anniversary_channel_id = Some(v); }
+    if let Some(v) = dto.anniversary_message { current.anniversary_message = v; }
+    if let Some(v) = dto.rejoin_message { current.rejoin_message = v; }
 
-    Ok(Json(config))
+    let saved = state.welcome_config_repo.save_config(&guild_id, &current).await?;
+    Ok(Json(saved.into()))
 }

@@ -114,4 +114,58 @@ impl WelcomeConfigRepository for PgWelcomeConfigRepository {
 
         Ok(row.map(Into::into).unwrap_or_else(|| default_config(guild_id)))
     }
+
+    async fn save_config(&self, guild_id: &str, d: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> {
+        let row: Row = sqlx::query_as(
+            r#"INSERT INTO welcome_config (guild_id,
+                welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_color,
+                welcome_dm_enabled, welcome_dm_message,
+                leave_enabled, leave_channel_id, leave_message,
+                rules_enabled, rules_channel_id, rules_message, rules_role_id, rules_button_label,
+                counter_enabled, counter_channel_id, counter_format,
+                anniversary_enabled, anniversary_channel_id, anniversary_message, rejoin_message)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+               ON CONFLICT (guild_id) DO UPDATE SET
+                welcome_enabled = COALESCE($2, welcome_config.welcome_enabled),
+                welcome_channel_id = COALESCE($3, welcome_config.welcome_channel_id),
+                welcome_message = COALESCE($4, welcome_config.welcome_message),
+                welcome_embed_color = COALESCE($5, welcome_config.welcome_embed_color),
+                welcome_dm_enabled = COALESCE($6, welcome_config.welcome_dm_enabled),
+                welcome_dm_message = COALESCE($7, welcome_config.welcome_dm_message),
+                leave_enabled = COALESCE($8, welcome_config.leave_enabled),
+                leave_channel_id = COALESCE($9, welcome_config.leave_channel_id),
+                leave_message = COALESCE($10, welcome_config.leave_message),
+                rules_enabled = COALESCE($11, welcome_config.rules_enabled),
+                rules_channel_id = COALESCE($12, welcome_config.rules_channel_id),
+                rules_message = COALESCE($13, welcome_config.rules_message),
+                rules_role_id = COALESCE($14, welcome_config.rules_role_id),
+                rules_button_label = COALESCE($15, welcome_config.rules_button_label),
+                counter_enabled = COALESCE($16, welcome_config.counter_enabled),
+                counter_channel_id = COALESCE($17, welcome_config.counter_channel_id),
+                counter_format = COALESCE($18, welcome_config.counter_format),
+                anniversary_enabled = COALESCE($19, welcome_config.anniversary_enabled),
+                anniversary_channel_id = COALESCE($20, welcome_config.anniversary_channel_id),
+                anniversary_message = COALESCE($21, welcome_config.anniversary_message),
+                rejoin_message = COALESCE($22, welcome_config.rejoin_message),
+                updated_at = NOW()
+               RETURNING guild_id, welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_color,
+                welcome_dm_enabled, welcome_dm_message, leave_enabled, leave_channel_id, leave_message,
+                rules_enabled, rules_channel_id, rules_message, rules_role_id, rules_button_label,
+                counter_enabled, counter_channel_id, counter_format,
+                anniversary_enabled, anniversary_channel_id, anniversary_message, rejoin_message"#,
+        )
+        .bind(guild_id)
+        .bind(d.welcome_enabled).bind(&d.welcome_channel_id).bind(&d.welcome_message).bind(&d.welcome_embed_color)
+        .bind(d.welcome_dm_enabled).bind(&d.welcome_dm_message)
+        .bind(d.leave_enabled).bind(&d.leave_channel_id).bind(&d.leave_message)
+        .bind(d.rules_enabled).bind(&d.rules_channel_id).bind(&d.rules_message).bind(&d.rules_role_id).bind(&d.rules_button_label)
+        .bind(d.counter_enabled).bind(&d.counter_channel_id).bind(&d.counter_format)
+        .bind(d.anniversary_enabled).bind(&d.anniversary_channel_id).bind(&d.anniversary_message)
+        .bind(&d.rejoin_message)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(row.into())
+    }
 }
