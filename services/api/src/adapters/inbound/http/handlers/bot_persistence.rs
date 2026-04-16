@@ -165,17 +165,11 @@ pub async fn create_sponsorship(
     )
     .await?;
 
-    sqlx::query(
-        "INSERT INTO sponsorships (guild_id, sponsor_id, sponsored_id) \
-         VALUES ($1, $2, $3) ON CONFLICT (guild_id, sponsored_id) DO NOTHING",
-    )
-    .bind(&dto.guild_id)
-    .bind(&dto.sponsor_id)
-    .bind(&dto.sponsored_id)
-    .execute(&state.pg_pool)
-    .await
-    .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert sponsorship"))
-    .ok();
+    state.sponsorship_repo
+        .create(&dto.guild_id, &dto.sponsor_id, &dto.sponsored_id)
+        .await
+        .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert sponsorship"))
+        .ok();
 
     Ok(ok_response())
 }
@@ -184,23 +178,16 @@ pub async fn create_sponsorship(
 pub async fn list_sponsorships(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
-) -> Result<Json<Vec<SponsorshipRow>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::Sponsorship>>, ApiError> {
     // Validation
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
-    let rows = sqlx::query_as::<_, SponsorshipRow>(
-        "SELECT id, guild_id, sponsor_id, sponsored_id, created_at \
-         FROM sponsorships WHERE guild_id = $1 ORDER BY created_at DESC",
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .unwrap_or_else(|e| {
-        warn!(error = %e, guild_id = %guild_id, "Echec SELECT sponsorships");
+    let entries = state.sponsorship_repo.list(&guild_id).await.unwrap_or_else(|e| {
+        warn!(error = %e, guild_id = %guild_id, "Echec list sponsorships");
         vec![]
     });
 
-    Ok(Json(rows))
+    Ok(Json(entries))
 }
 
 // ═══════════════════════════════════════════════════
@@ -243,19 +230,11 @@ pub async fn create_temp_role(
     )
     .await?;
 
-    sqlx::query(
-        "INSERT INTO temp_roles (guild_id, user_id, role_id, expires_at) \
-         VALUES ($1, $2, $3, $4::timestamptz) \
-         ON CONFLICT (guild_id, user_id, role_id) DO UPDATE SET expires_at = $4::timestamptz",
-    )
-    .bind(&dto.guild_id)
-    .bind(&dto.user_id)
-    .bind(&dto.role_id)
-    .bind(&dto.expires_at)
-    .execute(&state.pg_pool)
-    .await
-    .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert temp_role"))
-    .ok();
+    state.temp_role_repo
+        .create(&dto.guild_id, &dto.user_id, &dto.role_id, &dto.expires_at)
+        .await
+        .inspect_err(|e| warn!(error = %e, guild_id = %dto.guild_id, "Echec insert temp_role"))
+        .ok();
 
     Ok(ok_response())
 }
@@ -264,24 +243,16 @@ pub async fn create_temp_role(
 pub async fn list_temp_roles(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
-) -> Result<Json<Vec<TempRoleRow>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::TempRole>>, ApiError> {
     // Validation
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
-    let rows = sqlx::query_as::<_, TempRoleRow>(
-        "SELECT id, guild_id, user_id, role_id, expires_at, created_at \
-         FROM temp_roles WHERE guild_id = $1 AND expires_at > NOW() \
-         ORDER BY expires_at ASC",
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .unwrap_or_else(|e| {
-        warn!(error = %e, guild_id = %guild_id, "Echec SELECT temp_roles");
+    let entries = state.temp_role_repo.list_active(&guild_id).await.unwrap_or_else(|e| {
+        warn!(error = %e, guild_id = %guild_id, "Echec list temp_roles");
         vec![]
     });
 
-    Ok(Json(rows))
+    Ok(Json(entries))
 }
 
 /// DELETE /api/temp-roles/{guild_id}/{user_id}/{role_id}
@@ -303,16 +274,11 @@ pub async fn delete_temp_role(
             .map_err(|_| ApiError(DomainError::Forbidden("moderator+ requis pour supprimer un temp role".into())))?;
     }
 
-    sqlx::query(
-        "DELETE FROM temp_roles WHERE guild_id = $1 AND user_id = $2 AND role_id = $3",
-    )
-    .bind(&guild_id)
-    .bind(&user_id)
-    .bind(&role_id)
-    .execute(&state.pg_pool)
-    .await
-    .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, "Echec delete temp_role"))
-    .ok();
+    state.temp_role_repo
+        .delete(&guild_id, &user_id, &role_id)
+        .await
+        .inspect_err(|e| warn!(error = %e, guild_id = %guild_id, "Echec delete temp_role"))
+        .ok();
 
     Ok(ok_response())
 }

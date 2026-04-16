@@ -18,7 +18,7 @@ use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgCoudeBetRepository, PgCoudeCombatRepository, PgCoudeEconomyRepository, PgCoudeInventoryRepository, PgCoudePlayerRepository, PgCoudeSocialRepository, PgGuildRepository, PgInfractionRepository,
     PgMemberRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgIaConfigRepository, PgLevelRepository, PgModstatsRepository, PgNotesRepository, PgReminderRepository, PgReviewRepository, PgRolePanelRepository, PgStrikeRepository, PgTicketRepository, PgUserActivityRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository, PgWelcomeConfigRepository,
+    PgAnalyticsRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgIaConfigRepository, PgLevelRepository, PgModstatsRepository, PgNotesRepository, PgReminderRepository, PgReviewRepository, PgRolePanelRepository, PgSponsorshipRepository, PgStrikeRepository, PgTempRoleRepository, PgTicketRepository, PgUserActivityRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository, PgWelcomeConfigRepository,
 };
 use sentinel_api::adapters::outbound::batching::{
     BatchWriterConfig, BatchedPgAuditLogRepository, BatchedPgLogRepository,
@@ -479,6 +479,8 @@ async fn main() {
         review_repo: Arc::new(PgReviewRepository::new(pg_pool.clone())),
         modstats_repo: Arc::new(PgModstatsRepository::new(pg_pool.clone())),
         game_repo: Arc::new(PgGameRepository::new(pg_pool.clone())),
+        sponsorship_repo: Arc::new(PgSponsorshipRepository::new(pg_pool.clone())),
+        temp_role_repo: Arc::new(PgTempRoleRepository::new(pg_pool.clone())),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

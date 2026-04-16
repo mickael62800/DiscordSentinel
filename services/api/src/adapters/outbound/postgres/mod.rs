@@ -113,3 +113,9 @@ pub use modstats_repository::PgModstatsRepository;
 
 mod game_repository;
 pub use game_repository::PgGameRepository;
+
+mod sponsorship_repository;
+pub use sponsorship_repository::PgSponsorshipRepository;
+
+mod temp_role_repository;
+pub use temp_role_repository::PgTempRoleRepository;

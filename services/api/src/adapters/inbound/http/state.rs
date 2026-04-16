@@ -78,6 +78,8 @@ pub struct AppState {
     pub review_repo: Arc<dyn crate::ports::outbound::ReviewRepository>,
     pub modstats_repo: Arc<dyn crate::ports::outbound::ModstatsRepository>,
     pub game_repo: Arc<dyn crate::ports::outbound::GameRepository>,
+    pub sponsorship_repo: Arc<dyn crate::ports::outbound::SponsorshipRepository>,
+    pub temp_role_repo: Arc<dyn crate::ports::outbound::TempRoleRepository>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,
