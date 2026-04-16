@@ -245,6 +245,7 @@ pub struct RecentJoinEntry {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct SecurityDecisionResponse {
     pub is_raid: bool,
     pub raid_score: u32,

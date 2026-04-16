@@ -195,7 +195,7 @@ impl EventHandler for Handler {
             Some(a) => a,
             None => { error!(guild_id = %guild_id, "RaidDetectorKey manquant"); return; }
         };
-        let account_checker = match data.get::<AccountCheckerKey>() {
+        let _account_checker = match data.get::<AccountCheckerKey>() {
             Some(a) => a,
             None => { error!(guild_id = %guild_id, "AccountCheckerKey manquant"); return; }
         };
@@ -223,7 +223,7 @@ impl EventHandler for Handler {
             Some(a) => a,
             None => { error!(guild_id = %guild_id, "CaptchaPendingKey manquant"); return; }
         };
-        let alt_detector = match data.get::<AltDetectorKey>() {
+        let _alt_detector = match data.get::<AltDetectorKey>() {
             Some(a) => a,
             None => { error!(guild_id = %guild_id, "AltDetectorKey manquant"); return; }
         };
@@ -241,10 +241,10 @@ impl EventHandler for Handler {
             return;
         }
 
-        let min_account_age = BaseApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
+        let _min_account_age = BaseApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
 
         // Config quarantaine per-guild
-        let quarantine_enabled = guild_config
+        let _quarantine_enabled = guild_config
             .get("quarantine_enabled")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(env_config.quarantine_enabled);
@@ -256,15 +256,15 @@ impl EventHandler for Handler {
                 }).ok()
             })
             .or(env_config.quarantine_role_id);
-        let captcha_enabled = guild_config
+        let _captcha_enabled = guild_config
             .get("captcha_enabled")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(env_config.captcha_enabled);
-        let slowmode_secs: u16 = guild_config
+        let _slowmode_secs: u16 = guild_config
             .get("slowmode_seconds")
             .and_then(|v| v.parse().ok())
             .unwrap_or(env_config.slowmode_seconds);
-        let lockdown_enabled = guild_config
+        let _lockdown_enabled = guild_config
             .get("lockdown_enabled")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(env_config.lockdown_enabled);
@@ -272,15 +272,15 @@ impl EventHandler for Handler {
             .get("captcha_type")
             .cloned()
             .unwrap_or_else(|| env_config.captcha_type.clone());
-        let alt_detection_enabled = guild_config
+        let _alt_detection_enabled = guild_config
             .get("alt_detection_enabled")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(env_config.alt_detection_enabled);
-        let raid_pattern_enabled = guild_config
+        let _raid_pattern_enabled = guild_config
             .get("raid_pattern_enabled")
             .map(|v| v == "true" || v == "1")
             .unwrap_or(env_config.raid_pattern_enabled);
-        let raid_pattern_score_threshold = guild_config
+        let _raid_pattern_score_threshold = guild_config
             .get("raid_pattern_score_threshold")
             .and_then(|v| v.parse().ok())
             .unwrap_or(env_config.raid_pattern_score_threshold);

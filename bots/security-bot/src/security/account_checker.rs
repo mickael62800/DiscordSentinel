@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use serenity::model::user::User;
 
 /// Vérifie si un compte est suspect (trop récent).

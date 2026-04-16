@@ -9,7 +9,7 @@ use sqlx::PgPool;
 use tonic::transport::{Channel, Endpoint};
 use tonic::metadata::MetadataValue;
 use tonic::Request;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 use sentinel_proto::coude::v1::coude_social_service_client::CoudeSocialServiceClient;
 use sentinel_proto::coude::v1::TriggerDailyChaosRequest;
