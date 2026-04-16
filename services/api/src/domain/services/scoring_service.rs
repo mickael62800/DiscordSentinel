@@ -44,6 +44,11 @@ impl ScoringService {
     /// 3. Comparer le score aux seuils (du plus sévère au moins sévère)
     /// 4. Retourner l'action correspondante
     pub fn score(flags: &DetectionFlags, rules: &[Rule]) -> ScoringResult {
+        Self::score_with_mute_duration(flags, rules, DEFAULT_MUTE_DURATION)
+    }
+
+    /// Version paramétrique avec durée de mute configurable.
+    pub fn score_with_mute_duration(flags: &DetectionFlags, rules: &[Rule], mute_duration: u64) -> ScoringResult {
         let active = flags.active_flags();
 
         if active.is_empty() {
@@ -76,7 +81,7 @@ impl ScoringService {
         let (action, duration) = if total_score >= t_ban {
             (Action::Ban, None)
         } else if total_score >= t_mute {
-            (Action::Mute, Some(DEFAULT_MUTE_DURATION))
+            (Action::Mute, Some(mute_duration))
         } else if total_score >= t_delete {
             (Action::Delete, None)
         } else if total_score >= t_warn {

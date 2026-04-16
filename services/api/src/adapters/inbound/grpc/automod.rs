@@ -25,6 +25,18 @@ impl AutomodService for AutomodGrpc {
         request: Request<proto::AnalyzeMessageRequest>,
     ) -> Result<Response<proto::AnalyzeMessageResponse>, Status> {
         let req = request.into_inner();
+
+        // Validation inputs obligatoires.
+        if req.guild_id.is_empty() || req.guild_id.len() > 20 {
+            return Err(Status::invalid_argument("guild_id invalide"));
+        }
+        if req.user_id.is_empty() || req.user_id.len() > 20 {
+            return Err(Status::invalid_argument("user_id invalide"));
+        }
+        if req.content.is_empty() {
+            return Err(Status::invalid_argument("content ne peut pas etre vide"));
+        }
+
         let flags = req
             .flags
             .map(proto_to_flags)

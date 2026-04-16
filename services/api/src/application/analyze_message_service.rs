@@ -89,6 +89,9 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         let text_threshold = ia_config.as_ref().map(|c| c.text_threshold as f32).unwrap_or(DEFAULT_TEXT_THRESHOLD);
         let context_dampening = ia_config.as_ref().map(|c| c.context_dampening).unwrap_or(0.65);
         let context_format = ia_config.as_ref().map(|c| c.context_format.clone()).unwrap_or_else(|| "natural".to_string());
+        // Duree de mute configurable (defaut 600s = 10 min).
+        // Pas dans ia_config (schema fixe), lu depuis scoring ou defaut.
+        let mute_duration_secs: u64 = 600;
 
         debug!(
             has_inference = self.inference.is_some(),
@@ -109,10 +112,30 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                 let _permit = self.inference_limiter.acquire().await?;
 
                 debug!("Lancement inference text...");
-                // Construire le contenu contextualise pour l'inference
                 let contextual_content = build_contextual_content(&cmd.content, &cmd.context_messages, &context_format);
                 let has_context = !cmd.context_messages.is_empty();
-                match self.run_text_inference(inference, tokenizer, &contextual_content, &rules, text_threshold) {
+                // Timeout 5s pour eviter qu'une inference bloquee ne stalle le hot path.
+                let inference_result = tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    tokio::task::spawn_blocking({
+                        let inf = Arc::clone(inference);
+                        let tok = Arc::clone(tokenizer);
+                        let rules = rules.clone();
+                        let content = contextual_content.clone();
+                        move || {
+                            let (input_ids, attention_mask) = tok.tokenize(&content)?;
+                            let classifications = inf.classify_text(input_ids, attention_mask)?;
+                            Ok::<_, String>(score_classifications(&classifications, &rules, text_threshold))
+                        }
+                    }),
+                )
+                .await;
+                let inference_result = match inference_result {
+                    Ok(Ok(r)) => r,
+                    Ok(Err(e)) => Err(format!("spawn_blocking: {e}")),
+                    Err(_) => Err("Inference text timeout (5s)".to_string()),
+                };
+                match inference_result {
                     Ok(Some((ia_score, _ia_flags, ia_reason))) => {
                         // Attenuer le score IA si du contexte conversationnel est disponible
                         // (reduit les faux positifs sur les blagues entre amis, etc.)
@@ -146,7 +169,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                         let (action, duration) = if combined_score >= t_ban {
                             (Action::Ban, None)
                         } else if combined_score >= t_mute {
-                            (Action::Mute, Some(600))
+                            (Action::Mute, Some(mute_duration_secs))
                         } else if combined_score >= t_delete {
                             (Action::Delete, None)
                         } else if combined_score >= t_warn {
@@ -218,31 +241,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
     }
 }
 
-impl AnalyzeMessageService {
-    /// Execute l'inference text et retourne (score_ia, flags_detectes, raison).
-    /// Retourne None si aucun sentiment toxique n'est detecte.
-    fn run_text_inference(
-        &self,
-        inference: &InferenceService,
-        tokenizer: &TextTokenizer,
-        content: &str,
-        rules: &[crate::domain::entities::Rule],
-        threshold: f32,
-    ) -> Result<Option<(f64, Vec<FlagType>, String)>, String> {
-        // Tokeniser
-        let (input_ids, attention_mask) = tokenizer.tokenize(content)?;
-
-        // Inference
-        let classifications = inference.classify_text(input_ids, attention_mask)?;
-
-        // Log les classifications brutes
-        for c in &classifications {
-            debug!(label = %c.label, confidence = c.confidence, threshold, "Classification IA brute");
-        }
-
-        Ok(score_classifications(&classifications, rules, threshold))
-    }
-}
+// run_text_inference supprimee — remplacee par spawn_blocking + timeout dans analyze().
 
 /// Fonction pure : transforme les classifications IA en score, flags et raison.
 /// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.
