@@ -311,7 +311,7 @@ pub(super) async fn create_temp_channel(
     // Envoyer le panneau de controle (prive + game)
     if let Some(aid) = admin_channel_id {
         let queue_enabled_init = queue_channel_id.is_some();
-        send_control_panel(ctx, aid, false, false, queue_enabled_init, user_id.get()).await;
+        send_control_panel(ctx, aid, false, queue_enabled_init, false, user_id.get()).await;
     }
 
     // Envoyer le panel membres avec vote kick

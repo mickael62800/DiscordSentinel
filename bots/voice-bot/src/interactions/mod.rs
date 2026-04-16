@@ -1,5 +1,6 @@
 pub mod access_control;
 pub mod channel_management;
+pub mod claim_ownership;
 pub mod co_admin;
 pub mod queue;
 pub mod transfer;
@@ -169,6 +170,8 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
                 access_control::handle(ctx, component).await;
             } else if other.starts_with("queue_accept_") || other.starts_with("queue_refuse_") {
                 queue::handle(ctx, component).await;
+            } else if other.starts_with("btn_claim_ownership_") {
+                claim_ownership::handle(ctx, component).await;
             } else {
                 warn!(custom_id = %other, "Interaction inconnue");
             }

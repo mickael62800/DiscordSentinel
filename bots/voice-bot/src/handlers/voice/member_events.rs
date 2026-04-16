@@ -154,11 +154,13 @@ pub async fn handle_voice_state_update(
 /// transfere automatiquement l'ownership au premier membre restant. Evite
 /// qu'un salon devienne orphelin sans possibilite de reprise.
 ///
-/// Note : on ne revoke PAS les permissions de l'ancien owner — s'il revient
-/// dans le salon, il reste juste un membre sans privileges admin.
+/// Au lieu de transferer silencieusement, on poste un message interactif
+/// dans le salon membres (visible par tous) demandant qui veut reprendre.
+/// Le premier qui clique sur le bouton devient le nouveau owner.
+/// L'ancien owner est downgrade (retrait MANAGE_CHANNELS + acces panel).
 async fn maybe_auto_transfer_ownership(
     ctx: &Context,
-    guild_id: GuildId,
+    _guild_id: GuildId,
     voice_channel_id: ChannelId,
     leaving_user: UserId,
 ) {
@@ -173,72 +175,19 @@ async fn maybe_auto_transfer_ownership(
         return;
     }
 
-    // Trouver un remplacant : premier membre encore present dans le vocal
-    // (hors l'utilisateur qui vient de partir et les bots).
-    let candidate: Option<UserId> = ctx.cache.guild(guild_id).and_then(|guild| {
-        guild
-            .voice_states
-            .values()
-            .filter(|vs| vs.channel_id == Some(voice_channel_id) && vs.user_id != leaving_user)
-            .map(|vs| vs.user_id)
-            .find(|uid| {
-                guild
-                    .members
-                    .get(uid)
-                    .map(|m| !m.user.bot)
-                    .unwrap_or(true)
-            })
-    });
-
-    let new_owner = match candidate {
-        Some(u) => u,
-        None => return, // personne ne reste, check_and_delete_empty fera son travail
-    };
-
-    // Recuperer le nom du nouveau owner
-    let new_owner_name = new_owner
-        .to_user(&ctx.http)
-        .await
-        .map(|u| u.name)
-        .unwrap_or_else(|_| new_owner.to_string());
-
-    // Maj API + carte locale + permissions Discord
-    {
-        let data = ctx.data.read().await;
-        if let Some(api) = crate::api_client::ApiClient::from_data(&data) {
-            let req = crate::api_client::TransferOwnershipRequest {
-                new_owner_id: new_owner.get().to_string(),
-                new_owner_name: new_owner_name.clone(),
-            };
-            if let Err(e) = api
-                .transfer_ownership(&voice_channel_id.get().to_string(), &req)
-                .await
-            {
-                tracing::warn!(error = %e, "Erreur API transfer ownership automatique");
-            }
-        }
-        if let Some(map) = data.get::<crate::handler::VoiceOwnerMapKey>() {
-            map.insert(voice_channel_id, new_owner);
-        }
-    }
-
-    // Donner au nouveau owner les permissions admin sur le vocal
-    let owner_perm = serenity::model::channel::PermissionOverwrite {
+    // Downgrade l'ancien owner : retirer MANAGE_CHANNELS sur le vocal.
+    let old_perm = serenity::model::channel::PermissionOverwrite {
         allow: serenity::model::Permissions::CONNECT
             | serenity::model::Permissions::VIEW_CHANNEL
-            | serenity::model::Permissions::SPEAK
-            | serenity::model::Permissions::MOVE_MEMBERS
-            | serenity::model::Permissions::MUTE_MEMBERS
-            | serenity::model::Permissions::DEAFEN_MEMBERS
-            | serenity::model::Permissions::MANAGE_CHANNELS,
+            | serenity::model::Permissions::SPEAK,
         deny: serenity::model::Permissions::empty(),
-        kind: serenity::model::channel::PermissionOverwriteType::Member(new_owner),
+        kind: serenity::model::channel::PermissionOverwriteType::Member(leaving_user),
     };
-    if let Err(e) = voice_channel_id.create_permission(&ctx.http, owner_perm).await {
-        tracing::warn!(error = %e, "failed to grant owner permission on auto-transfer");
+    if let Err(e) = voice_channel_id.create_permission(&ctx.http, old_perm).await {
+        tracing::warn!(error = %e, "failed to downgrade old owner permissions");
     }
 
-    // Donner acces au salon texte admin pour le nouveau owner
+    // Retirer l'acces au panel admin pour l'ancien owner.
     let text_channel_id = {
         let data = ctx.data.read().await;
         data.get::<crate::handler::TextToVoiceMapKey>().and_then(|map| {
@@ -248,44 +197,56 @@ async fn maybe_auto_transfer_ownership(
         })
     };
     if let Some(tid) = text_channel_id {
-        let text_perm = serenity::model::channel::PermissionOverwrite {
-            allow: serenity::model::Permissions::VIEW_CHANNEL
-                | serenity::model::Permissions::SEND_MESSAGES
-                | serenity::model::Permissions::READ_MESSAGE_HISTORY,
-            deny: serenity::model::Permissions::empty(),
-            kind: serenity::model::channel::PermissionOverwriteType::Member(new_owner),
+        let deny_perm = serenity::model::channel::PermissionOverwrite {
+            allow: serenity::model::Permissions::empty(),
+            deny: serenity::model::Permissions::VIEW_CHANNEL,
+            kind: serenity::model::channel::PermissionOverwriteType::Member(leaving_user),
         };
-        if let Err(e) = tid.create_permission(&ctx.http, text_perm).await {
-            tracing::warn!(error = %e, "failed to grant admin panel access to new owner");
+        if let Err(e) = tid.create_permission(&ctx.http, deny_perm).await {
+            tracing::warn!(error = %e, "failed to revoke old owner admin panel access");
         }
+    }
 
-        // Notifier dans le salon admin
-        let embed = serenity::builder::CreateEmbed::new()
-            .title("\u{1f504} Transfert automatique")
-            .description(format!(
-                "L'ancien proprietaire a quitte le vocal.\n\
-                 <@{}> est maintenant le proprietaire de ce salon.",
-                new_owner.get()
-            ))
-            .color(0x3498db)
-            .timestamp(serenity::model::Timestamp::now());
+    // Poster la candidature dans le salon membres (visible par tous).
+    let members_channel_id = {
+        let data = ctx.data.read().await;
+        data.get::<crate::handler::MembersToVoiceMapKey>().and_then(|map| {
+            map.iter()
+                .find(|entry| *entry.value() == voice_channel_id)
+                .map(|entry| *entry.key())
+        })
+    };
+    let Some(mid) = members_channel_id else {
+        return;
+    };
 
-        if let Err(e) = tid
-            .send_message(
-                &ctx.http,
-                serenity::builder::CreateMessage::new().embed(embed),
-            )
-            .await
-        {
-            tracing::warn!(error = %e, "failed to send auto-transfer notification");
-        }
+    let embed = serenity::builder::CreateEmbed::new()
+        .title("\u{1f6a8} Le proprietaire a quitte le salon !")
+        .description(
+            "Le salon n'a plus d'admin.\n\
+             Clique sur le bouton ci-dessous pour reprendre le controle."
+        )
+        .color(0xE67E22)
+        .timestamp(serenity::model::Timestamp::now());
+
+    let button = serenity::builder::CreateButton::new(
+        format!("btn_claim_ownership_{}", voice_channel_id.get()),
+    )
+    .label("Reprendre le salon")
+    .style(serenity::all::ButtonStyle::Success);
+
+    let msg = serenity::builder::CreateMessage::new()
+        .embed(embed)
+        .components(vec![serenity::builder::CreateActionRow::Buttons(vec![button])]);
+
+    if let Err(e) = mid.send_message(&ctx.http, msg).await {
+        tracing::warn!(error = %e, "failed to send claim ownership prompt");
     }
 
     tracing::info!(
         voice = %voice_channel_id,
         old_owner = %leaving_user,
-        new_owner = %new_owner,
-        "Ownership transferee automatiquement (owner a quitte)"
+        "Ownership en attente de candidature (owner a quitte)"
     );
 }
 
