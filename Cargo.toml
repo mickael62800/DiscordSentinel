@@ -26,6 +26,7 @@ members = [
     "services/workers/temp-roles-worker",
 
     # Bots Discord
+    "bots/sentinel-bot",
     "bots/audit-bot",
     "bots/automod-bot",
     "bots/blackjack-bot",

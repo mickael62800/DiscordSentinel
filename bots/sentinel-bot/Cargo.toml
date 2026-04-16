@@ -1,0 +1,32 @@
+[package]
+name = "sentinel-bot"
+version = "0.1.0"
+edition = "2021"
+description = "Bot Discord unifie DiscordSentinel — tous les modules en un seul processus"
+
+[dependencies]
+sentinel-shared = { workspace = true }
+sentinel-proto = { workspace = true }
+serenity = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true }
+reqwest = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+dotenvy = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+dashmap = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+rand = { workspace = true }
+redis = { version = "0.27", features = ["tokio-comp"] }
+regex = "1"
+time = "0.3"
+base64 = "0.22"
+
+[target.'cfg(not(target_env = "msvc"))'.dependencies]
+tikv-jemallocator = "0.6"
+
+[lints]
+workspace = true
