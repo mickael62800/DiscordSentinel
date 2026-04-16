@@ -40,7 +40,7 @@ impl ModerationRepository for InMemoryModerationRepo {
         Ok(actions.iter().find(|a| a.id == id).cloned())
     }
 
-    async fn find_by_target(&self, guild_id: &str, target_id: &str) -> Result<Vec<ModerationAction>, DomainError> {
+    async fn find_by_target(&self, guild_id: &str, target_id: &str, _limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
         let actions = self.actions.lock().await;
         Ok(actions
             .iter()
@@ -65,6 +65,7 @@ impl ModerationRepository for InMemoryModerationRepo {
         Ok(())
     }
 
+    async fn find_all_for_guild(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
     async fn delete_action(&self, id: uuid::Uuid) -> Result<bool, DomainError> {
         let mut actions = self.actions.lock().await;
         let len_before = actions.len();

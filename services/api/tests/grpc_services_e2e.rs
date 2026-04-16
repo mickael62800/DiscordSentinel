@@ -268,6 +268,7 @@ impl ManageSecurityUseCase for MockSecurityUc {
             created_at: ts(),
         })
     }
+    async fn analyze_new_member(&self, _: sentinel_api::ports::inbound::AnalyzeNewMemberCommand) -> Result<sentinel_api::ports::inbound::SecurityDecision, DomainError> { unimplemented!() }
     async fn list_events(&self, _: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> {
         Ok(vec![SecurityEvent {
             id: Uuid::nil(),
@@ -381,6 +382,7 @@ struct MockModerationUc;
 
 #[async_trait]
 impl ManageModerationUseCase for MockModerationUc {
+    async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
     async fn log_action(&self, cmd: LogModerationCommand) -> Result<ModerationAction, DomainError> {
         Ok(ModerationAction {
             id: Uuid::new_v4(),
@@ -723,6 +725,8 @@ struct MockVoiceChannelsUc;
 
 #[async_trait]
 impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
+    async fn list_history_channels(&self, _: &str, _: i64) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
+    async fn get_voice_config(&self, _: &str) -> Result<sentinel_api::domain::entities::VoiceChannelConfig, DomainError> { Ok(Default::default()) }
     async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError> {
         Ok(vec![
             sample_voice_channel(guild_id, "ch1", "Salon de Joe"),

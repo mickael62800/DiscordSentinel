@@ -64,6 +64,7 @@ fn make_action(
 
 #[async_trait]
 impl ManageModerationUseCase for MockModerationUC {
+    async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
     async fn log_action(&self, cmd: LogModerationCommand) -> Result<ModerationAction, DomainError> {
         Ok(ModerationAction {
             id: Uuid::new_v4(),

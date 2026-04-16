@@ -14,6 +14,8 @@
 //! - CoudeInventoryService (F.1)            — list_inventory, has_item
 //! - CoudeSocialService (F.1)               — leaderboard, current_season
 
+mod test_helpers;
+
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -138,6 +140,7 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
     async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { unimplemented!() }
     async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
 }
 
 // ── Helper : demarre un serveur in-process et retourne (url, shutdown_tx) ──
@@ -369,7 +372,7 @@ impl ManageCoudeCombatsUseCase for MockCombatsUc {
 
 #[tokio::test]
 async fn coude_combats_list_and_create_round_trip() {
-    let svc = CoudeCombatsServiceServer::new(CoudeCombatsGrpc { uc: Arc::new(MockCombatsUc) });
+    let svc = CoudeCombatsServiceServer::new(CoudeCombatsGrpc { uc: Arc::new(MockCombatsUc), resolve_batch_uc: Arc::new(test_helpers::StubResolveBettingBatch), expire_batch_uc: Arc::new(test_helpers::StubExpireCombatsBatch), resolve_now_uc: Arc::new(test_helpers::StubResolveCombatNow) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeCombatsServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();
@@ -496,14 +499,14 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
     async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { unimplemented!() }
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
-    async fn buy_insurance(&self, _: &str, _: &str, _: bool) -> Result<(), DomainError> { unimplemented!() }
+    async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { unimplemented!() }
     async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> { unimplemented!() }
     async fn expire_insurance(&self, _: Uuid) -> Result<(), DomainError> { unimplemented!() }
 }
 
 #[tokio::test]
 async fn coude_inventory_list_and_has_item_round_trip() {
-    let svc = CoudeInventoryServiceServer::new(CoudeInventoryGrpc { uc: Arc::new(MockInventoryUc) });
+    let svc = CoudeInventoryServiceServer::new(CoudeInventoryGrpc { uc: Arc::new(MockInventoryUc), steal_protections_uc: Arc::new(test_helpers::StubCoudeStealProtections), steal_boosts_uc: Arc::new(test_helpers::StubCoudeStealBoosts) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeInventoryServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();
@@ -541,6 +544,7 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
             value: 1000 - i * 100,
         }).collect())
     }
+    async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<sentinel_api::domain::entities::DailyChaosOutcome>, DomainError> { Ok(None) }
     async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
         Ok(CoudeCurrentSeason {
             season_number: 5,
@@ -557,7 +561,7 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
 
 #[tokio::test]
 async fn coude_social_leaderboard_and_season_round_trip() {
-    let svc = CoudeSocialServiceServer::new(CoudeSocialGrpc { uc: Arc::new(MockSocialUc) });
+    let svc = CoudeSocialServiceServer::new(CoudeSocialGrpc { uc: Arc::new(MockSocialUc), cashbox_uc: Arc::new(test_helpers::StubCoudeCashbox), catalog_uc: Arc::new(test_helpers::StubCoudeCatalog), heist_uc: Arc::new(test_helpers::StubCoudeHeist), taunts_uc: Arc::new(test_helpers::StubCoudeTaunts) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeSocialServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();
