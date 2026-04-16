@@ -27,9 +27,10 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::api_client::ApiClient;
 use crate::config::Config;
+use crate::api_client::VoiceConfigResponse;
 use crate::handler::{
     AfkTrackerKey, ConfigKey, CooldownTrackerKey, FloodTrackerKey, Handler, MembersToVoiceMapKey,
-    SessionCardKey, TextToVoiceMapKey, VoiceOwnerMapKey, VoteTrackerKey,
+    SessionCardKey, TextToVoiceMapKey, VoiceConfigKey, VoiceOwnerMapKey, VoteTrackerKey,
 };
 use crate::state::{AfkTracker, CooldownTracker, FloodTracker, VoteTracker};
 
@@ -131,6 +132,38 @@ async fn main() {
         }
     }
 
+    // Charger la config voice depuis l'API (cooldown, flood, cleanup).
+    // En cas d'echec, on garde les defaults — le bot demarre quand meme.
+    let cooldown_tracker = Arc::new(CooldownTracker::new());
+    let flood_tracker = Arc::new(FloodTracker::new());
+    let voice_config = match voice_api.get_voice_config(&guild_id_str).await {
+        Ok(cfg) => {
+            cooldown_tracker.set_cooldown_secs(cfg.creation_cooldown_secs);
+            flood_tracker.set_thresholds(cfg.flood_max_messages, cfg.flood_time_window_secs);
+            info!(
+                cooldown = cfg.creation_cooldown_secs,
+                flood_max = cfg.flood_max_messages,
+                flood_window = cfg.flood_time_window_secs,
+                cleanup_delay = cfg.empty_cleanup_delay_secs,
+                mute_duration = cfg.flood_mute_duration_secs,
+                vote_kick_timeout = cfg.vote_kick_timeout_secs,
+                "Voice config chargee depuis l'API"
+            );
+            cfg
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Impossible de charger la voice config, defaults utilises");
+            VoiceConfigResponse {
+                creation_cooldown_secs: 5,
+                flood_max_messages: 5,
+                flood_time_window_secs: 5,
+                empty_cleanup_delay_secs: 2,
+                flood_mute_duration_secs: 30,
+                vote_kick_timeout_secs: 60,
+            }
+        }
+    };
+
     let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)
         .cache_settings(sentinel_shared::cache_settings::full())
@@ -142,13 +175,14 @@ async fn main() {
         data.insert::<ApiClientKey>(api.clone());
         data.insert::<GrpcClientKey>(Arc::clone(&grpc));
         data.insert::<ConfigKey>(config);
-        data.insert::<FloodTrackerKey>(Arc::new(FloodTracker::new()));
+        data.insert::<FloodTrackerKey>(flood_tracker);
         data.insert::<VoteTrackerKey>(Arc::new(VoteTracker::new()));
-        data.insert::<CooldownTrackerKey>(Arc::new(CooldownTracker::new()));
+        data.insert::<CooldownTrackerKey>(cooldown_tracker);
         data.insert::<TextToVoiceMapKey>(text_to_voice);
         data.insert::<MembersToVoiceMapKey>(members_to_voice);
         data.insert::<VoiceOwnerMapKey>(voice_owner);
         data.insert::<AfkTrackerKey>(Arc::new(AfkTracker::new()));
+        data.insert::<VoiceConfigKey>(voice_config);
         data.insert::<SessionCardKey>(Arc::new(DashMap::new()));
     }
 

@@ -1,42 +1,51 @@
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 use dashmap::DashMap;
 use serenity::model::id::UserId;
 
-const COOLDOWN_SECS: u64 = 5;
+const DEFAULT_COOLDOWN_SECS: u64 = 5;
 
 pub struct CooldownTracker {
     map: DashMap<UserId, Instant>,
+    cooldown_secs: AtomicU64,
 }
 
 impl CooldownTracker {
     pub fn new() -> Self {
         Self {
             map: DashMap::new(),
+            cooldown_secs: AtomicU64::new(DEFAULT_COOLDOWN_SECS),
         }
     }
 
+    /// Met a jour le cooldown depuis la config API.
+    pub fn set_cooldown_secs(&self, secs: u64) {
+        self.cooldown_secs.store(secs, Ordering::Relaxed);
+    }
+
+    fn cooldown(&self) -> u64 {
+        self.cooldown_secs.load(Ordering::Relaxed)
+    }
+
     /// Verifie le cooldown. Retourne Some(remaining_secs) si en cooldown, None si OK.
-    /// Supprime l'entree au passage si elle est expiree (cleanup inline).
     pub fn check(&self, user_id: UserId) -> Option<u64> {
+        let cd = self.cooldown();
         if let Some(entry) = self.map.get(&user_id) {
             let elapsed = entry.value().elapsed().as_secs();
-            if elapsed < COOLDOWN_SECS {
-                return Some(COOLDOWN_SECS - elapsed);
+            if elapsed < cd {
+                return Some(cd - elapsed);
             }
         }
-        // Expired (ou absent) — drop l'entree pour eviter le leak memoire.
         self.map.remove(&user_id);
         None
     }
 
     /// Enregistre le timestamp de creation.
     pub fn set(&self, user_id: UserId) {
-        // Cleanup periodique quand la map devient grosse : retire les
-        // entrees dont le cooldown a expire. Seuil choisi pour ne pas
-        // ralentir le check critique path.
+        let cd = self.cooldown();
         if self.map.len() > 500 {
-            self.map.retain(|_, ts| ts.elapsed().as_secs() < COOLDOWN_SECS);
+            self.map.retain(|_, ts| ts.elapsed().as_secs() < cd);
         }
         self.map.insert(user_id, Instant::now());
     }
@@ -60,7 +69,7 @@ mod tests {
         tracker.set(uid(1));
         let remaining = tracker.check(uid(1));
         assert!(remaining.is_some());
-        assert!(remaining.unwrap() <= COOLDOWN_SECS);
+        assert!(remaining.unwrap() <= DEFAULT_COOLDOWN_SECS);
     }
 
     #[test]

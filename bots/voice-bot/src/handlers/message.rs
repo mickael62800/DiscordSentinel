@@ -41,12 +41,18 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
         return;
     };
 
-    // Mute 30 secondes
-    let until = chrono::Utc::now() + chrono::Duration::seconds(30);
+    // Mute configurable (default 30s, lu depuis VoiceConfig).
+    let mute_secs = {
+        let data = ctx.data.read().await;
+        data.get::<crate::handler::VoiceConfigKey>()
+            .map(|c| c.flood_mute_duration_secs as i64)
+            .unwrap_or(30)
+    };
+    let until = chrono::Utc::now() + chrono::Duration::seconds(mute_secs);
     let edit = serenity::builder::EditMember::new()
         .disable_communication_until(until.to_rfc3339());
     match guild_id.edit_member(&ctx.http, user_id, edit).await {
-        Ok(_) => info!(user = %user_id, "Anti-flood: mute 30s"),
+        Ok(_) => info!(user = %user_id, mute_secs, "Anti-flood: mute"),
         Err(why) => error!(error = %why, "Erreur mute anti-flood"),
     }
 

@@ -366,6 +366,74 @@ impl ApiClient {
             .await
             .map_err(grpc_err_to_string)
     }
+
+    // ── Config voice-bot par guild (gRPC) ──
+
+    pub async fn get_voice_config(
+        &self,
+        guild_id: &str,
+    ) -> Result<VoiceConfigResponse, String> {
+        let req = proto::GetVoiceConfigRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        let cfg = g
+            .guarded(|| async move {
+                client.get_voice_config(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(VoiceConfigResponse {
+            creation_cooldown_secs: cfg.creation_cooldown_secs,
+            flood_max_messages: cfg.flood_max_messages,
+            flood_time_window_secs: cfg.flood_time_window_secs,
+            empty_cleanup_delay_secs: cfg.empty_cleanup_delay_secs,
+            flood_mute_duration_secs: cfg.flood_mute_duration_secs,
+            vote_kick_timeout_secs: cfg.vote_kick_timeout_secs,
+        })
+    }
+
+    // ── Themes (gRPC) ──
+
+    pub async fn list_themes(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<VoiceThemeResponse>, String> {
+        let req = proto::ListThemesRequest {
+            guild_id: guild_id.to_string(),
+        };
+        let g = &self.grpc;
+        let mut client = g.voice_channels();
+        let list = g
+            .guarded(|| async move {
+                client.list_themes(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(list.themes.into_iter().map(|t| VoiceThemeResponse {
+            name: t.name,
+            member_limit: t.member_limit,
+        }).collect())
+    }
+}
+
+// ── Response DTOs ──
+
+#[derive(Debug, Clone)]
+pub struct VoiceConfigResponse {
+    pub creation_cooldown_secs: u64,
+    pub flood_max_messages: u64,
+    pub flood_time_window_secs: u64,
+    pub empty_cleanup_delay_secs: u64,
+    pub flood_mute_duration_secs: u64,
+    pub vote_kick_timeout_secs: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct VoiceThemeResponse {
+    pub name: String,
+    pub member_limit: Option<i32>,
 }
 
 fn proto_to_response(c: proto::VoiceChannel) -> VoiceChannelResponse {

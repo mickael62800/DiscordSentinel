@@ -216,13 +216,19 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
     }
     respond_ephemeral(ctx, component, "Vote lance !").await;
 
-    // Timeout 60s
+    // Timeout configurable (default 60s, lu depuis VoiceConfig).
+    let vote_timeout = {
+        let data = ctx.data.read().await;
+        data.get::<crate::handler::VoiceConfigKey>()
+            .map(|c| c.vote_kick_timeout_secs)
+            .unwrap_or(60)
+    };
     let ctx_clone = ctx.clone();
     let mc = members_channel_id;
     let vc = voice_channel_id;
     let guild_id = component.guild_id;
     tokio::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        tokio::time::sleep(std::time::Duration::from_secs(vote_timeout)).await;
 
         let vote = {
             let data = ctx_clone.data.read().await;

@@ -366,9 +366,15 @@ pub(super) async fn check_and_delete_empty(
         return;
     }
 
-    // Petit delai pour laisser le cache Discord se synchroniser
-    // (evite de supprimer un salon pendant un move_member en cours)
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    // Delai anti-race configurable : laisse le cache Discord se synchroniser
+    // (evite de supprimer un salon pendant un move_member en cours).
+    let cleanup_delay = {
+        let data = ctx.data.read().await;
+        data.get::<crate::handler::VoiceConfigKey>()
+            .map(|c| c.empty_cleanup_delay_secs)
+            .unwrap_or(2)
+    };
+    tokio::time::sleep(std::time::Duration::from_secs(cleanup_delay)).await;
 
     let is_empty = if let Some(guild) = ctx.cache.guild(guild_id) {
         guild

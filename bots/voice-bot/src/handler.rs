@@ -13,6 +13,7 @@ use tracing::{info, warn};
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
 
+use crate::api_client::VoiceConfigResponse;
 use crate::config::Config;
 use crate::state::{AfkTracker, CooldownTracker, FloodTracker, VoteTracker};
 
@@ -59,6 +60,12 @@ impl TypeMapKey for VoiceOwnerMapKey {
 pub struct AfkTrackerKey;
 impl TypeMapKey for AfkTrackerKey {
     type Value = Arc<AfkTracker>;
+}
+
+/// Config voice-bot chargee depuis l'API au boot.
+pub struct VoiceConfigKey;
+impl TypeMapKey for VoiceConfigKey {
+    type Value = VoiceConfigResponse;
 }
 
 /// Carte live de session vocale dans le salon de logs.
