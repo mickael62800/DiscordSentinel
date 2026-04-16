@@ -7,7 +7,7 @@ use crate::domain::errors::DomainError;
 pub trait ModerationRepository: Send + Sync {
     async fn save(&self, action: &ModerationAction) -> Result<(), DomainError>;
     async fn find_by_id(&self, id: uuid::Uuid) -> Result<Option<ModerationAction>, DomainError>;
-    async fn find_by_target(&self, guild_id: &str, target_id: &str) -> Result<Vec<ModerationAction>, DomainError>;
+    async fn find_by_target(&self, guild_id: &str, target_id: &str, limit: i64) -> Result<Vec<ModerationAction>, DomainError>;
     async fn find_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError>;
     /// Liste toutes les actions de moderation (warn, mute, ban, unban, etc.)
     /// pour une guild (ou toutes si guild_id = None). Utilise pour le journal

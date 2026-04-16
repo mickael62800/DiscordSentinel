@@ -146,10 +146,10 @@ impl ModerationRepository for PgModerationRepository {
         Ok(row.map(ModerationAction::from))
     }
 
-    async fn find_by_target(&self, guild_id: &str, target_id: &str) -> Result<Vec<ModerationAction>, DomainError> {
-        // Phase 2 : lecture depuis audit_logs (event_type 'mod_*').
+    async fn find_by_target(&self, guild_id: &str, target_id: &str, limit: i64) -> Result<Vec<ModerationAction>, DomainError> {
+        let limit = limit.min(1000).max(1);
         let sql = format!(
-            "{AUDIT_MOD_SELECT} WHERE guild_id = $1 AND target_id = $2 AND event_type LIKE 'mod_%' ORDER BY created_at DESC LIMIT 200"
+            "{AUDIT_MOD_SELECT} WHERE guild_id = $1 AND target_id = $2 AND event_type LIKE 'mod_%' ORDER BY created_at DESC LIMIT {limit}"
         );
         let rows = sqlx::query_as::<_, AuditModRow>(&sql)
             .bind(guild_id)

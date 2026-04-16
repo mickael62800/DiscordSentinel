@@ -176,7 +176,7 @@ impl ManageModerationUseCase for ManageModerationService {
             }
         }
 
-        let actions = self.repo.find_by_target(guild_id, target_id).await?;
+        let actions = self.repo.find_by_target(guild_id, target_id, 500).await?;
         let target_name = actions.first().map(|a| a.target_name.clone()).unwrap_or_default();
 
         let total_warns = actions.iter().filter(|a| a.action_type == "warn").count() as u32;

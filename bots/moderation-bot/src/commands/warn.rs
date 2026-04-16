@@ -185,7 +185,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
                             .as_secs() as i64 + secs as i64;
-                        let datetime = time::OffsetDateTime::from_unix_timestamp(ts).expect("timestamp");
+                        let datetime = time::OffsetDateTime::from_unix_timestamp(ts).unwrap_or_else(|_| time::OffsetDateTime::now_utc());
                         let timeout = serenity::model::Timestamp::from(datetime);
                         if let Err(e) = member.disable_communication_until_datetime(&ctx.http, timeout).await {
                             warn!(error = %e, "Escalation mute echouee");

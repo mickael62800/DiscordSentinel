@@ -84,3 +84,18 @@ pub struct AppState {
     pub discord_oauth_redirect_uri: String,
     pub web_front_url: String,
 }
+
+impl AppState {
+    /// Lit le delai de rappel avant expiration depuis la config guild
+    /// (cle `reminder_advance_secs` du bot `moderation-bot`). Default 3600s = 1h.
+    pub async fn bot_config_reminder_advance_secs(&self, guild_id: &str) -> u64 {
+        match self.bot_config_repo.get_config(guild_id, "moderation-bot").await {
+            Ok(entries) => entries
+                .iter()
+                .find(|e| e.config_key == "reminder_advance_secs")
+                .and_then(|e| e.config_value.parse().ok())
+                .unwrap_or(3600),
+            Err(_) => 3600,
+        }
+    }
+}

@@ -291,7 +291,7 @@ pub async fn execute_mute(
         .as_secs() as i64
         + timeout_secs as i64;
 
-    let datetime = time::OffsetDateTime::from_unix_timestamp(ts).expect("timestamp invalide");
+    let datetime = time::OffsetDateTime::from_unix_timestamp(ts).unwrap_or_else(|_| time::OffsetDateTime::now_utc());
     let timeout = serenity::model::Timestamp::from(datetime);
 
     if let Err(e) = member

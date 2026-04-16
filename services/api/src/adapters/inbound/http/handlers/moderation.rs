@@ -113,7 +113,7 @@ pub async fn log_action(
                 reason: reason.clone(),
                 action_id: action_uuid,
                 duration_secs: dur,
-                remind_before_secs: 3600,
+                remind_before_secs: state.bot_config_reminder_advance_secs(&guild_id).await,
             }).await {
                 // Niveau ERROR (pas warn) : une sanction temporaire sans
                 // rappel = durée perpétuelle jusqu'à intervention manuelle.
