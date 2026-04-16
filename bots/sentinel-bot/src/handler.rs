@@ -78,6 +78,12 @@ impl EventHandler for Handler {
                     _ => {}
                 }
             }
+            Interaction::Component(component) => {
+                let cid = component.data.custom_id.as_str();
+                if modules::welcome::handles_component(cid) {
+                    modules::welcome::on_component(&ctx, &component).await;
+                }
+            }
             _ => {}
         }
     }

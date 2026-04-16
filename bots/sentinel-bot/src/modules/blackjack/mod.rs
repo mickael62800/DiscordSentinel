@@ -1,13 +1,9 @@
-//! Module roles — panels de roles + sync (ex roles-bot).
-//! TODO: extraire EventHandler en fonctions libres.
-
-pub mod api_client;
+//! Module blackjack — TODO: migration depuis blackjack-bot.
 
 use serenity::all::{CommandInteraction, Context, CreateCommand};
 
 pub fn register_commands() -> Vec<CreateCommand> {
-    // TODO: roles-panel command
-    vec![]
+    vec![] // TODO
 }
 
 pub async fn handle_command(_ctx: &Context, _command: &CommandInteraction) {

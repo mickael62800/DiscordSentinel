@@ -1,36 +1,28 @@
 use std::sync::Arc;
 
-use serenity::async_trait;
 use serenity::builder::{
     CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, EditChannel,
 };
-use serenity::model::application::{ButtonStyle, Interaction};
+use serenity::model::application::ButtonStyle;
 use serenity::model::channel::Message;
-use serenity::model::gateway::Ready;
 use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, RoleId};
 use serenity::model::user::User;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use sentinel_shared::heartbeat::{ApiClientKey, register_guilds};
+use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::api_client::WelcomeApiClient;
 use super::template;
 
 pub const RULES_ACCEPT_ID: &str = "sentinel_rules_accept";
 
-pub struct Handler;
-
-#[async_trait]
-impl EventHandler for Handler {
-    async fn ready(&self, ctx: Context, ready: Ready) {
-        info!(bot = %ready.user.name, guilds = ready.guilds.len(), "Welcome bot connecte");
-        register_guilds(&ctx, &ready).await;
-    }
-
-    async fn guild_member_addition(&self, ctx: Context, new_member: Member) {
+/// Appele quand un nouveau membre rejoint.
+pub async fn on_member_add(ctx: &Context, new_member: &Member) {
+        let ctx = ctx.clone();
+        let new_member = new_member.clone();
         let guild_id = new_member.guild_id;
         let user_id = new_member.user.id;
 
@@ -152,13 +144,10 @@ impl EventHandler for Handler {
         ));
     }
 
-    async fn guild_member_removal(
-        &self,
-        ctx: Context,
-        guild_id: GuildId,
-        user: User,
-        _member: Option<Member>,
-    ) {
+/// Appele quand un membre quitte.
+pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
+        let ctx = ctx.clone();
+        let user = user.clone();
         let data = ctx.data.read().await;
         let base = match data.get::<ApiClientKey>() {
             Some(b) => Arc::clone(b),
@@ -232,12 +221,10 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-        if let Interaction::Component(component) = interaction {
-            if component.data.custom_id == RULES_ACCEPT_ID {
-                handle_rules_accept(&ctx, &component).await;
-            }
-        }
+/// Appele pour les interactions de composants (bouton reglement).
+pub async fn on_component(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    if component.data.custom_id == RULES_ACCEPT_ID {
+        handle_rules_accept(ctx, component).await;
     }
 }
 
