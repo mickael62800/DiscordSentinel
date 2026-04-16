@@ -16,10 +16,19 @@ use crate::api_client::GameApiClient;
 use crate::commands;
 use crate::detector;
 
-/// Cooldown anti-spam sur la detection des mentions `#Jeu` : un user ne
-/// peut declencher au maximum une notification pour un jeu donne toutes
-/// les N secondes dans la meme guild.
-const MENTION_COOLDOWN_SECS: u64 = 60;
+/// Cooldown anti-spam mentions `#Jeu` (env GAME_MENTION_COOLDOWN_SECS, defaut 60s).
+fn mention_cooldown_secs() -> u64 {
+    static VAL: std::sync::OnceLock<u64> = std::sync::OnceLock::new();
+    *VAL.get_or_init(|| {
+        std::env::var("GAME_MENTION_COOLDOWN_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(60)
+    })
+}
+
+/// Seuil de cleanup du cache cooldown (technique, pas metier).
+const COOLDOWN_CLEANUP_THRESHOLD: usize = 500;
 
 static MENTION_COOLDOWN: std::sync::LazyLock<Mutex<HashMap<(u64, u64, String), Instant>>> =
     std::sync::LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -28,7 +37,7 @@ static MENTION_COOLDOWN: std::sync::LazyLock<Mutex<HashMap<(u64, u64, String), I
 fn can_notify(guild_id: u64, user_id: u64, game_id: &str) -> bool {
     let key = (guild_id, user_id, game_id.to_string());
     let now = Instant::now();
-    let cooldown = Duration::from_secs(MENTION_COOLDOWN_SECS);
+    let cooldown = Duration::from_secs(mention_cooldown_secs());
     let mut map = match MENTION_COOLDOWN.lock() {
         Ok(g) => g,
         Err(p) => p.into_inner(),
@@ -40,7 +49,7 @@ fn can_notify(guild_id: u64, user_id: u64, game_id: &str) -> bool {
     }
     map.insert(key, now);
     // Cleanup opportuniste pour borner la memoire.
-    if map.len() > 500 {
+    if map.len() > COOLDOWN_CLEANUP_THRESHOLD {
         map.retain(|_, ts| now.duration_since(*ts) < cooldown);
     }
     true
