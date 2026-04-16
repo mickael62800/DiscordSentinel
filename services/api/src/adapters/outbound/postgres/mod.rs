@@ -122,3 +122,6 @@ pub use temp_role_repository::PgTempRoleRepository;
 
 mod pending_action_repository;
 pub use pending_action_repository::PgPendingActionRepository;
+
+mod blackjack_table_repository;
+pub use blackjack_table_repository::PgBlackjackTableRepository;

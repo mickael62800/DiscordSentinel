@@ -18,7 +18,7 @@ use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use sentinel_api::adapters::outbound::postgres::{
     PgBotConfigRepository, PgConductRepository, PgCoudeBetRepository, PgCoudeCombatRepository, PgCoudeEconomyRepository, PgCoudeInventoryRepository, PgCoudePlayerRepository, PgCoudeSocialRepository, PgGuildRepository, PgInfractionRepository,
     PgMemberRepository, PgModerationRepository, PgRuleRepository, PgSecurityEventRepository, PgStatsRepository,
-    PgAnalyticsRepository, PgBlackjackRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgIaConfigRepository, PgLevelRepository, PgModstatsRepository, PgNotesRepository, PgPendingActionRepository, PgReminderRepository, PgReviewRepository, PgRolePanelRepository, PgSponsorshipRepository, PgStrikeRepository, PgTempRoleRepository, PgTicketRepository, PgUserActivityRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository, PgWelcomeConfigRepository,
+    PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgDailyActivityRepository, PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgIaConfigRepository, PgLevelRepository, PgModstatsRepository, PgNotesRepository, PgPendingActionRepository, PgReminderRepository, PgReviewRepository, PgRolePanelRepository, PgSponsorshipRepository, PgStrikeRepository, PgTempRoleRepository, PgTicketRepository, PgUserActivityRepository, PgVoiceChannelRepository, PgWalletRepository, PgWatchedUserRepository, PgWelcomeConfigRepository,
 };
 use sentinel_api::adapters::outbound::batching::{
     BatchWriterConfig, BatchedPgAuditLogRepository, BatchedPgLogRepository,
@@ -482,6 +482,7 @@ async fn main() {
         sponsorship_repo: Arc::new(PgSponsorshipRepository::new(pg_pool.clone())),
         temp_role_repo: Arc::new(PgTempRoleRepository::new(pg_pool.clone())),
         pending_action_repo: Arc::new(PgPendingActionRepository::new(pg_pool.clone())),
+        blackjack_table_repo: Arc::new(PgBlackjackTableRepository::new(pg_pool.clone())),
         pg_pool: pg_pool.clone(),
         redis_client: redis_client.clone(),
         cache: Some(cache.clone()),

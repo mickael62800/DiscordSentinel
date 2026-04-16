@@ -114,3 +114,6 @@ pub use temp_role_repository::{TempRole, TempRoleRepository};
 
 mod pending_action_repository;
 pub use pending_action_repository::{PendingAction, PendingActionRepository};
+
+mod blackjack_table_repository;
+pub use blackjack_table_repository::{BlackjackTable, BlackjackTablePlayer, BlackjackTableRepository};
