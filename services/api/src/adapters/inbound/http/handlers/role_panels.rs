@@ -55,25 +55,14 @@ pub async fn delete_panel(
     rbac: Option<Extension<RoleContext>>,
     Path(panel_id): Path<String>,
 ) -> Result<Json<()>, ApiError> {
-    // Phase 7 B — Gate RBAC : admin+ pour supprimer un panel. Fetch le
-    // guild_id via sqlx direct (ressource-id-based).
+    // Gate RBAC : admin+ pour supprimer un panel. On passe par le use case
+    // pour recuperer le guild_id (plus de SQL direct dans le handler).
     if rbac.is_some() {
-        let panel_uuid = uuid::Uuid::parse_str(&panel_id).map_err(|_| {
-            ApiError(DomainError::ValidationError("panel_id invalide".into()))
-        })?;
-        let row: Option<(String,)> = sqlx::query_as(
-            "SELECT guild_id FROM role_panels WHERE id = $1",
-        )
-        .bind(panel_uuid)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("fetch panel guild: {e}"))))?;
-
-        if let Some((guild_id,)) = row {
+        if let Ok(detail) = state.role_panels_uc.get_panel(&panel_id).await {
             check_role_for_guild(
                 &state,
                 &rbac,
-                &guild_id,
+                &detail.panel.guild_id,
                 Role::Admin,
                 "admin+ requis pour supprimer un panel",
             )

@@ -39,11 +39,15 @@ impl EventHandler for Handler {
         // Sync initiale des roles Discord vers l'API
         sync_all_guild_roles(&ctx).await;
 
-        // Sync periodique toutes les 5 minutes
+        // Sync periodique (configurable via env, defaut 300s = 5 min).
+        let sync_interval = std::env::var("ROLES_SYNC_INTERVAL_SECS")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(300u64);
         let ctx_clone = ctx.clone();
         tokio::spawn(async move {
             loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(300)).await;
+                tokio::time::sleep(tokio::time::Duration::from_secs(sync_interval)).await;
                 sync_all_guild_roles(&ctx_clone).await;
             }
         });
