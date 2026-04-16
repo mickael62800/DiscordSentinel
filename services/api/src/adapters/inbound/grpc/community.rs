@@ -89,6 +89,9 @@ impl CommunityService for CommunityGrpc {
         request: Request<proto::CreateTempRoleRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
+        // Valider le format RFC3339 avant de passer a Postgres.
+        chrono::DateTime::parse_from_rfc3339(&req.expires_at)
+            .map_err(|_| Status::invalid_argument("expires_at doit etre au format RFC3339"))?;
         sqlx::query(
             "INSERT INTO temp_roles (guild_id, user_id, role_id, expires_at) \
              VALUES ($1, $2, $3, $4::timestamptz) \

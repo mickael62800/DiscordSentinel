@@ -333,9 +333,14 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
                     if let Some(tracker) = data.get::<TempRoleKey>() {
                         tracker.remove(guild_id.get(), component.user.id.get(), role_id);
                     }
-                    // Note : on ne rollback pas l'API ici (pas de endpoint
-                    // delete direct disponible sans worker). Le cleanup-worker
-                    // traitera l'orphelin a la prochaine passe.
+                    // Rollback API : supprimer le temp_role persiste.
+                    if let Some(api) = data.get::<RolesApiKey>() {
+                        api.delete_temp_role(
+                            &guild_id.to_string(),
+                            &component.user.id.to_string(),
+                            &role_id.to_string(),
+                        ).await;
+                    }
                 }
             }
         }
