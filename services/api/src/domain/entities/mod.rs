@@ -87,7 +87,8 @@ pub use coude_inventory::{
 
 mod coude_social;
 pub use coude_social::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, LeaderboardCategory, NewDailyChaos,
+    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, DailyChaosOutcome,
+    LeaderboardCategory, NewDailyChaos,
 };
 
 mod coude_cashbox;

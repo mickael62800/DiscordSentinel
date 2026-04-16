@@ -47,6 +47,9 @@ pub trait CoudeSocialRepository: Send + Sync {
 
     async fn log_daily_chaos(&self, chaos: NewDailyChaos) -> Result<(), DomainError>;
 
+    /// Nombre de chaos deja emis aujourd'hui pour cette guild.
+    async fn count_daily_chaos_today(&self, guild_id: &str) -> Result<i64, DomainError>;
+
     // ── Saison ──
 
     /// Renvoie la saison active du guild. Bootstrap automatique si aucune

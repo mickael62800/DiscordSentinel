@@ -446,6 +446,33 @@ impl CoudeSocialService for CoudeSocialGrpc {
             reason: status.reason,
         }))
     }
+
+    async fn trigger_daily_chaos(
+        &self,
+        request: Request<proto::TriggerDailyChaosRequest>,
+    ) -> Result<Response<proto::DailyChaosResponse>, Status> {
+        let guild_id = request.into_inner().guild_id;
+        let outcome = self
+            .uc
+            .trigger_daily_chaos(&guild_id)
+            .await
+            .map_err(domain_to_status)?;
+        match outcome {
+            Some(o) => Ok(Response::new(proto::DailyChaosResponse {
+                triggered: true,
+                loser_id: o.loser_id,
+                loser_name: o.loser_name,
+                winner_id: o.winner_id,
+                winner_name: o.winner_name,
+                amount: o.amount,
+                channel_id: o.channel_id,
+            })),
+            None => Ok(Response::new(proto::DailyChaosResponse {
+                triggered: false,
+                ..Default::default()
+            })),
+        }
+    }
 }
 
 pub(super) fn redistribution_to_proto(

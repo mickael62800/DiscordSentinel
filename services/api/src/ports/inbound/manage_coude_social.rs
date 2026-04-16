@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
 use crate::domain::entities::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, LeaderboardCategory, NewDailyChaos,
+    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, DailyChaosOutcome,
+    LeaderboardCategory, NewDailyChaos,
 };
 use crate::domain::errors::DomainError;
 
@@ -34,6 +35,17 @@ pub trait ManageCoudeSocialUseCase: Send + Sync {
     async fn list_active_events(&self, guild_id: &str) -> Result<Vec<CoudeEvent>, DomainError>;
 
     async fn log_daily_chaos(&self, chaos: NewDailyChaos) -> Result<(), DomainError>;
+
+    /// Tente de declencher un chaos journalier. L'API decide de tout :
+    /// - Compte les chaos deja emis aujourd'hui (cap 5)
+    /// - Tire 2 joueurs aleatoires avec assez de coins
+    /// - Calcule le montant (20% des coins de la victime)
+    /// - Fait le transfert + log
+    /// Retourne None si pas de chaos (cap atteint, pas de joueurs eligibles).
+    async fn trigger_daily_chaos(
+        &self,
+        guild_id: &str,
+    ) -> Result<Option<DailyChaosOutcome>, DomainError>;
 
     async fn current_season(&self, guild_id: &str) -> Result<CoudeCurrentSeason, DomainError>;
 }

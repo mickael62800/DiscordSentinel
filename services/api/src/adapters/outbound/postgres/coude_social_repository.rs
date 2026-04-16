@@ -197,6 +197,17 @@ impl CoudeSocialRepository for PgCoudeSocialRepository {
         Ok(())
     }
 
+    async fn count_daily_chaos_today(&self, guild_id: &str) -> Result<i64, DomainError> {
+        let count: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM coude_daily_chaos WHERE guild_id = $1 AND created_at >= CURRENT_DATE",
+        )
+        .bind(guild_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(count.0)
+    }
+
     // ── Saison ──
 
     async fn get_or_bootstrap_current_season(

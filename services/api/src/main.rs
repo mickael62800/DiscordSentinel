@@ -288,11 +288,16 @@ async fn main() {
     let coude_bet_repo = Arc::new(PgCoudeBetRepository::new(pg_pool.clone()));
     let coude_bets_uc = Arc::new(ManageCoudeBetsService::new(coude_bet_repo, coude_combats_uc.clone()));
     let coude_economy_repo = Arc::new(PgCoudeEconomyRepository::new(pg_pool.clone()));
-    let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(coude_economy_repo));
+    let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(coude_economy_repo.clone()));
     let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
     let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));
     let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
-    let coude_social_uc = Arc::new(ManageCoudeSocialService::new(coude_social_repo));
+    let coude_social_uc = Arc::new(ManageCoudeSocialService::new(
+        coude_social_repo,
+        coude_player_repo.clone(),
+        coude_economy_repo.clone(),
+        bot_config_repo.clone(),
+    ));
 
     // Phase 9 Part D — railleries (cree en amont : utilise par les deux
     // services de resolution de combat).

@@ -685,6 +685,23 @@ service CoudeSocialService {
   rpc AttemptHeist(UserInGuildRequest) returns (HeistResult);
   rpc GetHeistCooldown(UserInGuildRequest) returns (HeistCooldownState);
   rpc GetPrisonStatus(UserInGuildRequest) returns (PrisonStatusState);
+
+  // Daily chaos : le worker appelle, l'API decide (cap, joueurs, montant).
+  rpc TriggerDailyChaos(TriggerDailyChaosRequest) returns (DailyChaosResponse);
+}
+
+message TriggerDailyChaosRequest {
+  string guild_id = 1;
+}
+
+message DailyChaosResponse {
+  bool triggered = 1;
+  string loser_id = 2;
+  string loser_name = 3;
+  string winner_id = 4;
+  string winner_name = 5;
+  int64 amount = 6;
+  string channel_id = 7;
 }
 
 message GetCashboxRequest {

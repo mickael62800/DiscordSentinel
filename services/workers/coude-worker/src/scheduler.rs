@@ -1,5 +1,7 @@
+use rand::Rng;
 use sqlx::PgPool;
 use tokio::sync::watch;
+use tracing::info;
 
 use sentinel_worker_common::spawn_periodic;
 
@@ -55,18 +57,47 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
     }
 
     // Job 4 : redistribution hebdo des caisses communautaires (Phase 9).
-    // Le worker tick regulierement mais l'API filtre elle-meme les guilds
-    // dues (> cashbox_min_days jours depuis la derniere redistribution).
     let min_days = config.cashbox_min_days as i64;
     spawn_periodic(
         "redistribute_cashbox",
         config.cashbox_tick_secs,
-        pool,
-        shutdown,
-        api_url,
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
         "coude-worker",
         move |pool| {
             Box::pin(async move { jobs::redistribute_cashbox::run(&pool, min_days).await })
         },
     );
+
+    // Job 5 : "Roue du Destin" — chaos journalier avec timer aleatoire.
+    // Le worker dort un temps aleatoire entre 2h et 6h, puis appelle l'API
+    // qui decide seule (cap 5/jour, joueurs, montant, transfert).
+    {
+        let api = api_url;
+        let token = bot_token;
+        let mut rx = shutdown;
+        tokio::spawn(async move {
+            loop {
+                // Delai aleatoire 2-6h (7200..21600 secondes).
+                let delay_secs = {
+                    let mut rng = rand::thread_rng();
+                    rng.gen_range(7200..=21600)
+                };
+                info!(delay_secs, "daily_chaos: prochain tick dans {}h{}",
+                    delay_secs / 3600, (delay_secs % 3600) / 60);
+
+                tokio::select! {
+                    _ = tokio::time::sleep(tokio::time::Duration::from_secs(delay_secs)) => {}
+                    _ = rx.changed() => {
+                        if *rx.borrow() { return; }
+                    }
+                }
+
+                if let Err(e) = jobs::daily_chaos::run(&pool, &api, &token).await {
+                    tracing::error!(error = %e, "daily_chaos job failed");
+                }
+            }
+        });
+    }
 }

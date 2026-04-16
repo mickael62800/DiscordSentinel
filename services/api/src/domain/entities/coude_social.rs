@@ -64,6 +64,17 @@ pub struct NewDailyChaos {
     pub amount: i64,
 }
 
+/// Resultat d'un trigger de chaos journalier reussi, pret a etre affiche.
+#[derive(Debug, Clone)]
+pub struct DailyChaosOutcome {
+    pub loser_id: String,
+    pub loser_name: String,
+    pub winner_id: String,
+    pub winner_name: String,
+    pub amount: i64,
+    pub channel_id: String,
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // ── Saison ──
 // ══════════════════════════════════════════════════════════════════════
