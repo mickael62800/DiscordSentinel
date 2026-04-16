@@ -158,20 +158,24 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
             "Blackjack | Sentinel — Table multijoueur",
         ));
 
-    let bet_buttons = vec![
-        CreateButton::new(format!("{BET_PREFIX}50"))
-            .label("50 \u{1fa99}")
-            .style(ButtonStyle::Secondary),
-        CreateButton::new(format!("{BET_PREFIX}100"))
-            .label("100 \u{1fa99}")
-            .style(ButtonStyle::Primary),
-        CreateButton::new(format!("{BET_PREFIX}250"))
-            .label("250 \u{1fa99}")
-            .style(ButtonStyle::Primary),
-        CreateButton::new(format!("{BET_PREFIX}500"))
-            .label("500 \u{1fa99}")
-            .style(ButtonStyle::Danger),
+    // Paliers de mise affiches dans l'UI. L'API valide min_bet/max_bet
+    // en config guild — si un palier est hors range, StartGame retourne
+    // une erreur claire au joueur. Idealement ces paliers viendraient de
+    // la config guild (futur: RPC GetBlackjackConfig).
+    const BET_TIERS: &[(u64, ButtonStyle)] = &[
+        (50, ButtonStyle::Secondary),
+        (100, ButtonStyle::Primary),
+        (250, ButtonStyle::Primary),
+        (500, ButtonStyle::Danger),
     ];
+    let bet_buttons: Vec<CreateButton> = BET_TIERS
+        .iter()
+        .map(|(amount, style)| {
+            CreateButton::new(format!("{BET_PREFIX}{amount}"))
+                .label(format!("{amount} \u{1fa99}"))
+                .style(*style)
+        })
+        .collect();
     let invite_button = CreateButton::new(INVITE_BUTTON_ID)
         .label("Inviter un joueur")
         .emoji(serenity::model::channel::ReactionType::Unicode(

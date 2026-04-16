@@ -62,8 +62,9 @@ impl BlackjackService {
 
         // Créer le deck et distribuer les cartes
         let mut deck = create_deck();
-        let player_hand = vec![deck.pop().unwrap(), deck.pop().unwrap()];
-        let dealer_hand = vec![deck.pop().unwrap(), deck.pop().unwrap()];
+        let err = || DomainError::Internal("Deck vide a la distribution".into());
+        let player_hand = vec![deck.pop().ok_or_else(err)?, deck.pop().ok_or_else(err)?];
+        let dealer_hand = vec![deck.pop().ok_or_else(err)?, deck.pop().ok_or_else(err)?];
 
         let player_score = calculate_score(&player_hand);
         let dealer_score = calculate_score(&dealer_hand);
