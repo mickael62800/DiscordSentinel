@@ -16,6 +16,8 @@ service VoiceChannelsService {
   rpc AddCoAdmin(AddCoAdminRequest) returns (Empty);
   rpc AddToWhitelist(AddToWhitelistRequest) returns (Empty);
   rpc BanFromChannel(BanFromChannelRequest) returns (Empty);
+  rpc GetVoiceConfig(GetVoiceConfigRequest) returns (VoiceConfig);
+  rpc ListThemes(ListThemesRequest) returns (ThemeList);
 }
 
 message Empty {}
@@ -124,4 +126,47 @@ message VoiceChannel {
 
 message VoiceChannelList {
   repeated VoiceChannel channels = 1;
+}
+
+// ── Config voice-bot par guild ──
+
+message GetVoiceConfigRequest {
+  string guild_id = 1;
+}
+
+message VoiceConfig {
+  uint64 creation_cooldown_secs = 1;
+  uint64 flood_max_messages = 2;
+  uint64 flood_time_window_secs = 3;
+  uint64 empty_cleanup_delay_secs = 4;
+  uint64 flood_mute_duration_secs = 5;
+  uint64 vote_kick_timeout_secs = 6;
+}
+
+// ── Themes ──
+
+message ListThemesRequest {
+  string guild_id = 1;
+}
+
+message VoiceChannelTheme {
+  string id = 1;
+  string guild_id = 2;
+  string name = 3;
+  optional string emoji = 4;
+  string channel_name_template = 5;
+  optional int32 member_limit = 6;
+  string visibility = 7;
+  bool locked = 8;
+  bool queue_enabled = 9;
+  optional int32 bitrate = 10;
+  optional int32 slowmode_secs = 11;
+  bool stage_enabled = 12;
+  bool is_default = 13;
+  int32 sort_order = 14;
+  string created_at = 15;
+}
+
+message ThemeList {
+  repeated VoiceChannelTheme themes = 1;
 }

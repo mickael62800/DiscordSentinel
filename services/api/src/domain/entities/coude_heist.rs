@@ -17,7 +17,8 @@ pub const HEIST_COOLDOWN_DAYS: i64 = 7;
 /// Taux de succes de base sans aucun item.
 pub const HEIST_BASE_SUCCESS_PERCENT: u32 = 5;
 
-/// Bonus apporte par chaque item de braquage actif dans l'inventaire.
+/// Ancien bonus fixe par item — remplace par `HeistToolDef.bonus_percent`
+/// individuel. Conserve comme fallback si un item n'a pas de bonus defini.
 pub const HEIST_ITEM_BONUS_PERCENT: u32 = 5;
 
 /// Plafond maximum du taux de succes (avec tous les items).
@@ -38,11 +39,13 @@ pub struct HeistToolDef {
     pub emoji: &'static str,
     pub description: &'static str,
     pub price: i64,
+    /// Bonus de chance individuel (%). Les items chers boostent plus.
+    pub bonus_percent: u32,
 }
 
-/// 9 items consommables. Chacun apporte +5 % de chance de succes quand
-/// present dans l'inventaire au moment du braquage. 9 items × 5 % + 5 %
-/// base = 50 % max (le cap). Tous les items actifs sont consommes quel
+/// 9 items consommables. Chacun apporte un bonus de chance proportionnel
+/// a son prix (2 % a 10 %). Somme des 9 bonus = 50 % (avec base 5 % →
+/// cap 50 % atteint pile). Tous les items actifs sont consommes quel
 /// que soit le resultat du roll.
 ///
 /// **Choix d'architecture** : catalog et prix hardcodes. Modifier ici
@@ -53,22 +56,25 @@ pub const HEIST_TOOLS: &[HeistToolDef] = &[
         key: "masque_braquage",
         name: "Masque de braquage",
         emoji: "\u{1f3ad}",
-        description: "+5 % de chance de reussite. Le classique.",
+        description: "+2 % de chance de reussite. Le classique.",
         price: 100,
+        bonus_percent: 2,
     },
     HeistToolDef {
         key: "pied_de_biche",
         name: "Pied-de-biche",
         emoji: "\u{1f528}",
-        description: "+5 % de chance. Pour forcer les portes arriere.",
+        description: "+3 % de chance. Pour forcer les portes arriere.",
         price: 150,
+        bonus_percent: 3,
     },
     HeistToolDef {
         key: "crochet_vault",
         name: "Crochet de vault",
         emoji: "\u{1f513}",
-        description: "+5 % de chance. Plus discret que l'explosif.",
+        description: "+4 % de chance. Plus discret que l'explosif.",
         price: 220,
+        bonus_percent: 4,
     },
     HeistToolDef {
         key: "plan_coffre",
@@ -76,6 +82,7 @@ pub const HEIST_TOOLS: &[HeistToolDef] = &[
         emoji: "\u{1f5fa}\u{fe0f}",
         description: "+5 % de chance. La moitie du boulot est deja fait.",
         price: 320,
+        bonus_percent: 5,
     },
     HeistToolDef {
         key: "fumigene_diversion",
@@ -83,34 +90,39 @@ pub const HEIST_TOOLS: &[HeistToolDef] = &[
         emoji: "\u{1f4a8}",
         description: "+5 % de chance. Sors discret.",
         price: 450,
+        bonus_percent: 5,
     },
     HeistToolDef {
         key: "explosif",
         name: "Explosif",
         emoji: "\u{1f4a3}",
-        description: "+5 % de chance. La methode directe.",
+        description: "+6 % de chance. La methode directe.",
         price: 600,
+        bonus_percent: 6,
     },
     HeistToolDef {
         key: "hacker_kit",
         name: "Hacker kit",
         emoji: "\u{1f4be}",
-        description: "+5 % de chance. Bypass total des alarmes.",
+        description: "+7 % de chance. Bypass total des alarmes.",
         price: 800,
+        bonus_percent: 7,
     },
     HeistToolDef {
         key: "drone_espion",
         name: "Drone espion",
         emoji: "\u{1f681}",
-        description: "+5 % de chance. Reperage aerien avant le coup.",
+        description: "+8 % de chance. Reperage aerien avant le coup.",
         price: 1000,
+        bonus_percent: 8,
     },
     HeistToolDef {
         key: "equipe_de_pros",
         name: "Equipe de pros",
         emoji: "\u{1f46a}",
-        description: "+5 % de chance. Tu n'es plus seul sur le coup.",
+        description: "+10 % de chance. Tu n'es plus seul sur le coup.",
         price: 1500,
+        bonus_percent: 10,
     },
 ];
 
@@ -120,7 +132,8 @@ pub fn find_heist_tool(key: &str) -> Option<&'static HeistToolDef> {
 
 /// Calcule le taux de succes effectif en fonction des items actifs.
 /// `active_tool_keys` est la liste des item_keys de braquage presents
-/// dans l'inventaire du joueur (doublons ignores).
+/// dans l'inventaire du joueur (doublons ignores). Chaque item apporte
+/// son propre `bonus_percent` proportionnel a son prix.
 pub fn compute_success_chance<I, S>(active_tool_keys: I) -> u32
 where
     I: IntoIterator<Item = S>,
@@ -132,7 +145,11 @@ where
         .filter(|k| find_heist_tool(k.as_ref()).is_some())
         .map(|k| k.as_ref().to_string())
         .collect();
-    let bonus = (unique.len() as u32) * HEIST_ITEM_BONUS_PERCENT;
+    let bonus: u32 = unique
+        .iter()
+        .filter_map(|k| find_heist_tool(k))
+        .map(|t| t.bonus_percent)
+        .sum();
     (HEIST_BASE_SUCCESS_PERCENT + bonus).min(HEIST_MAX_SUCCESS_PERCENT)
 }
 
@@ -189,24 +206,24 @@ mod tests {
     }
 
     #[test]
-    fn compute_chance_adds_bonus_per_unique_item() {
+    fn compute_chance_adds_individual_bonus() {
+        // masque +2%, pied_de_biche +3% → 5 + 2 + 3 = 10
         let v = vec!["masque_braquage", "pied_de_biche"];
-        // 5 + 2*5 = 15
-        assert_eq!(compute_success_chance(v), 15);
+        assert_eq!(compute_success_chance(v), 10);
     }
 
     #[test]
     fn compute_chance_ignores_unknown_items() {
+        // masque +2%, unknown 0 → 5 + 2 = 7
         let v = vec!["masque_braquage", "unknown_tool"];
-        assert_eq!(compute_success_chance(v), 10);
+        assert_eq!(compute_success_chance(v), 7);
     }
 
     #[test]
     fn compute_chance_deduplicates_items() {
-        // Si le joueur a 2x le meme item (bug futur ou migration), on
-        // compte comme 1. Le meme item ne boost pas plusieurs fois.
+        // masque +2% une seule fois → 5 + 2 = 7
         let v = vec!["masque_braquage", "masque_braquage"];
-        assert_eq!(compute_success_chance(v), 10);
+        assert_eq!(compute_success_chance(v), 7);
     }
 
     #[test]

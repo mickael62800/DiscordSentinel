@@ -1,6 +1,5 @@
 //! Implementation gRPC du `VoiceChannelsService` (Phase 7A).
-//! Wrappe `ManageVoiceChannelsUseCase`. Themes/invite-links non migres
-//! (non utilises par api_client.rs du voice-bot).
+//! Wrappe `ManageVoiceChannelsUseCase`. Invite-links non migres.
 
 use std::sync::Arc;
 
@@ -180,6 +179,59 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::Empty {}))
+    }
+
+    async fn get_voice_config(
+        &self,
+        request: Request<proto::GetVoiceConfigRequest>,
+    ) -> Result<Response<proto::VoiceConfig>, Status> {
+        let cfg = self
+            .uc
+            .get_voice_config(&request.into_inner().guild_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::VoiceConfig {
+            creation_cooldown_secs: cfg.creation_cooldown_secs,
+            flood_max_messages: cfg.flood_max_messages,
+            flood_time_window_secs: cfg.flood_time_window_secs,
+            empty_cleanup_delay_secs: cfg.empty_cleanup_delay_secs,
+            flood_mute_duration_secs: cfg.flood_mute_duration_secs,
+            vote_kick_timeout_secs: cfg.vote_kick_timeout_secs,
+        }))
+    }
+
+    async fn list_themes(
+        &self,
+        request: Request<proto::ListThemesRequest>,
+    ) -> Result<Response<proto::ThemeList>, Status> {
+        let themes = self
+            .uc
+            .list_themes(&request.into_inner().guild_id)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::ThemeList {
+            themes: themes.into_iter().map(voice_theme_to_proto).collect(),
+        }))
+    }
+}
+
+fn voice_theme_to_proto(t: crate::domain::entities::VoiceChannelTheme) -> proto::VoiceChannelTheme {
+    proto::VoiceChannelTheme {
+        id: t.id.to_string(),
+        guild_id: t.guild_id,
+        name: t.name,
+        emoji: t.emoji,
+        channel_name_template: t.channel_name_template,
+        member_limit: t.member_limit,
+        visibility: t.visibility,
+        locked: t.locked,
+        queue_enabled: t.queue_enabled,
+        bitrate: t.bitrate,
+        slowmode_secs: t.slowmode_secs,
+        stage_enabled: t.stage_enabled,
+        is_default: t.is_default,
+        sort_order: t.sort_order,
+        created_at: t.created_at.to_rfc3339(),
     }
 }
 

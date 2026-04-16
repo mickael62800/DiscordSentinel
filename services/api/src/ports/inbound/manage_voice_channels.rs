@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{VoiceChannel, VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry};
+use crate::domain::entities::{VoiceChannel, VoiceChannelConfig, VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry};
 use crate::domain::errors::DomainError;
 
 pub struct CreateVoiceChannelCommand {
@@ -121,6 +121,9 @@ pub trait ManageVoiceChannelsUseCase: Send + Sync {
     async fn list_invite_links(&self, channel_id: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError>;
     async fn use_invite_link(&self, cmd: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError>;
     async fn revoke_invite_link(&self, channel_id: &str, link_id: &str) -> Result<(), DomainError>;
+
+    // Config voice-bot par guild
+    async fn get_voice_config(&self, guild_id: &str) -> Result<VoiceChannelConfig, DomainError>;
 
     // Themes
     async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError>;

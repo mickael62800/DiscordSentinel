@@ -94,6 +94,56 @@ pub struct VoiceChannelTheme {
     pub created_at: DateTime<Utc>,
 }
 
+/// Configuration voice-bot par guild. Valeurs lues depuis `bot_guild_config`
+/// (bot_name = "voice-bot"), avec fallback sur les defaults raisonnables.
+#[derive(Debug, Clone, Copy)]
+pub struct VoiceChannelConfig {
+    /// Cooldown entre deux creations de salon par un meme user (V2).
+    pub creation_cooldown_secs: u64,
+    /// Seuil de flood : nombre de messages dans la fenetre (V3).
+    pub flood_max_messages: u64,
+    /// Fenetre de detection de flood en secondes (V3).
+    pub flood_time_window_secs: u64,
+    /// Delai anti-race avant suppression d'un salon vide (V4).
+    pub empty_cleanup_delay_secs: u64,
+    /// Duree du mute automatique sur flood detecte (V8).
+    pub flood_mute_duration_secs: u64,
+    /// Duree du vote-kick avant expiration (V10).
+    pub vote_kick_timeout_secs: u64,
+}
+
+impl Default for VoiceChannelConfig {
+    fn default() -> Self {
+        Self {
+            creation_cooldown_secs: 5,
+            flood_max_messages: 5,
+            flood_time_window_secs: 5,
+            empty_cleanup_delay_secs: 2,
+            flood_mute_duration_secs: 30,
+            vote_kick_timeout_secs: 60,
+        }
+    }
+}
+
+impl VoiceChannelConfig {
+    /// Construit depuis une liste de `(key, value)` lues en DB.
+    pub fn from_kv_pairs(pairs: &[(String, String)]) -> Self {
+        let mut cfg = Self::default();
+        for (k, v) in pairs {
+            match k.as_str() {
+                "voice_creation_cooldown_secs" => { if let Ok(n) = v.parse() { cfg.creation_cooldown_secs = n; } }
+                "voice_flood_max_messages" => { if let Ok(n) = v.parse() { cfg.flood_max_messages = n; } }
+                "voice_flood_time_window_secs" => { if let Ok(n) = v.parse() { cfg.flood_time_window_secs = n; } }
+                "voice_empty_cleanup_delay_secs" => { if let Ok(n) = v.parse() { cfg.empty_cleanup_delay_secs = n; } }
+                "voice_flood_mute_duration_secs" => { if let Ok(n) = v.parse() { cfg.flood_mute_duration_secs = n; } }
+                "voice_vote_kick_timeout_secs" => { if let Ok(n) = v.parse() { cfg.vote_kick_timeout_secs = n; } }
+                _ => {}
+            }
+        }
+        cfg
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannelDetail {
     pub channel: VoiceChannel,

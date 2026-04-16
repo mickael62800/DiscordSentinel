@@ -43,8 +43,9 @@ pub use security_event::SecurityEvent;
 pub use ticket::{Ticket, TicketDetail, TicketMessage};
 pub use user_stats::{GuildStatsOverview, GuildVoiceStats, UserStats, VoiceSessionStats};
 pub use voice_channel::{
-    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelDetail,
-    VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry,
+    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelConfig,
+    VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme,
+    VoiceChannelWhitelistEntry,
 };
 pub use watched_user::WatchedUser;
 pub use discord_role::DiscordRole;

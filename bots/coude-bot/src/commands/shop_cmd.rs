@@ -77,15 +77,15 @@ pub fn register() -> CreateCommand {
             "Item a acheter (facultatif)",
         )
         .required(false)
-        .add_string_choice("Masque (100)", "masque_braquage")
-        .add_string_choice("Pied-de-biche (150)", "pied_de_biche")
-        .add_string_choice("Crochet de vault (220)", "crochet_vault")
-        .add_string_choice("Plan du coffre (320)", "plan_coffre")
-        .add_string_choice("Fumigene de diversion (450)", "fumigene_diversion")
-        .add_string_choice("Explosif (600)", "explosif")
-        .add_string_choice("Hacker kit (800)", "hacker_kit")
-        .add_string_choice("Drone espion (1000)", "drone_espion")
-        .add_string_choice("Equipe de pros (1500)", "equipe_de_pros"),
+        .add_string_choice("Masque +2% (100)", "masque_braquage")
+        .add_string_choice("Pied-de-biche +3% (150)", "pied_de_biche")
+        .add_string_choice("Crochet de vault +4% (220)", "crochet_vault")
+        .add_string_choice("Plan du coffre +5% (320)", "plan_coffre")
+        .add_string_choice("Fumigene +5% (450)", "fumigene_diversion")
+        .add_string_choice("Explosif +6% (600)", "explosif")
+        .add_string_choice("Hacker kit +7% (800)", "hacker_kit")
+        .add_string_choice("Drone espion +8% (1000)", "drone_espion")
+        .add_string_choice("Equipe de pros +10% (1500)", "equipe_de_pros"),
     );
 
     CreateCommand::new("shop")

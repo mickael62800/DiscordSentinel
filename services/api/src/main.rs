@@ -254,7 +254,7 @@ async fn main() {
     // Note : la creation de moderation_uc est differee plus bas pour pouvoir
     // injecter strikes_uc via with_strikes_uc (log_action_with_strike).
     let stats_uc = Arc::new(ManageStatsService::new(stats_repo.clone(), infraction_repo.clone(), cache.clone(), redis_client.clone()));
-    let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone()));
+    let voice_channels_uc = Arc::new(ManageVoiceChannelsService::new(voice_channel_repo.clone(), cache.clone(), bot_config_repo.clone()));
     let role_panel_repo = Arc::new(PgRolePanelRepository::new(pg_pool.clone()));
     let role_panels_uc = Arc::new(ManageRolePanelsService::new(role_panel_repo));
     let analytics_repo = Arc::new(PgAnalyticsRepository::new(pg_pool.clone()));

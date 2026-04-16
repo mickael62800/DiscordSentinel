@@ -178,6 +178,16 @@ impl CoudeConfig {
             "surprise" => 300,
             "poison" => 300,
             "coup_traitre" => 350,
+            // Braquage (Phase 10)
+            "masque_braquage" => 100,
+            "pied_de_biche" => 150,
+            "crochet_vault" => 220,
+            "plan_coffre" => 320,
+            "fumigene_diversion" => 450,
+            "explosif" => 600,
+            "hacker_kit" => 800,
+            "drone_espion" => 1000,
+            "equipe_de_pros" => 1500,
             _ => 100,
         };
         BaseApiClient::config_u64(&self.raw, &config_key, default) as i64

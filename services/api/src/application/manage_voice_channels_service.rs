@@ -5,8 +5,9 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelDetail,
-    VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry,
+    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelConfig,
+    VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme,
+    VoiceChannelWhitelistEntry,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::{
@@ -14,7 +15,7 @@ use crate::ports::inbound::{
     ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
     TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
 };
-use crate::ports::outbound::{CachePort, VoiceChannelRepository};
+use crate::ports::outbound::{BotConfigRepository, CachePort, VoiceChannelRepository};
 
 const CHANNELS_LIST_TTL: u64 = 60;
 const CHANNEL_DETAIL_TTL: u64 = 300;
@@ -22,11 +23,16 @@ const CHANNEL_DETAIL_TTL: u64 = 300;
 pub struct ManageVoiceChannelsService {
     repo: Arc<dyn VoiceChannelRepository>,
     cache: Arc<dyn CachePort>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ManageVoiceChannelsService {
-    pub fn new(repo: Arc<dyn VoiceChannelRepository>, cache: Arc<dyn CachePort>) -> Self {
-        Self { repo, cache }
+    pub fn new(
+        repo: Arc<dyn VoiceChannelRepository>,
+        cache: Arc<dyn CachePort>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
+    ) -> Self {
+        Self { repo, cache, bot_config_repo }
     }
 
     fn generate_code() -> String {
@@ -397,6 +403,17 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
         Ok(())
     }
 
+    // ── Config voice-bot par guild ──
+
+    async fn get_voice_config(&self, guild_id: &str) -> Result<VoiceChannelConfig, DomainError> {
+        let entries = self.bot_config_repo.get_config(guild_id, "voice-bot").await?;
+        let pairs: Vec<(String, String)> = entries
+            .into_iter()
+            .map(|e| (e.config_key, e.config_value))
+            .collect();
+        Ok(VoiceChannelConfig::from_kv_pairs(&pairs))
+    }
+
     // ── Themes ──
 
     async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
@@ -701,6 +718,18 @@ mod tests {
         async fn invalidate_pattern(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
     }
 
+    // ── Mock BotConfig ──
+
+    struct MockBotConfig;
+    #[async_trait]
+    impl BotConfigRepository for MockBotConfig {
+        async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::BotDefinition>, DomainError> { Ok(vec![]) }
+        async fn get_config(&self, _: &str, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, DomainError> { Ok(vec![]) }
+        async fn get_all_config(&self, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, DomainError> { Ok(vec![]) }
+        async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    }
+
     // ── Mock Repo ──
 
     struct MockVoiceRepo {
@@ -861,6 +890,7 @@ mod tests {
         ManageVoiceChannelsService::new(
             Arc::new(repo),
             Arc::new(MockCache),
+            Arc::new(MockBotConfig),
         )
     }
 
