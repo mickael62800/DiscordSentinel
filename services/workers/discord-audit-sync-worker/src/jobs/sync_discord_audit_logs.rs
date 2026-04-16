@@ -223,17 +223,20 @@ async fn sync_guild(
         .await;
 
         match res {
-            Ok(_) => inserted += 1,
+            Ok(_) => {
+                inserted += 1;
+                // Avancer le curseur SEULEMENT si l'INSERT a reussi.
+                // Sinon l'entry sera re-fetchee au prochain sync.
+                if is_newer_snowflake(newest_id.as_deref(), &entry.id) {
+                    newest_id = Some(entry.id.clone());
+                }
+            }
             Err(e) => warn!(
                 error = %e,
                 entry_id = %entry.id,
                 event_type = %event_type,
-                "insert audit_log failed"
+                "insert audit_log failed — curseur non avance"
             ),
-        }
-
-        if is_newer_snowflake(newest_id.as_deref(), &entry.id) {
-            newest_id = Some(entry.id.clone());
         }
     }
 
