@@ -15,4 +15,12 @@ pub trait TicketRepository: Send + Sync {
     async fn save_message(&self, message: &TicketMessage) -> Result<(), DomainError>;
     async fn update_voice_channel(&self, id: Uuid, voice_channel_id: Option<&str>) -> Result<(), DomainError>;
     async fn update_invited_user(&self, id: Uuid, invited_user_id: Option<&str>) -> Result<(), DomainError>;
+    async fn update_priority(&self, id: Uuid, priority: &str) -> Result<(), DomainError>;
+    async fn update_sla(
+        &self,
+        id: Uuid,
+        first_response_at: Option<&str>,
+        resolved_at: Option<&str>,
+        satisfaction_rating: Option<i32>,
+    ) -> Result<(), DomainError>;
 }

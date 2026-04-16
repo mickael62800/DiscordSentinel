@@ -74,7 +74,6 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     };
     let tickets = TicketsGrpc {
         tickets_uc: state.tickets_uc.clone(),
-        pg_pool: state.pg_pool.clone(),
     };
     let moderation = ModerationGrpc {
         moderation_uc: state.moderation_uc.clone(),

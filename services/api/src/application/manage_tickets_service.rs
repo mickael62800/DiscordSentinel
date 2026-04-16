@@ -205,6 +205,23 @@ impl ManageTicketsUseCase for ManageTicketsService {
 
         Ok(())
     }
+
+    async fn update_priority(&self, id: Uuid, priority: &str) -> Result<(), DomainError> {
+        self.ticket_repo.update_priority(id, priority).await?;
+        self.invalidate_tickets_cache().await;
+        Ok(())
+    }
+
+    async fn update_sla(
+        &self,
+        id: Uuid,
+        first_response_at: Option<&str>,
+        resolved_at: Option<&str>,
+        satisfaction_rating: Option<i32>,
+    ) -> Result<(), DomainError> {
+        self.ticket_repo.update_sla(id, first_response_at, resolved_at, satisfaction_rating).await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -277,6 +294,8 @@ mod tests {
             *self.last_invited_user.lock().unwrap() = Some((id, inv_id.map(|s| s.to_string())));
             Ok(())
         }
+        async fn update_priority(&self, _id: Uuid, _priority: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn update_sla(&self, _id: Uuid, _fr: Option<&str>, _ra: Option<&str>, _rating: Option<i32>) -> Result<(), DomainError> { Ok(()) }
     }
 
     // ── Mock CachePort ──

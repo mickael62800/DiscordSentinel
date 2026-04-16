@@ -335,8 +335,9 @@ pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInter
         None => return,
     };
 
-    // Log la note au backend + persister le rating SLA
+    // Persister le rating via l'API (UUID complet dans le custom_id).
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let ticket_id = crate::satisfaction::extract_ticket_id(&component.data.custom_id);
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
@@ -348,23 +349,9 @@ pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInter
                     component.user.name, rating
                 ),
             );
-
-            // Extraire le ticket_short_id du custom_id pour persister
-            let custom_id = &component.data.custom_id;
-            let ticket_part = custom_id
-                .strip_prefix(crate::satisfaction::SATISFACTION_PREFIX)
-                .and_then(|s| s.rsplit_once('_'))
-                .map(|(ticket, _)| ticket);
-
-            if let Some(_ticket_short) = ticket_part {
-                // Chercher le ticket complet via l'API par short id
-                // Fire-and-forget : on ne peut pas retrouver l'UUID complet
-                // depuis le short id sans appel API, donc on log via send_log
-                // Le rating est deja logge ci-dessus
-                // Note: le rating sera visible dans les logs desktop
-                // Pour une persistance complete, il faudrait stocker l'UUID
-                // dans le custom_id ou dans un DashMap
-            }
+        }
+        if let (Some(tid), Some(api)) = (ticket_id, crate::api_client::ApiClient::from_data(&data)) {
+            api.update_ticket_sla(tid, None, None, Some(rating)).await;
         }
     }
 

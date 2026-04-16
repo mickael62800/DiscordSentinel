@@ -42,4 +42,6 @@ pub trait ManageTicketsUseCase: Send + Sync {
     async fn assign_ticket(&self, command: AssignTicketCommand) -> Result<(), DomainError>;
     async fn update_status(&self, id: &str, status: &str) -> Result<(), DomainError>;
     async fn update_ticket_channel(&self, command: UpdateTicketChannelCommand) -> Result<(), DomainError>;
+    async fn update_priority(&self, id: uuid::Uuid, priority: &str) -> Result<(), DomainError>;
+    async fn update_sla(&self, id: uuid::Uuid, first_response_at: Option<&str>, resolved_at: Option<&str>, satisfaction_rating: Option<i32>) -> Result<(), DomainError>;
 }

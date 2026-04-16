@@ -263,7 +263,41 @@ impl TicketRepository for PgTicketRepository {
             .execute(&self.pool)
             .await
             .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(())
+    }
 
+    async fn update_priority(&self, id: Uuid, priority: &str) -> Result<(), DomainError> {
+        sqlx::query("UPDATE tickets SET priority = $1, updated_at = NOW() WHERE id = $2")
+            .bind(priority)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(())
+    }
+
+    async fn update_sla(
+        &self,
+        id: Uuid,
+        first_response_at: Option<&str>,
+        resolved_at: Option<&str>,
+        satisfaction_rating: Option<i32>,
+    ) -> Result<(), DomainError> {
+        if let Some(fr) = first_response_at {
+            sqlx::query("UPDATE tickets SET first_response_at = $1::timestamptz, updated_at = NOW() WHERE id = $2")
+                .bind(fr).bind(id).execute(&self.pool).await
+                .map_err(|e| DomainError::Internal(e.to_string()))?;
+        }
+        if let Some(ra) = resolved_at {
+            sqlx::query("UPDATE tickets SET resolved_at = $1::timestamptz, updated_at = NOW() WHERE id = $2")
+                .bind(ra).bind(id).execute(&self.pool).await
+                .map_err(|e| DomainError::Internal(e.to_string()))?;
+        }
+        if let Some(rating) = satisfaction_rating {
+            sqlx::query("UPDATE tickets SET satisfaction_rating = $1, updated_at = NOW() WHERE id = $2")
+                .bind(rating).bind(id).execute(&self.pool).await
+                .map_err(|e| DomainError::Internal(e.to_string()))?;
+        }
         Ok(())
     }
 }

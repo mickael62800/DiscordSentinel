@@ -3,12 +3,12 @@ use serenity::builder::{CreateActionRow, CreateButton, CreateEmbed, CreateMessag
 pub const SATISFACTION_PREFIX: &str = "sentinel_ticket_satisfaction_";
 
 /// Construit le message de sondage satisfaction avec 5 boutons etoiles.
-#[allow(dead_code)]
-pub fn build_survey_message(ticket_short_id: &str) -> CreateMessage {
+/// `ticket_id` doit etre l'UUID complet pour pouvoir persister le rating.
+pub fn build_survey_message(ticket_id: &str) -> CreateMessage {
     let buttons: Vec<CreateButton> = (1..=5)
         .map(|rating| {
             let stars = "\u{2b50}".repeat(rating);
-            let custom_id = format!("{}{}_{}", SATISFACTION_PREFIX, ticket_short_id, rating);
+            let custom_id = format!("{}{}_{}", SATISFACTION_PREFIX, ticket_id, rating);
             CreateButton::new(custom_id)
                 .label(stars)
                 .style(serenity::all::ButtonStyle::Secondary)
@@ -29,7 +29,7 @@ pub fn build_survey_message(ticket_short_id: &str) -> CreateMessage {
 }
 
 /// Extrait le rating (1-5) depuis le custom_id d'un bouton satisfaction.
-/// Format: "sentinel_ticket_satisfaction_{ticket_short}_{rating}"
+/// Format: "sentinel_ticket_satisfaction_{ticket_uuid}_{rating}"
 pub fn extract_rating(custom_id: &str) -> Option<u8> {
     let suffix = custom_id.strip_prefix(SATISFACTION_PREFIX)?;
     let rating_str = suffix.rsplit('_').next()?;
@@ -39,6 +39,14 @@ pub fn extract_rating(custom_id: &str) -> Option<u8> {
     } else {
         None
     }
+}
+
+/// Extrait le ticket UUID depuis le custom_id.
+/// Format: "sentinel_ticket_satisfaction_{ticket_uuid}_{rating}"
+pub fn extract_ticket_id(custom_id: &str) -> Option<&str> {
+    let suffix = custom_id.strip_prefix(SATISFACTION_PREFIX)?;
+    let (ticket_id, _rating) = suffix.rsplit_once('_')?;
+    if ticket_id.is_empty() { None } else { Some(ticket_id) }
 }
 
 #[cfg(test)]
