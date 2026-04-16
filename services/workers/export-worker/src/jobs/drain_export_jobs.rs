@@ -10,10 +10,15 @@
 //! collision. On traite 1 job par tick pour ne pas bloquer les autres jobs
 //! en cas de gros export (next tick dans scan_interval_secs).
 
-use chrono::{DateTime, Utc};
 use sqlx::PgPool;
+use tonic::transport::Endpoint;
+use tonic::metadata::MetadataValue;
+use tonic::Request;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+
+use sentinel_proto::export::v1::export_service_client::ExportServiceClient;
+use sentinel_proto::export::v1::ExecuteExportRequest;
 
 use crate::config::{MAX_ROWS_PER_EXPORT, PROCESSING_TIMEOUT_SECS};
 
@@ -72,15 +77,8 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
         "Export job claim"
     );
 
-    // 3. Executer l'export
-    let result = match job.job_type.as_str() {
-        "infractions" => export_infractions(pool, &job.guild_id, &job.format, &job.filters).await,
-        "audit_logs" => export_audit_logs(pool, &job.guild_id, &job.format, &job.filters).await,
-        "moderation_actions" => {
-            export_moderation_actions(pool, &job.guild_id, &job.format, &job.filters).await
-        }
-        other => Err(format!("job_type inconnu: {other}")),
-    };
+    // 3. Appel gRPC a l'API pour executer l'export (zero logique metier ici).
+    let result = call_export_api(&job.guild_id, &job.job_type, &job.format).await;
 
     // 4. Persister le resultat
     match result {
@@ -127,276 +125,39 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     Ok(())
 }
 
-// ═══════════════════════════════════════════════════
-// Exporters par type de donnees
-// ═══════════════════════════════════════════════════
-
-#[derive(Debug, sqlx::FromRow, serde::Serialize)]
-struct InfractionRow {
-    id: Uuid,
-    guild_id: String,
-    channel_id: String,
-    user_id: String,
-    username: String,
-    message_id: String,
-    content: String,
-    score: f64,
-    action: String,
-    reason: String,
-    duration: Option<i64>,
-    created_at: DateTime<Utc>,
-}
-
-async fn export_infractions(
-    pool: &PgPool,
+/// Appelle l'API gRPC ExportService.ExecuteExport.
+async fn call_export_api(
     guild_id: &str,
+    job_type: &str,
     format: &str,
-    _filters: &serde_json::Value,
 ) -> Result<(String, usize), String> {
-    // NOTE : la table `infractions` contient les detections automod (pas
-    // d'action moderateur humain). Colonnes reelles : id, guild_id, channel_id,
-    // user_id, username, message_id, content, flags, score, action, reason,
-    // duration, created_at (voir migration 002_create_infractions.sql).
-    let rows: Vec<InfractionRow> = sqlx::query_as::<_, InfractionRow>(
-        "SELECT id, guild_id, channel_id, user_id, username, message_id, content, \
-                score, action, reason, duration, created_at \
-         FROM infractions \
-         WHERE guild_id = $1 \
-         ORDER BY created_at DESC \
-         LIMIT $2",
-    )
-    .bind(guild_id)
-    .bind(MAX_ROWS_PER_EXPORT)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| format!("query infractions: {e}"))?;
+    let grpc_url = std::env::var("GRPC_API_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
+    let api_key = std::env::var("API_KEY").unwrap_or_default();
 
-    serialize_rows(
-        &rows,
-        format,
-        |r| {
-            vec![
-                r.id.to_string(),
-                r.channel_id.clone(),
-                r.user_id.clone(),
-                r.username.clone(),
-                r.message_id.clone(),
-                r.content.clone(),
-                format!("{:.3}", r.score),
-                r.action.clone(),
-                r.reason.clone(),
-                r.duration.map(|d| d.to_string()).unwrap_or_default(),
-                r.created_at.to_rfc3339(),
-            ]
-        },
-        &[
-            "id",
-            "channel_id",
-            "user_id",
-            "username",
-            "message_id",
-            "content",
-            "score",
-            "action",
-            "reason",
-            "duration_secs",
-            "created_at",
-        ],
-    )
-}
+    let channel = Endpoint::from_shared(grpc_url.clone())
+        .map_err(|e| format!("bad grpc endpoint: {e}"))?
+        .connect()
+        .await
+        .map_err(|e| format!("gRPC connect failed ({}): {e}", grpc_url))?;
 
-#[derive(Debug, sqlx::FromRow, serde::Serialize)]
-struct AuditLogRow {
-    id: Uuid,
-    guild_id: String,
-    event_type: String,
-    actor_id: Option<String>,
-    actor_name: Option<String>,
-    target_id: Option<String>,
-    target_name: Option<String>,
-    channel_id: Option<String>,
-    channel_name: Option<String>,
-    created_at: DateTime<Utc>,
-}
-
-async fn export_audit_logs(
-    pool: &PgPool,
-    guild_id: &str,
-    format: &str,
-    _filters: &serde_json::Value,
-) -> Result<(String, usize), String> {
-    let rows: Vec<AuditLogRow> = sqlx::query_as::<_, AuditLogRow>(
-        "SELECT id, guild_id, event_type, actor_id, actor_name, target_id, target_name, \
-                channel_id, channel_name, created_at \
-         FROM audit_logs \
-         WHERE guild_id = $1 \
-         ORDER BY created_at DESC \
-         LIMIT $2",
-    )
-    .bind(guild_id)
-    .bind(MAX_ROWS_PER_EXPORT)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| format!("query audit_logs: {e}"))?;
-
-    serialize_rows(&rows, format, |r| {
-        vec![
-            r.id.to_string(),
-            r.event_type.clone(),
-            r.actor_id.clone().unwrap_or_default(),
-            r.actor_name.clone().unwrap_or_default(),
-            r.target_id.clone().unwrap_or_default(),
-            r.target_name.clone().unwrap_or_default(),
-            r.channel_id.clone().unwrap_or_default(),
-            r.channel_name.clone().unwrap_or_default(),
-            r.created_at.to_rfc3339(),
-        ]
-    }, &[
-        "id", "event_type", "actor_id", "actor_name", "target_id",
-        "target_name", "channel_id", "channel_name", "created_at",
-    ])
-}
-
-#[derive(Debug, sqlx::FromRow, serde::Serialize)]
-struct ModerationActionRow {
-    id: Uuid,
-    guild_id: String,
-    moderator_id: String,
-    moderator_name: String,
-    target_id: String,
-    target_name: String,
-    action_type: String,
-    reason: String,
-    duration: Option<i64>,
-    created_at: DateTime<Utc>,
-}
-
-async fn export_moderation_actions(
-    pool: &PgPool,
-    guild_id: &str,
-    format: &str,
-    _filters: &serde_json::Value,
-) -> Result<(String, usize), String> {
-    let rows: Vec<ModerationActionRow> = sqlx::query_as::<_, ModerationActionRow>(
-        "SELECT id, guild_id, moderator_id, moderator_name, target_id, target_name, \
-                action_type, reason, duration, created_at \
-         FROM moderation_actions \
-         WHERE guild_id = $1 \
-         ORDER BY created_at DESC \
-         LIMIT $2",
-    )
-    .bind(guild_id)
-    .bind(MAX_ROWS_PER_EXPORT)
-    .fetch_all(pool)
-    .await
-    .map_err(|e| format!("query moderation_actions: {e}"))?;
-
-    serialize_rows(&rows, format, |r| {
-        vec![
-            r.id.to_string(),
-            r.moderator_id.clone(),
-            r.moderator_name.clone(),
-            r.target_id.clone(),
-            r.target_name.clone(),
-            r.action_type.clone(),
-            r.reason.clone(),
-            r.duration.map(|d| d.to_string()).unwrap_or_default(),
-            r.created_at.to_rfc3339(),
-        ]
-    }, &[
-        "id", "moderator_id", "moderator_name", "target_id", "target_name",
-        "action_type", "reason", "duration_secs", "created_at",
-    ])
-}
-
-// ═══════════════════════════════════════════════════
-// Serialization helpers
-// ═══════════════════════════════════════════════════
-
-fn serialize_rows<T, F>(
-    rows: &[T],
-    format: &str,
-    to_csv_row: F,
-    headers: &[&str],
-) -> Result<(String, usize), String>
-where
-    T: serde::Serialize,
-    F: Fn(&T) -> Vec<String>,
-{
-    let count = rows.len();
-    let serialized = match format {
-        "json" => serde_json::to_string(rows).map_err(|e| format!("json serialize: {e}"))?,
-        "csv" => to_csv(rows, headers, to_csv_row),
-        other => return Err(format!("format inconnu: {other}")),
-    };
-    Ok((serialized, count))
-}
-
-/// Genere un CSV en escapant les champs contenant `,`, `"` ou `\n`.
-fn to_csv<T, F>(rows: &[T], headers: &[&str], to_row: F) -> String
-where
-    F: Fn(&T) -> Vec<String>,
-{
-    let mut out = String::new();
-    out.push_str(&headers.join(","));
-    out.push('\n');
-    for row in rows {
-        let cols = to_row(row);
-        let line = cols
-            .iter()
-            .map(|c| csv_escape(c))
-            .collect::<Vec<_>>()
-            .join(",");
-        out.push_str(&line);
-        out.push('\n');
-    }
-    out
-}
-
-fn csv_escape(field: &str) -> String {
-    if field.contains(',') || field.contains('"') || field.contains('\n') {
-        let escaped = field.replace('"', "\"\"");
-        format!("\"{escaped}\"")
-    } else {
-        field.to_string()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn csv_escape_simple() {
-        assert_eq!(csv_escape("hello"), "hello");
+    let mut client = ExportServiceClient::new(channel);
+    let mut req = Request::new(ExecuteExportRequest {
+        guild_id: guild_id.to_string(),
+        job_type: job_type.to_string(),
+        format: format.to_string(),
+        filters_json: String::new(),
+        max_rows: MAX_ROWS_PER_EXPORT,
+    });
+    if let Ok(v) = api_key.parse::<MetadataValue<_>>() {
+        req.metadata_mut().insert("x-api-key", v);
     }
 
-    #[test]
-    fn csv_escape_comma() {
-        assert_eq!(csv_escape("a,b"), "\"a,b\"");
-    }
+    let resp = client
+        .execute_export(req)
+        .await
+        .map_err(|e| format!("gRPC ExecuteExport: {e}"))?
+        .into_inner();
 
-    #[test]
-    fn csv_escape_quote() {
-        assert_eq!(csv_escape("a\"b"), "\"a\"\"b\"");
-    }
-
-    #[test]
-    fn csv_escape_newline() {
-        assert_eq!(csv_escape("a\nb"), "\"a\nb\"");
-    }
-
-    #[test]
-    fn to_csv_basic() {
-        struct R {
-            a: String,
-            b: String,
-        }
-        let rows = vec![
-            R { a: "1".into(), b: "hello".into() },
-            R { a: "2".into(), b: "a,b".into() },
-        ];
-        let out = to_csv(&rows, &["a", "b"], |r| vec![r.a.clone(), r.b.clone()]);
-        assert_eq!(out, "a,b\n1,hello\n2,\"a,b\"\n");
-    }
+    Ok((resp.data, resp.row_count as usize))
 }

@@ -16,6 +16,8 @@ dotenvy = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
 sentinel-worker-common = { path = "../worker-common" }
+sentinel-proto = { path = "../../proto" }
+tonic = { workspace = true }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"
