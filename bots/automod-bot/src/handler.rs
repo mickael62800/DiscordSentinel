@@ -326,9 +326,17 @@ impl EventHandler for Handler {
 
         let ctx_clone = ctx.clone();
         let msg_clone = msg.clone();
+        let vision_enabled = BaseApiClient::config_bool(&config, "vision_enabled", true);
         tokio::spawn(async move {
             let ai_review = BaseApiClient::config_bool(&config, "ai_review_mode", true);
+
+            // Analyse texte
             send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars).await;
+
+            // Analyse image : si le message contient des images, les analyser via l'API.
+            if vision_enabled {
+                analyze_message_images(&ctx_clone, &msg_clone, mute_duration_secs, log_channel_id, &colors).await;
+            }
         });
     }
 
@@ -1200,4 +1208,93 @@ async fn execute_action(
     Ok(())
 }
 
-// send_discord_log supprime — remplace par send_review_card (Phase 8).
+/// Analyse les images attachees a un message via l'API gRPC.
+/// Zero logique metier : telechargement + appel API + execution action retournee.
+async fn analyze_message_images(
+    ctx: &Context,
+    msg: &Message,
+    mute_duration_secs: u64,
+    _log_channel_id: u64,
+    colors: &EmbedColors,
+) {
+    // Collecter les URLs d'images depuis les attachments.
+    let image_urls: Vec<String> = msg
+        .attachments
+        .iter()
+        .filter(|a| {
+            a.content_type
+                .as_deref()
+                .map(|ct| ct.starts_with("image/"))
+                .unwrap_or(false)
+        })
+        .map(|a| a.url.clone())
+        .collect();
+
+    if image_urls.is_empty() {
+        return;
+    }
+
+    let data = ctx.data.read().await;
+    let (Some(base), Some(grpc)) = (
+        data.get::<sentinel_shared::heartbeat::ApiClientKey>(),
+        data.get::<sentinel_shared::grpc_client::GrpcClientKey>(),
+    ) else {
+        return;
+    };
+    let api = crate::api_client::ApiClient::new(Arc::clone(base), Arc::clone(grpc));
+
+    let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+    let http_client = reqwest::Client::new();
+
+    for url in &image_urls {
+        // Telecharger l'image depuis Discord (IO pur, pas de logique).
+        let bytes = match http_client.get(url).send().await {
+            Ok(resp) if resp.status().is_success() => match resp.bytes().await {
+                Ok(b) => b.to_vec(),
+                Err(e) => { warn!(error = %e, url, "Echec lecture bytes image"); continue; }
+            },
+            Ok(resp) => { warn!(status = %resp.status(), url, "Image download non-success"); continue; }
+            Err(e) => { warn!(error = %e, url, "Echec download image"); continue; }
+        };
+
+        // Limiter la taille (14 Mo max).
+        if bytes.len() > 14 * 1024 * 1024 {
+            continue;
+        }
+
+        // Appel API — l'API decide de l'action (zero logique ici).
+        let response = match api
+            .analyze_image(
+                &guild_id,
+                &msg.channel_id.to_string(),
+                &msg.author.id.to_string(),
+                &msg.author.name,
+                &msg.id.to_string(),
+                bytes,
+            )
+            .await
+        {
+            Ok(r) => r,
+            Err(e) => { warn!(error = %e, "Echec analyse image API"); continue; }
+        };
+
+        if response.action == crate::api_client::Action::None {
+            continue;
+        }
+
+        let reason = response.reason.as_deref().unwrap_or("Image detectee");
+        info!(
+            user = %msg.author.name,
+            action = ?response.action,
+            reason,
+            "Image moderation action"
+        );
+
+        if let Err(e) = execute_action(ctx, msg, &response.action, Some(reason), mute_duration_secs, colors).await {
+            warn!(error = %e, "Echec execution action image");
+        }
+
+        // Une seule action par message suffit (l'image la plus severe gagne).
+        break;
+    }
+}

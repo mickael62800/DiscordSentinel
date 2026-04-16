@@ -21,6 +21,7 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
 use sentinel_proto::automod::v1 as proto;
+use sentinel_proto::images::v1 as proto_images;
 
 use crate::detectors::DetectionFlags;
 
@@ -121,6 +122,42 @@ impl ApiClient {
             } else {
                 Some(resp.reason)
             },
+            duration: resp.duration,
+            score: Some(resp.score),
+        })
+    }
+
+    /// gRPC `ImagesService.AnalyzeImage` — analyse vision d'une image.
+    pub async fn analyze_image(
+        &self,
+        guild_id: &str,
+        channel_id: &str,
+        user_id: &str,
+        username: &str,
+        message_id: &str,
+        image_bytes: Vec<u8>,
+    ) -> Result<AnalyzeResponse, String> {
+        let req = proto_images::AnalyzeImageRequest {
+            guild_id: guild_id.to_string(),
+            channel_id: channel_id.to_string(),
+            user_id: user_id.to_string(),
+            username: username.to_string(),
+            message_id: message_id.to_string(),
+            image_data: image_bytes,
+            content_type: "image/png".to_string(),
+            filename: String::new(),
+        };
+        let mut client = self.grpc.images();
+        let resp = self
+            .grpc
+            .guarded(|| async move {
+                client.analyze_image(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(AnalyzeResponse {
+            action: proto_action_to_action(resp.action),
+            reason: if resp.reason.is_empty() { None } else { Some(resp.reason) },
             duration: resp.duration,
             score: Some(resp.score),
         })
