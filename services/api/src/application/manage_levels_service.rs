@@ -67,13 +67,10 @@ impl ManageLevelsUseCase for ManageLevelsService {
             return Err(DomainError::ValidationError("Le montant XP ne peut pas depasser 10000".into()));
         }
 
-        // Lire l'ancien etat pour detecter les level-ups
-        let old = self.repo.get_user_level(&cmd.guild_id, &cmd.user_id).await?;
-        let old_level_text = old.as_ref().map(|u| u.level_text).unwrap_or(0);
-        let old_level_voice = old.as_ref().map(|u| u.level_voice).unwrap_or(0);
-
-        // UPDATE atomique — pas de race condition
-        let mut user_level = self.repo.add_xp_atomic(
+        // UPDATE atomique. RETURNING retourne les levels PRE-update (le SQL
+        // ne modifie pas les colonnes level_*), ce qui elimine la race condition
+        // entre lecture de l'ancien etat et l'update.
+        let user_level_pre = self.repo.add_xp_atomic(
             &cmd.guild_id,
             &cmd.user_id,
             &cmd.username,
@@ -81,14 +78,17 @@ impl ManageLevelsUseCase for ManageLevelsService {
             cmd.source,
         ).await?;
 
-        // Recalculer les niveaux depuis l'XP (la DB stocke juste l'XP, les niveaux sont derives)
+        // Anciens niveaux = ceux retournes par RETURNING (non touches par l'UPDATE).
+        let old_level_text = user_level_pre.level_text;
+        let old_level_voice = user_level_pre.level_voice;
+
+        // Recalculer les niveaux depuis le nouvel XP.
+        let mut user_level = user_level_pre;
         user_level.level = level_from_xp(user_level.xp);
         user_level.level_text = level_from_xp(user_level.xp_text);
         user_level.level_voice = level_from_xp(user_level.xp_voice);
 
-        // Mettre a jour les niveaux en base
-        // NOTE: fenetre de race entre add_xp_atomic et upsert_user_level —
-        // acceptable car les niveaux sont recalcules depuis l'XP a chaque appel
+        // Persister les niveaux recalcules.
         if let Err(e) = self.repo.upsert_user_level(&user_level).await {
             tracing::error!(
                 error = %e,

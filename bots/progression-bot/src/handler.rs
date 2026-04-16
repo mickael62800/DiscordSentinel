@@ -242,7 +242,7 @@ impl EventHandler for Handler {
                 .unwrap_or_default();
             let role_mult = multipliers::get_role_multiplier(&role_mults, &user_roles);
 
-            let base_xp = 15.0;
+            let base_xp = BaseApiClient::config_u64(&guild_config, "xp_per_message", 15) as f64;
             let final_xp = (base_xp * channel_mult * role_mult * streak_mult)
                 .round()
                 .clamp(1.0, 1000.0) as i64;
@@ -399,8 +399,14 @@ impl EventHandler for Handler {
                                 warn!(error = %e, "Impossible d'envoyer les stats vocal au backend");
                             }
 
-                            // Ajouter XP vocal (5 XP par minute)
-                            let xp_amount = (seconds / 60) as i64 * 5;
+                            // XP vocal : lire le taux depuis la config guild.
+                            let xp_per_minute = if let Some(base) = data.get::<ApiClientKey>() {
+                                let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                                BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as i64
+                            } else {
+                                5
+                            };
+                            let xp_amount = (seconds / 60) as i64 * xp_per_minute;
                             if xp_amount > 0 {
                                 match api
                                     .add_xp(
