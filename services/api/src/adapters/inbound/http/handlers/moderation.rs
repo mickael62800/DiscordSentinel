@@ -517,6 +517,26 @@ pub struct ReviewQueueEntryDto {
     pub action_reason: Option<String>,
 }
 
+fn review_entry_to_dto(e: crate::ports::outbound::ReviewEntry) -> ReviewQueueEntryDto {
+    ReviewQueueEntryDto {
+        id: e.id.to_string(),
+        action_id: e.action_id.to_string(),
+        guild_id: e.guild_id,
+        added_by: e.added_by,
+        added_by_name: e.added_by_name,
+        reason: e.reason,
+        status: e.status,
+        reviewer_id: e.reviewer_id,
+        reviewer_name: e.reviewer_name,
+        reviewer_notes: e.reviewer_notes,
+        added_at: e.added_at.to_rfc3339(),
+        resolved_at: e.resolved_at.map(|d| d.to_rfc3339()),
+        action_type: e.action_type,
+        target_name: e.target_name,
+        action_reason: e.action_reason,
+    }
+}
+
 pub async fn add_review(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -540,47 +560,11 @@ pub async fn add_review(
     .await?;
     let reason = dto.reason.as_ref().map(|r| r.chars().take(500).collect::<String>());
 
-    #[derive(sqlx::FromRow)]
-    struct Row {
-        id: uuid::Uuid,
-        added_at: chrono::DateTime<chrono::Utc>,
-    }
+    let entry = state.review_repo
+        .add(action_uuid, &dto.guild_id, &dto.added_by, &dto.added_by_name, reason.as_deref())
+        .await?;
 
-    let row: Row = sqlx::query_as::<_, Row>(
-        "INSERT INTO review_queue (action_id, guild_id, added_by, added_by_name, reason) \
-         VALUES ($1, $2, $3, $4, $5) \
-         RETURNING id, added_at",
-    )
-    .bind(action_uuid)
-    .bind(&dto.guild_id)
-    .bind(&dto.added_by)
-    .bind(&dto.added_by_name)
-    .bind(&reason)
-    .fetch_one(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        ApiError(crate::domain::errors::DomainError::Internal(format!(
-            "insert review: {e}"
-        )))
-    })?;
-
-    Ok(Json(ReviewQueueEntryDto {
-        id: row.id.to_string(),
-        action_id: dto.action_id,
-        guild_id: dto.guild_id,
-        added_by: dto.added_by,
-        added_by_name: dto.added_by_name,
-        reason,
-        status: "pending".into(),
-        reviewer_id: None,
-        reviewer_name: None,
-        reviewer_notes: None,
-        added_at: row.added_at.to_rfc3339(),
-        resolved_at: None,
-        action_type: None,
-        target_name: None,
-        action_reason: None,
-    }))
+    Ok(Json(review_entry_to_dto(entry)))
 }
 
 /// MOD #3 — GET /api/moderation/review/{guild_id}/pending
@@ -595,59 +579,8 @@ pub async fn list_pending_reviews(
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(&rbac, Role::Moderator, "moderator+ requis pour lister les reviews")?;
 
-    #[derive(sqlx::FromRow)]
-    struct Row {
-        id: uuid::Uuid,
-        action_id: uuid::Uuid,
-        added_by: String,
-        added_by_name: String,
-        reason: Option<String>,
-        added_at: chrono::DateTime<chrono::Utc>,
-        action_type: String,
-        target_name: String,
-        action_reason: String,
-    }
-
-    let rows: Vec<Row> = sqlx::query_as::<_, Row>(
-        "SELECT r.id, r.action_id, r.added_by, r.added_by_name, r.reason, r.added_at, \
-                a.action_type, a.target_name, a.reason AS action_reason \
-         FROM review_queue r \
-         INNER JOIN moderation_actions a ON a.id = r.action_id \
-         WHERE r.guild_id = $1 AND r.status = 'pending' \
-         ORDER BY r.added_at ASC \
-         LIMIT 50",
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        ApiError(crate::domain::errors::DomainError::Internal(format!(
-            "list pending reviews: {e}"
-        )))
-    })?;
-
-    let dtos = rows
-        .into_iter()
-        .map(|r| ReviewQueueEntryDto {
-            id: r.id.to_string(),
-            action_id: r.action_id.to_string(),
-            guild_id: guild_id.clone(),
-            added_by: r.added_by,
-            added_by_name: r.added_by_name,
-            reason: r.reason,
-            status: "pending".into(),
-            reviewer_id: None,
-            reviewer_name: None,
-            reviewer_notes: None,
-            added_at: r.added_at.to_rfc3339(),
-            resolved_at: None,
-            action_type: Some(r.action_type),
-            target_name: Some(r.target_name),
-            action_reason: Some(r.action_reason),
-        })
-        .collect();
-
-    Ok(Json(dtos))
+    let entries = state.review_repo.list_pending(&guild_id).await?;
+    Ok(Json(entries.into_iter().map(review_entry_to_dto).collect()))
 }
 
 /// MOD #3 — PATCH /api/moderation/review/{id}/resolve
@@ -672,24 +605,10 @@ pub async fn resolve_review(
         ))
     })?;
 
-    // Pour gater RBAC on recupere le guild_id de la review.
+    // RBAC via le repo.
     if rbac.is_some() {
-        let gid: Option<(String,)> = sqlx::query_as(
-            "SELECT guild_id FROM review_queue WHERE id = $1",
-        )
-        .bind(review_uuid)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("fetch review guild_id: {e}"))))?;
-        if let Some((guild_id,)) = gid {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &guild_id,
-                Role::Moderator,
-                "moderator+ requis pour resoudre une review",
-            )
-            .await?;
+        if let Some(guild_id) = state.review_repo.get_guild_id(review_uuid).await? {
+            check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour resoudre une review").await?;
         }
     }
 
@@ -701,29 +620,11 @@ pub async fn resolve_review(
     validation::validate_discord_id("reviewer_id", &dto.reviewer_id).map_err(ApiError)?;
     let notes = dto.reviewer_notes.as_ref().map(|n| n.chars().take(500).collect::<String>());
 
-    let res = sqlx::query(
-        "UPDATE review_queue SET \
-            status = $1, \
-            reviewer_id = $2, \
-            reviewer_name = $3, \
-            reviewer_notes = $4, \
-            resolved_at = NOW() \
-         WHERE id = $5 AND status = 'pending'",
-    )
-    .bind(&dto.status)
-    .bind(&dto.reviewer_id)
-    .bind(&dto.reviewer_name)
-    .bind(&notes)
-    .bind(review_uuid)
-    .execute(&state.pg_pool)
-    .await
-    .map_err(|e| {
-        ApiError(crate::domain::errors::DomainError::Internal(format!(
-            "resolve review: {e}"
-        )))
-    })?;
+    let resolved = state.review_repo
+        .resolve(review_uuid, &dto.reviewer_id, &dto.reviewer_name, notes.as_deref(), &dto.status)
+        .await?;
 
-    if res.rows_affected() == 0 {
+    if !resolved {
         return Err(ApiError(crate::domain::errors::DomainError::NotFound(
             "review introuvable ou deja resolue".into(),
         )));
