@@ -120,6 +120,11 @@ impl EventHandler for Handler {
                 }
             }
             Interaction::Component(component) => {
+                // Prison check sur les boutons offensifs.
+                if crate::prison_check::check_component_in_prison(&ctx, &component).await {
+                    return;
+                }
+
                 let custom_id = &component.data.custom_id;
 
                 if custom_id.starts_with(commands::coude::PRECONFIRM_OK_PREFIX) {

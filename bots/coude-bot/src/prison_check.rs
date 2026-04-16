@@ -12,10 +12,21 @@
 //! a NOW). On affiche juste le message ephemeral de refus.
 
 use serenity::all::{
-    CommandInteraction, Context, CreateInteractionResponse, CreateInteractionResponseMessage,
+    CommandInteraction, ComponentInteraction, Context, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 
 use crate::GameApiKey;
+
+/// Prefixes de boutons bloques en prison (actions offensives/actives).
+/// Refuser, annuler, classe = passif, pas bloque.
+const BLOCKED_BUTTON_PREFIXES: &[&str] = &[
+    "coude_prec_ok|",     // confirmer un defi
+    "coude_accept:",      // accepter un defi
+    "coude_defend:",      // utiliser item defensif (= participer au combat)
+    "coude_defend_select:", // choisir item defensif
+    "steal_defend:",      // se defendre contre un vol
+];
 
 /// Liste des noms de commandes bloquees quand le joueur est en prison.
 /// Les commandes passives (lecture seule) ne sont pas bloquees.
@@ -106,6 +117,57 @@ pub async fn check_and_reply_if_in_prison(
         .await
     {
         tracing::warn!(error = %e, "Echec reponse prison block");
+    }
+
+    true
+}
+
+/// Variante pour les interactions de boutons/selects (ComponentInteraction).
+/// Meme logique : si le joueur est en prison et le bouton est offensif, on bloque.
+pub async fn check_component_in_prison(
+    ctx: &Context,
+    component: &ComponentInteraction,
+) -> bool {
+    let custom_id = &component.data.custom_id;
+
+    if !BLOCKED_BUTTON_PREFIXES.iter().any(|p| custom_id.starts_with(p)) {
+        return false;
+    }
+
+    let guild_id = match component.guild_id {
+        Some(id) => id.to_string(),
+        None => return false,
+    };
+    let user_id = component.user.id.to_string();
+
+    let data = ctx.data.read().await;
+    let api = match data.get::<GameApiKey>() {
+        Some(a) => a,
+        None => return false,
+    };
+
+    let status = match api.get_prison_status(&guild_id, &user_id).await {
+        Ok(s) => s,
+        Err(_) => return false, // fail-open
+    };
+
+    if !status.in_prison {
+        return false;
+    }
+
+    let msg = "\u{26d3}\u{fe0f} **Tu es en prison !** Impossible d'effectuer cette action.";
+    if let Err(e) = component
+        .create_response(
+            ctx,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(msg)
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec reponse prison block (component)");
     }
 
     true
