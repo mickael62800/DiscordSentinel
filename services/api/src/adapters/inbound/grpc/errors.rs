@@ -23,6 +23,13 @@ pub fn domain_to_status(err: DomainError) -> Status {
     Status::new(code, msg)
 }
 
+/// Convertit une erreur sqlx en `Status::Internal`. Utilise par les handlers
+/// gRPC qui font du SQL direct (community, etc.) pour eviter les
+/// `.map_err(|e| Status::internal(format!("...: {e}")))` inline repetes.
+pub fn sqlx_to_status(context: &str) -> impl Fn(sqlx::Error) -> Status + '_ {
+    move |e| Status::internal(format!("{context}: {e}"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

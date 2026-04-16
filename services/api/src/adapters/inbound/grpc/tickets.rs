@@ -148,8 +148,7 @@ impl TicketsService for TicketsGrpc {
         request: Request<proto::UpdatePriorityRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        let id = uuid::Uuid::parse_str(&req.id)
-            .map_err(|_| Status::invalid_argument("UUID invalide"))?;
+        let id = super::parse_uuid(&req.id)?;
         self.tickets_uc
             .update_priority(id, &req.priority)
             .await
@@ -162,8 +161,7 @@ impl TicketsService for TicketsGrpc {
         request: Request<proto::UpdateSlaRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        let id = uuid::Uuid::parse_str(&req.id)
-            .map_err(|_| Status::invalid_argument("UUID invalide"))?;
+        let id = super::parse_uuid(&req.id)?;
         self.tickets_uc
             .update_sla(
                 id,

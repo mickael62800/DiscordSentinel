@@ -7,10 +7,8 @@
 //! emis a la fin de chaque partie pour ne rien casser cote dashboard.
 
 use std::sync::Arc;
-use std::str::FromStr;
 
 use tonic::{Request, Response, Status};
-use uuid::Uuid;
 
 use sentinel_proto::blackjack::v1 as proto;
 use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackService as BlackjackGrpcTrait;
@@ -175,9 +173,7 @@ fn game_is_over(status: &str) -> bool {
     )
 }
 
-fn parse_uuid(s: &str) -> Result<Uuid, Status> {
-    Uuid::from_str(s).map_err(|_| Status::invalid_argument("game_id n'est pas un UUID valide"))
-}
+use super::parse_uuid;
 
 fn card_to_proto(c: &Card) -> proto::Card {
     proto::Card {

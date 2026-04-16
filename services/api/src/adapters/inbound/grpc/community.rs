@@ -7,6 +7,8 @@
 use chrono::{DateTime, Utc};
 use tonic::{Request, Response, Status};
 
+use crate::adapters::inbound::grpc::errors::sqlx_to_status;
+
 use sentinel_proto::community::v1 as proto;
 use sentinel_proto::community::v1::community_service_server::CommunityService;
 
@@ -51,7 +53,7 @@ impl CommunityService for CommunityGrpc {
         .bind(&req.sponsored_id)
         .execute(&self.pg_pool)
         .await
-        .map_err(|e| Status::internal(format!("INSERT sponsorship: {e}")))?;
+        .map_err(sqlx_to_status("INSERT sponsorship"))?;
         Ok(Response::new(proto::Empty {}))
     }
 
@@ -67,7 +69,7 @@ impl CommunityService for CommunityGrpc {
         .bind(&req.guild_id)
         .fetch_all(&self.pg_pool)
         .await
-        .map_err(|e| Status::internal(format!("SELECT sponsorships: {e}")))?;
+        .map_err(sqlx_to_status("SELECT sponsorships"))?;
         Ok(Response::new(proto::SponsorshipList {
             sponsorships: rows
                 .into_iter()
@@ -103,7 +105,7 @@ impl CommunityService for CommunityGrpc {
         .bind(&req.expires_at)
         .execute(&self.pg_pool)
         .await
-        .map_err(|e| Status::internal(format!("INSERT temp_role: {e}")))?;
+        .map_err(sqlx_to_status("INSERT temp_role"))?;
         Ok(Response::new(proto::Empty {}))
     }
 
@@ -120,7 +122,7 @@ impl CommunityService for CommunityGrpc {
         .bind(&req.guild_id)
         .fetch_all(&self.pg_pool)
         .await
-        .map_err(|e| Status::internal(format!("SELECT temp_roles: {e}")))?;
+        .map_err(sqlx_to_status("SELECT temp_roles"))?;
         Ok(Response::new(proto::TempRoleList {
             roles: rows
                 .into_iter()
@@ -149,7 +151,7 @@ impl CommunityService for CommunityGrpc {
         .bind(&req.role_id)
         .execute(&self.pg_pool)
         .await
-        .map_err(|e| Status::internal(format!("DELETE temp_role: {e}")))?;
+        .map_err(sqlx_to_status("DELETE temp_role"))?;
         Ok(Response::new(proto::Empty {}))
     }
 }

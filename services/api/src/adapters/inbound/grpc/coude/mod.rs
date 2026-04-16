@@ -11,16 +11,10 @@
 //! du trait tonic + ses helpers prives (en `pub(super)` quand les tests
 //! de mod.rs en ont besoin).
 
-use std::str::FromStr;
-
-use tonic::Status;
-use uuid::Uuid;
-
 use sentinel_proto::coude::v1 as proto;
 
-pub(super) fn parse_uuid(s: &str) -> Result<Uuid, Status> {
-    Uuid::from_str(s).map_err(|_| Status::invalid_argument(format!("UUID invalide: {s}")))
-}
+// Re-export du parse_uuid centralise.
+pub(super) use crate::adapters::inbound::grpc::parse_uuid;
 
 /// Helper partage : convertit un `TauntEvent` domain en message proto.
 /// Utilise par `CoudeCombatsService.ResolveCombatNow` (qui retourne
