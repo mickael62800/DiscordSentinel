@@ -164,6 +164,8 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         })
     }
 
+    async fn list_history_channels(&self, _: &str, _: i64) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
+    async fn get_voice_config(&self, _: &str) -> Result<VoiceChannelConfig, DomainError> { Ok(VoiceChannelConfig::default()) }
     async fn close_channel(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn delete_channel(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn update_channel(&self, _: UpdateVoiceChannelCommand) -> Result<(), DomainError> { Ok(()) }

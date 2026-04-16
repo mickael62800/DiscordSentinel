@@ -61,6 +61,7 @@ pub use social::CoudeSocialGrpc;
 mod tests {
     use super::*;
     use chrono::{TimeZone, Utc};
+    use uuid::Uuid;
 
     use crate::domain::entities::{
         BetPayout, BetResolutionPlan, CoudeBet, CoudeCombat, CoudeCurrentSeason, CoudeEvent,

@@ -157,8 +157,8 @@ mod tests {
 
     #[test]
     fn interval_constants() {
-        assert_eq!(WEEKLY_INTERVAL, "7 days");
-        assert_eq!(MONTHLY_INTERVAL, "30 days");
+        assert_eq!(WEEKLY_DAYS, 7);
+        assert_eq!(MONTHLY_DAYS, 30);
     }
 
     #[test]

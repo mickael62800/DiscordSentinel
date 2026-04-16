@@ -139,6 +139,9 @@ mod tests {
             ModerationActionResponse {
                 id: "action-1".to_string(),
                 action_type: "warn".to_string(),
+                moderator_name: "Mod1".to_string(),
+                gravity: None,
+                created_at: "2026-01-01T00:00:00Z".to_string(),
                 target_name: "Alice".to_string(),
                 reason: "Spam".to_string(),
                 escalation_action: None,
@@ -148,6 +151,9 @@ mod tests {
             ModerationActionResponse {
                 id: "action-2".to_string(),
                 action_type: "mute".to_string(),
+                moderator_name: "Mod1".to_string(),
+                gravity: Some("medium".to_string()),
+                created_at: "2026-01-02T00:00:00Z".to_string(),
                 target_name: "Alice".to_string(),
                 reason: "Insulte, comportement toxique".to_string(),
                 escalation_action: Some("mute".to_string()),
@@ -177,6 +183,9 @@ mod tests {
         let actions = vec![ModerationActionResponse {
             id: "1".to_string(),
             action_type: "warn".to_string(),
+                moderator_name: "Mod1".to_string(),
+                gravity: None,
+                created_at: "2026-01-01T00:00:00Z".to_string(),
             target_name: "Bob".to_string(),
             reason: "Raison avec, virgule".to_string(),
             escalation_action: None,

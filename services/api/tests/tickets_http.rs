@@ -108,6 +108,8 @@ impl ManageTicketsUseCase for MockTicketsUC {
     async fn assign_ticket(&self, _: AssignTicketCommand) -> Result<(), DomainError> { Ok(()) }
     async fn update_status(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn update_ticket_channel(&self, _: UpdateTicketChannelCommand) -> Result<(), DomainError> { Ok(()) }
+    async fn update_priority(&self, _: uuid::Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn update_sla(&self, _: uuid::Uuid, _: Option<&str>, _: Option<&str>, _: Option<i32>) -> Result<(), DomainError> { Ok(()) }
 }
 
 // ══════════════════════════════════════════════════════════

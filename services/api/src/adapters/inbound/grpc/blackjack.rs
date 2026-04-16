@@ -218,6 +218,7 @@ fn wallet_to_proto(w: Wallet) -> proto::Wallet {
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use uuid::Uuid;
 
     fn ts() -> chrono::DateTime<chrono::Utc> {
         chrono::Utc.with_ymd_and_hms(2026, 1, 15, 12, 0, 0).unwrap()

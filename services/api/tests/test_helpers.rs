@@ -409,6 +409,95 @@ impl manage_coude_players::ManageCoudePlayersUseCase for StubCoudePlayers {
     async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
 }
 
+// ── Stubs pour les nouveaux repos ──
+
+pub struct StubUserActivityRepo;
+#[async_trait] impl UserActivityRepository for StubUserActivityRepo {
+    async fn create(&self, _: &UserActivity) -> Result<(), DomainError> { Ok(()) }
+    async fn list(&self, _: &str, _: &str, _: Option<&str>, _: i64, _: i64) -> Result<Vec<UserActivity>, DomainError> { Ok(vec![]) }
+}
+
+pub struct StubWelcomeConfigRepo;
+#[async_trait] impl WelcomeConfigRepository for StubWelcomeConfigRepo {
+    async fn get_config(&self, guild_id: &str) -> Result<WelcomeConfigData, DomainError> {
+        Ok(WelcomeConfigData { guild_id: guild_id.into(), welcome_enabled: true, welcome_channel_id: None, welcome_message: String::new(), welcome_embed_color: "3498db".into(), welcome_dm_enabled: false, welcome_dm_message: String::new(), leave_enabled: false, leave_channel_id: None, leave_message: String::new(), rules_enabled: false, rules_channel_id: None, rules_message: String::new(), rules_role_id: None, rules_button_label: String::new(), counter_enabled: false, counter_channel_id: None, counter_format: String::new(), anniversary_enabled: false, anniversary_channel_id: None, anniversary_message: String::new(), rejoin_message: String::new() })
+    }
+    async fn save_config(&self, _: &str, d: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> { Ok(d.clone()) }
+}
+
+pub struct StubExportUC;
+#[async_trait] impl sentinel_api::application::ExecuteExportUseCase for StubExportUC {
+    async fn execute(&self, _: &str, _: &str, _: &str, _: i64) -> Result<sentinel_api::application::export_service::ExportResult, DomainError> {
+        Ok(sentinel_api::application::export_service::ExportResult { data: String::new(), row_count: 0 })
+    }
+}
+
+pub struct StubEvidenceRepo;
+#[async_trait] impl EvidenceRepository for StubEvidenceRepo {
+    async fn add(&self, _: Uuid, _: &str, _: Option<&str>, _: &str, _: &str) -> Result<EvidenceEntry, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn list(&self, _: Uuid) -> Result<Vec<EvidenceEntry>, DomainError> { Ok(vec![]) }
+}
+
+pub struct StubReviewRepo;
+#[async_trait] impl ReviewRepository for StubReviewRepo {
+    async fn add(&self, _: Uuid, _: &str, _: &str, _: &str, _: Option<&str>) -> Result<ReviewEntry, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn list_pending(&self, _: &str) -> Result<Vec<ReviewEntry>, DomainError> { Ok(vec![]) }
+    async fn resolve(&self, _: Uuid, _: &str, _: &str, _: Option<&str>, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn get_guild_id(&self, _: Uuid) -> Result<Option<String>, DomainError> { Ok(None) }
+}
+
+pub struct StubModstatsRepo;
+#[async_trait] impl ModstatsRepository for StubModstatsRepo {
+    async fn top_moderators(&self, _: &str, _: i32, _: i64) -> Result<Vec<ModeratorStat>, DomainError> { Ok(vec![]) }
+}
+
+pub struct StubGameRepo;
+#[async_trait] impl GameRepository for StubGameRepo {
+    async fn list(&self, _: &str) -> Result<Vec<Game>, DomainError> { Ok(vec![]) }
+    async fn create(&self, _: &str, _: &str, _: &str) -> Result<Game, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn delete(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn find_by_name(&self, _: &str, _: &str) -> Result<Option<Game>, DomainError> { Ok(None) }
+    async fn subscribe(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn unsubscribe(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn get_subscribers(&self, _: &str) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn get_user_games(&self, _: &str, _: &str) -> Result<Vec<Game>, DomainError> { Ok(vec![]) }
+}
+
+pub struct StubSponsorshipRepo;
+#[async_trait] impl SponsorshipRepository for StubSponsorshipRepo {
+    async fn create(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn list(&self, _: &str) -> Result<Vec<Sponsorship>, DomainError> { Ok(vec![]) }
+}
+
+pub struct StubTempRoleRepo;
+#[async_trait] impl TempRoleRepository for StubTempRoleRepo {
+    async fn create(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn list_active(&self, _: &str) -> Result<Vec<TempRole>, DomainError> { Ok(vec![]) }
+    async fn delete(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+}
+
+pub struct StubPendingActionRepo;
+#[async_trait] impl PendingActionRepository for StubPendingActionRepo {
+    async fn create(&self, _: &str, _: &str, _: &str, _: &str, _: &str, _: &str, _: &str, _: Option<&str>, _: Option<i64>) -> Result<Uuid, DomainError> { Ok(Uuid::new_v4()) }
+    async fn list_pending(&self, _: &str) -> Result<Vec<PendingAction>, DomainError> { Ok(vec![]) }
+    async fn get_guild_id(&self, _: Uuid) -> Result<Option<String>, DomainError> { Ok(None) }
+    async fn resolve(&self, _: Uuid, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+}
+
+pub struct StubBlackjackTableRepo;
+#[async_trait] impl BlackjackTableRepository for StubBlackjackTableRepo {
+    async fn create(&self, _: &str, _: &str, _: &str, _: &str, _: &serde_json::Value) -> Result<BlackjackTable, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn get_status_and_guild(&self, _: &str) -> Result<Option<(String, String)>, DomainError> { Ok(None) }
+    async fn count_players(&self, _: &str) -> Result<i64, DomainError> { Ok(0) }
+    async fn add_player(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn touch_activity(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn list_players(&self, _: &str) -> Result<Vec<BlackjackTablePlayer>, DomainError> { Ok(vec![]) }
+    async fn find_open_by_channel(&self, _: &str) -> Result<Option<BlackjackTable>, DomainError> { Ok(None) }
+    async fn get_guild_id(&self, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
+    async fn close(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn list_games(&self, _: &str) -> Result<Vec<serde_json::Value>, DomainError> { Ok(vec![]) }
+}
+
 // ══════════════════════════════════════════════════════════
 // TestAppState builder
 // ══════════════════════════════════════════════════════════
@@ -455,6 +544,17 @@ fn base_state() -> AppState {
         coude_economy_uc: Arc::new(StubCoudeEconomy),
         coude_inventory_uc: Arc::new(StubCoudeInventory),
         coude_social_uc: Arc::new(StubCoudeSocial),
+        user_activity_repo: Arc::new(StubUserActivityRepo),
+        welcome_config_repo: Arc::new(StubWelcomeConfigRepo),
+        export_uc: Arc::new(StubExportUC),
+        evidence_repo: Arc::new(StubEvidenceRepo),
+        review_repo: Arc::new(StubReviewRepo),
+        modstats_repo: Arc::new(StubModstatsRepo),
+        game_repo: Arc::new(StubGameRepo),
+        sponsorship_repo: Arc::new(StubSponsorshipRepo),
+        temp_role_repo: Arc::new(StubTempRoleRepo),
+        pending_action_repo: Arc::new(StubPendingActionRepo),
+        blackjack_table_repo: Arc::new(StubBlackjackTableRepo),
         broadcaster: Arc::new(EventBroadcaster::new()),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
         discord_api: Arc::new(DiscordApiService::new(String::new())),
