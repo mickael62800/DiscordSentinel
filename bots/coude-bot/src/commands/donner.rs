@@ -8,14 +8,8 @@ use crate::catalog::CatalogCacheKey;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
-/// Minimum coins pour un don.
-const MIN_COINS_GIFT: i64 = 10;
-/// Le donneur doit garder au moins 50 coins apres le don.
-const MIN_COINS_AFTER_GIFT: i64 = 50;
-/// Taxe sur les dons de coins (10%).
-const COIN_TAX_RATE: f64 = 0.10;
-/// Cooldown pour les dons de coins (1 heure = 3600s).
-const COIN_GIFT_COOLDOWN_SECS: i64 = 3600;
+// Constantes migrees dans guild_config.rs :
+// gift_min_coins, gift_min_coins_after, gift_tax_rate, gift_cooldown_secs
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("donner")
@@ -147,11 +141,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         // ── Don de coins (avec taxe 10%, cooldown 1h) ──
         let amount = quantite;
 
-        if amount < MIN_COINS_GIFT {
+        if amount < config.gift_min_coins() {
             reply_ephemeral(
                 ctx,
                 command,
-                &format!("Le don minimum est de {} coins.", MIN_COINS_GIFT),
+                &format!("Le don minimum est de {} coins.", config.gift_min_coins()),
             )
             .await;
             return;
@@ -170,13 +164,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             return;
         }
 
-        if donor.coins - amount < MIN_COINS_AFTER_GIFT {
+        if donor.coins - amount < config.gift_min_coins_after() {
             reply_ephemeral(
                 ctx,
                 command,
                 &format!(
                     "Tu dois garder au moins {} coins apres le don. Tu as {} coins.",
-                    MIN_COINS_AFTER_GIFT, donor.coins
+                    config.gift_min_coins_after(), donor.coins
                 ),
             )
             .await;
@@ -218,7 +212,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
 
         // Apply 10% tax (gold sink)
-        let tax = ((amount as f64) * COIN_TAX_RATE).ceil() as i64;
+        let tax = ((amount as f64) * config.gift_tax_rate()).ceil() as i64;
         let received = amount - tax;
 
         // Transfert atomique donor -> target de `received` coins (partie
@@ -259,7 +253,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
         // Set cooldown
         if let Err(e) = api
-            .set_cooldown(&guild_id, &donor_id, "donner_coins", COIN_GIFT_COOLDOWN_SECS)
+            .set_cooldown(&guild_id, &donor_id, "donner_coins", config.gift_cooldown_secs())
             .await
         {
             tracing::warn!(error = %e, "Echec set_cooldown donner_coins");

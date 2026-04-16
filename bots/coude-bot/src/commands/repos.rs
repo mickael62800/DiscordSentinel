@@ -6,8 +6,6 @@ use serenity::all::{
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
-/// Cooldown du repos en heures.
-const REPOS_COOLDOWN_HOURS: i64 = 12;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("repos")
@@ -49,7 +47,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(last_used) {
             let elapsed =
                 chrono::Utc::now().signed_duration_since(dt.with_timezone(&chrono::Utc));
-            let cooldown_mins = REPOS_COOLDOWN_HOURS * 60;
+            let cooldown_mins = config.repos_cooldown_hours() * 60;
             if elapsed.num_minutes() < cooldown_mins {
                 let remaining_mins = cooldown_mins - elapsed.num_minutes();
                 let h = remaining_mins / 60;
@@ -90,7 +88,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             "<@{}> se repose et recupere **+{} HP** !\n\n\
              \u{2764}\u{fe0f} **{}/{}** HP\n\n\
              _Prochain repos disponible dans {} heures._",
-            command.user.id, healed, hp_max, hp_max, REPOS_COOLDOWN_HOURS
+            command.user.id, healed, hp_max, hp_max, config.repos_cooldown_hours()
         ))
         .color(0x57F287)
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))

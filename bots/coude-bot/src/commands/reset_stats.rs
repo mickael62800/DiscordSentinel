@@ -7,7 +7,6 @@ use crate::catalog::CatalogCacheKey;
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
-const RESET_COST: i64 = 300;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("reset-stats")
@@ -55,9 +54,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    if player.coins < RESET_COST {
+    if player.coins < config.reset_stats_cost() {
         reply_ephemeral(ctx, command, &format!(
-            "Le reset coute **{} coins**. Tu n'as que {} coins.", RESET_COST, player.coins
+            "Le reset coute **{} coins**. Tu n'as que {} coins.", config.reset_stats_cost(), player.coins
         )).await;
         return;
     }
@@ -65,7 +64,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Reset atomique cote API : deduit le cout, remet ATK/DEF a 0,
     // et restitue les points dans stat_points en une seule UPDATE.
     if let Err(e) = api
-        .reset_stats(&guild_id, &command.user.id.to_string(), RESET_COST)
+        .reset_stats(&guild_id, &command.user.id.to_string(), config.reset_stats_cost())
         .await
     {
         reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
@@ -76,7 +75,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     if let Err(e) = api
         .deposit_cashbox(
             &guild_id,
-            RESET_COST,
+            config.reset_stats_cost(),
             crate::api_client::CashboxDepositSource::ResetStatsCost,
         )
         .await
@@ -93,7 +92,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             **{} points** ont ete recuperes.\n\
             Utilise `/train atk` ou `/train def` pour les reassigner.\n\n\
             Stats de base ({} {}) : ATK {} | DEF {}",
-            command.user.id, RESET_COST, total_points_spent,
+            command.user.id, config.reset_stats_cost(), total_points_spent,
             class.emoji, class.name, class.base_atk, class.base_def
         ))
         .color(0x3498DB)

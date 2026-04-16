@@ -193,6 +193,60 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, &config_key, default) as i64
     }
 
+    // ── Classe ──
+
+    pub fn class_change_cost(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "class_change_cost", 500) as i64
+    }
+
+    // ── Don ──
+
+    pub fn gift_min_coins(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "gift_min_coins", 10) as i64
+    }
+
+    pub fn gift_min_coins_after(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "gift_min_coins_after", 50) as i64
+    }
+
+    pub fn gift_tax_rate(&self) -> f64 {
+        BaseApiClient::config_u64(&self.raw, "gift_tax_percent", 10) as f64 / 100.0
+    }
+
+    pub fn gift_cooldown_secs(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "gift_cooldown_secs", 3600) as i64
+    }
+
+    // ── Reset stats ──
+
+    pub fn reset_stats_cost(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "reset_stats_cost", 300) as i64
+    }
+
+    // ── Repos ──
+
+    pub fn repos_cooldown_hours(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "repos_cooldown_hours", 12) as i64
+    }
+
+    // ── HP regen (affichage seulement — le calcul reel est dans le worker/API) ──
+
+    pub fn hp_regen_rate_0_25(&self) -> f64 {
+        BaseApiClient::config_u64(&self.raw, "hp_regen_rate_0_25", 100) as f64
+    }
+
+    pub fn hp_regen_rate_25_50(&self) -> f64 {
+        BaseApiClient::config_u64(&self.raw, "hp_regen_rate_25_50", 50) as f64
+    }
+
+    pub fn hp_regen_rate_50_75(&self) -> f64 {
+        BaseApiClient::config_u64(&self.raw, "hp_regen_rate_50_75", 30) as f64
+    }
+
+    pub fn hp_regen_rate_75_100(&self) -> f64 {
+        BaseApiClient::config_u64(&self.raw, "hp_regen_rate_75_100", 10) as f64
+    }
+
     // ── Log channel ──
 
     pub fn log_channel_id(&self) -> Option<String> {

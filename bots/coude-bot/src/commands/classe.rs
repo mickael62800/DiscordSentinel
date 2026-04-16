@@ -68,11 +68,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
         }
 
-        // Verifier les coins (500 pour changer)
-        if player.coins < 500 {
+        // Verifier les coins (cout configurable par guild)
+        let cost = config.class_change_cost();
+        if player.coins < cost {
             reply_ephemeral(
                 ctx, command,
-                &format!("Changer de classe coute **500 coins**. Tu n'as que {} coins.", player.coins),
+                &format!("Changer de classe coute **{} coins**. Tu n'as que {} coins.", cost, player.coins),
             ).await;
             return;
         }
@@ -87,7 +88,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     );
 
     if has_chosen {
-        description.push_str("**Changer de classe coute 500 coins.**\n\n");
+        description.push_str(&format!("**Changer de classe coute {} coins.**\n\n", config.class_change_cost()));
     } else {
         description.push_str("**Premier choix gratuit !**\n\n");
     }
@@ -189,13 +190,15 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
     let current_class = player.class.as_deref().unwrap_or("bourrin");
     let has_chosen = player.class.is_some() && current_class != "bourrin" || player.level > 1;
 
-    // Si c'est un changement (pas premier choix), deduire 500 coins
+    // Si c'est un changement (pas premier choix), deduire le cout (configurable).
+    let config = load_guild_config(ctx, &guild_id).await;
+    let class_cost = config.class_change_cost();
     if has_chosen {
-        if player.coins < 500 {
-            reply_component_ephemeral(ctx, component, "Pas assez de coins ! (500 requis)").await;
+        if player.coins < class_cost {
+            reply_component_ephemeral(ctx, component, &format!("Pas assez de coins ! ({} requis)", class_cost)).await;
             return;
         }
-        if let Err(e) = api.update_player_coins(&guild_id, &user_id, -500).await {
+        if let Err(e) = api.update_player_coins(&guild_id, &user_id, -class_cost).await {
             reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
@@ -203,7 +206,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
         if let Err(e) = api
             .deposit_cashbox(
                 &guild_id,
-                500,
+                class_cost,
                 crate::api_client::CashboxDepositSource::ClassChangeCost,
             )
             .await
@@ -220,7 +223,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
 
     let class_info = catalog_early.get_class(&class_name);
 
-    let cost_msg = if has_chosen { " (-500 coins)" } else { " (gratuit)" };
+    let cost_msg = if has_chosen { format!(" (-{} coins)", class_cost) } else { " (gratuit)".to_string() };
 
     let embed = CreateEmbed::new()
         .title("\u{2728} Classe choisie !")

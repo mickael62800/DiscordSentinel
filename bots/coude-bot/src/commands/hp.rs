@@ -6,27 +6,20 @@ use serenity::all::{
 use crate::handler::load_guild_config;
 use crate::GameApiKey;
 
-/// Paliers de regen (HP/h par bande de % HP courant).
-/// Doivent rester en sync avec services/workers/coude-worker/src/jobs/hp_regen.rs.
-const RATE_0_25: f64 = 100.0;
-const RATE_25_50: f64 = 50.0;
-const RATE_50_75: f64 = 30.0;
-const RATE_75_100: f64 = 10.0;
+use crate::guild_config::CoudeConfig;
 
 /// Calcule le temps (en minutes) necessaire pour passer de `hp_current` a
-/// `hp_max` avec la regen degressive.
-fn estimate_minutes_to_full(mut hp_current: i32, hp_max: i32) -> i32 {
+/// `hp_max` avec la regen degressive. Taux lus depuis la config guild.
+fn estimate_minutes_to_full(mut hp_current: i32, hp_max: i32, config: &CoudeConfig) -> i32 {
     if hp_current >= hp_max || hp_max <= 0 {
         return 0;
     }
     let mut total_minutes = 0.0_f64;
-    // On consomme palier par palier ; chaque palier est defini par un
-    // plafond en HP absolu et un taux horaire.
     let thresholds: [(i32, f64); 4] = [
-        (hp_max / 4, RATE_0_25),
-        (hp_max / 2, RATE_25_50),
-        ((hp_max * 3) / 4, RATE_50_75),
-        (hp_max, RATE_75_100),
+        (hp_max / 4, config.hp_regen_rate_0_25()),
+        (hp_max / 2, config.hp_regen_rate_25_50()),
+        ((hp_max * 3) / 4, config.hp_regen_rate_50_75()),
+        (hp_max, config.hp_regen_rate_75_100()),
     ];
     for (ceiling, rate) in thresholds {
         if hp_current >= ceiling {
@@ -117,15 +110,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         "\u{2705} HP au maximum !".to_string()
     } else {
         let current_rate = if hp_pct < 25 {
-            RATE_0_25
+            config.hp_regen_rate_0_25()
         } else if hp_pct < 50 {
-            RATE_25_50
+            config.hp_regen_rate_25_50()
         } else if hp_pct < 75 {
-            RATE_50_75
+            config.hp_regen_rate_50_75()
         } else {
-            RATE_75_100
+            config.hp_regen_rate_75_100()
         };
-        let minutes_to_full = estimate_minutes_to_full(hp_current, hp_max);
+        let minutes_to_full = estimate_minutes_to_full(hp_current, hp_max, &config);
         let full_heal_str = if minutes_to_full < 60 {
             format!("~{}min", minutes_to_full)
         } else {
