@@ -83,8 +83,8 @@ pub async fn run(pool: &PgPool, bot_token: &str) -> Result<(), String> {
                 warn!(guild_id = %guild_id, error = %e, "Discord audit sync failed");
                 guilds_errored += 1;
 
-                // Enregistre l'erreur dans le state
-                let _ = sqlx::query(
+                // Enregistre l'erreur dans le state.
+                if let Err(db_err) = sqlx::query(
                     "INSERT INTO discord_audit_sync_state (guild_id, last_synced_at, last_error, consecutive_errors) \
                      VALUES ($1, NOW(), $2, 1) \
                      ON CONFLICT (guild_id) DO UPDATE SET \
@@ -95,7 +95,10 @@ pub async fn run(pool: &PgPool, bot_token: &str) -> Result<(), String> {
                 .bind(&guild_id)
                 .bind(&e)
                 .execute(pool)
-                .await;
+                .await
+                {
+                    warn!(guild_id = %guild_id, error = %db_err, "Echec sauvegarde error state dans sync_state");
+                }
             }
         }
     }
@@ -143,6 +146,18 @@ async fn sync_guild(
     if status == reqwest::StatusCode::FORBIDDEN {
         // Le bot n'a pas VIEW_AUDIT_LOG sur cette guild — on n'insiste pas
         return Err("VIEW_AUDIT_LOG manquant".into());
+    }
+    if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+        // Rate limited par Discord — respecter Retry-After avant de retenter.
+        let retry_after = resp
+            .headers()
+            .get("retry-after")
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(5.0);
+        warn!(guild_id = %guild_id, retry_after, "Discord rate limit — attente");
+        tokio::time::sleep(std::time::Duration::from_secs_f64(retry_after)).await;
+        return Err(format!("rate limited ({retry_after}s), retry au prochain tick"));
     }
     if !status.is_success() {
         let body = resp.text().await.unwrap_or_default();
