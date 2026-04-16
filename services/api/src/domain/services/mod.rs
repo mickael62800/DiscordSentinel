@@ -1,4 +1,5 @@
 pub mod coude_combat_engine;
+pub mod security_analyzer;
 mod discord_api;
 mod inference_limiter;
 mod inference_service;

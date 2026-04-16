@@ -24,7 +24,7 @@ pub use manage_conduct::{
 pub use manage_infractions::{InfractionFilters, ManageInfractionsUseCase};
 pub use manage_rules::{CreateRuleCommand, ManageRulesUseCase};
 pub use manage_moderation::{LoggedModerationAction, LogModerationCommand, ManageModerationUseCase};
-pub use manage_security::{ManageSecurityUseCase, ReportSecurityEventCommand};
+pub use manage_security::{AnalyzeNewMemberCommand, ManageSecurityUseCase, ReportSecurityEventCommand, SecurityDecision};
 pub use manage_stats::ManageStatsUseCase;
 pub use manage_tickets::{
     AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,

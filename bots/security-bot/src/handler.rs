@@ -285,7 +285,7 @@ impl EventHandler for Handler {
             .and_then(|v| v.parse().ok())
             .unwrap_or(env_config.raid_pattern_score_threshold);
 
-        // ── 0. Enregistrer le join pour l'analyse de pattern ──
+        // ── 0. Buffer temporel des joins (le bot garde le timing, pas le metier) ──
         let join_info = JoinInfo {
             username: user.name.clone(),
             has_avatar: user.avatar.is_some(),
@@ -293,260 +293,94 @@ impl EventHandler for Handler {
         };
         recent_joins.record(guild_id, join_info);
 
-        // ── 1. Detection anti-raid ──
-        let is_raid = raid_detector.record_join(guild_id);
+        // Simple detection seuil de joins rapides (buffer local).
+        let simple_raid = raid_detector.record_join(guild_id);
 
-        // Analyse de pattern avancee (meme si le seuil de joins n'est pas atteint)
-        let pattern_raid = if raid_pattern_enabled {
-            let joins = recent_joins.recent(guild_id);
-            if joins.len() >= 3 {
-                let analysis = raid_analyzer::analyze_joins(&joins, 2, 3600);
-                analysis.score >= raid_pattern_score_threshold
-            } else {
-                false
+        // ── 1. Appel API : l'API decide de tout ──
+        let recent = recent_joins.recent(guild_id);
+        let recent_entries: Vec<crate::api_client::RecentJoinEntry> = recent
+            .iter()
+            .map(|j| crate::api_client::RecentJoinEntry {
+                username: j.username.clone(),
+                has_avatar: j.has_avatar,
+                account_created_timestamp: j.account_created_timestamp,
+            })
+            .collect();
+
+        let decision = match sec_api
+            .analyze_new_member(
+                &guild_id.to_string(),
+                &user.id.to_string(),
+                &user.name,
+                user.avatar.is_some(),
+                user.created_at().unix_timestamp(),
+                user.bot,
+                recent_entries,
+            )
+            .await
+        {
+            Ok(d) => d,
+            Err(e) => {
+                error!(error = %e, "Erreur API analyze_new_member");
+                return;
             }
-        } else {
-            false
         };
 
-        let is_raid = is_raid || pattern_raid;
+        let is_raid = simple_raid || decision.is_raid;
+
+        // ── 2. Executer les decisions de l'API ──
 
         if is_raid {
-            let join_count = raid_detector.recent_joins(guild_id);
+            warn!(guild_id = %guild_id, score = decision.raid_score, "RAID DETECTE");
 
-            warn!(
-                guild_id = %guild_id,
-                joins = join_count,
-                "RAID DETECTE — activation lockdown"
-            );
-
-            // Signaler au backend
-            let event = SecurityEvent {
-                guild_id: guild_id.to_string(),
-                event_type: "raid_detected".to_string(),
-                severity: "critical".to_string(),
-                description: format!(
-                    "Raid detecte : {} joins en quelques secondes. Actions: lockdown{}{}",
-                    join_count,
-                    if slowmode_secs > 0 { ", slowmode auto" } else { "" },
-                    if quarantine_enabled { ", quarantaine" } else { "" },
-                ),
-                user_ids: vec![user.id.to_string()],
-            };
-
-            if let Err(e) = sec_api.report_event(&event).await {
-                error!(error = %e, "Erreur envoi evenement raid au backend");
-            }
-
-            // Activer le mode verification du serveur (highest)
-            if let Ok(mut guild) = guild_id.to_partial_guild(&ctx.http).await {
-                let edit = serenity::builder::EditGuild::new()
-                    .verification_level(serenity::model::guild::VerificationLevel::Higher);
-
-                if let Err(e) = guild.edit(&ctx.http, edit).await {
-                    error!(error = %e, "Impossible d'activer le lockdown");
-                } else {
-                    info!(guild_id = %guild_id, "Lockdown active (verification: Highest)");
+            if decision.activate_lockdown {
+                if let Ok(mut guild) = guild_id.to_partial_guild(&ctx.http).await {
+                    let edit = serenity::builder::EditGuild::new()
+                        .verification_level(serenity::model::guild::VerificationLevel::Higher);
+                    if let Err(e) = guild.edit(&ctx.http, edit).await {
+                        error!(error = %e, "Impossible d'activer le lockdown");
+                    }
                 }
-            }
-
-            // ── Slowmode auto ──
-            if slowmode_secs > 0 {
-                slowmode.activate(&ctx, guild_id, slowmode_secs).await;
-            }
-
-            // ── Lockdown auto ──
-            if lockdown_enabled {
                 lockdown.activate(&ctx, guild_id).await;
             }
 
-            // ── Quarantaine sur le membre qui a declenche ──
-            if quarantine_enabled {
-                if let Some(role_id) = quarantine_role_id {
-                    quarantine
-                        .quarantine_user(&ctx, guild_id, user.id, RoleId::new(role_id))
-                        .await;
-
-                    if captcha_enabled {
-                        let guild_name = guild_id
-                            .to_partial_guild(&ctx.http)
-                            .await
-                            .map(|g| g.name.clone())
-                            .unwrap_or_else(|_| "Serveur".to_string());
-
-                        send_captcha(&ctx, user.id, guild_id, &guild_name, &captcha_type, captcha_pending).await;
-                    }
-                }
+            if decision.slowmode_secs > 0 {
+                slowmode.activate(&ctx, guild_id, decision.slowmode_secs as u16).await;
             }
-
-            // Envoyer une alerte dans le premier salon texte trouve
-            match guild_id.channels(&ctx.http).await {
-            Err(e) => tracing::warn!(guild=%guild_id, error=%e, "Impossible de charger les channels pour l'alerte raid"),
-            Ok(channels) => {
-                if let Some(channel) = channels
-                    .values()
-                    .find(|c| c.kind == serenity::model::channel::ChannelType::Text)
-                {
-                    let mut actions = String::from("Niveau de verification augmente automatiquement.");
-                    if slowmode_secs > 0 {
-                        actions.push_str(&format!(
-                            "\nSlowmode active ({}s) sur tous les salons.",
-                            slowmode_secs
-                        ));
-                    }
-                    if lockdown_enabled {
-                        actions.push_str("\nLockdown active — envoi de messages desactive.");
-                    }
-                    if quarantine_enabled {
-                        actions.push_str("\nNouveaux membres mis en quarantaine.");
-                    }
-
-                    let embed = danger_embed("\u{1f6a8} ALERTE RAID DETECTE")
-                        .field("\u{1f465} Joins rapides", join_count.to_string(), true)
-                        .field("\u{26a1} Actions", actions, false);
-
-                    if let Err(e) = channel
-                        .send_message(
-                            &ctx.http,
-                            serenity::builder::CreateMessage::new().embed(embed),
-                        )
-                        .await
-                    {
-                        warn!(error = %e, "Failed to send raid alert embed");
-                    }
-                }
-            }}
 
             raid_detector.reset(guild_id);
             recent_joins.reset(guild_id);
         }
 
-        // ── 2. Verification compte suspect ──
-        // Skip les bots : leur date de creation est souvent recente (ajout
-        // recent au serveur) mais c'est normal — ce ne sont pas des comptes
-        // suspects au sens raid/fake.
-        if user.bot {
-            return;
+        // Quarantaine + captcha (decision API).
+        if decision.quarantine {
+            if let Some(role_id) = quarantine_role_id {
+                quarantine
+                    .quarantine_user(&ctx, guild_id, user.id, RoleId::new(role_id))
+                    .await;
+
+                if decision.send_captcha {
+                    let guild_name = guild_id
+                        .to_partial_guild(&ctx.http)
+                        .await
+                        .map(|g| g.name.clone())
+                        .unwrap_or_else(|_| "Serveur".to_string());
+                    send_captcha(&ctx, user.id, guild_id, &guild_name, &captcha_type, captcha_pending).await;
+                }
+            }
         }
 
-        let per_guild_checker = AccountChecker::new(min_account_age);
-        let checker = if guild_config.contains_key("min_account_age_secs") {
-            &per_guild_checker
-        } else {
-            account_checker
-        };
-
-        if checker.is_suspicious(user) {
-            let age_h = checker.account_age_hours(user);
-
-            warn!(
+        // Log si event detecte.
+        if !decision.event_type.is_empty() {
+            info!(
                 guild_id = %guild_id,
-                user = %user.name,
-                account_age_hours = age_h,
-                "Compte suspect detecte (trop recent)"
+                event = %decision.event_type,
+                desc = %decision.event_description,
+                raid = decision.is_raid,
+                suspicious = decision.is_suspicious_account,
+                alt = decision.is_alt_account,
+                "Security decision appliquee"
             );
-
-            let mut description = format!(
-                "Compte suspect : {} (cree il y a {}h)",
-                user.name, age_h
-            );
-
-            // ── Quarantaine pour comptes suspects ──
-            if quarantine_enabled {
-                if let Some(role_id) = quarantine_role_id {
-                    let quarantined = quarantine
-                        .quarantine_user(&ctx, guild_id, user.id, RoleId::new(role_id))
-                        .await;
-
-                    if quarantined {
-                        description.push_str(" — mis en quarantaine");
-
-                        if captcha_enabled {
-                            let guild_name = guild_id
-                                .to_partial_guild(&ctx.http)
-                                .await
-                                .map(|g| g.name.clone())
-                                .unwrap_or_else(|_| "Serveur".to_string());
-
-                            send_captcha(&ctx, user.id, guild_id, &guild_name, &captcha_type, captcha_pending).await;
-                        }
-                    }
-                }
-            }
-
-            let event = SecurityEvent {
-                guild_id: guild_id.to_string(),
-                event_type: "suspicious_account".to_string(),
-                severity: "warning".to_string(),
-                description,
-                user_ids: vec![user.id.to_string()],
-            };
-
-            if let Err(e) = sec_api.report_event(&event).await {
-                error!(error = %e, "Erreur envoi evenement compte suspect");
-            }
-        }
-
-        // ── 3. Detection alt account ──
-        if alt_detection_enabled {
-            let alt_analysis = alt_detector.check_user(
-                guild_id,
-                &user.name,
-                user.created_at().unix_timestamp(),
-            );
-
-            if alt_analysis.is_suspicious() {
-                let mut description = format!("Alt account suspecte : {}", user.name);
-                if let Some(ref banned) = alt_analysis.similar_to_banned {
-                    description.push_str(&format!(" (nom similaire a {})", banned));
-                }
-                if let Some(ref banned) = alt_analysis.creation_near_banned {
-                    description.push_str(&format!(" (creation proche de {})", banned));
-                }
-
-                warn!(
-                    guild_id = %guild_id,
-                    user = %user.name,
-                    similar_to = ?alt_analysis.similar_to_banned,
-                    creation_near = ?alt_analysis.creation_near_banned,
-                    "Alt account suspecte"
-                );
-
-                // Quarantaine si active
-                if quarantine_enabled {
-                    if let Some(role_id) = quarantine_role_id {
-                        let quarantined = quarantine
-                            .quarantine_user(&ctx, guild_id, user.id, RoleId::new(role_id))
-                            .await;
-
-                        if quarantined {
-                            description.push_str(" — mis en quarantaine");
-
-                            if captcha_enabled {
-                                let guild_name = guild_id
-                                    .to_partial_guild(&ctx.http)
-                                    .await
-                                    .map(|g| g.name.clone())
-                                    .unwrap_or_else(|_| "Serveur".to_string());
-
-                                send_captcha(&ctx, user.id, guild_id, &guild_name, &captcha_type, captcha_pending).await;
-                            }
-                        }
-                    }
-                }
-
-                let event = SecurityEvent {
-                    guild_id: guild_id.to_string(),
-                    event_type: "alt_account_suspected".to_string(),
-                    severity: "warning".to_string(),
-                    description,
-                    user_ids: vec![user.id.to_string()],
-                };
-
-                if let Err(e) = sec_api.report_event(&event).await {
-                    error!(error = %e, "Erreur envoi evenement alt account");
-                }
-            }
         }
     }
 

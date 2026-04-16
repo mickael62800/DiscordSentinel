@@ -1,0 +1,226 @@
+//! Analyse de securite : raid patterns, comptes suspects, alt detection.
+//!
+//! Fonctions pures (aucune IO) — migrees depuis security-bot pour
+//! centraliser la logique metier cote API.
+
+/// Info d'un join recent (envoyee par le bot).
+#[derive(Debug, Clone)]
+pub struct JoinInfo {
+    pub username: String,
+    pub has_avatar: bool,
+    pub account_created_timestamp: i64,
+}
+
+/// Resultat de l'analyse raid.
+#[derive(Debug, Clone)]
+pub struct RaidAnalysis {
+    pub similar_names: bool,
+    pub high_default_avatar_ratio: bool,
+    pub clustered_creation: bool,
+    pub score: u32,
+}
+
+// ── Levenshtein ──
+
+pub fn levenshtein(a: &str, b: &str) -> usize {
+    let a_chars: Vec<char> = a.chars().collect();
+    let b_chars: Vec<char> = b.chars().collect();
+    let (a_len, b_len) = (a_chars.len(), b_chars.len());
+    if a_len == 0 { return b_len; }
+    if b_len == 0 { return a_len; }
+
+    let mut prev: Vec<usize> = (0..=b_len).collect();
+    let mut curr = vec![0usize; b_len + 1];
+    for i in 1..=a_len {
+        curr[0] = i;
+        for j in 1..=b_len {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b_len]
+}
+
+// ── Noms similaires ──
+
+pub fn has_similar_usernames(names: &[String], max_distance: usize) -> bool {
+    if names.len() < 2 { return false; }
+    let capped = if names.len() > 50 { &names[..50] } else { names };
+    let lowered: Vec<String> = capped.iter().map(|n| n.to_lowercase()).collect();
+    for i in 0..lowered.len() {
+        for j in (i + 1)..lowered.len() {
+            if levenshtein(&lowered[i], &lowered[j]) <= max_distance {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+// ── Cluster de creation ──
+
+pub fn are_creations_clustered(timestamps: &[i64], max_spread_secs: i64) -> bool {
+    if timestamps.len() < 2 { return false; }
+    let min = timestamps.iter().min().copied().unwrap_or(0);
+    let max = timestamps.iter().max().copied().unwrap_or(0);
+    (max - min) <= max_spread_secs
+}
+
+// ── Analyse raid ──
+
+pub fn analyze_joins(
+    joins: &[JoinInfo],
+    name_distance: usize,
+    creation_spread_secs: i64,
+) -> RaidAnalysis {
+    if joins.len() < 2 {
+        return RaidAnalysis {
+            similar_names: false,
+            high_default_avatar_ratio: false,
+            clustered_creation: false,
+            score: 0,
+        };
+    }
+
+    let names: Vec<String> = joins.iter().map(|j| j.username.clone()).collect();
+    let similar_names = has_similar_usernames(&names, name_distance);
+
+    let default_count = joins.iter().filter(|j| !j.has_avatar).count();
+    let high_default_avatar_ratio = (default_count as f64 / joins.len() as f64) > 0.5;
+
+    let timestamps: Vec<i64> = joins.iter().map(|j| j.account_created_timestamp).collect();
+    let clustered_creation = are_creations_clustered(&timestamps, creation_spread_secs);
+
+    let mut score: u32 = 0;
+    if similar_names { score += 40; }
+    if high_default_avatar_ratio { score += 30; }
+    if clustered_creation { score += 30; }
+
+    RaidAnalysis { similar_names, high_default_avatar_ratio, clustered_creation, score }
+}
+
+// ── Check age compte ──
+
+pub fn is_account_suspicious(account_created_timestamp: i64, min_age_secs: u64) -> bool {
+    let now = chrono::Utc::now().timestamp();
+    let age = now - account_created_timestamp;
+    if age < 0 { return true; }
+    (age as u64) < min_age_secs
+}
+
+// ── Alt detection (contre les bans recents en DB) ──
+
+#[derive(Debug, Clone)]
+pub struct BannedUserInfo {
+    pub username: String,
+    pub account_created_timestamp: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct AltAnalysis {
+    pub similar_to_banned: Option<String>,
+    pub creation_near_banned: Option<String>,
+}
+
+impl AltAnalysis {
+    pub fn is_suspicious(&self) -> bool {
+        self.similar_to_banned.is_some() || self.creation_near_banned.is_some()
+    }
+}
+
+pub fn check_alt_account(
+    username: &str,
+    account_created_timestamp: i64,
+    recent_bans: &[BannedUserInfo],
+    name_distance: usize,
+    creation_cluster_secs: i64,
+) -> AltAnalysis {
+    let mut similar_to_banned = None;
+    let mut creation_near_banned = None;
+    let username_lower = username.to_lowercase();
+
+    for ban in recent_bans {
+        let ban_lower = ban.username.to_lowercase();
+        if levenshtein(&username_lower, &ban_lower) <= name_distance {
+            similar_to_banned = Some(ban.username.clone());
+        }
+        let diff = (account_created_timestamp - ban.account_created_timestamp).abs();
+        if diff <= creation_cluster_secs {
+            creation_near_banned = Some(ban.username.clone());
+        }
+        if similar_to_banned.is_some() && creation_near_banned.is_some() {
+            break;
+        }
+    }
+
+    AltAnalysis { similar_to_banned, creation_near_banned }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn levenshtein_identical() { assert_eq!(levenshtein("hello", "hello"), 0); }
+
+    #[test]
+    fn levenshtein_one_diff() { assert_eq!(levenshtein("cat", "bat"), 1); }
+
+    #[test]
+    fn levenshtein_empty() { assert_eq!(levenshtein("", "abc"), 3); }
+
+    #[test]
+    fn similar_names_found() {
+        let names = vec!["raider1".into(), "raider2".into(), "alice".into()];
+        assert!(has_similar_usernames(&names, 2));
+    }
+
+    #[test]
+    fn similar_names_not_found() {
+        let names = vec!["alice".into(), "bob".into(), "charlie".into()];
+        assert!(!has_similar_usernames(&names, 1));
+    }
+
+    #[test]
+    fn clustered_creation() {
+        assert!(are_creations_clustered(&[1000, 1500, 2000], 3600));
+        assert!(!are_creations_clustered(&[1000, 100000], 3600));
+    }
+
+    #[test]
+    fn raid_analysis_scoring() {
+        let joins = vec![
+            JoinInfo { username: "raid1".into(), has_avatar: false, account_created_timestamp: 1000 },
+            JoinInfo { username: "raid2".into(), has_avatar: false, account_created_timestamp: 1500 },
+        ];
+        let analysis = analyze_joins(&joins, 2, 3600);
+        assert!(analysis.score >= 60); // similar names + default avatars + clustered
+    }
+
+    #[test]
+    fn alt_detection_similar_name() {
+        let bans = vec![BannedUserInfo { username: "raider".into(), account_created_timestamp: 5000 }];
+        let result = check_alt_account("ra1der", 99999, &bans, 2, 3600);
+        assert!(result.similar_to_banned.is_some());
+    }
+
+    #[test]
+    fn alt_detection_no_match() {
+        let bans = vec![BannedUserInfo { username: "bob".into(), account_created_timestamp: 5000 }];
+        let result = check_alt_account("alice", 99999, &bans, 1, 3600);
+        assert!(!result.is_suspicious());
+    }
+
+    #[test]
+    fn suspicious_account_young() {
+        let now = chrono::Utc::now().timestamp();
+        assert!(is_account_suspicious(now - 3600, 86400)); // 1h old, min 24h
+    }
+
+    #[test]
+    fn suspicious_account_old() {
+        let now = chrono::Utc::now().timestamp();
+        assert!(!is_account_suspicious(now - 100000, 86400)); // 27h old, min 24h
+    }
+}

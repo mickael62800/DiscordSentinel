@@ -7,6 +7,10 @@ package sentinel.security.v1;
 service SecurityService {
   rpc ReportEvent(ReportEventRequest) returns (SecurityEvent);
   rpc ListEvents(ListEventsRequest) returns (SecurityEventList);
+
+  // Le bot envoie le nouveau membre + les joins recents, l'API decide
+  // de tout (raid, compte suspect, alt, quarantine, captcha, lockdown).
+  rpc AnalyzeNewMember(AnalyzeNewMemberRequest) returns (SecurityDecision);
 }
 
 message ReportEventRequest {
@@ -36,4 +40,39 @@ message SecurityEvent {
 
 message SecurityEventList {
   repeated SecurityEvent events = 1;
+}
+
+// ── Analyse nouveau membre ──
+
+message RecentJoinEntry {
+  string username = 1;
+  bool has_avatar = 2;
+  int64 account_created_timestamp = 3;
+}
+
+message AnalyzeNewMemberRequest {
+  string guild_id = 1;
+  string user_id = 2;
+  string username = 3;
+  bool has_avatar = 4;
+  int64 account_created_timestamp = 5;
+  bool is_bot = 6;
+  // Joins recents dans la fenetre (buffer temporel du bot).
+  repeated RecentJoinEntry recent_joins = 7;
+}
+
+message SecurityDecision {
+  bool is_raid = 1;
+  uint32 raid_score = 2;
+  bool is_suspicious_account = 3;
+  bool is_alt_account = 4;
+  string alt_similar_to = 5;
+  // Actions a executer par le bot.
+  bool quarantine = 6;
+  bool send_captcha = 7;
+  bool activate_lockdown = 8;
+  uint32 slowmode_secs = 9;
+  // Evenement auto-reporte si non-vide.
+  string event_type = 10;
+  string event_description = 11;
 }

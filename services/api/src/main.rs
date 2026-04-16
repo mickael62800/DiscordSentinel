@@ -249,6 +249,8 @@ async fn main() {
             security_repo.clone(),
             cache.clone(),
             watched_user_repo.clone(),
+            bot_config_repo.clone(),
+            moderation_repo.clone(),
         )
         .with_audit_logs_uc(audit_logs_uc.clone() as Arc<dyn sentinel_api::ports::inbound::ManageAuditLogsUseCase>),
     );

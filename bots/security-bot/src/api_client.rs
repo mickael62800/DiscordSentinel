@@ -182,6 +182,81 @@ impl ApiClient {
             .await
             .map_err(grpc_err_to_string)
     }
+
+    // ── Analyse nouveau membre (gRPC) ──
+
+    pub async fn analyze_new_member(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+        has_avatar: bool,
+        account_created_timestamp: i64,
+        is_bot: bool,
+        recent_joins: Vec<RecentJoinEntry>,
+    ) -> Result<SecurityDecisionResponse, String> {
+        let req = proto_security::AnalyzeNewMemberRequest {
+            guild_id: guild_id.to_string(),
+            user_id: user_id.to_string(),
+            username: username.to_string(),
+            has_avatar,
+            account_created_timestamp,
+            is_bot,
+            recent_joins: recent_joins
+                .into_iter()
+                .map(|j| proto_security::RecentJoinEntry {
+                    username: j.username,
+                    has_avatar: j.has_avatar,
+                    account_created_timestamp: j.account_created_timestamp,
+                })
+                .collect(),
+        };
+        let mut client = self.grpc.security();
+        let resp = self
+            .grpc
+            .guarded(|| async move {
+                client.analyze_new_member(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        Ok(SecurityDecisionResponse {
+            is_raid: resp.is_raid,
+            raid_score: resp.raid_score,
+            is_suspicious_account: resp.is_suspicious_account,
+            is_alt_account: resp.is_alt_account,
+            alt_similar_to: resp.alt_similar_to,
+            quarantine: resp.quarantine,
+            send_captcha: resp.send_captcha,
+            activate_lockdown: resp.activate_lockdown,
+            slowmode_secs: resp.slowmode_secs,
+            event_type: resp.event_type,
+            event_description: resp.event_description,
+        })
+    }
+}
+
+// ── DTOs ──
+
+#[derive(Debug, Clone)]
+pub struct RecentJoinEntry {
+    pub username: String,
+    pub has_avatar: bool,
+    pub account_created_timestamp: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SecurityDecisionResponse {
+    pub is_raid: bool,
+    pub raid_score: u32,
+    pub is_suspicious_account: bool,
+    pub is_alt_account: bool,
+    pub alt_similar_to: String,
+    pub quarantine: bool,
+    pub send_captcha: bool,
+    pub activate_lockdown: bool,
+    pub slowmode_secs: u32,
+    pub event_type: String,
+    pub event_description: String,
 }
 
 fn member_payload_to_proto(p: &MemberPayload) -> Result<proto_members::GuildMember, String> {

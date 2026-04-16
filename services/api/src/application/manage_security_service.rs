@@ -7,10 +7,15 @@ use tracing::warn;
 
 use crate::domain::entities::SecurityEvent;
 use crate::domain::errors::DomainError;
+use crate::domain::services::security_analyzer;
 use crate::ports::inbound::{
-    CreateAuditLogCommand, ManageAuditLogsUseCase, ManageSecurityUseCase, ReportSecurityEventCommand,
+    AnalyzeNewMemberCommand, CreateAuditLogCommand, ManageAuditLogsUseCase,
+    ManageSecurityUseCase, ReportSecurityEventCommand, SecurityDecision,
 };
-use crate::ports::outbound::{CachePort, SecurityEventRepository, WatchedUserRepository};
+use crate::ports::outbound::{
+    BotConfigRepository, CachePort, ModerationRepository, SecurityEventRepository,
+    WatchedUserRepository,
+};
 
 const EVENTS_TTL: u64 = 60; // 1 minute
 
@@ -19,6 +24,8 @@ pub struct ManageSecurityService {
     cache: Arc<dyn CachePort>,
     watched_repo: Arc<dyn WatchedUserRepository>,
     audit_logs_uc: Option<Arc<dyn ManageAuditLogsUseCase>>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
+    moderation_repo: Arc<dyn ModerationRepository>,
 }
 
 impl ManageSecurityService {
@@ -26,8 +33,10 @@ impl ManageSecurityService {
         repo: Arc<dyn SecurityEventRepository>,
         cache: Arc<dyn CachePort>,
         watched_repo: Arc<dyn WatchedUserRepository>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
+        moderation_repo: Arc<dyn ModerationRepository>,
     ) -> Self {
-        Self { repo, cache, watched_repo, audit_logs_uc: None }
+        Self { repo, cache, watched_repo, audit_logs_uc: None, bot_config_repo, moderation_repo }
     }
 
     /// Phase 1 dual-write : copie chaque evenement de securite dans audit_logs
@@ -110,6 +119,124 @@ impl ManageSecurityUseCase for ManageSecurityService {
         Ok(event)
     }
 
+    async fn analyze_new_member(
+        &self,
+        cmd: AnalyzeNewMemberCommand,
+    ) -> Result<SecurityDecision, DomainError> {
+        // Bots ignores.
+        if cmd.is_bot {
+            return Ok(SecurityDecision::default());
+        }
+
+        // Charger config guild.
+        let configs = self.bot_config_repo.get_config(&cmd.guild_id, "security-bot").await.unwrap_or_default();
+        let cfg = |key: &str, default: u64| -> u64 {
+            configs.iter()
+                .find(|c| c.config_key == key)
+                .and_then(|c| c.config_value.parse().ok())
+                .unwrap_or(default)
+        };
+        let cfg_bool = |key: &str, default: bool| -> bool {
+            configs.iter()
+                .find(|c| c.config_key == key)
+                .map(|c| c.config_value == "true" || c.config_value == "1")
+                .unwrap_or(default)
+        };
+
+        let min_account_age = cfg("min_account_age_secs", 86400);
+        let quarantine_enabled = cfg_bool("quarantine_enabled", false);
+        let captcha_enabled = cfg_bool("captcha_enabled", false);
+        let lockdown_enabled = cfg_bool("lockdown_enabled", false);
+        let slowmode_secs = cfg("slowmode_seconds", 0) as u32;
+        let alt_detection_enabled = cfg_bool("alt_detection_enabled", false);
+        let raid_pattern_enabled = cfg_bool("raid_pattern_enabled", false);
+        let raid_score_threshold = cfg("raid_pattern_score_threshold", 60) as u32;
+        let name_distance = cfg("alt_name_distance", 2) as usize;
+        let creation_spread = cfg("raid_creation_spread_secs", 3600) as i64;
+
+        let mut decision = SecurityDecision::default();
+
+        // 1. Analyse raid pattern.
+        if raid_pattern_enabled && cmd.recent_joins.len() >= 3 {
+            let analysis = security_analyzer::analyze_joins(&cmd.recent_joins, name_distance, creation_spread);
+            if analysis.score >= raid_score_threshold {
+                decision.is_raid = true;
+                decision.raid_score = analysis.score;
+                decision.activate_lockdown = lockdown_enabled;
+                decision.slowmode_secs = slowmode_secs;
+                decision.quarantine = quarantine_enabled;
+                decision.send_captcha = quarantine_enabled && captcha_enabled;
+                decision.event_type = "raid_detected".into();
+                decision.event_description = format!(
+                    "Raid pattern detecte (score {}). Noms similaires: {}, Avatars par defaut: {}, Creation clusteree: {}",
+                    analysis.score, analysis.similar_names, analysis.high_default_avatar_ratio, analysis.clustered_creation
+                );
+            }
+        }
+
+        // 2. Compte suspect (trop jeune).
+        if !decision.is_raid {
+            let suspicious = security_analyzer::is_account_suspicious(
+                cmd.account_created_timestamp,
+                min_account_age,
+            );
+            if suspicious {
+                decision.is_suspicious_account = true;
+                decision.quarantine = quarantine_enabled;
+                decision.send_captcha = quarantine_enabled && captcha_enabled;
+                if decision.event_type.is_empty() {
+                    decision.event_type = "suspicious_account".into();
+                    let age_hours = (chrono::Utc::now().timestamp() - cmd.account_created_timestamp) / 3600;
+                    decision.event_description = format!(
+                        "Compte suspect : age {} heures (min requis : {} heures)",
+                        age_hours, min_account_age / 3600
+                    );
+                }
+            }
+        }
+
+        // 3. Alt detection (noms/dates proches de bans recents).
+        if !decision.is_raid && alt_detection_enabled {
+            // Charger les bans recents depuis audit_logs (7 derniers jours).
+            let recent_bans = self.load_recent_ban_usernames(&cmd.guild_id).await;
+            if !recent_bans.is_empty() {
+                let alt = security_analyzer::check_alt_account(
+                    &cmd.username,
+                    cmd.account_created_timestamp,
+                    &recent_bans,
+                    name_distance,
+                    creation_spread,
+                );
+                if alt.is_suspicious() {
+                    decision.is_alt_account = true;
+                    decision.alt_similar_to = alt.similar_to_banned.or(alt.creation_near_banned).unwrap_or_default();
+                    decision.quarantine = quarantine_enabled;
+                    decision.send_captcha = quarantine_enabled && captcha_enabled;
+                    if decision.event_type.is_empty() {
+                        decision.event_type = "alt_account_suspected".into();
+                        decision.event_description = format!(
+                            "Alt suspecte de {} (similaire a banni: {})",
+                            cmd.username, decision.alt_similar_to
+                        );
+                    }
+                }
+            }
+        }
+
+        // Auto-report si un event a ete detecte.
+        if !decision.event_type.is_empty() {
+            let _ = self.report_event(ReportSecurityEventCommand {
+                guild_id: cmd.guild_id.clone(),
+                event_type: decision.event_type.clone(),
+                severity: if decision.is_raid { "critical" } else { "high" }.into(),
+                description: decision.event_description.clone(),
+                user_ids: vec![cmd.user_id.clone()],
+            }).await;
+        }
+
+        Ok(decision)
+    }
+
     async fn list_events(&self, guild_id: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> {
         let cache_key = match guild_id {
             Some(gid) => format!("security:{gid}"),
@@ -136,5 +263,24 @@ impl ManageSecurityUseCase for ManageSecurityService {
         }
 
         Ok(events)
+    }
+}
+
+impl ManageSecurityService {
+    /// Charge les usernames et dates de creation des bans recents (7j)
+    /// depuis le repo moderation pour l'alt detection.
+    async fn load_recent_ban_usernames(&self, guild_id: &str) -> Vec<security_analyzer::BannedUserInfo> {
+        let bans = match self.moderation_repo.find_bans(Some(guild_id), 100, 0).await {
+            Ok(actions) => actions,
+            Err(_) => return vec![],
+        };
+        let seven_days_ago = chrono::Utc::now() - chrono::Duration::days(7);
+        bans.into_iter()
+            .filter(|a| a.created_at >= seven_days_ago)
+            .map(|a| security_analyzer::BannedUserInfo {
+                username: a.target_name,
+                account_created_timestamp: 0,
+            })
+            .collect()
     }
 }

@@ -10,7 +10,10 @@ use sentinel_proto::security::v1::security_service_server::SecurityService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::domain::entities::SecurityEvent;
-use crate::ports::inbound::{ManageSecurityUseCase, ReportSecurityEventCommand};
+use crate::domain::services::security_analyzer::JoinInfo;
+use crate::ports::inbound::{
+    AnalyzeNewMemberCommand, ManageSecurityUseCase, ReportSecurityEventCommand,
+};
 
 pub struct SecurityGrpc {
     pub uc: Arc<dyn ManageSecurityUseCase>,
@@ -49,6 +52,48 @@ impl SecurityService for SecurityGrpc {
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::SecurityEventList {
             events: events.into_iter().map(security_event_to_proto).collect(),
+        }))
+    }
+
+    async fn analyze_new_member(
+        &self,
+        request: Request<proto::AnalyzeNewMemberRequest>,
+    ) -> Result<Response<proto::SecurityDecision>, Status> {
+        let req = request.into_inner();
+        let recent_joins = req
+            .recent_joins
+            .into_iter()
+            .map(|j| JoinInfo {
+                username: j.username,
+                has_avatar: j.has_avatar,
+                account_created_timestamp: j.account_created_timestamp,
+            })
+            .collect();
+        let decision = self
+            .uc
+            .analyze_new_member(AnalyzeNewMemberCommand {
+                guild_id: req.guild_id,
+                user_id: req.user_id,
+                username: req.username,
+                has_avatar: req.has_avatar,
+                account_created_timestamp: req.account_created_timestamp,
+                is_bot: req.is_bot,
+                recent_joins,
+            })
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::SecurityDecision {
+            is_raid: decision.is_raid,
+            raid_score: decision.raid_score,
+            is_suspicious_account: decision.is_suspicious_account,
+            is_alt_account: decision.is_alt_account,
+            alt_similar_to: decision.alt_similar_to,
+            quarantine: decision.quarantine,
+            send_captcha: decision.send_captcha,
+            activate_lockdown: decision.activate_lockdown,
+            slowmode_secs: decision.slowmode_secs,
+            event_type: decision.event_type,
+            event_description: decision.event_description,
         }))
     }
 }
