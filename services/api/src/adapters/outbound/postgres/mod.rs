@@ -119,3 +119,6 @@ pub use sponsorship_repository::PgSponsorshipRepository;
 
 mod temp_role_repository;
 pub use temp_role_repository::PgTempRoleRepository;
+
+mod pending_action_repository;
+pub use pending_action_repository::PgPendingActionRepository;

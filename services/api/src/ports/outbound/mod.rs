@@ -111,3 +111,6 @@ pub use sponsorship_repository::{Sponsorship, SponsorshipRepository};
 
 mod temp_role_repository;
 pub use temp_role_repository::{TempRole, TempRoleRepository};
+
+mod pending_action_repository;
+pub use pending_action_repository::{PendingAction, PendingActionRepository};

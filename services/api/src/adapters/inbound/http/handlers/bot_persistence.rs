@@ -328,28 +328,14 @@ pub async fn create_pending_action(
         &dto.guild_id, &dto.moderator_id, &dto.target_id, &dto.reason, &dto.action_type,
     ).map_err(ApiError)?;
 
-    let result = sqlx::query_scalar::<_, sqlx::types::Uuid>(
-        "INSERT INTO pending_mod_actions \
-         (guild_id, moderator_id, moderator_name, target_id, target_name, action_type, reason, gravity, duration) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) \
-         RETURNING id",
-    )
-    .bind(&dto.guild_id)
-    .bind(&dto.moderator_id)
-    .bind(&dto.moderator_name)
-    .bind(&dto.target_id)
-    .bind(&dto.target_name)
-    .bind(&dto.action_type)
-    .bind(&dto.reason)
-    .bind(&dto.gravity)
-    .bind(dto.duration)
-    .fetch_one(&state.pg_pool)
-    .await;
-
-    match result {
+    match state.pending_action_repo.create(
+        &dto.guild_id, &dto.moderator_id, &dto.moderator_name,
+        &dto.target_id, &dto.target_name, &dto.action_type,
+        &dto.reason, dto.gravity.as_deref(), dto.duration,
+    ).await {
         Ok(id) => Ok(Json(serde_json::json!({ "id": id.to_string() }))),
         Err(e) => {
-            warn!(error = %e, guild_id = %dto.guild_id, target_id = %dto.target_id, "Echec creation pending_action");
+            warn!(error = %e, guild_id = %dto.guild_id, "Echec creation pending_action");
             Ok(ok_response())
         }
     }
@@ -359,25 +345,16 @@ pub async fn create_pending_action(
 pub async fn list_pending_actions(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
-) -> Result<Json<Vec<PendingActionRow>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::PendingAction>>, ApiError> {
     // Validation
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
-    let rows = sqlx::query_as::<_, PendingActionRow>(
-        "SELECT id, guild_id, moderator_id, moderator_name, target_id, target_name, \
-         action_type, reason, gravity, duration, status, reviewed_by, created_at, updated_at \
-         FROM pending_mod_actions WHERE guild_id = $1 AND status = 'pending' \
-         ORDER BY created_at DESC",
-    )
-    .bind(&guild_id)
-    .fetch_all(&state.pg_pool)
-    .await
-    .unwrap_or_else(|e| {
-        warn!(error = %e, guild_id = %guild_id, "Echec SELECT pending_mod_actions");
+    let entries = state.pending_action_repo.list_pending(&guild_id).await.unwrap_or_else(|e| {
+        warn!(error = %e, guild_id = %guild_id, "Echec list pending_mod_actions");
         vec![]
     });
 
-    Ok(Json(rows))
+    Ok(Json(entries))
 }
 
 #[derive(Debug, Deserialize)]
@@ -395,37 +372,20 @@ pub async fn resolve_pending_action(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     // H10 — Revérif permission serveur : on lookup le guild_id de l'action
     // pending puis on gate sur Moderator+.
+    let uuid = uuid::Uuid::parse_str(&id)
+        .map_err(|_| ApiError(DomainError::ValidationError("id invalide".into())))?;
+
     if rbac.is_some() {
-        let gid: Option<(String,)> = sqlx::query_as(
-            "SELECT guild_id FROM pending_mod_actions WHERE id = $1::uuid",
-        )
-        .bind(&id)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("fetch pending guild_id: {e}"))))?;
-        if let Some((guild_id,)) = gid {
-            check_role_for_guild(
-                &state,
-                &rbac,
-                &guild_id,
-                Role::Moderator,
-                "moderator+ requis pour resoudre une action en attente",
-            )
-            .await?;
+        if let Some(guild_id) = state.pending_action_repo.get_guild_id(uuid).await? {
+            check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour resoudre une action en attente").await?;
         }
     }
 
-    sqlx::query(
-        "UPDATE pending_mod_actions SET status = $1, reviewed_by = $2, updated_at = NOW() \
-         WHERE id = $3::uuid",
-    )
-    .bind(&dto.status)
-    .bind(&dto.reviewed_by)
-    .bind(&id)
-    .execute(&state.pg_pool)
-    .await
-    .inspect_err(|e| warn!(error = %e, action_id = %id, "Echec resolution pending_action"))
-    .ok();
+    state.pending_action_repo
+        .resolve(uuid, &dto.status, &dto.reviewed_by)
+        .await
+        .inspect_err(|e| warn!(error = %e, action_id = %id, "Echec resolution pending_action"))
+        .ok();
 
     Ok(ok_response())
 }
