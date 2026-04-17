@@ -7,6 +7,7 @@ use tracing::warn;
 use crate::domain::entities::{DashboardStats, GuildStatsOverview, GuildVoiceStats, UserStats};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_stats::{ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand};
+use crate::adapters::outbound::cache_helpers::cached_json;
 use crate::ports::outbound::{CachePort, InfractionRepository, StatsRepository};
 use crate::ports::inbound::InfractionFilters;
 
@@ -134,59 +135,45 @@ impl ManageStatsUseCase for ManageStatsService {
 
     async fn get_guild_overview(&self, guild_id: &str) -> Result<GuildStatsOverview, DomainError> {
         let cache_key = format!("stats:overview:{guild_id}");
+        cached_json(&self.cache, &cache_key, OVERVIEW_TTL, || async {
+            // Fetch stats from DB
+            let members = self.stats_repo.find_by_guild(guild_id, 100).await?;
 
-        // Cache-first
-        if let Some(json) = self.cache.get_json(&cache_key).await? {
-            if let Ok(overview) = serde_json::from_str::<GuildStatsOverview>(&json) {
-                return Ok(overview);
-            }
-        }
+            let total_messages: u64 = members.iter().map(|m| m.message_count).sum();
+            let total_voice_seconds: u64 = members.iter().map(|m| m.voice_seconds).sum();
+            let active_members = members.len() as u64;
 
-        // Fetch stats from DB
-        let members = self.stats_repo.find_by_guild(guild_id, 100).await?;
+            // Fetch infractions
+            let filters = InfractionFilters {
+                user_id: None,
+                action: None,
+                limit: 10000,
+                offset: 0,
+            };
+            let infractions = self.infraction_repo.find_by_guild(guild_id, &filters).await.unwrap_or_else(|e| {
+                warn!(error = %e, guild_id, "Echec chargement infractions pour stats overview");
+                vec![]
+            });
 
-        let total_messages: u64 = members.iter().map(|m| m.message_count).sum();
-        let total_voice_seconds: u64 = members.iter().map(|m| m.voice_seconds).sum();
-        let active_members = members.len() as u64;
+            let total_warns = infractions.iter().filter(|i| i.action.as_str() == "warn").count() as u64;
+            let total_mutes = infractions.iter().filter(|i| i.action.as_str() == "mute").count() as u64;
+            let total_bans = infractions.iter().filter(|i| i.action.as_str() == "ban").count() as u64;
 
-        // Fetch infractions
-        let filters = InfractionFilters {
-            user_id: None,
-            action: None,
-            limit: 10000,
-            offset: 0,
-        };
-        let infractions = self.infraction_repo.find_by_guild(guild_id, &filters).await.unwrap_or_else(|e| {
-            warn!(error = %e, guild_id, "Echec chargement infractions pour stats overview");
-            vec![]
-        });
+            let top_members: Vec<UserStats> = members.into_iter().take(10).collect();
 
-        let total_warns = infractions.iter().filter(|i| i.action.as_str() == "warn").count() as u64;
-        let total_mutes = infractions.iter().filter(|i| i.action.as_str() == "mute").count() as u64;
-        let total_bans = infractions.iter().filter(|i| i.action.as_str() == "ban").count() as u64;
-
-        let top_members: Vec<UserStats> = members.into_iter().take(10).collect();
-
-        let overview = GuildStatsOverview {
-            guild_id: guild_id.to_string(),
-            total_messages,
-            total_voice_seconds,
-            active_members,
-            total_infractions: infractions.len() as u64,
-            total_warns,
-            total_mutes,
-            total_bans,
-            top_members,
-        };
-
-        // Populate cache
-        if let Ok(json) = serde_json::to_string(&overview) {
-            if let Err(e) = self.cache.set_json(&cache_key, &json, OVERVIEW_TTL).await {
-                warn!(error = %e, cache_key = %cache_key, "Echec cache set stats overview");
-            }
-        }
-
-        Ok(overview)
+            Ok(GuildStatsOverview {
+                guild_id: guild_id.to_string(),
+                total_messages,
+                total_voice_seconds,
+                active_members,
+                total_infractions: infractions.len() as u64,
+                total_warns,
+                total_mutes,
+                total_bans,
+                top_members,
+            })
+        })
+        .await
     }
 
     async fn get_leaderboard(&self, guild_id: &str, limit: u32) -> Result<Vec<UserStats>, DomainError> {
@@ -237,40 +224,28 @@ impl ManageStatsUseCase for ManageStatsService {
 
     async fn get_guild_voice_stats(&self, guild_id: &str, days: u32, limit: u32) -> Result<GuildVoiceStats, DomainError> {
         let cache_key = format!("voice_stats:{guild_id}:{days}:{limit}");
+        cached_json(&self.cache, &cache_key, OVERVIEW_TTL, || async {
+            let channels = self.stats_repo.get_guild_voice_stats(guild_id, days, limit).await?;
+            let unique_users = self.stats_repo.count_unique_voice_users(guild_id, days).await?;
 
-        if let Some(json) = self.cache.get_json(&cache_key).await? {
-            if let Ok(stats) = serde_json::from_str::<GuildVoiceStats>(&json) {
-                return Ok(stats);
-            }
-        }
+            let total_channels = channels.len() as i64;
+            let total_sessions: i64 = channels.iter().map(|c| c.total_sessions).sum();
+            let total_duration_secs: i64 = channels.iter().map(|c| c.total_duration_secs).sum();
+            let avg_session_secs = if total_sessions > 0 { total_duration_secs / total_sessions } else { 0 };
+            let temp_channels = channels.iter().filter(|c| c.is_temporary).count() as i64;
+            let perm_channels = channels.iter().filter(|c| !c.is_temporary).count() as i64;
 
-        let channels = self.stats_repo.get_guild_voice_stats(guild_id, days, limit).await?;
-        let unique_users = self.stats_repo.count_unique_voice_users(guild_id, days).await?;
-
-        let total_channels = channels.len() as i64;
-        let total_sessions: i64 = channels.iter().map(|c| c.total_sessions).sum();
-        let total_duration_secs: i64 = channels.iter().map(|c| c.total_duration_secs).sum();
-        let avg_session_secs = if total_sessions > 0 { total_duration_secs / total_sessions } else { 0 };
-        let temp_channels = channels.iter().filter(|c| c.is_temporary).count() as i64;
-        let perm_channels = channels.iter().filter(|c| !c.is_temporary).count() as i64;
-
-        let stats = GuildVoiceStats {
-            total_channels,
-            total_sessions,
-            total_duration_secs,
-            unique_users,
-            avg_session_secs,
-            temp_channels,
-            perm_channels,
-            channels,
-        };
-
-        if let Ok(json) = serde_json::to_string(&stats) {
-            if let Err(e) = self.cache.set_json(&cache_key, &json, OVERVIEW_TTL).await {
-                warn!(error = %e, cache_key = %cache_key, "Echec cache set voice stats");
-            }
-        }
-
-        Ok(stats)
+            Ok(GuildVoiceStats {
+                total_channels,
+                total_sessions,
+                total_duration_secs,
+                unique_users,
+                avg_session_secs,
+                temp_channels,
+                perm_channels,
+                channels,
+            })
+        })
+        .await
     }
 }

@@ -1,13 +1,11 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelConfig,
-    VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme,
-    VoiceChannelWhitelistEntry,
+    VoiceChannel, VoiceChannelConfig, VoiceChannelDetail, VoiceChannelInviteLink,
+    VoiceChannelTheme, VoiceChannelWhitelistEntry,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::{
@@ -15,16 +13,22 @@ use crate::ports::inbound::{
     ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
     TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
 };
-use crate::adapters::outbound::cache_helpers::cached_json;
 use crate::ports::outbound::{BotConfigRepository, CachePort, VoiceChannelRepository};
 
-const CHANNELS_LIST_TTL: u64 = 60;
-const CHANNEL_DETAIL_TTL: u64 = 300;
+mod access_control;
+mod co_admin;
+mod config;
+mod crud;
+mod invite;
+mod theme;
+
+pub(crate) const CHANNELS_LIST_TTL: u64 = 60;
+pub(crate) const CHANNEL_DETAIL_TTL: u64 = 300;
 
 pub struct ManageVoiceChannelsService {
-    repo: Arc<dyn VoiceChannelRepository>,
-    cache: Arc<dyn CachePort>,
-    bot_config_repo: Arc<dyn BotConfigRepository>,
+    pub(super) repo: Arc<dyn VoiceChannelRepository>,
+    pub(super) cache: Arc<dyn CachePort>,
+    pub(super) bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ManageVoiceChannelsService {
@@ -36,7 +40,7 @@ impl ManageVoiceChannelsService {
         Self { repo, cache, bot_config_repo }
     }
 
-    fn generate_code() -> String {
+    pub(super) fn generate_code() -> String {
         use rand::Rng;
         rand::thread_rng()
             .sample_iter(&rand::distributions::Alphanumeric)
@@ -47,7 +51,7 @@ impl ManageVoiceChannelsService {
     }
 
     /// Genere un code unique avec retry en cas de collision (UNIQUE constraint en DB).
-    async fn generate_unique_code(&self) -> Result<String, DomainError> {
+    pub(super) async fn generate_unique_code(&self) -> Result<String, DomainError> {
         for _ in 0..5 {
             let code = Self::generate_code();
             // Verifier si le code existe deja
@@ -58,7 +62,7 @@ impl ManageVoiceChannelsService {
         Err(DomainError::Internal("Impossible de generer un code unique apres 5 tentatives".to_string()))
     }
 
-    fn validate_theme(cmd: &CreateThemeCommand) -> Result<(), DomainError> {
+    pub(super) fn validate_theme(cmd: &CreateThemeCommand) -> Result<(), DomainError> {
         if cmd.name.trim().is_empty() {
             return Err(DomainError::ValidationError("Le nom du theme est obligatoire".to_string()));
         }
@@ -87,7 +91,7 @@ impl ManageVoiceChannelsService {
         Ok(())
     }
 
-    async fn invalidate_cache(&self, guild_id: &str, channel_id: &str) {
+    pub(super) async fn invalidate_cache(&self, guild_id: &str, channel_id: &str) {
         if let Err(e) = self.cache.invalidate(&format!("voice_channels:{guild_id}")).await {
             tracing::warn!(error = %e, guild_id, "Echec invalidation cache voice_channels");
         }
@@ -96,7 +100,7 @@ impl ManageVoiceChannelsService {
         }
     }
 
-    async fn resolve_channel(&self, channel_id: &str) -> Result<VoiceChannel, DomainError> {
+    pub(super) async fn resolve_channel(&self, channel_id: &str) -> Result<VoiceChannel, DomainError> {
         self.repo
             .find_by_channel_id(channel_id)
             .await?
@@ -107,383 +111,123 @@ impl ManageVoiceChannelsService {
 #[async_trait]
 impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
     async fn list_all_channels(&self) -> Result<Vec<VoiceChannel>, DomainError> {
-        self.repo.find_all().await
+        self.list_all_channels_impl().await
     }
 
     async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError> {
-        let cache_key = format!("voice_channels:{guild_id}");
-        cached_json(&self.cache, &cache_key, CHANNELS_LIST_TTL, || async {
-            self.repo.find_all_by_guild(guild_id).await
-        })
-        .await
+        self.list_channels_impl(guild_id).await
     }
 
     async fn list_history_channels(&self, guild_id: &str, limit: i64) -> Result<Vec<VoiceChannel>, DomainError> {
-        // Historique : pas de cache — donnees moins sollicitees et
-        // fraicheur preferable.
-        self.repo.find_closed_by_guild(guild_id, limit).await
+        self.list_history_channels_impl(guild_id, limit).await
     }
 
     async fn get_channel_detail(&self, channel_id: &str) -> Result<VoiceChannelDetail, DomainError> {
-        let cache_key = format!("voice_channel:{channel_id}");
-        cached_json(&self.cache, &cache_key, CHANNEL_DETAIL_TTL, || async {
-            let channel = self.resolve_channel(channel_id).await?;
-            let co_admins = self.repo.find_co_admins(channel.id).await?;
-            let bans = self.repo.find_bans(channel.id).await?;
-            let invite_links = self.repo.find_invite_links(channel.id).await?;
-            Ok(VoiceChannelDetail { channel, co_admins, bans, invite_links })
-        })
-        .await
+        self.get_channel_detail_impl(channel_id).await
     }
 
     async fn create_channel(&self, cmd: CreateVoiceChannelCommand) -> Result<VoiceChannel, DomainError> {
-        let channel = VoiceChannel {
-            id: Uuid::new_v4(),
-            guild_id: cmd.guild_id,
-            owner_id: cmd.owner_id,
-            owner_name: cmd.owner_name,
-            channel_id: cmd.channel_id,
-            text_channel_id: cmd.text_channel_id,
-            members_channel_id: cmd.members_channel_id,
-            queue_channel_id: cmd.queue_channel_id,
-            category_id: cmd.category_id,
-            channel_name: cmd.channel_name,
-            kind: crate::domain::value_objects::VoiceChannelKind::from_str_lossy(&cmd.kind),
-            visibility: cmd.visibility,
-            queue_enabled: cmd.queue_enabled,
-            locked: false,
-            stage_enabled: cmd.stage_enabled,
-            member_limit: None,
-            status: None,
-            channel_status: "open".to_string(),
-            closed_at: None,
-            created_at: Utc::now(),
-        };
-
-        self.repo.save(&channel).await?;
-        if let Err(e) = self.cache.invalidate(&format!("voice_channels:{}", channel.guild_id)).await {
-            tracing::warn!(error = %e, guild_id = %channel.guild_id, "Echec invalidation cache voice_channels apres creation");
-        }
-
-        Ok(channel)
+        self.create_channel_impl(cmd).await
     }
 
     async fn close_channel(&self, channel_id: &str) -> Result<(), DomainError> {
-        self.repo.close_by_channel_id(channel_id).await?;
-        // Invalider le cache — on essaie de résoudre le channel pour le guild_id
-        if let Ok(channel) = self.resolve_channel(channel_id).await {
-            self.invalidate_cache(&channel.guild_id, channel_id).await;
-        }
-        Ok(())
+        self.close_channel_impl(channel_id).await
     }
 
     async fn delete_channel(&self, channel_id: &str) -> Result<(), DomainError> {
-        // Soft-delete : close au lieu de supprimer
-        self.close_channel(channel_id).await
+        self.delete_channel_impl(channel_id).await
     }
 
     async fn update_channel(&self, cmd: UpdateVoiceChannelCommand) -> Result<(), DomainError> {
-        let channel = self.resolve_channel(&cmd.channel_id).await?;
-
-        if let Some(vis) = &cmd.visibility {
-            self.repo.update_visibility(channel.id, vis).await?;
-        }
-        if let Some(locked) = cmd.locked {
-            self.repo.update_locked(channel.id, locked).await?;
-        }
-        if let Some(queue_enabled) = cmd.queue_enabled {
-            self.repo.update_queue_enabled(channel.id, queue_enabled).await?;
-        }
-        if let Some(name) = &cmd.name {
-            self.repo.update_name(channel.id, name).await?;
-        }
-        if let Some(status) = &cmd.status {
-            self.repo.update_status(channel.id, Some(status)).await?;
-        }
-        if let Some(limit) = cmd.member_limit {
-            self.repo.update_member_limit(channel.id, limit).await?;
-        }
-        if let Some(queue_ch) = &cmd.queue_channel_id {
-            self.repo.update_queue_channel(channel.id, queue_ch.as_deref()).await?;
-        }
-        if let Some(stage) = cmd.stage_enabled {
-            self.repo.update_stage(channel.id, stage).await?;
-        }
-
-        self.invalidate_cache(&channel.guild_id, &cmd.channel_id).await;
-        Ok(())
+        self.update_channel_impl(cmd).await
     }
 
     async fn transfer_ownership(&self, cmd: TransferOwnershipCommand) -> Result<(), DomainError> {
-        let channel = self.resolve_channel(&cmd.channel_id).await?;
-        self.repo.update_owner(channel.id, &cmd.new_owner_id, &cmd.new_owner_name).await?;
-        self.invalidate_cache(&channel.guild_id, &cmd.channel_id).await;
-        Ok(())
+        self.transfer_ownership_impl(cmd).await
     }
 
     async fn add_co_admin(&self, cmd: ManageCoAdminCommand) -> Result<(), DomainError> {
-        let channel = self.resolve_channel(&cmd.channel_id).await?;
-
-        let co_admin = VoiceChannelCoAdmin {
-            id: Uuid::new_v4(),
-            voice_channel_id: channel.id,
-            user_id: cmd.user_id,
-            user_name: cmd.user_name,
-            granted_at: Utc::now(),
-        };
-
-        self.repo.add_co_admin(&co_admin).await?;
-        self.invalidate_cache(&channel.guild_id, &cmd.channel_id).await;
-        Ok(())
+        self.add_co_admin_impl(cmd).await
     }
 
     async fn remove_co_admin(&self, channel_id: &str, user_id: &str) -> Result<(), DomainError> {
-        let channel = self.resolve_channel(channel_id).await?;
-        self.repo.remove_co_admin(channel.id, user_id).await?;
-        self.invalidate_cache(&channel.guild_id, channel_id).await;
-        Ok(())
+        self.remove_co_admin_impl(channel_id, user_id).await
     }
 
     async fn get_whitelist(&self, guild_id: &str, owner_id: &str) -> Result<Vec<VoiceChannelWhitelistEntry>, DomainError> {
-        self.repo.find_whitelist(guild_id, owner_id).await
+        self.get_whitelist_impl(guild_id, owner_id).await
     }
 
     async fn add_to_whitelist(&self, cmd: ManageWhitelistCommand) -> Result<(), DomainError> {
-        let entry = VoiceChannelWhitelistEntry {
-            id: Uuid::new_v4(),
-            guild_id: cmd.guild_id,
-            owner_id: cmd.owner_id,
-            target_id: cmd.target_id,
-            target_name: cmd.target_name,
-            created_at: Utc::now(),
-        };
-
-        self.repo.add_to_whitelist(&entry).await
+        self.add_to_whitelist_impl(cmd).await
     }
 
     async fn remove_from_whitelist(&self, guild_id: &str, owner_id: &str, target_id: &str) -> Result<(), DomainError> {
-        self.repo.remove_from_whitelist(guild_id, owner_id, target_id).await
+        self.remove_from_whitelist_impl(guild_id, owner_id, target_id).await
     }
 
     async fn ban_from_channel(&self, cmd: BanFromChannelCommand) -> Result<(), DomainError> {
-        let channel = self.resolve_channel(&cmd.channel_id).await?;
-
-        let expires_at = cmd.duration_secs.map(|secs| Utc::now() + chrono::Duration::seconds(secs));
-
-        let ban = VoiceChannelBan {
-            id: Uuid::new_v4(),
-            voice_channel_id: channel.id,
-            user_id: cmd.user_id,
-            user_name: cmd.user_name,
-            banned_by: cmd.banned_by,
-            reason: cmd.reason,
-            expires_at,
-            created_at: Utc::now(),
-        };
-
-        self.repo.save_ban(&ban).await?;
-        self.invalidate_cache(&channel.guild_id, &cmd.channel_id).await;
-        Ok(())
+        self.ban_from_channel_impl(cmd).await
     }
 
     async fn unban_from_channel(&self, channel_id: &str, user_id: &str) -> Result<(), DomainError> {
-        let channel = self.resolve_channel(channel_id).await?;
-        self.repo.remove_ban(channel.id, user_id).await?;
-        self.invalidate_cache(&channel.guild_id, channel_id).await;
-        Ok(())
+        self.unban_from_channel_impl(channel_id, user_id).await
     }
 
     async fn is_banned(&self, channel_id: &str, user_id: &str) -> Result<bool, DomainError> {
-        let channel = self.resolve_channel(channel_id).await?;
-        let ban = self.repo.find_active_ban(channel.id, user_id).await?;
-        Ok(ban.is_some())
+        self.is_banned_impl(channel_id, user_id).await
     }
 
     // ── Invite Links ──
 
     async fn create_invite_link(&self, cmd: CreateInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> {
-        let channel = self.resolve_channel(&cmd.channel_id).await?;
-        let duration_secs = cmd.duration_secs.unwrap_or(1800);
-        let expires_at = Utc::now() + chrono::Duration::seconds(duration_secs);
-        let code = self.generate_unique_code().await?;
-
-        let link = VoiceChannelInviteLink {
-            id: Uuid::new_v4(),
-            voice_channel_id: channel.id,
-            guild_id: channel.guild_id.clone(),
-            channel_id: channel.channel_id.clone(),
-            created_by: cmd.created_by,
-            created_by_name: cmd.created_by_name,
-            code,
-            max_uses: cmd.max_uses,
-            current_uses: 0,
-            expires_at,
-            revoked: false,
-            created_at: Utc::now(),
-        };
-
-        self.repo.save_invite_link(&link).await?;
-        self.invalidate_cache(&channel.guild_id, &cmd.channel_id).await;
-
-        Ok(link)
+        self.create_invite_link_impl(cmd).await
     }
 
     async fn list_invite_links(&self, channel_id: &str) -> Result<Vec<VoiceChannelInviteLink>, DomainError> {
-        let channel = self.resolve_channel(channel_id).await?;
-        self.repo.find_invite_links(channel.id).await
+        self.list_invite_links_impl(channel_id).await
     }
 
     async fn use_invite_link(&self, cmd: UseInviteLinkCommand) -> Result<VoiceChannelInviteLink, DomainError> {
-        let mut link = self.repo
-            .find_invite_by_code(&cmd.code)
-            .await?
-            .ok_or_else(|| DomainError::NotFound(format!("Code d'invitation invalide : {}", cmd.code)))?;
-
-        if link.revoked {
-            return Err(DomainError::ValidationError("Ce lien d'invitation a ete revoque".to_string()));
-        }
-        if link.expires_at < Utc::now() {
-            return Err(DomainError::ValidationError("Ce lien d'invitation a expire".to_string()));
-        }
-
-        let incremented = self.repo.increment_invite_uses(link.id).await?;
-        if !incremented {
-            return Err(DomainError::ValidationError("Ce lien d'invitation n'est plus utilisable (limite atteinte ou expire)".to_string()));
-        }
-
-        // Mettre a jour current_uses pour refléter l'increment
-        link.current_uses += 1;
-
-        // Whitelist the user
-        let channel = self.resolve_channel(&link.channel_id).await?;
-        let entry = VoiceChannelWhitelistEntry {
-            id: Uuid::new_v4(),
-            guild_id: link.guild_id.clone(),
-            owner_id: channel.owner_id.clone(),
-            target_id: cmd.user_id,
-            target_name: cmd.user_name,
-            created_at: Utc::now(),
-        };
-        self.repo.add_to_whitelist(&entry).await?;
-        self.invalidate_cache(&link.guild_id, &link.channel_id).await;
-
-        Ok(link)
+        self.use_invite_link_impl(cmd).await
     }
 
     async fn revoke_invite_link(&self, channel_id: &str, link_id: &str) -> Result<(), DomainError> {
-        let channel = self.resolve_channel(channel_id).await?;
-        let id = Uuid::parse_str(link_id)
-            .map_err(|_| DomainError::ValidationError(format!("ID invalide : {link_id}")))?;
-        self.repo.revoke_invite_link(id).await?;
-        self.invalidate_cache(&channel.guild_id, channel_id).await;
-        Ok(())
+        self.revoke_invite_link_impl(channel_id, link_id).await
     }
 
     // ── Config voice-bot par guild ──
 
     async fn get_voice_config(&self, guild_id: &str) -> Result<VoiceChannelConfig, DomainError> {
-        let entries = self.bot_config_repo.get_config(guild_id, "voice-bot").await?;
-        let pairs: Vec<(String, String)> = entries
-            .into_iter()
-            .map(|e| (e.config_key, e.config_value))
-            .collect();
-        Ok(VoiceChannelConfig::from_kv_pairs(&pairs))
+        self.get_voice_config_impl(guild_id).await
     }
 
     // ── Themes ──
 
     async fn list_themes(&self, guild_id: &str) -> Result<Vec<VoiceChannelTheme>, DomainError> {
-        self.repo.find_themes(guild_id).await
+        self.list_themes_impl(guild_id).await
     }
 
     async fn create_theme(&self, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
-        Self::validate_theme(&cmd)?;
-
-        if cmd.is_default {
-            self.repo.clear_default_themes(&cmd.guild_id).await?;
-        }
-
-        let theme = VoiceChannelTheme {
-            id: Uuid::new_v4(),
-            guild_id: cmd.guild_id,
-            name: cmd.name,
-            emoji: cmd.emoji,
-            channel_name_template: cmd.channel_name_template,
-            member_limit: cmd.member_limit,
-            visibility: cmd.visibility,
-            locked: cmd.locked,
-            queue_enabled: cmd.queue_enabled,
-            bitrate: cmd.bitrate,
-            slowmode_secs: cmd.slowmode_secs,
-            stage_enabled: cmd.stage_enabled,
-            is_default: cmd.is_default,
-            sort_order: cmd.sort_order,
-            created_at: Utc::now(),
-        };
-
-        self.repo.save_theme(&theme).await?;
-        Ok(theme)
+        self.create_theme_impl(cmd).await
     }
 
     async fn update_theme(&self, theme_id: &str, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
-        Self::validate_theme(&cmd)?;
-
-        let id = Uuid::parse_str(theme_id)
-            .map_err(|_| DomainError::ValidationError(format!("ID invalide : {theme_id}")))?;
-
-        let existing = self.repo.find_theme(id).await?
-            .ok_or_else(|| DomainError::NotFound(format!("Theme introuvable : {theme_id}")))?;
-
-        // Verifier que le theme appartient au bon guild
-        if existing.guild_id != cmd.guild_id {
-            return Err(DomainError::ValidationError("Ce theme n'appartient pas a ce serveur".to_string()));
-        }
-
-        if cmd.is_default {
-            self.repo.clear_default_themes(&existing.guild_id).await?;
-        }
-
-        let theme = VoiceChannelTheme {
-            id,
-            guild_id: existing.guild_id,
-            name: cmd.name,
-            emoji: cmd.emoji,
-            channel_name_template: cmd.channel_name_template,
-            member_limit: cmd.member_limit,
-            visibility: cmd.visibility,
-            locked: cmd.locked,
-            queue_enabled: cmd.queue_enabled,
-            bitrate: cmd.bitrate,
-            slowmode_secs: cmd.slowmode_secs,
-            stage_enabled: cmd.stage_enabled,
-            is_default: cmd.is_default,
-            sort_order: cmd.sort_order,
-            created_at: existing.created_at,
-        };
-
-        self.repo.update_theme(&theme).await?;
-        Ok(theme)
+        self.update_theme_impl(theme_id, cmd).await
     }
 
     async fn delete_theme(&self, guild_id: &str, theme_id: &str) -> Result<(), DomainError> {
-        let id = Uuid::parse_str(theme_id)
-            .map_err(|_| DomainError::ValidationError(format!("ID invalide : {theme_id}")))?;
-
-        // Verifier que le theme appartient au bon guild
-        let existing = self.repo.find_theme(id).await?
-            .ok_or_else(|| DomainError::NotFound(format!("Theme introuvable : {theme_id}")))?;
-
-        if existing.guild_id != guild_id {
-            return Err(DomainError::ValidationError("Ce theme n'appartient pas a ce serveur".to_string()));
-        }
-
-        self.repo.delete_theme(id).await
+        self.delete_theme_impl(guild_id, theme_id).await
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::Utc;
+    use crate::domain::entities::{
+        VoiceChannelBan, VoiceChannelCoAdmin,
+    };
 
     fn make_theme_cmd(name: &str) -> CreateThemeCommand {
         CreateThemeCommand {

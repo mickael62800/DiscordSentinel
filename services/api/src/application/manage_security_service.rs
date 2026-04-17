@@ -12,6 +12,7 @@ use crate::ports::inbound::{
     AnalyzeNewMemberCommand, CreateAuditLogCommand, ManageAuditLogsUseCase,
     ManageSecurityUseCase, ReportSecurityEventCommand, SecurityDecision,
 };
+use crate::adapters::outbound::cache_helpers::cached_json;
 use crate::ports::outbound::{
     BotConfigRepository, CachePort, ModerationRepository, SecurityEventRepository,
     WatchedUserRepository,
@@ -243,26 +244,13 @@ impl ManageSecurityUseCase for ManageSecurityService {
             None => "security:all".to_string(),
         };
 
-        // Cache-first
-        if let Some(json) = self.cache.get_json(&cache_key).await? {
-            if let Ok(events) = serde_json::from_str::<Vec<SecurityEvent>>(&json) {
-                return Ok(events);
+        cached_json(&self.cache, &cache_key, EVENTS_TTL, || async {
+            match guild_id {
+                Some(gid) => self.repo.find_by_guild(gid).await,
+                None => self.repo.find_all().await,
             }
-        }
-
-        let events = match guild_id {
-            Some(gid) => self.repo.find_by_guild(gid).await?,
-            None => self.repo.find_all().await?,
-        };
-
-        // Populate cache
-        if let Ok(json) = serde_json::to_string(&events) {
-            if let Err(e) = self.cache.set_json(&cache_key, &json, EVENTS_TTL).await {
-                warn!(error = %e, cache_key = %cache_key, "Echec cache set security events");
-            }
-        }
-
-        Ok(events)
+        })
+        .await
     }
 }
 

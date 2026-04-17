@@ -11,6 +11,7 @@ use crate::ports::inbound::{
 };
 use tracing::warn;
 
+use crate::adapters::outbound::cache_helpers::cached_json;
 use crate::ports::outbound::{CachePort, TicketRepository};
 
 const TICKETS_LIST_TTL: u64 = 60; // 1 minute
@@ -73,35 +74,21 @@ impl ManageTicketsUseCase for ManageTicketsService {
 
     async fn get_ticket_detail(&self, id: &str) -> Result<TicketDetail, DomainError> {
         let cache_key = format!("ticket:{id}");
+        cached_json(&self.cache, &cache_key, TICKET_DETAIL_TTL, || async {
+            let uuid = id
+                .parse::<Uuid>()
+                .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {id}")))?;
 
-        // Cache-first
-        if let Some(json) = self.cache.get_json(&cache_key).await? {
-            if let Ok(detail) = serde_json::from_str::<TicketDetail>(&json) {
-                return Ok(detail);
-            }
-        }
+            let ticket = self
+                .ticket_repo
+                .find_by_id(uuid)
+                .await?
+                .ok_or(DomainError::Internal(format!("Ticket introuvable : {id}")))?;
 
-        let uuid = id
-            .parse::<Uuid>()
-            .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {id}")))?;
-
-        let ticket = self
-            .ticket_repo
-            .find_by_id(uuid)
-            .await?
-            .ok_or(DomainError::Internal(format!("Ticket introuvable : {id}")))?;
-
-        let messages = self.ticket_repo.find_messages(uuid).await?;
-        let detail = TicketDetail { ticket, messages };
-
-        // Populate cache
-        if let Ok(json) = serde_json::to_string(&detail) {
-            if let Err(e) = self.cache.set_json(&cache_key, &json, TICKET_DETAIL_TTL).await {
-                warn!(error = %e, cache_key = %cache_key, "Echec cache set ticket detail");
-            }
-        }
-
-        Ok(detail)
+            let messages = self.ticket_repo.find_messages(uuid).await?;
+            Ok(TicketDetail { ticket, messages })
+        })
+        .await
     }
 
     async fn create_ticket(&self, cmd: CreateTicketCommand) -> Result<Ticket, DomainError> {

@@ -12,6 +12,7 @@ use crate::ports::inbound::{
 };
 use tracing::warn;
 
+use crate::adapters::outbound::cache_helpers::cached_json;
 use crate::ports::outbound::{CachePort, ModerationRepository, StrikeRepository};
 
 const HISTORY_TTL: u64 = 180; // 3 minutes
@@ -168,38 +169,24 @@ impl ManageModerationUseCase for ManageModerationService {
 
     async fn get_history(&self, guild_id: &str, target_id: &str) -> Result<UserModerationHistory, DomainError> {
         let cache_key = format!("modhistory:{guild_id}:{target_id}");
+        cached_json(&self.cache, &cache_key, HISTORY_TTL, || async {
+            let actions = self.repo.find_by_target(guild_id, target_id, 500).await?;
+            let target_name = actions.first().map(|a| a.target_name.clone()).unwrap_or_default();
 
-        // Cache-first
-        if let Some(json) = self.cache.get_json(&cache_key).await? {
-            if let Ok(history) = serde_json::from_str::<UserModerationHistory>(&json) {
-                return Ok(history);
-            }
-        }
+            let total_warns = actions.iter().filter(|a| a.action_type == "warn").count() as u32;
+            let total_mutes = actions.iter().filter(|a| a.action_type.starts_with("mute")).count() as u32;
+            let total_bans = actions.iter().filter(|a| a.action_type.starts_with("ban")).count() as u32;
 
-        let actions = self.repo.find_by_target(guild_id, target_id, 500).await?;
-        let target_name = actions.first().map(|a| a.target_name.clone()).unwrap_or_default();
-
-        let total_warns = actions.iter().filter(|a| a.action_type == "warn").count() as u32;
-        let total_mutes = actions.iter().filter(|a| a.action_type.starts_with("mute")).count() as u32;
-        let total_bans = actions.iter().filter(|a| a.action_type.starts_with("ban")).count() as u32;
-
-        let history = UserModerationHistory {
-            target_id: target_id.to_string(),
-            target_name,
-            total_warns,
-            total_mutes,
-            total_bans,
-            actions,
-        };
-
-        // Populate cache
-        if let Ok(json) = serde_json::to_string(&history) {
-            if let Err(e) = self.cache.set_json(&cache_key, &json, HISTORY_TTL).await {
-                warn!(error = %e, cache_key = %cache_key, "Echec cache set mod history");
-            }
-        }
-
-        Ok(history)
+            Ok(UserModerationHistory {
+                target_id: target_id.to_string(),
+                target_name,
+                total_warns,
+                total_mutes,
+                total_bans,
+                actions,
+            })
+        })
+        .await
     }
 
     async fn list_bans(&self, guild_id: Option<&str>, limit: i64, offset: i64) -> Result<Vec<ModerationAction>, DomainError> {
