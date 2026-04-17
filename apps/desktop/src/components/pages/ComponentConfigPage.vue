@@ -50,6 +50,14 @@ function isWorker(botName: string): boolean {
   return workerNames.includes(botName);
 }
 
+const moduleDefinitions = computed(() =>
+  definitions.value.filter((d) => !isWorker(d.bot_name)),
+);
+
+const workerDefinitions = computed(() =>
+  definitions.value.filter((d) => isWorker(d.bot_name)),
+);
+
 const selectedDefinition = computed(() =>
   definitions.value.find((d) => d.bot_name === selectedComponent.value) ?? null,
 );
@@ -239,51 +247,89 @@ watch(selectedComponent, loadFormValues);
         <span class="server-name">{{ selectedGuild?.name }}</span>
       </div>
 
-      <!-- Grid of all components (modules + workers) — 3 colonnes -->
-      <div class="component-grid">
-        <div
-          v-for="def in definitions"
-          :key="def.bot_name"
-          class="component-card"
-          :class="{ active: selectedComponent === def.bot_name }"
-          @click="selectComponent(def.bot_name)"
-        >
-          <div class="component-card-header">
-            <div class="component-name">{{ def.display_name }}</div>
-            <div class="component-badges">
-              <span
-                v-if="needsToken(def.bot_name)"
-                class="token-badge"
-                :class="tokenMap[def.bot_name] ? 'token-ok' : 'token-missing'"
-              >
-                {{ tokenMap[def.bot_name] ? 'Token OK' : 'Pas de token' }}
-              </span>
-              <AppBadge
-                v-if="isWorker(def.bot_name)"
-                label="Worker"
-                variant="warning"
-              />
-              <AppBadge
-                v-else
-                label="Module"
-                variant="info"
-              />
-            </div>
-          </div>
-          <div class="component-desc">{{ def.description }}</div>
-          <div class="component-params">
-            {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
-          </div>
-
-          <!-- Gestion du token (composant dédié) -->
-          <BotTokenManager
-            v-if="needsToken(def.bot_name)"
-            :bot-name="def.bot_name"
-            :has-token="!!tokenMap[def.bot_name]"
-            @updated="fetchTokens"
-          />
+      <!-- Section Modules -->
+      <section class="component-section">
+        <div class="section-header">
+          <h2 class="section-heading">Modules</h2>
+          <span class="section-count">{{ moduleDefinitions.length }}</span>
         </div>
-      </div>
+        <div class="component-grid">
+          <div
+            v-for="def in moduleDefinitions"
+            :key="def.bot_name"
+            class="component-card"
+            :class="{ active: selectedComponent === def.bot_name }"
+            @click="selectComponent(def.bot_name)"
+          >
+            <div class="component-card-header">
+              <div class="component-name">{{ def.display_name }}</div>
+              <div class="component-badges">
+                <span
+                  v-if="needsToken(def.bot_name)"
+                  class="token-badge"
+                  :class="tokenMap[def.bot_name] ? 'token-ok' : 'token-missing'"
+                >
+                  {{ tokenMap[def.bot_name] ? 'Token OK' : 'Pas de token' }}
+                </span>
+                <AppBadge label="Module" variant="info" />
+              </div>
+            </div>
+            <div class="component-desc">{{ def.description }}</div>
+            <div class="component-params">
+              {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
+            </div>
+
+            <BotTokenManager
+              v-if="needsToken(def.bot_name)"
+              :bot-name="def.bot_name"
+              :has-token="!!tokenMap[def.bot_name]"
+              @updated="fetchTokens"
+            />
+          </div>
+        </div>
+      </section>
+
+      <!-- Section Workers -->
+      <section class="component-section">
+        <div class="section-header">
+          <h2 class="section-heading">Workers</h2>
+          <span class="section-count">{{ workerDefinitions.length }}</span>
+        </div>
+        <div class="component-grid">
+          <div
+            v-for="def in workerDefinitions"
+            :key="def.bot_name"
+            class="component-card"
+            :class="{ active: selectedComponent === def.bot_name }"
+            @click="selectComponent(def.bot_name)"
+          >
+            <div class="component-card-header">
+              <div class="component-name">{{ def.display_name }}</div>
+              <div class="component-badges">
+                <span
+                  v-if="needsToken(def.bot_name)"
+                  class="token-badge"
+                  :class="tokenMap[def.bot_name] ? 'token-ok' : 'token-missing'"
+                >
+                  {{ tokenMap[def.bot_name] ? 'Token OK' : 'Pas de token' }}
+                </span>
+                <AppBadge label="Worker" variant="warning" />
+              </div>
+            </div>
+            <div class="component-desc">{{ def.description }}</div>
+            <div class="component-params">
+              {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
+            </div>
+
+            <BotTokenManager
+              v-if="needsToken(def.bot_name)"
+              :bot-name="def.bot_name"
+              :has-token="!!tokenMap[def.bot_name]"
+              @updated="fetchTokens"
+            />
+          </div>
+        </div>
+      </section>
 
       <!-- Config form -->
       <div v-if="selectedDefinition" class="config-form">
@@ -596,11 +642,41 @@ watch(selectedComponent, loadFormValues);
   color: var(--text-primary);
 }
 
+.component-section {
+  margin-bottom: 24px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.section-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
 .component-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
-  margin-bottom: 24px;
 }
 
 .component-card {

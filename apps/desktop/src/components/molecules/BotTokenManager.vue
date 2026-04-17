@@ -48,7 +48,7 @@ async function save() {
 async function remove() {
   const ok = await confirm({
     title: "Supprimer le token",
-    message: "Voulez-vous vraiment supprimer ce token de bot ?",
+    message: "Voulez-vous vraiment supprimer ce token de module ?",
   });
   if (!ok) return;
   try {
