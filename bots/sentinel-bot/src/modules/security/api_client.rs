@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
+use sentinel_shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::members::v1 as proto_members;
 use sentinel_proto::security::v1 as proto_security;
@@ -277,10 +277,4 @@ fn member_payload_to_proto(p: &MemberPayload) -> Result<proto_members::GuildMemb
     })
 }
 
-fn grpc_err_to_string(e: GrpcCallError) -> String {
-    match e {
-        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
-        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
-        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
-    }
-}
+use sentinel_shared::grpc_client::grpc_err_to_string;

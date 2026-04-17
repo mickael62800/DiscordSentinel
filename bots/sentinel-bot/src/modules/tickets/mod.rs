@@ -26,6 +26,7 @@ use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::discord_helpers::is_module_enabled;
 use sentinel_shared::embeds::neutral_embed;
 use sentinel_shared::grpc_client::SentinelGrpcClient;
 use sentinel_shared::heartbeat::ApiClientKey;
@@ -45,6 +46,14 @@ impl TypeMapKey for SlaTrackerKey {
 // Re-export pour l'insertion dans le TypeMap depuis main.rs
 pub use config::TicketsConfig;
 
+// ── Init TypeMapKeys ──
+
+/// Insere les TypeMapKeys du module tickets.
+pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
+    data.insert::<config::ConfigKey>(TicketsConfig::from_env());
+    data.insert::<SlaTrackerKey>(sla::SlaTracker::new());
+}
+
 // ── Slash commands ──
 
 pub fn register_commands() -> Vec<CreateCommand> {
@@ -53,20 +62,9 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if command.data.name.as_str() == "ticket" {
-        // Check enabled flag (comme l'ex-handler du ticket-bot)
         if let Some(guild_id) = command.guild_id {
-            let data = ctx.data.read().await;
-            if let Some(api) = data.get::<ApiClientKey>() {
-                let config = match api.get_guild_config(&guild_id.to_string()).await {
-                    Ok(cfg) => cfg,
-                    Err(e) => {
-                        warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
-                        std::collections::HashMap::new()
-                    }
-                };
-                if !BaseApiClient::config_bool(&config, "enabled", true) {
-                    return;
-                }
+            if !is_module_enabled(ctx, &guild_id.to_string()).await {
+                return;
             }
         }
         ticket::handle(ctx, command).await;
@@ -97,20 +95,9 @@ pub fn handles_component(cid: &str) -> bool {
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     let cid = component.data.custom_id.as_str();
 
-    // Check enabled flag
     if let Some(guild_id) = component.guild_id {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            let config = match api.get_guild_config(&guild_id.to_string()).await {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
-                    std::collections::HashMap::new()
-                }
-            };
-            if !BaseApiClient::config_bool(&config, "enabled", true) {
-                return;
-            }
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
         }
     }
 
@@ -147,18 +134,8 @@ pub fn handles_modal(cid: &str) -> bool {
 
 pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
     if let Some(guild_id) = modal.guild_id {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            let config = match api.get_guild_config(&guild_id.to_string()).await {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
-                    std::collections::HashMap::new()
-                }
-            };
-            if !BaseApiClient::config_bool(&config, "enabled", true) {
-                return;
-            }
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
         }
     }
 
@@ -171,18 +148,8 @@ pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
 
 pub async fn on_message(ctx: &Context, msg: &Message) {
     if let Some(guild_id) = msg.guild_id {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            let config = match api.get_guild_config(&guild_id.to_string()).await {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
-                    std::collections::HashMap::new()
-                }
-            };
-            if !BaseApiClient::config_bool(&config, "enabled", true) {
-                return;
-            }
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
         }
     }
 

@@ -5,9 +5,10 @@
 
 use serenity::all::{
     ChannelType, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
-    CreateCommand, CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    Permissions,
+    CreateCommand, CreateCommandOption, Permissions,
 };
+
+use sentinel_shared::discord_helpers::reply_ephemeral;
 
 use crate::modules::coude::GameApiKey;
 
@@ -67,20 +68,4 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         None => "\u{1f6d1} Salon des railleries retire. La feature est maintenant desactivee.".into(),
     };
     reply_ephemeral(ctx, command, &msg).await;
-}
-
-async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
 }

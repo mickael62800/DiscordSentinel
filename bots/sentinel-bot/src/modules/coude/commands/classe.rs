@@ -4,6 +4,10 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
+use sentinel_shared::discord_helpers::{
+    component_reply_ephemeral as reply_component_ephemeral, reply_ephemeral,
+};
+
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
@@ -241,34 +245,6 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
                 CreateInteractionResponseMessage::new()
                     .embed(embed)
                     .components(vec![]),
-            ),
-        )
-        .await
-        .ok();
-}
-
-async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-        .ok();
-}
-
-async fn reply_component_ephemeral(ctx: &Context, component: &ComponentInteraction, content: &str) {
-    component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
             ),
         )
         .await

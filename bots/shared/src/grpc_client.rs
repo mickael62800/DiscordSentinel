@@ -71,6 +71,17 @@ pub enum GrpcCallError {
     Transport(#[from] tonic::transport::Error),
 }
 
+/// Format de secours reutilisable pour convertir un `GrpcCallError` en String.
+/// La plupart des api_clients de modules s'en contentent ; blackjack a une
+/// version custom qui nettoie les messages pour l'affichage utilisateur.
+pub fn grpc_err_to_string(e: GrpcCallError) -> String {
+    match e {
+        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
+        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
+        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
+    }
+}
+
 /// Client gRPC partage. Cloneable a moindre cout (Channel = Arc en interne).
 #[derive(Clone)]
 pub struct SentinelGrpcClient {

@@ -520,13 +520,7 @@ fn proto_user_stats_to_response(u: proto_stats::UserStats) -> UserStatsResponse 
     }
 }
 
-fn grpc_err_to_string(e: GrpcCallError) -> String {
-    match e {
-        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
-        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
-        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
-    }
-}
+use sentinel_shared::grpc_client::grpc_err_to_string;
 
 // On garde l'ancienne structure inutilisee mais conservee pour compat eventuelle.
 #[derive(Debug, Serialize)]

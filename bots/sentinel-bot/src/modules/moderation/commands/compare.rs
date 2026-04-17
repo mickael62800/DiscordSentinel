@@ -181,7 +181,7 @@ async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::super::super::api_client::ModerationActionResponse;
+    use crate::modules::moderation::api_client::ModerationActionResponse;
 
     fn mk_history(name: &str, warns: u32, mutes: u32, bans: u32) -> UserHistory {
         UserHistory {

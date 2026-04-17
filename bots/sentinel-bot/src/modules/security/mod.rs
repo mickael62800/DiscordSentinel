@@ -135,6 +135,36 @@ impl SecurityConfig {
     }
 }
 
+// ── Init TypeMapKeys ──
+
+use std::sync::Arc;
+
+/// Insere tous les TypeMapKeys du module security (trackers + config + API client).
+pub fn init_typemap(
+    data: &mut serenity::prelude::TypeMap,
+    api: &Arc<BaseApiClient>,
+    grpc: &Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
+) {
+    let sec_config = SecurityConfig::from_env();
+    data.insert::<SecurityApiKey>(ApiClient::new(Arc::clone(api), Arc::clone(grpc)));
+    data.insert::<RaidDetectorKey>(RaidDetector::new(
+        sec_config.raid_join_threshold,
+        sec_config.raid_join_window_secs,
+    ));
+    data.insert::<AccountCheckerKey>(AccountChecker::new(sec_config.min_account_age_secs));
+    data.insert::<QuarantineKey>(QuarantineManager::new());
+    data.insert::<SlowmodeKey>(SlowmodeManager::new());
+    data.insert::<LockdownKey>(LockdownManager::new());
+    data.insert::<RecentJoinsKey>(RecentJoinsTracker::new(sec_config.raid_join_window_secs));
+    data.insert::<CaptchaPendingKey>(CaptchaPending::new());
+    data.insert::<AltDetectorKey>(AltDetector::new(
+        sec_config.alt_retention_secs,
+        sec_config.alt_name_distance,
+        3600,
+    ));
+    data.insert::<SecurityConfigKey>(sec_config);
+}
+
 // ── Slash commands ──
 
 pub fn register_commands() -> Vec<CreateCommand> {

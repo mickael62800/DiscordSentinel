@@ -5,7 +5,7 @@ use serenity::model::id::{ChannelId, UserId};
 use serenity::model::Permissions;
 use serenity::prelude::*;
 
-use super::super::super::{MembersToVoiceMapKey, VoiceOwnerMapKey};
+use crate::modules::voice::{MembersToVoiceMapKey, VoiceOwnerMapKey};
 
 /// Donne a un nouveau participant l'acces au salon texte "panel membres"
 /// associe a `voice_channel_id`.

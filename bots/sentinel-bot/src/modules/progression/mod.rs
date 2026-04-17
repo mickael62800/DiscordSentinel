@@ -23,6 +23,7 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::discord_helpers::{guild_config_or_default, is_module_enabled};
 use sentinel_shared::embeds::success_embed;
 use sentinel_shared::heartbeat::ApiClientKey;
 
@@ -84,6 +85,21 @@ impl RewardsCache {
     }
 }
 
+// ── Init TypeMapKeys ──
+
+/// Insere les TypeMapKeys du module progression dans le TypeMap partage.
+pub fn init_typemap(
+    data: &mut serenity::prelude::TypeMap,
+    api: &Arc<sentinel_shared::api_client::BaseApiClient>,
+    grpc: &Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
+) {
+    data.insert::<StatsApiKey>(api_client::ApiClient::new(Arc::clone(api), Arc::clone(grpc)));
+    data.insert::<TrackerKey>(tracker::StatsTracker::new());
+    data.insert::<XpCooldownKey>(xp_cooldown::XpCooldown::new());
+    data.insert::<StreakTrackerKey>(streaks::StreakTracker::new());
+    data.insert::<RewardsCacheKey>(Arc::new(RewardsCache::new()));
+}
+
 // ── Slash commands ──
 
 pub fn register_commands() -> Vec<CreateCommand> {
@@ -107,24 +123,14 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         None => return,
     };
 
-    let data = ctx.data.read().await;
+    // Charger la config guild (helper partage : data.read() + get_guild_config)
+    let guild_config =
+        guild_config_or_default(ctx, &guild_id.to_string()).await;
+    if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
+        return;
+    }
 
-    // Charger la config guild
-    let guild_config = if let Some(api) = data.get::<ApiClientKey>() {
-        let config = match api.get_guild_config(&guild_id.to_string()).await {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
-                HashMap::new()
-            }
-        };
-        if !BaseApiClient::config_bool(&config, "enabled", true) {
-            return;
-        }
-        config
-    } else {
-        HashMap::new()
-    };
+    let data = ctx.data.read().await;
 
     // Track localement
     if let Some(tracker) = data.get::<TrackerKey>() {
@@ -291,20 +297,12 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
     };
 
     let user_id = new.user_id;
-    let data = ctx.data.read().await;
 
-    if let Some(api) = data.get::<ApiClientKey>() {
-        let config = match api.get_guild_config(&guild_id.to_string()).await {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
-                HashMap::new()
-            }
-        };
-        if !BaseApiClient::config_bool(&config, "enabled", true) {
-            return;
-        }
+    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        return;
     }
+
+    let data = ctx.data.read().await;
 
     let was_in_voice = old.as_ref().and_then(|s| s.channel_id).is_some();
     let is_in_voice = new.channel_id.is_some();

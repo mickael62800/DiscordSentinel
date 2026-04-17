@@ -4,6 +4,8 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
+use sentinel_shared::discord_helpers::reply_ephemeral;
+
 use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
 
@@ -260,18 +262,3 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
-async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
-}

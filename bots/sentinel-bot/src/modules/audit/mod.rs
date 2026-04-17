@@ -34,7 +34,7 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 use tracing::warn;
 
-use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::discord_helpers::is_module_enabled;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use api_client::{ApiClient, AuditEvent};
@@ -89,6 +89,25 @@ impl Default for AuditConfig {
     }
 }
 
+// ── Init TypeMapKeys ──
+
+/// Insere les TypeMapKeys du module audit.
+pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
+    let audit_config = AuditConfig::default();
+    data.insert::<MessageCacheKey>(message_cache::MessageCache::new(audit_config.message_cache_size));
+    data.insert::<AnomalyDetectorKey>(anomaly::AnomalyDetector::new(
+        audit_config.anomaly_window_secs,
+        anomaly::AnomalyThresholds {
+            mass_ban: audit_config.anomaly_mass_ban_threshold,
+            mass_delete: audit_config.anomaly_mass_delete_threshold,
+            mass_role_change: audit_config.anomaly_mass_role_threshold,
+        },
+    ));
+    data.insert::<WeeklyTrackerKey>(weekly_report::WeeklyTracker::new());
+    data.insert::<ConfigKey>(audit_config);
+    data.insert::<WatchedUserIdsKey>(Arc::new(DashSet::new()));
+}
+
 // ── Commands registration ──
 
 pub fn register_commands() -> Vec<CreateCommand> {
@@ -96,18 +115,9 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
-    // Guild-level enabled check
     if let Some(guild_id) = command.guild_id {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            if !sentinel_shared::discord_helpers::is_bot_enabled(
-                api,
-                &guild_id.to_string(),
-            )
-            .await
-            {
-                return;
-            }
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
         }
     }
 
@@ -115,19 +125,6 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
 }
 
 // ── Helper functions (extracted from impl Handler) ──
-
-/// Verifie si le bot est active pour une guild donnee (defaut : oui en cas d'erreur).
-pub async fn is_guild_enabled(ctx: &Context, guild_id: &str) -> bool {
-    let data = ctx.data.read().await;
-    if let Some(base) = data.get::<ApiClientKey>() {
-        let config = match base.get_guild_config(guild_id).await {
-            Ok(c) => c,
-            Err(_) => return true,
-        };
-        return BaseApiClient::config_bool(&config, "enabled", true);
-    }
-    true
-}
 
 /// Envoie un evenement d'audit a l'API.
 pub async fn send_event(ctx: &Context, event: AuditEvent) {
@@ -229,21 +226,8 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         None => return,
     };
 
-    // Verifier si le bot est active
-    {
-        let data = ctx.data.read().await;
-        if let Some(base) = data.get::<ApiClientKey>() {
-            let config = match base.get_guild_config(&guild_id.to_string()).await {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!(error = %e, "Failed to fetch guild config");
-                    return;
-                }
-            };
-            if !BaseApiClient::config_bool(&config, "enabled", true) {
-                return;
-            }
-        }
+    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        return;
     }
 
     let data = ctx.data.read().await;
@@ -293,7 +277,7 @@ pub async fn on_message_delete(
     guild_id: Option<GuildId>,
 ) {
     if let Some(gid) = guild_id {
-        if !is_guild_enabled(ctx, &gid.to_string()).await {
+        if !is_module_enabled(ctx, &gid.to_string()).await {
             return;
         }
     }
@@ -316,7 +300,7 @@ pub async fn on_message_delete_bulk(
     guild_id: Option<GuildId>,
 ) {
     if let Some(gid) = guild_id {
-        if !is_guild_enabled(ctx, &gid.to_string()).await {
+        if !is_module_enabled(ctx, &gid.to_string()).await {
             return;
         }
     }
@@ -324,28 +308,28 @@ pub async fn on_message_delete_bulk(
 }
 
 pub async fn on_member_add(ctx: &Context, new_member: &Member) {
-    if !is_guild_enabled(ctx, &new_member.guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &new_member.guild_id.to_string()).await {
         return;
     }
     handlers::member::handle_addition(ctx, new_member).await;
 }
 
 pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
-    if !is_guild_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string()).await {
         return;
     }
     handlers::member::handle_removal(ctx, guild_id, user).await;
 }
 
 pub async fn on_ban_add(ctx: &Context, guild_id: GuildId, banned_user: &User) {
-    if !is_guild_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string()).await {
         return;
     }
     handlers::member::handle_ban_addition(ctx, guild_id, banned_user).await;
 }
 
 pub async fn on_ban_remove(ctx: &Context, guild_id: GuildId, unbanned_user: &User) {
-    if !is_guild_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string()).await {
         return;
     }
     handlers::member::handle_ban_removal(ctx, guild_id, unbanned_user).await;

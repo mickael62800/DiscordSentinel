@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
+use sentinel_shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::moderation::v1 as proto_mod;
 use sentinel_proto::voice::v1 as proto;
@@ -461,10 +461,4 @@ fn proto_to_response(c: proto::VoiceChannel) -> VoiceChannelResponse {
     }
 }
 
-fn grpc_err_to_string(e: GrpcCallError) -> String {
-    match e {
-        GrpcCallError::Unavailable => "API indisponible (circuit breaker ouvert)".to_string(),
-        GrpcCallError::Status(s) => format!("gRPC {:?}: {}", s.code(), s.message()),
-        GrpcCallError::Transport(t) => format!("transport gRPC: {t}"),
-    }
-}
+use sentinel_shared::grpc_client::grpc_err_to_string;

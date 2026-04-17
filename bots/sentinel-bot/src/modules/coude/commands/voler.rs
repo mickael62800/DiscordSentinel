@@ -7,6 +7,10 @@ use serenity::all::{
 };
 use std::time::Duration;
 
+use sentinel_shared::discord_helpers::{
+    component_reply_ephemeral as reply_component_ephemeral, reply_ephemeral,
+};
+
 use crate::modules::coude::api_client::ApiClient;
 use crate::modules::coude::catalog::{CatalogCache, CatalogCacheKey};
 use crate::modules::coude::GameApiKey;
@@ -684,38 +688,3 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     }
 }
 
-async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
-}
-
-async fn reply_component_ephemeral(
-    ctx: &Context,
-    component: &ComponentInteraction,
-    content: &str,
-) {
-    if let Err(e) = component
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
-}

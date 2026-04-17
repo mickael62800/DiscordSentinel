@@ -3,7 +3,9 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateInteractionResponse,
     CreateInteractionResponseMessage,
 };
-use tracing::{error, warn};
+use tracing::error;
+
+use sentinel_shared::discord_helpers::reply_ephemeral as respond;
 
 use super::StatsApiKey;
 
@@ -250,12 +252,3 @@ fn make_progress_bar(current: i64, needed: i64) -> String {
     )
 }
 
-async fn respond(ctx: &Context, command: &CommandInteraction, content: &str) {
-    let msg = CreateInteractionResponseMessage::new()
-        .content(content)
-        .ephemeral(true);
-    let response = CreateInteractionResponse::Message(msg);
-    if let Err(e) = command.create_response(&ctx.http, response).await {
-        warn!(error = %e, "Failed to send level command response");
-    }
-}

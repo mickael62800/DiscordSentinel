@@ -57,6 +57,19 @@ impl TypeMapKey for SponsorshipKey {
 
 // ── Slash commands ──
 
+// ── Init TypeMapKeys ──
+
+pub fn init_typemap(
+    data: &mut serenity::prelude::TypeMap,
+    api: &Arc<sentinel_shared::api_client::BaseApiClient>,
+    grpc: &Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
+) {
+    data.insert::<RolesApiKey>(ApiClient::new(Arc::clone(api), Arc::clone(grpc)));
+    data.insert::<CooldownKey>(Arc::new(InteractionCooldown::new()));
+    data.insert::<TempRoleKey>(TempRoleTracker::new());
+    data.insert::<SponsorshipKey>(SponsorshipTracker::new());
+}
+
 pub fn register_commands() -> Vec<CreateCommand> {
     vec![roles_panel::register(), sponsor::register()]
 }

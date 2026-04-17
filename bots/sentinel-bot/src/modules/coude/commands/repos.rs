@@ -3,6 +3,8 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
+use sentinel_shared::discord_helpers::reply_ephemeral;
+
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
@@ -107,18 +109,3 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 }
 
-async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
-}

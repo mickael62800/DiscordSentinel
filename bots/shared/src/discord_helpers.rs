@@ -137,3 +137,28 @@ pub async fn is_bot_enabled(
     };
     crate::api_client::BaseApiClient::config_bool(&config, "enabled", true)
 }
+
+/// Variante de `is_bot_enabled` qui extrait l'ApiClient du TypeMap directement.
+/// Retourne `true` par defaut si l'ApiClient est absent ou l'appel API echoue
+/// (fail-open : on prefere laisser passer que bloquer tout le bot).
+pub async fn is_module_enabled(ctx: &Context, guild_id: &str) -> bool {
+    let data = ctx.data.read().await;
+    match data.get::<crate::heartbeat::ApiClientKey>() {
+        Some(api) => is_bot_enabled(api, guild_id).await,
+        None => true,
+    }
+}
+
+/// Charge la config guild ou retourne une HashMap vide si indisponible.
+/// Factorise le pattern `get::<ApiClientKey>() + get_guild_config()` present
+/// dans la plupart des handlers de modules.
+pub async fn guild_config_or_default(
+    ctx: &Context,
+    guild_id: &str,
+) -> std::collections::HashMap<String, String> {
+    let data = ctx.data.read().await;
+    let Some(api) = data.get::<crate::heartbeat::ApiClientKey>() else {
+        return std::collections::HashMap::new();
+    };
+    api.get_guild_config(guild_id).await.unwrap_or_default()
+}

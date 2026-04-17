@@ -52,6 +52,14 @@ impl TypeMapKey for SlowmodeTrackerKey {
 // Module interface (register_commands, handle_command, handles_component)
 // ══════════════════════════════════════════════════════════════════════
 
+/// Insere les TypeMapKeys du module automod.
+pub fn init_typemap(data: &mut serenity::prelude::TypeMap) {
+    use dashmap::DashMap;
+    data.insert::<ProcessedMessagesKey>(Arc::new(DashMap::new()));
+    data.insert::<FloodTrackerKey>(Arc::new(DashMap::new()));
+    data.insert::<SlowmodeTrackerKey>(adaptive_slowmode::SlowmodeTracker::new(30));
+}
+
 pub fn register_commands() -> Vec<CreateCommand> {
     vec![automod_cmd::register()]
 }
@@ -169,20 +177,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
     // Charger la config depuis l'API pour ce guild
     let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
-    let config = {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            match api.get_guild_config(&guild_id).await {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    warn!(guild_id = %guild_id, error = %e, "Impossible de charger la config guild, utilisation des valeurs par defaut");
-                    std::collections::HashMap::new()
-                }
-            }
-        } else {
-            std::collections::HashMap::new()
-        }
-    };
+    let config = sentinel_shared::discord_helpers::guild_config_or_default(ctx, &guild_id).await;
 
     if !BaseApiClient::config_bool(&config, "enabled", true) {
         return;

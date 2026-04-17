@@ -7,7 +7,7 @@ use tracing::{error, info, warn};
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::super::api_client::ApiClient;
+use crate::modules::tickets::api_client::ApiClient;
 
 use super::constants::*;
 use super::helpers::*;
@@ -315,13 +315,13 @@ pub async fn handle_close_cancel(ctx: &Context, component: &ComponentInteraction
 
 /// Gere le clic sur un bouton de satisfaction (1-5 etoiles).
 pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInteraction) {
-    let rating = match super::super::super::satisfaction::extract_rating(&component.data.custom_id) {
+    let rating = match crate::modules::tickets::satisfaction::extract_rating(&component.data.custom_id) {
         Some(r) => r,
         None => return,
     };
 
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
-    let ticket_id = super::super::super::satisfaction::extract_ticket_id(&component.data.custom_id);
+    let ticket_id = crate::modules::tickets::satisfaction::extract_ticket_id(&component.data.custom_id);
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
@@ -334,7 +334,7 @@ pub async fn handle_satisfaction_click(ctx: &Context, component: &ComponentInter
                 ),
             );
         }
-        if let (Some(tid), Some(api)) = (ticket_id, super::super::super::api_client::ApiClient::from_data(&data)) {
+        if let (Some(tid), Some(api)) = (ticket_id, crate::modules::tickets::api_client::ApiClient::from_data(&data)) {
             api.update_ticket_sla(tid, None, None, Some(rating)).await;
         }
     }

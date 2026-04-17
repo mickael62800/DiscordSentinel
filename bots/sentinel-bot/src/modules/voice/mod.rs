@@ -23,7 +23,7 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::heartbeat::ApiClientKey;
+use sentinel_shared::discord_helpers::is_module_enabled;
 
 use api_client::{ApiClient, VoiceConfigResponse, VoiceThemeResponse};
 use config::Config;
@@ -116,14 +116,9 @@ pub fn handles_component(cid: &str) -> bool {
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
-    let guild_id_str = component.guild_id.map(|g| g.to_string());
-    if let Some(guild_id) = guild_id_str {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            let config = api.get_guild_config(&guild_id).await.unwrap_or_default();
-            if !BaseApiClient::config_bool(&config, "enabled", true) {
-                return;
-            }
+    if let Some(guild_id) = component.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
         }
     }
     interactions::handle_component(ctx, component).await;
@@ -141,12 +136,8 @@ pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
 
 pub async fn on_message(ctx: &Context, msg: &Message) {
     if let Some(guild_id) = msg.guild_id {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            let config = api.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
-            if !BaseApiClient::config_bool(&config, "enabled", true) {
-                return;
-            }
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
         }
     }
     handlers::message::handle_message(ctx, msg).await;
@@ -243,9 +234,9 @@ async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
 
 /// Initialise les TypeMapKeys voice dans `data`. Appele depuis main.rs.
 pub async fn init_typemap(
-    client: &serenity::Client,
-    api: Arc<BaseApiClient>,
-    grpc: Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
+    data: &mut serenity::prelude::TypeMap,
+    api: &Arc<BaseApiClient>,
+    grpc: &Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
 ) {
     let config = Config::from_env();
 
@@ -253,7 +244,7 @@ pub async fn init_typemap(
         info!("Voice module: VOICE_GUILD_ID non defini, module desactive");
     }
 
-    let voice_api = ApiClient::new(api, grpc);
+    let voice_api = ApiClient::new(Arc::clone(api), Arc::clone(grpc));
 
     let text_to_voice: Arc<DashMap<ChannelId, ChannelId>> = Arc::new(DashMap::new());
     let members_to_voice: Arc<DashMap<ChannelId, ChannelId>> = Arc::new(DashMap::new());
@@ -318,7 +309,6 @@ pub async fn init_typemap(
         Arc::new(vec![])
     };
 
-    let mut data = client.data.write().await;
     data.insert::<ConfigKey>(config);
     data.insert::<FloodTrackerKey>(flood_tracker);
     data.insert::<VoteTrackerKey>(Arc::new(VoteTracker::new()));

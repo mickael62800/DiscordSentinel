@@ -5,6 +5,7 @@ use serenity::all::{
 use serenity::builder::CreateEmbed;
 use tracing::{info, warn};
 
+use sentinel_shared::discord_helpers::reply_ephemeral as reply;
 use sentinel_shared::embeds::{success_embed, info_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
@@ -248,15 +249,6 @@ async fn has_manage_guild(ctx: &Context, cmd: &CommandInteraction) -> bool {
         }
     }
     false
-}
-
-async fn reply(ctx: &Context, cmd: &CommandInteraction, content: &str) {
-    let response = CreateInteractionResponse::Message(
-        CreateInteractionResponseMessage::new().content(content).ephemeral(true),
-    );
-    if let Err(e) = cmd.create_response(&ctx.http, response).await {
-        warn!(error = %e, "Erreur reponse commande game");
-    }
 }
 
 async fn reply_embed(ctx: &Context, cmd: &CommandInteraction, embed: CreateEmbed) {

@@ -11,7 +11,7 @@ use tracing::{error, info, warn};
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::super::api_client::{ApiClient, CreateTicketRequest};
+use crate::modules::tickets::api_client::{ApiClient, CreateTicketRequest};
 
 use super::constants::*;
 
@@ -364,7 +364,7 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     // Enregistrer la creation dans le SLA tracker
     if ticket_id != "???" {
         let data = ctx.data.read().await;
-        if let Some(sla) = data.get::<super::super::super::SlaTrackerKey>() {
+        if let Some(sla) = data.get::<crate::modules::tickets::SlaTrackerKey>() {
             sla.record_creation(&ticket_id);
         }
         drop(data);
@@ -523,15 +523,15 @@ pub async fn handle_panel_click_with_faq(ctx: &Context, component: &ComponentInt
         }
     };
 
-    let entries = super::super::super::faq::parse_faq(&faq_raw);
+    let entries = crate::modules::tickets::faq::parse_faq(&faq_raw);
 
     if entries.is_empty() {
         handle_panel_click(ctx, component).await;
         return;
     }
 
-    let embed = super::super::super::faq::build_faq_embed(&entries);
-    let row = super::super::super::faq::build_faq_continue_button();
+    let embed = crate::modules::tickets::faq::build_faq_embed(&entries);
+    let row = crate::modules::tickets::faq::build_faq_continue_button();
 
     let response = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()

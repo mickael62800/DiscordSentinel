@@ -10,9 +10,10 @@
 
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseMessage,
+    CreateCommandOption, CreateEmbed, CreateEmbedFooter,
 };
+
+use sentinel_shared::discord_helpers::reply_ephemeral;
 
 use crate::modules::coude::api_client::{CashboxDepositSource, StealProtectionDuration};
 use crate::modules::coude::load_guild_config;
@@ -245,20 +246,4 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .timestamp(serenity::model::Timestamp::now());
 
     crate::modules::coude::interaction_helper::followup_embed_ephemeral(ctx, command, embed).await;
-}
-
-async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
-    }
 }

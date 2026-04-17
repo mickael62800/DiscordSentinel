@@ -10,8 +10,8 @@ use tracing::warn;
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::super::embeds;
-use super::super::super::{AfkTrackerKey, ConfigKey};
+use crate::modules::voice::embeds;
+use crate::modules::voice::{AfkTrackerKey, ConfigKey};
 
 use super::channel_lifecycle::{check_and_delete_empty, create_temp_channel};
 use super::channel_permissions::{grant_members_panel_access, revoke_members_panel_access};
@@ -140,7 +140,7 @@ async fn maybe_auto_transfer_ownership(
 ) {
     let is_owner = {
         let data = ctx.data.read().await;
-        data.get::<super::super::super::VoiceOwnerMapKey>()
+        data.get::<crate::modules::voice::VoiceOwnerMapKey>()
             .and_then(|map| map.get(&voice_channel_id).map(|e| *e == leaving_user))
             .unwrap_or(false)
     };
@@ -161,7 +161,7 @@ async fn maybe_auto_transfer_ownership(
 
     let text_channel_id = {
         let data = ctx.data.read().await;
-        data.get::<super::super::super::TextToVoiceMapKey>().and_then(|map| {
+        data.get::<crate::modules::voice::TextToVoiceMapKey>().and_then(|map| {
             map.iter()
                 .find(|entry| *entry.value() == voice_channel_id)
                 .map(|entry| *entry.key())
@@ -187,7 +187,7 @@ async fn maybe_auto_transfer_ownership(
 
     let members_channel_id = {
         let data = ctx.data.read().await;
-        data.get::<super::super::super::MembersToVoiceMapKey>().and_then(|map| {
+        data.get::<crate::modules::voice::MembersToVoiceMapKey>().and_then(|map| {
             map.iter()
                 .find(|entry| *entry.value() == voice_channel_id)
                 .map(|entry| *entry.key())
@@ -235,7 +235,7 @@ async fn find_co_admin_in_voice(
 ) -> Option<UserId> {
     let co_admin_ids: Vec<u64> = {
         let data = ctx.data.read().await;
-        let api = super::super::super::api_client::ApiClient::from_data(&data)?;
+        let api = crate::modules::voice::api_client::ApiClient::from_data(&data)?;
         match api.get_channel_co_admins(&voice_channel_id.get().to_string()).await {
             Ok(ids) => ids.iter().filter_map(|s| s.parse().ok()).collect(),
             Err(e) => {
@@ -272,8 +272,8 @@ async fn do_direct_transfer(
 
     {
         let data = ctx.data.read().await;
-        if let Some(api) = super::super::super::api_client::ApiClient::from_data(&data) {
-            let req = super::super::super::api_client::TransferOwnershipRequest {
+        if let Some(api) = crate::modules::voice::api_client::ApiClient::from_data(&data) {
+            let req = crate::modules::voice::api_client::TransferOwnershipRequest {
                 new_owner_id: new_owner.get().to_string(),
                 new_owner_name: new_owner_name.clone(),
             };
@@ -284,7 +284,7 @@ async fn do_direct_transfer(
                 tracing::warn!(error = %e, "Erreur API transfer co-admin");
             }
         }
-        if let Some(map) = data.get::<super::super::super::VoiceOwnerMapKey>() {
+        if let Some(map) = data.get::<crate::modules::voice::VoiceOwnerMapKey>() {
             map.insert(voice_channel_id, new_owner);
         }
     }
@@ -352,7 +352,7 @@ async fn check_queue_join(
     }
 
     let data = ctx.data.read().await;
-    let Some(api) = super::super::super::api_client::ApiClient::from_data(&data) else {
+    let Some(api) = crate::modules::voice::api_client::ApiClient::from_data(&data) else {
         return;
     };
 

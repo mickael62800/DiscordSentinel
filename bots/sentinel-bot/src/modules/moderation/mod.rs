@@ -21,6 +21,7 @@ use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::discord_helpers::is_module_enabled;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use api_client::{ApiClient, ModerationAction};
@@ -47,6 +48,21 @@ impl TypeMapKey for PendingActionsKey {
 pub const APPROVE_PREFIX: &str = "sentinel_mod_approve_";
 pub const REJECT_PREFIX: &str = "sentinel_mod_reject_";
 
+// ── Init TypeMapKeys ──
+
+pub fn init_typemap(
+    data: &mut serenity::prelude::TypeMap,
+    api: &Arc<sentinel_shared::api_client::BaseApiClient>,
+    grpc: &Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
+) {
+    data.insert::<ModerationApiKey>(Arc::new(ApiClient::new(
+        Arc::clone(api),
+        Arc::clone(grpc),
+    )));
+    data.insert::<PendingActionsKey>(DashMap::new());
+    data.insert::<risk_check::RiskyPendingKey>(DashMap::new());
+}
+
 // ── Slash commands ──
 
 pub fn register_commands() -> Vec<CreateCommand> {
@@ -58,20 +74,10 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     let moderator = command.user.name.clone();
     let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
-    if !guild_id.is_empty() {
-        let data = ctx.data.read().await;
-        if let Some(api) = data.get::<ApiClientKey>() {
-            let config = match api.get_guild_config(&guild_id).await {
-                Ok(c) => c,
-                Err(e) => {
-                    warn!(error = %e, "Failed to fetch guild config");
-                    std::collections::HashMap::new()
-                }
-            };
-            if !BaseApiClient::config_bool(&config, "enabled", true) {
-                return;
-            }
-        }
+    if !guild_id.is_empty()
+        && !is_module_enabled(ctx, &guild_id).await
+    {
+        return;
     }
 
     match cmd_name.as_str() {

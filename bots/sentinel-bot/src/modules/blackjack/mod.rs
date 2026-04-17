@@ -43,6 +43,17 @@ pub(self) const JOIN_BUTTON_ID: &str = "bj_join_table";
 
 // ── Slash commands ──
 
+// ── Init TypeMapKeys ──
+
+pub fn init_typemap(
+    data: &mut serenity::prelude::TypeMap,
+    api: &Arc<sentinel_shared::api_client::BaseApiClient>,
+    grpc: &Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
+) {
+    data.insert::<GameApiKey>(ApiClient::new(Arc::clone(api), Arc::clone(grpc)));
+    data.insert::<ChannelManagerKey>(Arc::new(ChannelManager::new()));
+}
+
 pub fn register_commands() -> Vec<CreateCommand> {
     vec![setup::register()]
 }

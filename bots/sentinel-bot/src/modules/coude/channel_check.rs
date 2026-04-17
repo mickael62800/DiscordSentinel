@@ -3,6 +3,8 @@ use serenity::all::{
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage, CreateMessage,
 };
 
+use sentinel_shared::discord_helpers::reply_ephemeral as reply;
+
 /// Verifie que la commande est utilisee dans le bon salon.
 /// Retourne `true` si OK, `false` si bloque (reponse ephemerale deja envoyee).
 pub async fn check_channel(
@@ -28,22 +30,6 @@ pub async fn check_channel(
                 false
             }
         }
-    }
-}
-
-async fn reply(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord");
     }
 }
 

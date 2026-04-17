@@ -12,6 +12,8 @@ pub mod interaction_helper;
 pub mod prison_check;
 pub mod taunts_dispatch;
 
+use std::sync::Arc;
+
 use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand, GuildId};
 use serenity::prelude::*;
 
@@ -45,6 +47,44 @@ pub async fn load_guild_config(ctx: &Context, guild_id: &str) -> CoudeConfig {
     let data = ctx.data.read().await;
     let api = data.get::<ApiClientKey>().expect("ApiClientKey non initialise");
     CoudeConfig::load(api, guild_id).await
+}
+
+// ── Init TypeMapKeys ──
+
+/// Insere les TypeMapKeys du module coude. Fetch le catalogue via l'API au boot
+/// (fail-degraded : insere un catalogue vide si l'API est down).
+pub async fn init_typemap(
+    data: &mut serenity::prelude::TypeMap,
+    api: &Arc<sentinel_shared::api_client::BaseApiClient>,
+    grpc: &Arc<sentinel_shared::grpc_client::SentinelGrpcClient>,
+) {
+    let coude_api = api_client::ApiClient::new(Arc::clone(api), Arc::clone(grpc));
+    let coude_catalog = match coude_api.get_catalog().await {
+        Ok(c) => {
+            tracing::info!(
+                classes = c.classes.len(),
+                items = c.shop_items.len(),
+                levels = c.level_table.len(),
+                "Catalogue Coude recupere depuis l'API"
+            );
+            Arc::new(c)
+        }
+        Err(e) => {
+            tracing::warn!(error = %e, "Echec fetch catalogue Coude (fail-degraded)");
+            Arc::new(catalog::CatalogCache {
+                classes: Vec::new(),
+                shop_items: Vec::new(),
+                level_table: Vec::new(),
+                matchmaking_buckets: Vec::new(),
+                anti_theft_items: Vec::new(),
+                max_level: 1,
+                hp_base: 100,
+                hp_per_def: 2,
+            })
+        }
+    };
+    data.insert::<GameApiKey>(coude_api);
+    data.insert::<CatalogCacheKey>(coude_catalog);
 }
 
 // ── Slash commands ──

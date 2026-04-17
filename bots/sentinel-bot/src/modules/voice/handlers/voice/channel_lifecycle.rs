@@ -18,9 +18,9 @@ use tracing::{error, info, warn};
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::super::api_client::{ApiClient, CreateVoiceChannelRequest};
-use super::super::super::embeds;
-use super::super::super::{
+use crate::modules::voice::api_client::{ApiClient, CreateVoiceChannelRequest};
+use crate::modules::voice::embeds;
+use crate::modules::voice::{
     CooldownTrackerKey, MembersToVoiceMapKey, TextToVoiceMapKey, VoiceOwnerMapKey,
 };
 
@@ -59,7 +59,7 @@ pub(super) async fn create_temp_channel(
     // user_limit par defaut : lu depuis le theme API si present, sinon 0.
     let default_user_limit: u32 = {
         let data = ctx.data.read().await;
-        data.get::<super::super::super::ThemeCacheKey>()
+        data.get::<crate::modules::voice::ThemeCacheKey>()
             .and_then(|themes| {
                 themes.iter().find(|t| t.name == kind).and_then(|t| t.member_limit)
             })
@@ -354,7 +354,7 @@ pub(super) async fn check_and_delete_empty(
 
     let cleanup_delay = {
         let data = ctx.data.read().await;
-        data.get::<super::super::super::VoiceConfigKey>()
+        data.get::<crate::modules::voice::VoiceConfigKey>()
             .map(|c| c.empty_cleanup_delay_secs)
             .unwrap_or(2)
     };

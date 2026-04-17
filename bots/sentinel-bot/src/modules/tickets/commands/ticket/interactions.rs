@@ -10,7 +10,7 @@ use tracing::{error, info, warn};
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::super::api_client::ApiClient;
+use crate::modules::tickets::api_client::ApiClient;
 
 use super::constants::*;
 use super::helpers::*;
@@ -424,7 +424,7 @@ pub async fn handle_template_button(ctx: &Context, component: &ComponentInteract
         }
     };
 
-    let templates = super::super::super::templates::parse_templates(&templates_raw);
+    let templates = crate::modules::tickets::templates::parse_templates(&templates_raw);
 
     if templates.is_empty() {
         let response = CreateInteractionResponse::Message(
@@ -438,7 +438,7 @@ pub async fn handle_template_button(ctx: &Context, component: &ComponentInteract
         return;
     }
 
-    let row = super::super::super::templates::build_template_select(&templates);
+    let row = crate::modules::tickets::templates::build_template_select(&templates);
 
     let response = CreateInteractionResponse::Message(
         CreateInteractionResponseMessage::new()
@@ -500,7 +500,7 @@ pub async fn handle_template_select(ctx: &Context, component: &ComponentInteract
         }
     };
 
-    let templates = super::super::super::templates::parse_templates(&templates_raw);
+    let templates = crate::modules::tickets::templates::parse_templates(&templates_raw);
 
     if let Some(template) = templates.get(index) {
         if let Err(e) = component.channel_id.say(&ctx.http, &template.content).await {
