@@ -10,6 +10,7 @@ use serenity::model::user::User;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
+use sentinel_shared::discord_helpers::is_module_enabled;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::api_client::WelcomeApiClient;
@@ -221,6 +222,11 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
 
 /// Appele pour les interactions de composants (bouton reglement).
 pub async fn on_component(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
+    if let Some(guild_id) = component.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     if component.data.custom_id == RULES_ACCEPT_ID {
         handle_rules_accept(ctx, component).await;
     }

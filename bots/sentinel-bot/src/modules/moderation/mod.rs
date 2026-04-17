@@ -129,6 +129,11 @@ pub fn handles_component(cid: &str) -> bool {
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
+    if let Some(guild_id) = component.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     let custom_id = &component.data.custom_id;
 
     if custom_id.starts_with(commands::unwarn::UNWARN_PREFIX) {

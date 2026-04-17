@@ -144,6 +144,11 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 }
 
 pub async fn on_voice_state_update(ctx: &Context, old: &Option<VoiceState>, new: &VoiceState) {
+    if let Some(guild_id) = new.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     handlers::voice::handle_voice_state_update(ctx, old, new).await;
 }
 

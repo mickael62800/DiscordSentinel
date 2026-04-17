@@ -19,6 +19,8 @@ use std::sync::Arc;
 use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand};
 use serenity::prelude::*;
 
+use sentinel_shared::discord_helpers::is_module_enabled;
+
 use api_client::ApiClient;
 use channel_manager::ChannelManager;
 
@@ -59,6 +61,11 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if let Some(guild_id) = command.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     if command.data.name == "blackjack-setup" {
         setup::handle(ctx, command).await;
     }
@@ -79,6 +86,11 @@ pub fn handles_component(cid: &str) -> bool {
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
+    if let Some(guild_id) = component.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     let custom_id = component.data.custom_id.as_str();
 
     if custom_id == setup::PANEL_BUTTON_ID {

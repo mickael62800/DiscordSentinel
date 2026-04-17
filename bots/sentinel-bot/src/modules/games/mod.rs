@@ -9,6 +9,7 @@ use std::sync::Arc;
 use serenity::all::{CommandInteraction, Context, CreateCommand, Message};
 use tracing::warn;
 
+use sentinel_shared::discord_helpers::is_module_enabled;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 pub fn register_commands() -> Vec<CreateCommand> {
@@ -16,6 +17,11 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if let Some(guild_id) = command.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     if command.data.name == "game" {
         commands::handle(ctx, command).await;
     }
@@ -27,6 +33,10 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         Some(g) => g,
         None => return,
     };
+
+    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        return;
+    }
 
     let mut mentions = detector::extract_game_mentions(&msg.content);
     mentions.sort_by(|a, b| a.to_lowercase().cmp(&b.to_lowercase()));

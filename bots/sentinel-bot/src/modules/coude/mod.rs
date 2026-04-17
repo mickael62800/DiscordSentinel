@@ -17,6 +17,7 @@ use std::sync::Arc;
 use serenity::all::{CommandInteraction, ComponentInteraction, Context, CreateCommand, GuildId};
 use serenity::prelude::*;
 
+use sentinel_shared::discord_helpers::is_module_enabled;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use api_client::ApiClient;
@@ -94,6 +95,11 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if let Some(guild_id) = command.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     match command.data.name.as_str() {
         "coude" => commands::coude::handle(ctx, command).await,
         "profil" => commands::profil::handle(ctx, command).await,
@@ -168,6 +174,11 @@ pub fn handles_component(cid: &str) -> bool {
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
+    if let Some(guild_id) = component.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     let custom_id = &component.data.custom_id;
 
     if custom_id.starts_with(commands::coude::PRECONFIRM_OK_PREFIX) {

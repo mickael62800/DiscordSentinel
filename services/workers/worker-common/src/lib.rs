@@ -181,6 +181,27 @@ pub async fn is_worker_enabled(pool: &PgPool, guild_id: &str, worker_name: &str)
     result.map(|v| v != "false").unwrap_or(true)
 }
 
+/// Verifie si le worker est active pour au moins une guild.
+/// Retourne true si:
+/// - Aucune entree `enabled` trouvee (defaut = active)
+/// - Au moins une entree `enabled = true`
+/// Retourne false si toutes les entrees trouvees sont `enabled = false`.
+pub async fn is_worker_globally_enabled(pool: &PgPool, worker_name: &str) -> bool {
+    let rows: Vec<(String,)> = sqlx::query_as(
+        "SELECT config_value FROM bot_guild_config \
+         WHERE bot_name = $1 AND config_key = 'enabled'",
+    )
+    .bind(worker_name)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    if rows.is_empty() {
+        return true; // Pas de config = active par defaut
+    }
+    rows.iter().any(|(v,)| v == "true" || v == "1")
+}
+
 /// Constantes de temps utilitaires.
 pub const SECS_PER_MINUTE: u64 = 60;
 pub const SECS_PER_HOUR: u64 = 3600;
@@ -310,6 +331,17 @@ pub fn spawn_periodic<F>(
             if *shutdown.borrow() {
                 info!(task = name, "Tache periodique arretee (shutdown)");
                 break;
+            }
+
+            // Verifie le flag enabled en DB avant chaque tick.
+            // Si toutes les guilds ont desactive ce worker, on skip la tache.
+            if !is_worker_globally_enabled(&pool, worker_name).await {
+                tracing::debug!(
+                    task = name,
+                    worker = worker_name,
+                    "Worker desactive via config, skip tick"
+                );
+                continue;
             }
 
             if let Err(e) = task_fn(pool.clone()).await {

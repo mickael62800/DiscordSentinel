@@ -16,6 +16,7 @@ use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::discord_helpers::is_module_enabled;
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use api_client::{ApiClient, MemberPayload, SyncMembersPayload, UpdateMemberPayload};
@@ -176,6 +177,11 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if let Some(guild_id) = command.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     commands::handle(ctx, command).await;
 }
 
@@ -356,5 +362,10 @@ pub async fn on_ban_remove(
 
 /// Gere les interactions captcha (bouton + math).
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
+    if let Some(guild_id) = component.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     captcha_handler::on_component(ctx, component).await
 }

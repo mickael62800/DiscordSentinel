@@ -107,6 +107,11 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
+    if let Some(guild_id) = command.guild_id {
+        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            return;
+        }
+    }
     match command.data.name.as_str() {
         "level" => level_cmd::handle(ctx, command).await,
         "stats" => stats_cmd::handle(ctx, command).await,
