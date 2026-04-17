@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use uuid::Uuid;
 
 use crate::domain::entities::{
     VoiceChannel, VoiceChannelConfig, VoiceChannelDetail, VoiceChannelInviteLink,
@@ -225,6 +224,7 @@ impl ManageVoiceChannelsUseCase for ManageVoiceChannelsService {
 mod tests {
     use super::*;
     use chrono::Utc;
+    use uuid::Uuid;
     use crate::domain::entities::{
         VoiceChannelBan, VoiceChannelCoAdmin,
     };
