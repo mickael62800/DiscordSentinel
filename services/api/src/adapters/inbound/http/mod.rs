@@ -5,5 +5,6 @@ pub mod helpers;
 pub mod metrics;
 pub mod middleware;
 pub mod router;
+pub mod routes;
 pub mod state;
 pub mod validation;
