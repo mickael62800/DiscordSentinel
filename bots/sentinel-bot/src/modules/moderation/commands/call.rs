@@ -12,8 +12,8 @@ use sentinel_shared::discord_helpers::reply_ephemeral;
 use sentinel_shared::embeds::info_embed;
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::api_client::ModerationAction;
-use super::super::ModerationApiKey;
+use super::api_client::ModerationAction;
+use super::ModerationApiKey;
 
 pub const CALL_CLOSE_PREFIX: &str = "sentinel_mod_call_close:";
 

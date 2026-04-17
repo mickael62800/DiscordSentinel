@@ -6,7 +6,7 @@ use tracing::{error, info, warn};
 
 use sentinel_shared::embeds::success_embed;
 
-use super::super::ModerationApiKey;
+use super::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("note")

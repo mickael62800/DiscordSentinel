@@ -1,0 +1,333 @@
+//! Handler du join d'un nouveau membre : analyse API + quarantaine + captcha.
+
+use chrono::DateTime;
+use serenity::model::guild::Member;
+use serenity::model::id::{GuildId, RoleId, UserId};
+use serenity::prelude::*;
+use tracing::{error, info, warn};
+
+use sentinel_shared::api_client::BaseApiClient;
+use sentinel_shared::heartbeat::ApiClientKey;
+
+use super::api_client::{MemberPayload, RecentJoinEntry};
+use super::detectors::captcha::{self, CaptchaPending};
+use super::detectors::raid_analyzer::JoinInfo;
+use super::{
+    AccountCheckerKey, AltDetectorKey, CaptchaPendingKey, LockdownKey, QuarantineKey,
+    RaidDetectorKey, RecentJoinsKey, SecurityApiKey, SecurityConfigKey, SlowmodeKey,
+};
+
+/// Declenche a chaque nouveau membre qui rejoint un serveur.
+pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
+    let guild_id = new_member.guild_id;
+    let user = &new_member.user;
+
+    info!(
+        guild_id = %guild_id,
+        user = %user.name,
+        user_id = %user.id,
+        "Nouveau membre (security)"
+    );
+
+    let data = ctx.data.read().await;
+
+    // Enregistrer le membre dans la BDD
+    if let Some(sec_api) = data.get::<SecurityApiKey>() {
+        let roles: Vec<String> = new_member.roles.iter().map(|r| r.to_string()).collect();
+        let member_payload = MemberPayload {
+            guild_id: guild_id.to_string(),
+            user_id: user.id.to_string(),
+            username: user.name.clone(),
+            display_name: new_member.nick.clone(),
+            avatar: user.avatar.as_ref().map(|a| a.to_string()),
+            roles: serde_json::json!(roles),
+            joined_at: new_member
+                .joined_at
+                .and_then(|t| DateTime::from_timestamp(t.unix_timestamp(), 0)),
+            account_created: Some(DateTime::from_timestamp(
+                user.created_at().unix_timestamp(),
+                0,
+            ))
+            .flatten(),
+            is_bot: user.bot,
+            last_seen_at: None,
+        };
+        if let Err(e) = sec_api.register_member(&member_payload).await {
+            warn!(error = %e, "Erreur register_member");
+        }
+    }
+
+    // Log l'arrivee dans le journal
+    if let Some(base) = data.get::<ApiClientKey>() {
+        base.send_log(
+            "info",
+            &guild_id.to_string(),
+            &format!("Nouveau membre : {} ({})", user.name, user.id),
+        );
+    }
+
+    let base = match data.get::<ApiClientKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "ApiClientKey manquant");
+            return;
+        }
+    };
+    let sec_api = match data.get::<SecurityApiKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "SecurityApiKey manquant");
+            return;
+        }
+    };
+    let raid_detector = match data.get::<RaidDetectorKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "RaidDetectorKey manquant");
+            return;
+        }
+    };
+    let _account_checker = match data.get::<AccountCheckerKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "AccountCheckerKey manquant");
+            return;
+        }
+    };
+    let env_config = match data.get::<SecurityConfigKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "SecurityConfigKey manquant");
+            return;
+        }
+    };
+    let quarantine = match data.get::<QuarantineKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "QuarantineKey manquant");
+            return;
+        }
+    };
+    let slowmode = match data.get::<SlowmodeKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "SlowmodeKey manquant");
+            return;
+        }
+    };
+    let lockdown = match data.get::<LockdownKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "LockdownKey manquant");
+            return;
+        }
+    };
+    let recent_joins = match data.get::<RecentJoinsKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "RecentJoinsKey manquant");
+            return;
+        }
+    };
+    let captcha_pending = match data.get::<CaptchaPendingKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "CaptchaPendingKey manquant");
+            return;
+        }
+    };
+    let _alt_detector = match data.get::<AltDetectorKey>() {
+        Some(a) => a,
+        None => {
+            error!(guild_id = %guild_id, "AltDetectorKey manquant");
+            return;
+        }
+    };
+
+    // Charger la config per-guild depuis l'API (fallback sur env vars)
+    let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+        Ok(cfg) => cfg,
+        Err(e) => {
+            tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
+            std::collections::HashMap::new()
+        }
+    };
+
+    if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
+        return;
+    }
+
+    let _min_account_age =
+        BaseApiClient::config_u64(&guild_config, "min_account_age_secs", env_config.min_account_age_secs);
+
+    // Config quarantaine per-guild
+    let _quarantine_enabled = guild_config
+        .get("quarantine_enabled")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(env_config.quarantine_enabled);
+    let quarantine_role_id = guild_config
+        .get("quarantine_role_id")
+        .and_then(|v| {
+            v.parse::<u64>()
+                .map_err(|_| {
+                    tracing::warn!(guild=%guild_id, value=%v, "quarantine_role_id invalide dans la config guild");
+                })
+                .ok()
+        })
+        .or(env_config.quarantine_role_id);
+    let _captcha_enabled = guild_config
+        .get("captcha_enabled")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(env_config.captcha_enabled);
+    let _slowmode_secs: u16 = guild_config
+        .get("slowmode_seconds")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(env_config.slowmode_seconds);
+    let _lockdown_enabled = guild_config
+        .get("lockdown_enabled")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(env_config.lockdown_enabled);
+    let captcha_type = guild_config
+        .get("captcha_type")
+        .cloned()
+        .unwrap_or_else(|| env_config.captcha_type.clone());
+    let _alt_detection_enabled = guild_config
+        .get("alt_detection_enabled")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(env_config.alt_detection_enabled);
+    let _raid_pattern_enabled = guild_config
+        .get("raid_pattern_enabled")
+        .map(|v| v == "true" || v == "1")
+        .unwrap_or(env_config.raid_pattern_enabled);
+    let _raid_pattern_score_threshold = guild_config
+        .get("raid_pattern_score_threshold")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(env_config.raid_pattern_score_threshold);
+
+    // ── 0. Buffer temporel des joins (le bot garde le timing, pas le metier) ──
+    let join_info = JoinInfo {
+        username: user.name.clone(),
+        has_avatar: user.avatar.is_some(),
+        account_created_timestamp: user.created_at().unix_timestamp(),
+    };
+    recent_joins.record(guild_id, join_info);
+
+    // Simple detection seuil de joins rapides (buffer local).
+    let simple_raid = raid_detector.record_join(guild_id);
+
+    // ── 1. Appel API : l'API decide de tout ──
+    let recent = recent_joins.recent(guild_id);
+    let recent_entries: Vec<RecentJoinEntry> = recent
+        .iter()
+        .map(|j| RecentJoinEntry {
+            username: j.username.clone(),
+            has_avatar: j.has_avatar,
+            account_created_timestamp: j.account_created_timestamp,
+        })
+        .collect();
+
+    let decision = match sec_api
+        .analyze_new_member(
+            &guild_id.to_string(),
+            &user.id.to_string(),
+            &user.name,
+            user.avatar.is_some(),
+            user.created_at().unix_timestamp(),
+            user.bot,
+            recent_entries,
+        )
+        .await
+    {
+        Ok(d) => d,
+        Err(e) => {
+            error!(error = %e, "Erreur API analyze_new_member");
+            return;
+        }
+    };
+
+    let is_raid = simple_raid || decision.is_raid;
+
+    // ── 2. Executer les decisions de l'API ──
+
+    if is_raid {
+        warn!(guild_id = %guild_id, score = decision.raid_score, "RAID DETECTE");
+
+        if decision.activate_lockdown {
+            if let Ok(mut guild) = guild_id.to_partial_guild(&ctx.http).await {
+                let edit = serenity::builder::EditGuild::new()
+                    .verification_level(serenity::model::guild::VerificationLevel::Higher);
+                if let Err(e) = guild.edit(&ctx.http, edit).await {
+                    error!(error = %e, "Impossible d'activer le lockdown");
+                }
+            }
+            lockdown.activate(ctx, guild_id).await;
+        }
+
+        if decision.slowmode_secs > 0 {
+            slowmode
+                .activate(ctx, guild_id, decision.slowmode_secs as u16)
+                .await;
+        }
+
+        raid_detector.reset(guild_id);
+        recent_joins.reset(guild_id);
+    }
+
+    // Quarantaine + captcha (decision API).
+    if decision.quarantine {
+        if let Some(role_id) = quarantine_role_id {
+            quarantine
+                .quarantine_user(ctx, guild_id, user.id, RoleId::new(role_id))
+                .await;
+
+            if decision.send_captcha {
+                let guild_name = guild_id
+                    .to_partial_guild(&ctx.http)
+                    .await
+                    .map(|g| g.name.clone())
+                    .unwrap_or_else(|_| "Serveur".to_string());
+                send_captcha(
+                    ctx,
+                    user.id,
+                    guild_id,
+                    &guild_name,
+                    &captcha_type,
+                    captcha_pending,
+                )
+                .await;
+            }
+        }
+    }
+
+    // Log si event detecte.
+    if !decision.event_type.is_empty() {
+        info!(
+            guild_id = %guild_id,
+            event = %decision.event_type,
+            desc = %decision.event_description,
+            raid = decision.is_raid,
+            suspicious = decision.is_suspicious_account,
+            alt = decision.is_alt_account,
+            "Security decision appliquee"
+        );
+    }
+}
+
+/// Envoie le captcha adapte selon le type configure.
+async fn send_captcha(
+    ctx: &Context,
+    user_id: UserId,
+    guild_id: GuildId,
+    guild_name: &str,
+    captcha_type: &str,
+    captcha_pending: &CaptchaPending,
+) {
+    match captcha_type {
+        "math" => {
+            captcha::send_math_challenge(ctx, user_id, guild_id, guild_name, captcha_pending).await;
+        }
+        _ => {
+            captcha::send_challenge(ctx, user_id, guild_name).await;
+        }
+    }
+}

@@ -7,8 +7,8 @@ use tracing::{info, warn};
 
 use sentinel_shared::embeds::danger_embed;
 
-use super::super::api_client::ModerationAction;
-use super::super::ModerationApiKey;
+use super::api_client::ModerationAction;
+use super::ModerationApiKey;
 
 pub fn register_massmute() -> CreateCommand {
     CreateCommand::new("massmute")

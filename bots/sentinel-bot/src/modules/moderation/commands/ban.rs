@@ -10,9 +10,9 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{critical_embed, success_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::api_client::ModerationAction;
-use super::super::ModerationApiKey;
-use super::super::risk_check::{
+use super::api_client::ModerationAction;
+use super::ModerationApiKey;
+use super::risk_check::{
     self, PendingKind, RiskyPending, RiskyPendingKey, CANCEL_PREFIX, CONFIRM_PREFIX,
 };
 

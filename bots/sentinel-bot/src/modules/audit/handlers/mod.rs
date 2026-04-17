@@ -7,6 +7,14 @@ pub mod role;
 pub mod thread;
 pub mod voice;
 
+// Re-exports pour les enfants de handlers/ (evite les super::super::)
+pub(super) use super::audit_event;
+pub(super) use super::weekly_report;
+pub(super) use super::watched_users;
+pub(super) use super::permission_diff;
+pub(super) use super::{WeeklyTrackerKey, MessageCacheKey, AnomalyDetectorKey};
+pub(super) use super::{send_event, log, post_to_channel};
+
 use serenity::model::id::ChannelId;
 use serenity::prelude::*;
 

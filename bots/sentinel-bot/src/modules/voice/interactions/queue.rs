@@ -6,7 +6,7 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::super::api_client::{ApiClient, UpdateVoiceChannelRequest};
+use super::api_client::{ApiClient, UpdateVoiceChannelRequest};
 
 /// Handle queue interactions: toggle queue, accept/refuse.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -152,7 +152,7 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
         }
 
         // Placer la file d'attente au-dessus du vocal pour la rendre visible
-        super::super::handlers::voice::channel_lifecycle::place_queue_above_voice(
+        super::handlers::voice::channel_lifecycle::place_queue_above_voice(
             ctx,
             guild_id,
             queue_channel_id,

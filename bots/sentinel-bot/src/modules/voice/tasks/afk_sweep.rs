@@ -5,8 +5,8 @@ use tracing::{info, warn};
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::embeds;
-use super::super::{AfkTrackerKey, VoiceOwnerMapKey};
+use super::embeds;
+use super::{AfkTrackerKey, VoiceOwnerMapKey};
 
 pub fn spawn_afk_sweep(ctx: Context) {
     tokio::spawn(async move {

@@ -3,8 +3,8 @@ use serenity::builder::{CreateActionRow, CreateButton, CreateEmbed, CreateMessag
 use serenity::model::application::{ComponentInteraction, ComponentInteractionDataKind};
 use serenity::prelude::*;
 
-use super::super::{VoiceOwnerMapKey, VoteTrackerKey};
-use super::super::handlers::voice;
+use super::{VoiceOwnerMapKey, VoteTrackerKey};
+use super::handlers::voice;
 
 use super::{find_voice_from_members, respond_ephemeral};
 
@@ -33,7 +33,7 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
     // Verifier le type du salon via l'API
     let channel_kind = {
         let data = ctx.data.read().await;
-        if let Some(api) = super::super::api_client::ApiClient::from_data(&data) {
+        if let Some(api) = super::api_client::ApiClient::from_data(&data) {
             api.get_channel(&voice_channel_id.get().to_string())
                 .await
                 .ok()
@@ -224,7 +224,7 @@ async fn handle_votekick_select(ctx: &Context, component: &ComponentInteraction)
     // Timeout configurable (default 60s, lu depuis VoiceConfig).
     let vote_timeout = {
         let data = ctx.data.read().await;
-        data.get::<super::super::VoiceConfigKey>()
+        data.get::<super::VoiceConfigKey>()
             .map(|c| c.vote_kick_timeout_secs)
             .unwrap_or(60)
     };

@@ -1,0 +1,76 @@
+//! Configuration helpers for the automod module : couleurs d'embeds,
+//! construction de `DetectorConfig`, detection mode nuit.
+
+use sentinel_shared::api_client::BaseApiClient;
+
+use super::detectors::DetectorConfig;
+
+/// Couleurs des embeds lues depuis la config guild.
+pub(super) struct EmbedColors {
+    pub(super) warn: u32,
+    pub(super) delete: u32,
+    pub(super) mute: u32,
+    pub(super) ban: u32,
+}
+
+/// Construit la config des detecteurs depuis la guild config.
+pub(super) fn build_detector_config(config: &std::collections::HashMap<String, String>) -> DetectorConfig {
+    DetectorConfig {
+        spam_enabled: BaseApiClient::config_bool(config, "spam_detection_enabled", true),
+        spam_repeat_char_threshold: BaseApiClient::config_u64(config, "spam_repeat_char_threshold", 6) as usize,
+        spam_repeat_word_threshold: BaseApiClient::config_u64(config, "spam_repeat_word_threshold", 5) as usize,
+        caps_enabled: BaseApiClient::config_bool(config, "caps_warning_enabled", true),
+        caps_threshold_chars: BaseApiClient::config_u64(config, "caps_threshold_chars", 8) as usize,
+        insult_enabled: BaseApiClient::config_bool(config, "insult_detection_enabled", true),
+        insult_custom_words: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "insult_custom_words", "")),
+        link_enabled: BaseApiClient::config_bool(config, "link_detection_enabled", true),
+        allow_discord_invites: BaseApiClient::config_bool(config, "allow_discord_invites", false),
+        allowed_domains: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "allowed_domains", "")),
+        phishing_enabled: BaseApiClient::config_bool(config, "phishing_detection_enabled", true),
+        phishing_extra_whitelist: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "phishing_extra_whitelist", "")),
+        emoji_spam_enabled: BaseApiClient::config_bool(config, "emoji_spam_enabled", true),
+        emoji_spam_max: BaseApiClient::config_u64(config, "emoji_spam_max", 10) as usize,
+        mentions_enabled: BaseApiClient::config_bool(config, "mentions_enabled", true),
+        mentions_max: BaseApiClient::config_u64(config, "mentions_max", 5) as usize,
+        suspicious_files_enabled: BaseApiClient::config_bool(config, "suspicious_files_enabled", true),
+        suspicious_file_extensions: sentinel_shared::parsers::split_csv(&BaseApiClient::config_or(config, "suspicious_file_extensions", "")),
+        unicode_enabled: BaseApiClient::config_bool(config, "unicode_detection_enabled", true),
+        unicode_max_combining: BaseApiClient::config_u64(config, "unicode_max_combining", 3) as usize,
+        unicode_max_invisible: BaseApiClient::config_u64(config, "unicode_max_invisible", 5) as usize,
+    }
+}
+
+/// Construit les couleurs d'embeds depuis la guild config.
+pub(super) fn build_embed_colors(config: &std::collections::HashMap<String, String>) -> EmbedColors {
+    EmbedColors {
+        warn:   parse_color(&BaseApiClient::config_or(config, "color_warn",   "f59e0b"), 0xf59e0b),
+        delete: parse_color(&BaseApiClient::config_or(config, "color_delete", "f97316"), 0xf97316),
+        mute:   parse_color(&BaseApiClient::config_or(config, "color_mute",   "ef4444"), 0xef4444),
+        ban:    parse_color(&BaseApiClient::config_or(config, "color_ban",    "dc2626"), 0xdc2626),
+    }
+}
+
+/// Parse une couleur hex (avec ou sans #) vers u32. Retourne `default` si invalide.
+fn parse_color(hex: &str, default: u32) -> u32 {
+    u32::from_str_radix(hex.trim_start_matches('#'), 16).unwrap_or(default)
+}
+
+/// Verifie si l'heure actuelle est dans la plage de nuit.
+pub(super) fn is_night_mode(start: u8, end: u8) -> bool {
+    let hour = time::OffsetDateTime::now_utc().hour();
+    if start > end {
+        // Passage par minuit (ex: 22h-8h)
+        hour >= start || hour < end
+    } else {
+        hour >= start && hour < end
+    }
+}
+
+/// Reduit les seuils de detection pour le mode nuit (seuils divises par ~2).
+pub(super) fn apply_night_mode(config: &mut DetectorConfig) {
+    config.spam_repeat_char_threshold = (config.spam_repeat_char_threshold / 2).max(4);
+    config.spam_repeat_word_threshold = (config.spam_repeat_word_threshold / 2).max(3);
+    config.caps_threshold_chars = (config.caps_threshold_chars / 2).max(6);
+    config.emoji_spam_max = (config.emoji_spam_max / 2).max(5);
+    config.mentions_max = (config.mentions_max / 2).max(3);
+}

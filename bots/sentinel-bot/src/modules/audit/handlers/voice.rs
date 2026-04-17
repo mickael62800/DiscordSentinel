@@ -1,10 +1,10 @@
 use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 
-use super::super::audit_event;
-use super::super::{WeeklyTrackerKey, watched_users};
-use super::super::{send_event, log};
-use super::super::weekly_report::StatField;
+use super::audit_event;
+use super::{WeeklyTrackerKey, watched_users};
+use super::{send_event, log};
+use super::weekly_report::StatField;
 
 pub async fn handle_state_update(ctx: &Context, old: Option<VoiceState>, new: &VoiceState) {
     let gid = match new.guild_id {

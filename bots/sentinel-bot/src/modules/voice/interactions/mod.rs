@@ -6,6 +6,11 @@ pub mod queue;
 pub mod transfer;
 pub mod vote_kick;
 
+// Re-exports pour les enfants de interactions/ (evite les super::super::)
+pub(super) use super::api_client;
+pub(super) use super::handlers;
+pub(super) use super::{VoiceOwnerMapKey, VoteTrackerKey, VoiceConfigKey, TextToVoiceMapKey};
+
 use serenity::model::application::ComponentInteraction;
 use serenity::model::application::ModalInteraction;
 use serenity::model::id::ChannelId;
@@ -13,7 +18,7 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use super::api_client::{ApiClient, VoiceChannelResponse};
-use super::{TextToVoiceMapKey, MembersToVoiceMapKey};
+use super::MembersToVoiceMapKey;
 
 // ── Helpers ──
 

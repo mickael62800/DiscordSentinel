@@ -9,7 +9,7 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::super::api_client::{ApiClient, AddWhitelistRequest, BanFromChannelRequest};
+use super::api_client::{ApiClient, AddWhitelistRequest, BanFromChannelRequest};
 
 /// Handle access control interactions: invite, kick, ban.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {

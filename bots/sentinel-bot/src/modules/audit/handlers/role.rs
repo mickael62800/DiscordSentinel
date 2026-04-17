@@ -2,11 +2,11 @@ use serenity::model::guild::Role;
 use serenity::model::id::{GuildId, RoleId};
 use serenity::prelude::*;
 
-use super::super::audit_event;
-use super::super::permission_diff;
-use super::super::{AnomalyDetectorKey, WeeklyTrackerKey};
-use super::super::{send_event, log, post_to_channel};
-use super::super::weekly_report::StatField;
+use super::audit_event;
+use super::permission_diff;
+use super::{AnomalyDetectorKey, WeeklyTrackerKey};
+use super::{send_event, log, post_to_channel};
+use super::weekly_report::StatField;
 
 pub async fn handle_create(ctx: &Context, new: &Role) {
     let gid = new.guild_id;

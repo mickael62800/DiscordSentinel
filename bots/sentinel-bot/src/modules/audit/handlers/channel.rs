@@ -1,9 +1,9 @@
 use serenity::model::channel::{GuildChannel, Message};
 use serenity::prelude::*;
 
-use super::super::audit_event;
-use super::super::{WeeklyTrackerKey, send_event, log};
-use super::super::weekly_report::StatField;
+use super::audit_event;
+use super::{WeeklyTrackerKey, send_event, log};
+use super::weekly_report::StatField;
 
 pub async fn handle_create(ctx: &Context, channel: &GuildChannel) {
     let gid = channel.guild_id;

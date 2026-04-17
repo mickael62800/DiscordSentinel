@@ -6,7 +6,7 @@ use tracing::{error, warn};
 
 use sentinel_shared::embeds::{info_embed, action_emoji};
 
-use super::super::ModerationApiKey;
+use super::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("history")

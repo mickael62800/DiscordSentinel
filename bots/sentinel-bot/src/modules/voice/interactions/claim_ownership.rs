@@ -7,8 +7,8 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use super::super::api_client::ApiClient;
-use super::super::{TextToVoiceMapKey, VoiceOwnerMapKey};
+use super::api_client::ApiClient;
+use super::{TextToVoiceMapKey, VoiceOwnerMapKey};
 
 /// Gere le clic sur `btn_claim_ownership_{voice_channel_id}`.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
@@ -57,7 +57,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             super::respond_ephemeral(ctx, component, "Erreur interne API.").await;
             return;
         };
-        let req = super::super::api_client::TransferOwnershipRequest {
+        let req = super::api_client::TransferOwnershipRequest {
             new_owner_id: user_id.get().to_string(),
             new_owner_name: new_owner_name.clone(),
         };

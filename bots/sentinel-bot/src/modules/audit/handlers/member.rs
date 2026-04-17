@@ -8,10 +8,10 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use tracing::warn;
 
-use super::super::{audit_event, watched_users};
-use super::super::{AnomalyDetectorKey, WeeklyTrackerKey};
-use super::super::{send_event, log, post_to_channel};
-use super::super::weekly_report::StatField;
+use super::{audit_event, watched_users};
+use super::{AnomalyDetectorKey, WeeklyTrackerKey};
+use super::{send_event, log, post_to_channel};
+use super::weekly_report::StatField;
 
 pub async fn handle_addition(ctx: &Context, new_member: &Member) {
     let gid = new_member.guild_id;

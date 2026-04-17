@@ -8,7 +8,7 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::super::api_client::{ApiClient, UpdateVoiceChannelRequest};
+use super::api_client::{ApiClient, UpdateVoiceChannelRequest};
 
 /// Handle channel management interactions.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {

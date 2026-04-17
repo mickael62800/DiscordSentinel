@@ -6,8 +6,8 @@ use tracing::{error, warn};
 
 use sentinel_shared::embeds::info_embed;
 
-use super::super::api_client::ModStatsEntry;
-use super::super::ModerationApiKey;
+use super::api_client::ModStatsEntry;
+use super::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("modstats")

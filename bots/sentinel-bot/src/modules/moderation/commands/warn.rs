@@ -8,8 +8,8 @@ use tracing::{error, info, warn};
 
 use sentinel_shared::embeds::{sentinel_embed, gravity_color, gravity_emoji, danger_embed, moderate_embed};
 
-use super::super::api_client::ModerationAction;
-use super::super::ModerationApiKey;
+use super::api_client::ModerationAction;
+use super::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("warn")

@@ -8,7 +8,7 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::super::api_client::{ApiClient, AddCoAdminRequest};
+use super::api_client::{ApiClient, AddCoAdminRequest};
 
 /// Handle co-admin interactions: promote/demote.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {

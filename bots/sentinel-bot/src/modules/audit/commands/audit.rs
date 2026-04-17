@@ -7,8 +7,8 @@ use sentinel_shared::discord_helpers::reply_ephemeral_embed;
 use sentinel_shared::embeds::info_embed;
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::api_client::ApiClient;
-use super::super::WeeklyTrackerKey;
+use super::api_client::ApiClient;
+use super::WeeklyTrackerKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("audit")

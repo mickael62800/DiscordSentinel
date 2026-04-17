@@ -8,8 +8,8 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{info_embed, success_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::super::ModerationApiKey;
-use super::super::reason_templates::{self, ReasonTemplate};
+use super::ModerationApiKey;
+use super::reason_templates::{self, ReasonTemplate};
 
 const CONFIG_KEY: &str = "reason_templates";
 const BOT_NAME: &str = "moderation-bot";

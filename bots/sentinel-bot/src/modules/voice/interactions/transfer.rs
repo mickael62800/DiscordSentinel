@@ -8,8 +8,8 @@ use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
 
-use super::super::api_client::{ApiClient, TransferOwnershipRequest};
-use super::super::VoiceOwnerMapKey;
+use super::api_client::{ApiClient, TransferOwnershipRequest};
+use super::VoiceOwnerMapKey;
 
 /// Handle transfer interactions.
 pub async fn handle(ctx: &Context, component: &ComponentInteraction) {

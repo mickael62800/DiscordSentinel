@@ -1,8 +1,8 @@
 use serenity::model::event::{InviteCreateEvent, InviteDeleteEvent};
 use serenity::prelude::*;
 
-use super::super::audit_event;
-use super::super::{send_event, log};
+use super::audit_event;
+use super::{send_event, log};
 
 pub async fn handle_create(ctx: &Context, data: &InviteCreateEvent) {
     let gid = match data.guild_id {

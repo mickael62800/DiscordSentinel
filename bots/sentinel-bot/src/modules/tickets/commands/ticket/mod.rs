@@ -89,7 +89,7 @@ async fn handle_close(
 ) -> Result<(), serenity::Error> {
     use serenity::model::channel::ChannelType;
     use sentinel_shared::heartbeat::ApiClientKey;
-    use super::super::api_client::ApiClient;
+    use super::api_client::ApiClient;
     use tracing::{info, warn};
 
     let channel_name = command

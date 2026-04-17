@@ -7,7 +7,7 @@ use tracing::{error, warn};
 
 use sentinel_shared::embeds::info_embed;
 
-use super::super::ModerationApiKey;
+use super::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("expirations")

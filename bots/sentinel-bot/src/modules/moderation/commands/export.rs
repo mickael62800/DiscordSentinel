@@ -5,8 +5,8 @@ use serenity::all::{
 };
 use tracing::{error, warn};
 
-use super::super::api_client::ModerationActionResponse;
-use super::super::ModerationApiKey;
+use super::api_client::ModerationActionResponse;
+use super::ModerationApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("export")

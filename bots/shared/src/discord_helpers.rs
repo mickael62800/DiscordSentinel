@@ -2,7 +2,7 @@
 /// Evite la duplication des reply_text, reply_ephemeral, etc.
 
 use serenity::all::{
-    CommandInteraction, ComponentInteraction, Context, CreateEmbed,
+    ChannelId, CommandInteraction, ComponentInteraction, Context, CreateEmbed,
     CreateInteractionResponse, CreateInteractionResponseFollowup,
     CreateInteractionResponseMessage,
 };
@@ -161,4 +161,15 @@ pub async fn guild_config_or_default(
         return std::collections::HashMap::new();
     };
     api.get_guild_config(guild_id).await.unwrap_or_default()
+}
+
+/// Lit le `log_channel_id` dans la config guild et retourne le `ChannelId`
+/// correspondant s'il est configure et valide (> 0). Retourne None sinon.
+pub async fn get_log_channel(ctx: &Context, guild_id: &str) -> Option<ChannelId> {
+    let config = guild_config_or_default(ctx, guild_id).await;
+    config
+        .get("log_channel_id")
+        .and_then(|v| v.parse::<u64>().ok())
+        .filter(|id| *id > 0)
+        .map(ChannelId::new)
 }

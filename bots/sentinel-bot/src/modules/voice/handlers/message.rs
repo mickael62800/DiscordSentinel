@@ -2,8 +2,8 @@ use serenity::model::channel::Message;
 use serenity::prelude::*;
 use tracing::{error, info};
 
-use super::super::api_client::{ApiClient, LogModerationActionRequest};
-use super::super::{FloodTrackerKey, MembersToVoiceMapKey};
+use super::api_client::{ApiClient, LogModerationActionRequest};
+use super::{FloodTrackerKey, MembersToVoiceMapKey};
 
 pub async fn handle_message(ctx: &Context, msg: &Message) {
     if msg.author.bot {
@@ -44,7 +44,7 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
     // Mute configurable (default 30s, lu depuis VoiceConfig).
     let mute_secs = {
         let data = ctx.data.read().await;
-        data.get::<super::super::VoiceConfigKey>()
+        data.get::<super::VoiceConfigKey>()
             .map(|c| c.flood_mute_duration_secs as i64)
             .unwrap_or(30)
     };

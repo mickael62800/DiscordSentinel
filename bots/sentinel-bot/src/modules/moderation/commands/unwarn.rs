@@ -5,7 +5,7 @@ use serenity::all::{
 };
 use tracing::{info, warn};
 
-use super::super::ModerationApiKey;
+use super::ModerationApiKey;
 
 pub const UNWARN_PREFIX: &str = "mod_unwarn:";
 
