@@ -73,8 +73,11 @@ impl AppConfig {
                 .parse()
                 .unwrap_or(30),
             allowed_origins: std::env::var("ALLOWED_ORIGINS").unwrap_or_default(),
-            discord_bot_token: std::env::var("AUTOMOD_DISCORD_TOKEN")
-                .or_else(|_| std::env::var("MODERATION_DISCORD_TOKEN"))
+            // Token Discord : priorite SENTINEL_DISCORD_TOKEN (bot unifie),
+            // fallback sur DISCORD_TOKEN. Les anciens noms par bot
+            // (AUTOMOD_DISCORD_TOKEN, MODERATION_DISCORD_TOKEN) sont abandonnes.
+            discord_bot_token: std::env::var("SENTINEL_DISCORD_TOKEN")
+                .or_else(|_| std::env::var("DISCORD_TOKEN"))
                 .unwrap_or_default(),
             superadmin_user_ids: std::env::var("SUPERADMIN_USER_IDS")
                 .unwrap_or_default()

@@ -58,7 +58,7 @@ impl DiscordApiService {
     fn ensure_configured(&self) -> Result<(), DomainError> {
         if self.token.is_empty() {
             return Err(DomainError::Internal(
-                "MODERATION_DISCORD_TOKEN non configure".into(),
+                "SENTINEL_DISCORD_TOKEN non configure".into(),
             ));
         }
         Ok(())

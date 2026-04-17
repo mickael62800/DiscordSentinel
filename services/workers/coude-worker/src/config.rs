@@ -27,7 +27,11 @@ impl WorkerConfig {
             database_url: load_database_url(),
             api_url: load_api_url(),
             combat_expiry_check_secs: load_env("COMBAT_EXPIRY_CHECK_SECS", DEFAULT_COMBAT_EXPIRY_CHECK_SECS),
-            discord_bot_token: std::env::var("COUDE_DISCORD_TOKEN").unwrap_or_default(),
+            // Token Discord : priorite SENTINEL_DISCORD_TOKEN (bot unifie),
+            // fallback DISCORD_TOKEN.
+            discord_bot_token: std::env::var("SENTINEL_DISCORD_TOKEN")
+                .or_else(|_| std::env::var("DISCORD_TOKEN"))
+                .unwrap_or_default(),
             betting_check_secs: load_env("BETTING_CHECK_SECS", 30),
             hp_regen_tick_secs: load_env("HP_REGEN_TICK_SECS", 300),
             cashbox_tick_secs: load_env("CASHBOX_TICK_SECS", DEFAULT_CASHBOX_TICK_SECS),

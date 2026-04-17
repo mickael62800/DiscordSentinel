@@ -10,7 +10,7 @@ pub struct BaseConfig {
 impl BaseConfig {
     /// Charge la config de base depuis les variables d'environnement.
     /// `token_var` est le nom de la variable pour le token Discord
-    /// (ex: "DISCORD_TOKEN", "AUDIT_DISCORD_TOKEN").
+    /// (ex: "SENTINEL_DISCORD_TOKEN", "DISCORD_TOKEN").
     pub fn from_env(token_var: &str) -> Self {
         Self {
             discord_token: std::env::var(token_var)
@@ -78,7 +78,7 @@ pub fn load_env_bool(key: &str, default: bool) -> bool {
 /// Evite le boilerplate d'un struct + impl BotConfig dans chaque bot.
 ///
 /// ```ignore
-/// let config = SimpleConfig::from_env("MODERATION_DISCORD_TOKEN");
+/// let config = SimpleConfig::from_env("SENTINEL_DISCORD_TOKEN");
 /// ```
 #[derive(Clone)]
 pub struct SimpleConfig {

@@ -29,7 +29,7 @@ impl ManageConductService {
     /// Mute un utilisateur via l'API Discord (timeout 10 minutes)
     async fn mute_user(&self, guild_id: &str, user_id: &str) {
         if self.discord_bot_token.is_empty() {
-            tracing::warn!("MODERATION_DISCORD_TOKEN non configure, mute impossible");
+            tracing::warn!("SENTINEL_DISCORD_TOKEN non configure, mute impossible");
             return;
         }
 

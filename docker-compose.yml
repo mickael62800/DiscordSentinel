@@ -149,7 +149,10 @@ services:
       # Liste (comma-separated) des Discord user_ids superadmin — bypassent
       # toutes les gates RBAC (y compris owner) sur toutes les guilds.
       SUPERADMIN_USER_IDS: ${SUPERADMIN_USER_IDS:-}
-      AUTOMOD_DISCORD_TOKEN: ${AUTOMOD_DISCORD_TOKEN}
+      # Token Discord unifie (fallback sur DISCORD_TOKEN si non defini).
+      # Utilise par l'API pour fetcher les images Discord (AnalyzeImageService)
+      # et pour les actions moderation (mute, ban via Discord REST).
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       VISION_MODEL_PATH: /models/vision/vision_sentinel.onnx
       TEXT_MODEL_PATH: /models/text/text_sentinel.onnx
       TEXT_TOKENIZER_PATH: /models/text/tokenizer.json
@@ -387,9 +390,8 @@ services:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
       API_KEY: ${API_KEY:-}
-      # Reutilise le token moderation-bot (doit avoir VIEW_AUDIT_LOG sur toutes
-      # les guilds a sync)
-      MODERATION_DISCORD_TOKEN: ${MODERATION_DISCORD_TOKEN:-}
+      # Token Discord unifie (doit avoir VIEW_AUDIT_LOG sur toutes les guilds).
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       AUDIT_SYNC_INTERVAL: ${AUDIT_SYNC_INTERVAL:-300}
       RUST_LOG: info
     depends_on:
@@ -497,7 +499,7 @@ services:
       API_KEY: ${API_KEY:-}
       COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
       BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
-      COUDE_DISCORD_TOKEN: ${COUDE_DISCORD_TOKEN}
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       RUST_LOG: info
     depends_on:
       postgres:

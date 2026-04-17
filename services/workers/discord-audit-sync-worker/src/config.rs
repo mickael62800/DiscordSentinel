@@ -20,11 +20,10 @@ impl WorkerConfig {
         Self {
             database_url: load_database_url(),
             api_url: load_api_url(),
-            // On tente plusieurs variantes — le meme token qu'utilise
-            // moderation-bot ou automod-bot fait l'affaire.
-            discord_bot_token: std::env::var("MODERATION_DISCORD_TOKEN")
-                .or_else(|_| std::env::var("AUTOMOD_DISCORD_TOKEN"))
-                .or_else(|_| std::env::var("DISCORD_BOT_TOKEN"))
+            // Token Discord : priorite SENTINEL_DISCORD_TOKEN (bot unifie),
+            // fallback DISCORD_TOKEN.
+            discord_bot_token: std::env::var("SENTINEL_DISCORD_TOKEN")
+                .or_else(|_| std::env::var("DISCORD_TOKEN"))
                 .unwrap_or_default(),
             sync_interval_secs: load_env("AUDIT_SYNC_INTERVAL", DEFAULT_SYNC_INTERVAL_SECS),
         }
