@@ -114,7 +114,7 @@ function fieldStatus(field: ConfigField): { text: string; source: "db" | "defaul
     return { text: "Non configure", source: "none" };
   }
 
-  // Bot: show type descriptions
+  // Module: show type descriptions
   const typeLabel =
     field.type === "channel" ? "ID du salon"
     : field.type === "role" ? "ID du role"
@@ -226,7 +226,7 @@ watch(selectedComponent, loadFormValues);
   <div class="page">
     <header class="page-header">
       <h1>Configuration des composants</h1>
-      <p class="page-subtitle">Parametrer chaque bot et worker pour le serveur selectionne</p>
+      <p class="page-subtitle">Parametrer chaque module et worker pour le serveur selectionne</p>
     </header>
 
     <div v-if="!selectedGuildId" class="empty-state">
@@ -239,7 +239,7 @@ watch(selectedComponent, loadFormValues);
         <span class="server-name">{{ selectedGuild?.name }}</span>
       </div>
 
-      <!-- Grid of all components (bots + workers) — 3 colonnes -->
+      <!-- Grid of all components (modules + workers) — 3 colonnes -->
       <div class="component-grid">
         <div
           v-for="def in definitions"
@@ -265,7 +265,7 @@ watch(selectedComponent, loadFormValues);
               />
               <AppBadge
                 v-else
-                label="Bot"
+                label="Module"
                 variant="info"
               />
             </div>
@@ -296,7 +296,7 @@ watch(selectedComponent, loadFormValues);
           />
           <AppBadge
             v-else
-            label="Bot"
+            label="Module"
             variant="info"
           />
         </div>
