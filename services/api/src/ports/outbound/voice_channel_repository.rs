@@ -5,7 +5,6 @@ use crate::domain::entities::{VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-#[allow(dead_code)]
 pub trait VoiceChannelRepository: Send + Sync {
     // Channels
     async fn find_all(&self) -> Result<Vec<VoiceChannel>, DomainError>;

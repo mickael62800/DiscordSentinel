@@ -33,7 +33,7 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
@@ -522,12 +522,3 @@ fn proto_user_stats_to_response(u: proto_stats::UserStats) -> UserStatsResponse 
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
 
-// On garde l'ancienne structure inutilisee mais conservee pour compat eventuelle.
-#[derive(Debug, Serialize)]
-#[allow(dead_code)]
-struct RecordMessagesPayload {
-    guild_id: String,
-    user_id: String,
-    username: String,
-    count: u64,
-}

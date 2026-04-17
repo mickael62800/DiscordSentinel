@@ -74,38 +74,3 @@ pub fn roll_chaos() -> Option<ChaosEvent> {
     }
 }
 
-/// Messages fun pour chaque type d'evenement chaos.
-#[allow(dead_code)]
-pub const CHAOS_CRITIQUE: &[&str] = &[
-    "\u{1f4a5} **CRITIQUE SAUVAGE !** {attaquant} met TOUTE sa force dans ce coup !",
-    "\u{26a1} Un eclair de puissance ! {attaquant} frappe deux fois plus fort !",
-    "\u{1f525} {attaquant} voit rouge et declenche un coup DEVASTATEUR !",
-];
-
-#[allow(dead_code)]
-pub const CHAOS_ESQUIVE: &[&str] = &[
-    "\u{2728} **ESQUIVE DIVINE !** {defenseur} esquive avec grace et contre-attaque !",
-    "\u{1f300} {defenseur} disparait comme un ninja et frappe dans le dos !",
-    "\u{1fa9e} {defenseur} fait un pas de cote digne d'un film et riposte !",
-];
-
-#[allow(dead_code)]
-pub const CHAOS_ACCIDENT: &[&str] = &[
-    "\u{1f4a9} **ACCIDENT DEBILE !** Les deux joueurs se cognent la tete en meme temps !",
-    "\u{1f921} Les deux glissent dans une flaque et se font mal !",
-    "\u{1f414} Un poulet traverse l'arene ! Les deux trebuchent !",
-];
-
-#[allow(dead_code)]
-pub const CHAOS_GLISSADE: &[&str] = &[
-    "\u{1faa4} **GLISSADE !** {attaquant} marche sur une peau de banane et se frappe !",
-    "\u{1f9ca} {attaquant} glisse sur du verglas et s'auto-KO ce round !",
-    "\u{1f938} {attaquant} tente une pirouette... et se met un coup de coude a lui-meme !",
-];
-
-#[allow(dead_code)]
-pub const CHAOS_VOL: &[&str] = &[
-    "\u{1f4b0} **VOL A LA TIRE !** Pendant le chaos, des coins tombent des poches !",
-    "\u{1f412} Un singe vole des coins et les donne au plus fort !",
-    "\u{1f32a}\u{fe0f} Le vent souffle des coins d'une poche a l'autre !",
-];

@@ -1,11 +1,9 @@
 use std::sync::Arc;
 
 use serenity::builder::{
-    CreateActionRow, CreateButton, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
+    CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, EditChannel,
 };
-use serenity::model::application::ButtonStyle;
-use serenity::model::channel::Message;
 use serenity::model::guild::Member;
 use serenity::model::id::{ChannelId, GuildId, RoleId};
 use serenity::model::user::User;
@@ -296,30 +294,3 @@ async fn handle_rules_accept(
     info!(user = %component.user.name, guild = %guild_id, "Reglement accepte");
 }
 
-/// Cree le message de reglement avec le bouton d'acceptation.
-/// Sera appele par la commande /welcome rules-post (a implementer).
-#[allow(dead_code)]
-pub async fn post_rules_message(
-    ctx: &Context,
-    channel_id: ChannelId,
-    message: &str,
-    button_label: &str,
-) -> Result<Message, serenity::Error> {
-    let embed = CreateEmbed::new()
-        .title("Reglement du serveur")
-        .description(message)
-        .color(0x2ecc71);
-
-    let button = CreateButton::new(RULES_ACCEPT_ID)
-        .label(button_label)
-        .style(ButtonStyle::Success);
-
-    let row = CreateActionRow::Buttons(vec![button]);
-
-    channel_id
-        .send_message(
-            &ctx.http,
-            CreateMessage::new().embed(embed).components(vec![row]),
-        )
-        .await
-}

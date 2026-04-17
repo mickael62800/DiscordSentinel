@@ -157,22 +157,6 @@ pub async fn get_channel_name(ctx: &Context, channel_id: ChannelId) -> String {
         .unwrap_or_else(|| format!("{channel_id}"))
 }
 
-// Legacy stubs -- kept for compatibility with code that still calls them
-#[allow(dead_code)]
-pub async fn log_channel_created(_ctx: &Context, _creator_id: u64, _channel_type: &str, _channel_name: &str, _options: &str) {}
-#[allow(dead_code)]
-pub async fn log_channel_deleted(_ctx: &Context, _channel_name: &str, _channel_type: &str) {}
-#[allow(dead_code)]
-pub async fn log_member_joined(_ctx: &Context, _user_id: u64, _channel_name: &str) {}
-#[allow(dead_code)]
-pub async fn log_member_left(_ctx: &Context, _user_id: u64, _channel_name: &str) {}
-#[allow(dead_code)]
-pub async fn log_vote_kick(_ctx: &Context, _target_id: u64, _channel_name: &str, _result: &str) {}
-#[allow(dead_code)]
-pub async fn log_transfer(_ctx: &Context, _from_id: u64, _to_id: u64, _channel_name: &str) {}
-#[allow(dead_code)]
-pub async fn log_ban(_ctx: &Context, _user_id: u64, _channel_name: &str, _duration: &str) {}
-#[allow(dead_code)]
-pub async fn log_flood_mute(_ctx: &Context, _user_id: u64, _channel_name: &str, _duration_secs: u64) {}
+// Legacy stub -- still called by afk_sweep
 #[allow(dead_code)]
 pub async fn log_afk_move(_ctx: &Context, _user_id: u64, _from_channel: &str, _to_channel: &str, _afk_minutes: u64) {}
