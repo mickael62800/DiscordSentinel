@@ -39,8 +39,8 @@ fi
 INFRA=(postgres redis)
 BACKEND=(api)
 GATEWAY=(gateway)
-WORKERS=(moderation-worker analytics-worker monitoring-worker cache-worker cleanup-worker coude-worker)
-BOTS=(automod-bot moderation-bot security-bot ticket-bot image-bot voice-bot progression-bot audit-bot community-bot roles-bot coude-bot)
+WORKERS=(moderation-worker analytics-worker monitoring-worker cache-worker cleanup-worker coude-worker ai-worker appeal-sla-worker audit-cache-worker blackjack-cleanup-worker discord-audit-sync-worker export-worker temp-roles-worker)
+BOTS=(sentinel-bot)
 
 ALL_SERVICES=("${INFRA[@]}" "${BACKEND[@]}" "${GATEWAY[@]}" "${WORKERS[@]}" "${BOTS[@]}")
 TOTAL=${#ALL_SERVICES[@]}

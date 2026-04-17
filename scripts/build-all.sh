@@ -39,8 +39,8 @@ if ! docker info &>/dev/null; then
   exit 1
 fi
 
-# Liste de tous les services a builder (ordre: bots, workers, gateway, api)
-BOTS=(automod-bot moderation-bot security-bot ticket-bot image-bot voice-bot progression-bot audit-bot community-bot roles-bot coude-bot blackjack-bot cleanup-bot game-bot welcome-bot)
+# Liste de tous les services a builder (ordre: bot, workers, gateway, api)
+BOTS=(sentinel-bot)
 WORKERS=(moderation-worker analytics-worker monitoring-worker cache-worker cleanup-worker coude-worker ai-worker appeal-sla-worker audit-cache-worker blackjack-cleanup-worker discord-audit-sync-worker export-worker temp-roles-worker)
 SERVICES=("${BOTS[@]}" "${WORKERS[@]}" gateway api)
 TOTAL=${#SERVICES[@]}

@@ -40,7 +40,11 @@
       "Bash(sudo iptables:*)",
       "Bash(curl:*)",
       "Bash(sudo ip6tables:*)",
-      "Bash(docker compose:*)"
+      "Bash(docker compose:*)",
+      "Bash(docker volume *)",
+      "Bash(docker network *)",
+      "Bash(grep -E \"^\\(sentinel-bot|ai-worker|analytics-worker|appeal-sla-worker|audit-cache-worker|blackjack-cleanup-worker|cache-worker|cleanup-worker|coude-worker|discord-audit-sync-worker|export-worker|moderation-worker|monitoring-worker|temp-roles-worker|api|gateway\\)$\")",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
