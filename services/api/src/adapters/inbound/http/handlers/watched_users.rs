@@ -22,7 +22,7 @@ pub async fn list_watched_users(
     Query(params): Query<WatchedUsersQueryParams>,
 ) -> Result<Json<Vec<WatchedUserResponseDto>>, ApiError> {
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200);
-    let offset = params.offset.unwrap_or(0).max(0);
+    let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset);
     let users = state
         .watched_users_uc
         .list_watched_users(params.guild_id.as_deref(), limit, offset)

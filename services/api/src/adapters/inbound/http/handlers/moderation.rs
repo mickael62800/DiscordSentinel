@@ -352,7 +352,7 @@ pub async fn list_bans(
     validation::validate_pagination(params.limit, params.offset).map_err(ApiError)?;
 
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500);
-    let offset = params.offset.unwrap_or(0).max(0);
+    let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset);
     let bans = state
         .moderation_uc
         .list_bans(params.guild_id.as_deref(), limit, offset)

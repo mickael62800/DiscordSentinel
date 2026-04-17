@@ -5,7 +5,7 @@ use crate::adapters::inbound::http::dto::audit_logs::{
     AuditLogQueryParams, AuditLogResponseDto, CreateAuditLogDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
+use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, normalize_offset, single_dto};
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
@@ -50,7 +50,7 @@ pub async fn list_audit_logs(
         actor_id: params.actor_id,
         target_id: params.target_id,
         limit: normalize_limit(params.limit, 100, 500),
-        offset: params.offset.unwrap_or(0),
+        offset: normalize_offset(params.offset),
     };
 
     let logs = state

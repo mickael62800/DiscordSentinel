@@ -3,6 +3,7 @@ use axum::{Extension, Json};
 
 use crate::adapters::inbound::http::dto::notes::{AddNoteDto, UserNoteDto};
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
@@ -70,7 +71,7 @@ pub async fn delete_note(
         .bind(note_uuid)
         .fetch_optional(&state.pg_pool)
         .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("fetch note guild_id: {e}"))))?;
+        .map_err(sqlx_internal("fetch note guild_id"))?;
 
         if let Some((guild_id,)) = row {
             check_role_for_guild(

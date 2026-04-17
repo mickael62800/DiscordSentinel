@@ -5,11 +5,11 @@ use crate::adapters::inbound::http::dto::security::{
     ReportEventDto, SecurityEventResponseDto, SecurityQueryParams,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::domain::errors::DomainError;
 
 /// POST /api/security/events — signaler un événement de sécurité (depuis le security-bot)
 pub async fn report_event(
@@ -64,7 +64,7 @@ pub async fn purge_events(
     .bind(&guild_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("purge audit security: {e}"))))?;
+    .map_err(sqlx_internal("purge audit security"))?;
 
     let _ = sqlx::query("DELETE FROM security_events WHERE guild_id = $1")
         .bind(&guild_id)
@@ -79,7 +79,7 @@ pub async fn purge_events(
     .bind(&guild_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("purge auto watch: {e}"))))?;
+    .map_err(sqlx_internal("purge auto watch"))?;
 
     Ok(Json(serde_json::json!({
         "deleted_events": events.rows_affected(),

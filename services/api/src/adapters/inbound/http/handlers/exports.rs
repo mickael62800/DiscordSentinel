@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
@@ -104,7 +105,7 @@ pub async fn create_export_job(
     .bind(&dto.filters)
     .fetch_one(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("export_jobs insert: {e}"))))?;
+    .map_err(sqlx_internal("export_jobs insert"))?;
 
     Ok((
         StatusCode::ACCEPTED,
@@ -131,7 +132,7 @@ pub async fn get_export_job(
     .bind(uuid)
     .fetch_optional(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("export_jobs select: {e}"))))?
+    .map_err(sqlx_internal("export_jobs select"))?
     .ok_or_else(|| ApiError(DomainError::NotFound(format!("export_job {id}"))))?;
 
     Ok(Json(job))

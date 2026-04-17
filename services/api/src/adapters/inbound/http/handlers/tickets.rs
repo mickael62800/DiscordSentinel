@@ -7,6 +7,7 @@ use crate::adapters::inbound::http::dto::tickets::{
     UpdateStatusDto, UpdateTicketChannelDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
@@ -24,7 +25,7 @@ pub async fn list_tickets(
     validation::validate_search(&params.search).map_err(ApiError)?;
 
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200);
-    let offset = params.offset.unwrap_or(0).max(0);
+    let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset);
     let tickets = state.tickets_uc.list_tickets(params.status, params.priority, params.search, params.author_id, limit, offset).await?;
     Ok(map_to_dtos(tickets))
 }
@@ -281,7 +282,7 @@ pub async fn bulk_delete_tickets(
     .bind(to_dt)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("bulk_delete_tickets: {e}"))))?;
+    .map_err(sqlx_internal("bulk_delete_tickets"))?;
 
     let deleted = res.rows_affected();
     tracing::info!(

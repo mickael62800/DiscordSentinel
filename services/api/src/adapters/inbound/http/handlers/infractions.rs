@@ -3,7 +3,7 @@ use axum::{Extension, Json};
 
 use crate::adapters::inbound::http::dto::infractions::{InfractionQueryParams, InfractionResponseDto};
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, ok_response};
+use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, normalize_offset, ok_response};
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
@@ -21,7 +21,7 @@ pub async fn list_infractions(
         user_id: params.user_id,
         action: params.action,
         limit: normalize_limit(params.limit, 50, 200),
-        offset: params.offset.unwrap_or(0),
+        offset: normalize_offset(params.offset),
     };
 
     let infractions = state.infractions_uc.list_infractions(&guild_id, filters).await?;

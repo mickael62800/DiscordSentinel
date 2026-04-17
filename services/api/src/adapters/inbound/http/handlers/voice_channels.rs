@@ -9,6 +9,7 @@ use crate::adapters::inbound::http::dto::voice_channels::{
     WhitelistEntryResponseDto,
 };
 use crate::adapters::inbound::http::errors::ApiError;
+use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
 use crate::adapters::inbound::http::middleware::rbac::{
     check_role_for_guild, require_role, Role, RoleContext,
@@ -39,7 +40,7 @@ async fn gate_by_channel_id(
     .bind(channel_id)
     .fetch_optional(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("fetch voice channel guild: {e}"))))?;
+    .map_err(sqlx_internal("fetch voice channel guild"))?;
 
     if let Some((guild_id,)) = row {
         check_role_for_guild(state, rbac, &guild_id, required, label).await?;
@@ -91,7 +92,7 @@ pub async fn list_all_channels(
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 500) as usize;
-    let offset = params.offset.unwrap_or(0).max(0) as usize;
+    let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset) as usize;
     let channels = state.voice_channels_uc.list_all_channels().await?;
     let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
     Ok(map_to_dtos(page))
@@ -103,7 +104,7 @@ pub async fn list_channels(
     Query(params): Query<PaginationQuery>,
 ) -> Result<Json<Vec<VoiceChannelResponseDto>>, ApiError> {
     let limit = crate::adapters::inbound::http::helpers::normalize_limit(params.limit, 50, 200) as usize;
-    let offset = params.offset.unwrap_or(0).max(0) as usize;
+    let offset = crate::adapters::inbound::http::helpers::normalize_offset(params.offset) as usize;
     let channels = state.voice_channels_uc.list_channels(&guild_id).await?;
     let page: Vec<_> = channels.into_iter().skip(offset).take(limit).collect();
     Ok(map_to_dtos(page))
@@ -139,7 +140,7 @@ pub async fn purge_channel(
     .bind(&channel_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("purge voice channel: {e}"))))?;
+    .map_err(sqlx_internal("purge voice channel"))?;
 
     if res.rows_affected() == 0 {
         return Err(ApiError(DomainError::ValidationError(
@@ -174,7 +175,7 @@ pub async fn purge_history(
     .bind(&guild_id)
     .execute(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("purge history: {e}"))))?;
+    .map_err(sqlx_internal("purge history"))?;
 
     state.broadcaster.broadcast(
         "voice_channel_closed",
@@ -217,7 +218,7 @@ pub async fn list_channel_events(
     .bind(limit)
     .fetch_all(&state.pg_pool)
     .await
-    .map_err(|e| ApiError(DomainError::Internal(format!("fetch voice events: {e}"))))?;
+    .map_err(sqlx_internal("fetch voice events"))?;
 
     let events: Vec<serde_json::Value> = rows
         .into_iter()
