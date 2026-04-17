@@ -1,0 +1,178 @@
+use serenity::model::id::ChannelId;
+use serenity::prelude::*;
+
+use super::{ConfigKey, SessionCardKey};
+use super::session_card::SessionCard;
+
+/// Si le clone a obtenu un log_message_id (renvoi initial), le reecrit dans le DashMap.
+async fn sync_message_id(ctx: &Context, voice_channel_id: ChannelId, card: &SessionCard) {
+    if let Some(mid) = card.log_message_id {
+        let data = ctx.data.read().await;
+        if let Some(cards) = data.get::<SessionCardKey>() {
+            if let Some(mut entry) = cards.get_mut(&voice_channel_id) {
+                if entry.log_message_id.is_none() {
+                    entry.log_message_id = Some(mid);
+                }
+            }
+        }
+    }
+}
+
+fn get_log_channel(data: &tokio::sync::RwLockReadGuard<'_, TypeMap>) -> Option<ChannelId> {
+    data.get::<ConfigKey>()
+        .and_then(|config| config.log_channel_id)
+}
+
+/// Cree et envoie une nouvelle carte de session dans le salon de logs.
+pub async fn create_session_card(
+    ctx: &Context,
+    voice_channel_id: ChannelId,
+    creator_name: &str,
+    channel_type: &str,
+) {
+    let log_channel = {
+        let data = ctx.data.read().await;
+        match get_log_channel(&data) {
+            Some(ch) => ch,
+            None => return,
+        }
+    };
+
+    let mut card = SessionCard::new(
+        log_channel,
+        creator_name.to_string(),
+        channel_type.to_string(),
+        chrono::Utc::now().timestamp(),
+    );
+
+    card.add_event(format!("\u{1f3a4} **{}** a cree le salon", creator_name));
+    card.current_members = 1;
+
+    card.send_initial(ctx).await;
+
+    // Stocker la carte
+    let data = ctx.data.read().await;
+    if let Some(cards) = data.get::<SessionCardKey>() {
+        cards.insert(voice_channel_id, card);
+    }
+}
+
+/// Ajoute un evenement "membre rejoint" a la carte de session.
+pub async fn session_member_joined(ctx: &Context, voice_channel_id: ChannelId, user_name: &str) {
+    let mut card_clone = {
+        let data = ctx.data.read().await;
+        let cards = match data.get::<SessionCardKey>() {
+            Some(c) => c,
+            None => return,
+        };
+        let mut entry = match cards.get_mut(&voice_channel_id) {
+            Some(e) => e,
+            None => return,
+        };
+        entry.current_members += 1;
+        entry.add_event(format!("\u{27a1}\u{fe0f} **{}** a rejoint", user_name));
+        entry.clone()
+    };
+    card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
+}
+
+/// Ajoute un evenement "membre parti" a la carte de session.
+pub async fn session_member_left(ctx: &Context, voice_channel_id: ChannelId, user_name: &str, duration_text: &str) {
+    let mut card_clone = {
+        let data = ctx.data.read().await;
+        let cards = match data.get::<SessionCardKey>() {
+            Some(c) => c,
+            None => return,
+        };
+        let mut entry = match cards.get_mut(&voice_channel_id) {
+            Some(e) => e,
+            None => return,
+        };
+        entry.current_members = entry.current_members.saturating_sub(1);
+        entry.add_event(format!("\u{2b05}\u{fe0f} **{}** a quitte ({})", user_name, duration_text));
+        entry.clone()
+    };
+    card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
+}
+
+/// Finalise la carte de session quand le salon est supprime.
+pub async fn session_closed(ctx: &Context, voice_channel_id: ChannelId, total_duration: &str) {
+    let mut card_clone = {
+        let data = ctx.data.read().await;
+        let cards = match data.get::<SessionCardKey>() {
+            Some(c) => c,
+            None => return,
+        };
+        let mut entry = match cards.get_mut(&voice_channel_id) {
+            Some(e) => e,
+            None => return,
+        };
+        entry.closed = true;
+        entry.closed_at_unix = Some(chrono::Utc::now().timestamp());
+        entry.total_duration = Some(total_duration.to_string());
+        entry.add_event(format!("\u{1f6d1} **Salon supprime** | Duree : {}", total_duration));
+        entry.clone()
+    };
+    card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
+
+    // Nettoyer du cache
+    let data = ctx.data.read().await;
+    if let Some(cards) = data.get::<SessionCardKey>() {
+        cards.remove(&voice_channel_id);
+    }
+}
+
+/// Ajoute un evenement custom a la carte.
+#[allow(dead_code)]
+pub async fn session_event(ctx: &Context, voice_channel_id: ChannelId, text: &str) {
+    let mut card_clone = {
+        let data = ctx.data.read().await;
+        let cards = match data.get::<SessionCardKey>() {
+            Some(c) => c,
+            None => return,
+        };
+        let mut entry = match cards.get_mut(&voice_channel_id) {
+            Some(e) => e,
+            None => return,
+        };
+        entry.add_event(text.to_string());
+        entry.clone()
+    };
+    card_clone.update(ctx).await;
+    sync_message_id(ctx, voice_channel_id, &card_clone).await;
+}
+
+// ── Helpers ──
+
+pub async fn get_channel_name(ctx: &Context, channel_id: ChannelId) -> String {
+    channel_id
+        .to_channel(&ctx.http)
+        .await
+        .ok()
+        .and_then(|ch| ch.guild())
+        .map(|gc| gc.name.clone())
+        .unwrap_or_else(|| format!("{channel_id}"))
+}
+
+// Legacy stubs -- kept for compatibility with code that still calls them
+#[allow(dead_code)]
+pub async fn log_channel_created(_ctx: &Context, _creator_id: u64, _channel_type: &str, _channel_name: &str, _options: &str) {}
+#[allow(dead_code)]
+pub async fn log_channel_deleted(_ctx: &Context, _channel_name: &str, _channel_type: &str) {}
+#[allow(dead_code)]
+pub async fn log_member_joined(_ctx: &Context, _user_id: u64, _channel_name: &str) {}
+#[allow(dead_code)]
+pub async fn log_member_left(_ctx: &Context, _user_id: u64, _channel_name: &str) {}
+#[allow(dead_code)]
+pub async fn log_vote_kick(_ctx: &Context, _target_id: u64, _channel_name: &str, _result: &str) {}
+#[allow(dead_code)]
+pub async fn log_transfer(_ctx: &Context, _from_id: u64, _to_id: u64, _channel_name: &str) {}
+#[allow(dead_code)]
+pub async fn log_ban(_ctx: &Context, _user_id: u64, _channel_name: &str, _duration: &str) {}
+#[allow(dead_code)]
+pub async fn log_flood_mute(_ctx: &Context, _user_id: u64, _channel_name: &str, _duration_secs: u64) {}
+#[allow(dead_code)]
+pub async fn log_afk_move(_ctx: &Context, _user_id: u64, _from_channel: &str, _to_channel: &str, _afk_minutes: u64) {}

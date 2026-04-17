@@ -25,22 +25,8 @@ members = [
     "services/workers/monitoring-worker",
     "services/workers/temp-roles-worker",
 
-    # Bots Discord
+    # Bot Discord unifie
     "bots/sentinel-bot",
-    "bots/audit-bot",
-    "bots/automod-bot",
-    "bots/blackjack-bot",
-    "bots/cleanup-bot",
-    "bots/community-bot",
-    "bots/coude-bot",
-    "bots/game-bot",
-    "bots/moderation-bot",
-    "bots/progression-bot",
-    "bots/roles-bot",
-    "bots/security-bot",
-    "bots/ticket-bot",
-    "bots/voice-bot",
-    "bots/welcome-bot",
 
     # Desktop
     "apps/desktop/src-tauri",

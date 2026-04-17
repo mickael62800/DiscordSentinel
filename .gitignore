@@ -41,3 +41,6 @@ desktop.ini
 *.dll
 *.so
 *.dylib
+
+# Claude Code local files
+.claude/

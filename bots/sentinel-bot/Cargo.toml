@@ -24,6 +24,8 @@ redis = { version = "0.27", features = ["tokio-comp"] }
 regex = "1"
 time = "0.3"
 base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png"] }
+once_cell = "1"
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = "0.6"

@@ -437,264 +437,53 @@ services:
       - ai
 
   # ──────────────────────────────────────────────
-  # Bots
+  # Bot unifie
   # ──────────────────────────────────────────────
   #
-  # Phase 7 C — Sharding Discord
-  # ─────────────────────────────
-  # Par defaut chaque bot utilise SHARD_MODE=single (non defini), ce qui
-  # correspond a `client.start()` historique. Trois modes disponibles via
-  # env var `SHARD_MODE` :
+  # Les 15 anciens bots (audit, automod, blackjack, cleanup, community, coude,
+  # games, moderation, progression, roles, security, tickets, voice, welcome,
+  # image) ont ete fusionnes en un seul binaire `sentinel-bot` structure en
+  # modules. Un seul processus, une seule connexion Gateway Discord, un seul
+  # cache, une seule TypeMap. Les env vars VOICE_GUILD_ID / CREATOR_CHANNEL_IDs
+  # sont conservees pour la fonctionnalite salons vocaux dynamiques.
   #
-  #   single  (defaut) : un seul shard (shard 0/1). OK jusqu'a ~2500 guilds.
-  #
-  #   auto             : Serenity appelle /gateway/bot Discord pour recuperer
-  #                      le nombre de shards recommande et spawn tous les
-  #                      shards dans le process courant.
-  #                      -> Recommande pour single-process a gros volume.
-  #
-  #   manual           : `client.start_shard(SHARD_ID, SHARD_TOTAL)` — spawn
-  #                      UN seul shard avec les id/total explicites.
-  #                      -> Requis pour multi-process (replicas).
-  #                      -> Chaque replica doit avoir SHARD_ID different.
-  #
-  # Exemple manual pour scaler moderation-bot en 4 replicas (docker-compose
-  # n'a pas de primitive "replicas with env override", mais on peut faire
-  # 4 services moderation-bot-0..3 qui partagent le meme Dockerfile et
-  # juste differencient SHARD_ID).
+  # Phase 7 C — Sharding Discord :
+  #   SHARD_MODE=single  (defaut) : 1 shard, OK jusqu'a ~2500 guilds.
+  #   SHARD_MODE=auto             : Serenity spawn tous les shards recommandes.
+  #   SHARD_MODE=manual           : requiert SHARD_ID + SHARD_TOTAL (multi-replica).
 
-  automod-bot:
+  sentinel-bot:
     build:
       context: .
-      dockerfile: bots/automod-bot/Dockerfile
-    container_name: sentinel-automod-bot
+      dockerfile: bots/sentinel-bot/Dockerfile
+    container_name: sentinel-bot
     restart: unless-stopped
     environment:
-      AUTOMOD_DISCORD_TOKEN: ${AUTOMOD_DISCORD_TOKEN}
+      # Token Discord unifie (fallback sur DISCORD_TOKEN si non defini)
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
+      # API (HTTP + gRPC)
       API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : full gRPC (AnalyzeMessage hot path)
+      GRPC_API_URL: http://api:50051
       API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  moderation-bot:
-    build:
-      context: .
-      dockerfile: bots/moderation-bot/Dockerfile
-    container_name: sentinel-moderation-bot
-    restart: unless-stopped
-    environment:
-      MODERATION_DISCORD_TOKEN: ${MODERATION_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : partiel (LogAction + GetHistory)
-      API_KEY: ${API_KEY:-}
+      # Redis pour les event streams (moderation, tickets, blackjack AFK, coude)
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  security-bot:
-    build:
-      context: .
-      dockerfile: bots/security-bot/Dockerfile
-    container_name: sentinel-security-bot
-    restart: unless-stopped
-    environment:
-      SECURITY_DISCORD_TOKEN: ${SECURITY_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : full (Security + Members)
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  ticket-bot:
-    build:
-      context: .
-      dockerfile: bots/ticket-bot/Dockerfile
-    container_name: sentinel-ticket-bot
-    restart: unless-stopped
-    environment:
-      TICKET_DISCORD_TOKEN: ${TICKET_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : full TicketsService
-      API_KEY: ${API_KEY:-}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      REDIS_CHANNEL: sentinel:events
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  image-bot:
-    build:
-      context: .
-      dockerfile: bots/image-bot/Dockerfile
-    container_name: sentinel-image-bot
-    restart: unless-stopped
-    environment:
-      IMAGE_DISCORD_TOKEN: ${IMAGE_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : full ImagesService (bytes natifs)
-      API_KEY: ${API_KEY:-}
-      MAX_IMAGE_SIZE: ${MAX_IMAGE_SIZE:-10485760}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  voice-bot:
-    build:
-      context: .
-      dockerfile: bots/voice-bot/Dockerfile
-    container_name: sentinel-voice-bot
-    restart: unless-stopped
-    environment:
-      VOICE_DISCORD_TOKEN: ${VOICE_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : full VoiceChannels + Moderation
-      API_KEY: ${API_KEY:-}
-      VOICE_GUILD_ID: ${VOICE_GUILD_ID}
-      VOICE_PUBLIC_CREATOR_CHANNEL_ID: ${VOICE_PUBLIC_CREATOR_CHANNEL_ID}
-      VOICE_PRIVATE_CREATOR_CHANNEL_ID: ${VOICE_PRIVATE_CREATOR_CHANNEL_ID}
+      # Config voice (optionnel — desactive le module si non defini)
+      VOICE_GUILD_ID: ${VOICE_GUILD_ID:-}
+      VOICE_PUBLIC_CREATOR_CHANNEL_ID: ${VOICE_PUBLIC_CREATOR_CHANNEL_ID:-}
+      VOICE_PRIVATE_CREATOR_CHANNEL_ID: ${VOICE_PRIVATE_CREATOR_CHANNEL_ID:-}
       VOICE_LOG_CHANNEL_ID: ${VOICE_LOG_CHANNEL_ID:-}
+      # Config tickets (optionnel)
+      TICKET_CATEGORY_ID: ${TICKET_CATEGORY_ID:-}
+      TICKET_CHANNEL_ID: ${TICKET_CHANNEL_ID:-}
+      # Sharding (single par defaut)
+      SHARD_MODE: ${SHARD_MODE:-single}
       RUST_LOG: info
     depends_on:
-      - api
-
-  progression-bot:
-    build:
-      context: .
-      dockerfile: bots/progression-bot/Dockerfile
-    container_name: sentinel-progression-bot
-    restart: unless-stopped
-    environment:
-      PROGRESSION_DISCORD_TOKEN: ${PROGRESSION_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : full Progression + Stats
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  audit-bot:
-    build:
-      context: .
-      dockerfile: bots/audit-bot/Dockerfile
-    container_name: sentinel-audit-bot
-    restart: unless-stopped
-    environment:
-      AUDIT_DISCORD_TOKEN: ${AUDIT_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  community-bot:
-    build:
-      context: .
-      dockerfile: bots/community-bot/Dockerfile
-    container_name: sentinel-community-bot
-    restart: unless-stopped
-    environment:
-      COMMUNITY_DISCORD_TOKEN: ${COMMUNITY_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : partiel RolePanelsService
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  roles-bot:
-    build:
-      context: .
-      dockerfile: bots/roles-bot/Dockerfile
-    container_name: sentinel-roles-bot
-    restart: unless-stopped
-    environment:
-      ROLES_DISCORD_TOKEN: ${ROLES_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : partiel RolePanelsService
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  cleanup-bot:
-    build:
-      context: .
-      dockerfile: bots/cleanup-bot/Dockerfile
-    container_name: sentinel-cleanup-bot
-    restart: unless-stopped
-    environment:
-      CLEANUP_DISCORD_TOKEN: ${CLEANUP_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  blackjack-bot:
-    build:
-      context: .
-      dockerfile: bots/blackjack-bot/Dockerfile
-    container_name: sentinel-blackjack-bot
-    restart: unless-stopped
-    environment:
-      BLACKJACK_DISCORD_TOKEN: ${BLACKJACK_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : full BlackjackService (solo + wallet)
-      API_KEY: ${API_KEY:-}
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      RUST_LOG: info
-    depends_on:
-      - api
-      - redis
-
-  coude-bot:
-    build:
-      context: .
-      dockerfile: bots/coude-bot/Dockerfile
-    container_name: sentinel-coude-bot
-    restart: unless-stopped
-    environment:
-      COUDE_DISCORD_TOKEN: ${COUDE_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : partiel CoudePlayerService
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  game-bot:
-    build:
-      context: .
-      dockerfile: bots/game-bot/Dockerfile
-    container_name: sentinel-game-bot
-    restart: unless-stopped
-    environment:
-      GAME_DISCORD_TOKEN: ${GAME_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
-
-  welcome-bot:
-    build:
-      context: .
-      dockerfile: bots/welcome-bot/Dockerfile
-    container_name: sentinel-welcome-bot
-    restart: unless-stopped
-    environment:
-      WELCOME_DISCORD_TOKEN: ${WELCOME_DISCORD_TOKEN}
-      API_BASE_URL: http://api:3000
-      GRPC_API_URL: http://api:50051   # Phase 7A : partiel MembersService.GetMember
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      - api
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 
   coude-worker:
     build:
