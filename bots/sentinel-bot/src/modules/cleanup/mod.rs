@@ -1,5 +1,7 @@
 //! Module cleanup — /purge et /cleanup (ex cleanup-bot).
 
+pub const MODULE_BOT_NAME: &str = "cleanup-bot";
+
 mod api_client;
 pub mod cleanup_cmd;
 pub mod purge;
@@ -14,7 +16,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }

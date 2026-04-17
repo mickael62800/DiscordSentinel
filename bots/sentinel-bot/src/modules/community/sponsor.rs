@@ -285,7 +285,7 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
 
     let max_sponsorships: u32 = if let Some(base) = data.get::<ApiClientKey>() {
         let gc = base
-            .get_guild_config(&guild_id.to_string())
+            .get_guild_config_for(&guild_id.to_string(), crate::modules::community::MODULE_BOT_NAME)
             .await
             .unwrap_or_default();
         BaseApiClient::config_u64(&gc, "max_sponsorships", 3) as u32
@@ -443,7 +443,7 @@ async fn validate_sponsorship(
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
             let gc = base
-                .get_guild_config(&guild_id.to_string())
+                .get_guild_config_for(&guild_id.to_string(), crate::modules::community::MODULE_BOT_NAME)
                 .await
                 .unwrap_or_default();
             (

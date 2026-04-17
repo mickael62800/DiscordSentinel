@@ -293,7 +293,7 @@ async fn load_templates(ctx: &Context, guild_id: &str) -> Result<Vec<ReasonTempl
         .get::<ApiClientKey>()
         .ok_or_else(|| "ApiClientKey manquant".to_string())?;
     let config = base
-        .get_guild_config(guild_id)
+        .get_guild_config_for(guild_id, crate::modules::moderation::MODULE_BOT_NAME)
         .await
         .map_err(|e| format!("fetch config: {e}"))?;
     let raw = BaseApiClient::config_or(&config, CONFIG_KEY, "");

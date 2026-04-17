@@ -3,6 +3,8 @@
 //!
 //! Migre depuis coude-bot standalone vers sentinel-bot unifie.
 
+pub const MODULE_BOT_NAME: &str = "coude-bot";
+
 pub mod api_client;
 pub mod catalog;
 pub mod channel_check;
@@ -96,7 +98,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -175,7 +177,7 @@ pub fn handles_component(cid: &str) -> bool {
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }

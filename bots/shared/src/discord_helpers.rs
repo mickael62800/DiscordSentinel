@@ -123,15 +123,17 @@ pub async fn component_reply_embed(ctx: &Context, component: &ComponentInteracti
     }
 }
 
-/// Verifie si le bot est active pour un guild. Charge la config et check "enabled".
+/// Verifie si le module est active pour un guild. Charge la config sous le
+/// `bot_name` du module (ex: "coude-bot") et check la cle "enabled".
 pub async fn is_bot_enabled(
     api: &crate::api_client::BaseApiClient,
     guild_id: &str,
+    module_bot_name: &str,
 ) -> bool {
-    let config = match api.get_guild_config(guild_id).await {
+    let config = match api.get_guild_config_for(guild_id, module_bot_name).await {
         Ok(cfg) => cfg,
         Err(e) => {
-            warn!(guild_id = %guild_id, error = %e, "Impossible de verifier si le bot est active, presume actif");
+            warn!(guild_id = %guild_id, module = %module_bot_name, error = %e, "Impossible de verifier si le module est active, presume actif");
             return true;
         }
     };
@@ -141,32 +143,33 @@ pub async fn is_bot_enabled(
 /// Variante de `is_bot_enabled` qui extrait l'ApiClient du TypeMap directement.
 /// Retourne `true` par defaut si l'ApiClient est absent ou l'appel API echoue
 /// (fail-open : on prefere laisser passer que bloquer tout le bot).
-pub async fn is_module_enabled(ctx: &Context, guild_id: &str) -> bool {
+///
+/// `module_bot_name` doit correspondre a une ligne dans `bot_definitions`
+/// (ex: "coude-bot", "automod-bot", "voice-bot", ...).
+pub async fn is_module_enabled(ctx: &Context, guild_id: &str, module_bot_name: &str) -> bool {
     let data = ctx.data.read().await;
     match data.get::<crate::heartbeat::ApiClientKey>() {
-        Some(api) => is_bot_enabled(api, guild_id).await,
+        Some(api) => is_bot_enabled(api, guild_id, module_bot_name).await,
         None => true,
     }
 }
 
-/// Charge la config guild ou retourne une HashMap vide si indisponible.
-/// Factorise le pattern `get::<ApiClientKey>() + get_guild_config()` present
-/// dans la plupart des handlers de modules.
+/// Charge la config guild du module donne, ou retourne une HashMap vide si indisponible.
 pub async fn guild_config_or_default(
     ctx: &Context,
     guild_id: &str,
+    module_bot_name: &str,
 ) -> std::collections::HashMap<String, String> {
     let data = ctx.data.read().await;
     let Some(api) = data.get::<crate::heartbeat::ApiClientKey>() else {
         return std::collections::HashMap::new();
     };
-    api.get_guild_config(guild_id).await.unwrap_or_default()
+    api.get_guild_config_for(guild_id, module_bot_name).await.unwrap_or_default()
 }
 
-/// Lit le `log_channel_id` dans la config guild et retourne le `ChannelId`
-/// correspondant s'il est configure et valide (> 0). Retourne None sinon.
-pub async fn get_log_channel(ctx: &Context, guild_id: &str) -> Option<ChannelId> {
-    let config = guild_config_or_default(ctx, guild_id).await;
+/// Lit le `log_channel_id` dans la config guild du module donne.
+pub async fn get_log_channel(ctx: &Context, guild_id: &str, module_bot_name: &str) -> Option<ChannelId> {
+    let config = guild_config_or_default(ctx, guild_id, module_bot_name).await;
     config
         .get("log_channel_id")
         .and_then(|v| v.parse::<u64>().ok())

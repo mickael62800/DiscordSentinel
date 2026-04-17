@@ -14,7 +14,7 @@ pub struct CoudeConfig {
 impl CoudeConfig {
     /// Charge la config guild depuis l'API.
     pub async fn load(api: &BaseApiClient, guild_id: &str) -> Self {
-        let raw = match api.get_guild_config(guild_id).await {
+        let raw = match api.get_guild_config_for(guild_id, crate::modules::coude::MODULE_BOT_NAME).await {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %guild_id, "Echec get_guild_config");

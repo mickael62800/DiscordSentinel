@@ -39,7 +39,7 @@ pub async fn handle_voice_state_update(
         };
 
         if let Some(base) = data.get::<ApiClientKey>() {
-            match base.get_guild_config(&guild_id.to_string()).await {
+            match base.get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME).await {
                 Ok(config) => {
                     if !BaseApiClient::config_bool(&config, "enabled", true) {
                         return;

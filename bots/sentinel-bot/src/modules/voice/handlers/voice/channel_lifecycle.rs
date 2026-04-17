@@ -70,7 +70,7 @@ pub(super) async fn create_temp_channel(
     let anchor_category_id: Option<u64> = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            base.get_guild_config(&guild_id.to_string())
+            base.get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME)
                 .await
                 .ok()
                 .and_then(|cfg| {

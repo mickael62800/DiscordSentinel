@@ -69,7 +69,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let category_id = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config(&guild_id.to_string()).await {
+            let gc = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::moderation::MODULE_BOT_NAME).await {
                 Ok(config) => config,
                 Err(e) => {
                     warn!(error = %e, "Failed to fetch guild config for call");

@@ -169,7 +169,7 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
     {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+            let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -259,7 +259,7 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         }
     };
     let api = ApiClient::new(base.clone(), grpc);
-    let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+    let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
         Ok(cfg) => cfg,
         Err(e) => {
             tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -510,7 +510,7 @@ pub async fn handle_panel_click_with_faq(ctx: &Context, component: &ComponentInt
     let faq_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config(&guild_id).await {
+            let gc = match base.get_guild_config_for(&guild_id, crate::modules::tickets::MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");

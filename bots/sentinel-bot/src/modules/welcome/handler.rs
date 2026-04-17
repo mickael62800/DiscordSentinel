@@ -223,7 +223,7 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
 /// Appele pour les interactions de composants (bouton reglement).
 pub async fn on_component(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), crate::modules::welcome::MODULE_BOT_NAME).await {
             return;
         }
     }

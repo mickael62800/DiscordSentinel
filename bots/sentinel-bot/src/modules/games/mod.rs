@@ -1,5 +1,7 @@
 //! Module games — /game et mentions #Jeu (ex game-bot).
 
+pub const MODULE_BOT_NAME: &str = "game-bot";
+
 pub mod api_client;
 pub mod commands;
 pub mod detector;
@@ -18,7 +20,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -34,7 +36,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         None => return,
     };
 
-    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
 

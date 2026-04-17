@@ -172,7 +172,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let transcript_enabled = {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config(&guild_id.to_string()).await {
+            let gc = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -188,7 +188,7 @@ pub async fn handle_close_confirm(ctx: &Context, component: &ComponentInteractio
     let close_delay = {
         let data2 = ctx.data.read().await;
         if let Some(base) = data2.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config(&guild_id.to_string()).await {
+            let gc = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::tickets::MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");

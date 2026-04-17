@@ -54,7 +54,7 @@ async fn handle_moderation_action_log(ctx: &Context, data: &serde_json::Value) {
         return;
     }
 
-    let Some(log_channel) = sentinel_shared::discord_helpers::get_log_channel(ctx, guild_id).await
+    let Some(log_channel) = sentinel_shared::discord_helpers::get_log_channel(ctx, guild_id, crate::modules::moderation::MODULE_BOT_NAME).await
     else {
         return;
     };
@@ -206,7 +206,7 @@ async fn handle_appeal_sla_escalated(ctx: &Context, data: &serde_json::Value) {
         return;
     }
 
-    let Some(log_channel) = sentinel_shared::discord_helpers::get_log_channel(ctx, guild_id).await
+    let Some(log_channel) = sentinel_shared::discord_helpers::get_log_channel(ctx, guild_id, crate::modules::moderation::MODULE_BOT_NAME).await
     else {
         return;
     };

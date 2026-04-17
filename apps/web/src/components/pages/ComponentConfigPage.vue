@@ -1,26 +1,17 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from "vue";
 import { botConfigService } from "@/services/botConfigService";
-import { botTokensService } from "@/services/botTokensService";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useToast } from "../../composables/useToast";
 import AppBadge from "../atoms/AppBadge.vue";
 import AppToggle from "../atoms/AppToggle.vue";
-import BotTokenManager from "../molecules/BotTokenManager.vue";
 
 const { success, error: showError } = useToast();
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
 
 const workerNames = ["moderation-worker", "analytics-worker", "cache-worker", "cleanup-worker", "coude-worker", "monitoring-worker"];
-
-// Workers qui n'ont PAS besoin de token Discord
-const workersWithoutToken = ["analytics-worker", "cache-worker", "cleanup-worker", "moderation-worker", "monitoring-worker"];
-
-function needsToken(botName: string): boolean {
-  return !workersWithoutToken.includes(botName);
-}
 
 const definitions = ref<BotDefinition[]>([]);
 const configs = ref<BotGuildConfig[]>([]);
@@ -31,25 +22,17 @@ const formValues = ref<Record<string, string>>({});
 const savedValues = ref<Record<string, string>>({});
 const successMessage = ref("");
 
-// ── Token status (map utilisée pour le badge ; la gestion CRUD vit dans BotTokenManager) ──
-const tokenMap = ref<Record<string, boolean>>({});
-
-async function fetchTokens() {
-  try {
-    const tokens = botTokensService.list();
-    const map: Record<string, boolean> = {};
-    for (const [name, has] of tokens) {
-      map[name] = has;
-    }
-    tokenMap.value = map;
-  } catch (e) {
-    console.error("Erreur chargement tokens:", e);
-  }
-}
-
 function isWorker(botName: string): boolean {
   return workerNames.includes(botName);
 }
+
+const moduleDefinitions = computed(() =>
+  definitions.value.filter((d) => !isWorker(d.bot_name)),
+);
+
+const workerDefinitions = computed(() =>
+  definitions.value.filter((d) => isWorker(d.bot_name)),
+);
 
 const selectedDefinition = computed(() =>
   definitions.value.find((d) => d.bot_name === selectedComponent.value) ?? null,
@@ -115,7 +98,7 @@ function fieldStatus(field: ConfigField): { text: string; source: "db" | "defaul
     return { text: "Non configure", source: "none" };
   }
 
-  // Bot: show type descriptions
+  // Module: show type descriptions
   const typeLabel =
     field.type === "channel" ? "ID du salon"
     : field.type === "role" ? "ID du role"
@@ -201,7 +184,6 @@ function selectComponent(name: string) {
 
 onMounted(() => {
   fetchDefinitions();
-  fetchTokens();
   if (selectedGuildId.value) fetchConfig();
 });
 
@@ -216,7 +198,7 @@ watch(selectedComponent, loadFormValues);
   <div class="page">
     <header class="page-header">
       <h1>Configuration des composants</h1>
-      <p class="page-subtitle">Parametrer chaque bot et worker pour le serveur selectionne</p>
+      <p class="page-subtitle">Parametrer chaque module et worker pour le serveur selectionne</p>
     </header>
 
     <div v-if="!selectedGuildId" class="empty-state">
@@ -229,51 +211,61 @@ watch(selectedComponent, loadFormValues);
         <span class="server-name">{{ selectedGuild?.name }}</span>
       </div>
 
-      <!-- Grid of all components (bots + workers) — 3 colonnes -->
-      <div class="component-grid">
-        <div
-          v-for="def in definitions"
-          :key="def.bot_name"
-          class="component-card"
-          :class="{ active: selectedComponent === def.bot_name }"
-          @click="selectComponent(def.bot_name)"
-        >
-          <div class="component-card-header">
-            <div class="component-name">{{ def.display_name }}</div>
-            <div class="component-badges">
-              <span
-                v-if="needsToken(def.bot_name)"
-                class="token-badge"
-                :class="tokenMap[def.bot_name] ? 'token-ok' : 'token-missing'"
-              >
-                {{ tokenMap[def.bot_name] ? 'Token OK' : 'Pas de token' }}
-              </span>
-              <AppBadge
-                v-if="isWorker(def.bot_name)"
-                label="Worker"
-                variant="warning"
-              />
-              <AppBadge
-                v-else
-                label="Bot"
-                variant="info"
-              />
+      <!-- Section Modules -->
+      <section class="component-section">
+        <div class="section-header">
+          <h2 class="section-heading">Modules</h2>
+          <span class="section-count">{{ moduleDefinitions.length }}</span>
+        </div>
+        <div class="component-grid">
+          <div
+            v-for="def in moduleDefinitions"
+            :key="def.bot_name"
+            class="component-card"
+            :class="{ active: selectedComponent === def.bot_name }"
+            @click="selectComponent(def.bot_name)"
+          >
+            <div class="component-card-header">
+              <div class="component-name">{{ def.display_name }}</div>
+              <div class="component-badges">
+                <AppBadge label="Module" variant="info" />
+              </div>
+            </div>
+            <div class="component-desc">{{ def.description }}</div>
+            <div class="component-params">
+              {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
             </div>
           </div>
-          <div class="component-desc">{{ def.description }}</div>
-          <div class="component-params">
-            {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
-          </div>
-
-          <!-- Gestion du token (composant dédié) -->
-          <BotTokenManager
-            v-if="needsToken(def.bot_name)"
-            :bot-name="def.bot_name"
-            :has-token="!!tokenMap[def.bot_name]"
-            @updated="fetchTokens"
-          />
         </div>
-      </div>
+      </section>
+
+      <!-- Section Workers -->
+      <section class="component-section">
+        <div class="section-header">
+          <h2 class="section-heading">Workers</h2>
+          <span class="section-count">{{ workerDefinitions.length }}</span>
+        </div>
+        <div class="component-grid">
+          <div
+            v-for="def in workerDefinitions"
+            :key="def.bot_name"
+            class="component-card"
+            :class="{ active: selectedComponent === def.bot_name }"
+            @click="selectComponent(def.bot_name)"
+          >
+            <div class="component-card-header">
+              <div class="component-name">{{ def.display_name }}</div>
+              <div class="component-badges">
+                <AppBadge label="Worker" variant="warning" />
+              </div>
+            </div>
+            <div class="component-desc">{{ def.description }}</div>
+            <div class="component-params">
+              {{ def.config_schema.length }} parametre{{ def.config_schema.length > 1 ? "s" : "" }}
+            </div>
+          </div>
+        </div>
+      </section>
 
       <!-- Config form -->
       <div v-if="selectedDefinition" class="config-form">
@@ -286,7 +278,7 @@ watch(selectedComponent, loadFormValues);
           />
           <AppBadge
             v-else
-            label="Bot"
+            label="Module"
             variant="info"
           />
         </div>
@@ -586,11 +578,41 @@ watch(selectedComponent, loadFormValues);
   color: var(--text-primary);
 }
 
+.component-section {
+  margin-bottom: 24px;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0;
+}
+
+.section-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
 .component-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
-  margin-bottom: 24px;
 }
 
 .component-card {
@@ -1070,9 +1092,4 @@ watch(selectedComponent, loadFormValues);
   border-radius: 8px;
 }
 
-/* ── Token styles ── */
-/* Badge visible dans l'en-tête de la carte composant (la gestion CRUD est dans BotTokenManager.vue). */
-.token-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; white-space: nowrap; }
-.token-ok { color: #22c55e; background: rgba(34, 197, 94, 0.12); }
-.token-missing { color: var(--text-secondary); background: rgba(255, 255, 255, 0.06); }
 </style>

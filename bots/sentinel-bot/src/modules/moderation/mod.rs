@@ -1,6 +1,8 @@
 //! Module moderation — 21 commandes slash + boutons + autocomplete + consumer Redis
 //! (ex moderation-bot).
 
+pub const MODULE_BOT_NAME: &str = "moderation-bot";
+
 pub mod api_client;
 pub mod commands;
 mod pending_actions;
@@ -76,7 +78,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
     if !guild_id.is_empty()
-        && !is_module_enabled(ctx, &guild_id).await
+        && !is_module_enabled(ctx, &guild_id, MODULE_BOT_NAME).await
     {
         return;
     }
@@ -130,7 +132,7 @@ pub fn handles_component(cid: &str) -> bool {
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -176,7 +178,7 @@ pub async fn handle_autocomplete(ctx: &Context, autocomplete: &CommandInteractio
     let templates_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config(&guild_id).await {
+            let gc = match base.get_guild_config_for(&guild_id, MODULE_BOT_NAME).await {
                 Ok(c) => c,
                 Err(e) => {
                     warn!(error = %e, "Failed to fetch guild config for reason templates");

@@ -43,7 +43,7 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
 
     // Charger la config depuis l'API pour ce guild
     let guild_id = msg.guild_id.map(|id| id.to_string()).unwrap_or_default();
-    let config = sentinel_shared::discord_helpers::guild_config_or_default(ctx, &guild_id).await;
+    let config = sentinel_shared::discord_helpers::guild_config_or_default(ctx, &guild_id, crate::modules::automod::MODULE_BOT_NAME).await;
 
     if !BaseApiClient::config_bool(&config, "enabled", true) {
         return;

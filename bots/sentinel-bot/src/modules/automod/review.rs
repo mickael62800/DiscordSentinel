@@ -221,7 +221,7 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
     let guild_id = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let data = ctx.data.read().await;
     let config = if let Some(api) = data.get::<ApiClientKey>() {
-        api.get_guild_config(&guild_id).await.unwrap_or_default()
+        api.get_guild_config_for(&guild_id, crate::modules::automod::MODULE_BOT_NAME).await.unwrap_or_default()
     } else {
         std::collections::HashMap::new()
     };

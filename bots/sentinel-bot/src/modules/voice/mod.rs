@@ -1,6 +1,8 @@
 //! Module voice — salons vocaux dynamiques + panels + vote-kick
 //! (ex voice-bot).
 
+pub const MODULE_BOT_NAME: &str = "voice-bot";
+
 pub mod api_client;
 pub mod config;
 pub mod embeds;
@@ -117,7 +119,7 @@ pub fn handles_component(cid: &str) -> bool {
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -136,7 +138,7 @@ pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
 
 pub async fn on_message(ctx: &Context, msg: &Message) {
     if let Some(guild_id) = msg.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -145,7 +147,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
 pub async fn on_voice_state_update(ctx: &Context, old: &Option<VoiceState>, new: &VoiceState) {
     if let Some(guild_id) = new.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }

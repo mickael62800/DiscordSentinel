@@ -29,7 +29,6 @@ members = [
     "bots/sentinel-bot",
 
     # Desktop
-    "apps/desktop/src-tauri",
     "apps/ai-trainer/src-tauri",
 ]
 

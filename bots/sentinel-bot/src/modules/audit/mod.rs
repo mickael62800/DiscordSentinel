@@ -11,6 +11,8 @@
 //! - `handlers` : sous-handlers par type d'event (message, member, ...)
 //! - `commands` : slash commands (/audit search, /audit stats)
 
+pub const MODULE_BOT_NAME: &str = "audit-bot";
+
 pub mod api_client;
 pub mod audit_event;
 pub mod message_cache;
@@ -116,7 +118,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -157,7 +159,7 @@ pub async fn post_to_channel(
     let config = {
         let data = ctx.data.read().await;
         match data.get::<ApiClientKey>() {
-            Some(base) => base.get_guild_config(guild_id).await.unwrap_or_default(),
+            Some(base) => base.get_guild_config_for(guild_id, MODULE_BOT_NAME).await.unwrap_or_default(),
             None => return,
         }
     };
@@ -226,7 +228,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
         None => return,
     };
 
-    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
 
@@ -277,7 +279,7 @@ pub async fn on_message_delete(
     guild_id: Option<GuildId>,
 ) {
     if let Some(gid) = guild_id {
-        if !is_module_enabled(ctx, &gid.to_string()).await {
+        if !is_module_enabled(ctx, &gid.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -300,7 +302,7 @@ pub async fn on_message_delete_bulk(
     guild_id: Option<GuildId>,
 ) {
     if let Some(gid) = guild_id {
-        if !is_module_enabled(ctx, &gid.to_string()).await {
+        if !is_module_enabled(ctx, &gid.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -308,28 +310,28 @@ pub async fn on_message_delete_bulk(
 }
 
 pub async fn on_member_add(ctx: &Context, new_member: &Member) {
-    if !is_module_enabled(ctx, &new_member.guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &new_member.guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
     handlers::member::handle_addition(ctx, new_member).await;
 }
 
 pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
-    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
     handlers::member::handle_removal(ctx, guild_id, user).await;
 }
 
 pub async fn on_ban_add(ctx: &Context, guild_id: GuildId, banned_user: &User) {
-    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
     handlers::member::handle_ban_addition(ctx, guild_id, banned_user).await;
 }
 
 pub async fn on_ban_remove(ctx: &Context, guild_id: GuildId, unbanned_user: &User) {
-    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
     handlers::member::handle_ban_removal(ctx, guild_id, unbanned_user).await;
@@ -348,7 +350,7 @@ pub async fn on_member_update(
 
 pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: &VoiceState) {
     if let Some(guild_id) = new.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }

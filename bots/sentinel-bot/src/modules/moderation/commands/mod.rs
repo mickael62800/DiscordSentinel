@@ -31,7 +31,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 /// Envoie un embed de log dans le salon de logs configure pour la guild.
 pub async fn log_to_channel(ctx: &Context, guild_id: &str, embed: CreateEmbed) {
-    let Some(channel) = sentinel_shared::discord_helpers::get_log_channel(ctx, guild_id).await
+    let Some(channel) = sentinel_shared::discord_helpers::get_log_channel(ctx, guild_id, crate::modules::moderation::MODULE_BOT_NAME).await
     else {
         return;
     };
@@ -53,7 +53,7 @@ pub async fn find_immune_role(
     let ignored_roles_raw = {
         let data = ctx.data.read().await;
         let base = data.get::<ApiClientKey>()?;
-        let config = base.get_guild_config(&guild_id.to_string()).await.ok()?;
+        let config = base.get_guild_config_for(&guild_id.to_string(), crate::modules::moderation::MODULE_BOT_NAME).await.ok()?;
         config.get("ignored_roles").cloned()
     };
 

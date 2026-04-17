@@ -5,6 +5,8 @@
 //! transcripts DM a la fermeture, satisfaction surveys, templates de reponses
 //! rapides, sync messages <-> API, relay staff depuis Redis.
 
+pub const MODULE_BOT_NAME: &str = "ticket-bot";
+
 pub mod api_client;
 pub mod commands;
 pub mod config;
@@ -63,7 +65,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if command.data.name.as_str() == "ticket" {
         if let Some(guild_id) = command.guild_id {
-            if !is_module_enabled(ctx, &guild_id.to_string()).await {
+            if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
                 return;
             }
         }
@@ -96,7 +98,7 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     let cid = component.data.custom_id.as_str();
 
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -134,7 +136,7 @@ pub fn handles_modal(cid: &str) -> bool {
 
 pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
     if let Some(guild_id) = modal.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -148,7 +150,7 @@ pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
 
 pub async fn on_message(ctx: &Context, msg: &Message) {
     if let Some(guild_id) = msg.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -298,7 +300,7 @@ async fn deploy_panel_if_needed(ctx: &Context) {
     } else if let Some(base) = data.get::<ApiClientKey>() {
         let mut ids = Vec::new();
         for guild in ctx.cache.guilds() {
-            let guild_config = match base.get_guild_config(&guild.to_string()).await {
+            let guild_config = match base.get_guild_config_for(&guild.to_string(), MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     warn!(error = %e, guild_id = %guild, "Echec chargement config guild");
@@ -378,7 +380,7 @@ async fn close_inactive_tickets(ctx: &Context) {
         let timeout_days = if let Some(t) = guild_timeouts.get(&ticket.server) {
             *t
         } else {
-            let guild_config = match base.get_guild_config(&ticket.server).await {
+            let guild_config = match base.get_guild_config_for(&ticket.server, MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     warn!(error = %e, guild_id = %ticket.server, "Echec chargement config guild");
@@ -477,7 +479,7 @@ async fn check_escalations(ctx: &Context) {
             continue;
         }
 
-        let guild_config = match base.get_guild_config(&ticket.server).await {
+        let guild_config = match base.get_guild_config_for(&ticket.server, MODULE_BOT_NAME).await {
             Ok(cfg) => cfg,
             Err(e) => {
                 warn!(error = %e, guild_id = %ticket.server, "Echec chargement config guild");

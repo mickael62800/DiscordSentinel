@@ -42,7 +42,7 @@ async fn run_afk_sweep(ctx: &Context) {
     drop(data);
 
     for guild_id in ctx.cache.guilds() {
-        let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+        let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::voice::MODULE_BOT_NAME).await {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");

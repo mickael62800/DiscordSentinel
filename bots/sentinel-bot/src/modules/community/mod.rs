@@ -1,6 +1,8 @@
 //! Module community — panels de roles, auto-roles, sponsorship, temp roles
 //! (ex community-bot + roles-bot).
 
+pub const MODULE_BOT_NAME: &str = "community-bot";
+
 pub mod api_client;
 pub mod cooldown;
 pub mod exclusive_groups;
@@ -77,7 +79,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -99,7 +101,7 @@ pub fn handles_component(cid: &str) -> bool {
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -374,7 +376,7 @@ async fn handle_role_button(ctx: &Context, component: &ComponentInteraction) {
     let guild_config = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            match base.get_guild_config(&guild_id.to_string()).await {
+            match base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await {
                 Ok(c) => c,
                 Err(e) => {
                     warn!(error = %e, "Failed to fetch guild config for role button");

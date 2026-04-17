@@ -114,7 +114,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_config = {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<ApiClientKey>() {
-            match api.get_guild_config(&guild_id.to_string()).await {
+            match api.get_guild_config_for(&guild_id.to_string(), crate::modules::moderation::MODULE_BOT_NAME).await {
                 Ok(config) => config,
                 Err(e) => {
                     warn!(error = %e, "Failed to fetch guild config for ban");

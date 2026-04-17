@@ -145,7 +145,7 @@ pub(super) async fn on_member_add(ctx: &Context, new_member: &Member) {
     };
 
     // Charger la config per-guild depuis l'API (fallback sur env vars)
-    let guild_config = match base.get_guild_config(&guild_id.to_string()).await {
+    let guild_config = match base.get_guild_config_for(&guild_id.to_string(), crate::modules::security::MODULE_BOT_NAME).await {
         Ok(cfg) => cfg,
         Err(e) => {
             tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");

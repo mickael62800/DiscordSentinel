@@ -1,6 +1,8 @@
 //! Module security — anti-raid, verification utilisateurs, protection serveur.
 //! Migre depuis security-bot.
 
+pub const MODULE_BOT_NAME: &str = "security-bot";
+
 pub mod api_client;
 mod background;
 mod captcha_handler;
@@ -178,7 +180,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -363,7 +365,7 @@ pub async fn on_ban_remove(
 /// Gere les interactions captcha (bouton + math).
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }

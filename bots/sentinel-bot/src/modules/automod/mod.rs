@@ -1,6 +1,8 @@
 //! Module automod — detection spam/insultes/liens/phishing + slowmode adaptatif.
 //! Migre depuis automod-bot.
 
+pub const MODULE_BOT_NAME: &str = "automod-bot";
+
 mod api_client;
 pub mod adaptive_slowmode;
 pub mod automod_cmd;
@@ -66,7 +68,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -81,7 +83,7 @@ pub fn handles_component(custom_id: &str) -> bool {
 /// Handle a component interaction (review button click).
 pub async fn on_component(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
     if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -164,7 +166,7 @@ const DEFAULT_MUTE_DURATION_SECS: u64 = 600;
 /// Main automod message handler. Called from the sentinel handler's message event.
 pub async fn on_message(ctx: &Context, msg: &Message) {
     if let Some(guild_id) = msg.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }

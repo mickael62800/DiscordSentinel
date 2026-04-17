@@ -411,7 +411,7 @@ pub async fn handle_template_button(ctx: &Context, component: &ComponentInteract
     let templates_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config(&guild_id).await {
+            let gc = match base.get_guild_config_for(&guild_id, crate::modules::tickets::MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -487,7 +487,7 @@ pub async fn handle_template_select(ctx: &Context, component: &ComponentInteract
     let templates_raw = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
-            let gc = match base.get_guild_config(&guild_id).await {
+            let gc = match base.get_guild_config_for(&guild_id, crate::modules::tickets::MODULE_BOT_NAME).await {
                 Ok(cfg) => cfg,
                 Err(e) => {
                     tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");

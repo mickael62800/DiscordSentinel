@@ -1,5 +1,7 @@
 //! Module progression — XP, levels, streaks (ex progression-bot).
 
+pub const MODULE_BOT_NAME: &str = "progression-bot";
+
 pub mod api_client;
 pub mod level_channel;
 pub mod level_cmd;
@@ -108,7 +110,7 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string()).await {
+        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
             return;
         }
     }
@@ -130,7 +132,7 @@ pub async fn on_message(ctx: &Context, msg: &Message) {
 
     // Charger la config guild (helper partage : data.read() + get_guild_config)
     let guild_config =
-        guild_config_or_default(ctx, &guild_id.to_string()).await;
+        guild_config_or_default(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await;
     if !BaseApiClient::config_bool(&guild_config, "enabled", true) {
         return;
     }
@@ -303,7 +305,7 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
 
     let user_id = new.user_id;
 
-    if !is_module_enabled(ctx, &guild_id.to_string()).await {
+    if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
         return;
     }
 
@@ -380,7 +382,7 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                         }
 
                         let xp_per_minute = if let Some(base) = data.get::<ApiClientKey>() {
-                            let gc = base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default();
+                            let gc = base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await.unwrap_or_default();
                             BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as i64
                         } else {
                             5
@@ -407,7 +409,7 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                             ));
 
                                         let voice_guild_config = if let Some(base) = data.get::<ApiClientKey>() {
-                                            base.get_guild_config(&guild_id.to_string()).await.unwrap_or_default()
+                                            base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await.unwrap_or_default()
                                         } else {
                                             HashMap::new()
                                         };
@@ -449,7 +451,7 @@ pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
 
     let data = ctx.data.read().await;
     let default_role_id = if let Some(base) = data.get::<ApiClientKey>() {
-        let config = match base.get_guild_config(&guild_id.to_string()).await {
+        let config = match base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");
@@ -499,7 +501,7 @@ async fn check_and_assign_all_roles(
     let data = ctx.data.read().await;
 
     let xp_role_mode = if let Some(base) = data.get::<ApiClientKey>() {
-        let config = match base.get_guild_config(&guild_id.to_string()).await {
+        let config = match base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await {
             Ok(cfg) => cfg,
             Err(e) => {
                 tracing::warn!(error = %e, guild_id = %guild_id, "Echec chargement config guild");

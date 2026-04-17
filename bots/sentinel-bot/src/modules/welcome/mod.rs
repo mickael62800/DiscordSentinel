@@ -1,5 +1,7 @@
 //! Module welcome — bienvenue/depart (ex welcome-bot).
 
+pub const MODULE_BOT_NAME: &str = "welcome-bot";
+
 pub mod api_client;
 pub mod handler;
 pub mod template;
