@@ -66,7 +66,8 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
-    if command.data.name.as_str() == "ticket" {
+    let name = command.data.name.as_str();
+    if name == "ticket" || name == "ticket-admin" {
         if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
             return;
         }

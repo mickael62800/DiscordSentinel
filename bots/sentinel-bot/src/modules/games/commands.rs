@@ -12,27 +12,13 @@ use sentinel_shared::heartbeat::ApiClientKey;
 use super::api_client::GameApiClient;
 
 pub fn all() -> Vec<CreateCommand> {
-    vec![register()]
+    vec![register_public(), register_admin()]
 }
 
-fn register() -> CreateCommand {
+fn register_public() -> CreateCommand {
     CreateCommand::new("game")
-        .description("Gerer les jeux et les inscriptions")
-        .default_member_permissions(serenity::all::Permissions::empty()) // visible par tous
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "create", "Creer un jeu (admin)")
-                .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
-                        .required(true),
-                ),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "delete", "Supprimer un jeu (admin)")
-                .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
-                        .required(true),
-                ),
-        )
+        .description("Consulter et s'inscrire aux jeux")
+        .default_member_permissions(serenity::all::Permissions::empty())
         .add_option(
             CreateCommandOption::new(CommandOptionType::SubCommand, "list", "Lister les jeux disponibles"),
         )
@@ -62,6 +48,26 @@ fn register() -> CreateCommand {
         )
 }
 
+fn register_admin() -> CreateCommand {
+    CreateCommand::new("game-admin")
+        .description("Gerer les jeux (admin)")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_GUILD)
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::SubCommand, "create", "Creer un jeu")
+                .add_sub_option(
+                    CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
+                        .required(true),
+                ),
+        )
+        .add_option(
+            CreateCommandOption::new(CommandOptionType::SubCommand, "delete", "Supprimer un jeu")
+                .add_sub_option(
+                    CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
+                        .required(true),
+                ),
+        )
+}
+
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(g) => g.to_string(),
@@ -82,15 +88,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let sub = &command.data.options;
     let sub_name = sub.first().map(|o| o.name.as_str()).unwrap_or("");
+    let top_name = command.data.name.as_str();
 
-    match sub_name {
-        "create" => handle_create(ctx, command, &api, &guild_id).await,
-        "delete" => handle_delete(ctx, command, &api, &guild_id).await,
-        "list" => handle_list(ctx, command, &api, &guild_id).await,
-        "join" => handle_join(ctx, command, &api, &guild_id).await,
-        "leave" => handle_leave(ctx, command, &api, &guild_id).await,
-        "my-games" => handle_my_games(ctx, command, &api, &guild_id).await,
-        "players" => handle_players(ctx, command, &api, &guild_id).await,
+    match (top_name, sub_name) {
+        ("game-admin", "create") => handle_create(ctx, command, &api, &guild_id).await,
+        ("game-admin", "delete") => handle_delete(ctx, command, &api, &guild_id).await,
+        ("game", "list") => handle_list(ctx, command, &api, &guild_id).await,
+        ("game", "join") => handle_join(ctx, command, &api, &guild_id).await,
+        ("game", "leave") => handle_leave(ctx, command, &api, &guild_id).await,
+        ("game", "my-games") => handle_my_games(ctx, command, &api, &guild_id).await,
+        ("game", "players") => handle_players(ctx, command, &api, &guild_id).await,
         _ => reply(ctx, command, "Sous-commande inconnue.").await,
     }
 }

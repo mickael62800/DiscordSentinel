@@ -22,7 +22,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
         return;
     }
-    if command.data.name == "game" {
+    if command.data.name == "game" || command.data.name == "game-admin" {
         commands::handle(ctx, command).await;
     }
 }

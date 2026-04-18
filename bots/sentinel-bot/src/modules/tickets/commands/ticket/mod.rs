@@ -16,10 +16,26 @@ use serenity::all::{
 };
 use tracing::error;
 
-/// Enregistre la commande /ticket avec ses sous-commandes.
-pub fn register() -> CreateCommand {
+/// Enregistre les commandes /ticket (public) et /ticket-admin (staff).
+pub fn register() -> Vec<CreateCommand> {
+    vec![register_public(), register_admin()]
+}
+
+fn register_public() -> CreateCommand {
     CreateCommand::new("ticket")
         .description("Gestion des tickets de support")
+        .default_member_permissions(serenity::all::Permissions::empty())
+        .add_option(CreateCommandOption::new(
+            CommandOptionType::SubCommand,
+            "close",
+            "Fermer le ticket du salon actuel",
+        ))
+}
+
+fn register_admin() -> CreateCommand {
+    CreateCommand::new("ticket-admin")
+        .description("Administration des tickets (staff)")
+        .default_member_permissions(serenity::all::Permissions::MANAGE_CHANNELS)
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
@@ -27,11 +43,6 @@ pub fn register() -> CreateCommand {
                 "Deployer le panneau de creation de ticket dans ce salon",
             ),
         )
-        .add_option(CreateCommandOption::new(
-            CommandOptionType::SubCommand,
-            "close",
-            "Fermer le ticket du salon actuel",
-        ))
         .add_option(
             CreateCommandOption::new(
                 CommandOptionType::SubCommand,
@@ -52,10 +63,11 @@ pub fn register() -> CreateCommand {
 /// Dispatch la slash command vers la bonne sous-commande.
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let sub = &command.data.options[0];
-    let result = match sub.name.as_str() {
-        "panel" => handle_panel(ctx, command).await,
-        "close" => handle_close(ctx, command).await,
-        "invite" => handle_invite(ctx, command).await,
+    let top = command.data.name.as_str();
+    let result = match (top, sub.name.as_str()) {
+        ("ticket", "close") => handle_close(ctx, command).await,
+        ("ticket-admin", "panel") => handle_panel(ctx, command).await,
+        ("ticket-admin", "invite") => handle_invite(ctx, command).await,
         _ => reply(ctx, command, "Sous-commande inconnue.").await,
     };
 
