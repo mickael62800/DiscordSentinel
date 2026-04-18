@@ -195,6 +195,7 @@ impl GameApiClient {
         resp.json::<GamePanel>().await.map_err(|e| e.to_string())
     }
 
+    #[allow(dead_code)]
     pub async fn find_panel_by_message(
         &self,
         guild_id: &str,

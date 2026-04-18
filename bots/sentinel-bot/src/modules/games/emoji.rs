@@ -44,6 +44,7 @@ fn parse_custom(s: &str) -> Option<ReactionType> {
 }
 
 /// Compare un emoji stocke en DB avec un ReactionType recu de Discord.
+#[allow(dead_code)]
 pub fn emoji_matches(stored: &str, reaction: &ReactionType) -> bool {
     let parsed = match parse_reaction_type(stored) {
         Some(p) => p,

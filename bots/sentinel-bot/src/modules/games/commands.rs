@@ -1,7 +1,8 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
-    CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
-    CreateMessage, EditMessage,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateActionRow,
+    CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    CreateInteractionResponseMessage, CreateMessage, CreateSelectMenu, CreateSelectMenuKind,
+    CreateSelectMenuOption, EditMessage,
 };
 use serenity::builder::CreateEmbed;
 use tracing::{info, warn};
@@ -12,6 +13,15 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::api_client::{Game, GameApiClient};
 use super::emoji::parse_reaction_type;
+
+/// Prefix du custom_id des select menus de panel de jeux.
+/// Format : `game_panel_select_{panel_id}_{chunk_index}`.
+pub const PANEL_SELECT_PREFIX: &str = "game_panel_select_";
+
+/// Max options par select menu (limite Discord).
+const MAX_OPTIONS_PER_SELECT: usize = 25;
+/// Max select menus par message (limite Discord : 5 action rows).
+const MAX_SELECTS_PER_MESSAGE: usize = 5;
 
 pub fn all() -> Vec<CreateCommand> {
     vec![register_public(), register_admin()]
@@ -61,8 +71,8 @@ fn register_admin() -> CreateCommand {
                         .required(true),
                 )
                 .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "emoji", "Emoji (unicode ou <:name:id>)")
-                        .required(true),
+                    CreateCommandOption::new(CommandOptionType::String, "emoji", "Emoji optionnel (unicode ou <:name:id>)")
+                        .required(false),
                 )
                 .add_sub_option(
                     CreateCommandOption::new(CommandOptionType::String, "category", "Categorie (ex: RPG)")
@@ -137,21 +147,27 @@ async fn handle_create(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCli
     }
 
     let name = get_string_option(cmd, "name").unwrap_or_default();
-    let emoji = get_string_option(cmd, "emoji").unwrap_or_default();
-    let emoji_trim = emoji.trim();
+    let emoji_raw = get_string_option(cmd, "emoji");
     let category = get_string_option(cmd, "category");
 
-    if parse_reaction_type(emoji_trim).is_none() {
-        reply(ctx, cmd, "Emoji invalide. Utilise un emoji unicode (ex. 🎮) ou un emoji serveur (ex. `<:name:123456>`).").await;
-        return;
-    }
+    // Emoji optionnel : on valide seulement s'il est fourni.
+    let emoji_clean: Option<String> = match emoji_raw.as_deref().map(str::trim) {
+        Some(e) if !e.is_empty() => {
+            if parse_reaction_type(e).is_none() {
+                reply(ctx, cmd, "Emoji invalide. Utilise un emoji unicode (ex. 🎮) ou un emoji serveur (ex. `<:name:123456>`).").await;
+                return;
+            }
+            Some(e.to_string())
+        }
+        _ => None,
+    };
 
     match api
         .create_game(
             guild_id,
             &name,
             &cmd.user.id.to_string(),
-            Some(emoji_trim),
+            emoji_clean.as_deref(),
             category.as_deref(),
         )
         .await
@@ -296,14 +312,20 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
     };
 
-    let games_with_emoji: Vec<&Game> = games.iter().filter(|g| g.emoji.is_some()).collect();
-    if games_with_emoji.is_empty() {
-        reply(ctx, cmd, "Aucun jeu avec emoji dans cette categorie. Ajoute-en avec `/game-admin create`.").await;
+    if games.is_empty() {
+        reply(ctx, cmd, "Aucun jeu dans cette categorie. Ajoute-en avec `/game-admin create`.").await;
         return;
     }
 
-    let embed = build_panel_embed(category.as_deref(), &games_with_emoji);
+    let max_games = MAX_OPTIONS_PER_SELECT * MAX_SELECTS_PER_MESSAGE;
+    let games_slice: Vec<&Game> = games.iter().take(max_games).collect();
+    if games.len() > max_games {
+        warn!(total = games.len(), shown = max_games, "Panel tronque : trop de jeux pour un seul message");
+    }
 
+    let embed = build_panel_embed(category.as_deref(), &games_slice);
+
+    // 1) Envoie un message initial avec l'embed seulement (pas encore de components).
     let msg = match cmd
         .channel_id
         .send_message(&ctx.http, CreateMessage::new().embed(embed))
@@ -313,19 +335,8 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         Err(e) => { reply(ctx, cmd, &format!("Erreur envoi message : {e}")).await; return; }
     };
 
-    // Ajoute les reactions
-    for g in &games_with_emoji {
-        if let Some(em) = &g.emoji {
-            if let Some(rt) = parse_reaction_type(em) {
-                if let Err(e) = msg.react(&ctx.http, rt).await {
-                    warn!(error = %e, game = %g.game_name, "Echec ajout reaction panel");
-                }
-            }
-        }
-    }
-
-    // Sauve le panel
-    if let Err(e) = api
+    // 2) Sauve le panel en DB pour obtenir son UUID.
+    let panel = match api
         .save_panel(
             guild_id,
             &msg.channel_id.to_string(),
@@ -334,11 +345,24 @@ async fn handle_panel(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         )
         .await
     {
-        reply(ctx, cmd, &format!("Panel envoye mais erreur de sauvegarde : {e}")).await;
-        return;
+        Ok(p) => p,
+        Err(e) => {
+            reply(ctx, cmd, &format!("Panel envoye mais erreur de sauvegarde : {e}")).await;
+            return;
+        }
+    };
+
+    // 3) Edite le message pour attacher les components (select menus) en utilisant panel.id.
+    let components = build_panel_components(&panel.id, &games_slice);
+    let mut msg_mut = msg;
+    if let Err(e) = msg_mut
+        .edit(&ctx.http, EditMessage::new().components(components))
+        .await
+    {
+        warn!(error = %e, "Erreur attachement components au panel");
     }
 
-    reply(ctx, cmd, &format!("Panneau deploye ({} jeux).", games_with_emoji.len())).await;
+    reply(ctx, cmd, &format!("Panneau deploye ({} jeux).", games_slice.len())).await;
 }
 
 async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
@@ -367,10 +391,12 @@ async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCl
         Ok(g) => g,
         Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
     };
-    let games_with_emoji: Vec<&Game> = games.iter().filter(|g| g.emoji.is_some()).collect();
-    let embed = build_panel_embed(category.as_deref(), &games_with_emoji);
+    let max_games = MAX_OPTIONS_PER_SELECT * MAX_SELECTS_PER_MESSAGE;
+    let games_slice: Vec<&Game> = games.iter().take(max_games).collect();
 
-    // Edit le message
+    let embed = build_panel_embed(category.as_deref(), &games_slice);
+    let components = build_panel_components(&panel.id, &games_slice);
+
     let channel_id: serenity::model::id::ChannelId = match panel.channel_id.parse::<u64>() {
         Ok(id) => serenity::model::id::ChannelId::new(id),
         Err(_) => { reply(ctx, cmd, "channel_id invalide en DB.").await; return; }
@@ -385,25 +411,21 @@ async fn handle_refresh(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCl
         Err(e) => { reply(ctx, cmd, &format!("Message panneau introuvable : {e}")).await; return; }
     };
 
-    if let Err(e) = msg.edit(&ctx.http, EditMessage::new().embed(embed)).await {
+    // Retire les eventuelles vieilles reactions (legacy panels pre-select-menu).
+    let _ = msg.delete_reactions(&ctx.http).await;
+
+    if let Err(e) = msg
+        .edit(
+            &ctx.http,
+            EditMessage::new().embed(embed).components(components),
+        )
+        .await
+    {
         reply(ctx, cmd, &format!("Erreur edition : {e}")).await;
         return;
     }
 
-    // Reactions : on retire toutes les reactions du bot et on remet les bonnes.
-    // Simple approche : delete_all_reactions (necessite MANAGE_MESSAGES).
-    let _ = msg.delete_reactions(&ctx.http).await;
-    for g in &games_with_emoji {
-        if let Some(em) = &g.emoji {
-            if let Some(rt) = parse_reaction_type(em) {
-                if let Err(e) = msg.react(&ctx.http, rt).await {
-                    warn!(error = %e, game = %g.game_name, "Echec ajout reaction refresh");
-                }
-            }
-        }
-    }
-
-    reply(ctx, cmd, &format!("Panneau rafraichi ({} jeux).", games_with_emoji.len())).await;
+    reply(ctx, cmd, &format!("Panneau rafraichi ({} jeux).", games_slice.len())).await;
 }
 
 fn build_panel_embed(category: Option<&str>, games: &[&Game]) -> CreateEmbed {
@@ -414,13 +436,95 @@ fn build_panel_embed(category: Option<&str>, games: &[&Game]) -> CreateEmbed {
     let desc = if games.is_empty() {
         "*Aucun jeu.*".to_string()
     } else {
-        games
-            .iter()
-            .map(|g| format!("{} @{}", g.emoji.clone().unwrap_or_default(), g.game_name))
-            .collect::<Vec<_>>()
-            .join("\n")
+        let mut lines = Vec::with_capacity(games.len());
+        for (idx, g) in games.iter().enumerate() {
+            let emoji = g.emoji.clone().unwrap_or_default();
+            let prefix = if emoji.is_empty() {
+                String::new()
+            } else {
+                format!("{} ", emoji)
+            };
+            lines.push(format!("{}. {}**{}**", idx + 1, prefix, g.game_name));
+        }
+        let mut s = lines.join("\n");
+        s.push_str("\n\n*Utilise le menu ci-dessous pour selectionner les jeux que tu veux suivre.*");
+        s
     };
     info_embed(&title).description(desc)
+}
+
+/// Construit les action rows de select menus pour un panel donne.
+/// Si la liste depasse 25 jeux, on split en plusieurs select menus (max 5).
+fn build_panel_components(panel_id: &str, games: &[&Game]) -> Vec<CreateActionRow> {
+    if games.is_empty() {
+        return Vec::new();
+    }
+
+    let total_chunks = games.chunks(MAX_OPTIONS_PER_SELECT).count();
+    games
+        .chunks(MAX_OPTIONS_PER_SELECT)
+        .enumerate()
+        .take(MAX_SELECTS_PER_MESSAGE)
+        .map(|(chunk_idx, chunk)| {
+            let options: Vec<CreateSelectMenuOption> = chunk
+                .iter()
+                .map(|g| build_select_option(g))
+                .collect();
+
+            let custom_id = format!("{}{}_{}", PANEL_SELECT_PREFIX, panel_id, chunk_idx);
+            let placeholder = if total_chunks > 1 {
+                format!(
+                    "Choisis les jeux que tu veux suivre ({}/{})",
+                    chunk_idx + 1,
+                    total_chunks.min(MAX_SELECTS_PER_MESSAGE),
+                )
+            } else {
+                "Choisis les jeux que tu veux suivre".to_string()
+            };
+
+            let max_values = options.len().min(MAX_OPTIONS_PER_SELECT) as u8;
+            let select = CreateSelectMenu::new(
+                custom_id,
+                CreateSelectMenuKind::String { options },
+            )
+            .placeholder(placeholder)
+            .min_values(0)
+            .max_values(max_values);
+
+            CreateActionRow::SelectMenu(select)
+        })
+        .collect()
+}
+
+fn build_select_option(g: &Game) -> CreateSelectMenuOption {
+    // label : max 100 chars
+    let mut label = g.game_name.clone();
+    truncate_chars(&mut label, 100);
+
+    let mut option = CreateSelectMenuOption::new(label, g.id.clone());
+
+    if let Some(cat) = &g.category {
+        if !cat.is_empty() {
+            let mut desc = format!("Categorie : {}", cat);
+            truncate_chars(&mut desc, 100);
+            option = option.description(desc);
+        }
+    }
+
+    if let Some(em) = &g.emoji {
+        if let Some(rt) = parse_reaction_type(em) {
+            option = option.emoji(rt);
+        }
+    }
+
+    option
+}
+
+fn truncate_chars(s: &mut String, max: usize) {
+    if s.chars().count() > max {
+        let truncated: String = s.chars().take(max).collect();
+        *s = truncated;
+    }
 }
 
 // ── Helpers ──
@@ -456,4 +560,3 @@ async fn reply_embed(ctx: &Context, cmd: &CommandInteraction, embed: CreateEmbed
         warn!(error = %e, "Erreur reponse embed commande game");
     }
 }
-

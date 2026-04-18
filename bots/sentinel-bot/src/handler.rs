@@ -115,14 +115,6 @@ impl EventHandler for Handler {
         modules::tickets::on_message(&ctx, &msg).await;
     }
 
-    async fn reaction_add(&self, ctx: Context, reaction: serenity::model::channel::Reaction) {
-        modules::games::on_reaction_add(&ctx, &reaction).await;
-    }
-
-    async fn reaction_remove(&self, ctx: Context, reaction: serenity::model::channel::Reaction) {
-        modules::games::on_reaction_remove(&ctx, &reaction).await;
-    }
-
     async fn message_delete(
         &self,
         ctx: Context,
@@ -312,6 +304,8 @@ impl EventHandler for Handler {
                 let cid = component.data.custom_id.as_str();
                 if modules::welcome::handles_component(cid) {
                     modules::welcome::on_component(&ctx, &component).await;
+                } else if modules::games::handles_component(cid) {
+                    modules::games::on_component(&ctx, &component).await;
                 } else if modules::community::handles_component(cid) {
                     modules::community::on_component(&ctx, &component).await;
                 } else if modules::blackjack::handles_component(cid) {
