@@ -45,7 +45,7 @@ export const gamesService = {
     return httpGet(`/api/games/${guildId}`);
   },
   create(payload: CreateGamePayload): Promise<Game> {
-    return httpPost(`/api/games/`, payload);
+    return httpPost(`/api/games`, payload);
   },
   update(guildId: string, gameId: string, payload: UpdateGamePayload): Promise<Game> {
     return httpPatch(`/api/games/${guildId}/${gameId}`, payload);
