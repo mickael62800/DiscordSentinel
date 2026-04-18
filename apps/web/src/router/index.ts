@@ -20,6 +20,7 @@ import CoudeTauntsConfigPage from "../components/pages/CoudeTauntsConfigPage.vue
 import BlackjackPage from "../components/pages/BlackjackPage.vue";
 import WalletPage from "../components/pages/WalletPage.vue";
 import RbacPage from "../components/pages/RbacPage.vue";
+import GamesPage from "../components/pages/GamesPage.vue";
 import SettingsPage from "../components/pages/SettingsPage.vue";
 import AuthCallbackPage from "../components/pages/AuthCallbackPage.vue";
 
@@ -47,6 +48,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/coude/taunts", name: "coude-taunts", component: CoudeTauntsConfigPage },
   { path: "/blackjack", name: "blackjack", component: BlackjackPage },
   { path: "/wallet", name: "wallet", component: WalletPage },
+  { path: "/games", name: "games", component: GamesPage },
   { path: "/rbac", name: "rbac", component: RbacPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

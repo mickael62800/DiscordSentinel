@@ -43,6 +43,7 @@ const logItems = [
 ];
 
 const gameItems = [
+  { path: "/games", label: "Jeux", icon: "layers" },
   { path: "/coude", label: "Coup de Coude", icon: "zap" },
   { path: "/coude/taunts", label: "Railleries", icon: "zap" },
   { path: "/blackjack", label: "Blackjack", icon: "layers" },

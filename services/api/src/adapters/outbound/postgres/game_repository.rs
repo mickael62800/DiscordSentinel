@@ -109,6 +109,49 @@ impl GameRepository for PgGameRepository {
         Ok(row.into())
     }
 
+    async fn update(&self, guild_id: &str, game_id: &str, game_name: Option<&str>, emoji: Option<Option<&str>>, category: Option<Option<&str>>) -> Result<Option<Game>, DomainError> {
+        // Utilise COALESCE pour ne mettre a jour que les champs fournis.
+        // Pour emoji/category, on distingue "pas touche" (None) vs "mettre a NULL" (Some(None)).
+        let update_name = game_name.is_some();
+        let update_emoji = emoji.is_some();
+        let update_category = category.is_some();
+        if !update_name && !update_emoji && !update_category {
+            // Rien a mettre a jour — on relit juste le jeu.
+            let sql = format!(
+                "SELECT {GAME_COLS} FROM games WHERE guild_id = $1 AND id = $2::uuid"
+            );
+            let row: Option<GameRow> = sqlx::query_as(&sql)
+                .bind(guild_id).bind(game_id).fetch_optional(&self.pool).await.map_err(pg_err)?;
+            return Ok(row.map(Into::into));
+        }
+        let sql = format!(
+            "UPDATE games SET \
+                game_name = CASE WHEN $3::bool THEN $4 ELSE game_name END, \
+                emoji = CASE WHEN $5::bool THEN $6 ELSE emoji END, \
+                category = CASE WHEN $7::bool THEN $8 ELSE category END \
+             WHERE guild_id = $1 AND id = $2::uuid \
+             RETURNING {GAME_COLS}"
+        );
+        let row: Option<GameRow> = sqlx::query_as(&sql)
+            .bind(guild_id)
+            .bind(game_id)
+            .bind(update_name)
+            .bind(game_name.unwrap_or(""))
+            .bind(update_emoji)
+            .bind(emoji.flatten())
+            .bind(update_category)
+            .bind(category.flatten())
+            .fetch_optional(&self.pool).await
+            .map_err(|e| {
+                if e.to_string().contains("idx_games_guild_name") {
+                    DomainError::Conflict("Un jeu avec ce nom existe deja".into())
+                } else {
+                    pg_err(e)
+                }
+            })?;
+        Ok(row.map(Into::into))
+    }
+
     async fn delete(&self, guild_id: &str, game_id: &str) -> Result<bool, DomainError> {
         let res = sqlx::query("DELETE FROM games WHERE guild_id = $1 AND id = $2::uuid")
             .bind(guild_id).bind(game_id)

@@ -14,7 +14,7 @@ path = "src/lib.rs"
 
 [dependencies]
 # Web
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "multipart"] }
 tokio = { workspace = true }
 tower = { version = "0.5", features = ["limit", "load-shed"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "limit", "request-id", "propagate-header", "set-header", "compression-zstd", "compression-gzip"] }

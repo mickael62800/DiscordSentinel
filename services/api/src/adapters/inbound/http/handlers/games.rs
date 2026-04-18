@@ -112,6 +112,71 @@ pub async fn create_game(
     Ok(Json(game.into()))
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UpdateGameDto {
+    #[serde(default)]
+    pub game_name: Option<String>,
+    // emoji/category : `null` = mettre a NULL, absent = ne pas toucher.
+    #[serde(default, deserialize_with = "deserialize_opt_opt")]
+    pub emoji: Option<Option<String>>,
+    #[serde(default, deserialize_with = "deserialize_opt_opt")]
+    pub category: Option<Option<String>>,
+}
+
+fn deserialize_opt_opt<'de, D>(deserializer: D) -> Result<Option<Option<String>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let v = Option::<Option<String>>::deserialize(deserializer)?;
+    Ok(Some(v.unwrap_or(None)))
+}
+
+pub async fn update_game(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path((guild_id, game_id)): Path<(String, String)>,
+    Json(dto): Json<UpdateGameDto>,
+) -> Result<Json<GameDto>, ApiError> {
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Admin).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "admin+ requis pour modifier une game".into(),
+            ))
+        })?;
+    }
+
+    let name_owned = dto
+        .game_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .map(str::to_string);
+    if let Some(ref n) = name_owned {
+        if n.len() > 100 {
+            return Err(DomainError::ValidationError(
+                "Le nom du jeu ne peut pas depasser 100 caracteres".into(),
+            )
+            .into());
+        }
+    }
+
+    let emoji = dto.emoji.as_ref().map(|opt| {
+        opt.as_deref().map(str::trim).filter(|s| !s.is_empty())
+    });
+    let category = dto.category.as_ref().map(|opt| {
+        opt.as_deref().map(str::trim).filter(|s| !s.is_empty())
+    });
+
+    let updated = state
+        .game_repo
+        .update(&guild_id, &game_id, name_owned.as_deref(), emoji, category)
+        .await?;
+    match updated {
+        Some(g) => Ok(Json(g.into())),
+        None => Err(DomainError::NotFound("Jeu introuvable".into()).into()),
+    }
+}
+
 pub async fn delete_game(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
@@ -215,4 +280,154 @@ pub async fn list_games_by_category(
 pub struct CategoryQuery {
     #[serde(default)]
     pub category: Option<String>,
+}
+
+// ── Upload emoji ──
+
+#[derive(Debug, Serialize)]
+pub struct UploadEmojiResponse {
+    pub emoji: String,
+    pub emoji_id: String,
+    pub name: String,
+    pub animated: bool,
+}
+
+fn slugify_emoji_name(raw: &str) -> String {
+    let mut out = String::with_capacity(raw.len());
+    for ch in raw.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else if ch == '_' {
+            out.push('_');
+        } else if ch.is_whitespace() || ch == '-' || ch == '.' {
+            if !out.ends_with('_') {
+                out.push('_');
+            }
+        }
+    }
+    let trimmed = out.trim_matches('_').to_string();
+    // Discord impose 2..=32 chars [A-Za-z0-9_]
+    let mut s = trimmed;
+    if s.len() > 32 {
+        s.truncate(32);
+    }
+    if s.len() < 2 {
+        // Padding trivial pour rester valide ; l'UI devrait prevenir ce cas.
+        while s.len() < 2 {
+            s.push('_');
+        }
+    }
+    s
+}
+
+pub async fn upload_emoji(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(guild_id): Path<String>,
+    mut multipart: axum::extract::Multipart,
+) -> Result<Json<UploadEmojiResponse>, ApiError> {
+    if let Some(Extension(ctx)) = rbac {
+        require_role(&ctx, Role::Admin).map_err(|_| {
+            ApiError(DomainError::Forbidden(
+                "admin+ requis pour uploader un emoji".into(),
+            ))
+        })?;
+    }
+
+    let mut name: Option<String> = None;
+    let mut image_bytes: Option<Vec<u8>> = None;
+    let mut mime: Option<String> = None;
+
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|e| ApiError(DomainError::ValidationError(format!("Multipart invalide : {e}"))))?
+    {
+        let field_name = field.name().unwrap_or("").to_string();
+        match field_name.as_str() {
+            "name" => {
+                let v = field.text().await.map_err(|e| {
+                    ApiError(DomainError::ValidationError(format!(
+                        "Lecture champ name : {e}"
+                    )))
+                })?;
+                name = Some(v);
+            }
+            "image" => {
+                let ct = field.content_type().map(|s| s.to_string());
+                let data = field.bytes().await.map_err(|e| {
+                    ApiError(DomainError::ValidationError(format!(
+                        "Lecture image : {e}"
+                    )))
+                })?;
+                mime = ct.or_else(|| Some("image/png".to_string()));
+                image_bytes = Some(data.to_vec());
+            }
+            _ => { /* ignore */ }
+        }
+    }
+
+    let raw_name = name.ok_or_else(|| {
+        ApiError(DomainError::ValidationError(
+            "Champ 'name' manquant".into(),
+        ))
+    })?;
+    let bytes = image_bytes.ok_or_else(|| {
+        ApiError(DomainError::ValidationError(
+            "Champ 'image' manquant".into(),
+        ))
+    })?;
+
+    if bytes.len() > 256 * 1024 {
+        return Err(DomainError::ValidationError(
+            "L'image depasse 256 KB (limite Discord).".into(),
+        )
+        .into());
+    }
+
+    let mime = mime.unwrap_or_else(|| "image/png".to_string());
+    if !matches!(
+        mime.as_str(),
+        "image/png" | "image/jpeg" | "image/jpg" | "image/gif" | "image/webp"
+    ) {
+        return Err(DomainError::ValidationError(format!(
+            "Type d'image non supporte : {mime}"
+        ))
+        .into());
+    }
+
+    let emoji_name = slugify_emoji_name(&raw_name);
+
+    // Determine la guild cible (emoji_host_guild_id ou guild courante).
+    let host_guild = state
+        .bot_config_repo
+        .get_config(&guild_id, "game-bot")
+        .await
+        .map(|entries| {
+            entries
+                .into_iter()
+                .find(|e| e.config_key == "emoji_host_guild_id")
+                .map(|e| e.config_value)
+                .filter(|v| !v.trim().is_empty())
+        })
+        .unwrap_or(None)
+        .unwrap_or_else(|| guild_id.clone());
+
+    let (emoji_id, final_name, animated) = state
+        .discord_api
+        .upload_emoji(&host_guild, &emoji_name, &bytes, &mime)
+        .await?;
+
+    let formatted = if animated {
+        format!("<a:{}:{}>", final_name, emoji_id)
+    } else {
+        format!("<:{}:{}>", final_name, emoji_id)
+    };
+
+    Ok(Json(UploadEmojiResponse {
+        emoji: formatted,
+        emoji_id,
+        name: final_name,
+        animated,
+    }))
 }
