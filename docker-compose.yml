@@ -332,6 +332,7 @@ services:
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
+      GRPC_API_URL: http://api:50051
       API_KEY: ${API_KEY:-}
       EXPORT_SCAN_INTERVAL: ${EXPORT_SCAN_INTERVAL:-5}
       RUST_LOG: info
@@ -496,6 +497,7 @@ services:
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
+      GRPC_API_URL: http://api:50051
       API_KEY: ${API_KEY:-}
       COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
       BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
