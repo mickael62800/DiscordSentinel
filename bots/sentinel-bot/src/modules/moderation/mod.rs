@@ -24,7 +24,9 @@ use serenity::prelude::*;
 use tracing::warn;
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::discord_helpers::is_module_enabled;
+use sentinel_shared::discord_helpers::{
+    is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
+};
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use api_client::{ApiClient, ModerationAction};
@@ -77,9 +79,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     let moderator = command.user.name.clone();
     let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
 
-    if !guild_id.is_empty()
-        && !is_module_enabled(ctx, &guild_id, MODULE_BOT_NAME).await
-    {
+    if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
         return;
     }
 
@@ -131,10 +131,8 @@ pub fn handles_component(cid: &str) -> bool {
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
-    if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
+        return;
     }
     let custom_id = &component.data.custom_id;
 

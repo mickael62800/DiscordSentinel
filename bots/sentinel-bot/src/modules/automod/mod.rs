@@ -23,7 +23,9 @@ use serenity::model::id::{ChannelId, MessageId, UserId};
 use serenity::prelude::*;
 use tracing::{info, warn};
 
-use sentinel_shared::discord_helpers::is_module_enabled;
+use sentinel_shared::discord_helpers::{
+    is_module_enabled, is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
+};
 
 use self::adaptive_slowmode::SlowmodeTracker;
 
@@ -67,10 +69,8 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
-    if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+        return;
     }
     automod_cmd::handle(ctx, command).await;
 }
@@ -82,10 +82,8 @@ pub fn handles_component(custom_id: &str) -> bool {
 
 /// Handle a component interaction (review button click).
 pub async fn on_component(ctx: &Context, component: &serenity::model::application::ComponentInteraction) {
-    if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
+        return;
     }
     review::handle_review_button(ctx, component).await;
 }

@@ -11,7 +11,7 @@ use std::sync::Arc;
 use serenity::all::{CommandInteraction, Context, CreateCommand, Message};
 use tracing::warn;
 
-use sentinel_shared::discord_helpers::is_module_enabled;
+use sentinel_shared::discord_helpers::{is_module_enabled, is_module_enabled_or_reply_command};
 use sentinel_shared::heartbeat::ApiClientKey;
 
 pub fn register_commands() -> Vec<CreateCommand> {
@@ -19,10 +19,8 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
-    if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+        return;
     }
     if command.data.name == "game" {
         commands::handle(ctx, command).await;

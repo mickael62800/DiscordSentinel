@@ -25,7 +25,7 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::discord_helpers::is_module_enabled;
+use sentinel_shared::discord_helpers::{is_module_enabled, is_module_enabled_or_reply_component};
 
 use api_client::{ApiClient, VoiceConfigResponse, VoiceThemeResponse};
 use config::Config;
@@ -118,10 +118,8 @@ pub fn handles_component(cid: &str) -> bool {
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
-    if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
+        return;
     }
     interactions::handle_component(ctx, component).await;
 }

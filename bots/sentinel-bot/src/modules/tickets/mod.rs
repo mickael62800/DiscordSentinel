@@ -28,7 +28,10 @@ use serenity::prelude::*;
 use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::discord_helpers::is_module_enabled;
+use sentinel_shared::discord_helpers::{
+    is_module_enabled, is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
+    is_module_enabled_or_reply_modal,
+};
 use sentinel_shared::embeds::neutral_embed;
 use sentinel_shared::grpc_client::SentinelGrpcClient;
 use sentinel_shared::heartbeat::ApiClientKey;
@@ -64,10 +67,8 @@ pub fn register_commands() -> Vec<CreateCommand> {
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     if command.data.name.as_str() == "ticket" {
-        if let Some(guild_id) = command.guild_id {
-            if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-                return;
-            }
+        if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+            return;
         }
         ticket::handle(ctx, command).await;
     }
@@ -97,10 +98,8 @@ pub fn handles_component(cid: &str) -> bool {
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
     let cid = component.data.custom_id.as_str();
 
-    if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
+        return;
     }
 
     match cid {
@@ -135,10 +134,8 @@ pub fn handles_modal(cid: &str) -> bool {
 }
 
 pub async fn on_modal(ctx: &Context, modal: &ModalInteraction) {
-    if let Some(guild_id) = modal.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_modal(ctx, modal, MODULE_BOT_NAME).await {
+        return;
     }
 
     if ticket::is_ticket_modal(&modal.data.custom_id) {

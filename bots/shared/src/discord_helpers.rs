@@ -4,7 +4,7 @@
 use serenity::all::{
     ChannelId, CommandInteraction, ComponentInteraction, Context, CreateEmbed,
     CreateInteractionResponse, CreateInteractionResponseFollowup,
-    CreateInteractionResponseMessage,
+    CreateInteractionResponseMessage, ModalInteraction,
 };
 use tracing::warn;
 
@@ -152,6 +152,85 @@ pub async fn is_module_enabled(ctx: &Context, guild_id: &str, module_bot_name: &
         Some(api) => is_bot_enabled(api, guild_id, module_bot_name).await,
         None => true,
     }
+}
+
+/// Variante de `is_module_enabled` qui, si desactive, repond en ephemeral
+/// a la slash command et retourne false. Si actif, retourne true sans repondre.
+pub async fn is_module_enabled_or_reply_command(
+    ctx: &Context,
+    command: &CommandInteraction,
+    module_bot_name: &str,
+) -> bool {
+    let Some(guild_id) = command.guild_id else { return true; };
+    if is_module_enabled(ctx, &guild_id.to_string(), module_bot_name).await {
+        return true;
+    }
+    if let Err(e) = command
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Cette fonctionnalite est desactivee sur ce serveur.")
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, command = %command.data.name, "Echec reponse module desactive (command)");
+    }
+    false
+}
+
+/// Idem pour les component interactions (boutons, select menus).
+pub async fn is_module_enabled_or_reply_component(
+    ctx: &Context,
+    component: &ComponentInteraction,
+    module_bot_name: &str,
+) -> bool {
+    let Some(guild_id) = component.guild_id else { return true; };
+    if is_module_enabled(ctx, &guild_id.to_string(), module_bot_name).await {
+        return true;
+    }
+    if let Err(e) = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Cette fonctionnalite est desactivee sur ce serveur.")
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, "Echec reponse module desactive (component)");
+    }
+    false
+}
+
+/// Idem pour les modals.
+pub async fn is_module_enabled_or_reply_modal(
+    ctx: &Context,
+    modal: &ModalInteraction,
+    module_bot_name: &str,
+) -> bool {
+    let Some(guild_id) = modal.guild_id else { return true; };
+    if is_module_enabled(ctx, &guild_id.to_string(), module_bot_name).await {
+        return true;
+    }
+    if let Err(e) = modal
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content("Cette fonctionnalite est desactivee sur ce serveur.")
+                    .ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, "Echec reponse module desactive (modal)");
+    }
+    false
 }
 
 /// Charge la config guild du module donne, ou retourne une HashMap vide si indisponible.

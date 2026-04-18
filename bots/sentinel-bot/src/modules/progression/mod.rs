@@ -25,7 +25,9 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::discord_helpers::{guild_config_or_default, is_module_enabled};
+use sentinel_shared::discord_helpers::{
+    guild_config_or_default, is_module_enabled, is_module_enabled_or_reply_command,
+};
 use sentinel_shared::embeds::success_embed;
 use sentinel_shared::heartbeat::ApiClientKey;
 
@@ -109,10 +111,8 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
-    if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+        return;
     }
     match command.data.name.as_str() {
         "level" => level_cmd::handle(ctx, command).await,

@@ -27,7 +27,9 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
-use sentinel_shared::discord_helpers::is_module_enabled;
+use sentinel_shared::discord_helpers::{
+    is_module_enabled_or_reply_command, is_module_enabled_or_reply_component,
+};
 use sentinel_shared::embeds::{neutral_embed, success_embed};
 use sentinel_shared::heartbeat::ApiClientKey;
 
@@ -78,10 +80,8 @@ pub fn register_commands() -> Vec<CreateCommand> {
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
-    if let Some(guild_id) = command.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_command(ctx, command, MODULE_BOT_NAME).await {
+        return;
     }
     match command.data.name.as_str() {
         "roles-panel" => roles_panel::handle(ctx, command).await,
@@ -100,10 +100,8 @@ pub fn handles_component(cid: &str) -> bool {
 }
 
 pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
-    if let Some(guild_id) = component.guild_id {
-        if !is_module_enabled(ctx, &guild_id.to_string(), MODULE_BOT_NAME).await {
-            return;
-        }
+    if !is_module_enabled_or_reply_component(ctx, component, MODULE_BOT_NAME).await {
+        return;
     }
     let cid = component.data.custom_id.as_str();
     if cid.starts_with("role_") {
