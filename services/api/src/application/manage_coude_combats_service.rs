@@ -3,18 +3,56 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
+use crate::domain::entities::{CombatResolution, CoudeBalanceParams, CoudeCombat, NewCoudeCombat};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
-use crate::ports::outbound::CoudeCombatRepository;
+use crate::ports::inbound::ManageCoudePlayersUseCase;
+use crate::ports::outbound::{BotConfigRepository, CoudeCombatRepository};
 
 pub struct ManageCoudeCombatsService {
     repo: Arc<dyn CoudeCombatRepository>,
+    /// Optionnel : requis pour appliquer le gate `surprise_min_hp_percent`.
+    players_uc: Option<Arc<dyn ManageCoudePlayersUseCase>>,
+    /// Optionnel : requis pour lire `CoudeBalanceParams` depuis la config guild.
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeCombatsService {
     pub fn new(repo: Arc<dyn CoudeCombatRepository>) -> Self {
-        Self { repo }
+        Self {
+            repo,
+            players_uc: None,
+            bot_config_repo: None,
+        }
+    }
+
+    /// Branche les dependances pour le gate `surprise_min_hp_percent`
+    /// (Phase 132+). Sans ces deps, le gate est inactif (comportement
+    /// historique).
+    pub fn with_surprise_gate(
+        mut self,
+        players_uc: Arc<dyn ManageCoudePlayersUseCase>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
+    ) -> Self {
+        self.players_uc = Some(players_uc);
+        self.bot_config_repo = Some(bot_config_repo);
+        self
+    }
+
+    async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
+        let Some(repo) = self.bot_config_repo.as_ref() else {
+            return CoudeBalanceParams::default();
+        };
+        match repo.get_config(guild_id, "coude-bot").await {
+            Ok(entries) => {
+                let map: std::collections::HashMap<String, String> = entries
+                    .into_iter()
+                    .map(|e| (e.config_key, e.config_value))
+                    .collect();
+                CoudeBalanceParams::from_config(&map)
+            }
+            Err(_) => CoudeBalanceParams::default(),
+        }
     }
 }
 
@@ -80,6 +118,31 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
                 "Un joueur ne peut pas se defier lui-meme".into(),
             ));
         }
+
+        // Gate : pour l'attaque surprise, verifier que l'attaquant a au
+        // moins `surprise_min_hp_percent` % de ses HP max. Empeche
+        // l'attaquant de finir le combat a 1 HP en bypassant la defense.
+        if new.special_attack.as_deref() == Some("surprise") {
+            if let (Some(players_uc), Some(_)) =
+                (self.players_uc.as_ref(), self.bot_config_repo.as_ref())
+            {
+                let params = self.load_balance(&new.guild_id).await;
+                let min_pct = params.surprise_min_hp_pct;
+                if min_pct > 0 {
+                    let attacker =
+                        players_uc.get(&new.guild_id, &new.attacker_id).await?;
+                    let hp_max = attacker.hp_max.max(1) as u64;
+                    let hp_cur = attacker.hp_current.max(0) as u64;
+                    let cur_pct = hp_cur.saturating_mul(100) / hp_max;
+                    if cur_pct < min_pct {
+                        return Err(DomainError::ValidationError(format!(
+                            "HP insuffisants pour une attaque surprise : {hp_cur}/{hp_max} ({cur_pct}%), minimum requis {min_pct}%."
+                        )));
+                    }
+                }
+            }
+        }
+
         self.repo.create(new).await
     }
 

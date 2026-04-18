@@ -6,19 +6,51 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 
 use crate::domain::entities::{
-    find_boost_item, sum_roll_bonus_for_active_keys, CoudeStealBoost, StealBoostDuration,
+    find_boost_item, sum_roll_bonus_for_active_keys, CoudeBalanceParams, CoudeStealBoost,
+    StealBoostDuration,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_steal_boosts::ManageCoudeStealBoostsUseCase;
-use crate::ports::outbound::CoudeStealBoostRepository;
+use crate::ports::outbound::{BotConfigRepository, CoudeStealBoostRepository};
 
 pub struct ManageCoudeStealBoostsService {
     repo: Arc<dyn CoudeStealBoostRepository>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeStealBoostsService {
     pub fn new(repo: Arc<dyn CoudeStealBoostRepository>) -> Self {
-        Self { repo }
+        Self {
+            repo,
+            bot_config_repo: None,
+        }
+    }
+
+    /// Branche la lecture de `bot_guild_config` pour appliquer le gate
+    /// `steal_max_active_boosts`. Optionnel : sans config_repo, le cap
+    /// n'est pas applique (comportement historique).
+    pub fn with_bot_config_repo(
+        mut self,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
+    ) -> Self {
+        self.bot_config_repo = Some(bot_config_repo);
+        self
+    }
+
+    async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
+        let Some(repo) = self.bot_config_repo.as_ref() else {
+            return CoudeBalanceParams::default();
+        };
+        match repo.get_config(guild_id, "coude-bot").await {
+            Ok(entries) => {
+                let map: std::collections::HashMap<String, String> = entries
+                    .into_iter()
+                    .map(|e| (e.config_key, e.config_value))
+                    .collect();
+                CoudeBalanceParams::from_config(&map)
+            }
+            Err(_) => CoudeBalanceParams::default(),
+        }
     }
 }
 
@@ -55,6 +87,25 @@ impl ManageCoudeStealBoostsUseCase for ManageCoudeStealBoostsService {
                 "Item de boost inconnu : {item_key}"
             )));
         }
+
+        // Gate : cap sur le nombre de boosts actifs simultanes.
+        // On ne compte pas l'item courant (re-souscription = prolongation),
+        // seulement les autres deja actifs. `cap = 0` signifie illimite.
+        let params = self.load_balance(guild_id).await;
+        let cap = params.steal_max_active_boosts;
+        if cap > 0 {
+            let actives = self.repo.list_active(guild_id, user_id).await?;
+            let other_active = actives
+                .iter()
+                .filter(|b| b.item_key != item_key)
+                .count() as u64;
+            if other_active >= cap {
+                return Err(DomainError::ValidationError(format!(
+                    "Trop de boosts actifs ({other_active}/{cap}). Attends qu'un boost expire avant d'en souscrire un nouveau."
+                )));
+            }
+        }
+
         self.repo
             .upsert(guild_id, user_id, item_key, duration.days())
             .await
@@ -148,5 +199,120 @@ mod tests {
     async fn total_bonus_zero_when_no_active() {
         let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
         assert_eq!(svc.total_bonus("g", "u").await.unwrap(), 0);
+    }
+
+    // ── Gate steal_max_active_boosts ──
+
+    use crate::domain::entities::{BotDefinition, BotGuildConfig};
+    use crate::ports::outbound::BotConfigRepository;
+
+    struct MockBotConfigRepo {
+        cap: Option<&'static str>, // valeur de steal_max_active_boosts
+    }
+
+    #[async_trait]
+    impl BotConfigRepository for MockBotConfigRepo {
+        async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> {
+            Ok(vec![])
+        }
+        async fn get_config(
+            &self,
+            _guild_id: &str,
+            _bot_name: &str,
+        ) -> Result<Vec<BotGuildConfig>, DomainError> {
+            let mut out = Vec::new();
+            if let Some(cap) = self.cap {
+                out.push(BotGuildConfig {
+                    id: Uuid::new_v4(),
+                    guild_id: "g".into(),
+                    bot_name: "coude-bot".into(),
+                    config_key: "steal_max_active_boosts".into(),
+                    config_value: cap.into(),
+                    updated_at: Utc::now(),
+                });
+            }
+            Ok(out)
+        }
+        async fn get_all_config(
+            &self,
+            _guild_id: &str,
+        ) -> Result<Vec<BotGuildConfig>, DomainError> {
+            Ok(vec![])
+        }
+        async fn set_config(
+            &self,
+            _guild_id: &str,
+            _bot_name: &str,
+            _key: &str,
+            _value: &str,
+        ) -> Result<(), DomainError> {
+            Ok(())
+        }
+        async fn delete_config(
+            &self,
+            _guild_id: &str,
+            _bot_name: &str,
+            _key: &str,
+        ) -> Result<(), DomainError> {
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn subscribe_refuse_quand_cap_atteint() {
+        // Cap = 2, 2 boosts actifs (autres que celui demande) → refus.
+        let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
+            actives: vec![mk_boost("crochet"), mk_boost("marteau")],
+        }))
+        .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("2") }));
+        let err = svc
+            .subscribe("g", "u", "fumigene", StealBoostDuration::OneDay)
+            .await
+            .unwrap_err();
+        assert!(matches!(err, DomainError::ValidationError(_)));
+    }
+
+    #[tokio::test]
+    async fn subscribe_autorise_re_souscription_meme_au_cap() {
+        // Cap = 2, 2 actifs mais on re-souscrit `crochet` (deja actif) →
+        // autorise (ne compte pas le re-subscribe).
+        let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
+            actives: vec![mk_boost("crochet"), mk_boost("marteau")],
+        }))
+        .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("2") }));
+        let res = svc
+            .subscribe("g", "u", "crochet", StealBoostDuration::OneDay)
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn subscribe_cap_zero_ne_bloque_jamais() {
+        let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
+            actives: vec![
+                mk_boost("crochet"),
+                mk_boost("marteau"),
+                mk_boost("fumigene"),
+                mk_boost("passe_partout"),
+            ],
+        }))
+        .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("0") }));
+        let res = svc
+            .subscribe("g", "u", "deguisement", StealBoostDuration::OneDay)
+            .await;
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn subscribe_sans_config_repo_applique_default_3() {
+        // Sans bot_config_repo branche → fallback CoudeBalanceParams::default()
+        // qui impose un cap de 3. 2 actifs (autres) → OK.
+        let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
+            actives: vec![mk_boost("marteau"), mk_boost("fumigene")],
+        }));
+        let res = svc
+            .subscribe("g", "u", "crochet", StealBoostDuration::OneDay)
+            .await;
+        assert!(res.is_ok());
     }
 }

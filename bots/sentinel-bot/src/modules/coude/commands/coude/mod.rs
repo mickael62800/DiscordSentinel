@@ -541,17 +541,24 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
     // Important : poster l'embed d'annonce PUIS l'embed de resultat retourne
     // par resolve_combat_internal. Avant, la valeur de retour etait ignoree
     // et le combat semblait ne pas avoir eu lieu (seule l'annonce s'affichait).
+    drop(data);
+
     if special_opt == Some("surprise") {
-        drop(data);
-        let _ = component
-            .channel_id
-            .send_message(
-                &ctx.http,
-                CreateMessage::new().embed(build_surprise_embed(attacker_user.id, target.id)),
-            )
-            .await;
-        match super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await {
-            Some(embed) => {
+        // On tente l'auto-resolve. Si l'API refuse parce que le defenseur
+        // possede un item de contre (Explosion) + `surprise_allow_defender_counter`
+        // active, on bascule sur le flow de defi normal pour laisser au
+        // defenseur une chance de riposter.
+        match super::accepter::resolve_combat_internal_ex(ctx, &combat, component.channel_id).await
+        {
+            super::accepter::ResolveOutcome::Resolved(embed) => {
+                let _ = component
+                    .channel_id
+                    .send_message(
+                        &ctx.http,
+                        CreateMessage::new()
+                            .embed(build_surprise_embed(attacker_user.id, target.id)),
+                    )
+                    .await;
                 if let Err(e) = component
                     .channel_id
                     .send_message(&ctx.http, CreateMessage::new().embed(embed))
@@ -560,11 +567,21 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                     tracing::warn!(error = %e, "Echec post embed resultat combat surprise");
                 }
                 edit_component_message(ctx, component, "\u{2705} Defi surprise resolu !").await;
+                return;
             }
-            None => {
+            super::accepter::ResolveOutcome::DefenderCanCounter => {
+                // On ne poste pas l'embed "surprise auto-resolu" : on
+                // tombe sur le flow normal en bas (challenge embed + boutons).
+                tracing::info!(
+                    combat_id = %combat.id,
+                    "Surprise bloquee : defenseur possede item de contre, bascule sur flow normal"
+                );
+                // fall-through
+            }
+            super::accepter::ResolveOutcome::Failed => {
                 tracing::error!(
                     combat_id = %combat.id,
-                    "resolve_combat_internal a retourne None pour un combat surprise"
+                    "resolve_combat_internal a echoue pour un combat surprise"
                 );
                 edit_component_message(
                     ctx,
@@ -572,10 +589,15 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                     "\u{26a0}\u{fe0f} Defi surprise lance mais la resolution a echoue (voir logs bot).",
                 )
                 .await;
+                return;
             }
         }
-        return;
     }
+
+    // Re-acquerir data/api : ils ont pu etre drop dans la branche surprise
+    // (fall-through apres DefenderCanCounter).
+    let data = ctx.data.read().await;
+    let api = data.get::<GameApiKey>().unwrap();
 
     // Bloodbath : auto-accept — meme correction que surprise.
     let events = api.get_active_events(&guild_id).await.unwrap_or_default();

@@ -121,6 +121,28 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // si bot_guild_config indispo ou vide).
         let balance = load_balance_params(self.bot_config_repo.as_ref(), &combat.guild_id).await;
 
+        // Gate : si l'attaquant a lance une surprise ET que le defenseur
+        // possede Explosion dans son inventaire ET que le flag
+        // `surprise_allow_defender_counter` est actif, on refuse l'auto-
+        // resolve. Le bot doit basculer sur le flow de defi normal pour
+        // laisser le defenseur une chance de riposter.
+        if combat.special_attack.as_deref() == Some("surprise")
+            && combat.defender_special.is_none()
+            && balance.surprise_allow_defender_counter
+        {
+            let has_explosion = self
+                .inventory_uc
+                .has_item(&combat.guild_id, &combat.defender_id, "explosion")
+                .await
+                .unwrap_or(false);
+            if has_explosion {
+                return Err(DomainError::Conflict(
+                    "surprise_defender_can_counter: le defenseur possede Explosion, passer par le flow de defi normal"
+                        .into(),
+                ));
+            }
+        }
+
         let result = engine::combat::resolve_combat(
             &atk_player,
             &def_player,

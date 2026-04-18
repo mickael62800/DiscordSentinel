@@ -298,7 +298,13 @@ pub async fn build_app_state(
     let coude_players_uc = Arc::new(ManageCoudePlayersService::new(coude_player_repo.clone()));
     let coude_combat_repo = Arc::new(PgCoudeCombatRepository::new(pg_pool.clone()));
     let coude_combats_uc: Arc<dyn crate::ports::inbound::ManageCoudeCombatsUseCase> =
-        Arc::new(ManageCoudeCombatsService::new(coude_combat_repo.clone()));
+        Arc::new(
+            ManageCoudeCombatsService::new(coude_combat_repo.clone()).with_surprise_gate(
+                coude_players_uc.clone()
+                    as Arc<dyn crate::ports::inbound::ManageCoudePlayersUseCase>,
+                bot_config_repo.clone(),
+            ),
+        );
     let coude_bet_repo = Arc::new(PgCoudeBetRepository::new(pg_pool.clone()));
     let coude_bets_uc = Arc::new(ManageCoudeBetsService::new(
         coude_bet_repo,
@@ -379,7 +385,10 @@ pub async fn build_app_state(
     let coude_steal_boost_repo: Arc<dyn crate::ports::outbound::CoudeStealBoostRepository> =
         Arc::new(PgCoudeStealBoostRepository::new(pg_pool.clone()));
     let coude_steal_boosts_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealBoostsUseCase> =
-        Arc::new(ManageCoudeStealBoostsService::new(coude_steal_boost_repo));
+        Arc::new(
+            ManageCoudeStealBoostsService::new(coude_steal_boost_repo)
+                .with_bot_config_repo(bot_config_repo.clone()),
+        );
     let resolve_combat_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase> =
         Arc::new(ResolveCombatNowService::new(
             coude_combat_repo.clone(),

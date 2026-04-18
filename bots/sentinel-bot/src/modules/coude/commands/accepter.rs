@@ -167,6 +167,18 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 
 /// Resoud un combat instantanement et retourne l'embed pret a poster.
 ///
+/// Resultat d'une tentative de resolution instantanee cote API.
+///
+/// Distingue le succes (embed pret a poster) du cas special ou l'API
+/// refuse l'auto-resolve parce que le defenseur possede un item de contre
+/// (Explosion) et que la regle `surprise_allow_defender_counter` est active.
+/// Dans ce dernier cas, l'appelant doit basculer sur le flow de defi normal.
+pub enum ResolveOutcome {
+    Resolved(CreateEmbed),
+    DefenderCanCounter,
+    Failed,
+}
+
 /// Phase 7 refacto : 450 lignes -> ~15. Toute la logique metier (combat
 /// engine, wallet, stats, XP, primes, paris, assurance, chaos) vit
 /// maintenant dans l'API via le use case `ResolveCombatNowUseCase` /
@@ -176,14 +188,33 @@ pub async fn resolve_combat_internal(
     combat_record: &Combat,
     _channel_id: ChannelId,
 ) -> Option<CreateEmbed> {
+    match resolve_combat_internal_ex(ctx, combat_record, _channel_id).await {
+        ResolveOutcome::Resolved(e) => Some(e),
+        _ => None,
+    }
+}
+
+/// Variante etendue qui distingue l'echec general du cas "defender_can_counter"
+/// (Phase 132+). Utilisee par le flow d'attaque surprise pour basculer sur
+/// le flow de defi normal quand l'API refuse l'auto-resolve.
+pub async fn resolve_combat_internal_ex(
+    ctx: &Context,
+    combat_record: &Combat,
+    _channel_id: ChannelId,
+) -> ResolveOutcome {
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
 
     let resp = match api.resolve_combat_now(&combat_record.id).await {
         Ok(r) => r,
         Err(e) => {
+            // Sentinel : le defenseur possede un item de contre (Explosion),
+            // l'API demande au bot de basculer sur le flow normal.
+            if e.contains("surprise_defender_can_counter") {
+                return ResolveOutcome::DefenderCanCounter;
+            }
             tracing::error!(error = %e, combat_id = %combat_record.id, "Echec API resolve_combat_now");
-            return None;
+            return ResolveOutcome::Failed;
         }
     };
 
@@ -206,7 +237,7 @@ pub async fn resolve_combat_internal(
         }
     }
 
-    Some(embed)
+    ResolveOutcome::Resolved(embed)
 }
 
 /// Followup ephemeral apres un Acknowledge (on a defer au debut).
