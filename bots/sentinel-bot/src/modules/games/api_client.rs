@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sentinel_shared::api_client::BaseApiClient;
 
 /// URL-encode un segment de path pour eviter qu'un nom de jeu avec `/` ou
@@ -17,18 +17,41 @@ fn encode_segment(s: &str) -> String {
         .collect()
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 #[allow(dead_code)]
 pub struct Game {
     pub id: String,
     pub guild_id: String,
     pub game_name: String,
     pub created_by: String,
+    #[serde(default)]
+    pub emoji: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct Subscriber {
     pub user_id: String,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+#[allow(dead_code)]
+pub struct GamePanel {
+    pub id: String,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub message_id: String,
+    #[serde(default)]
+    pub category: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct SavePanelReq<'a> {
+    channel_id: &'a str,
+    message_id: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    category: Option<&'a str>,
 }
 
 pub struct GameApiClient {
@@ -47,12 +70,30 @@ impl GameApiClient {
             .await
     }
 
+    /// Liste les jeux d'une categorie (None => jeux sans categorie).
+    pub async fn list_games_by_category(&self, guild_id: &str, category: Option<&str>) -> Result<Vec<Game>, String> {
+        let mut url = format!("/api/games/{}/by-category", encode_segment(guild_id));
+        if let Some(cat) = category {
+            url.push_str(&format!("?category={}", encode_segment(cat)));
+        }
+        self.base.get_json(&url).await
+    }
+
     /// Cree un jeu.
-    pub async fn create_game(&self, guild_id: &str, game_name: &str, created_by: &str) -> Result<Game, String> {
+    pub async fn create_game(
+        &self,
+        guild_id: &str,
+        game_name: &str,
+        created_by: &str,
+        emoji: Option<&str>,
+        category: Option<&str>,
+    ) -> Result<Game, String> {
         self.base.post_json("/api/games", &serde_json::json!({
             "guild_id": guild_id,
             "game_name": game_name,
             "created_by": created_by,
+            "emoji": emoji,
+            "category": category,
         })).await
     }
 
@@ -71,10 +112,6 @@ impl GameApiClient {
         Ok(())
     }
 
-    /// Inscrit un joueur a un jeu. Verifie explicitement le code HTTP de la
-    /// reponse : auparavant on utilisait post_fire_and_forget qui ignorait
-    /// silencieusement les erreurs API, donc le bot confirmait "inscrit" meme
-    /// en cas de 500.
     pub async fn subscribe(&self, guild_id: &str, game_id: &str, user_id: &str) -> Result<(), String> {
         let url = format!(
             "{}/api/games/{}/{}/subscribe",
@@ -90,8 +127,6 @@ impl GameApiClient {
         Ok(())
     }
 
-    /// Desinscrit un joueur d'un jeu. Meme remarque que subscribe : on
-    /// verifie le status HTTP au lieu d'ignorer l'erreur.
     pub async fn unsubscribe(&self, guild_id: &str, game_id: &str, user_id: &str) -> Result<(), String> {
         let req = self.base.client().delete(format!(
             "{}/api/games/{}/{}/subscribe/{}",
@@ -107,7 +142,6 @@ impl GameApiClient {
         Ok(())
     }
 
-    /// Recupere les abonnes d'un jeu.
     pub async fn get_subscribers(&self, guild_id: &str, game_id: &str) -> Result<Vec<Subscriber>, String> {
         self.base
             .get_json(&format!(
@@ -118,7 +152,6 @@ impl GameApiClient {
             .await
     }
 
-    /// Trouve un jeu par nom (case-insensitive).
     pub async fn get_game_by_name(&self, guild_id: &str, game_name: &str) -> Result<Option<Game>, String> {
         self.base
             .get_json(&format!(
@@ -129,13 +162,59 @@ impl GameApiClient {
             .await
     }
 
-    /// Jeux auxquels un joueur est inscrit.
     pub async fn get_user_games(&self, guild_id: &str, user_id: &str) -> Result<Vec<Game>, String> {
         self.base
             .get_json(&format!(
                 "/api/games/{}/user/{}",
                 encode_segment(guild_id),
                 encode_segment(user_id)
+            ))
+            .await
+    }
+
+    // ── Panels ──
+
+    pub async fn save_panel(
+        &self,
+        guild_id: &str,
+        channel_id: &str,
+        message_id: &str,
+        category: Option<&str>,
+    ) -> Result<GamePanel, String> {
+        let url = format!(
+            "{}/api/games/{}/panels",
+            self.base.base_url(),
+            encode_segment(guild_id),
+        );
+        let body = SavePanelReq { channel_id, message_id, category };
+        let req = self.base.client().post(url).json(&body);
+        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
+        if !resp.status().is_success() {
+            return Err(format!("API error: {}", resp.status()));
+        }
+        resp.json::<GamePanel>().await.map_err(|e| e.to_string())
+    }
+
+    pub async fn find_panel_by_message(
+        &self,
+        guild_id: &str,
+        message_id: &str,
+    ) -> Result<Option<GamePanel>, String> {
+        self.base
+            .get_json(&format!(
+                "/api/games/{}/panels/by-message/{}",
+                encode_segment(guild_id),
+                encode_segment(message_id)
+            ))
+            .await
+    }
+
+    #[allow(dead_code)]
+    pub async fn list_panels(&self, guild_id: &str) -> Result<Vec<GamePanel>, String> {
+        self.base
+            .get_json(&format!(
+                "/api/games/{}/panels",
+                encode_segment(guild_id)
             ))
             .await
     }

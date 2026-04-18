@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::{Game, GameRepository};
+use crate::ports::outbound::{Game, GamePanel, GameRepository};
 use super::pg_err;
 
 pub struct PgGameRepository { pool: PgPool }
@@ -12,36 +12,100 @@ impl PgGameRepository {
 }
 
 #[derive(sqlx::FromRow)]
-struct GameRow { id: String, guild_id: String, game_name: String, created_by: String, created_at: String }
+struct GameRow {
+    id: String,
+    guild_id: String,
+    game_name: String,
+    created_by: String,
+    created_at: String,
+    emoji: Option<String>,
+    category: Option<String>,
+}
 
 impl From<GameRow> for Game {
     fn from(r: GameRow) -> Self {
-        Self { id: r.id, guild_id: r.guild_id, game_name: r.game_name, created_by: r.created_by, created_at: r.created_at }
+        Self {
+            id: r.id,
+            guild_id: r.guild_id,
+            game_name: r.game_name,
+            created_by: r.created_by,
+            created_at: r.created_at,
+            emoji: r.emoji,
+            category: r.category,
+        }
     }
 }
+
+#[derive(sqlx::FromRow)]
+struct PanelRow {
+    id: String,
+    guild_id: String,
+    channel_id: String,
+    message_id: String,
+    category: Option<String>,
+}
+
+impl From<PanelRow> for GamePanel {
+    fn from(r: PanelRow) -> Self {
+        Self {
+            id: r.id,
+            guild_id: r.guild_id,
+            channel_id: r.channel_id,
+            message_id: r.message_id,
+            category: r.category,
+        }
+    }
+}
+
+const GAME_COLS: &str =
+    "id::text, guild_id, game_name, created_by, created_at::text, emoji, category";
 
 #[async_trait]
 impl GameRepository for PgGameRepository {
     async fn list(&self, guild_id: &str) -> Result<Vec<Game>, DomainError> {
-        let rows: Vec<GameRow> = sqlx::query_as(
-            "SELECT id::text, guild_id, game_name, created_by, created_at::text FROM games WHERE guild_id = $1 ORDER BY game_name",
-        ).bind(guild_id).fetch_all(&self.pool).await.map_err(pg_err)?;
+        let sql = format!(
+            "SELECT {GAME_COLS} FROM games WHERE guild_id = $1 ORDER BY game_name"
+        );
+        let rows: Vec<GameRow> = sqlx::query_as(&sql)
+            .bind(guild_id).fetch_all(&self.pool).await.map_err(pg_err)?;
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn create(&self, guild_id: &str, game_name: &str, created_by: &str) -> Result<Game, DomainError> {
-        let row: GameRow = sqlx::query_as(
-            "INSERT INTO games (guild_id, game_name, created_by) VALUES ($1, $2, $3) \
-             RETURNING id::text, guild_id, game_name, created_by, created_at::text",
-        ).bind(guild_id).bind(game_name).bind(created_by)
-        .fetch_one(&self.pool).await
-        .map_err(|e| {
-            if e.to_string().contains("idx_games_guild_name") {
-                DomainError::Conflict("Un jeu avec ce nom existe deja".into())
-            } else {
-                pg_err(e)
+    async fn list_by_category(&self, guild_id: &str, category: Option<&str>) -> Result<Vec<Game>, DomainError> {
+        let rows: Vec<GameRow> = match category {
+            Some(cat) => {
+                let sql = format!(
+                    "SELECT {GAME_COLS} FROM games WHERE guild_id = $1 AND LOWER(category) = LOWER($2) ORDER BY game_name"
+                );
+                sqlx::query_as(&sql).bind(guild_id).bind(cat)
+                    .fetch_all(&self.pool).await.map_err(pg_err)?
             }
-        })?;
+            None => {
+                let sql = format!(
+                    "SELECT {GAME_COLS} FROM games WHERE guild_id = $1 AND category IS NULL ORDER BY game_name"
+                );
+                sqlx::query_as(&sql).bind(guild_id)
+                    .fetch_all(&self.pool).await.map_err(pg_err)?
+            }
+        };
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn create(&self, guild_id: &str, game_name: &str, created_by: &str, emoji: Option<&str>, category: Option<&str>) -> Result<Game, DomainError> {
+        let sql = format!(
+            "INSERT INTO games (guild_id, game_name, created_by, emoji, category) VALUES ($1, $2, $3, $4, $5) \
+             RETURNING {GAME_COLS}"
+        );
+        let row: GameRow = sqlx::query_as(&sql)
+            .bind(guild_id).bind(game_name).bind(created_by).bind(emoji).bind(category)
+            .fetch_one(&self.pool).await
+            .map_err(|e| {
+                if e.to_string().contains("idx_games_guild_name") {
+                    DomainError::Conflict("Un jeu avec ce nom existe deja".into())
+                } else {
+                    pg_err(e)
+                }
+            })?;
         Ok(row.into())
     }
 
@@ -53,9 +117,11 @@ impl GameRepository for PgGameRepository {
     }
 
     async fn find_by_name(&self, guild_id: &str, game_name: &str) -> Result<Option<Game>, DomainError> {
-        let row: Option<GameRow> = sqlx::query_as(
-            "SELECT id::text, guild_id, game_name, created_by, created_at::text FROM games WHERE guild_id = $1 AND LOWER(game_name) = LOWER($2)",
-        ).bind(guild_id).bind(game_name).fetch_optional(&self.pool).await.map_err(pg_err)?;
+        let sql = format!(
+            "SELECT {GAME_COLS} FROM games WHERE guild_id = $1 AND LOWER(game_name) = LOWER($2)"
+        );
+        let row: Option<GameRow> = sqlx::query_as(&sql)
+            .bind(guild_id).bind(game_name).fetch_optional(&self.pool).await.map_err(pg_err)?;
         Ok(row.map(Into::into))
     }
 
@@ -82,11 +148,46 @@ impl GameRepository for PgGameRepository {
     }
 
     async fn get_user_games(&self, guild_id: &str, user_id: &str) -> Result<Vec<Game>, DomainError> {
-        let rows: Vec<GameRow> = sqlx::query_as(
-            "SELECT g.id::text, g.guild_id, g.game_name, g.created_by, g.created_at::text \
+        let sql = format!(
+            "SELECT g.id::text, g.guild_id, g.game_name, g.created_by, g.created_at::text, g.emoji, g.category \
              FROM games g INNER JOIN game_subscriptions gs ON gs.game_id = g.id \
-             WHERE g.guild_id = $1 AND gs.user_id = $2 ORDER BY g.game_name",
-        ).bind(guild_id).bind(user_id).fetch_all(&self.pool).await.map_err(pg_err)?;
+             WHERE g.guild_id = $1 AND gs.user_id = $2 ORDER BY g.game_name"
+        );
+        let rows: Vec<GameRow> = sqlx::query_as(&sql)
+            .bind(guild_id).bind(user_id).fetch_all(&self.pool).await.map_err(pg_err)?;
+        Ok(rows.into_iter().map(Into::into).collect())
+    }
+
+    async fn save_panel(&self, guild_id: &str, channel_id: &str, message_id: &str, category: Option<&str>) -> Result<GamePanel, DomainError> {
+        // Upsert sur (guild_id, COALESCE(category, '')).
+        let row: PanelRow = sqlx::query_as(
+            "INSERT INTO game_panels (guild_id, channel_id, message_id, category) \
+             VALUES ($1, $2, $3, $4) \
+             ON CONFLICT (guild_id, COALESCE(category, '')) DO UPDATE SET \
+               channel_id = EXCLUDED.channel_id, \
+               message_id = EXCLUDED.message_id \
+             RETURNING id::text, guild_id, channel_id, message_id, category",
+        )
+        .bind(guild_id).bind(channel_id).bind(message_id).bind(category)
+        .fetch_one(&self.pool).await.map_err(pg_err)?;
+        Ok(row.into())
+    }
+
+    async fn find_panel_by_message(&self, guild_id: &str, message_id: &str) -> Result<Option<GamePanel>, DomainError> {
+        let row: Option<PanelRow> = sqlx::query_as(
+            "SELECT id::text, guild_id, channel_id, message_id, category FROM game_panels WHERE guild_id = $1 AND message_id = $2",
+        )
+        .bind(guild_id).bind(message_id)
+        .fetch_optional(&self.pool).await.map_err(pg_err)?;
+        Ok(row.map(Into::into))
+    }
+
+    async fn list_panels(&self, guild_id: &str) -> Result<Vec<GamePanel>, DomainError> {
+        let rows: Vec<PanelRow> = sqlx::query_as(
+            "SELECT id::text, guild_id, channel_id, message_id, category FROM game_panels WHERE guild_id = $1 ORDER BY category NULLS FIRST",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool).await.map_err(pg_err)?;
         Ok(rows.into_iter().map(Into::into).collect())
     }
 }

@@ -17,11 +17,21 @@ pub struct GameDto {
     pub game_name: String,
     pub created_by: String,
     pub created_at: String,
+    pub emoji: Option<String>,
+    pub category: Option<String>,
 }
 
 impl From<crate::ports::outbound::Game> for GameDto {
     fn from(g: crate::ports::outbound::Game) -> Self {
-        Self { id: g.id, guild_id: g.guild_id, game_name: g.game_name, created_by: g.created_by, created_at: g.created_at }
+        Self {
+            id: g.id,
+            guild_id: g.guild_id,
+            game_name: g.game_name,
+            created_by: g.created_by,
+            created_at: g.created_at,
+            emoji: g.emoji,
+            category: g.category,
+        }
     }
 }
 
@@ -30,6 +40,10 @@ pub struct CreateGameDto {
     pub guild_id: String,
     pub game_name: String,
     pub created_by: String,
+    #[serde(default)]
+    pub emoji: Option<String>,
+    #[serde(default)]
+    pub category: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -40,6 +54,35 @@ pub struct SubscribeDto {
 #[derive(Debug, Serialize)]
 pub struct SubscriberDto {
     pub user_id: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GamePanelDto {
+    pub id: String,
+    pub guild_id: String,
+    pub channel_id: String,
+    pub message_id: String,
+    pub category: Option<String>,
+}
+
+impl From<crate::ports::outbound::GamePanel> for GamePanelDto {
+    fn from(p: crate::ports::outbound::GamePanel) -> Self {
+        Self {
+            id: p.id,
+            guild_id: p.guild_id,
+            channel_id: p.channel_id,
+            message_id: p.message_id,
+            category: p.category,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SavePanelDto {
+    pub channel_id: String,
+    pub message_id: String,
+    #[serde(default)]
+    pub category: Option<String>,
 }
 
 // ── Games CRUD (via GameRepository) ──
@@ -63,7 +106,9 @@ pub async fn create_game(
     if name.len() > 100 {
         return Err(DomainError::ValidationError("Le nom du jeu ne peut pas depasser 100 caracteres".into()).into());
     }
-    let game = state.game_repo.create(&dto.guild_id, &name, &dto.created_by).await?;
+    let emoji = dto.emoji.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let category = dto.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let game = state.game_repo.create(&dto.guild_id, &name, &dto.created_by, emoji, category).await?;
     Ok(Json(game.into()))
 }
 
@@ -123,4 +168,51 @@ pub async fn get_user_games(
 ) -> Result<Json<Vec<GameDto>>, ApiError> {
     let games = state.game_repo.get_user_games(&guild_id, &user_id).await?;
     Ok(Json(games.into_iter().map(Into::into).collect()))
+}
+
+// ── Panels ──
+
+pub async fn save_panel(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<SavePanelDto>,
+) -> Result<Json<GamePanelDto>, ApiError> {
+    let category = dto.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let panel = state
+        .game_repo
+        .save_panel(&guild_id, &dto.channel_id, &dto.message_id, category)
+        .await?;
+    Ok(Json(panel.into()))
+}
+
+pub async fn find_panel_by_message(
+    State(state): State<AppState>,
+    Path((guild_id, message_id)): Path<(String, String)>,
+) -> Result<Json<Option<GamePanelDto>>, ApiError> {
+    let panel = state.game_repo.find_panel_by_message(&guild_id, &message_id).await?;
+    Ok(Json(panel.map(Into::into)))
+}
+
+pub async fn list_panels(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<Vec<GamePanelDto>>, ApiError> {
+    let panels = state.game_repo.list_panels(&guild_id).await?;
+    Ok(Json(panels.into_iter().map(Into::into).collect()))
+}
+
+pub async fn list_games_by_category(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    axum::extract::Query(q): axum::extract::Query<CategoryQuery>,
+) -> Result<Json<Vec<GameDto>>, ApiError> {
+    let cat = q.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let games = state.game_repo.list_by_category(&guild_id, cat).await?;
+    Ok(Json(games.into_iter().map(Into::into).collect()))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CategoryQuery {
+    #[serde(default)]
+    pub category: Option<String>,
 }

@@ -1,4 +1,4 @@
-//! Routes games (abonnements / alertes).
+//! Routes games (abonnements / alertes / panels).
 
 use axum::routing::{delete, get, post};
 use axum::Router;
@@ -16,6 +16,9 @@ fn game_inner() -> Router<AppState> {
         .route("/{guild_id}/{game_id}/subscribers", get(handlers::games::get_subscribers))
         .route("/{guild_id}/by-name/{game_name}", get(handlers::games::get_game_by_name))
         .route("/{guild_id}/user/{user_id}", get(handlers::games::get_user_games))
+        .route("/{guild_id}/by-category", get(handlers::games::list_games_by_category))
+        .route("/{guild_id}/panels", post(handlers::games::save_panel).get(handlers::games::list_panels))
+        .route("/{guild_id}/panels/by-message/{message_id}", get(handlers::games::find_panel_by_message))
 }
 
 pub fn routes() -> Router<AppState> {

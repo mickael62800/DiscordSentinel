@@ -104,7 +104,7 @@ mod modstats_repository;
 pub use modstats_repository::{ModeratorStat, ModstatsRepository};
 
 mod game_repository;
-pub use game_repository::{Game, GameRepository};
+pub use game_repository::{Game, GamePanel, GameRepository};
 
 mod sponsorship_repository;
 pub use sponsorship_repository::{Sponsorship, SponsorshipRepository};

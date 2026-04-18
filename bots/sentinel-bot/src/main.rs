@@ -46,7 +46,8 @@ async fn main() {
         | GatewayIntents::GUILD_MEMBERS
         | GatewayIntents::GUILD_MESSAGES
         | GatewayIntents::MESSAGE_CONTENT
-        | GatewayIntents::GUILD_MODERATION;
+        | GatewayIntents::GUILD_MODERATION
+        | GatewayIntents::GUILD_MESSAGE_REACTIONS;
 
     let mut client = Client::builder(config.discord_token(), intents)
         .event_handler(Handler)

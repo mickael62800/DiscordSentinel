@@ -115,6 +115,14 @@ impl EventHandler for Handler {
         modules::tickets::on_message(&ctx, &msg).await;
     }
 
+    async fn reaction_add(&self, ctx: Context, reaction: serenity::model::channel::Reaction) {
+        modules::games::on_reaction_add(&ctx, &reaction).await;
+    }
+
+    async fn reaction_remove(&self, ctx: Context, reaction: serenity::model::channel::Reaction) {
+        modules::games::on_reaction_remove(&ctx, &reaction).await;
+    }
+
     async fn message_delete(
         &self,
         ctx: Context,
@@ -280,7 +288,7 @@ impl EventHandler for Handler {
 
                 match name {
                     "purge" | "cleanup" => modules::cleanup::handle_command(&ctx, &command).await,
-                    "game" => modules::games::handle_command(&ctx, &command).await,
+                    "game" | "game-admin" => modules::games::handle_command(&ctx, &command).await,
                     "roles-panel" | "parrain" => modules::community::handle_command(&ctx, &command).await,
                     "audit" => modules::audit::handle_command(&ctx, &command).await,
                     "level" | "stats" => modules::progression::handle_command(&ctx, &command).await,
