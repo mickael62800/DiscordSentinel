@@ -42,17 +42,26 @@ pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     // 1. Query les tables AFK — clam-based : on UPDATE directement via
     //    `RETURNING` pour garantir l'atomicite (une table ne sera marquee
     //    closed qu'une seule fois, meme avec plusieurs replicas workers).
+    // Timeout lu par guild depuis bot_guild_config (bot_name='blackjack-bot',
+    // key='afk_timeout_secs'). Fallback sur DEFAULT_AFK_TIMEOUT_SECS si absent.
     let afk: Vec<AfkTable> = sqlx::query_as::<_, AfkTable>(
-        "UPDATE blackjack_tables SET status = 'closed' \
-         WHERE id IN ( \
-             SELECT id FROM blackjack_tables \
-             WHERE status = 'open' \
-               AND last_activity < NOW() - make_interval(secs => $1) \
-             ORDER BY last_activity ASC \
-             FOR UPDATE SKIP LOCKED \
-             LIMIT 50 \
-         ) \
-         RETURNING id, guild_id, channel_id, owner_id, last_activity",
+        r#"UPDATE blackjack_tables SET status = 'closed'
+           WHERE id IN (
+               SELECT t.id FROM blackjack_tables t
+               LEFT JOIN bot_guild_config cfg
+                   ON cfg.guild_id = t.guild_id
+                   AND cfg.bot_name = 'blackjack-bot'
+                   AND cfg.config_key = 'afk_timeout_secs'
+               WHERE t.status = 'open'
+                 AND t.last_activity < NOW() - (COALESCE(
+                       CASE WHEN cfg.config_value ~ '^\d+$' THEN cfg.config_value::int ELSE NULL END,
+                       $1
+                     ) * INTERVAL '1 second')
+               ORDER BY t.last_activity ASC
+               FOR UPDATE OF t SKIP LOCKED
+               LIMIT 50
+           )
+           RETURNING id, guild_id, channel_id, owner_id, last_activity"#,
     )
     .bind(DEFAULT_AFK_TIMEOUT_SECS)
     .fetch_all(pool)
