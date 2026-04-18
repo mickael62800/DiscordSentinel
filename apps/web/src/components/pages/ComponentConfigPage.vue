@@ -4,14 +4,11 @@ import { botConfigService } from "@/services/botConfigService";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useToast } from "../../composables/useToast";
-import AppBadge from "../atoms/AppBadge.vue";
 import AppToggle from "../atoms/AppToggle.vue";
 
 const { success, error: showError } = useToast();
 
 const { selectedGuildId, selectedGuild } = useGuildSelector();
-
-const workerNames = ["moderation-worker", "analytics-worker", "cache-worker", "cleanup-worker", "coude-worker", "monitoring-worker"];
 
 const definitions = ref<BotDefinition[]>([]);
 const configs = ref<BotGuildConfig[]>([]);
@@ -22,8 +19,121 @@ const formValues = ref<Record<string, string>>({});
 const savedValues = ref<Record<string, string>>({});
 const successMessage = ref("");
 
+// Detection automatique : tout ce qui finit par "-worker" est un worker.
 function isWorker(botName: string): boolean {
-  return workerNames.includes(botName);
+  return botName.endsWith("-worker");
+}
+
+// Regroupe les champs par prefixe de cle (mot avant le premier '_').
+// Ex: shop_potion_* et shop_bouclier_* sont regroupes dans la sous-section "shop".
+// Les cles sans prefixe (ou prefixe unique) sont regroupees dans "General".
+const KNOWN_PREFIXES: Record<string, string> = {
+  shop: "Shop",
+  gift: "Dons",
+  afk: "AFK",
+  captcha: "Captcha",
+  raid: "Raid",
+  lockdown: "Lockdown",
+  quarantine: "Quarantaine",
+  alt: "Alts",
+  combat: "Combat",
+  casino: "Casino",
+  cashbox: "Caisse",
+  hp: "Points de vie",
+  xp: "XP",
+  level: "Niveaux",
+  levelup: "Level-up",
+  streak: "Streaks",
+  sponsor: "Parrainage",
+  exclusive: "Groupes exclusifs",
+  role: "Roles",
+  temp: "Temporaire",
+  ban: "Ban",
+  mute: "Mute",
+  kick: "Kick",
+  warn: "Warn",
+  escalation: "Escalade",
+  flood: "Flood",
+  vote: "Vote",
+  queue: "Queue",
+  ai: "IA",
+  text: "Texte IA",
+  vision: "Vision IA",
+  ticket: "Tickets",
+  sla: "SLA",
+  faq: "FAQ",
+  transcript: "Transcript",
+  assistance: "Assistance",
+  welcome: "Bienvenue",
+  anomaly: "Anomalies",
+  audit: "Audit",
+  daily: "Quotidien",
+  weekly: "Hebdomadaire",
+  monthly: "Mensuel",
+  hourly: "Horaire",
+  cleanup: "Nettoyage",
+  vacuum: "Vacuum",
+  logs: "Logs",
+  cache: "Cache",
+  partition: "Partitions",
+  leaderboards: "Leaderboards",
+  user: "Utilisateurs",
+  analytics: "Analytics",
+  dashboard: "Dashboard",
+  voice: "Vocaux",
+  reason: "Raisons",
+  ignored: "Ignores",
+  call: "Call",
+  export: "Export",
+  channel: "Salons",
+  happy: "Happy hour",
+  chaos: "Chaos",
+  cowardice: "Couardise",
+  refusal: "Refus",
+  cancel: "Annulation",
+  insurance: "Assurance",
+  starting: "Depart",
+  min: "Minimum",
+  max: "Maximum",
+  default: "Defaut",
+  bet: "Paris",
+  betting: "Paris",
+  steal: "Vol",
+  repos: "Repos",
+  class: "Classes",
+  don: "Dons (legacy)",
+  reset: "Reset",
+};
+
+function prefixOf(key: string): string {
+  const first = key.split("_")[0];
+  return first || "general";
+}
+
+function subsectionLabel(prefix: string): string {
+  return KNOWN_PREFIXES[prefix] ?? prefix.charAt(0).toUpperCase() + prefix.slice(1);
+}
+
+function groupByPrefix(fields: ConfigField[]): Array<{ prefix: string; label: string; fields: ConfigField[] }> {
+  const buckets = new Map<string, ConfigField[]>();
+  for (const f of fields) {
+    const p = prefixOf(f.key);
+    if (!buckets.has(p)) buckets.set(p, []);
+    buckets.get(p)!.push(f);
+  }
+  // Si un seul bucket, on ne cree pas de sous-section (juste "Général").
+  const result = Array.from(buckets.entries()).map(([prefix, fields]) => ({
+    prefix,
+    label: subsectionLabel(prefix),
+    fields,
+  }));
+  // Tri : les sous-sections avec plus de 1 champ d'abord, puis alphabetique.
+  result.sort((a, b) => {
+    if (a.fields.length === 1 && b.fields.length > 1) return 1;
+    if (a.fields.length > 1 && b.fields.length === 1) return -1;
+    return a.label.localeCompare(b.label);
+  });
+  return result;
 }
 
 const moduleDefinitions = computed(() =>
@@ -198,7 +308,7 @@ watch(selectedComponent, loadFormValues);
   <div class="page">
     <header class="page-header">
       <h1>Configuration des composants</h1>
-      <p class="page-subtitle">Parametrer chaque module et worker pour le serveur selectionne</p>
+      <p class="page-subtitle">Parametrer chaque composant pour le serveur selectionne</p>
     </header>
 
     <div v-if="!selectedGuildId" class="empty-state">
@@ -227,9 +337,6 @@ watch(selectedComponent, loadFormValues);
           >
             <div class="component-card-header">
               <div class="component-name">{{ def.display_name }}</div>
-              <div class="component-badges">
-                <AppBadge label="Module" variant="info" />
-              </div>
             </div>
             <div class="component-desc">{{ def.description }}</div>
             <div class="component-params">
@@ -255,9 +362,6 @@ watch(selectedComponent, loadFormValues);
           >
             <div class="component-card-header">
               <div class="component-name">{{ def.display_name }}</div>
-              <div class="component-badges">
-                <AppBadge label="Worker" variant="warning" />
-              </div>
             </div>
             <div class="component-desc">{{ def.description }}</div>
             <div class="component-params">
@@ -271,16 +375,6 @@ watch(selectedComponent, loadFormValues);
       <div v-if="selectedDefinition" class="config-form">
         <div class="config-form-header">
           <h2>{{ selectedDefinition.display_name }}</h2>
-          <AppBadge
-            v-if="selectedIsWorker"
-            label="Worker"
-            variant="warning"
-          />
-          <AppBadge
-            v-else
-            label="Module"
-            variant="info"
-          />
         </div>
 
         <div v-if="configFields.length === 0" class="no-params">
@@ -288,7 +382,7 @@ watch(selectedComponent, loadFormValues);
         </div>
 
         <template v-else>
-          <!-- Section toggles (6 par ligne) -->
+          <!-- Section toggles (10 par ligne, sous-sections par prefixe) -->
           <div v-if="booleanFields.length > 0" class="toggles-section">
             <div class="section-title-row">
               <h3 class="section-title">Fonctionnalites</h3>
@@ -299,153 +393,183 @@ watch(selectedComponent, loadFormValues);
                 {{ allTogglesOn ? 'Tout desactiver' : 'Tout activer' }}
               </button>
             </div>
-            <div class="toggles-grid">
-              <div
-                v-for="field in booleanFields"
-                :key="field.key"
-                class="toggle-card"
-                :class="{ modified: isFieldModified(field.key) }"
-              >
-                <div class="toggle-card-header">
-                  <span class="toggle-card-label">{{ field.label }}</span>
-                  <span v-if="field.description" class="tooltip-wrap">
-                    <span class="info-icon">i</span>
-                    <span class="tooltip-text">{{ field.description }}</span>
-                  </span>
-                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
-                </div>
-                <div class="toggle-card-control">
-                  <AppToggle
-                    :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
-                    @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
-                  />
-                  <span class="toggle-state" :class="{ active: formValues[field.key] === 'true' || formValues[field.key] === '1' }">
-                    {{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'ON' : 'OFF' }}
-                  </span>
+            <template v-for="group in groupByPrefix(booleanFields)" :key="group.prefix">
+              <div v-if="groupByPrefix(booleanFields).length > 1" class="subsection-title">
+                {{ group.label }}
+                <span class="subsection-count">{{ group.fields.length }}</span>
+              </div>
+              <div class="toggles-grid">
+                <div
+                  v-for="field in group.fields"
+                  :key="field.key"
+                  class="toggle-card"
+                  :class="{ modified: isFieldModified(field.key) }"
+                >
+                  <div class="toggle-card-header">
+                    <span class="toggle-card-label">{{ field.label }}</span>
+                    <span v-if="field.description" class="tooltip-wrap">
+                      <span class="info-icon">i</span>
+                      <span class="tooltip-text">{{ field.description }}</span>
+                    </span>
+                    <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                  </div>
+                  <div class="toggle-card-control">
+                    <AppToggle
+                      :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
+                      @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
+                    />
+                    <span class="toggle-state" :class="{ active: formValues[field.key] === 'true' || formValues[field.key] === '1' }">
+                      {{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'ON' : 'OFF' }}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </template>
           </div>
 
-          <!-- Section Valeurs numeriques -->
+          <!-- Section Valeurs numeriques (4 par ligne, sous-sections) -->
           <div v-if="numberFields.length > 0" class="inputs-section">
             <h3 class="section-title">Valeurs</h3>
-            <div class="fields-grid">
-              <div
-                v-for="field in numberFields"
-                :key="field.key"
-                class="field-card"
-                :class="{ modified: isFieldModified(field.key) }"
-              >
-                <label :for="field.key" class="form-label">
-                  {{ field.label }}
-                  <span v-if="field.description" class="tooltip-wrap">
-                    <span class="info-icon">i</span>
-                    <span class="tooltip-text">{{ field.description }}</span>
-                  </span>
-                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
-                </label>
-                <input
-                  :id="field.key"
-                  v-model="formValues[field.key]"
-                  class="form-input form-input-number"
-                  type="number"
-                  min="0"
-                  :placeholder="field.default !== undefined ? String(field.default) : '0'"
-                />
-                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+            <template v-for="group in groupByPrefix(numberFields)" :key="group.prefix">
+              <div v-if="groupByPrefix(numberFields).length > 1" class="subsection-title">
+                {{ group.label }}
+                <span class="subsection-count">{{ group.fields.length }}</span>
               </div>
-            </div>
+              <div class="fields-grid">
+                <div
+                  v-for="field in group.fields"
+                  :key="field.key"
+                  class="field-card"
+                  :class="{ modified: isFieldModified(field.key) }"
+                >
+                  <label :for="field.key" class="form-label">
+                    {{ field.label }}
+                    <span v-if="field.description" class="tooltip-wrap">
+                      <span class="info-icon">i</span>
+                      <span class="tooltip-text">{{ field.description }}</span>
+                    </span>
+                    <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                  </label>
+                  <input
+                    :id="field.key"
+                    v-model="formValues[field.key]"
+                    class="form-input form-input-number"
+                    type="number"
+                    min="0"
+                    :placeholder="field.default !== undefined ? String(field.default) : '0'"
+                  />
+                  <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+                </div>
+              </div>
+            </template>
           </div>
 
-          <!-- Section Salons -->
+          <!-- Section Salons (4 par ligne, sous-sections) -->
           <div v-if="channelFields.length > 0" class="inputs-section">
             <h3 class="section-title">Salons</h3>
-            <div class="fields-grid">
-              <div
-                v-for="field in channelFields"
-                :key="field.key"
-                class="field-card"
-                :class="{ modified: isFieldModified(field.key) }"
-              >
-                <label :for="field.key" class="form-label">
-                  {{ field.label }}
-                  <span v-if="field.description" class="tooltip-wrap">
-                    <span class="info-icon">i</span>
-                    <span class="tooltip-text">{{ field.description }}</span>
-                  </span>
-                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
-                </label>
-                <input
-                  :id="field.key"
-                  v-model="formValues[field.key]"
-                  class="form-input"
-                  type="text"
-                  placeholder="ID du salon Discord"
-                />
-                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+            <template v-for="group in groupByPrefix(channelFields)" :key="group.prefix">
+              <div v-if="groupByPrefix(channelFields).length > 1" class="subsection-title">
+                {{ group.label }}
+                <span class="subsection-count">{{ group.fields.length }}</span>
               </div>
-            </div>
+              <div class="fields-grid">
+                <div
+                  v-for="field in group.fields"
+                  :key="field.key"
+                  class="field-card"
+                  :class="{ modified: isFieldModified(field.key) }"
+                >
+                  <label :for="field.key" class="form-label">
+                    {{ field.label }}
+                    <span v-if="field.description" class="tooltip-wrap">
+                      <span class="info-icon">i</span>
+                      <span class="tooltip-text">{{ field.description }}</span>
+                    </span>
+                    <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                  </label>
+                  <input
+                    :id="field.key"
+                    v-model="formValues[field.key]"
+                    class="form-input"
+                    type="text"
+                    placeholder="ID du salon Discord"
+                  />
+                  <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+                </div>
+              </div>
+            </template>
           </div>
 
-          <!-- Section Roles -->
+          <!-- Section Roles (4 par ligne, sous-sections) -->
           <div v-if="roleFields.length > 0" class="inputs-section">
             <h3 class="section-title">Roles</h3>
-            <div class="fields-grid">
-              <div
-                v-for="field in roleFields"
-                :key="field.key"
-                class="field-card"
-                :class="{ modified: isFieldModified(field.key) }"
-              >
-                <label :for="field.key" class="form-label">
-                  {{ field.label }}
-                  <span v-if="field.description" class="tooltip-wrap">
-                    <span class="info-icon">i</span>
-                    <span class="tooltip-text">{{ field.description }}</span>
-                  </span>
-                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
-                </label>
-                <input
-                  :id="field.key"
-                  v-model="formValues[field.key]"
-                  class="form-input"
-                  type="text"
-                  placeholder="ID du role Discord"
-                />
-                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+            <template v-for="group in groupByPrefix(roleFields)" :key="group.prefix">
+              <div v-if="groupByPrefix(roleFields).length > 1" class="subsection-title">
+                {{ group.label }}
+                <span class="subsection-count">{{ group.fields.length }}</span>
               </div>
-            </div>
+              <div class="fields-grid">
+                <div
+                  v-for="field in group.fields"
+                  :key="field.key"
+                  class="field-card"
+                  :class="{ modified: isFieldModified(field.key) }"
+                >
+                  <label :for="field.key" class="form-label">
+                    {{ field.label }}
+                    <span v-if="field.description" class="tooltip-wrap">
+                      <span class="info-icon">i</span>
+                      <span class="tooltip-text">{{ field.description }}</span>
+                    </span>
+                    <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                  </label>
+                  <input
+                    :id="field.key"
+                    v-model="formValues[field.key]"
+                    class="form-input"
+                    type="text"
+                    placeholder="ID du role Discord"
+                  />
+                  <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+                </div>
+              </div>
+            </template>
           </div>
 
-          <!-- Section Texte / Listes -->
+          <!-- Section Texte / Listes (sous-sections) -->
           <div v-if="textFields.length > 0" class="inputs-section">
             <h3 class="section-title">Texte & Listes</h3>
-            <div class="fields-grid fields-grid-text">
-              <div
-                v-for="field in textFields"
-                :key="field.key"
-                class="field-card field-card-wide"
-                :class="{ modified: isFieldModified(field.key) }"
-              >
-                <label :for="field.key" class="form-label">
-                  {{ field.label }}
-                  <span v-if="field.description" class="tooltip-wrap">
-                    <span class="info-icon">i</span>
-                    <span class="tooltip-text">{{ field.description }}</span>
-                  </span>
-                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
-                </label>
-                <input
-                  :id="field.key"
-                  v-model="formValues[field.key]"
-                  class="form-input"
-                  type="text"
-                  :placeholder="field.default !== undefined ? String(field.default) : ''"
-                />
-                <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+            <template v-for="group in groupByPrefix(textFields)" :key="group.prefix">
+              <div v-if="groupByPrefix(textFields).length > 1" class="subsection-title">
+                {{ group.label }}
+                <span class="subsection-count">{{ group.fields.length }}</span>
               </div>
-            </div>
+              <div class="fields-grid fields-grid-text">
+                <div
+                  v-for="field in group.fields"
+                  :key="field.key"
+                  class="field-card field-card-wide"
+                  :class="{ modified: isFieldModified(field.key) }"
+                >
+                  <label :for="field.key" class="form-label">
+                    {{ field.label }}
+                    <span v-if="field.description" class="tooltip-wrap">
+                      <span class="info-icon">i</span>
+                      <span class="tooltip-text">{{ field.description }}</span>
+                    </span>
+                    <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                  </label>
+                  <input
+                    :id="field.key"
+                    v-model="formValues[field.key]"
+                    class="form-input"
+                    type="text"
+                    :placeholder="field.default !== undefined ? String(field.default) : ''"
+                  />
+                  <span class="form-hint" :class="'hint-' + fieldStatus(field).source">{{ fieldStatus(field).text }}</span>
+                </div>
+              </div>
+            </template>
           </div>
 
           <div class="form-actions">
@@ -689,17 +813,42 @@ watch(selectedComponent, loadFormValues);
   padding: 20px 0;
 }
 
-/* Grid 3 colonnes pour les champs */
+/* Grid 4 colonnes pour les champs */
 .fields-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-top: 12px;
-  margin-bottom: 8px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 12px;
 }
 
 .fields-grid-text {
   grid-template-columns: repeat(2, 1fr);
+}
+
+/* Sous-sections (regroupement par prefixe de cle) */
+.subsection-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-top: 16px;
+  margin-bottom: 6px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--border);
+}
+
+.subsection-count {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.12);
+  padding: 1px 6px;
+  border-radius: 8px;
 }
 
 .field-card {
@@ -939,8 +1088,9 @@ watch(selectedComponent, loadFormValues);
 
 .toggles-grid {
   display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 10px;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .toggle-card {
