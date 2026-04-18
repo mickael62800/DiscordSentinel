@@ -68,7 +68,8 @@ pub async fn create_pg_pool(database_url: &str) -> PgPool {
 
 /// Envoie un log de cycle de vie a l'API.
 pub async fn send_lifecycle_log(api_url: &str, worker_name: &str, level: &str, message: &str) {
-    if let Err(e) = reqwest::Client::new()
+    let api_key = std::env::var("API_KEY").unwrap_or_default();
+    let mut req = reqwest::Client::new()
         .post(format!("{}/api/logs", api_url))
         .json(&serde_json::json!({
             "level": level,
@@ -76,10 +77,11 @@ pub async fn send_lifecycle_log(api_url: &str, worker_name: &str, level: &str, m
             "server": "",
             "message": message,
             "category": "worker",
-        }))
-        .send()
-        .await
-    {
+        }));
+    if !api_key.is_empty() {
+        req = req.bearer_auth(&api_key);
+    }
+    if let Err(e) = req.send().await {
         warn!(error = %e, worker = worker_name, "Erreur envoi log lifecycle");
     }
 }
@@ -323,6 +325,7 @@ pub fn spawn_periodic<F>(
 
     tokio::spawn(async move {
         let client = reqwest::Client::new();
+        let api_key = std::env::var("API_KEY").unwrap_or_default();
         let interval = Duration::from_secs(interval_secs);
 
         loop {
@@ -346,7 +349,7 @@ pub fn spawn_periodic<F>(
 
             if let Err(e) = task_fn(pool.clone()).await {
                 error!(task = name, error = %e, "Erreur tache periodique");
-                if let Err(log_err) = client
+                let mut req = client
                     .post(format!("{}/api/logs", api_url))
                     .json(&serde_json::json!({
                         "level": "error",
@@ -354,7 +357,11 @@ pub fn spawn_periodic<F>(
                         "message": format!("Erreur job {} : {}", name, e),
                         "category": "worker",
                         "details": {"job": name, "error": e.to_string()},
-                    }))
+                    }));
+                if !api_key.is_empty() {
+                    req = req.bearer_auth(&api_key);
+                }
+                if let Err(log_err) = req
                     .send()
                     .await
                 {

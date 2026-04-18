@@ -5,6 +5,7 @@ const DEFAULT_CHECK_INTERVAL_SECS: u64 = 30;
 pub struct MonitorConfig {
     pub redis_url: String,
     pub api_url: String,
+    pub api_key: String,
     pub check_interval_secs: u64,
 }
 
@@ -15,6 +16,7 @@ impl MonitorConfig {
         Self {
             redis_url: load_redis_url(),
             api_url: load_api_url(),
+            api_key: std::env::var("API_KEY").unwrap_or_default(),
             check_interval_secs: load_env("MONITOR_CHECK_INTERVAL", DEFAULT_CHECK_INTERVAL_SECS),
         }
     }

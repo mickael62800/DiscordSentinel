@@ -5,6 +5,7 @@ use reqwest::Client;
 pub struct GatewayLogger {
     client: Client,
     api_url: String,
+    api_key: String,
 }
 
 impl GatewayLogger {
@@ -12,6 +13,7 @@ impl GatewayLogger {
         Arc::new(Self {
             client: Client::new(),
             api_url,
+            api_key: std::env::var("API_KEY").unwrap_or_default(),
         })
     }
 
@@ -25,7 +27,10 @@ impl GatewayLogger {
             "category": "websocket",
             "details": details,
         });
-        let req = self.client.post(url).json(&body);
+        let mut req = self.client.post(url).json(&body);
+        if !self.api_key.is_empty() {
+            req = req.bearer_auth(&self.api_key);
+        }
         tokio::spawn(async move {
             if let Err(e) = req.send().await {
                 tracing::debug!(error = %e, "Failed to send gateway log to API");

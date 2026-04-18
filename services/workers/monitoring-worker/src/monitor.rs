@@ -60,7 +60,7 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                     let label = service_label(name);
                     warn!(service = %name, label = label, "Service hors ligne");
 
-                    if let Err(e) = http
+                    let mut req = http
                         .post(format!("{}/api/logs", config.api_url))
                         .json(&serde_json::json!({
                             "level": "error",
@@ -68,10 +68,11 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                             "server": "",
                             "message": format!("{} hors ligne : {}", label, name),
                             "category": "worker",
-                        }))
-                        .send()
-                        .await
-                    {
+                        }));
+                    if !config.api_key.is_empty() {
+                        req = req.bearer_auth(&config.api_key);
+                    }
+                    if let Err(e) = req.send().await {
                         warn!(error = %e, service = %name, "Erreur envoi alerte offline a l'API");
                     }
 
@@ -95,7 +96,7 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                     let label = service_label(name);
                     info!(service = %name, label = label, "Service en ligne");
 
-                    if let Err(e) = http
+                    let mut req = http
                         .post(format!("{}/api/logs", config.api_url))
                         .json(&serde_json::json!({
                             "level": "info",
@@ -103,10 +104,11 @@ pub fn start(redis_client: redis::Client, config: MonitorConfig) {
                             "server": "",
                             "message": format!("{} en ligne : {}", label, name),
                             "category": "worker",
-                        }))
-                        .send()
-                        .await
-                    {
+                        }));
+                    if !config.api_key.is_empty() {
+                        req = req.bearer_auth(&config.api_key);
+                    }
+                    if let Err(e) = req.send().await {
                         warn!(error = %e, service = %name, "Erreur envoi alerte online a l'API");
                     }
 
