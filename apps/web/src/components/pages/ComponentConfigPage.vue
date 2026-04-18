@@ -807,17 +807,17 @@ watch(selectedComponent, loadFormValues);
   padding: 20px 0;
 }
 
-/* Grid 4 colonnes pour les champs */
+/* Grid 6 colonnes pour les champs */
 .fields-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
   margin-top: 8px;
   margin-bottom: 12px;
 }
 
 .fields-grid-text {
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
 }
 
 /* Sous-sections (regroupement par prefixe de cle) */
