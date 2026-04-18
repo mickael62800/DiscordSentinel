@@ -382,7 +382,7 @@ watch(selectedComponent, loadFormValues);
         </div>
 
         <template v-else>
-          <!-- Section toggles (10 par ligne, sous-sections par prefixe) -->
+          <!-- Section toggles (10 par ligne, pas de sous-sections) -->
           <div v-if="booleanFields.length > 0" class="toggles-section">
             <div class="section-title-row">
               <h3 class="section-title">Fonctionnalites</h3>
@@ -393,38 +393,32 @@ watch(selectedComponent, loadFormValues);
                 {{ allTogglesOn ? 'Tout desactiver' : 'Tout activer' }}
               </button>
             </div>
-            <template v-for="group in groupByPrefix(booleanFields)" :key="group.prefix">
-              <div v-if="groupByPrefix(booleanFields).length > 1" class="subsection-title">
-                {{ group.label }}
-                <span class="subsection-count">{{ group.fields.length }}</span>
-              </div>
-              <div class="toggles-grid">
-                <div
-                  v-for="field in group.fields"
-                  :key="field.key"
-                  class="toggle-card"
-                  :class="{ modified: isFieldModified(field.key) }"
-                >
-                  <div class="toggle-card-header">
-                    <span class="toggle-card-label">{{ field.label }}</span>
-                    <span v-if="field.description" class="tooltip-wrap">
-                      <span class="info-icon">i</span>
-                      <span class="tooltip-text">{{ field.description }}</span>
-                    </span>
-                    <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
-                  </div>
-                  <div class="toggle-card-control">
-                    <AppToggle
-                      :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
-                      @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
-                    />
-                    <span class="toggle-state" :class="{ active: formValues[field.key] === 'true' || formValues[field.key] === '1' }">
-                      {{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'ON' : 'OFF' }}
-                    </span>
-                  </div>
+            <div class="toggles-grid">
+              <div
+                v-for="field in booleanFields"
+                :key="field.key"
+                class="toggle-card"
+                :class="{ modified: isFieldModified(field.key) }"
+              >
+                <div class="toggle-card-header">
+                  <span class="toggle-card-label">{{ field.label }}</span>
+                  <span v-if="field.description" class="tooltip-wrap">
+                    <span class="info-icon">i</span>
+                    <span class="tooltip-text">{{ field.description }}</span>
+                  </span>
+                  <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
+                </div>
+                <div class="toggle-card-control">
+                  <AppToggle
+                    :model-value="formValues[field.key] === 'true' || formValues[field.key] === '1'"
+                    @update:model-value="formValues[field.key] = $event ? 'true' : 'false'"
+                  />
+                  <span class="toggle-state" :class="{ active: formValues[field.key] === 'true' || formValues[field.key] === '1' }">
+                    {{ formValues[field.key] === 'true' || formValues[field.key] === '1' ? 'ON' : 'OFF' }}
+                  </span>
                 </div>
               </div>
-            </template>
+            </div>
           </div>
 
           <!-- Section Valeurs numeriques (4 par ligne, sous-sections) -->
