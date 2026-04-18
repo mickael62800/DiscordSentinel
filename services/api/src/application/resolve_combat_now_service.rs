@@ -15,6 +15,7 @@ use async_trait::async_trait;
 use tracing::warn;
 use uuid::Uuid;
 
+use crate::domain::entities::CoudeBalanceParams;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{
     self as engine, PlayerLite, ServerEventLite,
@@ -26,7 +27,7 @@ use crate::ports::inbound::{
     ManageCoudeBetsUseCase, ManageCoudeCombatsUseCase, ManageCoudeInventoryUseCase,
     ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
 };
-use crate::ports::outbound::{CoudeCombatRepository, WalletRepository};
+use crate::ports::outbound::{BotConfigRepository, CoudeCombatRepository, WalletRepository};
 
 pub struct ResolveCombatNowService {
     combat_repo: Arc<dyn CoudeCombatRepository>,
@@ -37,6 +38,7 @@ pub struct ResolveCombatNowService {
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     social_uc: Arc<dyn ManageCoudeSocialUseCase>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ResolveCombatNowService {
@@ -49,6 +51,7 @@ impl ResolveCombatNowService {
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
         social_uc: Arc<dyn ManageCoudeSocialUseCase>,
         taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self {
             combat_repo,
@@ -59,6 +62,7 @@ impl ResolveCombatNowService {
             inventory_uc,
             social_uc,
             taunts_uc,
+            bot_config_repo,
         }
     }
 }
@@ -113,6 +117,10 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             hp_current: Some(defender.hp_current),
         };
 
+        // Charge les parametres de balance de la guild (fallback default
+        // si bot_guild_config indispo ou vide).
+        let balance = load_balance_params(self.bot_config_repo.as_ref(), &combat.guild_id).await;
+
         let result = engine::combat::resolve_combat(
             &atk_player,
             &def_player,
@@ -122,6 +130,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             combat.special_attack.as_deref(),
             combat.defender_special.as_deref(),
             &engine_events,
+            &balance,
         );
 
         let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);
@@ -495,6 +504,29 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             fields,
             taunt_events,
         })
+    }
+}
+
+/// Charge les parametres de balance du jeu Coup de Coude pour une guild
+/// depuis `bot_guild_config` (`bot_name = 'coude-bot'`). Retombe sur le
+/// default si l'appel echoue — on prefere ne pas bloquer un combat pour
+/// une erreur de lecture de config.
+async fn load_balance_params(
+    repo: &dyn crate::ports::outbound::BotConfigRepository,
+    guild_id: &str,
+) -> CoudeBalanceParams {
+    match repo.get_config(guild_id, "coude-bot").await {
+        Ok(entries) => {
+            let map: std::collections::HashMap<String, String> = entries
+                .into_iter()
+                .map(|e| (e.config_key, e.config_value))
+                .collect();
+            CoudeBalanceParams::from_config(&map)
+        }
+        Err(e) => {
+            warn!(error = %e, guild_id, "Echec chargement coude balance params — default");
+            CoudeBalanceParams::default()
+        }
     }
 }
 

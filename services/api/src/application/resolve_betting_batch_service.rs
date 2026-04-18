@@ -18,7 +18,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::CoudeCombat;
+use crate::domain::entities::{CoudeBalanceParams, CoudeCombat};
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{
     self as engine, PlayerLite, ServerEventLite,
@@ -30,7 +30,9 @@ use crate::ports::inbound::{
     ManageCoudeBetsUseCase, ManageCoudeInventoryUseCase, ManageCoudeSocialUseCase,
     ManageCoudeTauntsUseCase,
 };
-use crate::ports::outbound::{CoudeCombatRepository, CoudePlayerRepository, WalletRepository};
+use crate::ports::outbound::{
+    BotConfigRepository, CoudeCombatRepository, CoudePlayerRepository, WalletRepository,
+};
 
 /// Delai de paris par defaut (5 min), override par guild via bot_guild_config.
 const DEFAULT_BET_DELAY_SECS: i64 = 300;
@@ -45,6 +47,7 @@ pub struct ResolveBettingBatchService {
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     social_uc: Arc<dyn ManageCoudeSocialUseCase>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ResolveBettingBatchService {
@@ -56,6 +59,7 @@ impl ResolveBettingBatchService {
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
         social_uc: Arc<dyn ManageCoudeSocialUseCase>,
         taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self {
             combat_repo,
@@ -65,6 +69,24 @@ impl ResolveBettingBatchService {
             inventory_uc,
             social_uc,
             taunts_uc,
+            bot_config_repo,
+        }
+    }
+
+    /// Charge les parametres de balance de la guild ou default.
+    async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
+        match self.bot_config_repo.get_config(guild_id, "coude-bot").await {
+            Ok(entries) => {
+                let map: std::collections::HashMap<String, String> = entries
+                    .into_iter()
+                    .map(|e| (e.config_key, e.config_value))
+                    .collect();
+                CoudeBalanceParams::from_config(&map)
+            }
+            Err(e) => {
+                warn!(error = %e, guild_id, "Echec chargement coude balance params — default");
+                CoudeBalanceParams::default()
+            }
         }
     }
 
@@ -115,6 +137,9 @@ impl ResolveBettingBatchService {
         let atk_hp = attacker.hp_current.unwrap_or(100);
         let def_hp = defender.hp_current.unwrap_or(100);
 
+        // Charge params balance pour la guild (Phase 132).
+        let balance = self.load_balance(&combat.guild_id).await;
+
         // Moteur pur (domain).
         let result = engine::combat::resolve_combat(
             &attacker,
@@ -125,6 +150,7 @@ impl ResolveBettingBatchService {
             combat.special_attack.as_deref(),
             combat.defender_special.as_deref(),
             &engine_events,
+            &balance,
         );
 
         let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);

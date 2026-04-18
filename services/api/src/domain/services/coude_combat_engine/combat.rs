@@ -4,6 +4,7 @@ use super::chaos::{self, ChaosEvent};
 use super::classes;
 use super::progression;
 use super::{PlayerLite as Player, ServerEventLite as ServerEvent};
+use crate::domain::entities::CoudeBalanceParams;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Flavor text ──
@@ -157,7 +158,14 @@ pub fn resolve_combat(
     special: Option<&str>,
     defender_special: Option<&str>,
     active_events: &[ServerEvent],
+    params: &CoudeBalanceParams,
 ) -> CombatResult {
+    // Pre-calcul des coefficients a partir des % config.
+    let rage_atk_mult = 1.0 + (params.rage_atk_bonus_pct as f64 / 100.0);
+    let rage_def_mult = 1.0 - (params.rage_def_malus_pct as f64 / 100.0);
+    let coup_traitre_mult = 1.0 - (params.coup_traitre_def_malus_pct as f64 / 100.0);
+    let bouclier_mult = 1.0 + (params.bouclier_def_bonus_pct as f64 / 100.0);
+    let poison_dmg = params.poison_damage_per_round as i32;
     let mut rng = rand::thread_rng();
 
     let atk_class = classes::get_class(attacker.class.as_deref().unwrap_or("bourrin"));
@@ -182,30 +190,30 @@ pub fn resolve_combat(
 
     // ── Item effects (global, applied once) ──
 
-    // Rage: +50% ATK, -30% DEF
+    // Rage: +X% ATK, -Y% DEF (config)
     if special == Some("rage") {
-        atk_atk = (atk_atk as f64 * 1.5) as i32;
-        atk_def = (atk_def as f64 * 0.7) as i32;
+        atk_atk = (atk_atk as f64 * rage_atk_mult) as i32;
+        atk_def = (atk_def as f64 * rage_def_mult) as i32;
     }
     if defender_special == Some("rage") {
-        def_atk = (def_atk as f64 * 1.5) as i32;
-        def_def = (def_def as f64 * 0.7) as i32;
+        def_atk = (def_atk as f64 * rage_atk_mult) as i32;
+        def_def = (def_def as f64 * rage_def_mult) as i32;
     }
 
-    // Coup traitre: reduce enemy DEF by 50%
+    // Coup traitre: -X% DEF adverse (config)
     if special == Some("coup_traitre") {
-        def_def = (def_def as f64 * 0.5) as i32;
+        def_def = (def_def as f64 * coup_traitre_mult) as i32;
     }
     if defender_special == Some("coup_traitre") {
-        atk_def = (atk_def as f64 * 0.5) as i32;
+        atk_def = (atk_def as f64 * coup_traitre_mult) as i32;
     }
 
-    // Bouclier: +20% DEF
+    // Bouclier: +X% DEF (config)
     if special == Some("bouclier") {
-        atk_def = (atk_def as f64 * 1.2) as i32;
+        atk_def = (atk_def as f64 * bouclier_mult) as i32;
     }
     if defender_special == Some("bouclier") {
-        def_def = (def_def as f64 * 1.2) as i32;
+        def_def = (def_def as f64 * bouclier_mult) as i32;
     }
 
     // Recalculate HP max with modified DEF
@@ -289,11 +297,11 @@ pub fn resolve_combat(
 
         if atk_double {
             let second: i32 = rng.gen_range(1..=20);
-            atk_roll = atk_roll.max(second);
+            atk_roll = params.double_coup_mode.aggregate(atk_roll, second);
         }
         if def_double {
             let second: i32 = rng.gen_range(1..=20);
-            def_roll = def_roll.max(second);
+            def_roll = params.double_coup_mode.aggregate(def_roll, second);
         }
 
         // ── Effective ATK this round (class passives) ──
@@ -446,17 +454,17 @@ pub fn resolve_combat(
             }
         }
 
-        // ── Apply poison ──
+        // ── Apply poison (damage configurable) ──
         if atk_poison {
-            def_hp -= 5;
+            def_hp -= poison_dmg;
             round_msg.push_str(&format!(
-                "\u{2620}\u{fe0f} {} subit 5 degats de poison !\n", def_name
+                "\u{2620}\u{fe0f} {} subit {} degats de poison !\n", def_name, poison_dmg
             ));
         }
         if def_poison {
-            atk_hp -= 5;
+            atk_hp -= poison_dmg;
             round_msg.push_str(&format!(
-                "\u{2620}\u{fe0f} {} subit 5 degats de poison !\n", atk_name
+                "\u{2620}\u{fe0f} {} subit {} degats de poison !\n", atk_name, poison_dmg
             ));
         }
 
@@ -852,7 +860,7 @@ mod tests {
         // resultat structurellement valide (HP finaux dans [0, max], coins >= 0).
         let atk = player("111", "bourrin", 5);
         let def = player("222", "agile", 5);
-        let result = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[]);
+        let result = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
         assert!(result.total_rounds >= 0);
         assert!(result.coins_won >= 0);
         assert!(result.coins_lost_by_loser >= 0);
@@ -865,7 +873,7 @@ mod tests {
         // Defender joue explosion → winner_id = None, les 2 perdent 50% de la mise.
         let atk = player("111", "bourrin", 5);
         let def = player("222", "fourbe", 5);
-        let result = resolve_combat(&atk, &def, 100, 100, 200, None, Some("explosion"), &[]);
+        let result = resolve_combat(&atk, &def, 100, 100, 200, None, Some("explosion"), &[], &CoudeBalanceParams::default());
         assert!(result.winner_id.is_none());
         assert!(result.loser_id.is_none());
         assert_eq!(result.coins_lost_by_loser, 100); // 50% de 200
@@ -881,7 +889,7 @@ mod tests {
         let def = player("222", "tank", 5);
         let mut any_round_above_1 = false;
         for _ in 0..20 {
-            let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[]);
+            let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
             for round in &r.rounds {
                 if round.attacker_damage > 1 || round.defender_damage > 1 {
                     any_round_above_1 = true;
@@ -904,7 +912,7 @@ mod tests {
         let atk = player("111", "bourrin", 5);
         let def = player("222", "bourrin", 5);
         for _ in 0..100 {
-            let r = resolve_combat(&atk, &def, 10, 10, 50, None, None, &[]);
+            let r = resolve_combat(&atk, &def, 10, 10, 50, None, None, &[], &CoudeBalanceParams::default());
             if r.winner_id.is_none() {
                 assert!(r.loser_id.is_none(), "draw doit avoir winner ET loser None");
                 return;

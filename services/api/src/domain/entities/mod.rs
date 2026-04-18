@@ -114,6 +114,9 @@ pub use coude_taunt::{
     TauntEvent, TAUNT_THRESHOLDS,
 };
 
+mod coude_balance;
+pub use coude_balance::{CoudeBalanceParams, DoubleCoupMode};
+
 mod coude_heist;
 pub use coude_heist::{
     compute_success_chance, find_heist_tool, CoudeHeistAttempt, CoudePrisonState, HeistOutcome,

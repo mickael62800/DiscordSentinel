@@ -18,8 +18,8 @@ use rand::Rng;
 use tracing::info;
 
 use crate::domain::entities::{
-    compute_success_chance, HeistOutcome, HEIST_COOLDOWN_DAYS, HEIST_GAIN_MAX_PERCENT,
-    HEIST_GAIN_MIN_PERCENT, HEIST_PRISON_HOURS, HEIST_TOOLS,
+    compute_success_chance, CoudeBalanceParams, HeistOutcome, HEIST_COOLDOWN_DAYS,
+    HEIST_GAIN_MAX_PERCENT, HEIST_GAIN_MIN_PERCENT, HEIST_PRISON_HOURS, HEIST_TOOLS,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_heist::{
@@ -27,7 +27,7 @@ use crate::ports::inbound::manage_coude_heist::{
 };
 use crate::ports::inbound::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::{
-    CoudeCashboxRepository, CoudeHeistRepository, WalletRepository,
+    BotConfigRepository, CoudeCashboxRepository, CoudeHeistRepository, WalletRepository,
 };
 
 pub struct ManageCoudeHeistService {
@@ -35,6 +35,7 @@ pub struct ManageCoudeHeistService {
     cashbox_repo: Arc<dyn CoudeCashboxRepository>,
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     wallet_repo: Arc<dyn WalletRepository>,
+    bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ManageCoudeHeistService {
@@ -43,12 +44,27 @@ impl ManageCoudeHeistService {
         cashbox_repo: Arc<dyn CoudeCashboxRepository>,
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
         wallet_repo: Arc<dyn WalletRepository>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self {
             heist_repo,
             cashbox_repo,
             inventory_uc,
             wallet_repo,
+            bot_config_repo,
+        }
+    }
+
+    async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
+        match self.bot_config_repo.get_config(guild_id, "coude-bot").await {
+            Ok(entries) => {
+                let map: std::collections::HashMap<String, String> = entries
+                    .into_iter()
+                    .map(|e| (e.config_key, e.config_value))
+                    .collect();
+                CoudeBalanceParams::from_config(&map)
+            }
+            Err(_) => CoudeBalanceParams::default(),
         }
     }
 }
@@ -155,12 +171,29 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             (success, gain)
         };
 
-        // 7. Consomme TOUS les outils de braquage actifs (quel que soit
-        //    le resultat — c'est le cout d'entree du braquage).
-        // Propagation d'erreur : si la consommation echoue (ex. DB
-        // indispo), on ne continue pas le braquage — sinon on risque
-        // de debiter la cashbox sans debiter les outils.
-        for key in &tool_keys {
+        // 7. Consomme une fraction aleatoire des outils utilises (Phase 132) :
+        //    * succes → `braquage_tools_consumed_success_pct` (%)
+        //    * echec  → `braquage_tools_consumed_fail_pct`    (%)
+        //    Selection aleatoire parmi les outils actifs. Si l'erreur
+        //    survient en cours de consommation, on arrete et on remonte
+        //    l'erreur (meme semantique qu'avant).
+        let balance = self.load_balance(guild_id).await;
+        let consumed_pct = if success {
+            balance.braquage_tools_consumed_success_pct
+        } else {
+            balance.braquage_tools_consumed_fail_pct
+        };
+        let tools_to_consume: Vec<String> = {
+            use rand::seq::SliceRandom;
+            let total = tool_keys.len();
+            let count = ((total as u64 * consumed_pct) / 100) as usize;
+            let count = count.min(total);
+            let mut rng = rand::thread_rng();
+            let mut shuffled: Vec<String> = tool_keys.clone();
+            shuffled.shuffle(&mut rng);
+            shuffled.into_iter().take(count).collect()
+        };
+        for key in &tools_to_consume {
             self.inventory_uc.use_item(guild_id, user_id, key).await?;
         }
 
@@ -242,7 +275,7 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             chance_percent: chance,
             cashbox_total_before: cashbox.balance,
             amount_stolen,
-            tools_consumed: tool_keys,
+            tools_consumed: tools_to_consume,
             prison_released_at,
         })
     }

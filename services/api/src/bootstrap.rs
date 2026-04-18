@@ -340,6 +340,7 @@ pub async fn build_app_state(
             coude_inventory_uc.clone(),
             coude_social_uc.clone(),
             coude_taunts_uc.clone(),
+            bot_config_repo.clone(),
         ));
     let coude_cashbox_repo: Arc<dyn crate::ports::outbound::CoudeCashboxRepository> =
         Arc::new(PgCoudeCashboxRepository::new(pg_pool.clone()));
@@ -364,6 +365,7 @@ pub async fn build_app_state(
             coude_cashbox_repo.clone(),
             coude_inventory_uc.clone(),
             wallet_repo.clone(),
+            bot_config_repo.clone(),
         ));
 
     let coude_steal_protection_repo: Arc<
@@ -388,6 +390,7 @@ pub async fn build_app_state(
             coude_inventory_uc.clone(),
             coude_social_uc.clone(),
             coude_taunts_uc.clone(),
+            bot_config_repo.clone(),
         ));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
