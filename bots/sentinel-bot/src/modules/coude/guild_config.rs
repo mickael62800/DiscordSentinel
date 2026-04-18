@@ -5,6 +5,36 @@
 use std::collections::HashMap;
 use sentinel_shared::api_client::BaseApiClient;
 
+/// Mode d'agregation des deux d20 de Double Coup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DoubleCoupMode {
+    Max,
+    Median,
+    Min,
+}
+
+impl DoubleCoupMode {
+    /// Parse depuis la config. Fallback `Median` si valeur inconnue.
+    pub fn parse(s: &str) -> Self {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "max" => Self::Max,
+            "min" => Self::Min,
+            "median" | "mediane" | "" => Self::Median,
+            _ => Self::Median,
+        }
+    }
+
+    /// Applique la strategie d'agregation sur deux rolls.
+    pub fn aggregate(self, a: i32, b: i32) -> i32 {
+        match self {
+            Self::Max => a.max(b),
+            Self::Min => a.min(b),
+            // Mediane de deux valeurs = moyenne arrondie au plus proche.
+            Self::Median => (a + b) / 2,
+        }
+    }
+}
+
 /// Configuration du jeu Coup de Coude pour une guild.
 /// Toutes les valeurs ont un defaut raisonnable.
 pub struct CoudeConfig {
@@ -260,6 +290,75 @@ impl CoudeConfig {
     fn channel_opt(&self, key: &str) -> Option<String> {
         let v = BaseApiClient::config_or(&self.raw, key, "");
         if v.is_empty() { None } else { Some(v) }
+    }
+
+    // ── Balance (Phase 132 : parametres rendus configurables) ──
+    //
+    // Note : la plupart de ces valeurs sont consommees par l'API (moteur
+    // de combat, vol, braquage). Le bot expose les getters pour que l'UI
+    // Desktop puisse editer la config et pour les rares cas ou le bot
+    // applique lui-meme la regle (ex: steal_failure_penalty_pct dans
+    // voler.rs). Les autres getters sont disponibles pour futur wiring.
+
+    /// PV min (%) attaquant requis pour utiliser Surprise. 0 = desactive.
+    pub fn surprise_min_hp_percent(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "surprise_min_hp_percent", 40)
+    }
+
+    /// Defenseur peut-il repondre avec Explosion a une Surprise ?
+    pub fn surprise_allow_defender_counter(&self) -> bool {
+        BaseApiClient::config_bool(&self.raw, "surprise_allow_defender_counter", true)
+    }
+
+    /// Max boosts voleur simultanes actifs (0 = illimite).
+    pub fn steal_max_active_boosts(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "steal_max_active_boosts", 3)
+    }
+
+    /// % coins perdus par le voleur si son vol echoue.
+    pub fn steal_failure_penalty_pct(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "steal_failure_penalty_pct", 20)
+    }
+
+    /// % outils consommes si braquage reussit.
+    pub fn braquage_tools_consumed_success_pct(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "braquage_tools_consumed_success_pct", 50)
+    }
+
+    /// % outils consommes si braquage echoue.
+    pub fn braquage_tools_consumed_fail_pct(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "braquage_tools_consumed_fail_pct", 25)
+    }
+
+    /// Mode d'agregation des 2d20 de Double Coup : max | median | min.
+    pub fn double_coup_mode(&self) -> DoubleCoupMode {
+        let raw = BaseApiClient::config_or(&self.raw, "double_coup_mode", "median");
+        DoubleCoupMode::parse(&raw)
+    }
+
+    /// +% ATK applique par Rage.
+    pub fn rage_atk_bonus_pct(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "rage_atk_bonus_pct", 40)
+    }
+
+    /// -% DEF applique par Rage.
+    pub fn rage_def_malus_pct(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "rage_def_malus_pct", 15)
+    }
+
+    /// -% DEF applique au defenseur par Coup Traitre.
+    pub fn coup_traitre_def_malus_pct(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "coup_traitre_def_malus_pct", 40)
+    }
+
+    /// +% DEF applique par Bouclier.
+    pub fn bouclier_def_bonus_pct(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "bouclier_def_bonus_pct", 20)
+    }
+
+    /// PV perdus par round avec Poison.
+    pub fn poison_damage_per_round(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "poison_damage_per_round", 5)
     }
 
     pub fn channel_combats(&self) -> Option<String> { self.channel_opt("channel_combats") }

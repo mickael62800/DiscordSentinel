@@ -302,6 +302,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let thief_id_clone = thief_id.clone();
     let target_id_clone = target_id_str.clone();
     let guild_id_clone = guild_id.clone();
+    let failure_penalty_pct = config.steal_failure_penalty_pct();
 
     tokio::spawn(async move {
         tokio::time::sleep(Duration::from_secs(60)).await;
@@ -356,6 +357,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             &thief_player,
             &target_player,
             true, // AFK
+            failure_penalty_pct,
         )
         .await;
 
@@ -401,6 +403,7 @@ async fn resolve_steal_attempt(
     thief_player: &crate::modules::coude::api_client::Player,
     target_player: &crate::modules::coude::api_client::Player,
     afk: bool,
+    failure_penalty_pct: u64,
 ) -> (CreateEmbed, Vec<crate::modules::coude::api_client::TauntEvent>) {
     use rand::Rng;
 
@@ -549,8 +552,10 @@ async fn resolve_steal_attempt(
             .timestamp(serenity::model::Timestamp::now());
         (embed, taunt_events)
     } else {
-        // Vol echoue : le voleur perd 15% de ses coins, victime +3 XP.
-        let lost = ((thief_player.coins as f64 * 0.15) as i64).max(1);
+        // Vol echoue : le voleur perd `steal_failure_penalty_pct`% de
+        // ses coins, victime +3 XP.
+        let lost =
+            ((thief_player.coins as f64 * (failure_penalty_pct as f64 / 100.0)) as i64).max(1);
 
         if let Err(e) = api.record_coins_lost(guild_id, thief_id, lost).await {
             tracing::warn!(error = %e, "Echec API record_coins_lost vol");
@@ -622,6 +627,9 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
+    let config = load_guild_config(ctx, guild_id).await;
+    let failure_penalty_pct = config.steal_failure_penalty_pct();
+
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
     let catalog_defend = data.get::<CatalogCacheKey>().unwrap().clone();
@@ -658,6 +666,7 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         &thief_player,
         &target_player,
         false, // defense active
+        failure_penalty_pct,
     )
     .await;
 
