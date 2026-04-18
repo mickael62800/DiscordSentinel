@@ -184,24 +184,24 @@ async function submitModal() {
   modal.value.error = null;
   try {
     if (modal.value.mode === "create") {
-      if (!modal.value.imageFile) {
-        modal.value.error = "Image requise pour creer un jeu.";
-        modal.value.submitting = false;
-        return;
+      // Image optionnelle : si fournie, on upload l'emoji sur Discord.
+      // Sinon le jeu est cree sans emoji (le panel utilisera juste le nom).
+      let emoji: string | null = null;
+      if (modal.value.imageFile) {
+        const blob = await resizeImage(modal.value.imageFile);
+        if (blob.size > 256 * 1024) {
+          modal.value.error = "Image toujours trop grosse apres resize.";
+          modal.value.submitting = false;
+          return;
+        }
+        const emojiResp = await gamesService.uploadEmoji(gid, name, blob);
+        emoji = emojiResp.emoji;
       }
-      // Resize cote browser
-      const blob = await resizeImage(modal.value.imageFile);
-      if (blob.size > 256 * 1024) {
-        modal.value.error = "Image toujours trop grosse apres resize.";
-        modal.value.submitting = false;
-        return;
-      }
-      const emojiResp = await gamesService.uploadEmoji(gid, name, blob);
       await gamesService.create({
         guild_id: gid,
         game_name: name,
         created_by: "web-ui",
-        emoji: emojiResp.emoji,
+        emoji,
         category: modal.value.category.trim() || null,
       });
       showSuccess(`Jeu "${name}" cree.`);
@@ -387,7 +387,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
           </label>
 
           <div class="field">
-            <span>Image de l'emoji</span>
+            <span>Image de l'emoji <em class="optional">(optionnel)</em></span>
             <div
               class="dropzone"
               :class="{ 'has-image': modal.imagePreviewUrl || modal.existingEmoji }"
@@ -417,7 +417,8 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
               </label>
             </div>
             <p class="sub-hint">
-              Resize automatique a 128x128 PNG cote navigateur. Max 256 KB apres resize.
+              Optionnel — le panel Discord utilise un dropdown, l'emoji sert
+              juste d'icone a cote du nom. Resize automatique a 128x128 PNG.
             </p>
           </div>
 
@@ -585,6 +586,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
   border: 1px solid var(--border);
 }
 .dropzone-hint { font-size: 12px; color: var(--text-secondary); text-align: center; }
+.optional { color: var(--text-secondary); font-style: italic; font-weight: 400; font-size: 12px; }
 .browse-btn {
   padding: 6px 14px;
   border: 1px solid var(--border);
