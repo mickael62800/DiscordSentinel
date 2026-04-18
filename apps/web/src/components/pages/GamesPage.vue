@@ -11,7 +11,7 @@ import EmptyState from "@/components/atoms/EmptyState.vue";
 import LoadingState from "@/components/atoms/LoadingState.vue";
 
 const { selectedGuildId } = useGuildSelector();
-const { games, panels, subscriberCounts, categories, loading, fetchAll } = useGames();
+const { games, panels, categories, loading, fetchAll } = useGames();
 const { success: showSuccess, error: showError } = useToast();
 const { confirm } = useConfirm();
 
@@ -240,7 +240,7 @@ async function onDelete(game: Game) {
   if (!gid) return;
   const ok = await confirm({
     title: "Supprimer le jeu",
-    message: `Supprimer "${game.game_name}" ? Tous les abonnements seront perdus.`,
+    message: `Supprimer "${game.game_name}" ? Le role Discord associe sera egalement supprime.`,
   });
   if (!ok) return;
   try {
@@ -294,7 +294,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
           <div class="col emoji">Emoji</div>
           <div class="col name">Nom</div>
           <div class="col category">Categorie</div>
-          <div class="col subs">Abonnes</div>
+          <div class="col subs">Role</div>
           <div class="col actions">Actions</div>
         </div>
         <div v-for="g in filteredGames" :key="g.id" class="row">
@@ -316,7 +316,14 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
             />
             <span v-else class="muted">—</span>
           </div>
-          <div class="col subs">{{ subscriberCounts[g.id] ?? 0 }}</div>
+          <div class="col subs">
+            <AppBadge
+              v-if="g.role_id"
+              :label="`@${g.game_name}`"
+              variant="success"
+            />
+            <span v-else class="muted">—</span>
+          </div>
           <div class="col actions">
             <AppButton variant="secondary" size="sm" @click="openEdit(g)">Editer</AppButton>
             <AppButton variant="danger" size="sm" @click="onDelete(g)">Suppr.</AppButton>
@@ -329,8 +336,8 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
         <h2>Panels Discord</h2>
         <p class="hint">
           Les panels sont deployes dans Discord via la commande
-          <code>/game-admin panel category:&lt;nom&gt;</code>. Ils permettent aux membres de
-          s'abonner aux jeux en cliquant sur des reactions.
+          <code>/game-admin panel category:&lt;nom&gt;</code>. Ils affichent un dropdown
+          qui assigne/retire automatiquement le role Discord associe a chaque jeu.
         </p>
         <div v-if="panels.length === 0" class="muted">
           Aucun panel deploye. Utilisez la commande ci-dessus dans Discord.

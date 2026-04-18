@@ -8,7 +8,6 @@ use sentinel_shared::api_client::BaseApiClient;
 fn encode_segment(s: &str) -> String {
     s.bytes()
         .map(|b| match b {
-            // RFC 3986 unreserved
             b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
                 (b as char).to_string()
             }
@@ -28,11 +27,8 @@ pub struct Game {
     pub emoji: Option<String>,
     #[serde(default)]
     pub category: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct Subscriber {
-    pub user_id: String,
+    #[serde(default)]
+    pub role_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
@@ -79,12 +75,13 @@ impl GameApiClient {
         self.base.get_json(&url).await
     }
 
-    /// Cree un jeu.
+    /// Cree un jeu. Le bot cree d'abord le role Discord puis passe son ID ici.
     pub async fn create_game(
         &self,
         guild_id: &str,
         game_name: &str,
         created_by: &str,
+        role_id: Option<&str>,
         emoji: Option<&str>,
         category: Option<&str>,
     ) -> Result<Game, String> {
@@ -94,6 +91,7 @@ impl GameApiClient {
             "created_by": created_by,
             "emoji": emoji,
             "category": category,
+            "role_id": role_id,
         })).await
     }
 
@@ -112,44 +110,28 @@ impl GameApiClient {
         Ok(())
     }
 
-    pub async fn subscribe(&self, guild_id: &str, game_id: &str, user_id: &str) -> Result<(), String> {
+    /// Associe un role Discord a un jeu (PATCH role_id).
+    #[allow(dead_code)]
+    pub async fn set_role_id(
+        &self,
+        guild_id: &str,
+        game_id: &str,
+        role_id: Option<&str>,
+    ) -> Result<Game, String> {
         let url = format!(
-            "{}/api/games/{}/{}/subscribe",
+            "{}/api/games/{}/{}/role",
             self.base.base_url(),
             encode_segment(guild_id),
             encode_segment(game_id),
         );
-        let req = self.base.client().post(url).json(&serde_json::json!({ "user_id": user_id }));
+        let req = self.base.client().patch(url).json(&serde_json::json!({
+            "role_id": role_id,
+        }));
         let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
         if !resp.status().is_success() {
             return Err(format!("API error: {}", resp.status()));
         }
-        Ok(())
-    }
-
-    pub async fn unsubscribe(&self, guild_id: &str, game_id: &str, user_id: &str) -> Result<(), String> {
-        let req = self.base.client().delete(format!(
-            "{}/api/games/{}/{}/subscribe/{}",
-            self.base.base_url(),
-            encode_segment(guild_id),
-            encode_segment(game_id),
-            encode_segment(user_id),
-        ));
-        let resp = self.base.auth(req).send().await.map_err(|e| e.to_string())?;
-        if !resp.status().is_success() {
-            return Err(format!("API error: {}", resp.status()));
-        }
-        Ok(())
-    }
-
-    pub async fn get_subscribers(&self, guild_id: &str, game_id: &str) -> Result<Vec<Subscriber>, String> {
-        self.base
-            .get_json(&format!(
-                "/api/games/{}/{}/subscribers",
-                encode_segment(guild_id),
-                encode_segment(game_id)
-            ))
-            .await
+        resp.json::<Game>().await.map_err(|e| e.to_string())
     }
 
     pub async fn get_game_by_name(&self, guild_id: &str, game_name: &str) -> Result<Option<Game>, String> {
@@ -158,16 +140,6 @@ impl GameApiClient {
                 "/api/games/{}/by-name/{}",
                 encode_segment(guild_id),
                 encode_segment(game_name)
-            ))
-            .await
-    }
-
-    pub async fn get_user_games(&self, guild_id: &str, user_id: &str) -> Result<Vec<Game>, String> {
-        self.base
-            .get_json(&format!(
-                "/api/games/{}/user/{}",
-                encode_segment(guild_id),
-                encode_segment(user_id)
             ))
             .await
     }
@@ -210,7 +182,6 @@ impl GameApiClient {
             .await
     }
 
-    #[allow(dead_code)]
     pub async fn list_panels(&self, guild_id: &str) -> Result<Vec<GamePanel>, String> {
         self.base
             .get_json(&format!(

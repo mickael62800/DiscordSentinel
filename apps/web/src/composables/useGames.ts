@@ -9,7 +9,6 @@ export function useGames() {
 
   const games = ref<Game[]>([]);
   const panels = ref<GamePanel[]>([]);
-  const subscriberCounts = ref<Record<string, number>>({});
   const loading = ref(false);
 
   const categories = computed<string[]>(() => {
@@ -25,7 +24,6 @@ export function useGames() {
     if (!gid) {
       games.value = [];
       panels.value = [];
-      subscriberCounts.value = {};
       return;
     }
     loading.value = true;
@@ -36,19 +34,6 @@ export function useGames() {
       ]);
       games.value = gs;
       panels.value = ps;
-      // Fetch subscribers counts en parallele (best effort).
-      const counts: Record<string, number> = {};
-      await Promise.all(
-        gs.map(async (g) => {
-          try {
-            const subs = await gamesService.getSubscribers(gid, g.id);
-            counts[g.id] = subs.length;
-          } catch {
-            counts[g.id] = 0;
-          }
-        }),
-      );
-      subscriberCounts.value = counts;
     } catch (e) {
       console.error("Erreur chargement jeux :", e);
       showError("Erreur lors du chargement des jeux.");
@@ -63,7 +48,6 @@ export function useGames() {
   return {
     games,
     panels,
-    subscriberCounts,
     categories,
     loading,
     fetchAll,

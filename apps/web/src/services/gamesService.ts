@@ -9,6 +9,7 @@ export interface Game {
   created_at: string;
   emoji: string | null;
   category: string | null;
+  role_id: string | null;
 }
 
 export interface GamePanel {
@@ -32,6 +33,8 @@ export interface CreateGamePayload {
   created_by: string;
   emoji?: string | null;
   category?: string | null;
+  /** Si absent, l'API cree automatiquement un role Discord. */
+  role_id?: string | null;
 }
 
 export interface UpdateGamePayload {
@@ -52,9 +55,6 @@ export const gamesService = {
   },
   delete(guildId: string, gameId: string): Promise<void> {
     return httpDelete(`/api/games/${guildId}/${gameId}`);
-  },
-  async getSubscribers(guildId: string, gameId: string): Promise<{ user_id: string }[]> {
-    return httpGet(`/api/games/${guildId}/${gameId}/subscribers`);
   },
   listPanels(guildId: string): Promise<GamePanel[]> {
     return httpGet(`/api/games/${guildId}/panels`);

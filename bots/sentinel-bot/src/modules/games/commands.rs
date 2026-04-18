@@ -1,8 +1,8 @@
 use serenity::all::{
-    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateActionRow,
-    CreateCommand, CreateCommandOption, CreateInteractionResponse,
+    Colour, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context,
+    CreateActionRow, CreateCommand, CreateCommandOption, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateMessage, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption, EditMessage,
+    CreateSelectMenuOption, EditMessage, EditRole, RoleId,
 };
 use serenity::builder::CreateEmbed;
 use tracing::{info, warn};
@@ -13,6 +13,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::api_client::{Game, GameApiClient};
 use super::emoji::parse_reaction_type;
+use super::MODULE_BOT_NAME;
 
 /// Prefix du custom_id des select menus de panel de jeux.
 /// Format : `game_panel_select_{panel_id}_{chunk_index}`.
@@ -43,16 +44,6 @@ fn register_public() -> CreateCommand {
         )
         .add_option(
             CreateCommandOption::new(CommandOptionType::SubCommand, "leave", "Se desinscrire d'un jeu")
-                .add_sub_option(
-                    CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
-                        .required(true),
-                ),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "my-games", "Voir mes jeux"),
-        )
-        .add_option(
-            CreateCommandOption::new(CommandOptionType::SubCommand, "players", "Voir les joueurs d'un jeu")
                 .add_sub_option(
                     CreateCommandOption::new(CommandOptionType::String, "name", "Nom du jeu")
                         .required(true),
@@ -132,8 +123,6 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ("game", "list") => handle_list(ctx, command, &api, &guild_id).await,
         ("game", "join") => handle_join(ctx, command, &api, &guild_id).await,
         ("game", "leave") => handle_leave(ctx, command, &api, &guild_id).await,
-        ("game", "my-games") => handle_my_games(ctx, command, &api, &guild_id).await,
-        ("game", "players") => handle_players(ctx, command, &api, &guild_id).await,
         _ => reply(ctx, command, "Sous-commande inconnue.").await,
     }
 }
@@ -162,11 +151,44 @@ async fn handle_create(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCli
         _ => None,
     };
 
+    let guild_id_obj = match cmd.guild_id {
+        Some(g) => g,
+        None => { reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await; return; }
+    };
+
+    // Lit la couleur de role configuree pour game-bot (hex sans #).
+    let role_color = load_role_color(&api.base, guild_id).await;
+
+    // 1) Cree le role Discord.
+    let role = match guild_id_obj
+        .create_role(
+            &ctx.http,
+            EditRole::new()
+                .name(&name)
+                .colour(Colour::new(role_color))
+                .mentionable(true)
+                .hoist(false),
+        )
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(error = %e, game = %name, "Erreur create_role Discord");
+            reply(ctx, cmd, &format!(
+                "Erreur creation du role Discord : {e}. Verifie que le bot a la permission **Gerer les roles**."
+            )).await;
+            return;
+        }
+    };
+    let role_id_str = role.id.get().to_string();
+
+    // 2) Insere en DB avec le role_id. Si ca echoue, rollback du role Discord.
     match api
         .create_game(
             guild_id,
             &name,
             &cmd.user.id.to_string(),
+            Some(&role_id_str),
             emoji_clean.as_deref(),
             category.as_deref(),
         )
@@ -174,18 +196,36 @@ async fn handle_create(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCli
     {
         Ok(game) => {
             let desc = format!(
-                "**{}** {} est maintenant disponible.\nCategorie : {}\nLes joueurs peuvent s'inscrire avec `/game join {}` ou via le panneau.",
+                "**{}** {} est maintenant disponible.\nCategorie : {}\nRole : <@&{}>\nLes joueurs peuvent s'inscrire avec `/game join {}` ou via le panneau.",
                 game.game_name,
                 game.emoji.clone().unwrap_or_default(),
                 game.category.clone().unwrap_or_else(|| "(aucune)".into()),
+                role_id_str,
                 game.game_name,
             );
             let embed = success_embed("Jeu cree !").description(desc);
             reply_embed(ctx, cmd, embed).await;
-            info!(game = %game.game_name, guild = %guild_id, "Jeu cree");
+            info!(game = %game.game_name, role = %role_id_str, guild = %guild_id, "Jeu cree (avec role)");
         }
-        Err(e) => reply(ctx, cmd, &format!("Erreur : {e}")).await,
+        Err(e) => {
+            // Rollback : le jeu n'a pas ete cree, on supprime le role pour
+            // eviter de laisser un role orphelin.
+            if let Err(del_err) = guild_id_obj.delete_role(&ctx.http, role.id).await {
+                warn!(error = %del_err, role = %role_id_str, "Rollback delete_role a echoue");
+            }
+            reply(ctx, cmd, &format!("Erreur : {e}")).await;
+        }
     }
+}
+
+async fn load_role_color(base: &sentinel_shared::api_client::BaseApiClient, guild_id: &str) -> u32 {
+    let raw = base
+        .get_guild_config_for(guild_id, MODULE_BOT_NAME)
+        .await
+        .unwrap_or_default();
+    let hex = sentinel_shared::api_client::BaseApiClient::config_or(&raw, "role_color", "3498db");
+    let trimmed = hex.trim().trim_start_matches('#');
+    u32::from_str_radix(trimmed, 16).unwrap_or(0x3498db)
 }
 
 async fn handle_delete(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
@@ -203,6 +243,15 @@ async fn handle_delete(ctx: &Context, cmd: &CommandInteraction, api: &GameApiCli
 
     match api.delete_game(guild_id, &game.id).await {
         Ok(()) => {
+            // Supprime le role Discord associe (best-effort : si l'admin
+            // l'a deja supprime a la main, on ignore).
+            if let (Some(role_id_str), Some(guild_id_obj)) = (game.role_id.as_deref(), cmd.guild_id) {
+                if let Ok(rid) = role_id_str.parse::<u64>() {
+                    if let Err(e) = guild_id_obj.delete_role(&ctx.http, RoleId::new(rid)).await {
+                        warn!(error = %e, role = %role_id_str, game = %game.game_name, "Erreur delete_role (le role a peut-etre deja ete supprime manuellement)");
+                    }
+                }
+            }
             reply(ctx, cmd, &format!("Jeu **{}** supprime.", game.game_name)).await;
             info!(game = %game.game_name, guild = %guild_id, "Jeu supprime");
         }
@@ -237,8 +286,27 @@ async fn handle_join(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClien
         Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
     };
 
-    match api.subscribe(guild_id, &game.id, &cmd.user.id.to_string()).await {
-        Ok(()) => reply(ctx, cmd, &format!("Tu es inscrit a **{}** ! Tu seras ping quand quelqu'un ecrira `#{}`.", game.game_name, game.game_name)).await,
+    let (guild_id_obj, role_id) = match (cmd.guild_id, game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok())) {
+        (Some(g), Some(rid)) => (g, RoleId::new(rid)),
+        (Some(_), None) => {
+            reply(ctx, cmd, &format!(
+                "Le jeu **{}** n'a pas de role Discord associe (jeu legacy). Demande a un admin de le recreer.",
+                game.game_name
+            )).await;
+            return;
+        }
+        _ => { reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await; return; }
+    };
+
+    let member = match guild_id_obj.member(&ctx.http, cmd.user.id).await {
+        Ok(m) => m,
+        Err(e) => { reply(ctx, cmd, &format!("Impossible de lire ton profil : {e}")).await; return; }
+    };
+    match member.add_role(&ctx.http, role_id).await {
+        Ok(()) => reply(ctx, cmd, &format!(
+            "Tu es inscrit a **{}** ! Utilise <@&{}> pour pinger les joueurs.",
+            game.game_name, role_id.get()
+        )).await,
         Err(e) => reply(ctx, cmd, &format!("Erreur : {e}")).await,
     }
 }
@@ -251,49 +319,21 @@ async fn handle_leave(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClie
         Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
     };
 
-    match api.unsubscribe(guild_id, &game.id, &cmd.user.id.to_string()).await {
-        Ok(()) => reply(ctx, cmd, &format!("Tu es desinscrit de **{}**.", game.game_name)).await,
-        Err(e) => reply(ctx, cmd, &format!("Erreur : {e}")).await,
-    }
-}
-
-async fn handle_my_games(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
-    match api.get_user_games(guild_id, &cmd.user.id.to_string()).await {
-        Ok(games) => {
-            if games.is_empty() {
-                reply(ctx, cmd, "Tu n'es inscrit a aucun jeu. Utilise `/game join <nom>`.").await;
-            } else {
-                let list: String = games.iter()
-                    .map(|g| format!("- {} **{}**", g.emoji.clone().unwrap_or_default(), g.game_name))
-                    .collect::<Vec<_>>()
-                    .join("\n");
-                reply(ctx, cmd, &format!("Tes jeux :\n{}", list)).await;
-            }
+    let (guild_id_obj, role_id) = match (cmd.guild_id, game.role_id.as_deref().and_then(|s| s.parse::<u64>().ok())) {
+        (Some(g), Some(rid)) => (g, RoleId::new(rid)),
+        (Some(_), None) => {
+            reply(ctx, cmd, &format!("Le jeu **{}** n'a pas de role Discord associe.", game.game_name)).await;
+            return;
         }
-        Err(e) => reply(ctx, cmd, &format!("Erreur : {e}")).await,
-    }
-}
-
-async fn handle_players(ctx: &Context, cmd: &CommandInteraction, api: &GameApiClient, guild_id: &str) {
-    let name = get_string_option(cmd, "name").unwrap_or_default();
-    let game = match api.get_game_by_name(guild_id, &name).await {
-        Ok(Some(g)) => g,
-        Ok(None) => { reply(ctx, cmd, &format!("Jeu **{}** introuvable.", name)).await; return; }
-        Err(e) => { reply(ctx, cmd, &format!("Erreur : {e}")).await; return; }
+        _ => { reply(ctx, cmd, "Commande disponible uniquement dans un serveur.").await; return; }
     };
 
-    match api.get_subscribers(guild_id, &game.id).await {
-        Ok(subs) => {
-            if subs.is_empty() {
-                reply(ctx, cmd, &format!("Aucun joueur inscrit a **{}**.", game.game_name)).await;
-            } else {
-                let list: String = subs.iter()
-                    .map(|s| format!("<@{}>", s.user_id))
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                reply(ctx, cmd, &format!("Joueurs inscrits a **{}** ({}) : {}", game.game_name, subs.len(), list)).await;
-            }
-        }
+    let member = match guild_id_obj.member(&ctx.http, cmd.user.id).await {
+        Ok(m) => m,
+        Err(e) => { reply(ctx, cmd, &format!("Impossible de lire ton profil : {e}")).await; return; }
+    };
+    match member.remove_role(&ctx.http, role_id).await {
+        Ok(()) => reply(ctx, cmd, &format!("Tu es desinscrit de **{}**.", game.game_name)).await,
         Err(e) => reply(ctx, cmd, &format!("Erreur : {e}")).await,
     }
 }

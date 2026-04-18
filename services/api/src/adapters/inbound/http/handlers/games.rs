@@ -19,6 +19,7 @@ pub struct GameDto {
     pub created_at: String,
     pub emoji: Option<String>,
     pub category: Option<String>,
+    pub role_id: Option<String>,
 }
 
 impl From<crate::ports::outbound::Game> for GameDto {
@@ -31,6 +32,7 @@ impl From<crate::ports::outbound::Game> for GameDto {
             created_at: g.created_at,
             emoji: g.emoji,
             category: g.category,
+            role_id: g.role_id,
         }
     }
 }
@@ -44,16 +46,17 @@ pub struct CreateGameDto {
     pub emoji: Option<String>,
     #[serde(default)]
     pub category: Option<String>,
+    /// Role Discord associe au jeu. Si absent, l'API essaiera de creer
+    /// automatiquement un role via Discord API (workflow UI web).
+    #[serde(default)]
+    pub role_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct SubscribeDto {
-    pub user_id: String,
-}
-
-#[derive(Debug, Serialize)]
-pub struct SubscriberDto {
-    pub user_id: String,
+pub struct SetRoleIdDto {
+    // `null` = reset a NULL, absent = NOT_PROVIDED ; ici on traite both comme "null ou valeur".
+    #[serde(default)]
+    pub role_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -108,8 +111,62 @@ pub async fn create_game(
     }
     let emoji = dto.emoji.as_deref().map(str::trim).filter(|s| !s.is_empty());
     let category = dto.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let game = state.game_repo.create(&dto.guild_id, &name, &dto.created_by, emoji, category).await?;
-    Ok(Json(game.into()))
+
+    // Si le DTO fournit un role_id (workflow bot qui a deja cree le role),
+    // on l'utilise tel quel. Sinon (workflow UI web), on cree le role
+    // Discord via le bot token et on rollback en cas d'echec DB.
+    let provided_role = dto.role_id.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let (role_id_to_store, created_role_for_rollback): (Option<String>, Option<String>) = if let Some(r) = provided_role {
+        (Some(r.to_string()), None)
+    } else {
+        // Lit la couleur de role configuree pour game-bot.
+        let color_hex = state
+            .bot_config_repo
+            .get_config(&dto.guild_id, "game-bot")
+            .await
+            .ok()
+            .and_then(|entries| {
+                entries
+                    .into_iter()
+                    .find(|e| e.config_key == "role_color")
+                    .map(|e| e.config_value)
+            })
+            .unwrap_or_else(|| "3498db".to_string());
+        let color = u32::from_str_radix(color_hex.trim().trim_start_matches('#'), 16).unwrap_or(0x3498db);
+
+        let created = state
+            .discord_api
+            .create_role(&dto.guild_id, &name, color, None)
+            .await?;
+        // On veut mentionable=true, hoist=false : patch apres creation.
+        let new_id = created
+            .get("id")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| DomainError::Internal("Discord n'a pas renvoye l'id du role cree".into()))?
+            .to_string();
+        // Best-effort : positionne mentionable=true.
+        let _ = state
+            .discord_api
+            .edit_role(&dto.guild_id, &new_id, None, None, None, Some(true), Some(false))
+            .await;
+        (Some(new_id.clone()), Some(new_id))
+    };
+
+    let role_ref = role_id_to_store.as_deref();
+    let result = state
+        .game_repo
+        .create(&dto.guild_id, &name, &dto.created_by, emoji, category, role_ref)
+        .await;
+    match result {
+        Ok(game) => Ok(Json(game.into())),
+        Err(e) => {
+            // Rollback du role cree si l'insert DB a echoue.
+            if let Some(rid) = created_role_for_rollback {
+                let _ = state.discord_api.delete_role(&dto.guild_id, &rid).await;
+            }
+            Err(e.into())
+        }
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -192,31 +249,24 @@ pub async fn delete_game(
     Ok(StatusCode::NO_CONTENT)
 }
 
-// ── Subscriptions ──
+// ── Role binding ──
 
-pub async fn subscribe(
+/// PATCH /api/games/{guild_id}/{game_id}/role
+/// Body: `{ "role_id": "..." | null }` — `null` efface la liaison.
+pub async fn set_role_id(
     State(state): State<AppState>,
     Path((guild_id, game_id)): Path<(String, String)>,
-    Json(dto): Json<SubscribeDto>,
-) -> Result<StatusCode, ApiError> {
-    state.game_repo.subscribe(&guild_id, &game_id, &dto.user_id).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn unsubscribe(
-    State(state): State<AppState>,
-    Path((guild_id, game_id, user_id)): Path<(String, String, String)>,
-) -> Result<StatusCode, ApiError> {
-    state.game_repo.unsubscribe(&guild_id, &game_id, &user_id).await?;
-    Ok(StatusCode::NO_CONTENT)
-}
-
-pub async fn get_subscribers(
-    State(state): State<AppState>,
-    Path((_guild_id, game_id)): Path<(String, String)>,
-) -> Result<Json<Vec<SubscriberDto>>, ApiError> {
-    let subs = state.game_repo.get_subscribers(&game_id).await?;
-    Ok(Json(subs.into_iter().map(|u| SubscriberDto { user_id: u }).collect()))
+    Json(dto): Json<SetRoleIdDto>,
+) -> Result<Json<GameDto>, ApiError> {
+    let role_ref = dto.role_id.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let updated = state
+        .game_repo
+        .set_role_id(&guild_id, &game_id, role_ref)
+        .await?;
+    match updated {
+        Some(g) => Ok(Json(g.into())),
+        None => Err(DomainError::NotFound("Jeu introuvable".into()).into()),
+    }
 }
 
 pub async fn get_game_by_name(
@@ -225,14 +275,6 @@ pub async fn get_game_by_name(
 ) -> Result<Json<Option<GameDto>>, ApiError> {
     let game = state.game_repo.find_by_name(&guild_id, &game_name).await?;
     Ok(Json(game.map(Into::into)))
-}
-
-pub async fn get_user_games(
-    State(state): State<AppState>,
-    Path((guild_id, user_id)): Path<(String, String)>,
-) -> Result<Json<Vec<GameDto>>, ApiError> {
-    let games = state.game_repo.get_user_games(&guild_id, &user_id).await?;
-    Ok(Json(games.into_iter().map(Into::into).collect()))
 }
 
 // ── Panels ──

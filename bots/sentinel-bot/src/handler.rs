@@ -109,7 +109,6 @@ impl EventHandler for Handler {
         }
         modules::automod::on_message(&ctx, &msg).await;
         modules::audit::on_message(&ctx, &msg).await;
-        modules::games::on_message(&ctx, &msg).await;
         modules::progression::on_message(&ctx, &msg).await;
         modules::voice::on_message(&ctx, &msg).await;
         modules::tickets::on_message(&ctx, &msg).await;
