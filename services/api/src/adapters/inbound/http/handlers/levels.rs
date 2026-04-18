@@ -1,5 +1,5 @@
 use axum::extract::{Path, Query, State};
-use axum::{Extension, Json};
+use axum::Json;
 
 use crate::adapters::inbound::http::dto::levels::{
     AddXpDto, AddXpResponseDto, LevelConfigDto, LevelLeaderboardParams, LevelRewardDto,
@@ -7,7 +7,6 @@ use crate::adapters::inbound::http::dto::levels::{
 };
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::XpSource;
 use crate::ports::inbound::manage_levels::AddXpCommand;
@@ -105,11 +104,9 @@ pub async fn set_reward(
 
 pub async fn delete_reward(
     State(state): State<AppState>,
-    rbac: Option<Extension<RoleContext>>,
     Path((guild_id, level)): Path<(String, i32)>,
     Query(params): Query<DeleteRewardParams>,
 ) -> Result<Json<()>, ApiError> {
-    check_role(&rbac, Role::Admin, "admin+ requis pour supprimer une recompense")?;
     let source = XpSource::from_str(params.source.as_deref().unwrap_or("text"));
     state.levels_uc.delete_reward(&guild_id, level, source).await?;
     Ok(Json(()))
