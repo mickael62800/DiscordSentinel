@@ -817,7 +817,7 @@ watch(selectedComponent, loadFormValues);
 }
 
 .fields-grid-text {
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(6, 1fr);
 }
 
 /* Sous-sections (regroupement par prefixe de cle) */
