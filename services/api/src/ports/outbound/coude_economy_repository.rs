@@ -11,17 +11,13 @@ use crate::domain::errors::DomainError;
 #[async_trait]
 pub trait CoudeEconomyRepository: Send + Sync {
     // ── Transferts entre joueurs ──
-
-    /// Transfère `amount` coins de `from_id` vers `to_id` de manière atomique.
-    /// Renvoie `ValidationError` si solde insuffisant, `NotFound` si un des
-    /// deux joueurs n'existe pas.
-    async fn transfer(
-        &self,
-        guild_id: &str,
-        from_id: &str,
-        to_id: &str,
-        amount: i64,
-    ) -> Result<(), DomainError>;
+    //
+    // NOTE migration wallet unifie : `transfer` a ete retire de ce repo.
+    // La logique SQL est desormais centralisee dans
+    // `WalletRepository::transfer` + `ManageWalletUseCase::transfer`, qui
+    // gere aussi la detection de faillite/jackpot via le service taunts.
+    // `ManageCoudeEconomyService::transfer` delegue directement a ce use
+    // case (voir son implementation).
 
     /// Vol : débite la victime du minimum entre `amount` et son solde réel,
     /// crédite le voleur de la même somme. Retourne le montant réellement volé

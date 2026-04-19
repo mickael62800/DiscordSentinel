@@ -378,7 +378,7 @@ message RefundSummary {
 // ══════════════════════════════════════════════════════════════════════
 
 service CoudeEconomyService {
-  rpc Transfer(TransferRequest) returns (Empty);
+  rpc Transfer(TransferRequest) returns (TransferResponse);
   rpc Steal(StealRequest) returns (StealResponse);
   rpc RecordCasinoWin(RecordCasinoWinRequest) returns (Empty);
   rpc RecordCasinoLoss(RecordCasinoLossRequest) returns (Empty);
@@ -400,6 +400,14 @@ message TransferRequest {
   string from_id = 2;
   string to_id = 3;
   int64 amount = 4;
+}
+
+// Migration wallet unifie : Transfer retourne desormais la liste des
+// TauntEvents declenches (faillite cote emetteur, jackpot cote recepteur,
+// don genereux si amount depasse le seuil configure) pour que le bot les
+// dispatche en un seul aller-retour.
+message TransferResponse {
+  repeated TauntEvent taunt_events = 1;
 }
 
 message StealRequest {

@@ -4,24 +4,36 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
+use serde::Serialize;
 
 use super::dto::{GainDto, LostDto, StealDto, TransferCoinsDto};
+use super::taunts::TauntEventDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 
 // ── Transferts ──
+
+/// Reponse du POST /api/coude/{guild_id}/transfer apres la migration
+/// wallet unifie : expose les TauntEvents declenches (faillite, jackpot,
+/// don genereux) pour que le bot les dispatche en un seul aller-retour.
+#[derive(Debug, Serialize)]
+pub struct TransferCoinsResponse {
+    pub taunt_events: Vec<TauntEventDto>,
+}
 
 /// POST /api/coude/{guild_id}/transfer
 pub async fn transfer_coins(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
     Json(dto): Json<TransferCoinsDto>,
-) -> Result<StatusCode, ApiError> {
-    state
+) -> Result<Json<TransferCoinsResponse>, ApiError> {
+    let taunts = state
         .coude_economy_uc
         .transfer(&guild_id, &dto.from_id, &dto.to_id, dto.amount)
         .await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(TransferCoinsResponse {
+        taunt_events: taunts.into_iter().map(Into::into).collect(),
+    }))
 }
 
 /// POST /api/coude/{guild_id}/steal

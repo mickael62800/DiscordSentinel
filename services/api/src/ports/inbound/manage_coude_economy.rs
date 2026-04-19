@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use crate::domain::entities::TauntEvent;
 use crate::domain::errors::DomainError;
 
 /// Use case "gérer l'économie Coup de Coude".
@@ -10,13 +11,18 @@ use crate::domain::errors::DomainError;
 /// `ManageCoudePlayersUseCase`.
 #[async_trait]
 pub trait ManageCoudeEconomyUseCase: Send + Sync {
+    /// Transfert atomique entre deux joueurs. Depuis la migration wallet
+    /// unifie, retourne les `TauntEvent` declenches : faillite cote emetteur
+    /// (solde passe de >0 a 0), jackpot cote recepteur (amount >= seuil
+    /// config), don genereux cote emetteur (amount >= seuil config). Le bot
+    /// dispatche la liste via `taunts_dispatch::dispatch_all`.
     async fn transfer(
         &self,
         guild_id: &str,
         from_id: &str,
         to_id: &str,
         amount: i64,
-    ) -> Result<(), DomainError>;
+    ) -> Result<Vec<TauntEvent>, DomainError>;
 
     /// Retourne le montant réellement volé (erreur si la victime n'a rien).
     async fn steal(

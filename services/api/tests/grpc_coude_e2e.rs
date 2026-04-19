@@ -437,11 +437,17 @@ struct MockEconomyUc;
 
 #[async_trait]
 impl ManageCoudeEconomyUseCase for MockEconomyUc {
-    async fn transfer(&self, _: &str, from: &str, to: &str, amount: i64) -> Result<(), DomainError> {
+    async fn transfer(
+        &self,
+        _: &str,
+        from: &str,
+        to: &str,
+        amount: i64,
+    ) -> Result<Vec<sentinel_api::domain::entities::TauntEvent>, DomainError> {
         if from == to || amount <= 0 {
             return Err(DomainError::ValidationError("transfer invalide".into()));
         }
-        Ok(())
+        Ok(vec![])
     }
     async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(7) }
     async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<i64, DomainError> { unimplemented!() }

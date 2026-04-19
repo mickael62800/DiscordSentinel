@@ -10,6 +10,7 @@ use tonic::{Request, Response, Status};
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyService;
 
+use crate::adapters::inbound::grpc::coude::taunt_event_to_proto;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::ports::inbound::ManageCoudeEconomyUseCase;
 
@@ -22,13 +23,16 @@ impl CoudeEconomyService for CoudeEconomyGrpc {
     async fn transfer(
         &self,
         request: Request<proto::TransferRequest>,
-    ) -> Result<Response<proto::Empty>, Status> {
+    ) -> Result<Response<proto::TransferResponse>, Status> {
         let req = request.into_inner();
-        self.uc
+        let taunts = self
+            .uc
             .transfer(&req.guild_id, &req.from_id, &req.to_id, req.amount)
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(proto::Empty {}))
+        Ok(Response::new(proto::TransferResponse {
+            taunt_events: taunts.into_iter().map(taunt_event_to_proto).collect(),
+        }))
     }
 
     async fn steal(

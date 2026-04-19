@@ -20,71 +20,11 @@ impl PgCoudeEconomyRepository {
 
 #[async_trait]
 impl CoudeEconomyRepository for PgCoudeEconomyRepository {
-    async fn transfer(
-        &self,
-        guild_id: &str,
-        from_id: &str,
-        to_id: &str,
-        amount: i64,
-    ) -> Result<(), DomainError> {
-        let mut tx = self.pool.begin().await.map_err(pg_err)?;
-
-        // Phase 8 : lire le solde depuis user_wallets (wallet partage).
-        let sender: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
-        )
-        .bind(guild_id)
-        .bind(from_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
-        let (sender_coins,) = sender
-            .ok_or_else(|| DomainError::NotFound("Expediteur introuvable".into()))?;
-
-        if sender_coins < amount {
-            return Err(DomainError::ValidationError(format!(
-                "Solde insuffisant ({} coins, {} requis)",
-                sender_coins, amount
-            )));
-        }
-
-        // Phase 8 : coins dans user_wallets (wallet partage).
-        let sender_after: i64 = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2
-             RETURNING coins",
-        )
-        .bind(guild_id)
-        .bind(from_id)
-        .bind(amount)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
-        let receiver_after: Option<i64> = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2
-             RETURNING coins",
-        )
-        .bind(guild_id)
-        .bind(to_id)
-        .bind(amount)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
-        let receiver_after = receiver_after
-            .ok_or_else(|| DomainError::NotFound("Destinataire introuvable".into()))?;
-
-        let desc = format!("Transfert vers {}", to_id);
-        log_wallet_tx(&mut tx, guild_id, from_id, -amount, sender_after, "coude_transfer_out", &desc).await?;
-        let desc = format!("Transfert recu de {}", from_id);
-        log_wallet_tx(&mut tx, guild_id, to_id, amount, receiver_after, "coude_transfer_in", &desc).await?;
-
-        tx.commit().await.map_err(pg_err)?;
-        Ok(())
-    }
+    // NOTE migration wallet unifie : la methode `transfer` a ete supprimee.
+    // Toute la logique SQL (SELECT FOR UPDATE + UPDATE debit/credit + log
+    // wallet_transactions) est centralisee dans `PgWalletRepository::transfer`
+    // et orchestree par `ManageWalletService::transfer` (taunts inclus).
+    // `ManageCoudeEconomyService::transfer` delegue directement au wallet UC.
 
     async fn steal(
         &self,

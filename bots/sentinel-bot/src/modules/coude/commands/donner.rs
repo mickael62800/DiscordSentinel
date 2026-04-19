@@ -220,13 +220,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         // qui arrive effectivement au destinataire). C'est une seule
         // transaction SQL cote API : impossible d'avoir un debit sans
         // credit correspondant.
-        if let Err(e) = api
+        //
+        // Migration wallet unifie : l'API retourne desormais la liste
+        // des TauntEvents declenches (faillite, jackpot, don genereux).
+        // On les dispatche en une seule passe apres confirmation du
+        // transfert (cf. bas de ce bloc).
+        let transfer_taunts = match api
             .transfer_coins(&guild_id, &donor_id, &target_id_str, received)
             .await
         {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
-            return;
-        }
+            Ok(events) => events,
+            Err(e) => {
+                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+                return;
+            }
+        };
 
         // Debit separe de la taxe, puis depot dans la caisse communautaire
         // (Phase 9 : la taxe n'est plus un gold sink, elle alimente la caisse
@@ -275,16 +283,20 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
         crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
 
-        // Migration 139 : taunt generous donor si montant depasse le seuil.
-        // On calcule sur le montant avant taxe (amount) — c'est la generosite
-        // "faciale". Le backend applique le threshold configure.
-        match api.track_generous_donor(&guild_id, &donor_id, amount).await {
-            Ok(Some(ev)) => {
-                let guild_id_val = command.guild_id.unwrap();
-                crate::modules::coude::taunts_dispatch::dispatch_all(ctx, guild_id_val, &[ev]).await;
-            }
-            Ok(None) => {}
-            Err(e) => tracing::warn!(error = %e, "track_generous_donor failed"),
+        // Migration wallet unifie : dispatch en un seul passage les
+        // TauntEvents retournes par l'API (faillite cote emetteur si le
+        // don vide son wallet, jackpot cote recepteur, don genereux si
+        // le montant depasse le seuil). Plus besoin d'un second appel
+        // `track_generous_donor` (backend le declenche desormais dans
+        // la meme transaction logique que le transfer).
+        if !transfer_taunts.is_empty() {
+            let guild_id_val = command.guild_id.unwrap();
+            crate::modules::coude::taunts_dispatch::dispatch_all(
+                ctx,
+                guild_id_val,
+                &transfer_taunts,
+            )
+            .await;
         }
     } else {
         // ── Don d'item (pas de taxe, pas de cooldown) ──

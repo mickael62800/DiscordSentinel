@@ -354,7 +354,7 @@ impl manage_coude_inventory::ManageCoudeInventoryUseCase for StubCoudeInventory 
 pub struct StubCoudeEconomy;
 #[async_trait]
 impl manage_coude_economy::ManageCoudeEconomyUseCase for StubCoudeEconomy {
-    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
+    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
     async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<i64, DomainError> { unimplemented!() }
     async fn record_casino_win(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }

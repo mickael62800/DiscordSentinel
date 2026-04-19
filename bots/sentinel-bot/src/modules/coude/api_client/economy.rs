@@ -129,13 +129,20 @@ impl ApiClient {
         Ok(r.value.max(0) as u64)
     }
 
+    /// Don de coins entre deux joueurs.
+    ///
+    /// Depuis la migration wallet unifie cote API, cet endpoint retourne
+    /// desormais la liste des `TauntEvent` declenches (faillite cote
+    /// emetteur, jackpot cote recepteur, don genereux) pour dispatch
+    /// immediat via `taunts_dispatch`. Plus besoin d'appeler
+    /// `track_generous_donor` en sequence cote bot.
     pub async fn transfer_coins(
         &self,
         guild_id: &str,
         from_id: &str,
         to_id: &str,
         amount: i64,
-    ) -> Result<(), String> {
+    ) -> Result<Vec<super::TauntEvent>, String> {
         let req = proto_coude::TransferRequest {
             guild_id: guild_id.to_string(),
             from_id: from_id.to_string(),
@@ -143,10 +150,16 @@ impl ApiClient {
             amount,
         };
         let mut client = self.grpc.coude_economy();
-        self.grpc
-            .guarded(|| async move { client.transfer(req).await.map(|_| ()) })
+        let resp = self
+            .grpc
+            .guarded(|| async move { client.transfer(req).await.map(|r| r.into_inner()) })
             .await
-            .map_err(grpc_err_to_string)
+            .map_err(grpc_err_to_string)?;
+        Ok(resp
+            .taunt_events
+            .into_iter()
+            .map(super::taunt_event_from_proto)
+            .collect())
     }
 
     pub async fn record_steal(

@@ -42,7 +42,8 @@ use crate::application::{
     ManageCoudeCashboxService, ManageCoudeCatalogService, ManageCoudeCombatsService,
     ManageCoudeEconomyService, ManageCoudeHeistService, ManageCoudeInventoryService,
     ManageCoudePlayersService, ManageCoudeSocialService, ManageCoudeStealBoostsService,
-    ManageCoudeStealProtectionsService, ManageCoudeTauntsService, ManageInfractionsService,
+    ManageCoudeStealProtectionsService, ManageCoudeTauntsService, ManageWalletService,
+    ManageInfractionsService,
     ManageLevelsService, ManageMembersService, ManageModerationService, ManageNotesService,
     ManageRemindersService, ManageRolePanelsService, ManageRulesService, ManageSecurityService,
     ManageStatsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService,
@@ -311,19 +312,10 @@ pub async fn build_app_state(
         coude_combats_uc.clone(),
     ));
     let coude_economy_repo = Arc::new(PgCoudeEconomyRepository::new(pg_pool.clone()));
-    let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(coude_economy_repo.clone()));
-    let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
-    let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));
-    let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
-    let coude_social_uc = Arc::new(ManageCoudeSocialService::new(
-        coude_social_repo,
-        coude_player_repo.clone(),
-        coude_economy_repo.clone(),
-        bot_config_repo.clone(),
-    ));
 
-    // Phase 9 Part D — railleries (cree en amont : utilise par les deux
-    // services de resolution de combat).
+    // Phase 9 Part D — railleries (cree en amont : utilise par le wallet UC
+    // unifie, les services de resolution de combat, et l'economy UC pour
+    // les taunts "don genereux").
     let coude_taunts_repo: Arc<dyn crate::ports::outbound::CoudeTauntsRepository> =
         Arc::new(PgCoudeTauntsRepository::new(pg_pool.clone()));
     let coude_taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase> = Arc::new(
@@ -333,6 +325,30 @@ pub async fn build_app_state(
             bot_config_repo.clone(),
         ),
     );
+
+    // Migration wallet unifie : use case qui centralise les mutations
+    // `user_wallets` + detecte faillite/jackpot en retournant les
+    // TauntEvent a dispatcher. Depend de `coude_taunts_uc`.
+    let wallet_uc: Arc<dyn crate::ports::inbound::manage_wallet::ManageWalletUseCase> =
+        Arc::new(ManageWalletService::new(
+            wallet_repo.clone(),
+            coude_taunts_uc.clone(),
+        ));
+
+    let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(
+        coude_economy_repo.clone(),
+        wallet_uc.clone(),
+        coude_taunts_uc.clone(),
+    ));
+    let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
+    let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));
+    let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
+    let coude_social_uc = Arc::new(ManageCoudeSocialService::new(
+        coude_social_repo,
+        coude_player_repo.clone(),
+        coude_economy_repo.clone(),
+        bot_config_repo.clone(),
+    ));
 
     // Phase 10 — braquage (depend de cashbox_repo, inventory_uc, wallet_repo).
     let coude_heist_repo: Arc<dyn crate::ports::outbound::CoudeHeistRepository> =
