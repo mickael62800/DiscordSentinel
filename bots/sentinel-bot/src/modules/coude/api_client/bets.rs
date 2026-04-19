@@ -9,11 +9,13 @@
 use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{
-    grpc_err_to_string, proto_combat_to_dto, ApiClient, Bet, BetResult, Combat,
-    FighterBetBonus,
+    grpc_err_to_string, proto_combat_to_dto, taunt_event_from_proto, ApiClient, Bet, BetResult,
+    Combat, FighterBetBonus, TauntEvent,
 };
 
 impl ApiClient {
+    /// Place un pari. Retourne les TauntEvents declenches (faillite parieur
+    /// si le debit de mise fait passer son solde a zero).
     pub async fn place_bet(
         &self,
         guild_id: &str,
@@ -22,7 +24,7 @@ impl ApiClient {
         bettor_name: &str,
         backed_id: &str,
         amount: i64,
-    ) -> Result<(), String> {
+    ) -> Result<Vec<TauntEvent>, String> {
         let req = proto_coude::PlaceBetRequest {
             guild_id: guild_id.to_string(),
             combat_id: combat_id.to_string(),
@@ -32,10 +34,16 @@ impl ApiClient {
             amount,
         };
         let mut client = self.grpc.coude_bets();
-        self.grpc
-            .guarded(|| async move { client.place(req).await.map(|_| ()) })
+        let resp = self
+            .grpc
+            .guarded(|| async move { client.place(req).await.map(|r| r.into_inner()) })
             .await
-            .map_err(grpc_err_to_string)
+            .map_err(grpc_err_to_string)?;
+        Ok(resp
+            .taunt_events
+            .into_iter()
+            .map(taunt_event_from_proto)
+            .collect())
     }
 
     pub async fn get_combat_bets(&self, combat_id: &str) -> Result<Vec<Bet>, String> {
@@ -84,21 +92,31 @@ impl ApiClient {
         Ok(r.combat.map(proto_combat_to_dto))
     }
 
+    /// Resout les paris. Retourne les resultats + bonus + TauntEvents
+    /// (Migration #7 : jackpots parieurs gagnants + bonus combattants).
     pub async fn resolve_bets(
         &self,
         combat_id: &str,
         winner_id: Option<&str>,
-    ) -> Result<(Vec<BetResult>, Option<FighterBetBonus>), String> {
+    ) -> Result<
+        (
+            Vec<BetResult>,
+            Option<FighterBetBonus>,
+            Vec<TauntEvent>,
+        ),
+        String,
+    > {
         let req = proto_coude::ResolveBetsRequest {
             combat_id: combat_id.to_string(),
             winner_id: winner_id.map(str::to_string),
         };
         let mut client = self.grpc.coude_bets();
-        let plan = self
+        let resp = self
             .grpc
             .guarded(|| async move { client.resolve(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
+        let plan = resp.plan.unwrap_or_default();
         let results = plan
             .payouts
             .into_iter()
@@ -118,7 +136,12 @@ impl ApiClient {
             loser_bonus: b.loser_bonus,
             total_pot: b.total_pot,
         });
-        Ok((results, bonus))
+        let taunts = resp
+            .taunt_events
+            .into_iter()
+            .map(taunt_event_from_proto)
+            .collect();
+        Ok((results, bonus, taunts))
     }
 
     pub async fn refund_bets(&self, combat_id: &str) -> Result<(usize, i64), String> {

@@ -4,10 +4,12 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    calculate_bet_resolution, BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary,
+    calculate_bet_resolution, CoudeBet, NewCoudeBet, RefundSummary,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::manage_coude_bets::{
+    ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
+};
 use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
 use crate::ports::outbound::CoudeBetRepository;
 
@@ -27,7 +29,7 @@ impl ManageCoudeBetsService {
 
 #[async_trait]
 impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
-    async fn place(&self, new: NewCoudeBet) -> Result<(), DomainError> {
+    async fn place(&self, new: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> {
         if new.amount <= 0 {
             return Err(DomainError::ValidationError(
                 "Le montant du pari doit etre positif".into(),
@@ -52,7 +54,8 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
             ));
         }
 
-        self.bet_repo.place(new).await
+        let taunt_events = self.bet_repo.place(new).await?;
+        Ok(PlaceBetOutcome { taunt_events })
     }
 
     async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
@@ -63,7 +66,7 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
         &self,
         combat_id: Uuid,
         winner_id: Option<String>,
-    ) -> Result<BetResolutionPlan, DomainError> {
+    ) -> Result<ResolveBetsOutcome, DomainError> {
         let combat = self.combats_uc.get(combat_id).await?;
         let bets = self.bet_repo.list_for_combat(combat_id).await?;
 
@@ -76,13 +79,17 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
 
         if plan.payouts.is_empty() {
             // Rien à faire côté DB : pas de paris sur ce combat.
-            return Ok(plan);
+            return Ok(ResolveBetsOutcome {
+                plan,
+                taunt_events: Vec::new(),
+            });
         }
 
-        self.bet_repo
+        let taunt_events = self
+            .bet_repo
             .apply_resolution(&combat.guild_id, plan.clone())
             .await?;
-        Ok(plan)
+        Ok(ResolveBetsOutcome { plan, taunt_events })
     }
 
     async fn refund(&self, combat_id: Uuid) -> Result<RefundSummary, DomainError> {

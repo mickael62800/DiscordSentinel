@@ -153,7 +153,7 @@ pub struct PrisonStatus {
     pub reason: Option<String>,
 }
 
-fn taunt_event_from_proto(e: proto_coude::TauntEvent) -> TauntEvent {
+pub(super) fn taunt_event_from_proto(e: proto_coude::TauntEvent) -> TauntEvent {
     TauntEvent {
         channel_id: e.channel_id,
         target_user_id: e.target_user_id,

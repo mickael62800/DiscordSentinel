@@ -9,6 +9,7 @@ pub mod api_client;
 pub mod catalog;
 pub mod channel_check;
 pub mod commands;
+pub mod daily_chaos_events;
 pub mod guild_config;
 pub mod interaction_helper;
 pub mod prison_check;
@@ -213,6 +214,10 @@ pub async fn on_ready(ctx: &Context, guild_ids: Vec<GuildId>) {
 ///
 /// - `tournament_events` : consumer Redis streams qui poste l'embed "Tournoi
 ///   hebdo cloture" quand le coude-worker publie un event `tournament_resolved`.
+/// - `daily_chaos_events` (Migration #5) : consumer des TauntEvents emis
+///   par le job daily chaos (faillite victime / jackpot gagnant). Dispatch
+///   via `taunts_dispatch` — meme pipeline que les taunts combat.
 pub fn spawn_background(ctx: Context) {
-    tournament_events::spawn(ctx);
+    tournament_events::spawn(ctx.clone());
+    daily_chaos_events::spawn(ctx);
 }

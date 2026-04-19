@@ -432,14 +432,19 @@ impl ResolveBettingBatchService {
             .add_xp(&combat.guild_id, &loser_id, 5)
             .await;
 
-        // Resolve bets
-        if let Err(e) = self
+        // Resolve bets (Migration #7 : collecte aussi les taunts jackpot
+        // cote parieurs gagnants + bonus combattants).
+        let bets_taunts = match self
             .bets_uc
             .resolve(combat.id, Some(winner_id.clone()))
             .await
         {
-            warn!(error = %e, combat_id = %combat.id, "Echec resolve paris");
-        }
+            Ok(outcome) => outcome.taunt_events,
+            Err(e) => {
+                warn!(error = %e, combat_id = %combat.id, "Echec resolve paris");
+                Vec::new()
+            }
+        };
 
         // Message final : on y attache le message assurance si present
         let final_message = if let Some(ins_msg) = insurance_msg {
@@ -449,7 +454,7 @@ impl ResolveBettingBatchService {
         };
 
         // Phase 9 Part D : track streaks et collecte les taunt events.
-        let mut taunt_events = Vec::new();
+        let mut taunt_events = bets_taunts;
         match self
             .taunts_uc
             .on_player_won(&combat.guild_id, &winner_id)

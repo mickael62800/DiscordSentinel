@@ -408,8 +408,19 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
             backed_id: "a".into(), amount: 100, won: None, payout: None,
         }])
     }
-    async fn place(&self, _: NewCoudeBet) -> Result<(), DomainError> { unimplemented!() }
-    async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<BetResolutionPlan, DomainError> { unimplemented!() }
+    async fn place(
+        &self,
+        _: NewCoudeBet,
+    ) -> Result<sentinel_api::ports::inbound::PlaceBetOutcome, DomainError> {
+        unimplemented!()
+    }
+    async fn resolve(
+        &self,
+        _: Uuid,
+        _: Option<String>,
+    ) -> Result<sentinel_api::ports::inbound::ResolveBetsOutcome, DomainError> {
+        unimplemented!()
+    }
     async fn refund(&self, _: Uuid) -> Result<RefundSummary, DomainError> { unimplemented!() }
 }
 

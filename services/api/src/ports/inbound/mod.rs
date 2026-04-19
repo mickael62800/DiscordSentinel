@@ -74,7 +74,7 @@ pub mod manage_coude_combats;
 pub use manage_coude_combats::ManageCoudeCombatsUseCase;
 
 pub mod manage_coude_bets;
-pub use manage_coude_bets::ManageCoudeBetsUseCase;
+pub use manage_coude_bets::{ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome};
 
 pub mod manage_coude_economy;
 pub use manage_coude_economy::{ManageCoudeEconomyUseCase, StealOutcome};

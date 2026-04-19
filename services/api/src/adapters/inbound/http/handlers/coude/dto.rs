@@ -387,6 +387,14 @@ pub struct PlaceBetDto {
     pub amount: i64,
 }
 
+/// Reponse du POST /api/coude/{guild_id}/bets apres la Migration #7 :
+/// expose les TauntEvents declenches (faillite parieur) pour que le bot
+/// les dispatche en un seul aller-retour (meme pattern que `/donner`).
+#[derive(Debug, Serialize)]
+pub struct PlaceBetResponse {
+    pub taunt_events: Vec<super::taunts::TauntEventDto>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ResolveBetsDto {
     pub winner_id: Option<String>,
@@ -427,6 +435,11 @@ impl From<CoudeFighterBetBonus> for FighterBetBonus {
 pub struct ResolveBetsResponse {
     pub results: Vec<BetResult>,
     pub fighter_bonus: Option<FighterBetBonus>,
+    /// Migration #7 : TauntEvents declenches par l'application des paris
+    /// (jackpots parieurs gagnants, bonus combattants). Vide par defaut,
+    /// rempli par le handler apres mapping depuis `ResolveBetsOutcome`.
+    #[serde(default)]
+    pub taunt_events: Vec<super::taunts::TauntEventDto>,
 }
 
 impl From<BetResolutionPlan> for ResolveBetsResponse {
@@ -445,6 +458,7 @@ impl From<BetResolutionPlan> for ResolveBetsResponse {
                 })
                 .collect(),
             fighter_bonus: plan.fighter_bonus.map(FighterBetBonus::from),
+            taunt_events: Vec::new(),
         }
     }
 }

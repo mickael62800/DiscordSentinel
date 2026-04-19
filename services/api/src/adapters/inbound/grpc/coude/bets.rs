@@ -17,7 +17,7 @@ use crate::domain::entities::{
 };
 use crate::ports::inbound::ManageCoudeBetsUseCase;
 
-use super::parse_uuid;
+use super::{parse_uuid, taunt_event_to_proto};
 
 pub struct CoudeBetsGrpc {
     pub uc: Arc<dyn ManageCoudeBetsUseCase>,
@@ -78,10 +78,11 @@ impl CoudeBetsService for CoudeBetsGrpc {
     async fn place(
         &self,
         request: Request<proto::PlaceBetRequest>,
-    ) -> Result<Response<proto::Empty>, Status> {
+    ) -> Result<Response<proto::PlaceBetResponse>, Status> {
         let req = request.into_inner();
         let combat_id = parse_uuid(&req.combat_id)?;
-        self.uc
+        let outcome = self
+            .uc
             .place(NewCoudeBet {
                 guild_id: req.guild_id,
                 combat_id,
@@ -92,7 +93,13 @@ impl CoudeBetsService for CoudeBetsGrpc {
             })
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(proto::Empty {}))
+        Ok(Response::new(proto::PlaceBetResponse {
+            taunt_events: outcome
+                .taunt_events
+                .into_iter()
+                .map(taunt_event_to_proto)
+                .collect(),
+        }))
     }
 
     async fn list_for_combat(
@@ -113,15 +120,22 @@ impl CoudeBetsService for CoudeBetsGrpc {
     async fn resolve(
         &self,
         request: Request<proto::ResolveBetsRequest>,
-    ) -> Result<Response<proto::BetResolutionPlan>, Status> {
+    ) -> Result<Response<proto::ResolveBetsResponse>, Status> {
         let req = request.into_inner();
         let combat_id = parse_uuid(&req.combat_id)?;
-        let plan = self
+        let outcome = self
             .uc
             .resolve(combat_id, req.winner_id)
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(bet_resolution_plan_to_proto(plan)))
+        Ok(Response::new(proto::ResolveBetsResponse {
+            plan: Some(bet_resolution_plan_to_proto(outcome.plan)),
+            taunt_events: outcome
+                .taunt_events
+                .into_iter()
+                .map(taunt_event_to_proto)
+                .collect(),
+        }))
     }
 
     async fn refund(

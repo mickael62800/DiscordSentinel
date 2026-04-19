@@ -2,23 +2,29 @@
 //! est ici parce que c'est une lookup combat utilisée par le flow paris.
 
 use axum::extract::{Path, State};
-use axum::http::StatusCode;
 use axum::Json;
 
-use super::dto::{BetDto, FullCombatDto, PlaceBetDto, ResolveBetsDto, ResolveBetsResponse};
+use super::dto::{
+    BetDto, FullCombatDto, PlaceBetDto, PlaceBetResponse, ResolveBetsDto, ResolveBetsResponse,
+};
+use super::taunts::TauntEventDto;
 use super::parse_combat_id;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::NewCoudeBet;
 
 /// POST /api/coude/{guild_id}/bets
+///
+/// Migration #7 : retourne `PlaceBetResponse { taunt_events }` plutot que
+/// 204 No Content. Les taunts eventuels (faillite parieur) sont propages
+/// au bot via ce payload (meme pattern que `/donner`).
 pub async fn place_bet(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
     Json(dto): Json<PlaceBetDto>,
-) -> Result<StatusCode, ApiError> {
+) -> Result<Json<PlaceBetResponse>, ApiError> {
     let combat_id = parse_combat_id(&dto.combat_id)?;
-    state
+    let outcome = state
         .coude_bets_uc
         .place(NewCoudeBet {
             guild_id,
@@ -29,7 +35,13 @@ pub async fn place_bet(
             amount: dto.amount,
         })
         .await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(PlaceBetResponse {
+        taunt_events: outcome
+            .taunt_events
+            .into_iter()
+            .map(TauntEventDto::from)
+            .collect(),
+    }))
 }
 
 /// GET /api/coude/combats/{combat_id}/bets
@@ -67,8 +79,14 @@ pub async fn resolve_bets(
     Json(dto): Json<ResolveBetsDto>,
 ) -> Result<Json<ResolveBetsResponse>, ApiError> {
     let id = parse_combat_id(&combat_id)?;
-    let plan = state.coude_bets_uc.resolve(id, dto.winner_id).await?;
-    Ok(Json(plan.into()))
+    let outcome = state.coude_bets_uc.resolve(id, dto.winner_id).await?;
+    let mut resp: ResolveBetsResponse = outcome.plan.into();
+    resp.taunt_events = outcome
+        .taunt_events
+        .into_iter()
+        .map(TauntEventDto::from)
+        .collect();
+    Ok(Json(resp))
 }
 
 /// POST /api/coude/combats/{combat_id}/refund-bets

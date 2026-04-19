@@ -145,7 +145,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // INSERT dans une seule transaction sur user_wallets. Pas de debit
     // upfront cote bot (sinon double-debit : une fois par update_player_coins,
     // une fois par le tx interne de place_bet).
-    if let Err(e) = api
+    // Migration #7 : place_bet retourne les TauntEvents declenches
+    // (faillite parieur si solde passe a zero). On les dispatche apres
+    // confirmation du pari.
+    let taunts = match api
         .place_bet(
             &guild_id,
             &combat.id,
@@ -156,9 +159,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .await
     {
-        crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur pari : {e}")).await;
-        return;
-    }
+        Ok(events) => events,
+        Err(e) => {
+            crate::modules::coude::interaction_helper::followup_text(
+                ctx,
+                command,
+                &format!("Erreur pari : {e}"),
+            )
+            .await;
+            return;
+        }
+    };
 
     let embed = CreateEmbed::new()
         .title("\u{1f3b2} Pari enregistre !")
@@ -171,5 +182,13 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .timestamp(serenity::model::Timestamp::now());
 
     crate::modules::coude::interaction_helper::followup_embed(ctx, command, embed).await;
+
+    // Migration #7 : dispatch des taunts (faillite parieur si debit de mise
+    // a vide son wallet).
+    if !taunts.is_empty() {
+        if let Some(gid) = command.guild_id {
+            crate::modules::coude::taunts_dispatch::dispatch_all(ctx, gid, &taunts).await;
+        }
+    }
 }
 

@@ -367,10 +367,10 @@ impl manage_coude_economy::ManageCoudeEconomyUseCase for StubCoudeEconomy {
 
 pub struct StubCoudeBets;
 #[async_trait]
-impl manage_coude_bets::ManageCoudeBetsUseCase for StubCoudeBets {
-    async fn place(&self, _: NewCoudeBet) -> Result<(), DomainError> { unimplemented!() }
+impl ManageCoudeBetsUseCase for StubCoudeBets {
+    async fn place(&self, _: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> { unimplemented!() }
     async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> { unimplemented!() }
-    async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<BetResolutionPlan, DomainError> { unimplemented!() }
+    async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<ResolveBetsOutcome, DomainError> { unimplemented!() }
     async fn refund(&self, _: Uuid) -> Result<RefundSummary, DomainError> { unimplemented!() }
 }
 

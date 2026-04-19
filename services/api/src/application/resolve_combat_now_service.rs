@@ -220,6 +220,10 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // 7. Winner path / Draw path
         let (mut title_color, mut insurance_msg, mut prime_amount, mut xp_lines) =
             (0x57F287u32, None::<String>, 0i64, Vec::<String>::new());
+        // Migration #7 : taunts declenches par les mutations wallet des paris
+        // (jackpots cote parieurs gagnants + bonus combattants). Fusionnes en
+        // fin de fonction avec les taunts streaks win/loss.
+        let mut bets_draw_taunts: Vec<crate::domain::entities::TauntEvent> = Vec::new();
         if result.chaos_events_count > 0 {
             title_color = 0x9B59B6;
         }
@@ -363,12 +367,14 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 }
 
                 // Paris
-                let plan = self
+                let outcome = self
                     .bets_uc
                     .resolve(combat.id, Some(winner_id.clone()))
                     .await
                     .ok();
-                if let Some(plan) = plan {
+                if let Some(outcome) = outcome {
+                    bets_draw_taunts = outcome.taunt_events;
+                    let plan = outcome.plan;
                     if !plan.payouts.is_empty() {
                         let mut lines = vec!["\u{1f3b2} **Resultats des paris :**".to_string()];
                         for p in &plan.payouts {
@@ -455,11 +461,11 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 }
 
                 // Paris (refund tout le monde)
-                let plan = self.bets_uc.resolve(combat.id, None).await.ok();
-                if let Some(plan) = plan {
-                    if !plan.payouts.is_empty() {
+                let outcome = self.bets_uc.resolve(combat.id, None).await.ok();
+                if let Some(outcome) = outcome {
+                    if !outcome.plan.payouts.is_empty() {
                         let mut lines = vec!["\u{1f3b2} **Resultats des paris :**".to_string()];
-                        for p in &plan.payouts {
+                        for p in &outcome.plan.payouts {
                             lines.push(format!(
                                 "\u{274c} **{}** perd sa mise de **{} coins**",
                                 p.bettor_name, p.amount_bet
@@ -471,6 +477,13 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                             inline: false,
                         });
                     }
+                    // Taunts declenches lors de l'application des paris
+                    // (jackpots parieurs / bonus combattants — pour un draw,
+                    // pas de jackpot attendu cote payouts, mais on propage
+                    // defensively).
+                    // bets_draw_taunts collectes ici, fusionnes plus bas avec
+                    // les streaks win/loss/draw.
+                    bets_draw_taunts = outcome.taunt_events;
                 }
                 title_color = 0x9B59B6; // draw = violet
             }
@@ -532,6 +545,10 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .await;
             }
         }
+
+        // Migration #7 : fusionne les taunts issus de la resolution paris
+        // (jackpots parieurs + bonus combattants) avec ceux des streaks.
+        taunt_events.extend(bets_draw_taunts);
 
         Ok(ResolveCombatNowOutput {
             combat_id: combat.id.to_string(),

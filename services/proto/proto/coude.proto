@@ -301,9 +301,9 @@ message SetDefenderSpecialRequest {
 // ══════════════════════════════════════════════════════════════════════
 
 service CoudeBetsService {
-  rpc Place(PlaceBetRequest) returns (Empty);
+  rpc Place(PlaceBetRequest) returns (PlaceBetResponse);
   rpc ListForCombat(ListForCombatRequest) returns (BetList);
-  rpc Resolve(ResolveBetsRequest) returns (BetResolutionPlan);
+  rpc Resolve(ResolveBetsRequest) returns (ResolveBetsResponse);
   rpc Refund(RefundBetsRequest) returns (RefundSummary);
 }
 
@@ -366,6 +366,20 @@ message FighterBetBonus {
 message BetResolutionPlan {
   repeated BetPayout payouts = 1;
   optional FighterBetBonus fighter_bonus = 2;
+}
+
+// Migration #7 : reponse enrichie avec les TauntEvents declenches par
+// l'application des paris (jackpots parieurs gagnants + bonus
+// combattants).
+message ResolveBetsResponse {
+  BetResolutionPlan plan = 1;
+  repeated TauntEvent taunt_events = 2;
+}
+
+// Migration #7 : reponse enrichie avec les TauntEvents declenches par le
+// debit de mise (faillite parieur).
+message PlaceBetResponse {
+  repeated TauntEvent taunt_events = 1;
 }
 
 message RefundSummary {

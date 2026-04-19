@@ -307,11 +307,9 @@ pub async fn build_app_state(
                 bot_config_repo.clone(),
             ),
         );
-    let coude_bet_repo = Arc::new(PgCoudeBetRepository::new(pg_pool.clone()));
-    let coude_bets_uc = Arc::new(ManageCoudeBetsService::new(
-        coude_bet_repo,
-        coude_combats_uc.clone(),
-    ));
+    // `coude_bet_repo` est construit plus bas, apres `wallet_uc`
+    // (Migration #7 : le repo delegue les mutations user_wallets au
+    // service wallet unifie pour la detection faillite/jackpot).
     let coude_economy_repo = Arc::new(PgCoudeEconomyRepository::new(pg_pool.clone()));
 
     // Phase 9 Part D — railleries (cree en amont : utilise par le wallet UC
@@ -335,6 +333,17 @@ pub async fn build_app_state(
             wallet_repo.clone(),
             coude_taunts_uc.clone(),
         ));
+
+    // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
+    // deleguer les mutations user_wallets via credit_tx/debit_tx.
+    let coude_bet_repo = Arc::new(PgCoudeBetRepository::new(
+        pg_pool.clone(),
+        wallet_uc.clone(),
+    ));
+    let coude_bets_uc = Arc::new(ManageCoudeBetsService::new(
+        coude_bet_repo,
+        coude_combats_uc.clone(),
+    ));
 
     // Migration #4 : `blackjack_svc` passe ses mutations wallet (mise, cashout,
     // double down) par `wallet_uc` pour centralisation + detection auto des
