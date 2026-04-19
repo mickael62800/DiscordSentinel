@@ -225,6 +225,9 @@ pub async fn register_guild(
     State(state): State<AppState>,
     Json(dto): Json<RegisterGuildDto>,
 ) -> Result<StatusCode, ApiError> {
+    let guild_id = dto.guild_id.clone();
+    let owner_id = dto.owner_id.clone();
+
     let guild = crate::domain::entities::Guild {
         guild_id: dto.guild_id,
         name: dto.name,
@@ -234,6 +237,24 @@ pub async fn register_guild(
         updated_at: chrono::Utc::now(),
     };
     state.guild_repo.upsert(&guild).await?;
+
+    // Auto-grant le proprietaire Discord comme `owner` RBAC au premier
+    // enregistrement. ON CONFLICT DO NOTHING : si quelqu un est deja defini
+    // (meme en viewer), on ne l ecrase pas.
+    if let Some(owner) = owner_id {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO api_user_guilds (discord_user_id, guild_id, role, granted_by) \
+             VALUES ($1, $2, 'owner', $1) \
+             ON CONFLICT (discord_user_id, guild_id) DO NOTHING",
+        )
+        .bind(&owner)
+        .bind(&guild_id)
+        .execute(&state.pg_pool)
+        .await
+        {
+            warn!(error = %e, guild_id = %guild_id, owner_id = %owner, "Echec auto-grant owner RBAC");
+        }
+    }
 
     // Invalider le cache guilds
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {

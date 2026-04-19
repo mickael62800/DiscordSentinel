@@ -212,6 +212,10 @@ pub struct RegisterGuildDto {
     pub name: String,
     pub icon: Option<String>,
     pub member_count: Option<i32>,
+    /// Discord user ID du proprietaire de la guild. Si fourni, l API
+    /// l enregistre automatiquement comme `owner` RBAC (ON CONFLICT DO NOTHING
+    /// pour ne pas ecraser un role deja defini).
+    pub owner_id: Option<String>,
 }
 
 // ── Filtre par guild ──

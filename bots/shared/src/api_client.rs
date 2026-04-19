@@ -160,12 +160,15 @@ impl BaseApiClient {
         guild_id: &str,
         name: &str,
         member_count: i32,
+        owner_id: Option<&str>,
     ) -> Result<(), String> {
         #[derive(Serialize)]
         struct Payload {
             guild_id: String,
             name: String,
             member_count: Option<i32>,
+            #[serde(skip_serializing_if = "Option::is_none")]
+            owner_id: Option<String>,
         }
 
         let req = self
@@ -175,6 +178,7 @@ impl BaseApiClient {
                 guild_id: guild_id.to_string(),
                 name: name.to_string(),
                 member_count: Some(member_count),
+                owner_id: owner_id.map(String::from),
             });
 
         self.auth(req)

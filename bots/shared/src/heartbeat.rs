@@ -39,8 +39,9 @@ pub async fn register_guilds(
         let guild_id = guild_status.id;
         if let Ok(guild) = guild_id.to_partial_guild(&ctx.http).await {
             let member_count = guild.approximate_member_count.unwrap_or(0) as i32;
+            let owner_id = guild.owner_id.to_string();
             if let Err(e) = api
-                .register_guild(&guild_id.to_string(), &guild.name, member_count)
+                .register_guild(&guild_id.to_string(), &guild.name, member_count, Some(&owner_id))
                 .await
             {
                 tracing::warn!(error = %e, guild = %guild.name, "Erreur enregistrement guild");
