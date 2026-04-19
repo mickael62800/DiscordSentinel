@@ -19,6 +19,7 @@ pub mod economy;
 pub mod inventory;
 pub mod social;
 pub mod taunts;
+pub mod tournaments;
 
 pub use bets::*;
 pub use combats::*;
@@ -28,6 +29,7 @@ pub use inventory::*;
 pub use players::*;
 pub use social::*;
 pub use taunts::*;
+pub use tournaments::*;
 
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.
 ///

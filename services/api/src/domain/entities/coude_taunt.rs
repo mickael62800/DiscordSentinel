@@ -1,4 +1,4 @@
-//! Railleries automatiques sur series (Phase 9 Part D).
+//! Railleries automatiques sur series (Phase 9 Part D + extensions blackjack/eco).
 //!
 //! Toute la "logique metier" des railleries vit ici :
 //! - les seuils de declenchement (3/5/10)
@@ -7,21 +7,22 @@
 //!
 //! Le bot ne fait que poster dans un salon et renommer — il n'a aucune
 //! regle a appliquer.
+//!
+//! # Extensions (migration 139)
+//!
+//! Ajout de 6 nouveaux `StreakKind` :
+//! - blackjack : `BjNatural21` (one-shot), `BjBustStreak` (3/5/10),
+//!   `BjWinStreak` (3/5/10)
+//! - economie  : `EcoBankruptcy`, `EcoJackpot`, `EcoGenerousDonor` (one-shots)
+//!
+//! Les "one-shot" passent par `build_taunt_event_single` qui court-circuite
+//! le check de palier.
 
 use rand::seq::SliceRandom;
 use rand::Rng;
 
 /// Seuils auxquels on declenche un taunt. Toute nouvelle valeur de
 /// streak qui matche un seuil provoque un `TauntEvent`.
-///
-/// **Choix d'architecture** : hardcode a [3, 5, 10]. Ces trois valeurs
-/// sont un sweet spot gameplay (premiere raillerie atteignable mais
-/// pas triviale, escalade claire, plafond legendaire rare) et les
-/// rendre per-guild configurables demanderait de refactorer
-/// `build_taunt_event` pour accepter les seuils en parametre. Les
-/// catalogues de messages et suffixes sont eux aussi ecrits pour ces
-/// paliers specifiques, donc un override runtime n'apporterait rien
-/// sans une grosse refacto parallele.
 pub const TAUNT_THRESHOLDS: &[i32] = &[3, 5, 10];
 
 /// Type de serie trackee.
@@ -33,6 +34,22 @@ pub enum StreakKind {
     Loss,
     /// Fois d'affilee ou le joueur s'est fait voler (victime).
     StealVictim,
+
+    // ── Blackjack ──
+    /// Blackjack naturel (21 en 2 cartes). One-shot, pas de palier.
+    BjNatural21,
+    /// Bust (depassement de 21) consecutifs. Palier 3/5/10.
+    BjBustStreak,
+    /// Mains blackjack gagnees consecutives. Palier 3/5/10.
+    BjWinStreak,
+
+    // ── Economie ──
+    /// Balance du wallet passe de >0 a 0 (faillite). One-shot.
+    EcoBankruptcy,
+    /// Gain enorme en une op (> seuil configurable, default 10_000). One-shot.
+    EcoJackpot,
+    /// Don a un autre joueur > seuil (default 1_000). One-shot.
+    EcoGenerousDonor,
 }
 
 impl StreakKind {
@@ -41,7 +58,26 @@ impl StreakKind {
             Self::Win => "win",
             Self::Loss => "loss",
             Self::StealVictim => "steal_victim",
+            Self::BjNatural21 => "bj_natural21",
+            Self::BjBustStreak => "bj_bust_streak",
+            Self::BjWinStreak => "bj_win_streak",
+            Self::EcoBankruptcy => "eco_bankruptcy",
+            Self::EcoJackpot => "eco_jackpot",
+            Self::EcoGenerousDonor => "eco_generous_donor",
         }
+    }
+
+    /// True si ce kind fonctionne par palier (streak qui atteint 3/5/10),
+    /// false pour les one-shots (naturel 21, faillite, jackpot, don).
+    pub fn is_threshold_based(self) -> bool {
+        matches!(
+            self,
+            Self::Win
+                | Self::Loss
+                | Self::StealVictim
+                | Self::BjBustStreak
+                | Self::BjWinStreak
+        )
     }
 }
 
@@ -65,9 +101,7 @@ pub struct TauntEvent {
     pub target_user_id: String,
     /// Message moqueur deja compose avec mention du joueur.
     pub message: String,
-    /// Suffixe (ou prefixe) a ajouter au pseudo Discord. Le bot prend
-    /// le display_name courant et applique ce suffixe, en gardant un
-    /// nickname final sous 32 caracteres (limite Discord).
+    /// Suffixe (ou prefixe) a ajouter au pseudo Discord.
     pub nickname_suffix: String,
     /// Pour le log (non utilise par le bot).
     pub streak_kind: &'static str,
@@ -132,6 +166,198 @@ const STEAL_VICTIM_MESSAGES_10: &[&str] = &[
     "\u{1f621} 10 fois. DIX FOIS. {user}, comment c'est encore possible ?",
 ];
 
+// ── Blackjack : Natural 21 (one-shot) ──
+
+const BJ_NATURAL_MESSAGES: &[&str] = &[
+    "\u{1f3b0} {user} tire un blackjack naturel ! 21 en 2 cartes. La chance incarnee.",
+    "\u{1f3b2} {user} fait 21 d'entree. Le croupier s'incline.",
+    "\u{1f451} Blackjack naturel pour {user} — tapis rouge deroule.",
+    "\u{2728} {user} : As + tete. Propre, efficace, insolent.",
+    "\u{1f4b0} {user} empoche le jackpot direct — blackjack naturel.",
+    "\u{1f60e} {user} n'a meme pas eu besoin de tirer. 21 direct.",
+    "\u{1f525} {user} sort un blackjack naturel. Le casino tremble.",
+    "\u{1f3af} Bullseye : {user} fait 21 en 2 cartes.",
+    "\u{1f340} La chance sourit a {user} : blackjack naturel !",
+    "\u{1f947} {user} ne joue pas, il collectionne les blackjacks naturels.",
+    "\u{1f921} {user} vient de sortir un 21 naturel. On dirait un scenario truque.",
+    "\u{1f3c6} {user} decroche le saint Graal du blackjack : le naturel.",
+    "\u{1f379} Cocktail parfait pour {user} : As + 10. 21 sans effort.",
+    "\u{1f4ab} {user} brille avec un blackjack naturel. Eblouissant.",
+    "\u{1f984} Licorne sauvage : {user} fait 21 en 2 cartes.",
+];
+
+// ── Blackjack : bust streaks ──
+
+const BJ_BUST_3: &[&str] = &[
+    "\u{1f4a5} {user} bust 3 fois de suite. Tirer n'est pas une strategie.",
+    "\u{1f915} 3 bust d'affilee pour {user}. Le 21 s'eloigne a chaque carte.",
+    "\u{1f614} {user} depasse 21 pour la 3e fois. Peut-etre s'arreter plus tot ?",
+    "\u{1f4c9} Triple bust pour {user}. La gravite s'en melerait presque.",
+    "\u{1f643} {user} collectionne les bust : 3 d'un coup.",
+    "\u{1f92a} {user} a tire 3 fois la carte de trop. Maths difficiles.",
+    "\u{1f4a8} 3 bust consecutifs pour {user}. Le deck te deteste.",
+    "\u{1f4ad} {user} se demande toujours pourquoi il a dit \"hit\". 3 bust.",
+    "\u{1f635} Triple bust pour {user}. Les cartes sont cruelles.",
+    "\u{1f926} {user} bust 3 fois. Le croupier n'en revient pas.",
+    "\u{1f4a6} {user} coule 3 mains d'affilee. Bust bust bust.",
+    "\u{1f94a} 3 KO auto-inflige pour {user}. Impressionnant.",
+    "\u{1f331} {user} plante 3 mains. Peut-etre apprendre le stand ?",
+    "\u{1f4a5} Bust triple pour {user}. Le chat noir est dans la manche.",
+    "\u{1f644} {user} repete 3 fois la meme erreur. Definition de folie.",
+];
+
+const BJ_BUST_5: &[&str] = &[
+    "\u{1f480} {user} bust 5 fois de suite. C'est devenu un art.",
+    "\u{1f921} 5 bust consecutifs pour {user}. On peut parler d'autodestruction.",
+    "\u{1f525} {user} brule sa main 5 fois d'affilee. Torche vivante.",
+    "\u{1f4c9} {user} atteint 5 bust. Le compteur explose, pas le score.",
+    "\u{1f97a} 5 bust pour {user}. Peut-etre changer de jeu ?",
+    "\u{1f6ae} {user} jette 5 mains a la poubelle. Recyclage intensif.",
+    "\u{1f92f} 5 depassements consecutifs pour {user}. Le chaos incarne.",
+    "\u{1f3b2} {user} bust 5 fois. Le RNG a rendu un verdict.",
+    "\u{1f47b} {user} est hante par le 21. 5 bust a la suite.",
+    "\u{1f635} 5 bust. {user}, le stand existe aussi comme option.",
+    "\u{1f4a2} {user} enchaine 5 bust. La table n'en peut plus.",
+    "\u{1f4a9} 5 mains ratees pour {user}. Triste spectacle.",
+    "\u{2620}\u{fe0f} {user} signe son 5e bust d'affilee. RIP.",
+    "\u{1f94a} 5e bust consecutif pour {user}. Masochisme validate.",
+    "\u{1f922} {user} ecoeure la table avec 5 bust.",
+];
+
+const BJ_BUST_10: &[&str] = &[
+    "\u{1f4c9} 10 bust d'affilee. {user}, apprends a compter jusqu'a 21.",
+    "\u{1f921} {user} atteint 10 bust consecutifs. Record du monde de la betise.",
+    "\u{1f9ee} {user}, l'addition c'est 21, pas 37. 10 bust.",
+    "\u{1f480} 10 bust pour {user}. Le casino t'interdit l'entree.",
+    "\u{1f3c6} Trophee du pire joueur decerne a {user} : 10 bust.",
+    "\u{1f92f} 10 bust consecutifs. {user}, c'est une performance artistique ?",
+    "\u{1f4a5} {user} atomise 10 mains d'affilee. Kaboom fois 10.",
+    "\u{1f47b} {user} est maudit. 10 bust a la suite, c'est statistiquement improbable.",
+    "\u{1f3b4} {user}, change de metier. 10 bust c'est un signe.",
+    "\u{1f4d6} Manuel du blackjack offert a {user} apres 10 bust.",
+    "\u{1f3af} {user} vise la fosse septique : 10 bust dans le mille.",
+    "\u{1faa6} 10 bust. {user} est officiellement nul.",
+    "\u{1f6d1} Stop. {user} a bust 10 fois. Quelqu'un lui confisque les cartes.",
+    "\u{1f4ad} {user} ne sait pas lire les chiffres. 10 bust le prouvent.",
+    "\u{1f921} 10 bust. {user}, Las Vegas t'envoie un cadeau de remerciement.",
+];
+
+// ── Blackjack : win streaks ──
+
+const BJ_WIN_3: &[&str] = &[
+    "\u{1f0cf} {user} gagne 3 mains de suite. Le croupier transpire.",
+    "\u{1f3b0} Triple win blackjack pour {user}. La table est froide.",
+    "\u{1f60e} {user} enchaine 3 victoires. Le croupier commence a douter.",
+    "\u{1f4b0} 3 mains gagnees pour {user}. Le pactole grossit.",
+    "\u{1f947} {user} rafle 3 mains. En douceur.",
+    "\u{1f3af} 3 wins blackjack pour {user}. Viseur calibre.",
+    "\u{1f525} {user} est lance : 3 victoires de blackjack d'affilee.",
+    "\u{1f9ca} {user} joue de sang-froid. 3 mains dans la poche.",
+    "\u{1f44c} 3 wins pour {user}. Tranquille, pas de stress.",
+    "\u{1f3af} {user} place 3 mains gagnantes. Sniper du blackjack.",
+    "\u{1f9e0} {user} compte les cartes ? 3 wins consecutifs.",
+    "\u{1f31f} Triple victoire blackjack pour {user}. Etoile montante.",
+    "\u{1f4a5} {user} explose 3 mains. Le croupier note dans son carnet.",
+    "\u{1f3b2} 3 wins pour {user}. Les des lui sourient.",
+    "\u{1f3c5} Medaille de bronze pour 3 wins consecutifs : {user}.",
+];
+
+const BJ_WIN_5: &[&str] = &[
+    "\u{1f3b0} 5 wins blackjack pour {user}. Le croupier appelle le manager.",
+    "\u{1f451} {user} domine la table : 5 victoires consecutives.",
+    "\u{1f525} {user} est en feu. 5 mains blackjack remportees d'affilee.",
+    "\u{1f4b0} 5 wins pour {user}. La banque commence a trembler.",
+    "\u{1f3af} {user} shoote 5 mains parfaites. Que dire de plus ?",
+    "\u{1f9ca} 5 wins avec sang-froid pour {user}. Maitre des nerfs.",
+    "\u{1f9e0} {user} lit le deck. 5 victoires blackjack consecutives.",
+    "\u{1f4ab} {user} aligne 5 wins. Constellation de victoires.",
+    "\u{1f3c6} 5 mains blackjack, 5 victoires. {user} signe un carton plein.",
+    "\u{1f60e} {user} repousse la chance a 5 reprises. Talent pur.",
+    "\u{26a1} 5 wins blackjack. {user} court-circuite le RNG.",
+    "\u{1f947} {user} rafle 5 mains. Le croupier envisage la reconversion.",
+    "\u{1f3b2} {user} gagne 5 fois d'affilee. La chance c'est pour les autres.",
+    "\u{1f4c8} Courbe ascendante pour {user} : 5 wins consecutifs.",
+    "\u{1f53a} {user} est au top : 5 victoires blackjack non-stop.",
+];
+
+const BJ_WIN_10: &[&str] = &[
+    "\u{1f988} {user} a atteint 10 victoires blackjack consecutives. C'est un requin.",
+    "\u{1f451} {user} a mis la couronne : 10 wins blackjack d'affilee.",
+    "\u{1f3b0} {user}, la legende vivante du blackjack. 10 wins.",
+    "\u{1f4a3} {user} fait sauter la banque : 10 victoires consecutives.",
+    "\u{1f31f} 10 wins blackjack ! {user} entre dans le hall of fame.",
+    "\u{1f525} {user} est incandescent. 10 victoires blackjack d'affilee.",
+    "\u{1f9e0} {user} compte chaque carte. 10 wins c'est un exploit.",
+    "\u{1f3c6} Trophee ultime pour {user} : 10 wins blackjack consecutifs.",
+    "\u{1f4b0} {user} vide les coffres : 10 victoires blackjack.",
+    "\u{1f3b2} 10 wins. Le RNG est au service exclusif de {user}.",
+    "\u{1f440} Le casino surveille {user}. 10 wins, trop suspect.",
+    "\u{1f451} {user} est roi du tapis : 10 wins blackjack consecutifs.",
+    "\u{1f3ad} {user} joue a un autre jeu : 10 wins blackjack.",
+    "\u{2b50} 10 wins blackjack ! {user} brille plus fort qu'une enseigne Vegas.",
+    "\u{1f6b8} Attention : {user} est officiellement dangereux. 10 wins blackjack.",
+];
+
+// ── Eco : Bankruptcy (one-shot) ──
+
+const ECO_BANKRUPTCY_MESSAGES: &[&str] = &[
+    "\u{1f4b8} {user} est en faillite. Zero coin au compteur.",
+    "\u{1faa6} {user} a tout perdu. Le compte est a sec.",
+    "\u{1f4c9} Faillite pour {user}. La courbe touche le fond.",
+    "\u{1f480} {user} voit sa fortune partir en fumee. Zero.",
+    "\u{1f6ab} {user}, plus un sou. Time to grind.",
+    "\u{1f4b0} 0 coin pour {user}. Les temps sont durs.",
+    "\u{1f4ad} {user} medite sur son passif. Faillite officielle.",
+    "\u{1f61e} {user} rejoint le club des fauches. Bienvenue.",
+    "\u{1f4e6} {user} a vendu ses meubles. Faillite complete.",
+    "\u{1f4ab} {user}, disparition totale du solde. Pouf, zero.",
+    "\u{1f6b7} Banqueroute. {user} est hors jeu financierement.",
+    "\u{1fab0} {user} se retrouve a sec. Zero coin.",
+    "\u{1f914} {user}, peut-etre eviter le blackjack la prochaine fois ?",
+    "\u{1f32a} Tempete financiere pour {user}. 0 coin.",
+    "\u{1f525} {user} a cramer toute sa fortune. Pheonix des fauches.",
+];
+
+// ── Eco : Jackpot (one-shot) ──
+
+const ECO_JACKPOT_MESSAGES: &[&str] = &[
+    "\u{1f4b0} {user} empoche un jackpot monstrueux ! La caisse explose.",
+    "\u{1f911} {user} vient de devenir riche. Attention aux voleurs.",
+    "\u{1f3b0} Jackpot ! {user} fait sauter la banque.",
+    "\u{1f4b8} {user} rafle un paquet enorme. Les yeux brillent.",
+    "\u{1f4a5} Gain massif pour {user}. La fortune sourit.",
+    "\u{1f947} {user} decroche la cagnotte. Bravo champion.",
+    "\u{1f31f} {user} flamboie : jackpot inscrit au palmares.",
+    "\u{1f4b2} {user} encaisse une pluie de coins.",
+    "\u{1f3c6} Jackpot legendaire pour {user}. On parle chiffres.",
+    "\u{1f48e} {user} se pave de diamants. Gain colossal.",
+    "\u{1f9e8} {user} fait tilt. Jackpot garanti.",
+    "\u{1f525} {user} brule la caisse, mais dans le bon sens. Jackpot.",
+    "\u{1f3ad} {user} joue au theatre des millionnaires. Jackpot.",
+    "\u{1f4a1} {user} illumine le serveur avec un gain enorme.",
+    "\u{1f680} {user} decolle. Jackpot ! Direction la lune.",
+];
+
+// ── Eco : Generous donor (one-shot) ──
+
+const ECO_DONOR_MESSAGES: &[&str] = &[
+    "\u{1f381} {user} fait un don genereux. Mere Teresa du serveur.",
+    "\u{1f64f} {user} partage sa fortune. Un cas rare.",
+    "\u{1f496} {user} donne sans compter. L'ame caritative.",
+    "\u{1f338} {user} offre des coins. Le serveur applaudit.",
+    "\u{1f31f} {user} illumine la journee d'un autre. Don massif.",
+    "\u{1f3f5}\u{fe0f} {user} fait pleuvoir les coins sur un heureux.",
+    "\u{1f973} Fete pour le beneficiaire : {user} a donne gros.",
+    "\u{1f49d} {user}, generosite validee. Don confirme.",
+    "\u{1f33c} {user} seme des coins. Fleurs de bonte.",
+    "\u{1f485} {user} a le coeur sur la main. Don monumental.",
+    "\u{1f64b} {user} partage, {user} est beni.",
+    "\u{1f955} {user} nourrit les autres. Don genereux.",
+    "\u{1f942} {user} leve son verre a sa generosite.",
+    "\u{1f940} {user} depose un bouquet de coins. Magnifique.",
+    "\u{1f31e} {user} reveille la bonte : don enorme.",
+];
+
 fn messages_for(kind: StreakKind, threshold: i32) -> &'static [&'static str] {
     match (kind, threshold) {
         (StreakKind::Win, 3) => WIN_MESSAGES_3,
@@ -143,12 +369,22 @@ fn messages_for(kind: StreakKind, threshold: i32) -> &'static [&'static str] {
         (StreakKind::StealVictim, 3) => STEAL_VICTIM_MESSAGES_3,
         (StreakKind::StealVictim, 5) => STEAL_VICTIM_MESSAGES_5,
         (StreakKind::StealVictim, 10) => STEAL_VICTIM_MESSAGES_10,
+        (StreakKind::BjBustStreak, 3) => BJ_BUST_3,
+        (StreakKind::BjBustStreak, 5) => BJ_BUST_5,
+        (StreakKind::BjBustStreak, 10) => BJ_BUST_10,
+        (StreakKind::BjWinStreak, 3) => BJ_WIN_3,
+        (StreakKind::BjWinStreak, 5) => BJ_WIN_5,
+        (StreakKind::BjWinStreak, 10) => BJ_WIN_10,
+        // One-shot : ignore le threshold
+        (StreakKind::BjNatural21, _) => BJ_NATURAL_MESSAGES,
+        (StreakKind::EcoBankruptcy, _) => ECO_BANKRUPTCY_MESSAGES,
+        (StreakKind::EcoJackpot, _) => ECO_JACKPOT_MESSAGES,
+        (StreakKind::EcoGenerousDonor, _) => ECO_DONOR_MESSAGES,
         _ => &[],
     }
 }
 
-/// Suffixe de pseudo par kind x threshold. Volontairement court pour
-/// rester sous les 32 chars de Discord meme avec des pseudos longs.
+/// Suffixe de pseudo par kind x threshold.
 pub fn nickname_suffix_for(kind: StreakKind, threshold: i32) -> &'static str {
     match (kind, threshold) {
         (StreakKind::Win, 3) => " (en feu)",
@@ -160,6 +396,18 @@ pub fn nickname_suffix_for(kind: StreakKind, threshold: i32) -> &'static str {
         (StreakKind::StealVictim, 3) => " (vide)",
         (StreakKind::StealVictim, 5) => " le Pigeon",
         (StreakKind::StealVictim, 10) => " la Tirelire",
+        // Blackjack
+        (StreakKind::BjNatural21, _) => " \u{1f3b0}",
+        (StreakKind::BjBustStreak, 3) => " \u{1f921}",
+        (StreakKind::BjBustStreak, 5) => " \u{1f480}",
+        (StreakKind::BjBustStreak, 10) => " \u{1f4c9}",
+        (StreakKind::BjWinStreak, 3) => " \u{1f0cf}",
+        (StreakKind::BjWinStreak, 5) => " \u{1f3b2}",
+        (StreakKind::BjWinStreak, 10) => " \u{1f988}",
+        // Eco (one-shot)
+        (StreakKind::EcoBankruptcy, _) => " \u{1faa6}",
+        (StreakKind::EcoJackpot, _) => " \u{1f4b0}",
+        (StreakKind::EcoGenerousDonor, _) => " \u{1f381}",
         _ => "",
     }
 }
@@ -174,7 +422,7 @@ pub fn crossed_threshold(new_streak: i32) -> Option<i32> {
 
 /// Construit un TauntEvent pret a etre poste par le bot. Renvoie None
 /// si :
-///   - le seuil n'est pas franchi
+///   - le seuil n'est pas franchi (pour les kinds threshold-based)
 ///   - aucun channel n'est configure / feature disabled
 ///   - le joueur a opt-out
 pub fn build_taunt_event(
@@ -191,17 +439,21 @@ pub fn build_taunt_event(
         return None;
     }
     let channel_id = config.channel_id.clone()?;
-    let threshold = crossed_threshold(new_streak)?;
+
+    // Pour les kinds threshold-based : verifier qu'on a franchi 3/5/10.
+    // Pour les one-shots : threshold ignore, on tire direct.
+    let threshold = if kind.is_threshold_based() {
+        crossed_threshold(new_streak)?
+    } else {
+        0 // valeur neutre : messages_for ignore le threshold pour one-shots
+    };
     let messages = messages_for(kind, threshold);
     if messages.is_empty() {
         return None;
     }
 
-    // Tire un message aleatoire dans un bloc scope pour que le
-    // ThreadRng (non-Send) soit drop avant qu'on rende l'Option.
     let chosen = {
         let mut rng = rand::thread_rng();
-        // unwrap() safe : on a verifie qu'on avait au moins un message.
         *messages.choose(&mut rng).unwrap_or(&"")
     };
     let message = chosen.replace("{user}", &format!("<@{target_user_id}>"));
@@ -217,6 +469,20 @@ pub fn build_taunt_event(
     })
 }
 
+/// Version one-shot pour les kinds sans palier (naturel 21, faillite,
+/// jackpot, don). Pas de check de streak, juste config + opt-out.
+pub fn build_taunt_event_single(
+    config: &CoudeTauntsConfig,
+    target_user_id: &str,
+    kind: StreakKind,
+    user_opted_out: bool,
+) -> Option<TauntEvent> {
+    if kind.is_threshold_based() {
+        return None;
+    }
+    build_taunt_event(config, target_user_id, kind, 0, user_opted_out)
+}
+
 /// Pour les tests : force une selection deterministe (first message).
 #[cfg(test)]
 pub fn build_taunt_event_deterministic(
@@ -230,7 +496,11 @@ pub fn build_taunt_event_deterministic(
         return None;
     }
     let channel_id = config.channel_id.clone()?;
-    let threshold = crossed_threshold(new_streak)?;
+    let threshold = if kind.is_threshold_based() {
+        crossed_threshold(new_streak)?
+    } else {
+        0
+    };
     let messages = messages_for(kind, threshold);
     let first = *messages.first()?;
     let message = first.replace("{user}", &format!("<@{target_user_id}>"));
@@ -270,7 +540,6 @@ mod tests {
         assert_eq!(crossed_threshold(3), Some(3));
         assert_eq!(crossed_threshold(5), Some(5));
         assert_eq!(crossed_threshold(10), Some(10));
-        // Les valeurs intermediaires ne declenchent pas.
         assert_eq!(crossed_threshold(1), None);
         assert_eq!(crossed_threshold(2), None);
         assert_eq!(crossed_threshold(4), None);
@@ -327,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn all_kind_threshold_combinations_have_messages_and_suffix() {
+    fn all_combat_kind_threshold_combinations_have_messages_and_suffix() {
         for kind in [StreakKind::Win, StreakKind::Loss, StreakKind::StealVictim] {
             for &t in TAUNT_THRESHOLDS {
                 let msgs = messages_for(kind, t);
@@ -345,11 +614,70 @@ mod tests {
     }
 
     #[test]
+    fn all_bj_threshold_kinds_have_messages_and_suffix() {
+        for kind in [StreakKind::BjBustStreak, StreakKind::BjWinStreak] {
+            for &t in TAUNT_THRESHOLDS {
+                let msgs = messages_for(kind, t);
+                assert!(!msgs.is_empty(), "missing bj messages {:?}/{}", kind, t);
+                let suffix = nickname_suffix_for(kind, t);
+                assert!(!suffix.is_empty(), "missing bj suffix {:?}/{}", kind, t);
+            }
+        }
+    }
+
+    #[test]
+    fn one_shot_kinds_have_catalog_and_suffix() {
+        for kind in [
+            StreakKind::BjNatural21,
+            StreakKind::EcoBankruptcy,
+            StreakKind::EcoJackpot,
+            StreakKind::EcoGenerousDonor,
+        ] {
+            assert!(!kind.is_threshold_based());
+            let msgs = messages_for(kind, 0);
+            assert!(!msgs.is_empty(), "missing one-shot messages {:?}", kind);
+            let suffix = nickname_suffix_for(kind, 0);
+            assert!(!suffix.is_empty(), "missing one-shot suffix {:?}", kind);
+        }
+    }
+
+    #[test]
     fn random_selection_picks_from_catalog() {
-        // Smoke test : le chemin non-deterministe ne panic pas et renvoie Some
-        // pour une config valide + seuil franchi.
         let ev =
             build_taunt_event(&cfg_with_channel(), "u42", StreakKind::Loss, 5, false);
         assert!(ev.is_some());
+    }
+
+    #[test]
+    fn build_single_one_shot_success() {
+        let ev = build_taunt_event_single(
+            &cfg_with_channel(),
+            "u1",
+            StreakKind::BjNatural21,
+            false,
+        )
+        .expect("one-shot should build");
+        assert!(ev.message.contains("<@u1>"));
+        assert_eq!(ev.streak_kind, "bj_natural21");
+    }
+
+    #[test]
+    fn build_single_rejects_threshold_kind() {
+        let ev = build_taunt_event_single(&cfg_with_channel(), "u1", StreakKind::Win, false);
+        assert!(ev.is_none());
+    }
+
+    #[test]
+    fn bj_bust_catalogs_have_at_least_15_variants() {
+        assert!(BJ_BUST_3.len() >= 15);
+        assert!(BJ_BUST_5.len() >= 15);
+        assert!(BJ_BUST_10.len() >= 15);
+        assert!(BJ_WIN_3.len() >= 15);
+        assert!(BJ_WIN_5.len() >= 15);
+        assert!(BJ_WIN_10.len() >= 15);
+        assert!(BJ_NATURAL_MESSAGES.len() >= 15);
+        assert!(ECO_BANKRUPTCY_MESSAGES.len() >= 15);
+        assert!(ECO_JACKPOT_MESSAGES.len() >= 15);
+        assert!(ECO_DONOR_MESSAGES.len() >= 15);
     }
 }

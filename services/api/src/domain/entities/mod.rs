@@ -110,8 +110,8 @@ pub use coude_steal_boost::{
 
 mod coude_taunt;
 pub use coude_taunt::{
-    build_taunt_event, crossed_threshold, nickname_suffix_for, CoudeTauntsConfig, StreakKind,
-    TauntEvent, TAUNT_THRESHOLDS,
+    build_taunt_event, build_taunt_event_single, crossed_threshold, nickname_suffix_for,
+    CoudeTauntsConfig, StreakKind, TauntEvent, TAUNT_THRESHOLDS,
 };
 
 mod coude_balance;

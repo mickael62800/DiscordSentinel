@@ -56,6 +56,17 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
         );
     }
 
+    // Job 4 bis : resolution du tournoi hebdo (migration 139). Tick 6h.
+    spawn_periodic(
+        "resolve_tournament",
+        21_600, // 6h
+        pool.clone(),
+        shutdown.clone(),
+        api_url.clone(),
+        "coude-worker",
+        |pool| Box::pin(async move { jobs::resolve_tournament::run(&pool).await }),
+    );
+
     // Job 4 : redistribution hebdo des caisses communautaires (Phase 9).
     let min_days = config.cashbox_min_days as i64;
     spawn_periodic(

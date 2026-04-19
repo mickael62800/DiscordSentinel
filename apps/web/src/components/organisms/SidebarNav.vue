@@ -48,6 +48,7 @@ const gameItems = [
   { path: "/coude/taunts", label: "Railleries", icon: "zap" },
   { path: "/blackjack", label: "Blackjack", icon: "layers" },
   { path: "/wallet", label: "Wallet", icon: "dollar-sign" },
+  { path: "/tournaments", label: "Tournoi hebdo", icon: "zap" },
 ];
 
 const aiItems = [

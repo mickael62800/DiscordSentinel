@@ -92,6 +92,15 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/config/taunts/opt-outs/{user_id}",
             delete(handlers::coude::remove_taunts_opt_out),
         )
+        // Migration 139 : tournoi hebdo
+        .route(
+            "/{guild_id}/tournaments/current",
+            get(handlers::coude::get_current_tournament),
+        )
+        .route(
+            "/{guild_id}/tournaments/history",
+            get(handlers::coude::get_tournament_history),
+        )
 }
 
 pub fn routes() -> Router<AppState> {
