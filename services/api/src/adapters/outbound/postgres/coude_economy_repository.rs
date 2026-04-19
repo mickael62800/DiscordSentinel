@@ -1,7 +1,6 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::adapters::outbound::postgres::wallet_tx_log::log_wallet_tx;
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
@@ -27,75 +26,10 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     // et orchestree par `ManageWalletService::transfer` (taunts inclus).
     // `ManageCoudeEconomyService::transfer` delegue directement au wallet UC.
 
-    // NOTE migration wallet unifie (/voler) : `ManageCoudeEconomyService::steal`
-    // n'utilise plus cette methode repo ; il delegue a
-    // `ManageWalletUseCase::transfer` + `record_steal_stats`. La methode
-    // ci-dessous est conservee pour le daily chaos (non migre).
-    async fn steal(
-        &self,
-        guild_id: &str,
-        thief_id: &str,
-        victim_id: &str,
-        amount: i64,
-    ) -> Result<i64, DomainError> {
-        let mut tx = self.pool.begin().await.map_err(pg_err)?;
-
-        let victim: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
-        )
-        .bind(guild_id)
-        .bind(victim_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
-        let (victim_coins,) = victim
-            .ok_or_else(|| DomainError::NotFound("Victime introuvable".into()))?;
-
-        let actual_stolen = amount.min(victim_coins);
-        if actual_stolen <= 0 {
-            tx.commit().await.map_err(pg_err)?;
-            return Ok(0);
-        }
-
-        let victim_after: i64 = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2
-             RETURNING coins",
-        )
-        .bind(guild_id).bind(victim_id).bind(actual_stolen)
-        .fetch_one(&mut *tx).await.map_err(pg_err)?;
-
-        let thief_after: i64 = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2
-             RETURNING coins",
-        )
-        .bind(guild_id).bind(thief_id).bind(actual_stolen)
-        .fetch_one(&mut *tx).await.map_err(pg_err)?;
-
-        let desc = format!("Vole par {}", thief_id);
-        log_wallet_tx(&mut tx, guild_id, victim_id, -actual_stolen, victim_after, "coude_steal_victim", &desc).await?;
-        let desc = format!("Vol sur {}", victim_id);
-        log_wallet_tx(&mut tx, guild_id, thief_id, actual_stolen, thief_after, "coude_steal_thief", &desc).await?;
-
-        sqlx::query(
-            "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
-        )
-        .bind(guild_id).bind(victim_id).bind(actual_stolen)
-        .execute(&mut *tx).await.map_err(pg_err)?;
-
-        sqlx::query(
-            "UPDATE coude_players SET total_stolen = total_stolen + $3, total_earned = total_earned + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
-        )
-        .bind(guild_id).bind(thief_id).bind(actual_stolen)
-        .execute(&mut *tx).await.map_err(pg_err)?;
-
-        tx.commit().await.map_err(pg_err)?;
-        Ok(actual_stolen)
-    }
+    // NOTE migration wallet unifie (Migration #5) : l'ancienne methode
+    // atomique `steal` a ete supprimee. Tous les call sites (ancien
+    // `/voler`, daily chaos) passent maintenant par
+    // `ManageWalletUseCase::transfer` + `record_steal_stats`.
 
     async fn record_steal_stats(
         &self,
@@ -162,7 +96,7 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         Ok(coins)
     }
 
-    async fn record_casino_win(
+    async fn record_casino_win_stats(
         &self,
         guild_id: &str,
         user_id: &str,
@@ -170,7 +104,8 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     ) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        // Phase 8 : credit sur user_wallets, stats sur coude_players.
+        // Migration #5 : stats-only. La mutation wallet est faite par
+        // ManageCoudeEconomyService via ManageWalletUseCase::credit.
         let result = sqlx::query(
             r#"UPDATE coude_players
                SET casino_wins = casino_wins + 1,
@@ -189,18 +124,6 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             return Err(DomainError::NotFound("Joueur introuvable".into()));
         }
 
-        let balance_after: i64 = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2
-             RETURNING coins",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .bind(gain)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
         sqlx::query("INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)")
             .bind(guild_id)
             .bind(user_id)
@@ -209,13 +132,11 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             .await
             .map_err(pg_err)?;
 
-        log_wallet_tx(&mut tx, guild_id, user_id, gain, balance_after, "coude_casino_win", "Blackjack gagne").await?;
-
         tx.commit().await.map_err(pg_err)?;
         Ok(())
     }
 
-    async fn record_casino_loss(
+    async fn record_casino_loss_stats(
         &self,
         guild_id: &str,
         user_id: &str,
@@ -223,8 +144,8 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     ) -> Result<(), DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        // Log la perte en négatif avant l'UPDATE pour rester cohérent avec
-        // le comportement legacy (log même si le joueur n'existe pas).
+        // Log la perte en negatif avant l'UPDATE pour rester coherent
+        // avec le comportement legacy (log meme si le joueur n'existe pas).
         sqlx::query("INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)")
             .bind(guild_id)
             .bind(user_id)
@@ -233,7 +154,8 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             .await
             .map_err(pg_err)?;
 
-        // Phase 8 : debit sur user_wallets, stats sur coude_players.
+        // Migration #5 : stats-only. La mutation wallet est faite par
+        // ManageCoudeEconomyService via ManageWalletUseCase::debit.
         let result = sqlx::query(
             r#"UPDATE coude_players
                SET casino_losses = casino_losses + 1,
@@ -252,61 +174,21 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
             return Err(DomainError::NotFound("Joueur introuvable".into()));
         }
 
-        let balance_after: i64 = sqlx::query_scalar(
-            "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2
-             RETURNING coins",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .bind(lost)
-        .fetch_one(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
-        log_wallet_tx(&mut tx, guild_id, user_id, -lost, balance_after, "coude_casino_loss", "Blackjack perdu").await?;
-
         tx.commit().await.map_err(pg_err)?;
         Ok(())
     }
 
-    async fn record_casino_faillite(
+    async fn record_casino_faillite_stats(
         &self,
         guild_id: &str,
         user_id: &str,
+        cleared: i64,
     ) -> Result<i64, DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        // Phase 8 : le solde vit dans user_wallets. Lire + locker le wallet.
-        let coins_before: Option<(i64,)> = sqlx::query_as(
-            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
-        let (coins_before,) = coins_before
-            .ok_or_else(|| DomainError::NotFound("Joueur introuvable".into()))?;
-
-        // Vider le wallet.
-        sqlx::query(
-            "UPDATE user_wallets SET coins = 0, total_spent = total_spent + $3, updated_at = NOW()
-             WHERE guild_id = $1 AND user_id = $2",
-        )
-        .bind(guild_id)
-        .bind(user_id)
-        .bind(coins_before)
-        .execute(&mut *tx)
-        .await
-        .map_err(pg_err)?;
-
-        if coins_before > 0 {
-            log_wallet_tx(&mut tx, guild_id, user_id, -coins_before, 0, "coude_casino_faillite", "Faillite blackjack").await?;
-        }
-
-        // Maj des stats dans coude_players (casino_losses + total_lost).
+        // Migration #5 : stats-only. Le debit du solde est fait par
+        // ManageCoudeEconomyService via ManageWalletUseCase::debit
+        // (cleared = solde avant faillite).
         let row: (i64,) = sqlx::query_as(
             r#"UPDATE coude_players
                SET casino_losses = casino_losses + 1,
@@ -317,18 +199,18 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         )
         .bind(guild_id)
         .bind(user_id)
-        .bind(coins_before)
+        .bind(cleared)
         .fetch_one(&mut *tx)
         .await
         .map_err(pg_err)?;
 
-        if coins_before > 0 {
+        if cleared > 0 {
             sqlx::query(
                 "INSERT INTO coude_casino_log (guild_id, user_id, amount) VALUES ($1, $2, $3)",
             )
             .bind(guild_id)
             .bind(user_id)
-            .bind(-coins_before)
+            .bind(-cleared)
             .execute(&mut *tx)
             .await
             .map_err(pg_err)?;

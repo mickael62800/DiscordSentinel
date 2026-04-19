@@ -65,6 +65,10 @@ pub struct NewDailyChaos {
 }
 
 /// Resultat d'un trigger de chaos journalier reussi, pret a etre affiche.
+///
+/// `taunt_events` contient les taunts declenches par la mutation wallet
+/// (faillite cote victime, jackpot cote winner) — propages via Redis
+/// pub/sub par le worker pour que le bot les dispatche.
 #[derive(Debug, Clone)]
 pub struct DailyChaosOutcome {
     pub loser_id: String,
@@ -73,6 +77,7 @@ pub struct DailyChaosOutcome {
     pub winner_name: String,
     pub amount: i64,
     pub channel_id: String,
+    pub taunt_events: Vec<crate::domain::entities::TauntEvent>,
 }
 
 // ══════════════════════════════════════════════════════════════════════

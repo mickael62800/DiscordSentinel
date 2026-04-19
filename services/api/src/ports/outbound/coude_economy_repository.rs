@@ -21,25 +21,12 @@ pub trait CoudeEconomyRepository: Send + Sync {
 
     // ── Vol ──
     //
-    // NOTE migration wallet unifie (`/voler`) : `ManageCoudeEconomyService::steal`
-    // delegue desormais a `ManageWalletUseCase::transfer` et appelle
-    // `record_steal_stats` pour les compteurs. La methode `steal`
-    // ci-dessous est conservee pour les call sites legacy non encore
-    // migres (ex: `ManageCoudeSocialService::run_daily_chaos`) qui
-    // enchainent wallet SQL + stats dans une meme tx.
-
-    /// Vol atomique : debite la victime du minimum entre `amount` et
-    /// son solde, credite le voleur, incremente `total_lost` /
-    /// `total_stolen` / `total_earned`. Retourne le montant reellement
-    /// vole (0 si la victime n'a rien). Utilise uniquement par le
-    /// daily chaos (pas par `/voler`).
-    async fn steal(
-        &self,
-        guild_id: &str,
-        thief_id: &str,
-        victim_id: &str,
-        amount: i64,
-    ) -> Result<i64, DomainError>;
+    // NOTE migration wallet unifie (`/voler` + daily chaos) : toutes les
+    // mutations wallet du vol passent desormais par
+    // `ManageWalletUseCase::transfer`. Le repo ne conserve que les
+    // compteurs stats (`record_steal_stats` / `record_steal_fail_stats`).
+    // L'ancienne methode atomique `steal` a ete supprimee (plus aucun
+    // caller).
 
     /// Compteurs `coude_players` apres un vol reussi : `total_lost` cote
     /// victime, `total_stolen` + `total_earned` cote voleur. Pas de
@@ -70,32 +57,43 @@ pub trait CoudeEconomyRepository: Send + Sync {
     ) -> Result<i64, DomainError>;
 
     // ── Casino ──
+    //
+    // NOTE migration wallet unifie (Migration #5) : les mutations
+    // `user_wallets` sont desormais deleguees a `ManageWalletUseCase`
+    // (credit / debit) par `ManageCoudeEconomyService`. Le repo ne garde
+    // que les compteurs `coude_players.casino_{wins,losses}` /
+    // `total_earned` / `total_lost` et le log `coude_casino_log`. La
+    // detection faillite / jackpot est centralisee cote wallet service.
 
-    /// Enregistre un gain casino : incrémente `casino_wins`, crédite le joueur,
-    /// loggue le gain dans `coude_casino_log` pour le tracking quotidien.
-    async fn record_casino_win(
+    /// Stats casino gain : incremente `casino_wins` + `total_earned`
+    /// cote `coude_players` et insere une ligne positive dans
+    /// `coude_casino_log`. Pas de mutation wallet.
+    async fn record_casino_win_stats(
         &self,
         guild_id: &str,
         user_id: &str,
         gain: i64,
     ) -> Result<(), DomainError>;
 
-    /// Enregistre une perte casino : incrémente `casino_losses`, débite le
-    /// joueur (plancher 0), loggue la perte (montant négatif) dans
-    /// `coude_casino_log`.
-    async fn record_casino_loss(
+    /// Stats casino perte : incremente `casino_losses` + `total_lost`
+    /// cote `coude_players` et insere une ligne negative dans
+    /// `coude_casino_log`. Pas de mutation wallet.
+    async fn record_casino_loss_stats(
         &self,
         guild_id: &str,
         user_id: &str,
         lost: i64,
     ) -> Result<(), DomainError>;
 
-    /// Faillite casino : remet les coins à 0, incrémente `casino_losses`,
-    /// loggue la faillite. Retourne le `total_lost` cumulé après opération.
-    async fn record_casino_faillite(
+    /// Stats casino faillite : incremente `casino_losses` + `total_lost`
+    /// cote `coude_players` et insere une ligne negative dans
+    /// `coude_casino_log`. Retourne le `total_lost` cumule apres
+    /// operation. Pas de mutation wallet.
+    async fn record_casino_faillite_stats(
         &self,
         guild_id: &str,
         user_id: &str,
+        cleared: i64,
     ) -> Result<i64, DomainError>;
 
     /// Nombre d'actions casino dans les 24h (via `coude_cooldowns`).

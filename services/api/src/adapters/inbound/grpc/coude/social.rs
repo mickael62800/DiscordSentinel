@@ -466,6 +466,11 @@ impl CoudeSocialService for CoudeSocialGrpc {
                 winner_name: o.winner_name,
                 amount: o.amount,
                 channel_id: o.channel_id,
+                taunt_events: o
+                    .taunt_events
+                    .into_iter()
+                    .map(super::taunt_event_to_proto)
+                    .collect(),
             })),
             None => Ok(Response::new(proto::DailyChaosResponse {
                 triggered: false,

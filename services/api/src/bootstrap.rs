@@ -359,6 +359,7 @@ pub async fn build_app_state(
         coude_player_repo.clone(),
         coude_economy_repo.clone(),
         bot_config_repo.clone(),
+        wallet_uc.clone(),
     ));
 
     // Phase 10 — braquage (depend de cashbox_repo, inventory_uc, wallet_repo).

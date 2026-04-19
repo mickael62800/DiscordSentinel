@@ -732,6 +732,10 @@ message DailyChaosResponse {
   string winner_name = 5;
   int64 amount = 6;
   string channel_id = 7;
+  // Migration #5 : taunts declenches par le transfert wallet (faillite
+  // cote loser, jackpot cote winner). Le worker les publie sur la stream
+  // `sentinel:events` pour que le bot les dispatche via taunts_dispatch.
+  repeated TauntEvent taunt_events = 8;
 }
 
 message GetCashboxRequest {

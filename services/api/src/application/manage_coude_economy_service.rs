@@ -192,7 +192,19 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
                 "Le gain ne peut pas etre negatif".into(),
             ));
         }
-        self.repo.record_casino_win(guild_id, user_id, gain).await
+        // Migration #5 : credit via wallet UC (jackpot auto-detecte) +
+        // stats repo. Gain = 0 : log stats uniquement (compte la main
+        // dans casino_wins) pour rester coherent avec le comportement
+        // legacy qui faisait un UPDATE coude_players meme a gain = 0.
+        if gain > 0 {
+            let _ = self
+                .wallet_uc
+                .credit(guild_id, user_id, gain, "coude_casino_win", "Blackjack gagne")
+                .await?;
+        }
+        self.repo
+            .record_casino_win_stats(guild_id, user_id, gain)
+            .await
     }
 
     async fn record_casino_loss(
@@ -206,7 +218,30 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
                 "La perte ne peut pas etre negative".into(),
             ));
         }
-        self.repo.record_casino_loss(guild_id, user_id, lost).await
+        // Migration #5 : debit via wallet UC (faillite auto-detectee) +
+        // stats repo. Le legacy clampait a 0 via GREATEST(0, coins -
+        // lost) ; on reproduit le clamp cote service pour eviter un
+        // ValidationError "solde insuffisant" si le debit demande
+        // depasse le solde reel.
+        if lost > 0 {
+            let current = self.wallet_uc.get_balance(guild_id, user_id).await?;
+            let effective = lost.min(current);
+            if effective > 0 {
+                let _ = self
+                    .wallet_uc
+                    .debit(
+                        guild_id,
+                        user_id,
+                        effective,
+                        "coude_casino_loss",
+                        "Blackjack perdu",
+                    )
+                    .await?;
+            }
+        }
+        self.repo
+            .record_casino_loss_stats(guild_id, user_id, lost)
+            .await
     }
 
     async fn record_casino_faillite(
@@ -214,7 +249,25 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         guild_id: &str,
         user_id: &str,
     ) -> Result<i64, DomainError> {
-        self.repo.record_casino_faillite(guild_id, user_id).await
+        // Migration #5 : lire le solde, debit integral via wallet UC
+        // (faillite auto-detectee), puis enregistrer la faillite dans
+        // les stats. Si le solde est deja a 0, on se contente des stats.
+        let current = self.wallet_uc.get_balance(guild_id, user_id).await?;
+        if current > 0 {
+            let _ = self
+                .wallet_uc
+                .debit(
+                    guild_id,
+                    user_id,
+                    current,
+                    "coude_casino_faillite",
+                    "Faillite blackjack",
+                )
+                .await?;
+        }
+        self.repo
+            .record_casino_faillite_stats(guild_id, user_id, current)
+            .await
     }
 
     async fn count_casino_today(
@@ -255,6 +308,9 @@ mod tests {
         coins: Mutex<std::collections::HashMap<String, i64>>,
         stats_calls: Mutex<Vec<(String, String, String, i64)>>,
         fail_stats_calls: Mutex<Vec<(String, String, i64)>>,
+        casino_win_stats: Mutex<Vec<(String, String, i64)>>,
+        casino_loss_stats: Mutex<Vec<(String, String, i64)>>,
+        casino_faillite_stats: Mutex<Vec<(String, String, i64)>>,
     }
     impl MockEconomyRepo {
         fn new() -> Self {
@@ -262,6 +318,9 @@ mod tests {
                 coins: Mutex::new(std::collections::HashMap::new()),
                 stats_calls: Mutex::new(Vec::new()),
                 fail_stats_calls: Mutex::new(Vec::new()),
+                casino_win_stats: Mutex::new(Vec::new()),
+                casino_loss_stats: Mutex::new(Vec::new()),
+                casino_faillite_stats: Mutex::new(Vec::new()),
             }
         }
         fn set_coins(&self, guild_id: &str, user_id: &str, coins: i64) {
@@ -273,11 +332,6 @@ mod tests {
     }
     #[async_trait]
     impl CoudeEconomyRepository for MockEconomyRepo {
-        async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<i64, DomainError> {
-            // Utilise uniquement par daily chaos, pas par le service
-            // steal migre. Test fail si appele par erreur.
-            unimplemented!("le nouveau service.steal() ne doit pas appeler repo.steal()")
-        }
         async fn record_steal_stats(
             &self,
             g: &str,
@@ -311,14 +365,41 @@ mod tests {
                 .copied()
                 .ok_or_else(|| DomainError::NotFound("Wallet introuvable".into()))
         }
-        async fn record_casino_win(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
-            unimplemented!()
+        async fn record_casino_win_stats(
+            &self,
+            g: &str,
+            u: &str,
+            gain: i64,
+        ) -> Result<(), DomainError> {
+            self.casino_win_stats
+                .lock()
+                .unwrap()
+                .push((g.into(), u.into(), gain));
+            Ok(())
         }
-        async fn record_casino_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
-            unimplemented!()
+        async fn record_casino_loss_stats(
+            &self,
+            g: &str,
+            u: &str,
+            lost: i64,
+        ) -> Result<(), DomainError> {
+            self.casino_loss_stats
+                .lock()
+                .unwrap()
+                .push((g.into(), u.into(), lost));
+            Ok(())
         }
-        async fn record_casino_faillite(&self, _: &str, _: &str) -> Result<i64, DomainError> {
-            unimplemented!()
+        async fn record_casino_faillite_stats(
+            &self,
+            g: &str,
+            u: &str,
+            cleared: i64,
+        ) -> Result<i64, DomainError> {
+            self.casino_faillite_stats
+                .lock()
+                .unwrap()
+                .push((g.into(), u.into(), cleared));
+            Ok(cleared)
         }
         async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> {
             unimplemented!()
@@ -348,14 +429,45 @@ mod tests {
         calls: Mutex<Vec<(String, String, String, i64, String)>>,
         debit_calls: Mutex<Vec<(String, String, i64, String)>>,
         debit_returned: Vec<TauntEvent>,
+        credit_calls: Mutex<Vec<(String, String, i64, String)>>,
+        credit_returned: Vec<TauntEvent>,
+        balances: Mutex<std::collections::HashMap<String, i64>>,
         should_fail: bool,
+    }
+    impl MockWalletUc {
+        fn set_balance(&self, guild_id: &str, user_id: &str, coins: i64) {
+            self.balances
+                .lock()
+                .unwrap()
+                .insert(format!("{}:{}", guild_id, user_id), coins);
+        }
     }
     #[async_trait]
     impl ManageWalletUseCase for MockWalletUc {
         async fn credit(
-            &self, _: &str, _: &str, _: i64, _: &str, _: &str,
+            &self,
+            guild_id: &str,
+            user: &str,
+            amount: i64,
+            source: &str,
+            _desc: &str,
         ) -> Result<crate::ports::inbound::manage_wallet::WalletMutation, DomainError> {
-            unimplemented!()
+            if self.should_fail {
+                return Err(DomainError::ValidationError("wallet fail".into()));
+            }
+            self.credit_calls.lock().unwrap().push((
+                guild_id.into(), user.into(), amount, source.into(),
+            ));
+            let key = format!("{}:{}", guild_id, user);
+            let mut map = self.balances.lock().unwrap();
+            let prev = *map.get(&key).unwrap_or(&0);
+            let new_balance = prev + amount;
+            map.insert(key, new_balance);
+            Ok(crate::ports::inbound::manage_wallet::WalletMutation {
+                new_balance,
+                previous_balance: prev,
+                triggered_taunts: self.credit_returned.clone(),
+            })
         }
         async fn debit(
             &self,
@@ -394,8 +506,13 @@ mod tests {
             ));
             Ok(self.returned.clone())
         }
-        async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> {
-            unimplemented!()
+        async fn get_balance(&self, guild_id: &str, user_id: &str) -> Result<i64, DomainError> {
+            Ok(*self
+                .balances
+                .lock()
+                .unwrap()
+                .get(&format!("{}:{}", guild_id, user_id))
+                .unwrap_or(&0))
         }
         async fn credit_tx(
             &self, _: &mut Transaction<'_, Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str,
@@ -487,6 +604,9 @@ mod tests {
             calls: Mutex::new(Vec::new()),
             debit_calls: Mutex::new(Vec::new()),
             debit_returned: debit_taunts,
+            credit_calls: Mutex::new(Vec::new()),
+            credit_returned: Vec::new(),
+            balances: Mutex::new(std::collections::HashMap::new()),
             should_fail: wallet_fail,
         });
         let taunts = Arc::new(MockTauntsUc {
@@ -695,5 +815,81 @@ mod tests {
         assert_eq!(lost, 1000);
         assert_eq!(taunts.len(), 1);
         assert_eq!(taunts[0].streak_kind, StreakKind::EcoBankruptcy.as_str());
+    }
+
+    // ── Casino tests (migration #5) ──
+
+    #[tokio::test]
+    async fn casino_win_delegates_to_wallet_credit() {
+        // Gain > 0 : credit via wallet_uc + stats repo.
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        svc.record_casino_win("g1", "alice", 1500).await.unwrap();
+
+        // wallet.credit appele une fois avec les bons args.
+        let credit_calls = wallet.credit_calls.lock().unwrap().clone();
+        assert_eq!(credit_calls.len(), 1);
+        assert_eq!(credit_calls[0].0, "g1");
+        assert_eq!(credit_calls[0].1, "alice");
+        assert_eq!(credit_calls[0].2, 1500);
+        assert_eq!(credit_calls[0].3, "coude_casino_win");
+
+        // Stats repo appele avec (g1, alice, 1500).
+        let stats = repo.casino_win_stats.lock().unwrap().clone();
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0], ("g1".into(), "alice".into(), 1500));
+    }
+
+    #[tokio::test]
+    async fn casino_loss_delegates_to_wallet_debit_clamped_to_balance() {
+        // Solde 800, lost demande 1500 : debit clamp a 800, stats
+        // restent sur 1500 (legacy conservait la perte "faciale").
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        wallet.set_balance("g1", "alice", 800);
+
+        svc.record_casino_loss("g1", "alice", 1500).await.unwrap();
+
+        let debit_calls = wallet.debit_calls.lock().unwrap().clone();
+        assert_eq!(debit_calls.len(), 1);
+        assert_eq!(debit_calls[0].2, 800);
+        assert_eq!(debit_calls[0].3, "coude_casino_loss");
+
+        let stats = repo.casino_loss_stats.lock().unwrap().clone();
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0], ("g1".into(), "alice".into(), 1500));
+    }
+
+    #[tokio::test]
+    async fn casino_faillite_debits_full_balance_and_records_stats() {
+        // Solde 2000 : faillite debite les 2000, stats = 2000.
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        wallet.set_balance("g1", "alice", 2000);
+
+        let total_lost = svc.record_casino_faillite("g1", "alice").await.unwrap();
+        assert_eq!(total_lost, 2000);
+
+        let debit_calls = wallet.debit_calls.lock().unwrap().clone();
+        assert_eq!(debit_calls.len(), 1);
+        assert_eq!(debit_calls[0].2, 2000);
+        assert_eq!(debit_calls[0].3, "coude_casino_faillite");
+
+        let stats = repo.casino_faillite_stats.lock().unwrap().clone();
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0], ("g1".into(), "alice".into(), 2000));
+    }
+
+    #[tokio::test]
+    async fn casino_faillite_on_empty_wallet_only_records_stats() {
+        // Solde 0 : pas de debit, stats quand meme enregistres avec
+        // cleared = 0 (incremente casino_losses).
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        wallet.set_balance("g1", "alice", 0);
+
+        let total_lost = svc.record_casino_faillite("g1", "alice").await.unwrap();
+        assert_eq!(total_lost, 0);
+
+        assert!(wallet.debit_calls.lock().unwrap().is_empty());
+        let stats = repo.casino_faillite_stats.lock().unwrap().clone();
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].2, 0);
     }
 }

@@ -10,6 +10,7 @@ use crate::domain::entities::{
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::{
     BotConfigRepository, CoudeEconomyRepository, CoudePlayerRepository, CoudeSocialRepository,
 };
@@ -26,6 +27,7 @@ pub struct ManageCoudeSocialService {
     player_repo: Arc<dyn CoudePlayerRepository>,
     economy_repo: Arc<dyn CoudeEconomyRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
+    wallet_uc: Arc<dyn ManageWalletUseCase>,
 }
 
 impl ManageCoudeSocialService {
@@ -34,8 +36,9 @@ impl ManageCoudeSocialService {
         player_repo: Arc<dyn CoudePlayerRepository>,
         economy_repo: Arc<dyn CoudeEconomyRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
+        wallet_uc: Arc<dyn ManageWalletUseCase>,
     ) -> Self {
-        Self { repo, player_repo, economy_repo, bot_config_repo }
+        Self { repo, player_repo, economy_repo, bot_config_repo, wallet_uc }
     }
 }
 
@@ -131,14 +134,30 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
             return Ok(None);
         }
 
-        // 5. Transfert via economy repo (steal atomique).
-        let actual = self
-            .economy_repo
-            .steal(guild_id, &winner.user_id, &victim.user_id, amount)
+        // 5. Migration #5 : transfert via ManageWalletUseCase (faillite
+        //    victime + jackpot winner auto-detectes, log atomique dans
+        //    wallet_transactions). Le `amount` est deja clamp par le
+        //    calcul 20% d'un solde > MIN_COINS_ELIGIBLE.
+        let description = format!(
+            "Daily chaos ({} -> {})",
+            victim.user_id, winner.user_id
+        );
+        let taunts = self
+            .wallet_uc
+            .transfer(
+                guild_id,
+                &victim.user_id,
+                &winner.user_id,
+                amount,
+                "coude_daily_chaos",
+                &description,
+            )
             .await?;
-        if actual <= 0 {
-            return Ok(None);
-        }
+        // Stats compteurs (total_lost victime / total_stolen+earned winner).
+        self.economy_repo
+            .record_steal_stats(guild_id, &winner.user_id, &victim.user_id, amount)
+            .await?;
+        let actual = amount;
 
         // 6. Log en DB.
         self.repo
@@ -157,6 +176,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
             loser = %victim.user_id,
             winner = %winner.user_id,
             actual,
+            taunts = taunts.len(),
             today = today_count + 1,
             "Daily chaos triggered"
         );
@@ -168,6 +188,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
             winner_name: winner.username.clone(),
             amount: actual,
             channel_id,
+            taunt_events: taunts,
         }))
     }
 
