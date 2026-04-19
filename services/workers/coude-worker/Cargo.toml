@@ -8,6 +8,7 @@ description = "Worker Coup de Coude DiscordSentinel — expiration des combats e
 tokio = { workspace = true }
 sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
 reqwest = { workspace = true }
+redis = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }

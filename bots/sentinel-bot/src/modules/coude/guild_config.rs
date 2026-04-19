@@ -367,4 +367,11 @@ impl CoudeConfig {
     pub fn channel_activites(&self) -> Option<String> { self.channel_opt("channel_activites") }
     pub fn channel_announcements(&self) -> Option<String> { self.channel_opt("channel_announcements") }
     pub fn channel_notifications(&self) -> Option<String> { self.channel_opt("channel_notifications") }
+
+    /// Salon dedie au post de l'embed tournoi hebdomadaire.
+    /// Fallback sur `channel_activites` si non defini.
+    pub fn channel_tournament(&self) -> Option<String> {
+        self.channel_opt("tournament_channel_id")
+            .or_else(|| self.channel_activites())
+    }
 }

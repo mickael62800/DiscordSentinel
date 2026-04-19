@@ -85,6 +85,9 @@ pub use manage_coude_inventory::ManageCoudeInventoryUseCase;
 pub mod manage_coude_social;
 pub use manage_coude_social::ManageCoudeSocialUseCase;
 
+pub mod manage_wallet;
+pub use manage_wallet::{ManageWalletUseCase, WalletMutation};
+
 pub use manage_voice_channels::{
     BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
     ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,

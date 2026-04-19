@@ -85,5 +85,8 @@ pub use manage_coude_taunts_service::ManageCoudeTauntsService;
 mod manage_coude_heist_service;
 pub use manage_coude_heist_service::ManageCoudeHeistService;
 
+mod manage_wallet_service;
+pub use manage_wallet_service::ManageWalletService;
+
 pub mod export_service;
 pub use export_service::{ExportService, ExecuteExportUseCase};

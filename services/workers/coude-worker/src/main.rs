@@ -34,9 +34,14 @@ async fn main() {
         info!(keys = db_config.len(), "Config DB chargee");
     }
 
+    let redis_client = redis::Client::open(config.redis_url.as_str()).unwrap_or_else(|e| {
+        tracing::error!(error = %e, "Impossible de creer le client Redis");
+        std::process::exit(1);
+    });
+
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
-    scheduler::start(&config, pg_pool.clone(), shutdown_rx);
+    scheduler::start(&config, pg_pool.clone(), redis_client, shutdown_rx);
     common::start_heartbeat(config.api_url.clone(), WORKER_NAME);
 
     common::send_lifecycle_log(&config.api_url, WORKER_NAME, "info", "Coude Worker demarre").await;

@@ -8,7 +8,12 @@ use sentinel_worker_common::spawn_periodic;
 use crate::config::WorkerConfig;
 use crate::jobs;
 
-pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool>) {
+pub fn start(
+    config: &WorkerConfig,
+    pool: PgPool,
+    redis_client: redis::Client,
+    shutdown: watch::Receiver<bool>,
+) {
     let api_url = config.api_url.clone();
     let bot_token = config.discord_bot_token.clone();
 
@@ -57,15 +62,21 @@ pub fn start(config: &WorkerConfig, pool: PgPool, shutdown: watch::Receiver<bool
     }
 
     // Job 4 bis : resolution du tournoi hebdo (migration 139). Tick 6h.
-    spawn_periodic(
-        "resolve_tournament",
-        21_600, // 6h
-        pool.clone(),
-        shutdown.clone(),
-        api_url.clone(),
-        "coude-worker",
-        |pool| Box::pin(async move { jobs::resolve_tournament::run(&pool).await }),
-    );
+    {
+        let redis = redis_client.clone();
+        spawn_periodic(
+            "resolve_tournament",
+            21_600, // 6h
+            pool.clone(),
+            shutdown.clone(),
+            api_url.clone(),
+            "coude-worker",
+            move |pool| {
+                let redis = redis.clone();
+                Box::pin(async move { jobs::resolve_tournament::run(&pool, &redis).await })
+            },
+        );
+    }
 
     // Job 4 : redistribution hebdo des caisses communautaires (Phase 9).
     let min_days = config.cashbox_min_days as i64;

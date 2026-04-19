@@ -16,8 +16,11 @@ use sqlx::PgPool;
 use tracing::{info, warn};
 
 const DEFAULT_PRIZE_PCT: i64 = 10;
+const STREAM_KEY: &str = "sentinel:events";
+const STREAM_MAXLEN: usize = 10_000;
+const PAYLOAD_FIELD: &str = "payload";
 
-pub async fn run(pool: &PgPool) -> Result<(), String> {
+pub async fn run(pool: &PgPool, redis: &redis::Client) -> Result<(), String> {
     let now = Utc::now();
 
     // Dimanche = 6 (Mon=0..Sun=6 via num_days_from_monday) et >= 23h UTC.
@@ -48,7 +51,7 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
     .map_err(|e| format!("list guilds: {e}"))?;
 
     for (guild_id,) in guilds {
-        if let Err(e) = resolve_guild(pool, &guild_id, week_start, week_end).await {
+        if let Err(e) = resolve_guild(pool, redis, &guild_id, week_start, week_end).await {
             warn!(guild_id = %guild_id, error = %e, "tournament resolution failed");
         }
     }
@@ -58,6 +61,7 @@ pub async fn run(pool: &PgPool) -> Result<(), String> {
 
 async fn resolve_guild(
     pool: &PgPool,
+    redis: &redis::Client,
     guild_id: &str,
     week_start: chrono::DateTime<Utc>,
     week_end: chrono::DateTime<Utc>,
@@ -239,6 +243,76 @@ async fn resolve_guild(
         prize_pct,
         "Tournoi hebdo resolu + prix distribue"
     );
+
+    // Top 5 de la semaine pour l'embed Discord (ordonne par net_gain desc).
+    let top5_rows: Vec<(String, Option<String>, i64)> = sqlx::query_as(
+        r#"
+        SELECT wt.user_id,
+               uw.username,
+               COALESCE(SUM(wt.amount), 0)::BIGINT AS net_gain
+        FROM wallet_transactions wt
+        LEFT JOIN user_wallets uw
+               ON uw.guild_id = wt.guild_id AND uw.user_id = wt.user_id
+        WHERE wt.guild_id = $1 AND wt.created_at >= $2 AND wt.created_at <= $3
+        GROUP BY wt.user_id, uw.username
+        ORDER BY net_gain DESC
+        LIMIT 5
+        "#,
+    )
+    .bind(guild_id)
+    .bind(week_start)
+    .bind(week_end)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    let top5_json: Vec<serde_json::Value> = top5_rows
+        .into_iter()
+        .map(|(user_id, username, net_gain)| {
+            serde_json::json!({
+                "user_id": user_id,
+                "username": username,
+                "net_gain": net_gain,
+            })
+        })
+        .collect();
+
+    // Publie l'event Redis pour que sentinel-bot post l'embed (pattern Phase 5B).
+    let event_payload = serde_json::json!({
+        "event": "tournament_resolved",
+        "data": {
+            "guild_id": guild_id,
+            "winner_user_id": winner_user_id,
+            "winner_username": username,
+            "winner_net_gain": winner_net,
+            "prize_amount": prize,
+            "prize_pct": prize_pct,
+            "week_start": week_start.to_rfc3339(),
+            "week_end": week_end.to_rfc3339(),
+            "top5": top5_json,
+        }
+    });
+
+    match redis.get_multiplexed_async_connection().await {
+        Ok(mut conn) => {
+            let res: redis::RedisResult<String> = redis::cmd("XADD")
+                .arg(STREAM_KEY)
+                .arg("MAXLEN")
+                .arg("~")
+                .arg(STREAM_MAXLEN)
+                .arg("*")
+                .arg(PAYLOAD_FIELD)
+                .arg(event_payload.to_string())
+                .query_async(&mut conn)
+                .await;
+            if let Err(e) = res {
+                warn!(error = %e, guild_id = %guild_id, "XADD tournament_resolved failed");
+            } else {
+                info!(guild_id = %guild_id, "tournament_resolved event publie");
+            }
+        }
+        Err(e) => warn!(error = %e, "Redis connect failed, XADD tournament_resolved skip"),
+    }
 
     Ok(())
 }

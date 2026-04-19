@@ -11,6 +11,7 @@ const DEFAULT_CASHBOX_MIN_DAYS: u64 = 7;
 pub struct WorkerConfig {
     pub database_url: String,
     pub api_url: String,
+    pub redis_url: String,
     pub combat_expiry_check_secs: u64,
     pub discord_bot_token: String,
     pub betting_check_secs: u64,
@@ -21,11 +22,12 @@ pub struct WorkerConfig {
 
 impl WorkerConfig {
     pub fn from_env() -> Self {
-        use sentinel_worker_common::{load_database_url, load_api_url, load_env};
+        use sentinel_worker_common::{load_database_url, load_api_url, load_env, load_redis_url};
 
         Self {
             database_url: load_database_url(),
             api_url: load_api_url(),
+            redis_url: load_redis_url(),
             combat_expiry_check_secs: load_env("COMBAT_EXPIRY_CHECK_SECS", DEFAULT_COMBAT_EXPIRY_CHECK_SECS),
             // Token Discord : priorite SENTINEL_DISCORD_TOKEN (bot unifie),
             // fallback DISCORD_TOKEN.

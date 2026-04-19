@@ -13,6 +13,7 @@ pub mod guild_config;
 pub mod interaction_helper;
 pub mod prison_check;
 pub mod taunts_dispatch;
+pub mod tournament_events;
 
 use std::sync::Arc;
 
@@ -208,8 +209,10 @@ pub async fn on_ready(ctx: &Context, guild_ids: Vec<GuildId>) {
     data.insert::<GuildIdsKey>(guild_ids);
 }
 
-/// Spawn les background tasks du module coude (actuellement: aucun — le
-/// daily chaos a ete migre dans coude-worker + API).
-pub fn spawn_background(_ctx: Context) {
-    // Reserve pour de futures taches (ex : reapprovisionnement cache catalogue).
+/// Spawn les background tasks du module coude.
+///
+/// - `tournament_events` : consumer Redis streams qui poste l'embed "Tournoi
+///   hebdo cloture" quand le coude-worker publie un event `tournament_resolved`.
+pub fn spawn_background(ctx: Context) {
+    tournament_events::spawn(ctx);
 }
