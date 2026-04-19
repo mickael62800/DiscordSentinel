@@ -92,6 +92,46 @@ impl StatsTracker {
         }
     }
 
+    /// Crédite le temps actif des sessions en cours sans attendre que
+    /// l'utilisateur quitte le vocal. Permet aux users qui restent
+    /// connectes 24/7 d'accumuler de l'XP regulierement. Retourne
+    /// `Vec<(guild_id, user_id, seconds_credited)>` pour que l'appelant
+    /// puisse enregistrer l'XP en DB. `active_since` est remis a now
+    /// pour eviter de double-compter au prochain tick.
+    ///
+    /// Ne touche pas a `credited_seconds` (reserve aux transitions AFK)
+    /// pour eviter un double paiement lors du `voice_leave` final.
+    pub async fn credit_active_sessions(&self) -> Vec<(u64, u64, u64)> {
+        let mut sessions = self.voice_sessions.write().await;
+        let now = Utc::now().timestamp();
+        let mut credited = Vec::new();
+        for ((gid, uid), session) in sessions.iter_mut() {
+            if let Some(since) = session.active_since {
+                let delta = (now - since).max(0) as u64;
+                if delta > 0 {
+                    credited.push((*gid, *uid, delta));
+                    session.active_since = Some(now);
+                }
+            }
+        }
+        credited
+    }
+
+    /// Hydrate les sessions in-memory depuis les voice states Discord
+    /// au demarrage du bot, pour ne pas perdre le temps des users
+    /// deja en vocal quand le bot redemarre. Idempotent : n'ecrase pas
+    /// une session existante.
+    pub async fn hydrate(&self, guild_id: u64, user_id: u64, is_afk: bool) {
+        let mut sessions = self.voice_sessions.write().await;
+        sessions.entry((guild_id, user_id)).or_insert_with(|| {
+            let active_since = if is_afk { None } else { Some(Utc::now().timestamp()) };
+            VoiceSession {
+                active_since,
+                credited_seconds: 0,
+            }
+        });
+    }
+
     /// Enregistre la sortie d'un utilisateur du salon vocal, cumule le temps
     /// actif (hors AFK) et retourne les secondes comptabilisees pour l'XP.
     pub async fn voice_leave(&self, guild_id: u64, user_id: u64) -> u64 {

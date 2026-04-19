@@ -104,6 +104,110 @@ pub fn init_typemap(
     data.insert::<RewardsCacheKey>(Arc::new(RewardsCache::new()));
 }
 
+/// Hydrate les sessions vocales depuis les voice_states Discord apres le boot.
+/// Les users deja en vocal au restart du bot ne perdent pas leur temps.
+pub async fn on_ready(ctx: &Context, ready: &serenity::model::gateway::Ready) {
+    let data = ctx.data.read().await;
+    let Some(tracker) = data.get::<TrackerKey>().cloned() else {
+        return;
+    };
+    drop(data);
+
+    let mut hydrated = 0usize;
+    for guild in &ready.guilds {
+        // Collecter hors du guard cache (CacheRef non-Send)
+        let entries: Vec<(u64, bool)> = match ctx.cache.guild(guild.id) {
+            Some(g) => g
+                .voice_states
+                .iter()
+                .filter(|(_, st)| st.channel_id.is_some())
+                .map(|(uid, st)| (uid.get(), st.self_mute && st.self_deaf))
+                .collect(),
+            None => continue,
+        };
+        for (user_id, is_afk) in entries {
+            tracker.hydrate(guild.id.get(), user_id, is_afk).await;
+            hydrated += 1;
+        }
+    }
+    info!(hydrated, "progression: sessions vocales hydratees au ready");
+}
+
+/// Spawn le tick periodique (toutes les 5 min) qui credit le temps actif
+/// accumule dans les sessions vocales, pour que les users connectes en
+/// permanence gagnent de l'XP sans attendre de quitter le salon.
+pub fn spawn_voice_tick(ctx: Context) {
+    use tokio::time::{interval, Duration};
+    tokio::spawn(async move {
+        let mut tick = interval(Duration::from_secs(300));
+        tick.tick().await; // skip first immediate tick
+        loop {
+            tick.tick().await;
+            if let Err(e) = credit_voice_tick(&ctx).await {
+                warn!(error = %e, "progression: erreur credit voice tick");
+            }
+        }
+    });
+}
+
+async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
+    // Etape 1 : recupere tracker + base API (Arc cloneable), credite les sessions.
+    let (credits, base) = {
+        let data = ctx.data.read().await;
+        let Some(tracker) = data.get::<TrackerKey>().cloned() else {
+            return Ok(());
+        };
+        let Some(base) = data.get::<ApiClientKey>().cloned() else {
+            return Ok(());
+        };
+        drop(data);
+        let credits = tracker.credit_active_sessions().await;
+        (credits, base)
+    };
+    if credits.is_empty() {
+        return Ok(());
+    }
+
+    // Etape 2 : pour chaque credit, re-acquire data brievement pour appeler api.add_xp.
+    for (guild_id, user_id, seconds) in credits {
+        let gc = base
+            .get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME)
+            .await
+            .unwrap_or_default();
+        if !BaseApiClient::config_bool(&gc, "enabled", true) {
+            continue;
+        }
+        let xp_per_minute = BaseApiClient::config_u64(&gc, "xp_per_voice_minute", 5) as i64;
+        let xp_amount = (seconds / 60) as i64 * xp_per_minute;
+        if xp_amount <= 0 {
+            continue;
+        }
+        let username = UserId::new(user_id)
+            .to_user(&ctx.http)
+            .await
+            .map(|u| u.name)
+            .unwrap_or_else(|_| user_id.to_string());
+
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<StatsApiKey>() {
+            if let Err(e) = api
+                .add_xp(
+                    &guild_id.to_string(),
+                    &user_id.to_string(),
+                    &username,
+                    xp_amount,
+                    "voice",
+                )
+                .await
+            {
+                warn!(error = %e, guild = %guild_id, user = %user_id, "progression: add_xp tick echoue");
+            }
+        }
+        drop(data);
+    }
+    Ok(())
+}
+
 // ── Slash commands ──
 
 pub fn register_commands() -> Vec<CreateCommand> {

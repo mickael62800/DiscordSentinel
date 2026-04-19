@@ -101,6 +101,10 @@ impl EventHandler for Handler {
         // Tickets: deploy panel + spawn background tasks (inactive close, SLA, Redis consumer)
         modules::tickets::on_ready(&ctx, &ready).await;
         modules::tickets::spawn_background(ctx.clone());
+
+        // Progression: hydrate voice sessions + tick periodique credit XP
+        modules::progression::on_ready(&ctx, &ready).await;
+        modules::progression::spawn_voice_tick(ctx.clone());
     }
 
     async fn message(&self, ctx: Context, msg: Message) {
