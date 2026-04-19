@@ -4,7 +4,7 @@
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use super::dto::{GainDto, LostDto, StealDto, TransferCoinsDto};
 use super::taunts::TauntEventDto;
@@ -36,17 +36,60 @@ pub async fn transfer_coins(
     }))
 }
 
+/// Reponse du POST /api/coude/{guild_id}/steal apres la migration
+/// wallet unifie : inclut le montant effectivement vole (clamp au solde
+/// victime) + les TauntEvents declenches (faillite victime, jackpot
+/// voleur).
+#[derive(Debug, Serialize)]
+pub struct StealResponse {
+    pub stolen: i64,
+    pub taunt_events: Vec<TauntEventDto>,
+}
+
 /// POST /api/coude/{guild_id}/steal
 pub async fn record_steal(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
     Json(dto): Json<StealDto>,
-) -> Result<StatusCode, ApiError> {
-    state
+) -> Result<Json<StealResponse>, ApiError> {
+    let outcome = state
         .coude_economy_uc
         .steal(&guild_id, &dto.thief_id, &dto.victim_id, dto.amount)
         .await?;
-    Ok(StatusCode::NO_CONTENT)
+    Ok(Json(StealResponse {
+        stolen: outcome.stolen,
+        taunt_events: outcome.taunt_events.into_iter().map(Into::into).collect(),
+    }))
+}
+
+/// Payload POST /api/coude/{guild_id}/steal-fail-penalty.
+#[derive(Debug, Deserialize)]
+pub struct StealFailPenaltyDto {
+    pub thief_id: String,
+    pub amount: i64,
+}
+
+/// Reponse du POST /api/coude/{guild_id}/steal-fail-penalty.
+#[derive(Debug, Serialize)]
+pub struct StealFailPenaltyResponse {
+    pub lost: i64,
+    pub taunt_events: Vec<TauntEventDto>,
+}
+
+/// POST /api/coude/{guild_id}/steal-fail-penalty (migration wallet unifie).
+pub async fn steal_fail_penalty(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<StealFailPenaltyDto>,
+) -> Result<Json<StealFailPenaltyResponse>, ApiError> {
+    let (lost, taunts) = state
+        .coude_economy_uc
+        .steal_fail_penalty(&guild_id, &dto.thief_id, dto.amount)
+        .await?;
+    Ok(Json(StealFailPenaltyResponse {
+        lost,
+        taunt_events: taunts.into_iter().map(Into::into).collect(),
+    }))
 }
 
 // ── Casino ──

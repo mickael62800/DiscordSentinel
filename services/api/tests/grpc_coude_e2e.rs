@@ -450,7 +450,8 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
         Ok(vec![])
     }
     async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(7) }
-    async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<i64, DomainError> { unimplemented!() }
+    async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<sentinel_api::ports::inbound::manage_coude_economy::StealOutcome, DomainError> { unimplemented!() }
+    async fn steal_fail_penalty(&self, _: &str, _: &str, _: i64) -> Result<(i64, Vec<sentinel_api::domain::entities::TauntEvent>), DomainError> { unimplemented!() }
     async fn record_casino_win(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_faillite(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }

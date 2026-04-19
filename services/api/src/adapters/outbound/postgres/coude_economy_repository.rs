@@ -7,6 +7,7 @@ use crate::domain::errors::DomainError;
 use super::pg_err;
 use crate::ports::outbound::CoudeEconomyRepository;
 
+
 pub struct PgCoudeEconomyRepository {
     pool: PgPool,
 }
@@ -26,6 +27,10 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     // et orchestree par `ManageWalletService::transfer` (taunts inclus).
     // `ManageCoudeEconomyService::transfer` delegue directement au wallet UC.
 
+    // NOTE migration wallet unifie (/voler) : `ManageCoudeEconomyService::steal`
+    // n'utilise plus cette methode repo ; il delegue a
+    // `ManageWalletUseCase::transfer` + `record_steal_stats`. La methode
+    // ci-dessous est conservee pour le daily chaos (non migre).
     async fn steal(
         &self,
         guild_id: &str,
@@ -35,7 +40,6 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
     ) -> Result<i64, DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        // Phase 8 : lire le solde depuis user_wallets.
         let victim: Option<(i64,)> = sqlx::query_as(
             "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2 FOR UPDATE",
         )
@@ -48,14 +52,12 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         let (victim_coins,) = victim
             .ok_or_else(|| DomainError::NotFound("Victime introuvable".into()))?;
 
-        // Clamp au solde réel — pas de création de coins.
         let actual_stolen = amount.min(victim_coins);
         if actual_stolen <= 0 {
             tx.commit().await.map_err(pg_err)?;
             return Ok(0);
         }
 
-        // Debiter la victime (wallet partage).
         let victim_after: i64 = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = coins - $3, total_spent = total_spent + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2
@@ -64,7 +66,6 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         .bind(guild_id).bind(victim_id).bind(actual_stolen)
         .fetch_one(&mut *tx).await.map_err(pg_err)?;
 
-        // Crediter le voleur (wallet partage).
         let thief_after: i64 = sqlx::query_scalar(
             "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2
@@ -78,7 +79,6 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
         let desc = format!("Vol sur {}", victim_id);
         log_wallet_tx(&mut tx, guild_id, thief_id, actual_stolen, thief_after, "coude_steal_thief", &desc).await?;
 
-        // Stats coude_players (total_stolen, total_lost) — pas de mutation coins.
         sqlx::query(
             "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
              WHERE guild_id = $1 AND user_id = $2",
@@ -95,6 +95,71 @@ impl CoudeEconomyRepository for PgCoudeEconomyRepository {
 
         tx.commit().await.map_err(pg_err)?;
         Ok(actual_stolen)
+    }
+
+    async fn record_steal_stats(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        victim_id: &str,
+        amount: i64,
+    ) -> Result<(), DomainError> {
+        if amount <= 0 {
+            return Ok(());
+        }
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+
+        sqlx::query(
+            "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(victim_id).bind(amount)
+        .execute(&mut *tx).await.map_err(pg_err)?;
+
+        sqlx::query(
+            "UPDATE coude_players SET total_stolen = total_stolen + $3, total_earned = total_earned + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(thief_id).bind(amount)
+        .execute(&mut *tx).await.map_err(pg_err)?;
+
+        tx.commit().await.map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn record_steal_fail_stats(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        amount: i64,
+    ) -> Result<(), DomainError> {
+        if amount <= 0 {
+            return Ok(());
+        }
+        sqlx::query(
+            "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
+             WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id).bind(thief_id).bind(amount)
+        .execute(&self.pool).await.map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn get_coins(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<i64, DomainError> {
+        let row: Option<(i64,)> = sqlx::query_as(
+            "SELECT coins FROM user_wallets WHERE guild_id = $1 AND user_id = $2",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        let (coins,) = row.ok_or_else(|| DomainError::NotFound("Wallet introuvable".into()))?;
+        Ok(coins)
     }
 
     async fn record_casino_win(

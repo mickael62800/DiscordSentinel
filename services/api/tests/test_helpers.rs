@@ -355,7 +355,8 @@ pub struct StubCoudeEconomy;
 #[async_trait]
 impl manage_coude_economy::ManageCoudeEconomyUseCase for StubCoudeEconomy {
     async fn transfer(&self, _: &str, _: &str, _: &str, _: i64) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
-    async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<i64, DomainError> { unimplemented!() }
+    async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<manage_coude_economy::StealOutcome, DomainError> { unimplemented!() }
+    async fn steal_fail_penalty(&self, _: &str, _: &str, _: i64) -> Result<(i64, Vec<TauntEvent>), DomainError> { unimplemented!() }
     async fn record_casino_win(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_faillite(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }

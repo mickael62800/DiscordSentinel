@@ -162,13 +162,20 @@ impl ApiClient {
             .collect())
     }
 
+    /// Vol reussi : debite la victime et credite le voleur (clamp au
+    /// solde victime). Depuis la migration wallet unifie, retourne le
+    /// montant reellement vole + la liste des TauntEvents (faillite
+    /// cote victime, jackpot cote voleur) pour dispatch via
+    /// `taunts_dispatch`. Le taunt "victim streak" reste declenche
+    /// separement par `track_steal_victim` (il depend du nombre de
+    /// vols subis, pas du montant).
     pub async fn record_steal(
         &self,
         guild_id: &str,
         thief_id: &str,
         victim_id: &str,
         amount: i64,
-    ) -> Result<i64, String> {
+    ) -> Result<(i64, Vec<super::TauntEvent>), String> {
         let req = proto_coude::StealRequest {
             guild_id: guild_id.to_string(),
             thief_id: thief_id.to_string(),
@@ -181,6 +188,42 @@ impl ApiClient {
             .guarded(|| async move { client.steal(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
-        Ok(r.stolen)
+        let taunts = r
+            .taunt_events
+            .into_iter()
+            .map(super::taunt_event_from_proto)
+            .collect();
+        Ok((r.stolen, taunts))
+    }
+
+    /// Penalite de vol rate : debite au plus `amount` coins du voleur
+    /// (clamp au solde reel). Remplace l'ancien appel
+    /// `record_coins_lost` pour le chemin d'echec de `/voler`. Retourne
+    /// `(lost, taunt_events)` (eventuelle faillite cote voleur).
+    pub async fn record_steal_fail_penalty(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        amount: i64,
+    ) -> Result<(i64, Vec<super::TauntEvent>), String> {
+        let req = proto_coude::StealFailPenaltyRequest {
+            guild_id: guild_id.to_string(),
+            thief_id: thief_id.to_string(),
+            amount,
+        };
+        let mut client = self.grpc.coude_economy();
+        let r = self
+            .grpc
+            .guarded(|| async move {
+                client.steal_fail_penalty(req).await.map(|r| r.into_inner())
+            })
+            .await
+            .map_err(grpc_err_to_string)?;
+        let taunts = r
+            .taunt_events
+            .into_iter()
+            .map(super::taunt_event_from_proto)
+            .collect();
+        Ok((r.lost, taunts))
     }
 }

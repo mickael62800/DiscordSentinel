@@ -40,12 +40,35 @@ impl CoudeEconomyService for CoudeEconomyGrpc {
         request: Request<proto::StealRequest>,
     ) -> Result<Response<proto::StealResponse>, Status> {
         let req = request.into_inner();
-        let stolen = self
+        let outcome = self
             .uc
             .steal(&req.guild_id, &req.thief_id, &req.victim_id, req.amount)
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(proto::StealResponse { stolen }))
+        Ok(Response::new(proto::StealResponse {
+            stolen: outcome.stolen,
+            taunt_events: outcome
+                .taunt_events
+                .into_iter()
+                .map(taunt_event_to_proto)
+                .collect(),
+        }))
+    }
+
+    async fn steal_fail_penalty(
+        &self,
+        request: Request<proto::StealFailPenaltyRequest>,
+    ) -> Result<Response<proto::StealFailPenaltyResponse>, Status> {
+        let req = request.into_inner();
+        let (lost, taunts) = self
+            .uc
+            .steal_fail_penalty(&req.guild_id, &req.thief_id, req.amount)
+            .await
+            .map_err(domain_to_status)?;
+        Ok(Response::new(proto::StealFailPenaltyResponse {
+            lost,
+            taunt_events: taunts.into_iter().map(taunt_event_to_proto).collect(),
+        }))
     }
 
     async fn record_casino_win(

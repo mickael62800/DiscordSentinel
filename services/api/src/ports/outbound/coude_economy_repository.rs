@@ -19,18 +19,54 @@ pub trait CoudeEconomyRepository: Send + Sync {
     // `ManageCoudeEconomyService::transfer` delegue directement a ce use
     // case (voir son implementation).
 
-    /// Vol : débite la victime du minimum entre `amount` et son solde réel,
-    /// crédite le voleur de la même somme. Retourne le montant réellement volé
-    /// (peut être 0 si la victime n'a pas de coins).
-    ///
-    /// Met à jour `total_lost` / `total_stolen` / `total_earned` pour les
-    /// compteurs historiques.
+    // ── Vol ──
+    //
+    // NOTE migration wallet unifie (`/voler`) : `ManageCoudeEconomyService::steal`
+    // delegue desormais a `ManageWalletUseCase::transfer` et appelle
+    // `record_steal_stats` pour les compteurs. La methode `steal`
+    // ci-dessous est conservee pour les call sites legacy non encore
+    // migres (ex: `ManageCoudeSocialService::run_daily_chaos`) qui
+    // enchainent wallet SQL + stats dans une meme tx.
+
+    /// Vol atomique : debite la victime du minimum entre `amount` et
+    /// son solde, credite le voleur, incremente `total_lost` /
+    /// `total_stolen` / `total_earned`. Retourne le montant reellement
+    /// vole (0 si la victime n'a rien). Utilise uniquement par le
+    /// daily chaos (pas par `/voler`).
     async fn steal(
         &self,
         guild_id: &str,
         thief_id: &str,
         victim_id: &str,
         amount: i64,
+    ) -> Result<i64, DomainError>;
+
+    /// Compteurs `coude_players` apres un vol reussi : `total_lost` cote
+    /// victime, `total_stolen` + `total_earned` cote voleur. Pas de
+    /// mutation wallet.
+    async fn record_steal_stats(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        victim_id: &str,
+        amount: i64,
+    ) -> Result<(), DomainError>;
+
+    /// Compteur `coude_players.total_lost` cote voleur apres un vol
+    /// rate (penalite). Pas de mutation wallet.
+    async fn record_steal_fail_stats(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        amount: i64,
+    ) -> Result<(), DomainError>;
+
+    /// Lecture rapide du solde d'un joueur pour clamp pre-mutation
+    /// (vol, penalite). Retourne `NotFound` si le wallet n'existe pas.
+    async fn get_coins(
+        &self,
+        guild_id: &str,
+        user_id: &str,
     ) -> Result<i64, DomainError>;
 
     // ── Casino ──

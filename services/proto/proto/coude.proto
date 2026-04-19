@@ -380,6 +380,7 @@ message RefundSummary {
 service CoudeEconomyService {
   rpc Transfer(TransferRequest) returns (TransferResponse);
   rpc Steal(StealRequest) returns (StealResponse);
+  rpc StealFailPenalty(StealFailPenaltyRequest) returns (StealFailPenaltyResponse);
   rpc RecordCasinoWin(RecordCasinoWinRequest) returns (Empty);
   rpc RecordCasinoLoss(RecordCasinoLossRequest) returns (Empty);
   rpc RecordCasinoFaillite(RecordCasinoFailliteRequest) returns (RecordCasinoFailliteResponse);
@@ -417,8 +418,29 @@ message StealRequest {
   int64 amount = 4;
 }
 
+// Migration wallet unifie : Steal retourne desormais (en plus du montant
+// reellement vole) la liste des TauntEvents declenches : faillite cote
+// victime (solde passe de >0 a 0 suite au vol), jackpot cote voleur
+// (stolen depasse le seuil jackpot configure), streak victim (gere par
+// `track_steal_victim` separement, cf. commande /voler).
 message StealResponse {
   int64 stolen = 1;
+  repeated TauntEvent taunt_events = 2;
+}
+
+// Migration wallet unifie : penalite de vol rate. Debite le voleur d'au
+// plus `amount` coins (clamp au solde reel, comme le legacy
+// `record_coins_lost`). Retourne le montant effectivement debite +
+// eventuel taunt de faillite cote voleur.
+message StealFailPenaltyRequest {
+  string guild_id = 1;
+  string thief_id = 2;
+  int64 amount = 3;
+}
+
+message StealFailPenaltyResponse {
+  int64 lost = 1;
+  repeated TauntEvent taunt_events = 2;
 }
 
 message RecordCasinoWinRequest {

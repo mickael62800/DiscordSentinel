@@ -549,14 +549,28 @@ async fn resolve_steal_attempt(
         };
         let stolen = ((target_player.coins as f64 * steal_pct) as i64).max(1);
 
-        if let Err(e) = api
+        // Migration wallet unifie : record_steal delegue a
+        // ManageWalletUseCase::transfer cote API (faillite victime +
+        // jackpot voleur auto-detectes). Retourne le montant
+        // effectivement vole (clamp serveur) + TauntEvents a
+        // dispatcher.
+        let stolen = match api
             .record_steal(guild_id, thief_id, target_id, stolen)
             .await
         {
-            tracing::warn!(error = %e, "Echec API record_steal");
-        }
+            Ok((actual_stolen, wallet_taunts)) => {
+                taunt_events.extend(wallet_taunts);
+                actual_stolen
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Echec API record_steal");
+                stolen
+            }
+        };
 
         // Phase 9 Part D : incremente le victim streak + collecte taunt event.
+        // Reste separe du record_steal car depend du nombre de vols
+        // subis et non du montant.
         match api.track_steal_victim(guild_id, target_id).await {
             Ok(Some(ev)) => taunt_events.push(ev),
             Ok(None) => {}
@@ -598,9 +612,21 @@ async fn resolve_steal_attempt(
         let lost =
             ((thief_player.coins as f64 * (failure_penalty_pct as f64 / 100.0)) as i64).max(1);
 
-        if let Err(e) = api.record_coins_lost(guild_id, thief_id, lost).await {
-            tracing::warn!(error = %e, "Echec API record_coins_lost vol");
-        }
+        // Migration wallet unifie : delegue la penalite a
+        // record_steal_fail_penalty (wallet_uc.debit + faillite
+        // auto-detectee cote voleur). Le montant reellement perdu peut
+        // etre clamp au solde du voleur cote serveur ; le message
+        // affiche utilise la valeur du serveur pour coherence.
+        let lost = match api.record_steal_fail_penalty(guild_id, thief_id, lost).await {
+            Ok((actual_lost, wallet_taunts)) => {
+                taunt_events.extend(wallet_taunts);
+                actual_lost.max(1)
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "Echec API record_steal_fail_penalty");
+                lost
+            }
+        };
 
         // Phase 9 Part D : vol rate = victime a "resiste", reset son streak.
         if let Err(e) = api.track_steal_defended(guild_id, target_id).await {

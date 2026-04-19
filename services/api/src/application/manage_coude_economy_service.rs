@@ -4,7 +4,9 @@ use async_trait::async_trait;
 
 use crate::domain::entities::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::manage_coude_economy::{
+    ManageCoudeEconomyUseCase, StealOutcome,
+};
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::CoudeEconomyRepository;
@@ -94,20 +96,89 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         thief_id: &str,
         victim_id: &str,
         amount: i64,
-    ) -> Result<i64, DomainError> {
+    ) -> Result<StealOutcome, DomainError> {
         require_positive(amount)?;
         if thief_id == victim_id {
             return Err(DomainError::ValidationError(
                 "Impossible de se voler soi-meme".into(),
             ));
         }
-        let stolen = self.repo.steal(guild_id, thief_id, victim_id, amount).await?;
+
+        // 1. Lire le solde victime + clamp : on ne peut pas voler plus
+        //    que ce qu'elle possede (pas de creation de coins). On lit
+        //    hors-tx : si un autre evenement modifie le solde entre le
+        //    read et le transfer, wallet_uc.transfer echouera
+        //    proprement (ValidationError "Solde insuffisant").
+        let victim_coins = self.repo.get_coins(guild_id, victim_id).await?;
+        let stolen = amount.min(victim_coins);
         if stolen <= 0 {
             return Err(DomainError::ValidationError(
                 "La victime n'a pas de coins a voler".into(),
             ));
         }
-        Ok(stolen)
+
+        // 2. Mutation wallet atomique via le service unifie (faillite
+        //    cote victime + jackpot cote voleur auto-detectes).
+        let description = format!("Vol entre joueurs ({} -> {})", victim_id, thief_id);
+        let taunts = self
+            .wallet_uc
+            .transfer(
+                guild_id,
+                victim_id,
+                thief_id,
+                stolen,
+                "coude_steal_success",
+                &description,
+            )
+            .await?;
+
+        // 3. Compteurs stats coude_players (side-effect hors wallet).
+        self.repo
+            .record_steal_stats(guild_id, thief_id, victim_id, stolen)
+            .await?;
+
+        Ok(StealOutcome {
+            stolen,
+            taunt_events: taunts,
+        })
+    }
+
+    async fn steal_fail_penalty(
+        &self,
+        guild_id: &str,
+        thief_id: &str,
+        amount: i64,
+    ) -> Result<(i64, Vec<TauntEvent>), DomainError> {
+        if amount <= 0 {
+            return Ok((0, Vec::new()));
+        }
+
+        // Clamp au solde reel (comportement legacy record_coins_lost :
+        // GREATEST(0, coins - amount), pas d'erreur si penalite > solde).
+        let thief_coins = self.repo.get_coins(guild_id, thief_id).await?;
+        let lost = amount.min(thief_coins);
+        if lost <= 0 {
+            // Pas de debit a faire ; taunts stats deja a jour. Le
+            // caller affiche quand meme la penalite "faciale".
+            return Ok((0, Vec::new()));
+        }
+
+        let mutation = self
+            .wallet_uc
+            .debit(
+                guild_id,
+                thief_id,
+                lost,
+                "coude_steal_fail_penalty",
+                "Penalite vol rate",
+            )
+            .await?;
+
+        self.repo
+            .record_steal_fail_stats(guild_id, thief_id, lost)
+            .await?;
+
+        Ok((lost, mutation.triggered_taunts))
     }
 
     async fn record_casino_win(
@@ -179,12 +250,66 @@ mod tests {
     use sqlx::{Postgres, Transaction};
     use std::sync::Mutex;
 
-    // ── Mock CoudeEconomyRepository : steal/casino uniquement (pas utilise ici) ──
-    struct MockEconomyRepo;
+    // ── Mock CoudeEconomyRepository ──
+    struct MockEconomyRepo {
+        coins: Mutex<std::collections::HashMap<String, i64>>,
+        stats_calls: Mutex<Vec<(String, String, String, i64)>>,
+        fail_stats_calls: Mutex<Vec<(String, String, i64)>>,
+    }
+    impl MockEconomyRepo {
+        fn new() -> Self {
+            Self {
+                coins: Mutex::new(std::collections::HashMap::new()),
+                stats_calls: Mutex::new(Vec::new()),
+                fail_stats_calls: Mutex::new(Vec::new()),
+            }
+        }
+        fn set_coins(&self, guild_id: &str, user_id: &str, coins: i64) {
+            self.coins
+                .lock()
+                .unwrap()
+                .insert(format!("{}:{}", guild_id, user_id), coins);
+        }
+    }
     #[async_trait]
     impl CoudeEconomyRepository for MockEconomyRepo {
         async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<i64, DomainError> {
-            unimplemented!()
+            // Utilise uniquement par daily chaos, pas par le service
+            // steal migre. Test fail si appele par erreur.
+            unimplemented!("le nouveau service.steal() ne doit pas appeler repo.steal()")
+        }
+        async fn record_steal_stats(
+            &self,
+            g: &str,
+            thief: &str,
+            victim: &str,
+            amount: i64,
+        ) -> Result<(), DomainError> {
+            self.stats_calls
+                .lock()
+                .unwrap()
+                .push((g.into(), thief.into(), victim.into(), amount));
+            Ok(())
+        }
+        async fn record_steal_fail_stats(
+            &self,
+            g: &str,
+            thief: &str,
+            amount: i64,
+        ) -> Result<(), DomainError> {
+            self.fail_stats_calls
+                .lock()
+                .unwrap()
+                .push((g.into(), thief.into(), amount));
+            Ok(())
+        }
+        async fn get_coins(&self, g: &str, u: &str) -> Result<i64, DomainError> {
+            self.coins
+                .lock()
+                .unwrap()
+                .get(&format!("{}:{}", g, u))
+                .copied()
+                .ok_or_else(|| DomainError::NotFound("Wallet introuvable".into()))
         }
         async fn record_casino_win(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> {
             unimplemented!()
@@ -221,6 +346,8 @@ mod tests {
     struct MockWalletUc {
         returned: Vec<TauntEvent>,
         calls: Mutex<Vec<(String, String, String, i64, String)>>,
+        debit_calls: Mutex<Vec<(String, String, i64, String)>>,
+        debit_returned: Vec<TauntEvent>,
         should_fail: bool,
     }
     #[async_trait]
@@ -231,9 +358,24 @@ mod tests {
             unimplemented!()
         }
         async fn debit(
-            &self, _: &str, _: &str, _: i64, _: &str, _: &str,
+            &self,
+            guild_id: &str,
+            user: &str,
+            amount: i64,
+            source: &str,
+            _desc: &str,
         ) -> Result<crate::ports::inbound::manage_wallet::WalletMutation, DomainError> {
-            unimplemented!()
+            if self.should_fail {
+                return Err(DomainError::ValidationError("Solde insuffisant".into()));
+            }
+            self.debit_calls.lock().unwrap().push((
+                guild_id.into(), user.into(), amount, source.into(),
+            ));
+            Ok(crate::ports::inbound::manage_wallet::WalletMutation {
+                new_balance: 0,
+                previous_balance: amount,
+                triggered_taunts: self.debit_returned.clone(),
+            })
         }
         async fn transfer(
             &self,
@@ -319,25 +461,46 @@ mod tests {
         wallet_taunts: Vec<TauntEvent>,
         wallet_fail: bool,
         donor_threshold: i64,
-    ) -> (ManageCoudeEconomyService, Arc<MockWalletUc>, Arc<MockTauntsUc>) {
-        let repo = Arc::new(MockEconomyRepo);
+    ) -> (
+        ManageCoudeEconomyService,
+        Arc<MockEconomyRepo>,
+        Arc<MockWalletUc>,
+        Arc<MockTauntsUc>,
+    ) {
+        build_service_with_debit_taunts(wallet_taunts, vec![], wallet_fail, donor_threshold)
+    }
+
+    fn build_service_with_debit_taunts(
+        wallet_taunts: Vec<TauntEvent>,
+        debit_taunts: Vec<TauntEvent>,
+        wallet_fail: bool,
+        donor_threshold: i64,
+    ) -> (
+        ManageCoudeEconomyService,
+        Arc<MockEconomyRepo>,
+        Arc<MockWalletUc>,
+        Arc<MockTauntsUc>,
+    ) {
+        let repo = Arc::new(MockEconomyRepo::new());
         let wallet = Arc::new(MockWalletUc {
             returned: wallet_taunts,
             calls: Mutex::new(Vec::new()),
+            debit_calls: Mutex::new(Vec::new()),
+            debit_returned: debit_taunts,
             should_fail: wallet_fail,
         });
         let taunts = Arc::new(MockTauntsUc {
             donor_threshold,
             donor_calls: Mutex::new(Vec::new()),
         });
-        let svc = ManageCoudeEconomyService::new(repo, wallet.clone(), taunts.clone());
-        (svc, wallet, taunts)
+        let svc = ManageCoudeEconomyService::new(repo.clone(), wallet.clone(), taunts.clone());
+        (svc, repo, wallet, taunts)
     }
 
     #[tokio::test]
     async fn transfer_delegates_to_wallet_uc_and_concats_donor_taunt() {
         let wallet_taunts = vec![fake_taunt(StreakKind::EcoBankruptcy, "alice")];
-        let (svc, wallet, taunts) = build_service(wallet_taunts, false, 1_000);
+        let (svc, _repo, wallet, taunts) = build_service(wallet_taunts, false, 1_000);
 
         let out = svc.transfer("g1", "alice", "bob", 5_000).await.unwrap();
 
@@ -363,14 +526,14 @@ mod tests {
 
     #[tokio::test]
     async fn transfer_below_donor_threshold_does_not_trigger_donor_taunt() {
-        let (svc, _wallet, _taunts) = build_service(vec![], false, 10_000);
+        let (svc, _repo, _wallet, _taunts) = build_service(vec![], false, 10_000);
         let out = svc.transfer("g1", "alice", "bob", 500).await.unwrap();
         assert!(out.is_empty());
     }
 
     #[tokio::test]
     async fn transfer_rejects_self_transfer_before_calling_wallet() {
-        let (svc, wallet, _) = build_service(vec![], false, 1);
+        let (svc, _repo, wallet, _) = build_service(vec![], false, 1);
         let err = svc.transfer("g1", "alice", "alice", 100).await.unwrap_err();
         assert!(matches!(err, DomainError::ValidationError(_)));
         assert!(wallet.calls.lock().unwrap().is_empty());
@@ -378,7 +541,7 @@ mod tests {
 
     #[tokio::test]
     async fn transfer_rejects_non_positive_amount() {
-        let (svc, wallet, _) = build_service(vec![], false, 1);
+        let (svc, _repo, wallet, _) = build_service(vec![], false, 1);
         assert!(svc.transfer("g1", "a", "b", 0).await.is_err());
         assert!(svc.transfer("g1", "a", "b", -10).await.is_err());
         assert!(wallet.calls.lock().unwrap().is_empty());
@@ -386,8 +549,151 @@ mod tests {
 
     #[tokio::test]
     async fn transfer_propagates_wallet_error() {
-        let (svc, _, _) = build_service(vec![], true, 1);
+        let (svc, _repo, _, _) = build_service(vec![], true, 1);
         let err = svc.transfer("g1", "alice", "bob", 100).await.unwrap_err();
         assert!(matches!(err, DomainError::ValidationError(_)));
+    }
+
+    // ── Steal tests (migration wallet unifie) ──
+
+    #[tokio::test]
+    async fn steal_success_delegates_to_wallet_transfer() {
+        // Victime a 5000 coins, voleur tente 1000. Wallet renverra un
+        // taunt jackpot (simule).
+        let wallet_taunts = vec![fake_taunt(StreakKind::EcoJackpot, "thief")];
+        let (svc, repo, wallet, _taunts) = build_service(wallet_taunts, false, 9_999_999);
+        repo.set_coins("g1", "victim", 5000);
+
+        let outcome = svc.steal("g1", "thief", "victim", 1000).await.unwrap();
+
+        assert_eq!(outcome.stolen, 1000);
+        assert_eq!(outcome.taunt_events.len(), 1);
+        assert_eq!(outcome.taunt_events[0].streak_kind, StreakKind::EcoJackpot.as_str());
+
+        // Wallet.transfer appele avec (victim -> thief, 1000, coude_steal_success).
+        let calls = wallet.calls.lock().unwrap().clone();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "g1");
+        assert_eq!(calls[0].1, "victim");
+        assert_eq!(calls[0].2, "thief");
+        assert_eq!(calls[0].3, 1000);
+        assert_eq!(calls[0].4, "coude_steal_success");
+
+        // Stats counters appeles avec (thief, victim, 1000).
+        let stats = repo.stats_calls.lock().unwrap().clone();
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].1, "thief");
+        assert_eq!(stats[0].2, "victim");
+        assert_eq!(stats[0].3, 1000);
+    }
+
+    #[tokio::test]
+    async fn steal_clamps_to_victim_balance() {
+        // Voleur demande 5000 mais victime n'en a que 800 : stolen = 800.
+        let (svc, repo, wallet, _) = build_service(vec![], false, 9_999_999);
+        repo.set_coins("g1", "victim", 800);
+
+        let outcome = svc.steal("g1", "thief", "victim", 5000).await.unwrap();
+        assert_eq!(outcome.stolen, 800);
+
+        let calls = wallet.calls.lock().unwrap().clone();
+        assert_eq!(calls[0].3, 800);
+    }
+
+    #[tokio::test]
+    async fn steal_rejects_when_victim_has_nothing() {
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        repo.set_coins("g1", "victim", 0);
+        let err = svc.steal("g1", "thief", "victim", 100).await.unwrap_err();
+        assert!(matches!(err, DomainError::ValidationError(_)));
+        assert!(wallet.calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn steal_rejects_self_steal() {
+        let (svc, _repo, wallet, _) = build_service(vec![], false, 1);
+        let err = svc.steal("g1", "alice", "alice", 100).await.unwrap_err();
+        assert!(matches!(err, DomainError::ValidationError(_)));
+        assert!(wallet.calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn steal_rejects_non_positive_amount() {
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        repo.set_coins("g1", "victim", 1000);
+        assert!(svc.steal("g1", "thief", "victim", 0).await.is_err());
+        assert!(svc.steal("g1", "thief", "victim", -10).await.is_err());
+        assert!(wallet.calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn steal_fail_penalty_delegates_to_wallet_debit() {
+        // Voleur a 2000 coins, penalite 500 : debit 500, faillite non
+        // declenchee par le mock.
+        let (svc, repo, wallet, _) =
+            build_service_with_debit_taunts(vec![], vec![], false, 1);
+        repo.set_coins("g1", "thief", 2000);
+
+        let (lost, taunts) = svc.steal_fail_penalty("g1", "thief", 500).await.unwrap();
+
+        assert_eq!(lost, 500);
+        assert!(taunts.is_empty());
+
+        let debit_calls = wallet.debit_calls.lock().unwrap().clone();
+        assert_eq!(debit_calls.len(), 1);
+        assert_eq!(debit_calls[0].0, "g1");
+        assert_eq!(debit_calls[0].1, "thief");
+        assert_eq!(debit_calls[0].2, 500);
+        assert_eq!(debit_calls[0].3, "coude_steal_fail_penalty");
+
+        // Fail stats counter (thief, 500).
+        let stats = repo.fail_stats_calls.lock().unwrap().clone();
+        assert_eq!(stats.len(), 1);
+        assert_eq!(stats[0].1, "thief");
+        assert_eq!(stats[0].2, 500);
+    }
+
+    #[tokio::test]
+    async fn steal_fail_penalty_clamps_to_thief_balance() {
+        // Voleur a 300 mais penalite demandee = 1000 : debite seulement 300.
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        repo.set_coins("g1", "thief", 300);
+
+        let (lost, _taunts) = svc.steal_fail_penalty("g1", "thief", 1000).await.unwrap();
+        assert_eq!(lost, 300);
+
+        let debit_calls = wallet.debit_calls.lock().unwrap().clone();
+        assert_eq!(debit_calls[0].2, 300);
+    }
+
+    #[tokio::test]
+    async fn steal_fail_penalty_noop_when_thief_has_nothing() {
+        // Voleur a 0 coin : pas de debit, pas d'erreur (comportement
+        // legacy record_coins_lost).
+        let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+        repo.set_coins("g1", "thief", 0);
+
+        let (lost, taunts) = svc.steal_fail_penalty("g1", "thief", 500).await.unwrap();
+        assert_eq!(lost, 0);
+        assert!(taunts.is_empty());
+        assert!(wallet.debit_calls.lock().unwrap().is_empty());
+        assert!(repo.fail_stats_calls.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn steal_fail_penalty_propagates_bankruptcy_taunt() {
+        // Wallet debit declenche une faillite cote voleur.
+        let (svc, repo, _wallet, _) = build_service_with_debit_taunts(
+            vec![],
+            vec![fake_taunt(StreakKind::EcoBankruptcy, "thief")],
+            false,
+            1,
+        );
+        repo.set_coins("g1", "thief", 1000);
+
+        let (lost, taunts) = svc.steal_fail_penalty("g1", "thief", 1000).await.unwrap();
+        assert_eq!(lost, 1000);
+        assert_eq!(taunts.len(), 1);
+        assert_eq!(taunts[0].streak_kind, StreakKind::EcoBankruptcy.as_str());
     }
 }

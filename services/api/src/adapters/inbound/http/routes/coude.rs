@@ -60,6 +60,7 @@ fn coude_inner() -> Router<AppState> {
         // Economy
         .route("/{guild_id}/transfer", post(handlers::coude::transfer_coins))
         .route("/{guild_id}/steal", post(handlers::coude::record_steal))
+        .route("/{guild_id}/steal-fail-penalty", post(handlers::coude::steal_fail_penalty))
         // Primes
         .route("/{guild_id}/primes", post(handlers::coude::create_prime))
         .route("/{guild_id}/primes/{target_id}/active", get(handlers::coude::get_active_primes))
