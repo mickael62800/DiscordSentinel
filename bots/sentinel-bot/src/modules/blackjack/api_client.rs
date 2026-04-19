@@ -80,6 +80,24 @@ pub struct TableDto {
     pub status: String,
 }
 
+/// Mirror du TauntEvent API (migration 139). Identique au type utilise
+/// par coude/api_client mais duplique pour eviter un couplage cross-module.
+#[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
+pub struct TauntEvent {
+    pub channel_id: String,
+    pub target_user_id: String,
+    pub message: String,
+    pub nickname_suffix: String,
+    pub streak_kind: String,
+    pub streak_value: i32,
+}
+
+#[derive(Debug, Deserialize)]
+struct MaybeTauntEvent {
+    event: Option<TauntEvent>,
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TablePlayerDto {
@@ -269,6 +287,70 @@ impl ApiClient {
         self.base
             .get_json(&format!("/api/blackjack/tables/{table_id}/players"))
             .await
+    }
+
+    // ── Migration 139 : hooks taunts blackjack (HTTP) ──
+
+    /// Blackjack naturel (21 en 2 cartes). One-shot.
+    pub async fn track_bj_natural(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/bj/natural/{user_id}");
+        let resp: MaybeTauntEvent = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event)
+    }
+
+    /// Main gagnee (palier 3/5/10 declenche un taunt).
+    pub async fn track_bj_hand_won(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/bj/won/{user_id}");
+        let resp: MaybeTauntEvent = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event)
+    }
+
+    /// Bust (palier 3/5/10 declenche un taunt).
+    pub async fn track_bj_hand_bust(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/bj/bust/{user_id}");
+        let resp: MaybeTauntEvent = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event)
+    }
+
+    /// Jackpot si gain > seuil (default 10k). One-shot.
+    pub async fn track_jackpot(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/eco/jackpot/{user_id}");
+        let resp: MaybeTauntEvent = self
+            .base
+            .post_json(&path, &serde_json::json!({ "amount": amount }))
+            .await?;
+        Ok(resp.event)
+    }
+
+    /// Faillite (wallet passe a 0). One-shot. Non utilise pour l'instant
+    /// cote blackjack (hook au niveau wallet skip — voir rapport migration 139),
+    /// conserve pour symetrie avec l'ApiClient coude.
+    #[allow(dead_code)]
+    pub async fn track_bankruptcy(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/eco/bankruptcy/{user_id}");
+        let resp: MaybeTauntEvent = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event)
     }
 
     pub async fn close_table(&self, table_id: &str) -> Result<(), String> {

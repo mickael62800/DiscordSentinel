@@ -92,6 +92,31 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/config/taunts/opt-outs/{user_id}",
             delete(handlers::coude::remove_taunts_opt_out),
         )
+        // Migration 139 : hooks taunts blackjack + eco (appeles par les bots).
+        .route(
+            "/{guild_id}/taunts/bj/natural/{user_id}",
+            post(handlers::coude::track_bj_natural),
+        )
+        .route(
+            "/{guild_id}/taunts/bj/won/{user_id}",
+            post(handlers::coude::track_bj_won),
+        )
+        .route(
+            "/{guild_id}/taunts/bj/bust/{user_id}",
+            post(handlers::coude::track_bj_bust),
+        )
+        .route(
+            "/{guild_id}/taunts/eco/bankruptcy/{user_id}",
+            post(handlers::coude::track_bankruptcy),
+        )
+        .route(
+            "/{guild_id}/taunts/eco/jackpot/{user_id}",
+            post(handlers::coude::track_jackpot),
+        )
+        .route(
+            "/{guild_id}/taunts/eco/donor/{user_id}",
+            post(handlers::coude::track_generous_donor),
+        )
         // Migration 139 : tournoi hebdo
         .route(
             "/{guild_id}/tournaments/current",

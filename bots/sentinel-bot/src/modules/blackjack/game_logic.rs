@@ -20,6 +20,105 @@ use sentinel_shared::discord_helpers::{
 
 use super::GameApiKey;
 
+use super::api_client::{ApiClient, BlackjackGameDto, TauntEvent};
+
+/// Detecte l'etat final d'une partie et declenche les hooks taunts
+/// appropries. Fire-and-forget : un echec reseau ne bloque pas le jeu.
+async fn maybe_dispatch_bj_taunts(
+    ctx: &Context,
+    api: &ApiClient,
+    guild_id_raw: &str,
+    game: &BlackjackGameDto,
+) {
+    let guild_id_num: u64 = match guild_id_raw.parse() {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let guild_id = serenity::all::GuildId::new(guild_id_num);
+    let user_id = &game.user_id;
+
+    let mut events: Vec<TauntEvent> = Vec::new();
+
+    match game.status.as_str() {
+        "player_blackjack" => {
+            if let Ok(Some(ev)) = api.track_bj_natural(guild_id_raw, user_id).await {
+                events.push(ev);
+            }
+            if game.payout > 0 {
+                if let Ok(Some(ev)) = api.track_jackpot(guild_id_raw, user_id, game.payout).await {
+                    events.push(ev);
+                }
+            }
+        }
+        "player_win" | "dealer_bust" => {
+            if let Ok(Some(ev)) = api.track_bj_hand_won(guild_id_raw, user_id).await {
+                events.push(ev);
+            }
+            if game.payout > 0 {
+                if let Ok(Some(ev)) = api.track_jackpot(guild_id_raw, user_id, game.payout).await {
+                    events.push(ev);
+                }
+            }
+        }
+        "player_bust" => {
+            if let Ok(Some(ev)) = api.track_bj_hand_bust(guild_id_raw, user_id).await {
+                events.push(ev);
+            }
+        }
+        _ => {}
+    }
+
+    for ev in events {
+        dispatch_blackjack_taunt(ctx, guild_id, ev).await;
+    }
+}
+
+/// Post + rename pour un TauntEvent (mini copie de coude::taunts_dispatch,
+/// pour eviter un couplage cross-module). Fire-and-forget.
+async fn dispatch_blackjack_taunt(
+    ctx: &Context,
+    guild_id: serenity::all::GuildId,
+    ev: TauntEvent,
+) {
+    use serenity::all::{
+        ChannelId, CreateEmbed, CreateEmbedFooter, CreateMessage, EditMember, UserId,
+    };
+
+    if let Ok(channel_id) = ev.channel_id.parse::<u64>() {
+        let embed = CreateEmbed::new()
+            .title("\u{1f3b0} Raillerie automatique")
+            .description(&ev.message)
+            .color(0xE67E22)
+            .footer(CreateEmbedFooter::new(format!(
+                "Serie : {} × {}",
+                ev.streak_kind, ev.streak_value
+            )));
+        let _ = ChannelId::new(channel_id)
+            .send_message(&ctx.http, CreateMessage::new().embed(embed))
+            .await;
+    }
+
+    if let Ok(uid) = ev.target_user_id.parse::<u64>() {
+        let user = UserId::new(uid);
+        if let Ok(member) = guild_id.member(&ctx.http, user).await {
+            let current = member
+                .nick
+                .clone()
+                .unwrap_or_else(|| member.user.name.clone());
+            if !current.ends_with(&ev.nickname_suffix) {
+                const MAX: usize = 32;
+                let suffix_len = ev.nickname_suffix.chars().count();
+                let max_base = MAX.saturating_sub(suffix_len);
+                let base: String = current.chars().take(max_base).collect();
+                let new_nick = format!("{}{}", base, ev.nickname_suffix);
+                let _ = guild_id
+                    .edit_member(&ctx.http, user, EditMember::new().nickname(&new_nick))
+                    .await;
+            }
+        }
+    }
+}
+
 // ── Slash command registration (legacy solo — conserve pour reference) ──
 
 #[allow(dead_code)]
@@ -99,11 +198,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     let (embed, attachment) = build_game_message(&game);
-    let components = if is_game_over(&game.status) {
-        vec![]
-    } else {
-        build_buttons(&game)
-    };
+    let game_over = is_game_over(&game.status);
+    let components = if game_over { vec![] } else { build_buttons(&game) };
 
     let mut msg = CreateInteractionResponseMessage::new()
         .embed(embed)
@@ -115,6 +211,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .create_response(&ctx.http, CreateInteractionResponse::Message(msg))
         .await
         .ok();
+
+    if game_over {
+        maybe_dispatch_bj_taunts(ctx, api, &guild_id, &game).await;
+    }
 }
 
 // ── Component (button) handler ──
@@ -189,11 +289,8 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
     };
 
     let (embed, attachment) = build_game_message(&game);
-    let components = if is_game_over(&game.status) {
-        vec![]
-    } else {
-        build_buttons(&game)
-    };
+    let game_over = is_game_over(&game.status);
+    let components = if game_over { vec![] } else { build_buttons(&game) };
 
     let mut msg = CreateInteractionResponseMessage::new()
         .embed(embed)
@@ -205,5 +302,18 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(msg))
         .await
         .ok();
+
+    // Migration 139 : si la main se termine, declenche les taunts appropries
+    // (natural 21, win, bust + eventuel jackpot sur le payout). Le lock
+    // sur `ctx.data` a deja ete relache a la fin du bloc precedent.
+    if game_over {
+        let api_clone = {
+            let data = ctx.data.read().await;
+            data.get::<GameApiKey>().cloned()
+        };
+        if let Some(api) = api_clone {
+            maybe_dispatch_bj_taunts(ctx, &api, &guild_id, &game).await;
+        }
+    }
 }
 

@@ -52,6 +52,61 @@ pub trait ManageCoudeTauntsUseCase: Send + Sync {
         user_id: &str,
     ) -> Result<(), DomainError>;
 
+    // ── Blackjack (migration 139) ──
+
+    /// Blackjack naturel (21 en 2 cartes). One-shot, pas de palier.
+    /// Reset egalement la `bj_bust_streak` et ne touche pas la win streak
+    /// (le caller appelera `on_bj_hand_won` a cote si approprie).
+    async fn on_bj_natural(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, DomainError>;
+
+    /// Main blackjack gagnee. Incremente `bj_win_streak`, reset
+    /// `bj_bust_streak`. Retourne un TauntEvent si palier franchi.
+    async fn on_bj_hand_won(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, DomainError>;
+
+    /// Bust (depassement de 21). Incremente `bj_bust_streak`, reset
+    /// `bj_win_streak`. Retourne un TauntEvent si palier franchi.
+    async fn on_bj_hand_bust(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, DomainError>;
+
+    // ── Economie (migration 139) ──
+
+    /// Passage du wallet a 0 apres une operation.
+    /// Lit `bankruptcy_taunt_enabled` dans bot_guild_config (default true).
+    async fn on_bankruptcy(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, DomainError>;
+
+    /// Gros gain en une operation. One-shot si `amount >= jackpot_threshold`
+    /// (default 10_000).
+    async fn on_jackpot(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, DomainError>;
+
+    /// Don significatif vers un autre joueur. One-shot si
+    /// `amount >= generous_donor_threshold` (default 1_000).
+    async fn on_generous_donor(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, DomainError>;
+
     // ── Config (exposee par les RPCs d'admin) ──
 
     async fn get_config(&self, guild_id: &str) -> Result<CoudeTauntsConfig, DomainError>;

@@ -166,6 +166,33 @@ pub trait CoudePlayerRepository: Send + Sync {
         user_id: &str,
     ) -> Result<(), DomainError>;
 
+    // ── Blackjack streaks (migration 139) ──
+
+    /// Incremente `bj_win_streak` et reset `bj_bust_streak`. Retourne la
+    /// nouvelle valeur du `bj_win_streak`, ou None si le joueur n'existe
+    /// pas.
+    async fn touch_bj_win_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError>;
+
+    /// Inverse de `touch_bj_win_streak` : incremente `bj_bust_streak` et
+    /// reset `bj_win_streak`. Retourne la nouvelle valeur du
+    /// `bj_bust_streak`.
+    async fn touch_bj_bust_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError>;
+
+    /// Reset `bj_bust_streak` (ex : blackjack naturel post-bust).
+    async fn reset_bj_bust_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError>;
+
     /// Incrémente le compteur de couardise et retourne sa nouvelle valeur.
     async fn increment_cowardice(
         &self,

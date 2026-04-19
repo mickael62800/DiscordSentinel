@@ -274,6 +274,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             .timestamp(serenity::model::Timestamp::now());
 
         crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
+
+        // Migration 139 : taunt generous donor si montant depasse le seuil.
+        // On calcule sur le montant avant taxe (amount) — c'est la generosite
+        // "faciale". Le backend applique le threshold configure.
+        match api.track_generous_donor(&guild_id, &donor_id, amount).await {
+            Ok(Some(ev)) => {
+                let guild_id_val = command.guild_id.unwrap();
+                crate::modules::coude::taunts_dispatch::dispatch_all(ctx, guild_id_val, &[ev]).await;
+            }
+            Ok(None) => {}
+            Err(e) => tracing::warn!(error = %e, "track_generous_donor failed"),
+        }
     } else {
         // ── Don d'item (pas de taxe, pas de cooldown) ──
         let item_key = &don_type;

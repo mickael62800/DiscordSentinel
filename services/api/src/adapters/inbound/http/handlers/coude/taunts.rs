@@ -16,7 +16,41 @@ use serde::{Deserialize, Serialize};
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::entities::TauntEvent;
 use crate::domain::errors::DomainError;
+
+#[derive(Debug, Serialize)]
+pub struct TauntEventDto {
+    pub channel_id: String,
+    pub target_user_id: String,
+    pub message: String,
+    pub nickname_suffix: String,
+    pub streak_kind: String,
+    pub streak_value: i32,
+}
+
+impl From<TauntEvent> for TauntEventDto {
+    fn from(e: TauntEvent) -> Self {
+        Self {
+            channel_id: e.channel_id,
+            target_user_id: e.target_user_id,
+            message: e.message,
+            nickname_suffix: e.nickname_suffix,
+            streak_kind: e.streak_kind.to_string(),
+            streak_value: e.streak_value,
+        }
+    }
+}
+
+#[derive(Debug, Serialize)]
+pub struct MaybeTauntEventDto {
+    pub event: Option<TauntEventDto>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct EcoAmountDto {
+    pub amount: i64,
+}
 
 #[derive(Debug, Serialize)]
 pub struct TauntsConfigDto {
@@ -70,6 +104,94 @@ pub async fn update_taunts_config(
         .set_enabled(&guild_id, dto.enabled)
         .await?;
     Ok(StatusCode::NO_CONTENT)
+}
+
+// ── Tracking endpoints (appeles par le bot apres une resolution de main) ──
+
+/// POST /api/coude/{guild_id}/taunts/bj/natural/{user_id}
+pub async fn track_bj_natural(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<MaybeTauntEventDto>, ApiError> {
+    let ev = state
+        .coude_taunts_uc
+        .on_bj_natural(&guild_id, &user_id)
+        .await?;
+    Ok(Json(MaybeTauntEventDto {
+        event: ev.map(Into::into),
+    }))
+}
+
+/// POST /api/coude/{guild_id}/taunts/bj/won/{user_id}
+pub async fn track_bj_won(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<MaybeTauntEventDto>, ApiError> {
+    let ev = state
+        .coude_taunts_uc
+        .on_bj_hand_won(&guild_id, &user_id)
+        .await?;
+    Ok(Json(MaybeTauntEventDto {
+        event: ev.map(Into::into),
+    }))
+}
+
+/// POST /api/coude/{guild_id}/taunts/bj/bust/{user_id}
+pub async fn track_bj_bust(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<MaybeTauntEventDto>, ApiError> {
+    let ev = state
+        .coude_taunts_uc
+        .on_bj_hand_bust(&guild_id, &user_id)
+        .await?;
+    Ok(Json(MaybeTauntEventDto {
+        event: ev.map(Into::into),
+    }))
+}
+
+/// POST /api/coude/{guild_id}/taunts/eco/bankruptcy/{user_id}
+pub async fn track_bankruptcy(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<MaybeTauntEventDto>, ApiError> {
+    let ev = state
+        .coude_taunts_uc
+        .on_bankruptcy(&guild_id, &user_id)
+        .await?;
+    Ok(Json(MaybeTauntEventDto {
+        event: ev.map(Into::into),
+    }))
+}
+
+/// POST /api/coude/{guild_id}/taunts/eco/jackpot/{user_id}
+pub async fn track_jackpot(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(dto): Json<EcoAmountDto>,
+) -> Result<Json<MaybeTauntEventDto>, ApiError> {
+    let ev = state
+        .coude_taunts_uc
+        .on_jackpot(&guild_id, &user_id, dto.amount)
+        .await?;
+    Ok(Json(MaybeTauntEventDto {
+        event: ev.map(Into::into),
+    }))
+}
+
+/// POST /api/coude/{guild_id}/taunts/eco/donor/{user_id}
+pub async fn track_generous_donor(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+    Json(dto): Json<EcoAmountDto>,
+) -> Result<Json<MaybeTauntEventDto>, ApiError> {
+    let ev = state
+        .coude_taunts_uc
+        .on_generous_donor(&guild_id, &user_id, dto.amount)
+        .await?;
+    Ok(Json(MaybeTauntEventDto {
+        event: ev.map(Into::into),
+    }))
 }
 
 /// DELETE /api/coude/{guild_id}/config/taunts/opt-outs/{user_id}

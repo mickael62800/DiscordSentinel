@@ -5,9 +5,39 @@
 //! ne fait que transmettre ; la logique "seuil franchi → TauntEvent"
 //! vit dans le domain cote API.
 
+use serde::Deserialize;
+
 use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{grpc_err_to_string, taunt_event_from_proto, ApiClient, TauntEvent};
+
+// ── Migration 139 : DTOs HTTP pour les hooks blackjack + eco ──
+
+#[derive(Debug, Clone, Deserialize)]
+struct TauntEventHttpDto {
+    channel_id: String,
+    target_user_id: String,
+    message: String,
+    nickname_suffix: String,
+    streak_kind: String,
+    streak_value: i32,
+}
+
+#[derive(Debug, Deserialize)]
+struct MaybeTauntEventHttpDto {
+    event: Option<TauntEventHttpDto>,
+}
+
+fn dto_to_taunt(dto: TauntEventHttpDto) -> TauntEvent {
+    TauntEvent {
+        channel_id: dto.channel_id,
+        target_user_id: dto.target_user_id,
+        message: dto.message,
+        nickname_suffix: dto.nickname_suffix,
+        streak_kind: dto.streak_kind,
+        streak_value: dto.streak_value,
+    }
+}
 
 impl ApiClient {
     /// Tracke un vol reussi : incremente le steal_victim_streak de la
@@ -65,6 +95,82 @@ impl ApiClient {
             .guarded(|| async move { client.set_taunts_opt_out(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
+    }
+
+    // ── Migration 139 : hooks blackjack + eco via HTTP ──
+
+    /// Blackjack naturel (21 en 2 cartes). One-shot.
+    pub async fn track_bj_natural(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/bj/natural/{user_id}");
+        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event.map(dto_to_taunt))
+    }
+
+    /// Main blackjack gagnee (palier 3/5/10).
+    pub async fn track_bj_hand_won(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/bj/won/{user_id}");
+        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event.map(dto_to_taunt))
+    }
+
+    /// Bust blackjack (palier 3/5/10).
+    pub async fn track_bj_hand_bust(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/bj/bust/{user_id}");
+        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event.map(dto_to_taunt))
+    }
+
+    /// Faillite (wallet passe a 0 apres une op). One-shot.
+    pub async fn track_bankruptcy(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/eco/bankruptcy/{user_id}");
+        let resp: MaybeTauntEventHttpDto = self.base.post_json(&path, &serde_json::json!({})).await?;
+        Ok(resp.event.map(dto_to_taunt))
+    }
+
+    /// Jackpot (gain > seuil). One-shot si threshold franchi.
+    pub async fn track_jackpot(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/eco/jackpot/{user_id}");
+        let resp: MaybeTauntEventHttpDto = self
+            .base
+            .post_json(&path, &serde_json::json!({ "amount": amount }))
+            .await?;
+        Ok(resp.event.map(dto_to_taunt))
+    }
+
+    /// Don genereux (> seuil). One-shot si threshold franchi.
+    pub async fn track_generous_donor(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        amount: i64,
+    ) -> Result<Option<TauntEvent>, String> {
+        let path = format!("/api/coude/{guild_id}/taunts/eco/donor/{user_id}");
+        let resp: MaybeTauntEventHttpDto = self
+            .base
+            .post_json(&path, &serde_json::json!({ "amount": amount }))
+            .await?;
+        Ok(resp.event.map(dto_to_taunt))
     }
 
     pub async fn set_taunts_channel(

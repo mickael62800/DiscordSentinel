@@ -291,6 +291,30 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         streaks::reset_steal_victim_streak(self, guild_id, user_id).await
     }
 
+    async fn touch_bj_win_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        streaks::touch_bj_win_streak(self, guild_id, user_id).await
+    }
+
+    async fn touch_bj_bust_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        streaks::touch_bj_bust_streak(self, guild_id, user_id).await
+    }
+
+    async fn reset_bj_bust_streak(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        streaks::reset_bj_bust_streak(self, guild_id, user_id).await
+    }
+
     async fn increment_chaos(
         &self,
         guild_id: &str,
