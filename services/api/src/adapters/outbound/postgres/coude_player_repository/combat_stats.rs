@@ -1,7 +1,14 @@
 //! Enregistrement des resultats de combat et compteurs : win/loss/draw,
 //! cowardice, chaos.
+//!
+//! Migration #3 (wallet unifie) : ces methodes ne mutent PLUS `user_wallets`.
+//! Elles se contentent d'incrementer les compteurs `coude_players`. Les
+//! mouvements de coins (credit/debit + wallet_transactions) sont a la charge
+//! de l'appelant, qui doit passer par `WalletRepository::credit/debit` ou
+//! `ManageWalletUseCase`. Ceci corrige le double-comptage historique (les
+//! resolve services faisaient deja les credit/debit + ces fonctions les
+//! refaisaient).
 
-use crate::adapters::outbound::postgres::wallet_tx_log::log_wallet_tx;
 use crate::domain::errors::DomainError;
 
 use super::{pg_err, PgCoudePlayerRepository};
@@ -13,8 +20,7 @@ pub(super) async fn record_win(
     earned: i64,
     stolen: i64,
 ) -> Result<bool, DomainError> {
-    let mut tx = repo.pool.begin().await.map_err(pg_err)?;
-    sqlx::query(
+    let result = sqlx::query(
         r#"UPDATE coude_players
            SET total_wins = total_wins + 1,
                total_earned = total_earned + $3,
@@ -23,22 +29,8 @@ pub(super) async fn record_win(
            WHERE guild_id = $1 AND user_id = $2"#,
     )
     .bind(guild_id).bind(user_id).bind(earned).bind(stolen)
-    .execute(&mut *tx).await.map_err(pg_err)?;
-
-    let row: Option<i64> = sqlx::query_scalar(
-        "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-         WHERE guild_id = $1 AND user_id = $2
-         RETURNING coins",
-    )
-    .bind(guild_id).bind(user_id).bind(earned)
-    .fetch_optional(&mut *tx).await.map_err(pg_err)?;
-    let Some(balance_after) = row else {
-        tx.commit().await.map_err(pg_err)?;
-        return Ok(false);
-    };
-    log_wallet_tx(&mut tx, guild_id, user_id, earned, balance_after, "coude_combat_win", "Combat gagne").await?;
-    tx.commit().await.map_err(pg_err)?;
-    Ok(true)
+    .execute(&repo.pool).await.map_err(pg_err)?;
+    Ok(result.rows_affected() > 0)
 }
 
 pub(super) async fn record_loss(
@@ -47,8 +39,7 @@ pub(super) async fn record_loss(
     user_id: &str,
     lost: i64,
 ) -> Result<bool, DomainError> {
-    let mut tx = repo.pool.begin().await.map_err(pg_err)?;
-    sqlx::query(
+    let result = sqlx::query(
         r#"UPDATE coude_players
            SET total_losses = total_losses + 1,
                total_lost = total_lost + $3,
@@ -56,22 +47,8 @@ pub(super) async fn record_loss(
            WHERE guild_id = $1 AND user_id = $2"#,
     )
     .bind(guild_id).bind(user_id).bind(lost)
-    .execute(&mut *tx).await.map_err(pg_err)?;
-
-    let row: Option<i64> = sqlx::query_scalar(
-        "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-         WHERE guild_id = $1 AND user_id = $2
-         RETURNING coins",
-    )
-    .bind(guild_id).bind(user_id).bind(lost)
-    .fetch_optional(&mut *tx).await.map_err(pg_err)?;
-    let Some(balance_after) = row else {
-        tx.commit().await.map_err(pg_err)?;
-        return Ok(false);
-    };
-    log_wallet_tx(&mut tx, guild_id, user_id, -lost, balance_after, "coude_combat_loss", "Combat perdu").await?;
-    tx.commit().await.map_err(pg_err)?;
-    Ok(true)
+    .execute(&repo.pool).await.map_err(pg_err)?;
+    Ok(result.rows_affected() > 0)
 }
 
 pub(super) async fn record_draw(
@@ -80,32 +57,13 @@ pub(super) async fn record_draw(
     user_id: &str,
     lost: i64,
 ) -> Result<bool, DomainError> {
-    let mut tx = repo.pool.begin().await.map_err(pg_err)?;
-    sqlx::query(
+    let result = sqlx::query(
         "UPDATE coude_players SET total_draws = total_draws + 1, total_lost = total_lost + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(guild_id).bind(user_id).bind(lost)
-    .execute(&mut *tx).await.map_err(pg_err)?;
-
-    let row: Option<i64> = sqlx::query_scalar(
-        "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-         WHERE guild_id = $1 AND user_id = $2
-         RETURNING coins",
-    )
-    .bind(guild_id)
-    .bind(user_id)
-    .bind(lost)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(pg_err)?;
-    let Some(balance_after) = row else {
-        tx.commit().await.map_err(pg_err)?;
-        return Ok(false);
-    };
-    log_wallet_tx(&mut tx, guild_id, user_id, -lost, balance_after, "coude_combat_draw", "Combat egalite").await?;
-    tx.commit().await.map_err(pg_err)?;
-    Ok(true)
+    .execute(&repo.pool).await.map_err(pg_err)?;
+    Ok(result.rows_affected() > 0)
 }
 
 pub(super) async fn increment_cowardice(

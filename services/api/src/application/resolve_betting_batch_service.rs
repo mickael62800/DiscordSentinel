@@ -217,19 +217,23 @@ impl ResolveBettingBatchService {
                 {
                     warn!(error = %e, "Echec debit defender explosion");
                 }
+                // Migration #3 wallet : on utilise record_draw (counter-only
+                // apres migration) plutot que record_coins_lost (qui debite
+                // encore user_wallets) — evite le double-debit puisque
+                // wallet_repo.debit a deja ete applique ci-dessus.
                 if let Err(e) = self
                     .player_repo
-                    .record_coins_lost(&combat.guild_id, &combat.attacker_id, explosion_loss)
+                    .record_draw(&combat.guild_id, &combat.attacker_id, explosion_loss)
                     .await
                 {
-                    warn!(error = %e, "Echec record_coins_lost attacker explosion");
+                    warn!(error = %e, "Echec record_draw attacker explosion");
                 }
                 if let Err(e) = self
                     .player_repo
-                    .record_coins_lost(&combat.guild_id, &combat.defender_id, explosion_loss)
+                    .record_draw(&combat.guild_id, &combat.defender_id, explosion_loss)
                     .await
                 {
-                    warn!(error = %e, "Echec record_coins_lost defender explosion");
+                    warn!(error = %e, "Echec record_draw defender explosion");
                 }
             }
 

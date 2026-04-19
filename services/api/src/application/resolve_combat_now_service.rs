@@ -421,6 +421,21 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     )
                 });
                 if had_accident {
+                    // Accident debile : les deux joueurs sont penalises de
+                    // `combat.mise`. On debite le wallet explicitement (avant,
+                    // record_draw faisait le debit en interne — plus le cas
+                    // depuis la migration #3 wallet).
+                    let desc = format!("Accident debile combat {}", combat.id);
+                    if combat.mise > 0 {
+                        let _ = self
+                            .wallet_repo
+                            .debit(&combat.guild_id, &combat.attacker_id, combat.mise, "coude_combat_draw", &desc)
+                            .await;
+                        let _ = self
+                            .wallet_repo
+                            .debit(&combat.guild_id, &combat.defender_id, combat.mise, "coude_combat_draw", &desc)
+                            .await;
+                    }
                     let _ = self
                         .players_uc
                         .record_draw(&combat.guild_id, &combat.attacker_id, combat.mise)
