@@ -126,7 +126,7 @@ impl ApiClient {
         user_id: &str,
         username: &str,
         bet: i64,
-    ) -> Result<BlackjackGameDto, String> {
+    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
         let req = proto::StartGameRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -134,23 +134,23 @@ impl ApiClient {
             bet,
         };
         let mut client = self.grpc.blackjack();
-        let game = self
+        let result = self
             .grpc
             .guarded(|| async move { client.start_game(req).await.map(|r| r.into_inner()) })
             .await
             .map_err(grpc_err_to_string)?;
-        Ok(proto_game_to_dto(game))
+        Ok(proto_result_to_dto(result))
     }
 
-    pub async fn hit(&self, game_id: &str) -> Result<BlackjackGameDto, String> {
+    pub async fn hit(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
         self.game_action(game_id, BlackjackAction::Hit).await
     }
 
-    pub async fn stand(&self, game_id: &str) -> Result<BlackjackGameDto, String> {
+    pub async fn stand(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
         self.game_action(game_id, BlackjackAction::Stand).await
     }
 
-    pub async fn double_down(&self, game_id: &str) -> Result<BlackjackGameDto, String> {
+    pub async fn double_down(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
         self.game_action(game_id, BlackjackAction::Double).await
     }
 
@@ -158,12 +158,12 @@ impl ApiClient {
         &self,
         game_id: &str,
         action: BlackjackAction,
-    ) -> Result<BlackjackGameDto, String> {
+    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
         let req = proto::GameIdRequest {
             game_id: game_id.to_string(),
         };
         let mut client = self.grpc.blackjack();
-        let game = self
+        let result = self
             .grpc
             .guarded(|| async move {
                 let result = match action {
@@ -175,7 +175,7 @@ impl ApiClient {
             })
             .await
             .map_err(grpc_err_to_string)?;
-        Ok(proto_game_to_dto(game))
+        Ok(proto_result_to_dto(result))
     }
 
     pub async fn get_active(
@@ -325,6 +325,13 @@ impl ApiClient {
     }
 
     /// Jackpot si gain > seuil (default 10k). One-shot.
+    ///
+    /// Non utilise depuis la migration #4 : la detection jackpot est
+    /// maintenant automatique cote API via le wallet UC unifie (les
+    /// `TauntEvent` sont retournes dans `BlackjackGameResult`). On le
+    /// conserve pour symetrie avec l'ApiClient coude + pour un eventuel
+    /// usage ponctuel hors flow blackjack.
+    #[allow(dead_code)]
     pub async fn track_jackpot(
         &self,
         guild_id: &str,
@@ -375,6 +382,44 @@ enum BlackjackAction {
 }
 
 // ── Helpers ──
+
+fn proto_taunt_to_dto(t: proto::TauntEvent) -> TauntEvent {
+    TauntEvent {
+        channel_id: t.channel_id,
+        target_user_id: t.target_user_id,
+        message: t.message,
+        nickname_suffix: t.nickname_suffix,
+        streak_kind: t.streak_kind,
+        streak_value: t.streak_value,
+    }
+}
+
+/// Convertit le `BlackjackGameResult` renvoye par le serveur gRPC en un
+/// tuple (game, taunts) consomme par le game_logic. La partie est
+/// obligatoire (l'absence serait une erreur serveur) — defaut a un
+/// squelette vide si jamais le champ manque pour robustesse.
+fn proto_result_to_dto(
+    r: proto::BlackjackGameResult,
+) -> (BlackjackGameDto, Vec<TauntEvent>) {
+    let game = r.game.map(proto_game_to_dto).unwrap_or(BlackjackGameDto {
+        id: String::new(),
+        guild_id: String::new(),
+        user_id: String::new(),
+        username: String::new(),
+        bet: 0,
+        player_hand: vec![],
+        dealer_hand: vec![],
+        status: "dealer_win".into(),
+        player_score: 0,
+        dealer_score: 0,
+        doubled: false,
+        payout: 0,
+        created_at: String::new(),
+        finished_at: None,
+    });
+    let taunts = r.taunt_events.into_iter().map(proto_taunt_to_dto).collect();
+    (game, taunts)
+}
 
 fn proto_game_to_dto(g: proto::BlackjackGame) -> BlackjackGameDto {
     BlackjackGameDto {

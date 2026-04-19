@@ -475,6 +475,17 @@ pub struct StubCoudeTaunts;
     async fn list_opt_outs(&self, _: &str) -> Result<Vec<String>, DomainError> { unimplemented!() }
 }
 
+pub struct StubWalletUc;
+#[async_trait] impl manage_wallet::ManageWalletUseCase for StubWalletUc {
+    async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::WalletMutation, DomainError> { unimplemented!() }
+    async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::WalletMutation, DomainError> { unimplemented!() }
+    async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
+    async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
+    async fn credit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::TxWalletMutation, DomainError> { unimplemented!() }
+    async fn debit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<manage_wallet::TxWalletMutation, DomainError> { unimplemented!() }
+    async fn post_commit_taunts(&self, _: &str, _: &str, _: &manage_wallet::TxWalletMutation) -> Vec<TauntEvent> { unimplemented!() }
+}
+
 pub struct StubCoudeHeist;
 #[async_trait] impl manage_coude_heist::ManageCoudeHeistUseCase for StubCoudeHeist {
     async fn get_cooldown_status(&self, _: &str, _: &str) -> Result<manage_coude_heist::HeistCooldownStatus, DomainError> { unimplemented!() }
@@ -610,6 +621,7 @@ fn base_state() -> AppState {
         blackjack_svc: Arc::new(sentinel_api::application::BlackjackService::new(
             Arc::new(StubBlackjackRepo),
             Arc::new(StubWalletRepo),
+            Arc::new(StubWalletUc),
         )),
         coude_players_uc: Arc::new(StubCoudePlayers),
         coude_combats_uc: Arc::new(StubCoudeCombats),

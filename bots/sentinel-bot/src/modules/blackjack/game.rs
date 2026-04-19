@@ -42,7 +42,7 @@ pub(super) async fn handle_bet_select(ctx: &Context, component: &ComponentIntera
         None => return,
     };
 
-    let game = match api
+    let (game, wallet_taunts) = match api
         .start_game(
             &guild_id,
             &component.user.id.to_string(),
@@ -86,6 +86,20 @@ pub(super) async fn handle_bet_select(ctx: &Context, component: &ComponentIntera
         .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(msg))
         .await
         .ok();
+
+    // Migration #4 : dispatch des taunts wallet (faillite / jackpot) qui
+    // peuvent se declencher au debit de la mise ou au credit si blackjack
+    // naturel. Les taunts specifiques (BjNatural21) sont dispatches par le
+    // handler complet dans `game_logic::handle` / `handle_component`, pas
+    // ici (flux table multijoueur — pas de streak track cote bot).
+    if !wallet_taunts.is_empty() {
+        if let Ok(gid_u64) = guild_id.parse::<u64>() {
+            let gid = serenity::all::GuildId::new(gid_u64);
+            for ev in wallet_taunts {
+                game_logic::dispatch_blackjack_taunt_pub(ctx, gid, ev).await;
+            }
+        }
+    }
 
     // Si blackjack naturel -> proposer de rejouer
     if game_logic::is_game_over(&game.status) {

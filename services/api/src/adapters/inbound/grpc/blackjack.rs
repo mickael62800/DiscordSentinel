@@ -16,7 +16,7 @@ use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackService as
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::application::BlackjackService as BlackjackApp;
-use crate::domain::entities::{BlackjackGame, Card, Wallet};
+use crate::domain::entities::{BlackjackGame, Card, TauntEvent, Wallet};
 use crate::ports::outbound::{BotConfigRepository, WalletRepository};
 
 pub struct BlackjackGrpc {
@@ -77,10 +77,10 @@ impl BlackjackGrpcTrait for BlackjackGrpc {
     async fn start_game(
         &self,
         request: Request<proto::StartGameRequest>,
-    ) -> Result<Response<proto::BlackjackGame>, Status> {
+    ) -> Result<Response<proto::BlackjackGameResult>, Status> {
         let req = request.into_inner();
         let (min_bet, max_bet, starting_coins, blackjack_payout) = self.config(&req.guild_id).await;
-        let game = self
+        let result = self
             .svc
             .start_game(
                 req.guild_id,
@@ -94,46 +94,46 @@ impl BlackjackGrpcTrait for BlackjackGrpc {
             )
             .await
             .map_err(domain_to_status)?;
-        if game_is_over(&game.status) {
-            self.broadcast_result(&game, false);
+        if game_is_over(&result.game.status) {
+            self.broadcast_result(&result.game, false);
         }
-        Ok(Response::new(blackjack_game_to_proto(game)))
+        Ok(Response::new(action_result_to_proto(result)))
     }
 
     async fn hit(
         &self,
         request: Request<proto::GameIdRequest>,
-    ) -> Result<Response<proto::BlackjackGame>, Status> {
+    ) -> Result<Response<proto::BlackjackGameResult>, Status> {
         let id = parse_uuid(&request.into_inner().game_id)?;
-        let game = self.svc.hit(id).await.map_err(domain_to_status)?;
-        if game_is_over(&game.status) {
-            self.broadcast_result(&game, false);
+        let result = self.svc.hit(id).await.map_err(domain_to_status)?;
+        if game_is_over(&result.game.status) {
+            self.broadcast_result(&result.game, false);
         }
-        Ok(Response::new(blackjack_game_to_proto(game)))
+        Ok(Response::new(action_result_to_proto(result)))
     }
 
     async fn stand(
         &self,
         request: Request<proto::GameIdRequest>,
-    ) -> Result<Response<proto::BlackjackGame>, Status> {
+    ) -> Result<Response<proto::BlackjackGameResult>, Status> {
         let id = parse_uuid(&request.into_inner().game_id)?;
-        let game = self.svc.stand(id).await.map_err(domain_to_status)?;
-        if game_is_over(&game.status) {
-            self.broadcast_result(&game, false);
+        let result = self.svc.stand(id).await.map_err(domain_to_status)?;
+        if game_is_over(&result.game.status) {
+            self.broadcast_result(&result.game, false);
         }
-        Ok(Response::new(blackjack_game_to_proto(game)))
+        Ok(Response::new(action_result_to_proto(result)))
     }
 
     async fn double_down(
         &self,
         request: Request<proto::GameIdRequest>,
-    ) -> Result<Response<proto::BlackjackGame>, Status> {
+    ) -> Result<Response<proto::BlackjackGameResult>, Status> {
         let id = parse_uuid(&request.into_inner().game_id)?;
-        let game = self.svc.double_down(id).await.map_err(domain_to_status)?;
-        if game_is_over(&game.status) {
-            self.broadcast_result(&game, true);
+        let result = self.svc.double_down(id).await.map_err(domain_to_status)?;
+        if game_is_over(&result.game.status) {
+            self.broadcast_result(&result.game, true);
         }
-        Ok(Response::new(blackjack_game_to_proto(game)))
+        Ok(Response::new(action_result_to_proto(result)))
     }
 
     async fn get_active(
@@ -199,6 +199,26 @@ fn blackjack_game_to_proto(g: BlackjackGame) -> proto::BlackjackGame {
         payout: g.payout,
         created_at: g.created_at.to_rfc3339(),
         finished_at: g.finished_at.map(|d| d.to_rfc3339()),
+    }
+}
+
+fn taunt_to_proto(t: TauntEvent) -> proto::TauntEvent {
+    proto::TauntEvent {
+        channel_id: t.channel_id,
+        target_user_id: t.target_user_id,
+        message: t.message,
+        nickname_suffix: t.nickname_suffix,
+        streak_kind: t.streak_kind.to_string(),
+        streak_value: t.streak_value,
+    }
+}
+
+fn action_result_to_proto(
+    result: crate::application::BlackjackActionResult,
+) -> proto::BlackjackGameResult {
+    proto::BlackjackGameResult {
+        game: Some(blackjack_game_to_proto(result.game)),
+        taunt_events: result.taunt_events.into_iter().map(taunt_to_proto).collect(),
     }
 }
 

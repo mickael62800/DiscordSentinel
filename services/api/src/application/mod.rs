@@ -38,7 +38,7 @@ mod manage_members_service;
 pub use manage_members_service::ManageMembersService;
 
 mod blackjack_service;
-pub use blackjack_service::BlackjackService;
+pub use blackjack_service::{BlackjackActionResult, BlackjackService};
 
 mod manage_coude_players_service;
 pub use manage_coude_players_service::ManageCoudePlayersService;

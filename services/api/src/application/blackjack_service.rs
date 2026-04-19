@@ -3,21 +3,53 @@ use std::sync::Arc;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::{BlackjackGame, calculate_score, create_deck};
+use crate::domain::entities::{BlackjackGame, TauntEvent, calculate_score, create_deck};
 use crate::domain::errors::DomainError;
+use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::{BlackjackRepository, WalletRepository};
 
+/// Resultat d'une action de jeu : la partie mise a jour + la liste des
+/// `TauntEvent` declenches par les mutations wallet (faillite, jackpot).
+/// La couche transport (gRPC / HTTP) est responsable de propager ces
+/// taunts vers le bot, qui les dispatchera.
+#[derive(Debug, Clone)]
+pub struct BlackjackActionResult {
+    pub game: BlackjackGame,
+    pub taunt_events: Vec<TauntEvent>,
+}
+
+/// # Migration wallet unifie (Migration #4)
+///
+/// Les mutations `user_wallets` passent maintenant par `wallet_uc` :
+/// - `start_game` : debit de la mise + credit si blackjack naturel
+/// - `double_down` : debit supplementaire + credit si gain
+/// - `stand` / `hit` (bust/resolve) : credit du payout sur victoire
+///
+/// Le use case wallet detecte automatiquement faillite / jackpot et
+/// retourne les `TauntEvent` associes, qui sont concatenes dans le
+/// `BlackjackActionResult`. Les taunts specifiques blackjack
+/// (BjNatural21 / BjWinStreak / BjBustStreak) restent cables a la main
+/// cote bot via les endpoints `track_bj_*`.
+///
+/// `wallet_repo` est conserve pour `get_or_create` au demarrage de la
+/// toute premiere partie (le wallet_uc ne l'expose pas).
+///
+/// `cancel_game` (admin) n'est PAS migre : il utilise sa propre tx
+/// composite dans le repo blackjack. Skippe pour garder le scope de la
+/// migration ciblee sur les flows joueurs (start/hit/stand/double).
 pub struct BlackjackService {
     repo: Arc<dyn BlackjackRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
+    wallet_uc: Arc<dyn ManageWalletUseCase>,
 }
 
 impl BlackjackService {
     pub fn new(
         repo: Arc<dyn BlackjackRepository>,
         wallet_repo: Arc<dyn WalletRepository>,
+        wallet_uc: Arc<dyn ManageWalletUseCase>,
     ) -> Self {
-        Self { repo, wallet_repo }
+        Self { repo, wallet_repo, wallet_uc }
     }
 
     /// Démarre une nouvelle partie de blackjack.
@@ -32,7 +64,7 @@ impl BlackjackService {
         max_bet: i64,
         starting_coins: i64,
         blackjack_payout: f64,
-    ) -> Result<BlackjackGame, DomainError> {
+    ) -> Result<BlackjackActionResult, DomainError> {
         // Validation de la mise
         if bet < min_bet {
             return Err(DomainError::ValidationError(
@@ -52,13 +84,19 @@ impl BlackjackService {
             ));
         }
 
-        // S'assurer que le wallet existe et débiter la mise
+        // S'assurer que le wallet existe (le wallet_uc suppose qu'il existe).
         self.wallet_repo
             .get_or_create(&guild_id, &user_id, &username, starting_coins)
             .await?;
-        self.wallet_repo
+
+        let mut taunt_events: Vec<TauntEvent> = Vec::new();
+
+        // Débiter la mise via le wallet UC centralise. Faillite auto-detectee.
+        let debit_mut = self
+            .wallet_uc
             .debit(&guild_id, &user_id, bet, "blackjack", "Mise blackjack")
             .await?;
+        taunt_events.extend(debit_mut.triggered_taunts);
 
         // Créer le deck et distribuer les cartes
         let mut deck = create_deck();
@@ -80,11 +118,13 @@ impl BlackjackService {
             ("playing".to_string(), 0, None)
         };
 
-        // Si blackjack, créditer le gain
-        if status == "player_blackjack" {
-            self.wallet_repo
+        // Si blackjack, créditer le gain via wallet_uc (jackpot auto-detecte).
+        if status == "player_blackjack" && payout > 0 {
+            let credit_mut = self
+                .wallet_uc
                 .credit(&guild_id, &user_id, payout, "blackjack", "Blackjack ! Gain x2.5")
                 .await?;
+            taunt_events.extend(credit_mut.triggered_taunts);
         }
 
         let game = BlackjackGame {
@@ -106,11 +146,11 @@ impl BlackjackService {
         };
 
         self.repo.create(&game).await?;
-        Ok(game)
+        Ok(BlackjackActionResult { game, taunt_events })
     }
 
     /// Le joueur tire une carte supplémentaire.
-    pub async fn hit(&self, game_id: Uuid) -> Result<BlackjackGame, DomainError> {
+    pub async fn hit(&self, game_id: Uuid) -> Result<BlackjackActionResult, DomainError> {
         let mut game = self.get_game(game_id).await?;
         self.ensure_playing(&game)?;
 
@@ -130,23 +170,25 @@ impl BlackjackService {
         }
 
         self.repo.update(&game).await?;
-        Ok(game)
+        // Hit ne touche pas le wallet (sauf si bust — pas de credit). Aucun
+        // taunt wallet a propager ici.
+        Ok(BlackjackActionResult { game, taunt_events: vec![] })
     }
 
     /// Le joueur reste avec sa main actuelle. Le dealer joue.
-    pub async fn stand(&self, game_id: Uuid) -> Result<BlackjackGame, DomainError> {
+    pub async fn stand(&self, game_id: Uuid) -> Result<BlackjackActionResult, DomainError> {
         let mut game = self.get_game(game_id).await?;
         self.ensure_playing(&game)?;
 
         self.dealer_play(&mut game);
-        self.resolve_game(&mut game).await?;
+        let taunt_events = self.resolve_game(&mut game).await?;
 
         self.repo.update(&game).await?;
-        Ok(game)
+        Ok(BlackjackActionResult { game, taunt_events })
     }
 
     /// Double down : doubler la mise, tirer une carte, puis le dealer joue.
-    pub async fn double_down(&self, game_id: Uuid) -> Result<BlackjackGame, DomainError> {
+    pub async fn double_down(&self, game_id: Uuid) -> Result<BlackjackActionResult, DomainError> {
         let mut game = self.get_game(game_id).await?;
         self.ensure_playing(&game)?;
 
@@ -157,8 +199,11 @@ impl BlackjackService {
             ));
         }
 
-        // Débiter la mise supplémentaire
-        self.wallet_repo
+        let mut taunt_events: Vec<TauntEvent> = Vec::new();
+
+        // Débiter la mise supplémentaire via wallet_uc.
+        let debit_mut = self
+            .wallet_uc
             .debit(
                 &game.guild_id,
                 &game.user_id,
@@ -167,6 +212,7 @@ impl BlackjackService {
                 "Double down blackjack",
             )
             .await?;
+        taunt_events.extend(debit_mut.triggered_taunts);
 
         game.bet *= 2;
         game.doubled = true;
@@ -186,11 +232,12 @@ impl BlackjackService {
         } else {
             // Le dealer joue
             self.dealer_play(&mut game);
-            self.resolve_game(&mut game).await?;
+            let resolve_taunts = self.resolve_game(&mut game).await?;
+            taunt_events.extend(resolve_taunts);
         }
 
         self.repo.update(&game).await?;
-        Ok(game)
+        Ok(BlackjackActionResult { game, taunt_events })
     }
 
     /// Récupère la partie active d'un joueur.
@@ -212,6 +259,13 @@ impl BlackjackService {
     }
 
     /// Annule une partie en cours + rembourse la mise — admin desktop.
+    ///
+    /// Non migre vers wallet_uc : le refund est fait dans une tx composite
+    /// dans le repo blackjack (select partie FOR UPDATE + update status +
+    /// credit wallet + audit) pour garantir l'atomicite. Migrer
+    /// impliquerait de casser cette tx ou d'utiliser `credit_tx`, ce qui
+    /// depasse le scope de la migration #4 (flux joueurs uniquement).
+    /// Admin-only : pas de taunt attendu sur un refund.
     pub async fn cancel_game(&self, id: Uuid) -> Result<(), DomainError> {
         self.repo.cancel_game(id).await
     }
@@ -247,8 +301,9 @@ impl BlackjackService {
         }
     }
 
-    /// Résout la partie après que le dealer ait joué : détermine le statut et crédite le wallet.
-    async fn resolve_game(&self, game: &mut BlackjackGame) -> Result<(), DomainError> {
+    /// Résout la partie après que le dealer ait joué : détermine le statut
+    /// et crédite le wallet via wallet_uc. Retourne les TauntEvent eventuels.
+    async fn resolve_game(&self, game: &mut BlackjackGame) -> Result<Vec<TauntEvent>, DomainError> {
         game.finished_at = Some(Utc::now());
 
         if game.dealer_score > 21 {
@@ -266,7 +321,7 @@ impl BlackjackService {
             game.payout = game.bet;
         }
 
-        // Créditer le wallet si gain ou push
+        // Créditer le wallet si gain ou push (via wallet_uc -> jackpot auto).
         if game.payout > 0 {
             let description = match game.status.as_str() {
                 "dealer_bust" => "Victoire blackjack (dealer bust)",
@@ -274,7 +329,8 @@ impl BlackjackService {
                 "push" => "Égalité blackjack (mise remboursée)",
                 _ => "Gain blackjack",
             };
-            self.wallet_repo
+            let credit_mut = self
+                .wallet_uc
                 .credit(
                     &game.guild_id,
                     &game.user_id,
@@ -283,8 +339,166 @@ impl BlackjackService {
                     description,
                 )
                 .await?;
+            return Ok(credit_mut.triggered_taunts);
         }
 
-        Ok(())
+        Ok(vec![])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::entities::{StreakKind, Wallet};
+    use crate::ports::inbound::manage_wallet::{TxWalletMutation, WalletMutation};
+    use async_trait::async_trait;
+    use chrono::Utc;
+    use std::sync::Mutex;
+
+    fn fake_taunt(kind: StreakKind) -> TauntEvent {
+        TauntEvent {
+            channel_id: "chan".into(),
+            target_user_id: "u".into(),
+            message: "boom".into(),
+            nickname_suffix: String::new(),
+            streak_kind: kind.as_str(),
+            streak_value: 1,
+        }
+    }
+
+    struct FakeBlackjackRepo {
+        created: Mutex<Option<BlackjackGame>>,
+    }
+    #[async_trait]
+    impl BlackjackRepository for FakeBlackjackRepo {
+        async fn create(&self, game: &BlackjackGame) -> Result<(), DomainError> {
+            *self.created.lock().unwrap() = Some(game.clone());
+            Ok(())
+        }
+        async fn get_active(&self, _: &str, _: &str) -> Result<Option<BlackjackGame>, DomainError> {
+            Ok(None)
+        }
+        async fn update(&self, _: &BlackjackGame) -> Result<(), DomainError> { Ok(()) }
+        async fn get_by_id(&self, _: Uuid) -> Result<Option<BlackjackGame>, DomainError> {
+            Ok(None)
+        }
+        async fn list_by_guild(&self, _: &str, _: Option<&str>) -> Result<Vec<BlackjackGame>, DomainError> {
+            Ok(vec![])
+        }
+        async fn cancel_game(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    struct FakeWalletRepo;
+    #[async_trait]
+    impl crate::ports::outbound::WalletRepository for FakeWalletRepo {
+        async fn get_or_create(&self, _: &str, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> {
+            Ok(Wallet {
+                id: Uuid::nil(), guild_id: "g".into(), user_id: "u".into(),
+                username: "x".into(), coins: 500, total_earned: 0, total_spent: 0,
+                created_at: Utc::now(), updated_at: Utc::now(),
+            })
+        }
+        async fn get(&self, _: &str, _: &str) -> Result<Option<Wallet>, DomainError> { Ok(None) }
+        async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Wallet, DomainError> { unimplemented!() }
+        async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Wallet, DomainError> { unimplemented!() }
+        async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+        async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> { unimplemented!() }
+        async fn get_transactions(&self, _: &str, _: &str, _: i64) -> Result<Vec<crate::domain::entities::WalletTransaction>, DomainError> { unimplemented!() }
+        async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> { unimplemented!() }
+        async fn reset_wallet(&self, _: &str, _: &str, _: i64) -> Result<Wallet, DomainError> { unimplemented!() }
+        async fn reset_all_wallets(&self, _: &str, _: i64) -> Result<u64, DomainError> { unimplemented!() }
+    }
+
+    /// Mock wallet UC qui simule un debit/credit reussis et retourne les
+    /// taunts fournis au constructeur. Trace les appels.
+    struct MockWalletUc {
+        debit_taunts: Vec<TauntEvent>,
+        credit_taunts: Vec<TauntEvent>,
+        debit_should_fail: bool,
+        calls: Mutex<Vec<String>>,
+    }
+    #[async_trait]
+    impl ManageWalletUseCase for MockWalletUc {
+        async fn credit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> {
+            self.calls.lock().unwrap().push("credit".into());
+            Ok(WalletMutation {
+                new_balance: 100, previous_balance: 0,
+                triggered_taunts: self.credit_taunts.clone(),
+            })
+        }
+        async fn debit(&self, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<WalletMutation, DomainError> {
+            self.calls.lock().unwrap().push("debit".into());
+            if self.debit_should_fail {
+                return Err(DomainError::ValidationError("Solde insuffisant".into()));
+            }
+            Ok(WalletMutation {
+                new_balance: 0, previous_balance: 100,
+                triggered_taunts: self.debit_taunts.clone(),
+            })
+        }
+        async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<Vec<TauntEvent>, DomainError> { unimplemented!() }
+        async fn get_balance(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
+        async fn credit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+        async fn debit_tx(&self, _: &mut sqlx::Transaction<'_, sqlx::Postgres>, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<TxWalletMutation, DomainError> { unimplemented!() }
+        async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
+    }
+
+    fn build_svc(wallet_uc: Arc<MockWalletUc>) -> BlackjackService {
+        BlackjackService::new(
+            Arc::new(FakeBlackjackRepo { created: Mutex::new(None) }),
+            Arc::new(FakeWalletRepo),
+            wallet_uc,
+        )
+    }
+
+    #[tokio::test]
+    async fn start_game_propagates_debit_taunts() {
+        let mock = Arc::new(MockWalletUc {
+            debit_taunts: vec![fake_taunt(StreakKind::EcoBankruptcy)],
+            credit_taunts: vec![],
+            debit_should_fail: false,
+            calls: Mutex::new(vec![]),
+        });
+        let svc = build_svc(mock.clone());
+        let result = svc.start_game("g".into(), "u".into(), "x".into(), 50, 10, 1000, 500, 1.5)
+            .await.expect("start_game ok");
+        // Au moins un taunt de faillite retourne (potentiellement + jackpot si natural).
+        assert!(result.taunt_events.iter().any(|e| e.streak_kind == StreakKind::EcoBankruptcy.as_str()));
+        assert_eq!(mock.calls.lock().unwrap()[0], "debit");
+    }
+
+    #[tokio::test]
+    async fn start_game_bubbles_insufficient_funds_error() {
+        let mock = Arc::new(MockWalletUc {
+            debit_taunts: vec![],
+            credit_taunts: vec![],
+            debit_should_fail: true,
+            calls: Mutex::new(vec![]),
+        });
+        let svc = build_svc(mock);
+        let err = svc.start_game("g".into(), "u".into(), "x".into(), 50, 10, 1000, 500, 1.5)
+            .await.expect_err("doit rejeter si solde insuffisant");
+        match err {
+            DomainError::ValidationError(msg) => assert!(msg.contains("insuffisant")),
+            other => panic!("Expected ValidationError, got {:?}", other),
+        }
+    }
+
+    #[tokio::test]
+    async fn start_game_validates_min_max_bet_before_debit() {
+        let mock = Arc::new(MockWalletUc {
+            debit_taunts: vec![], credit_taunts: vec![],
+            debit_should_fail: false,
+            calls: Mutex::new(vec![]),
+        });
+        let svc = build_svc(mock.clone());
+        // Mise < min.
+        let err = svc.start_game("g".into(), "u".into(), "x".into(), 5, 10, 1000, 500, 1.5).await.unwrap_err();
+        assert!(matches!(err, DomainError::ValidationError(_)));
+        // Mise > max.
+        let err = svc.start_game("g".into(), "u".into(), "x".into(), 5000, 10, 1000, 500, 1.5).await.unwrap_err();
+        assert!(matches!(err, DomainError::ValidationError(_)));
+        // Aucun appel debit ne doit avoir lieu.
+        assert!(mock.calls.lock().unwrap().is_empty());
     }
 }

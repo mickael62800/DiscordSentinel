@@ -60,7 +60,7 @@ pub async fn start_game(
         .and_then(|c| c.config_value.parse().ok())
         .unwrap_or(1.5);
 
-    let game = state
+    let result = state
         .blackjack_svc
         .start_game(
             dto.guild_id,
@@ -73,11 +73,15 @@ pub async fn start_game(
             blackjack_payout,
         )
         .await?;
+    let game = result.game;
 
     if game_is_over(&game.status) {
         broadcast_result(&state, &game, false);
     }
 
+    // Migration #4 : les `taunt_events` eventuels ne sont PAS renvoyes sur
+    // l'API HTTP (usage admin desktop qui n'a pas de pipeline de dispatch).
+    // Le bot passe par gRPC qui inclut les taunts dans `BlackjackGameResult`.
     Ok(Json(to_dto(&game)))
 }
 
@@ -87,7 +91,7 @@ pub async fn hit(
     Path(game_id): Path<String>,
 ) -> Result<Json<BlackjackGameDto>, ApiError> {
     let id = parse_uuid(&game_id)?;
-    let game = state.blackjack_svc.hit(id).await?;
+    let game = state.blackjack_svc.hit(id).await?.game;
 
     if game_is_over(&game.status) {
         broadcast_result(&state, &game, false);
@@ -102,7 +106,7 @@ pub async fn stand(
     Path(game_id): Path<String>,
 ) -> Result<Json<BlackjackGameDto>, ApiError> {
     let id = parse_uuid(&game_id)?;
-    let game = state.blackjack_svc.stand(id).await?;
+    let game = state.blackjack_svc.stand(id).await?.game;
 
     // stand termine toujours la partie → on broadcast systématiquement.
     broadcast_result(&state, &game, false);
@@ -116,7 +120,7 @@ pub async fn double_down(
     Path(game_id): Path<String>,
 ) -> Result<Json<BlackjackGameDto>, ApiError> {
     let id = parse_uuid(&game_id)?;
-    let game = state.blackjack_svc.double_down(id).await?;
+    let game = state.blackjack_svc.double_down(id).await?.game;
 
     if game_is_over(&game.status) {
         broadcast_result(&state, &game, true);

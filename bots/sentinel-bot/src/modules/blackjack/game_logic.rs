@@ -23,12 +23,21 @@ use super::GameApiKey;
 use super::api_client::{ApiClient, BlackjackGameDto, TauntEvent};
 
 /// Detecte l'etat final d'une partie et declenche les hooks taunts
-/// appropries. Fire-and-forget : un echec reseau ne bloque pas le jeu.
+/// specifiques blackjack (natural 21 / win / bust streak). Les taunts
+/// economiques (faillite + jackpot) sont desormais detectes cote API par
+/// le wallet UC unifie (migration #4) et retournes directement dans la
+/// reponse gRPC — on accepte donc une liste de `wallet_taunts` deja
+/// resolus a concatener. Fire-and-forget : un echec reseau ne bloque pas
+/// le jeu.
+///
+/// IMPORTANT : l'ancien appel manuel a `track_jackpot` a ete retire pour
+/// eviter un double-taunt avec la detection automatique du wallet UC.
 async fn maybe_dispatch_bj_taunts(
     ctx: &Context,
     api: &ApiClient,
     guild_id_raw: &str,
     game: &BlackjackGameDto,
+    wallet_taunts: Vec<TauntEvent>,
 ) {
     let guild_id_num: u64 = match guild_id_raw.parse() {
         Ok(v) => v,
@@ -37,27 +46,17 @@ async fn maybe_dispatch_bj_taunts(
     let guild_id = serenity::all::GuildId::new(guild_id_num);
     let user_id = &game.user_id;
 
-    let mut events: Vec<TauntEvent> = Vec::new();
+    let mut events: Vec<TauntEvent> = wallet_taunts;
 
     match game.status.as_str() {
         "player_blackjack" => {
             if let Ok(Some(ev)) = api.track_bj_natural(guild_id_raw, user_id).await {
                 events.push(ev);
             }
-            if game.payout > 0 {
-                if let Ok(Some(ev)) = api.track_jackpot(guild_id_raw, user_id, game.payout).await {
-                    events.push(ev);
-                }
-            }
         }
         "player_win" | "dealer_bust" => {
             if let Ok(Some(ev)) = api.track_bj_hand_won(guild_id_raw, user_id).await {
                 events.push(ev);
-            }
-            if game.payout > 0 {
-                if let Ok(Some(ev)) = api.track_jackpot(guild_id_raw, user_id, game.payout).await {
-                    events.push(ev);
-                }
             }
         }
         "player_bust" => {
@@ -71,6 +70,15 @@ async fn maybe_dispatch_bj_taunts(
     for ev in events {
         dispatch_blackjack_taunt(ctx, guild_id, ev).await;
     }
+}
+
+/// Re-export pour les autres sous-modules du blackjack (ex: `game.rs`).
+pub(super) async fn dispatch_blackjack_taunt_pub(
+    ctx: &Context,
+    guild_id: serenity::all::GuildId,
+    ev: TauntEvent,
+) {
+    dispatch_blackjack_taunt(ctx, guild_id, ev).await;
 }
 
 /// Post + rename pour un TauntEvent (mini copie de coude::taunts_dispatch,
@@ -189,7 +197,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Nouvelle partie
-    let game = match api.start_game(&guild_id, &user_id, &username, mise).await {
+    let (game, wallet_taunts) = match api.start_game(&guild_id, &user_id, &username, mise).await {
         Ok(g) => g,
         Err(e) => {
             reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
@@ -213,7 +221,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .ok();
 
     if game_over {
-        maybe_dispatch_bj_taunts(ctx, api, &guild_id, &game).await;
+        maybe_dispatch_bj_taunts(ctx, api, &guild_id, &game, wallet_taunts).await;
+    } else if !wallet_taunts.is_empty() {
+        // Rare mais possible : un taunt wallet (faillite) peut se declencher
+        // au debit meme si la partie continue. On dispatche direct.
+        let gid = serenity::all::GuildId::new(guild_id.parse().unwrap_or(0));
+        for ev in wallet_taunts {
+            dispatch_blackjack_taunt(ctx, gid, ev).await;
+        }
     }
 }
 
@@ -280,7 +295,7 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         _ => return,
     };
 
-    let game = match result {
+    let (game, wallet_taunts) = match result {
         Ok(g) => g,
         Err(e) => {
             reply_component_ephemeral(ctx, component, &format!("Erreur : {e}")).await;
@@ -303,8 +318,9 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         .await
         .ok();
 
-    // Migration 139 : si la main se termine, declenche les taunts appropries
-    // (natural 21, win, bust + eventuel jackpot sur le payout). Le lock
+    // Migration 139 + #4 : si la main se termine, declenche les taunts
+    // specifiques blackjack (natural 21, win, bust streak) et concatene les
+    // taunts wallet (faillite/jackpot) deja retournes par l'API. Le lock
     // sur `ctx.data` a deja ete relache a la fin du bloc precedent.
     if game_over {
         let api_clone = {
@@ -312,7 +328,13 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
             data.get::<GameApiKey>().cloned()
         };
         if let Some(api) = api_clone {
-            maybe_dispatch_bj_taunts(ctx, &api, &guild_id, &game).await;
+            maybe_dispatch_bj_taunts(ctx, &api, &guild_id, &game, wallet_taunts).await;
+        }
+    } else if !wallet_taunts.is_empty() {
+        // Faillite potentielle sur le debit d'un double down sans game_over.
+        let gid = serenity::all::GuildId::new(guild_id.parse().unwrap_or(0));
+        for ev in wallet_taunts {
+            dispatch_blackjack_taunt(ctx, gid, ev).await;
         }
     }
 }

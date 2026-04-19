@@ -294,7 +294,8 @@ pub async fn build_app_state(
     let discord_role_repo = Arc::new(PgDiscordRoleRepository::new(pg_pool.clone()));
     let wallet_repo = Arc::new(PgWalletRepository::new(pg_pool.clone()));
     let blackjack_repo = Arc::new(PgBlackjackRepository::new(pg_pool.clone()));
-    let blackjack_svc = Arc::new(BlackjackService::new(blackjack_repo, wallet_repo.clone()));
+    // `blackjack_svc` est instancie plus bas, apres la construction de
+    // `wallet_uc` (dependance de la migration #4).
     let coude_player_repo = Arc::new(PgCoudePlayerRepository::new(pg_pool.clone()));
     let coude_players_uc = Arc::new(ManageCoudePlayersService::new(coude_player_repo.clone()));
     let coude_combat_repo = Arc::new(PgCoudeCombatRepository::new(pg_pool.clone()));
@@ -334,6 +335,16 @@ pub async fn build_app_state(
             wallet_repo.clone(),
             coude_taunts_uc.clone(),
         ));
+
+    // Migration #4 : `blackjack_svc` passe ses mutations wallet (mise, cashout,
+    // double down) par `wallet_uc` pour centralisation + detection auto des
+    // taunts (faillite, jackpot). `wallet_repo` reste injecte pour
+    // `get_or_create` au demarrage de la toute premiere partie.
+    let blackjack_svc = Arc::new(BlackjackService::new(
+        blackjack_repo,
+        wallet_repo.clone(),
+        wallet_uc.clone(),
+    ));
 
     let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(
         coude_economy_repo.clone(),
