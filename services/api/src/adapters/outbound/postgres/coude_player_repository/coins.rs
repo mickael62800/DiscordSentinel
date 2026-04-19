@@ -1,37 +1,17 @@
-//! Ajustements wallet : adjust_coins, record_coins_earned, record_coins_lost.
+//! Increments stats-only sur `coude_players` : `total_earned` / `total_lost`.
+//!
+//! Migration wallet unifie (finale) : ces methodes NE mutent PLUS
+//! `user_wallets`. Les mouvements de coins + log `wallet_transactions`
+//! sont a la charge de l'appelant, qui doit passer par
+//! `ManageWalletUseCase::credit/debit` (ou `WalletRepository::credit/debit`
+//! pour les call sites qui ne peuvent pas injecter le use case).
+//!
+//! `adjust_coins` (ajustement admin) a ete supprime : les handlers HTTP/
+//! gRPC delegent desormais directement au `ManageWalletUseCase`.
 
-use crate::adapters::outbound::postgres::wallet_tx_log::log_wallet_tx;
 use crate::domain::errors::DomainError;
 
 use super::{pg_err, PgCoudePlayerRepository};
-
-pub(super) async fn adjust_coins(
-    repo: &PgCoudePlayerRepository,
-    guild_id: &str,
-    user_id: &str,
-    delta: i64,
-) -> Result<bool, DomainError> {
-    let mut tx = repo.pool.begin().await.map_err(pg_err)?;
-    let row: Option<i64> = sqlx::query_scalar(
-        "UPDATE user_wallets
-         SET coins = GREATEST(0, coins + $1), updated_at = NOW()
-         WHERE guild_id = $2 AND user_id = $3
-         RETURNING coins",
-    )
-    .bind(delta)
-    .bind(guild_id)
-    .bind(user_id)
-    .fetch_optional(&mut *tx)
-    .await
-    .map_err(pg_err)?;
-    let Some(balance_after) = row else {
-        tx.commit().await.map_err(pg_err)?;
-        return Ok(false);
-    };
-    log_wallet_tx(&mut tx, guild_id, user_id, delta, balance_after, "coude_adjust", "Ajustement manuel").await?;
-    tx.commit().await.map_err(pg_err)?;
-    Ok(true)
-}
 
 pub(super) async fn record_coins_earned(
     repo: &PgCoudePlayerRepository,
@@ -39,28 +19,13 @@ pub(super) async fn record_coins_earned(
     user_id: &str,
     amount: i64,
 ) -> Result<bool, DomainError> {
-    let mut tx = repo.pool.begin().await.map_err(pg_err)?;
-    sqlx::query(
+    let result = sqlx::query(
         "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(guild_id).bind(user_id).bind(amount)
-    .execute(&mut *tx).await.map_err(pg_err)?;
-
-    let row: Option<i64> = sqlx::query_scalar(
-        "UPDATE user_wallets SET coins = coins + $3, total_earned = total_earned + $3, updated_at = NOW()
-         WHERE guild_id = $1 AND user_id = $2
-         RETURNING coins",
-    )
-    .bind(guild_id).bind(user_id).bind(amount)
-    .fetch_optional(&mut *tx).await.map_err(pg_err)?;
-    let Some(balance_after) = row else {
-        tx.commit().await.map_err(pg_err)?;
-        return Ok(false);
-    };
-    log_wallet_tx(&mut tx, guild_id, user_id, amount, balance_after, "coude_earn", "Gain coude").await?;
-    tx.commit().await.map_err(pg_err)?;
-    Ok(true)
+    .execute(&repo.pool).await.map_err(pg_err)?;
+    Ok(result.rows_affected() > 0)
 }
 
 pub(super) async fn record_coins_lost(
@@ -69,26 +34,11 @@ pub(super) async fn record_coins_lost(
     user_id: &str,
     amount: i64,
 ) -> Result<bool, DomainError> {
-    let mut tx = repo.pool.begin().await.map_err(pg_err)?;
-    sqlx::query(
+    let result = sqlx::query(
         "UPDATE coude_players SET total_lost = total_lost + $3, updated_at = NOW()
          WHERE guild_id = $1 AND user_id = $2",
     )
     .bind(guild_id).bind(user_id).bind(amount)
-    .execute(&mut *tx).await.map_err(pg_err)?;
-
-    let row: Option<i64> = sqlx::query_scalar(
-        "UPDATE user_wallets SET coins = GREATEST(0, coins - $3), total_spent = total_spent + $3, updated_at = NOW()
-         WHERE guild_id = $1 AND user_id = $2
-         RETURNING coins",
-    )
-    .bind(guild_id).bind(user_id).bind(amount)
-    .fetch_optional(&mut *tx).await.map_err(pg_err)?;
-    let Some(balance_after) = row else {
-        tx.commit().await.map_err(pg_err)?;
-        return Ok(false);
-    };
-    log_wallet_tx(&mut tx, guild_id, user_id, -amount, balance_after, "coude_loss", "Perte coude").await?;
-    tx.commit().await.map_err(pg_err)?;
-    Ok(true)
+    .execute(&repo.pool).await.map_err(pg_err)?;
+    Ok(result.rows_affected() > 0)
 }

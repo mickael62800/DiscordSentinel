@@ -96,14 +96,12 @@ pub trait ManageCoudePlayersUseCase: Send + Sync {
 
     async fn increment_chaos(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
 
-    // ── Coins ──
-
-    async fn adjust_coins(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        delta: i64,
-    ) -> Result<(), DomainError>;
+    // ── Coins (stats-only : incrementent juste total_earned/total_lost) ──
+    //
+    // Les mouvements d'argent vers `user_wallets` passent par
+    // `ManageWalletUseCase`. Ces methodes ne font plus que l'update stats.
+    // `adjust_coins` a ete supprime : les handlers delegent directement au
+    // use case wallet.
 
     async fn record_coins_earned(
         &self,

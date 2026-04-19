@@ -186,15 +186,6 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         progression::reset_stats(self, guild_id, user_id, cost).await
     }
 
-    async fn adjust_coins(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        delta: i64,
-    ) -> Result<bool, DomainError> {
-        coins::adjust_coins(self, guild_id, user_id, delta).await
-    }
-
     async fn record_coins_earned(
         &self,
         guild_id: &str,

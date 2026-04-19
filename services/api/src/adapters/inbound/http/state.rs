@@ -10,6 +10,7 @@ use crate::ports::inbound::{
     ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageMembersUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
 use crate::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
 use crate::ports::inbound::manage_coude_bets::ManageCoudeBetsUseCase;
 use crate::ports::inbound::manage_coude_economy::ManageCoudeEconomyUseCase;
@@ -46,6 +47,7 @@ pub struct AppState {
     pub ia_config_repo: Arc<dyn IaConfigRepository>,
     pub discord_role_repo: Arc<dyn DiscordRoleRepository>,
     pub wallet_repo: Arc<dyn WalletRepository>,
+    pub wallet_uc: Arc<dyn ManageWalletUseCase>,
     pub blackjack_svc: Arc<BlackjackService>,
     pub coude_players_uc: Arc<dyn ManageCoudePlayersUseCase>,
     pub coude_combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,

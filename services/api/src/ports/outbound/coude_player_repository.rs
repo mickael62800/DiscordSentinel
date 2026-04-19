@@ -78,14 +78,14 @@ pub trait CoudePlayerRepository: Send + Sync {
         cost: i64,
     ) -> Result<Option<CoudePlayer>, DomainError>;
 
-    // ── Économie / coins ──
-
-    async fn adjust_coins(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        delta: i64,
-    ) -> Result<bool, DomainError>;
+    // ── Économie / coins (stats-only depuis migration wallet finale) ──
+    //
+    // Ces methodes NE mutent PLUS `user_wallets`. Elles incrementent juste
+    // les compteurs `total_earned` / `total_lost` de `coude_players`. Les
+    // mouvements d'argent passent par `ManageWalletUseCase` (ou
+    // `WalletRepository` pour les call sites qui ne peuvent injecter le use
+    // case). `adjust_coins` (ajustement admin) a ete supprime : les handlers
+    // HTTP/gRPC delegent directement au use case wallet.
 
     async fn record_coins_earned(
         &self,

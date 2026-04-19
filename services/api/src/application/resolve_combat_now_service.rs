@@ -305,6 +305,26 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .await
                     .unwrap_or(0);
                 if prime_amount > 0 {
+                    // Migration wallet finale : `record_coins_earned` est
+                    // stats-only (increment total_earned). Le credit reel
+                    // du wallet + log wallet_transactions est explicite ici
+                    // (pas via wallet_uc pour rester cote WalletRepository
+                    // deja injecte — les taunts de jackpot pour les primes
+                    // sont hors scope, le montant est typiquement petit).
+                    let prime_desc = format!("Primes combat {}", combat.id);
+                    if let Err(e) = self
+                        .wallet_repo
+                        .credit(
+                            &combat.guild_id,
+                            winner_id,
+                            prime_amount,
+                            "coude_primes",
+                            &prime_desc,
+                        )
+                        .await
+                    {
+                        warn!(error = %e, "Echec credit primes winner");
+                    }
                     let _ = self
                         .players_uc
                         .record_coins_earned(&combat.guild_id, winner_id, prime_amount)

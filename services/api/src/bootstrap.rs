@@ -495,6 +495,7 @@ pub async fn build_app_state(
         ia_config_repo,
         discord_role_repo,
         wallet_repo,
+        wallet_uc: wallet_uc.clone(),
         blackjack_svc,
         coude_players_uc,
         coude_combats_uc,

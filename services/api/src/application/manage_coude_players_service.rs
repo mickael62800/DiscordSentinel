@@ -192,19 +192,6 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         Ok(())
     }
 
-    async fn adjust_coins(
-        &self,
-        guild_id: &str,
-        user_id: &str,
-        delta: i64,
-    ) -> Result<(), DomainError> {
-        let updated = self.repo.adjust_coins(guild_id, user_id, delta).await?;
-        if !updated {
-            return Err(DomainError::NotFound("Joueur introuvable".into()));
-        }
-        Ok(())
-    }
-
     async fn record_coins_earned(
         &self,
         guild_id: &str,

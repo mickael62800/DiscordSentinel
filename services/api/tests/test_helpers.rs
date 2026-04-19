@@ -408,7 +408,6 @@ impl manage_coude_players::ManageCoudePlayersUseCase for StubCoudePlayers {
     async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn increment_cowardice(&self, _: &str, _: &str) -> Result<i32, DomainError> { unimplemented!() }
     async fn increment_chaos(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn adjust_coins(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { unimplemented!() }
@@ -618,6 +617,7 @@ fn base_state() -> AppState {
         discord_role_repo: Arc::new(StubDiscordRoleRepo),
         members_uc: Arc::new(StubMembers),
         wallet_repo: Arc::new(StubWalletRepo),
+        wallet_uc: Arc::new(StubWalletUc),
         blackjack_svc: Arc::new(sentinel_api::application::BlackjackService::new(
             Arc::new(StubBlackjackRepo),
             Arc::new(StubWalletRepo),

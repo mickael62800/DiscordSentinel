@@ -87,12 +87,18 @@ impl ExpireCombatsBatchUseCase for ExpireCombatsBatchService {
                 }
             }
 
-            if let Err(e) = self
-                .player_repo
-                .record_coins_lost(&combat.guild_id, &combat.defender_id, penalty)
-                .await
-            {
-                warn!(error = %e, "Echec record_coins_lost defenseur expire");
+            // Migration wallet finale : `record_coins_lost` est desormais
+            // stats-only (increment `total_lost`). La mutation wallet +
+            // log `wallet_transactions` est deja faite par `wallet_repo.debit`
+            // ci-dessus. Corrige le double-debit historique.
+            if debit_ok {
+                if let Err(e) = self
+                    .player_repo
+                    .record_coins_lost(&combat.guild_id, &combat.defender_id, penalty)
+                    .await
+                {
+                    warn!(error = %e, "Echec record_coins_lost (stats) defenseur expire");
+                }
             }
 
             if let Err(e) = self

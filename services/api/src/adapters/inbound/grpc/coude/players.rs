@@ -14,10 +14,12 @@ use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerService;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::domain::entities::{CoudePlayer, XpProgress};
 use crate::domain::value_objects::CoudeClass;
+use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::ManageCoudePlayersUseCase;
 
 pub struct CoudePlayerGrpc {
     pub players_uc: Arc<dyn ManageCoudePlayersUseCase>,
+    pub wallet_uc: Arc<dyn ManageWalletUseCase>,
 }
 
 #[tonic::async_trait]
@@ -85,10 +87,19 @@ impl CoudePlayerService for CoudePlayerGrpc {
         request: Request<proto::AdjustCoinsRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        self.players_uc
-            .adjust_coins(&req.guild_id, &req.user_id, req.delta)
-            .await
-            .map_err(domain_to_status)?;
+        // Migration wallet finale : delegue a `wallet_uc.credit/debit`
+        // (ajustement admin, pas d'update stats total_earned/total_lost).
+        if req.delta > 0 {
+            self.wallet_uc
+                .credit(&req.guild_id, &req.user_id, req.delta, "coude_adjust", "Ajustement manuel")
+                .await
+                .map_err(domain_to_status)?;
+        } else if req.delta < 0 {
+            self.wallet_uc
+                .debit(&req.guild_id, &req.user_id, -req.delta, "coude_adjust", "Ajustement manuel")
+                .await
+                .map_err(domain_to_status)?;
+        }
         Ok(Response::new(proto::Empty {}))
     }
 

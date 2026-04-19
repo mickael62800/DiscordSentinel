@@ -201,25 +201,55 @@ pub async fn increment_chaos(
 
 // ── Coins ──
 
-/// PATCH /api/coude/players/{guild_id}/{user_id}/coins — ajouter ou retirer des coins
+/// PATCH /api/coude/players/{guild_id}/{user_id}/coins — ajouter ou retirer des coins.
+///
+/// Migration wallet finale : delegue directement a `wallet_uc.credit/debit`
+/// (ajustement admin). Pas d'update stats `total_earned`/`total_lost` —
+/// un ajustement manuel n'est ni un gain ni une perte de gameplay.
 pub async fn adjust_coins(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<AdjustCoinsDto>,
 ) -> Result<StatusCode, ApiError> {
-    state
-        .coude_players_uc
-        .adjust_coins(&guild_id, &user_id, dto.amount)
-        .await?;
+    let delta = dto.amount;
+    if delta == 0 {
+        return Ok(StatusCode::NO_CONTENT);
+    }
+    if delta > 0 {
+        state
+            .wallet_uc
+            .credit(&guild_id, &user_id, delta, "coude_adjust", "Ajustement manuel")
+            .await?;
+    } else {
+        state
+            .wallet_uc
+            .debit(&guild_id, &user_id, -delta, "coude_adjust", "Ajustement manuel")
+            .await?;
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 
 /// POST /api/coude/{guild_id}/players/{user_id}/coins-earned
+///
+/// Migration wallet finale : `wallet_uc.credit` (avec detection auto
+/// jackpot) + update stats `total_earned`. Les taunts eventuels ne sont
+/// pas propages ici (endpoint fire-and-forget) : ils seraient perdus. Pour
+/// les flux qui produisent des gros jackpots (primes combat), preferer un
+/// call site plus direct comme `resolve_combat_now_service`.
 pub async fn record_coins_earned(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<AmountDto>,
 ) -> Result<StatusCode, ApiError> {
+    if dto.amount <= 0 {
+        return Err(ApiError::from(DomainError::ValidationError(
+            "Le montant doit etre positif".into(),
+        )));
+    }
+    state
+        .wallet_uc
+        .credit(&guild_id, &user_id, dto.amount, "coude_earn", "Gain coude")
+        .await?;
     state
         .coude_players_uc
         .record_coins_earned(&guild_id, &user_id, dto.amount)
@@ -228,14 +258,38 @@ pub async fn record_coins_earned(
 }
 
 /// POST /api/coude/{guild_id}/players/{user_id}/coins-lost
+///
+/// Migration wallet finale : clamp au solde reel (comportement legacy),
+/// delegue a `wallet_uc.debit` (detection auto faillite) + update stats
+/// `total_lost`. Les taunts de faillite eventuels ne sont pas propages
+/// ici (endpoint fire-and-forget).
 pub async fn record_coins_lost(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<AmountDto>,
 ) -> Result<StatusCode, ApiError> {
+    if dto.amount <= 0 {
+        return Err(ApiError::from(DomainError::ValidationError(
+            "Le montant doit etre positif".into(),
+        )));
+    }
+    // Clamp au solde reel pour preserver le comportement legacy
+    // (GREATEST(0, coins - amount)) : `wallet_uc.debit` echoue si solde
+    // insuffisant, on reduit le montant pour ne jamais echouer ici.
+    let balance = state.wallet_uc.get_balance(&guild_id, &user_id).await?;
+    let actual = dto.amount.min(balance).max(0);
+    if actual > 0 {
+        state
+            .wallet_uc
+            .debit(&guild_id, &user_id, actual, "coude_loss", "Perte coude")
+            .await?;
+    }
+    // On incremente total_lost du montant reel debite (coherent avec
+    // l'ancienne semantique : GREATEST(0, coins - amount) ne comptait que
+    // ce qui etait reellement retire).
     state
         .coude_players_uc
-        .record_coins_lost(&guild_id, &user_id, dto.amount)
+        .record_coins_lost(&guild_id, &user_id, actual)
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }

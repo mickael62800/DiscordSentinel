@@ -135,7 +135,6 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
     async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn increment_cowardice(&self, _: &str, _: &str) -> Result<i32, DomainError> { unimplemented!() }
     async fn increment_chaos(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn adjust_coins(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { unimplemented!() }
@@ -151,7 +150,10 @@ async fn start_server() -> (String, oneshot::Sender<()>) {
     let url = format!("http://{addr}");
 
     let (tx, rx) = oneshot::channel::<()>();
-    let svc = CoudePlayerGrpc { players_uc: Arc::new(MockPlayersUc) };
+    let svc = CoudePlayerGrpc {
+        players_uc: Arc::new(MockPlayersUc),
+        wallet_uc: Arc::new(test_helpers::StubWalletUc),
+    };
     let server = CoudePlayerServiceServer::new(svc);
 
     tokio::spawn(async move {
