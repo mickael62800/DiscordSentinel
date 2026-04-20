@@ -109,8 +109,9 @@ watch(selectedGuildId, () => {
     <header class="page-header">
       <h1>🔥 Railleries automatiques</h1>
       <p class="subtitle">
-        Configure le salon ou les railleries sont postees et la liste des
-        joueurs qui ont opt-out via <code>/no-taunts on</code>.
+        Systeme transversal a tous les jeux (Coup de Coude, Blackjack,
+        economie). Configure le salon ou les railleries sont postees et
+        la liste des joueurs qui ont opt-out via <code>/no-taunts on</code>.
       </p>
     </header>
 
