@@ -44,40 +44,5 @@ impl fmt::Display for TicketPriority {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn roundtrip_all_variants() {
-        for s in TicketPriority::VALID_VALUES {
-            let prio = TicketPriority::from_str(s).unwrap();
-            assert_eq!(prio.as_str(), *s);
-        }
-    }
-
-    #[test]
-    fn from_str_invalid() {
-        assert!(TicketPriority::from_str("critical").is_none());
-        assert!(TicketPriority::from_str("").is_none());
-    }
-
-    #[test]
-    fn ordering() {
-        assert!(TicketPriority::Urgent > TicketPriority::High);
-        assert!(TicketPriority::High > TicketPriority::Medium);
-        assert!(TicketPriority::Medium > TicketPriority::Low);
-    }
-
-    #[test]
-    fn serde_roundtrip() {
-        let json = serde_json::to_string(&TicketPriority::Urgent).unwrap();
-        assert_eq!(json, "\"urgent\"");
-        let back: TicketPriority = serde_json::from_str(&json).unwrap();
-        assert_eq!(back, TicketPriority::Urgent);
-    }
-
-    #[test]
-    fn valid_values_count() {
-        assert_eq!(TicketPriority::VALID_VALUES.len(), 4);
-    }
-}
+#[path = "tests/ticket_priority.rs"]
+mod tests;

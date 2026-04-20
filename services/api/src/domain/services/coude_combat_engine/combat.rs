@@ -255,9 +255,15 @@ pub fn resolve_combat(
     let atk_class = classes::get_class(attacker.class.as_deref().unwrap_or("bourrin"));
     let def_class = classes::get_class(defender.class.as_deref().unwrap_or("bourrin"));
 
-    // Base effective stats
+    // Base effective stats (classe + niveau + points). Sert aussi de base pour
+    // calculer le hp_max du combat : on snapshot la DEF AVANT d'appliquer les
+    // items (Rage, Coup Traitre, Bouclier) qui modifient atk_def/def_def. Sinon
+    // un joueur fraichement /repos voit son HP current cape a tort par un
+    // hp_max reduit (bug : « /repos pas pris en compte »).
     let (mut atk_atk, mut atk_def) = effective_stats(attacker);
     let (mut def_atk, mut def_def) = effective_stats(defender);
+    let base_atk_def = atk_def;
+    let base_def_def = def_def;
 
     // Matchmaking handicap
     let (handicap, _blocked) = progression::matchmaking_handicap(attacker.level, defender.level);
@@ -300,9 +306,13 @@ pub fn resolve_combat(
         def_def = (def_def as f64 * bouclier_mult) as i32;
     }
 
-    // Recalculate HP max with modified DEF
-    let atk_hp_max = 100 + atk_def * 2;
-    let def_hp_max = 100 + def_def * 2;
+    // HP max = base DEF * 2 + 100 (PAS la DEF modifiee par les items). Les
+    // buffs/debuffs DEF d'items n'ont d'effet que sur la reduction de degats
+    // round par round, jamais sur le HP pool de depart. Sans ce snapshot, un
+    // Tank frais apres /repos avec Rage/Coup Traitre perd silencieusement
+    // des HP avant meme le round 1.
+    let atk_hp_max = 100 + base_atk_def * 2;
+    let def_hp_max = 100 + base_def_def * 2;
 
     let mut atk_hp = attacker_current_hp.min(atk_hp_max);
     let mut def_hp = defender_current_hp.min(def_hp_max);
@@ -922,86 +932,7 @@ pub fn resolve_combat(
 // ── Tests ──
 // ══════════════════════════════════════════════════════════════════════
 
+
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn player(user_id: &str, class: &str, level: i32) -> Player {
-        Player {
-            user_id: user_id.to_string(),
-            class: Some(class.to_string()),
-            level,
-            atk: 10,
-            def: 10,
-            cowardice_count: 0,
-            hp_current: Some(100),
-        }
-    }
-
-    #[test]
-    fn resolve_produit_toujours_un_result_coherent() {
-        // Smoke test : le moteur ne doit jamais panic et doit retourner un
-        // resultat structurellement valide (HP finaux dans [0, max], coins >= 0).
-        let atk = player("111", "bourrin", 5);
-        let def = player("222", "agile", 5);
-        let result = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
-        assert!(result.total_rounds >= 0);
-        assert!(result.coins_won >= 0);
-        assert!(result.coins_lost_by_loser >= 0);
-        assert!(result.attacker_hp_final >= 0);
-        assert!(result.defender_hp_final >= 0);
-    }
-
-    #[test]
-    fn explosion_retourne_draw_avec_loss_50_pct() {
-        // Defender joue explosion → winner_id = None, les 2 perdent 50% de la mise.
-        let atk = player("111", "bourrin", 5);
-        let def = player("222", "fourbe", 5);
-        let result = resolve_combat(&atk, &def, 100, 100, 200, None, Some("explosion"), &[], &CoudeBalanceParams::default());
-        assert!(result.winner_id.is_none());
-        assert!(result.loser_id.is_none());
-        assert_eq!(result.coins_lost_by_loser, 100); // 50% de 200
-        assert_eq!(result.coins_won, 0);
-    }
-
-    #[test]
-    fn tank_vs_tank_ne_bloque_pas_a_1_dmg() {
-        // Avec le fix mirror, Tank vs Tank a un combat normal (pas de spirale
-        // 1 dmg/round). On lance plusieurs combats pour couvrir le RNG : au
-        // moins un doit avoir un dmg moyen > 1 par round.
-        let atk = player("111", "tank", 5);
-        let def = player("222", "tank", 5);
-        let mut any_round_above_1 = false;
-        for _ in 0..20 {
-            let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
-            for round in &r.rounds {
-                if round.attacker_damage > 1 || round.defender_damage > 1 {
-                    any_round_above_1 = true;
-                    break;
-                }
-            }
-            if any_round_above_1 { break; }
-        }
-        assert!(
-            any_round_above_1,
-            "Tank vs Tank devrait produire au moins un round avec > 1 dmg (mirror passif annule)"
-        );
-    }
-
-    #[test]
-    fn draw_path_pas_de_winner() {
-        // Stress test : un egalite parfaite est possible → les champs sont None.
-        // On ne peut pas forcer une draw, mais on verifie que SI c'est le cas,
-        // les invariants tiennent.
-        let atk = player("111", "bourrin", 5);
-        let def = player("222", "bourrin", 5);
-        for _ in 0..100 {
-            let r = resolve_combat(&atk, &def, 10, 10, 50, None, None, &[], &CoudeBalanceParams::default());
-            if r.winner_id.is_none() {
-                assert!(r.loser_id.is_none(), "draw doit avoir winner ET loser None");
-                return;
-            }
-        }
-        // Pas de draw dans 100 runs, c'est OK — on a juste pas tombe dessus.
-    }
-}
+#[path = "tests/combat.rs"]
+mod tests;

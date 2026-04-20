@@ -114,3 +114,7 @@ impl ManageCoudeCatalogUseCase for ManageCoudeCatalogService {
         })
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_coude_catalog.rs"]
+mod tests;

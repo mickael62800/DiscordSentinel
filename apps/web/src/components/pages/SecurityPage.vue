@@ -87,23 +87,23 @@ function eventIcon(type: string): string {
 
     <!-- Stats cards -->
     <div class="stats-grid">
-      <div class="stat-card stat-total">
+      <div class="card stat-card stat-total">
         <span class="stat-label">Total</span>
         <span class="stat-value">{{ stats.total }}</span>
       </div>
-      <div class="stat-card stat-critical">
+      <div class="card stat-card stat-critical">
         <span class="stat-label">Critiques</span>
         <span class="stat-value">{{ stats.critical }}</span>
       </div>
-      <div class="stat-card stat-high">
+      <div class="card stat-card stat-high">
         <span class="stat-label">Eleves</span>
         <span class="stat-value">{{ stats.high }}</span>
       </div>
-      <div class="stat-card stat-medium">
+      <div class="card stat-card stat-medium">
         <span class="stat-label">Moyens</span>
         <span class="stat-value">{{ stats.medium }}</span>
       </div>
-      <div class="stat-card stat-low">
+      <div class="card stat-card stat-low">
         <span class="stat-label">Faibles</span>
         <span class="stat-value">{{ stats.low }}</span>
       </div>
@@ -134,7 +134,7 @@ function eventIcon(type: string): string {
       <LoadingState v-else-if="loading" />
 
       <div v-else class="events-list">
-        <div v-for="event in filteredEvents" :key="event.id" class="event-card">
+        <div v-for="event in filteredEvents" :key="event.id" class="card event-card">
           <div :class="['event-icon', `icon--${event.severity}`]">
             {{ eventIcon(event.event_type) }}
           </div>
@@ -189,10 +189,7 @@ function eventIcon(type: string): string {
 }
 
 .stat-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 18px 20px;
+  padding: 18px 20px; /* override .card : padding horizontal custom */
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -287,7 +284,7 @@ function eventIcon(type: string): string {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .purge-btn:hover:not(:disabled) {
@@ -305,13 +302,10 @@ function eventIcon(type: string): string {
 }
 
 .event-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 18px;
+  padding: 16px 18px; /* override .card : padding custom pour alignement icone */
   display: flex;
   gap: 14px;
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
 }
 
 .event-card:hover {
@@ -415,45 +409,6 @@ function eventIcon(type: string): string {
 }
 
 /* Watched grid */
-.watched-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 16px;
-}
-
-.watched-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 18px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  text-decoration: none;
-  color: inherit;
-  transition: border-color 0.15s, transform 0.15s;
-}
-
-.watched-card:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-}
-
-.watched-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.watched-name {
-  font-weight: 600;
-  font-size: 14px;
-  color: var(--text-primary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 
 .watched-stats {
   display: grid;

@@ -9,7 +9,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="data-table">
+  <div class="card data-table">
     <table>
       <thead>
         <tr>
@@ -36,9 +36,7 @@ defineProps<{
 
 <style scoped>
 .data-table {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 0; /* override .card : le padding est gere ligne par ligne */
   overflow: hidden;
 }
 

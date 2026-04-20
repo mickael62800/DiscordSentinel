@@ -240,3 +240,7 @@ impl ManageModerationUseCase for ManageModerationService {
         Ok(true)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_moderation.rs"]
+mod tests;

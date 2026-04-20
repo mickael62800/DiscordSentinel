@@ -4,7 +4,7 @@
 import {
   getApiConfig, setApiConfig, clearApiConfig,
   getDiscordConfig, setDiscordConfig, clearDiscordConfig,
-  type ApiConfig, type DiscordConfig,
+  type ApiConfig,
 } from "@/api/config";
 
 export const configService = {

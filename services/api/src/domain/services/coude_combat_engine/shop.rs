@@ -230,3 +230,7 @@ pub fn potion_heal_amount(key: &str) -> i32 {
         _ => 0,
     }
 }
+
+#[cfg(test)]
+#[path = "tests/shop.rs"]
+mod tests;

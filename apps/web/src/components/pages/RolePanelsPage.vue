@@ -58,7 +58,7 @@ function styleColor(style: string): string {
           <div
             v-for="panel in panels"
             :key="panel.id"
-            :class="['panel-card', { selected: selectedPanel?.panel.id === panel.id }]"
+            :class="['card', 'panel-card', { selected: selectedPanel?.panel.id === panel.id }]"
             @click="selectPanel(panel.id)"
           >
             <div class="panel-header">
@@ -131,15 +131,11 @@ function styleColor(style: string): string {
 .panels-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
 
 .panel-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 .panel-card:hover { border-color: var(--accent); }
-.panel-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(99,102,241,0.25); }
+.panel-card.selected { border-color: var(--accent); box-shadow: var(--focus-ring); }
 
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .panel-title { font-weight: 600; font-size: 15px; }
@@ -180,6 +176,6 @@ function styleColor(style: string): string {
 /* Cross-link */
 .page-header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .page-header-row h1 { margin-bottom: 0; }
-.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all 0.15s; }
+.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all var(--transition-fast); }
 .cross-link:hover { background: var(--accent); color: white; }
 </style>

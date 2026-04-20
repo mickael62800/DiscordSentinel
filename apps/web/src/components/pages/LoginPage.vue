@@ -16,7 +16,7 @@ async function handleLogin() {
 
 <template>
   <div class="login-page">
-    <div class="login-card">
+    <div class="card card--elevated login-card">
       <div class="login-logo">
         <span class="logo-icon">S</span>
       </div>
@@ -55,25 +55,23 @@ async function handleLogin() {
 }
 
 .login-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 48px;
+  padding: var(--space-3xl);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg);
   text-align: center;
   width: 380px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .login-logo {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-lg);
 }
 
 .logo-icon {
   display: inline-flex;
   width: 64px;
   height: 64px;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
-  border-radius: 16px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  border-radius: var(--radius-xl);
   align-items: center;
   justify-content: center;
   font-weight: 700;
@@ -84,13 +82,13 @@ async function handleLogin() {
 h1 {
   font-size: 24px;
   font-weight: 700;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-xs);
 }
 
 .subtitle {
   color: var(--text-secondary);
   font-size: 14px;
-  margin-bottom: 32px;
+  margin-bottom: var(--space-2xl);
 }
 
 .discord-btn {
@@ -98,17 +96,17 @@ h1 {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 12px 24px;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
   font-size: 15px;
   font-weight: 600;
-  background-color: #5865f2;
-  border-radius: 8px;
-  transition: background-color 0.2s;
+  background-color: var(--accent);
+  border-radius: var(--radius-md);
+  transition: background-color var(--transition-base);
 }
 
 .discord-btn:hover:not(:disabled) {
-  background-color: #4752c4;
+  background-color: var(--accent-hover);
 }
 
 .discord-btn:disabled {
@@ -122,18 +120,18 @@ h1 {
 }
 
 .error-msg {
-  margin-top: 16px;
+  margin-top: var(--space-lg);
   color: var(--danger);
   font-size: 13px;
 }
 
 .setup-link {
   display: inline-block;
-  margin-top: 20px;
+  margin-top: var(--space-lg);
   color: var(--text-secondary);
   font-size: 13px;
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color var(--transition-base);
 }
 
 .setup-link:hover {

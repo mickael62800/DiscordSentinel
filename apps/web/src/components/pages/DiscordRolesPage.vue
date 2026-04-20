@@ -281,7 +281,7 @@ function formatPermissions(perms: string): string {
       <div
         v-for="role in filteredRoles"
         :key="role.id"
-        class="role-card"
+        class="card role-card"
         :class="{ managed: role.managed }"
       >
         <div class="role-header">
@@ -332,7 +332,7 @@ function formatPermissions(perms: string): string {
   margin-bottom: 24px;
 }
 
-.cross-link { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all 0.15s; }
+.cross-link { margin-left: auto; font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all var(--transition-fast); }
 .cross-link:hover { background: var(--accent); color: white; }
 
 .role-count {
@@ -359,11 +359,7 @@ function formatPermissions(perms: string): string {
 }
 
 .role-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition-base);
 }
 
 .role-card:hover {
@@ -452,7 +448,7 @@ function formatPermissions(perms: string): string {
 .btn-create {
   background: var(--accent); color: white; border: none; border-radius: 8px;
   padding: 10px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
-  white-space: nowrap; transition: opacity 0.2s;
+  white-space: nowrap; transition: opacity var(--transition-base);
 }
 .btn-create:hover { opacity: 0.85; }
 
@@ -462,14 +458,14 @@ function formatPermissions(perms: string): string {
   flex: 1; text-align: center;
   background: rgba(88, 101, 242, 0.1); color: var(--accent); border: 1px solid rgba(88, 101, 242, 0.2);
   border-radius: 6px; padding: 6px 12px; font-size: 12px; font-weight: 600; cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 .btn-edit:hover { background: rgba(88, 101, 242, 0.2); }
 .btn-delete {
   text-align: center;
   background: transparent; color: var(--text-secondary); border: 1px solid var(--border);
   border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 .btn-delete:hover { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.3); }
 .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -482,12 +478,12 @@ function formatPermissions(perms: string): string {
 
 /* Modal shared */
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+  position: fixed; inset: 0; background: var(--modal-overlay); backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center; z-index: 1000;
 }
 .modal-content {
   background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
-  width: 100%; max-width: 420px; box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  width: 100%; max-width: 420px; box-shadow: var(--shadow-xl);
   overflow: hidden;
 }
 .modal-content h3 { margin: 0; }
@@ -501,7 +497,7 @@ function formatPermissions(perms: string): string {
   width: 100%; padding: 11px 14px; background: var(--bg-primary); border: 1px solid var(--border);
   border-radius: 8px; color: var(--text-primary); font-size: 14px; box-sizing: border-box;
 }
-.modal-input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(88,101,242,0.15); }
+.modal-input:focus { border-color: var(--accent); outline: none; box-shadow: var(--focus-ring); }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 
 /* Modal edit */
@@ -514,7 +510,7 @@ function formatPermissions(perms: string): string {
 .modal-close {
   background: none; border: none; color: var(--text-secondary); font-size: 22px;
   cursor: pointer; width: 32px; height: 32px; border-radius: 6px; display: flex;
-  align-items: center; justify-content: center; transition: all 0.15s;
+  align-items: center; justify-content: center; transition: all var(--transition-fast);
 }
 .modal-close:hover { background: var(--bg-hover); color: var(--text-primary); }
 
@@ -538,7 +534,7 @@ function formatPermissions(perms: string): string {
 .option-toggle {
   flex: 1; display: flex; flex-direction: column; gap: 2px; cursor: pointer;
   padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border);
-  background: var(--bg-primary); transition: all 0.15s;
+  background: var(--bg-primary); transition: all var(--transition-fast);
 }
 .option-toggle:hover { border-color: var(--accent); }
 .option-toggle.active { border-color: var(--accent); background: rgba(88,101,242,0.06); }
@@ -552,7 +548,7 @@ function formatPermissions(perms: string): string {
   display: flex; align-items: center; gap: 8px; cursor: pointer;
   padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border);
   background: var(--bg-primary); font-size: 13px; color: var(--text-secondary);
-  transition: all 0.15s; user-select: none;
+  transition: all var(--transition-fast); user-select: none;
 }
 .perm-chip:hover { border-color: rgba(88,101,242,0.3); background: var(--bg-hover); }
 .perm-chip.active {
@@ -569,13 +565,13 @@ function formatPermissions(perms: string): string {
 .btn-cancel {
   background: transparent; border: 1px solid var(--border); border-radius: 8px;
   padding: 9px 18px; color: var(--text-primary); font-size: 13px; cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 .btn-cancel:hover { background: var(--bg-hover); }
 .btn-save {
   background: var(--accent); color: white; border: none; border-radius: 8px;
   padding: 9px 24px; font-size: 13px; font-weight: 600; cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 .btn-save:hover { opacity: 0.9; }
 .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }

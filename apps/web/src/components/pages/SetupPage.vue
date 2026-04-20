@@ -178,7 +178,7 @@ async function handleSubmit() {
   padding: 48px;
   text-align: center;
   width: 460px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .setup-logo {
@@ -189,7 +189,7 @@ async function handleSubmit() {
   display: inline-flex;
   width: 64px;
   height: 64px;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
   border-radius: 16px;
   align-items: center;
   justify-content: center;

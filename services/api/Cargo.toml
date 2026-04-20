@@ -77,3 +77,142 @@ tikv-jemallocator = "0.6"
 
 [lints]
 workspace = true
+
+# ═══════════════════════════════════════════════════════════════
+# Tests — arborescence par type (unit / integration / e2e) puis
+# par section metier (audit, coude, moderation, blackjack, etc.).
+# Cargo n'auto-decouvre pas les sous-dossiers de `tests/`, chaque
+# binaire doit etre declare ici explicitement.
+# ═══════════════════════════════════════════════════════════════
+
+# ── Unit tests (use cases avec mocks in-memory, pas de DB) ──
+
+# ── Integration par section metier (HTTP/DB selon fichier) ──
+
+# audit
+[[test]]
+name = "integration_audit_db"
+path = "tests/integration/audit/db.rs"
+
+# automod
+[[test]]
+name = "integration_automod_db"
+path = "tests/integration/automod/db.rs"
+
+# blackjack
+[[test]]
+name = "integration_blackjack_basic"
+path = "tests/integration/blackjack/basic.rs"
+[[test]]
+name = "integration_blackjack_multi"
+path = "tests/integration/blackjack/multi.rs"
+[[test]]
+name = "integration_blackjack_shoe"
+path = "tests/integration/blackjack/shoe.rs"
+
+# community
+[[test]]
+name = "integration_community_db"
+path = "tests/integration/community/db.rs"
+
+# config (bot configs + worker configs)
+[[test]]
+name = "integration_config_bots"
+path = "tests/integration/config/bots.rs"
+[[test]]
+name = "integration_config_worker"
+path = "tests/integration/config/worker.rs"
+
+# coude
+[[test]]
+name = "integration_coude_basic"
+path = "tests/integration/coude/basic.rs"
+[[test]]
+name = "integration_coude_advanced"
+path = "tests/integration/coude/advanced.rs"
+
+# games
+[[test]]
+name = "integration_games_db"
+path = "tests/integration/games/db.rs"
+
+# ia
+[[test]]
+name = "integration_ia_config"
+path = "tests/integration/ia/config.rs"
+
+# moderation
+[[test]]
+name = "integration_moderation_db"
+path = "tests/integration/moderation/db.rs"
+[[test]]
+name = "integration_moderation_http"
+path = "tests/integration/moderation/http.rs"
+
+# notes
+[[test]]
+name = "integration_notes_http"
+path = "tests/integration/notes/http.rs"
+
+# progression
+[[test]]
+name = "integration_progression_db"
+path = "tests/integration/progression/db.rs"
+
+# reminders
+[[test]]
+name = "integration_reminders_http"
+path = "tests/integration/reminders/http.rs"
+
+# strikes
+[[test]]
+name = "integration_strikes_http"
+path = "tests/integration/strikes/http.rs"
+
+# tickets
+[[test]]
+name = "integration_tickets_db"
+path = "tests/integration/tickets/db.rs"
+[[test]]
+name = "integration_tickets_http"
+path = "tests/integration/tickets/http.rs"
+
+# voice (channels)
+[[test]]
+name = "integration_voice_db"
+path = "tests/integration/voice/db.rs"
+[[test]]
+name = "integration_voice_http"
+path = "tests/integration/voice/http.rs"
+
+# wallet
+[[test]]
+name = "integration_wallet_db"
+path = "tests/integration/wallet/db.rs"
+
+# welcome
+[[test]]
+name = "integration_welcome_db"
+path = "tests/integration/welcome/db.rs"
+
+# misc (tests cross-cutting : plusieurs tables/entites en meme temps)
+[[test]]
+name = "integration_misc_advanced"
+path = "tests/integration/misc/advanced.rs"
+[[test]]
+name = "integration_misc_remaining"
+path = "tests/integration/misc/remaining.rs"
+[[test]]
+name = "integration_misc_repositories"
+path = "tests/integration/misc/repositories.rs"
+
+# ── E2E (serveur gRPC in-process, clients reels) ──
+[[test]]
+name = "e2e_grpc_coude"
+path = "tests/e2e/grpc/coude.rs"
+[[test]]
+name = "e2e_grpc_live"
+path = "tests/e2e/grpc/live.rs"
+[[test]]
+name = "e2e_grpc_services"
+path = "tests/e2e/grpc/services.rs"

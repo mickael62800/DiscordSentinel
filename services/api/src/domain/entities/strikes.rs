@@ -21,13 +21,14 @@ pub struct StrikeConfig {
 
 impl StrikeConfig {
     pub fn default_for_guild(guild_id: &str) -> Self {
+        let now = Utc::now();
         Self {
             guild_id: guild_id.to_string(),
             window_secs: 3600,
             thresholds: vec![],
             enabled: true,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: now,
+            updated_at: now,
         }
     }
 }
@@ -51,3 +52,7 @@ pub struct StrikeResult {
     pub escalation_action: Option<String>,
     pub escalation_duration: Option<u64>,
 }
+
+#[cfg(test)]
+#[path = "tests/strikes.rs"]
+mod tests;

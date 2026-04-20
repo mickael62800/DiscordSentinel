@@ -208,7 +208,7 @@ function statusClass(code: unknown): string {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.2s, border-color 0.2s;
+  transition: color var(--transition-base), border-color var(--transition-base);
 }
 
 .tab-btn:hover {
@@ -243,7 +243,7 @@ function statusClass(code: unknown): string {
 /* API */
 .method {
   background: var(--accent-bg);
-  color: #5865f2;
+  color: var(--accent);
 }
 
 .route {
@@ -253,17 +253,17 @@ function statusClass(code: unknown): string {
 
 .status-ok {
   background: var(--success-bg);
-  color: #57f287;
+  color: var(--success);
 }
 
 .status-warn {
   background: var(--warning-bg);
-  color: #f59e0b;
+  color: var(--warning);
 }
 
 .status-error {
   background: var(--danger-bg);
-  color: #ed4245;
+  color: var(--danger);
 }
 
 .latency {
@@ -274,7 +274,7 @@ function statusClass(code: unknown): string {
 /* WebSocket */
 .event {
   background: var(--accent-bg);
-  color: #5865f2;
+  color: var(--accent);
 }
 
 .ip {

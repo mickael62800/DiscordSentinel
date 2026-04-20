@@ -38,3 +38,7 @@ impl IaConfig {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/ia_config.rs"]
+mod tests;

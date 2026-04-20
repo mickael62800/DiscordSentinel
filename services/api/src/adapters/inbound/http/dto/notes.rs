@@ -59,3 +59,7 @@ impl From<UserNote> for UserNoteDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/notes.rs"]
+mod tests;

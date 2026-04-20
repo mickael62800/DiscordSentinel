@@ -3,7 +3,7 @@ import { ref } from "vue";
 import { authService } from "@/services/authService";
 import { configService } from "@/services/configService";
 import { Store as KvStore } from "@/api/store";
-import type { DiscordUser } from "@/types";
+import type { DiscordUser } from "@/api/config";
 
 const STORE_FILE = "auth.json";
 const USER_KEY = "discord_user";

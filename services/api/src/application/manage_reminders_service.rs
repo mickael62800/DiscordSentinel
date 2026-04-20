@@ -77,3 +77,7 @@ impl ManageRemindersUseCase for ManageRemindersService {
         self.repo.find_by_guild(guild_id).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_reminders.rs"]
+mod tests;

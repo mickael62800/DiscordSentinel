@@ -99,3 +99,7 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
             .await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_coude_bets.rs"]
+mod tests;

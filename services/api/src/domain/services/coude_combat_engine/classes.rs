@@ -96,3 +96,7 @@ pub fn get_class(name: &str) -> &'static ClassStats {
 pub fn is_valid_class(name: &str) -> bool {
     matches!(name, "bourrin" | "agile" | "fourbe" | "tank")
 }
+
+#[cfg(test)]
+#[path = "tests/classes.rs"]
+mod tests;

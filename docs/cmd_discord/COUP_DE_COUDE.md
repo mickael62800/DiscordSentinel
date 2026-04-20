@@ -480,10 +480,11 @@ chances de réussir sans préparation, mais la récompense peut être
 ```
 
 - **Taux de base** : 5 %
-- **Chaque outil consommable** dans ton inventaire ajoute **+5 %** au roll
-- **Cap maximum** : 50 % (avec les 9 outils activés)
+- **Chaque outil** ajoute un bonus **variable** selon sa rareté (+2 % à +10 %)
+- **Cap maximum** : 50 % (avec les 9 outils activés : 5 + 45 = 50, exactement)
 - **Cooldown** : 1 fois par **7 jours** par joueur
-- Les **outils sont consommés** quel que soit le résultat (succès ou échec)
+- Les **outils sont consommés partiellement** : 50 % aléatoirement sur succès,
+  25 % sur échec (tunables via config guilde `braquage_tools_consumed_*_pct`)
 
 ### Succès
 
@@ -506,22 +507,25 @@ Seules les commandes passives restent accessibles : `/profil`,
 
 ### Les outils de braquage (9 items consommables)
 
-Achetables via **`/shop braquage acheter:<item>`** :
+Achetables via **`/shop braquage acheter:<item>`** — chaque outil ajoute un
+bonus **croissant avec son prix** (du plus faible au plus puissant) :
 
 | Outil | Bonus | Prix |
 |---|---|---|
-| 🎭 **Masque de braquage** | +5 % | 100 coins |
-| 🔨 **Pied-de-biche** | +5 % | 150 coins |
-| 🔓 **Crochet de vault** | +5 % | 220 coins |
+| 🎭 **Masque de braquage** | +2 % | 100 coins |
+| 🔨 **Pied-de-biche** | +3 % | 150 coins |
+| 🔓 **Crochet de vault** | +4 % | 220 coins |
 | 🗺️ **Plan du coffre** | +5 % | 320 coins |
 | 💨 **Fumigène de diversion** | +5 % | 450 coins |
-| 💣 **Explosif** | +5 % | 600 coins |
-| 💾 **Hacker kit** | +5 % | 800 coins |
-| 🚁 **Drone espion** | +5 % | 1000 coins |
-| 👪 **Équipe de pros** | +5 % | 1500 coins |
+| 💣 **Explosif** | +6 % | 600 coins |
+| 💾 **Hacker kit** | +7 % | 800 coins |
+| 🚁 **Drone espion** | +8 % | 1000 coins |
+| 👪 **Équipe de pros** | +10 % | 1500 coins |
 
-> Les 9 outils + les 5 % de base = **50 %** max. Les doublons ne
-> comptent qu'une fois (achète chaque outil UNE fois pour maximiser).
+> Les 9 outils cumulés = **+45 % de bonus**, plus les **5 % de base** =
+> **50 %** de chance de réussite maximum. Les doublons ne comptent qu'une
+> fois (achète chaque outil UNE fois pour maximiser). Les outils les plus
+> chers sont proportionnellement plus rentables au %/coin.
 
 ### Stratégie
 
@@ -535,6 +539,39 @@ Achetables via **`/shop braquage acheter:<item>`** :
 
 ---
 
+## 🏆 Le tournoi hebdomadaire (auto)
+
+**Phase 11.** Chaque semaine, le bot track les **gains nets** de tous les
+joueurs (combats + vols + paris − pertes) et couronne le joueur qui a le
+plus gagné sur la semaine écoulée.
+
+### Comment ça marche
+
+- **Début de semaine** : tous les compteurs sont à 0, aucune action
+  requise de ta part. Tu joues normalement.
+- **Pendant la semaine** : tes gains nets s'accumulent en continu. Tu peux
+  consulter le classement courant dans le salon annonce (configuré par
+  l'admin via `tournament_channel_id`).
+- **Dimanche 23h UTC** : le tournoi se clôture automatiquement. Le gagnant
+  touche **10 % de la caisse communautaire** (paramétrable via
+  `tournament_prize_pct`) crédités direct sur son wallet, avec un message
+  d'annonce dans le salon.
+- **Un nouveau tournoi démarre immédiatement après** (boucle infinie).
+
+### Règles
+
+- Les gains nets comptent **toutes les sources coude** : combats, paris,
+  vols (reçus et réussis), primes, redistribution cagnotte.
+- Les pertes sont défalquées → un joueur peut finir la semaine en
+  **négatif** (exclu du podium).
+- Si le tournoi est désactivé par l'admin (`tournament_enabled: false`),
+  aucun prix n'est distribué mais les stats continuent de s'accumuler.
+
+> 💡 Pas de commande dédiée — utilise `/leaderboard` ou `/resume` pour
+> suivre tes gains hebdo. Le gagnant est annoncé automatiquement.
+
+---
+
 ## 🔥 Les railleries automatiques
 
 Le jeu track tes séries de **victoires**, **défaites** et **vols
@@ -542,19 +579,35 @@ subis**. Quand tu atteins un palier (**3, 5 ou 10**), un message
 moqueur est posté dans un salon dédié (configuré par l'admin) **et**
 ton pseudo Discord est renommé avec un suffixe progressif.
 
-### Les paliers
+### Les paliers (streaks combat / vol / blackjack)
 
-| Palier | Victoires | Défaites | Vols subis |
-|---|---|---|---|
-| **3** | « en feu » | « (KO) » | « (vidé) » |
-| **5** | « (tyran) » | « le Pouf » | « le Pigeon » |
-| **10** | « le Légende » | « le Paillasson » | « la Tirelire » |
+| Palier | Victoires | Défaites | Vols subis | BJ victoires | BJ busts |
+|---|---|---|---|---|---|
+| **3** | « en feu » | « (KO) » | « (vidé) » | « le Joueur » | « (pété) » |
+| **5** | « (tyran) » | « le Pouf » | « le Pigeon » | « (Flambeur) » | « le Bust » |
+| **10** | « le Légende » | « le Paillasson » | « la Tirelire » | « le Croupier » | « le Néant » |
 
 - Le **compteur se reset** dès que tu inverses la série (défaite après
-  victoires, victoire après défaites, vol bloqué après vols subis).
+  victoires, victoire après défaites, vol bloqué après vols subis, bust
+  après une série de BJ wins, etc.).
 - Un **match nul** reset les deux compteurs de combat.
 - Les messages sont tirés d'un catalogue aléatoire par palier (3
   variantes par type × paliers).
+
+### Les événements économiques (one-shots, Phase 11)
+
+En plus des streaks, certains événements éco déclenchent **une raillerie
+unique** (pas de palier, juste un one-shot) :
+
+| Event | Seuil | Effet |
+|---|---|---|
+| 💸 **Faillite** | solde = 0 coins | « (ruiné) » + message moqueur |
+| 💰 **Jackpot** | gain > `jackpot_threshold` (def. 10 000 c) en une op | « (Jackpot) » + message |
+| 🎁 **Don généreux** | `/donner` ≥ `generous_donor_threshold` (def. 1 000 c) | « le Généreux » + message |
+
+Ces seuils sont configurables par guilde via les clés
+`bankruptcy_taunt_enabled`, `jackpot_threshold`, `generous_donor_threshold`.
+L'opt-out via `/no-taunts on` s'applique aussi à ces events.
 
 ### Opt-out
 
@@ -786,6 +839,7 @@ la doc technique.
 
 **Bon combat, et que les rolls te soient favorables ! ⚔️**
 
-*Dernière mise à jour : 15 avril 2026 — Phase 9 (caisse + protections
-+ boosts + railleries) et Phase 10 (braquage hebdomadaire + prison +
-9 outils consommables).*
+*Dernière mise à jour : 20 avril 2026 — Phase 11 (tournoi hebdo auto +
+taunts blackjack streaks + taunts éco one-shots). Couvre aussi Phase 9
+(caisse + protections + boosts + railleries) et Phase 10 (braquage
+hebdomadaire + prison + 9 outils à bonus variable 2-10 %).*

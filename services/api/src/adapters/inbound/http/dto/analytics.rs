@@ -157,3 +157,7 @@ fn day_name(dow: i16) -> &'static str {
         _ => "?",
     }
 }
+
+#[cfg(test)]
+#[path = "tests/analytics.rs"]
+mod tests;

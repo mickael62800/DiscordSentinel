@@ -83,7 +83,7 @@ function eventLabel(type: string): string {
   gap: 10px;
   padding: 8px 12px;
   border-radius: 6px;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
 }
 
 .timeline-item:hover {

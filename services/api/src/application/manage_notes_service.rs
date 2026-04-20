@@ -29,6 +29,7 @@ impl ManageNotesUseCase for ManageNotesService {
             ));
         }
 
+        let now = Utc::now();
         let note = UserNote {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id,
@@ -37,8 +38,8 @@ impl ManageNotesUseCase for ManageNotesService {
             author_name: cmd.author_name,
             content: cmd.content,
             category: cmd.category,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: now,
+            updated_at: now,
         };
 
         self.repo.save(&note).await?;
@@ -53,3 +54,7 @@ impl ManageNotesUseCase for ManageNotesService {
         self.repo.delete(note_id).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_notes.rs"]
+mod tests;

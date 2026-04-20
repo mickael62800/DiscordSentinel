@@ -167,3 +167,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
         self.repo.delete_reward(guild_id, level, source).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_levels.rs"]
+mod tests;

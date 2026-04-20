@@ -414,7 +414,7 @@ onMounted(() => fetchWallets());
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .kpi-card:hover {
@@ -568,7 +568,7 @@ onMounted(() => fetchWallets());
   font-size: 0.9rem;
   font-family: inherit;
   outline: none;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition-fast);
 }
 
 .input:focus {
@@ -619,7 +619,7 @@ onMounted(() => fetchWallets());
 
 .row-main {
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--transition-fast);
 }
 
 .row-main:hover {
@@ -712,7 +712,7 @@ onMounted(() => fetchWallets());
 .chevron {
   font-size: 0.75rem;
   color: var(--text-muted);
-  transition: transform 0.15s;
+  transition: transform var(--transition-fast);
 }
 
 .table-row.expanded .chevron {

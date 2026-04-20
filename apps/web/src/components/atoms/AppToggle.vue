@@ -40,7 +40,7 @@ defineEmits<{
   inset: 0;
   background-color: var(--border);
   border-radius: 24px;
-  transition: 0.2s;
+  transition: var(--transition-base);
 }
 
 .toggle-slider::before {
@@ -52,7 +52,7 @@ defineEmits<{
   bottom: 3px;
   background-color: white;
   border-radius: 50%;
-  transition: 0.2s;
+  transition: var(--transition-base);
 }
 
 .toggle input:checked + .toggle-slider {

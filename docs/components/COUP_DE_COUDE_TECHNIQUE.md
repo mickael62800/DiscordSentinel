@@ -5,7 +5,7 @@ du jeu Coup de Coude : comment le bot, les workers et l'API collaborent,
 où vit la logique métier, quelles sont les invariants à respecter pour
 ajouter / modifier des fonctionnalités sans rien casser.
 
-> **Version** : post-refacto Phase 0 → 9 (15 avril 2026)
+> **Version** : post-refacto Phase 0 → 11 (20 avril 2026)
 > **Architecture cible** : hexagonale stricte côté API, bot et worker 100 %
 > thin (IO Discord + appels gRPC uniquement).
 >
@@ -23,7 +23,8 @@ ajouter / modifier des fonctionnalités sans rien casser.
 | **9C** | Boost voleur en abonnements + `/boost-voleur` | idem |
 | **9D** | Railleries automatiques streak 3/5/10 + `/no-taunts` + rename Discord | idem |
 | **9E** | Page web admin railleries + channel picker | idem |
-| **10** | Braquage hebdomadaire + prison + 9 outils consommables | [Phase 10 addendum](#phase-10-addendum) |
+| **10** | Braquage hebdomadaire + prison + 9 outils à bonus variable 2-10 % | [Phase 10 addendum](#phase-10-addendum) |
+| **11** | Tournoi hebdo auto + taunts blackjack streaks + taunts éco one-shots + 12 balance params tunables | [Phase 11 addendum](#phase-11-addendum) |
 
 ---
 
@@ -888,9 +889,43 @@ services/api/src/domain/services/coude_combat_engine/combat.rs
 
 ### Tests d'intégration
 
-Pas encore couvert à ce jour — à ajouter dans
-`services/api/tests/integration_coude.rs` (patterns existants dans
-`integration_blackjack.rs`).
+Depuis la réorganisation des tests, l'arborescence est la suivante :
+
+```
+services/api/tests/
+├── test_helpers.rs                (stubs partagés)
+├── unit/                          (use cases avec mocks in-memory, pas de DB)
+├── integration/
+│   ├── coude/
+│   │   ├── basic.rs               (CRUD combats, paris, joueurs)
+│   │   └── advanced.rs            (scénarios multi-joueurs, chaos events)
+│   ├── blackjack/
+│   │   ├── basic.rs
+│   │   ├── multi.rs
+│   │   └── shoe.rs
+│   └── <section>/                 (audit, moderation, tickets, voice, etc.)
+│       ├── db.rs                  (tests avec vraie PostgreSQL)
+│       └── http.rs                (tests router Axum in-process)
+└── e2e/grpc/
+    ├── coude.rs                   (serveur tonic in-process + client)
+    ├── live.rs
+    └── services.rs
+```
+
+Chaque fichier est déclaré comme binaire de test dans `services/api/Cargo.toml`
+via une entrée `[[test]]` (Cargo n'auto-découvre pas les sous-dossiers).
+
+Pour lancer les tests coude uniquement :
+
+```bash
+cargo test -p sentinel-api --test integration_coude_basic --test integration_coude_advanced
+cargo test -p sentinel-api --test e2e_grpc_coude
+```
+
+Pour compléter la couverture, ajouter de nouveaux cas dans
+`tests/integration/coude/basic.rs` (patterns existants) ou créer un nouveau
+fichier sous `tests/integration/coude/` et déclarer son entrée `[[test]]`
+dans `Cargo.toml`.
 
 ### Test manuel E2E post-déploiement
 
@@ -1201,7 +1236,8 @@ _attempts    withdraw   (use_item x N)
 |---|---|---|
 | Cooldown | 7 jours | `HEIST_COOLDOWN_DAYS` |
 | Chance de base | 5 % | `HEIST_BASE_SUCCESS_PERCENT` |
-| Bonus par item | +5 % | `HEIST_ITEM_BONUS_PERCENT` |
+| Bonus par item | **variable 2-10 %** | `HeistToolDef.bonus_percent` (champ par item) |
+| Fallback bonus | 5 % | `HEIST_ITEM_BONUS_PERCENT` (legacy, utilisé si item sans bonus_percent défini) |
 | Cap maximum | 50 % | `HEIST_MAX_SUCCESS_PERCENT` |
 | Gain sur succès | 30-75 % (aléatoire) | `HEIST_GAIN_MIN_PERCENT`/`_MAX_` |
 | Prison sur échec | 24 h | `HEIST_PRISON_HOURS` |
@@ -1209,8 +1245,9 @@ _attempts    withdraw   (use_item x N)
 Toutes les constantes vivent dans
 `services/api/src/domain/entities/coude_heist.rs` avec note
 « Choix d'architecture » — hardcodées à cause du catalogue de 9
-items spécifiquement calibré pour atteindre 50 % avec tous les
-items (5 + 9 × 5 = 50).
+items spécifiquement calibré : chaque item a un `bonus_percent`
+individuel (2/3/4/5/5/6/7/8/10 %) totalisant **+45 %**, plus la base
+5 % = **50 %** cap atteint exactement avec les 9 items.
 
 ### Fichiers clés
 
@@ -1301,5 +1338,112 @@ items (5 + 9 × 5 = 50).
 
 ---
 
-*Dernière mise à jour : 15 avril 2026 — post Phase 8 (bot 100 % thin,
-catalog API source unique de vérité).*
+## Phase 11 addendum
+
+La Phase 11 livre 3 features en une migration (`139_taunts_extensions_and_tournaments.sql`) :
+
+1. **Taunts blackjack** : compteurs de streak `bj_win_streak` / `bj_bust_streak` sur `coude_players`, émission via `on_bj_natural` / `on_bj_hand_won` / `on_bj_hand_bust` dans `ManageCoudeTauntsUseCase`.
+2. **Taunts économie one-shots** : événements non-streak (faillite, jackpot, don généreux) avec seuils configurables par guilde → `on_bankruptcy` / `on_jackpot` / `on_generous_donor`.
+3. **Tournoi hebdo automatique** : classement des gains nets de la semaine, résolution dimanche 23h UTC par worker, prix = pourcentage de la cashbox au gagnant.
+
+### Feature 1 — Taunts blackjack
+
+**Nouveaux champs** `coude_players` :
+- `bj_win_streak` INT (mains de BJ gagnées d'affilée)
+- `bj_bust_streak` INT (busts consécutifs)
+
+**Nouveaux paliers** (réutilisent le `TAUNT_THRESHOLDS = [3, 5, 10]`) :
+- `bj_win_streak` : "le Joueur" / "(Flambeur)" / "le Croupier"
+- `bj_bust_streak` : "(pété)" / "le Bust" / "le Néant"
+
+**Intégration** : `bots/sentinel-bot/src/modules/blackjack/*` appelle les nouveaux hooks du `ManageCoudeTauntsUseCase` après chaque fin de main BJ. Reset :
+- Win streak → reset sur bust ou perte
+- Bust streak → reset sur victoire
+
+### Feature 2 — Taunts économie (one-shots)
+
+Pas de streak, juste un événement ponctuel déclenché à certains seuils :
+
+| Event | Trigger | Config key | Défaut |
+|---|---|---|---|
+| Faillite | solde passe à 0 | `bankruptcy_taunt_enabled` | true |
+| Jackpot | gain unique ≥ seuil | `jackpot_threshold` | 10 000 c |
+| Don généreux | `/donner` ≥ seuil | `generous_donor_threshold` | 1 000 c |
+
+Les seuils vivent dans `bot_guild_config` et sont lus à chaque event. Aucun état persisté côté `coude_players` (pas de streak). Respect de l'opt-out `coude_taunts_opt_outs`.
+
+### Feature 3 — Tournoi hebdomadaire
+
+**Nouvelle table** `coude_weekly_tournaments` :
+```sql
+CREATE TABLE coude_weekly_tournaments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    guild_id TEXT NOT NULL,
+    week_start TIMESTAMPTZ NOT NULL,
+    week_end TIMESTAMPTZ NOT NULL,
+    winner_user_id TEXT,
+    winner_username TEXT,
+    winner_net_gain BIGINT DEFAULT 0,
+    prize_amount BIGINT NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'ongoing',  -- ongoing | resolved | skipped
+    resolved_at TIMESTAMPTZ,
+    UNIQUE (guild_id, week_start)
+);
+```
+
+**Config clés** (dans `bot_guild_config`, ajoutées au schema `coude-bot`) :
+
+| Clé | Type | Défaut |
+|---|---|---|
+| `tournament_enabled` | boolean | true |
+| `tournament_prize_pct` | number | 10 (% de la cashbox) |
+| `tournament_channel_id` | channel | (vide → salon activités) |
+
+**Orchestration** : worker hebdo (dimanche 23h UTC) qui :
+1. Pour chaque guild active : calcule les gains nets de chaque joueur sur la fenêtre `[week_start, NOW)` à partir de `user_wallets_history`.
+2. Élit le winner avec le plus haut gain net (> 0 ; sinon skip).
+3. Retire `tournament_prize_pct` % de la cashbox via `cashbox.withdraw`.
+4. Crédite le gagnant via `wallet.credit`.
+5. Marque la ligne `status = resolved` + stocke winner + prize.
+6. Crée la nouvelle ligne pour la semaine suivante (`status = ongoing`).
+7. Poste l'annonce sur `tournament_channel_id` (fallback activités).
+
+### Phase 11 : dispatch côté bot
+
+`bots/sentinel-bot/src/modules/coude/tournament_events.rs` gère le post Discord (embed trophée) + rename éventuel. Aucune commande slash dédiée : les joueurs consultent le classement via `/leaderboard` ou `/resume`.
+
+---
+
+## Migration 132 — Balance params tunables
+
+La migration `132_coude_balance_params.sql` expose **12 nouvelles clés** dans `bot_guild_config` pour rendre les valeurs d'équilibrage gameplay tunables sans rebuild :
+
+| Clé | Défaut | Usage |
+|---|---|---|
+| `surprise_min_hp_percent` | 40 | % PV max min attaquant pour utiliser Surprise (0 = désactive) |
+| `surprise_allow_defender_counter` | true | Défenseur peut contrer Surprise avec Explosion |
+| `steal_max_active_boosts` | 3 | Max boosts voleur actifs simultanés (0 = illimité) |
+| `steal_failure_penalty_pct` | 20 | % coins perdus par le voleur si son vol échoue |
+| `braquage_tools_consumed_success_pct` | 50 | % outils consommés aléatoirement si braquage réussi |
+| `braquage_tools_consumed_fail_pct` | 25 | % outils consommés aléatoirement si braquage échoue |
+| `double_coup_mode` | median | Stratégie agrégation 2d20 (`max` / `median` / `min`) |
+| `rage_atk_bonus_pct` | 40 | Bonus ATK item Rage |
+| `rage_def_malus_pct` | 15 | Malus DEF item Rage |
+| `coup_traitre_def_malus_pct` | 40 | Malus DEF item Coup Traître |
+| `bouclier_def_bonus_pct` | 20 | Bonus DEF item Bouclier |
+| `poison_damage_per_round` | 5 | PV perdus par round d'un joueur empoisonné |
+
+**Conséquence** : le moteur `coude_combat_engine` lit désormais ces valeurs via `guild_config` au lieu de constantes hardcodées. Les constantes Rust restent comme fallback défaut (même valeurs que ci-dessus) si la clé n'est pas configurée pour une guilde.
+
+---
+
+## Migration 133 — Cleanup legacy don keys
+
+Retire les clés `don_tax_percent` et `don_coins_cooldown_secs` du schema `coude-bot` ainsi que les valeurs orphelines en `bot_guild_config`. Elles avaient été remplacées par `gift_tax_percent` / `gift_cooldown_secs` en migration 131 mais le nettoyage du schema avait été oublié. Opération idempotente, aucun impact runtime.
+
+---
+
+*Dernière mise à jour : 20 avril 2026 — post Phase 11 (tournoi hebdo +
+taunts blackjack/éco + 12 balance params tunables). Phase 8 reste le
+référentiel d'architecture : bot 100 % thin, catalog API source unique
+de vérité.*

@@ -42,11 +42,12 @@ impl From<AuditModRow> for ModerationAction {
             .get("gravity")
             .and_then(|v| v.as_str())
             .and_then(ModerationGravity::from_str_lossy);
+        // Negative duration → None (ne wrap pas sur u64::MAX).
         let duration = row
             .details
             .get("duration_secs")
             .and_then(|v| v.as_i64())
-            .map(|d| d as u64);
+            .and_then(|d| u64::try_from(d).ok());
         // Si details.action_id existe, on l'utilise pour conserver l'identite
         // historique (Phase 4 : sera l'id audit_log lui-meme).
         let id = row
@@ -114,7 +115,7 @@ impl From<ActionRow> for ModerationAction {
             action_type: row.action_type,
             reason: row.reason,
             gravity: row.gravity,
-            duration: row.duration.map(|d| d as u64),
+            duration: row.duration.and_then(|d| u64::try_from(d).ok()),
             created_at: row.created_at,
         }
     }

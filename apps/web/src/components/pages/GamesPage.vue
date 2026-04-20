@@ -289,7 +289,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
         v-if="filteredGames.length === 0"
         message="Aucun jeu dans cette categorie. Cliquez sur « Ajouter un jeu » pour commencer."
       />
-      <div v-else class="games-table">
+      <div v-else class="card games-table">
         <div class="row header-row">
           <div class="col emoji">Emoji</div>
           <div class="col name">Nom</div>
@@ -343,7 +343,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
           Aucun panel deploye. Utilisez la commande ci-dessus dans Discord.
         </div>
         <div v-else class="panels-list">
-          <div v-for="p in panels" :key="p.id" class="panel-card">
+          <div v-for="p in panels" :key="p.id" class="card panel-card">
             <div class="panel-head">
               <AppBadge
                 :label="p.category ?? '(sans categorie)'"
@@ -365,7 +365,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
     <!-- Modal -->
     <Teleport to="body">
       <div v-if="modal.open" class="modal-overlay" @click.self="closeModal">
-        <div class="modal-dialog">
+        <div class="card card--lg modal-dialog">
           <h3>{{ modal.mode === "create" ? "Ajouter un jeu" : "Editer le jeu" }}</h3>
 
           <label class="field">
@@ -474,9 +474,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
 }
 
 .games-table {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 0; /* override .card : chaque row gere son padding */
   overflow: hidden;
 }
 
@@ -522,9 +520,7 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
 
 .panels-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .panel-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 10px; /* override .card : plus compact */
   padding: 14px;
 }
 .panel-head {
@@ -545,15 +541,11 @@ function jumpUrl(panel: { channel_id: string; message_id: string }): string {
 /* Modal */
 .modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--modal-overlay);
   display: flex; align-items: center; justify-content: center;
   z-index: 9999;
 }
 .modal-dialog {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
   width: 480px;
   max-width: 90vw;
   max-height: 90vh;

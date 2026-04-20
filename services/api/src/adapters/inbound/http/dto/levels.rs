@@ -194,3 +194,7 @@ impl From<AddXpResult> for AddXpResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/levels.rs"]
+mod tests;

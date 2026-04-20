@@ -15,7 +15,7 @@ const perPageOptions = [10, 25, 50, 100];
 </script>
 
 <template>
-  <div class="pagination-bar" v-if="totalItems > 0">
+  <div class="card pagination-bar" v-if="totalItems > 0">
     <div class="pagination-info">
       {{ totalItems }} resultat(s) - Page {{ currentPage }} / {{ totalPages }}
     </div>
@@ -89,11 +89,9 @@ const perPageOptions = [10, 25, 50, 100];
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
-  margin-top: 16px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  padding: var(--space-md) var(--space-lg);
+  margin-top: var(--space-lg);
+  border-radius: 10px; /* override .card pour un look plus compact */
   font-size: 13px;
   color: var(--text-secondary);
 }
@@ -105,7 +103,7 @@ const perPageOptions = [10, 25, 50, 100];
 .pagination-controls {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .pagination-btn {
@@ -115,12 +113,12 @@ const perPageOptions = [10, 25, 50, 100];
   align-items: center;
   justify-content: center;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-primary);
   cursor: pointer;
   font-size: 13px;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .pagination-btn:hover:not(:disabled) {
@@ -139,15 +137,15 @@ const perPageOptions = [10, 25, 50, 100];
 }
 
 .pagination-dots {
-  padding: 0 4px;
+  padding: 0 var(--space-xs);
   color: var(--text-secondary);
 }
 
 .pagination-size select {
   padding: 6px 10px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  background-color: var(--bg-input);
+  border-radius: var(--radius-sm);
+  background-color: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;

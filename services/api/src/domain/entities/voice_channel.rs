@@ -151,3 +151,7 @@ pub struct VoiceChannelDetail {
     pub bans: Vec<VoiceChannelBan>,
     pub invite_links: Vec<VoiceChannelInviteLink>,
 }
+
+#[cfg(test)]
+#[path = "tests/voice_channel.rs"]
+mod tests;

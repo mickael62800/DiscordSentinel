@@ -75,3 +75,7 @@ pub struct BlackjackGame {
     pub created_at: DateTime<Utc>,
     pub finished_at: Option<DateTime<Utc>>,
 }
+
+#[cfg(test)]
+#[path = "tests/blackjack.rs"]
+mod tests;

@@ -52,3 +52,7 @@ impl Rule {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/rule.rs"]
+mod tests;

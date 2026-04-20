@@ -17,7 +17,7 @@ button {
   border: none;
   border-radius: 6px;
   font-weight: 500;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
 }
 
 button.md {

@@ -631,7 +631,7 @@ watch(selectedComponent, loadFormValues);
   white-space: normal;
   width: max-content;
   max-width: 280px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  box-shadow: var(--shadow-md);
   z-index: 100;
   line-height: 1.4;
 }
@@ -739,7 +739,7 @@ watch(selectedComponent, loadFormValues);
   border-radius: 10px;
   padding: 16px;
   cursor: pointer;
-  transition: border-color 0.15s;
+  transition: border-color var(--transition-fast);
 }
 
 .component-card:hover {
@@ -850,7 +850,7 @@ watch(selectedComponent, loadFormValues);
   border-radius: 10px;
   border: 1px solid var(--border);
   background: var(--bg-card);
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color var(--transition-base), background var(--transition-base);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -870,7 +870,7 @@ watch(selectedComponent, loadFormValues);
   padding: 12px;
   border-radius: 8px;
   border: 1px solid transparent;
-  transition: border-color 0.2s, background 0.2s;
+  transition: border-color var(--transition-base), background var(--transition-base);
 }
 
 .form-group.modified {
@@ -952,7 +952,7 @@ watch(selectedComponent, loadFormValues);
 .form-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  box-shadow: var(--focus-ring);
 }
 
 .form-input::placeholder {
@@ -1071,7 +1071,7 @@ watch(selectedComponent, loadFormValues);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 

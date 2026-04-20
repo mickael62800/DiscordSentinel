@@ -165,7 +165,7 @@ const periods = computed(() => [7, 14, 30, 90]);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s, background-color 0.15s;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
 }
 
 .refresh-btn:hover:not(:disabled) {

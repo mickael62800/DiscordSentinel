@@ -466,6 +466,12 @@ pub struct StubCoudeTaunts;
     async fn on_player_drew(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn on_player_stolen_from(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
     async fn on_player_defended_steal(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
+    async fn on_bj_natural(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
+    async fn on_bj_hand_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
+    async fn on_bj_hand_bust(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
+    async fn on_bankruptcy(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
+    async fn on_jackpot(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
+    async fn on_generous_donor(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
     async fn get_config(&self, _: &str) -> Result<CoudeTauntsConfig, DomainError> { unimplemented!() }
     async fn set_channel(&self, _: &str, _: Option<&str>) -> Result<(), DomainError> { unimplemented!() }
     async fn set_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { unimplemented!() }
@@ -537,13 +543,15 @@ pub struct StubModstatsRepo;
 pub struct StubGameRepo;
 #[async_trait] impl GameRepository for StubGameRepo {
     async fn list(&self, _: &str) -> Result<Vec<Game>, DomainError> { Ok(vec![]) }
-    async fn create(&self, _: &str, _: &str, _: &str) -> Result<Game, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn list_by_category(&self, _: &str, _: Option<&str>) -> Result<Vec<Game>, DomainError> { Ok(vec![]) }
+    async fn create(&self, _: &str, _: &str, _: &str, _: Option<&str>, _: Option<&str>, _: Option<&str>) -> Result<Game, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn update(&self, _: &str, _: &str, _: Option<&str>, _: Option<Option<&str>>, _: Option<Option<&str>>) -> Result<Option<Game>, DomainError> { Ok(None) }
     async fn delete(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
     async fn find_by_name(&self, _: &str, _: &str) -> Result<Option<Game>, DomainError> { Ok(None) }
-    async fn subscribe(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn unsubscribe(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn get_subscribers(&self, _: &str) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
-    async fn get_user_games(&self, _: &str, _: &str) -> Result<Vec<Game>, DomainError> { Ok(vec![]) }
+    async fn set_role_id(&self, _: &str, _: &str, _: Option<&str>) -> Result<Option<Game>, DomainError> { Ok(None) }
+    async fn save_panel(&self, _: &str, _: &str, _: &str, _: Option<&str>) -> Result<GamePanel, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn find_panel_by_message(&self, _: &str, _: &str) -> Result<Option<GamePanel>, DomainError> { Ok(None) }
+    async fn list_panels(&self, _: &str) -> Result<Vec<GamePanel>, DomainError> { Ok(vec![]) }
 }
 
 pub struct StubSponsorshipRepo;

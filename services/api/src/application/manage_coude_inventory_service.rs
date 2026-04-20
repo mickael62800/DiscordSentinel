@@ -122,3 +122,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_coude_inventory.rs"]
+mod tests;

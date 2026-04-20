@@ -239,43 +239,7 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
     }
 }
 
+
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn distribute_random_total_sums_to_input() {
-        for _ in 0..50 {
-            let amounts = ManageCoudeCashboxService::distribute_random(1000, 5);
-            assert_eq!(amounts.iter().sum::<i64>(), 1000);
-            assert_eq!(amounts.len(), 5);
-        }
-    }
-
-    #[test]
-    fn distribute_random_sorted_desc() {
-        let amounts = ManageCoudeCashboxService::distribute_random(10_000, 10);
-        for pair in amounts.windows(2) {
-            assert!(pair[0] >= pair[1], "not sorted descending");
-        }
-    }
-
-    #[test]
-    fn distribute_random_empty_on_zero_total() {
-        assert!(ManageCoudeCashboxService::distribute_random(0, 5).is_empty());
-        assert!(ManageCoudeCashboxService::distribute_random(100, 0).is_empty());
-    }
-
-    #[test]
-    fn distribute_random_produces_disparity() {
-        // Sur 10 gagnants et 1M coins, le ratio max/min doit etre > 5x
-        // (sinon c'est pas assez disparate pour l'effet loterie).
-        let amounts = ManageCoudeCashboxService::distribute_random(1_000_000, 10);
-        let max = *amounts.first().unwrap();
-        let min = *amounts.last().unwrap();
-        assert!(max >= min);
-        // Tolerance : parfois le min peut etre proche du max (rand), donc on
-        // ne force pas un ratio strict. On verifie juste l'ordre + non-nul.
-        assert!(max > 0);
-    }
-}
+#[path = "tests/manage_coude_cashbox.rs"]
+mod tests;

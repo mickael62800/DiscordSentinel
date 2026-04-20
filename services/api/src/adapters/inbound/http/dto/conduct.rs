@@ -131,3 +131,7 @@ impl From<ConductPointsLog> for ConductPointsLogDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/conduct.rs"]
+mod tests;

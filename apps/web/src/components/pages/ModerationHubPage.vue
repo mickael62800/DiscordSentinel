@@ -441,7 +441,7 @@ async function handleActionSubmit() {
     <!-- ============================================ -->
     <div v-if="activeTab === 'journal'" class="tab-content">
       <!-- Filtres + bouton action -->
-      <div class="journal-toolbar">
+      <div class="card journal-toolbar">
         <div class="filters-grid">
           <div class="filter-field filter-search">
             <label>Recherche</label>
@@ -613,7 +613,7 @@ async function handleActionSubmit() {
           </div>
 
           <div class="ban-list">
-            <div v-for="ban in filteredConfirmed" :key="ban.id" class="ban-card confirmed">
+            <div v-for="ban in filteredConfirmed" :key="ban.id" class="card ban-card confirmed">
               <div class="ban-user">
                 <div class="user-avatar-placeholder confirmed-avatar">{{ ban.target_name.charAt(0).toUpperCase() }}</div>
                 <div class="user-info">
@@ -664,7 +664,7 @@ async function handleActionSubmit() {
           </div>
 
           <div class="ban-list">
-            <div v-for="proposal in filteredProposals" :key="proposal.id" class="ban-card proposal">
+            <div v-for="proposal in filteredProposals" :key="proposal.id" class="card ban-card proposal">
               <div class="ban-user">
                 <div class="user-avatar-placeholder proposal-avatar">{{ proposal.username.charAt(0).toUpperCase() }}</div>
                 <div class="user-info">
@@ -716,7 +716,7 @@ async function handleActionSubmit() {
     <!-- MODALE "Nouvelle action"                     -->
     <!-- ============================================ -->
     <div v-if="actionModalVisible" class="modal-overlay" @click.self="closeActionModal">
-      <div class="modal-content action-modal">
+      <div class="card modal-content action-modal">
         <div class="modal-header">
           <h3>Nouvelle action de moderation</h3>
           <button class="modal-close" @click="closeActionModal">&times;</button>
@@ -750,7 +750,7 @@ async function handleActionSubmit() {
                       :src="member.avatar_url"
                       class="autocomplete-avatar"
                     />
-                    <div v-else class="autocomplete-avatar-placeholder">
+                    <div v-else class="avatar-placeholder autocomplete-avatar-placeholder">
                       {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
                     </div>
                     <div class="autocomplete-info">
@@ -842,7 +842,7 @@ async function handleActionSubmit() {
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .hub-tab:hover {
@@ -867,12 +867,8 @@ async function handleActionSubmit() {
 .journal-toolbar {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 16px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 
 .filters-grid {
@@ -959,7 +955,7 @@ async function handleActionSubmit() {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .reset-btn:hover {
@@ -976,7 +972,7 @@ async function handleActionSubmit() {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .purge-btn:hover:not(:disabled) {
@@ -1068,7 +1064,7 @@ async function handleActionSubmit() {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -1100,7 +1096,7 @@ async function handleActionSubmit() {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -1135,7 +1131,7 @@ async function handleActionSubmit() {
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition-base);
 }
 
 .search-input:focus {
@@ -1190,19 +1186,14 @@ async function handleActionSubmit() {
   gap: 12px;
 }
 
-.ban-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-}
-
+/* .ban-card herite de .card (bg/border/radius/padding). Seules les variantes
+   confirmed/proposal ajoutent une bordure gauche coloree pour distinguer. */
 .ban-card.confirmed {
   border-left: 3px solid var(--danger);
 }
 
 .ban-card.proposal {
-  border-left: 3px solid var(--warning, #f59e0b);
+  border-left: 3px solid var(--warning);
 }
 
 .ban-user {
@@ -1292,7 +1283,7 @@ async function handleActionSubmit() {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-base);
 }
 
 .ban-btn:hover:not(:disabled) {
@@ -1314,7 +1305,7 @@ async function handleActionSubmit() {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .unban-btn:hover:not(:disabled) {
@@ -1332,7 +1323,7 @@ async function handleActionSubmit() {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--modal-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1341,15 +1332,13 @@ async function handleActionSubmit() {
 }
 
 .modal-content {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 0; /* override .card : header/body/footer gerent leur padding */
   width: 100%;
   max-width: 560px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-xl);
 }
 
 .action-modal {
@@ -1405,7 +1394,7 @@ async function handleActionSubmit() {
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--transition-base);
 }
 
 .modal-cancel:hover {
@@ -1463,7 +1452,7 @@ async function handleActionSubmit() {
   max-height: 240px;
   overflow-y: auto;
   z-index: 100;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .autocomplete-item {
@@ -1472,7 +1461,7 @@ async function handleActionSubmit() {
   gap: 10px;
   padding: 8px 12px;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background var(--transition-fast);
 }
 
 .autocomplete-item:hover {
@@ -1489,15 +1478,7 @@ async function handleActionSubmit() {
 .autocomplete-avatar-placeholder {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 12px;
-  font-weight: 700;
-  color: white;
-  flex-shrink: 0;
 }
 
 .autocomplete-info {

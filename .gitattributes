@@ -1,0 +1,6 @@
+# Force les fins de ligne LF sur les scripts executes dans des conteneurs Linux.
+# Sans ca, un clone sur Windows reecrit en CRLF et le shebang `#!/bin/sh\r`
+# plante dans l'image alpine (`exec format error`).
+*.sh text eol=lf
+docker-entrypoint.sh text eol=lf
+Dockerfile text eol=lf

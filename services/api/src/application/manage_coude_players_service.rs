@@ -257,3 +257,7 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
             .await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_coude_players.rs"]
+mod tests;

@@ -28,7 +28,7 @@ function typeIcon(type: string): string {
 </script>
 
 <template>
-  <div class="notification-panel">
+  <div class="card notification-panel">
     <div class="panel-header">
       <h3>Notifications</h3>
       <div class="panel-actions">
@@ -74,10 +74,8 @@ function typeIcon(type: string): string {
   left: var(--sidebar-width);
   width: 380px;
   max-height: 500px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  padding: 0; /* panel sans padding, chaque notif-item gere le sien */
+  box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
   z-index: 100;
@@ -138,7 +136,7 @@ function typeIcon(type: string): string {
   padding: 14px 20px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--transition-fast);
   position: relative;
 }
 
@@ -151,7 +149,9 @@ function typeIcon(type: string): string {
 }
 
 .notif-item.unread {
-  background-color: rgba(88, 101, 242, 0.05);
+  background-color: var(--accent-bg);
+  /* accent-bg est 0.15 d'opacite, on l'attenue via un voile semi-transparent */
+  background-color: color-mix(in srgb, var(--accent) 5%, transparent);
 }
 
 .notif-icon {

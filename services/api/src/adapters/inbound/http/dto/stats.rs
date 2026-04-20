@@ -179,3 +179,7 @@ impl From<GuildStatsOverview> for GuildOverviewDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/stats.rs"]
+mod tests;

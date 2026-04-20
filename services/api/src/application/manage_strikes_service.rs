@@ -92,15 +92,20 @@ impl ManageStrikesUseCase for ManageStrikesService {
     }
 
     async fn save_config(&self, cmd: SaveStrikeConfigCommand) -> Result<StrikeConfig, DomainError> {
+        let now = Utc::now();
         let config = StrikeConfig {
             guild_id: cmd.guild_id,
             window_secs: cmd.window_secs,
             thresholds: cmd.thresholds,
             enabled: cmd.enabled,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: now,
+            updated_at: now,
         };
         self.repo.save_config(&config).await?;
         Ok(config)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_strikes.rs"]
+mod tests;

@@ -115,12 +115,27 @@ services:
     build:
       context: .
       dockerfile: services/api/Dockerfile
-    container_name: sentinel-api
+    # container_name retire : API scalable horizontalement derriere un LB
+    # (ex: `docker compose up --scale api=3`). Le DNS Compose resout `api`
+    # en round-robin sur les replicas.
     restart: unless-stopped
-    # Partage le namespace PID de l'host → /proc dans le conteneur refere
-    # a l'host, ce qui permet a sysinfo de remonter le CPU/RAM reel de la
-    # machine (pas du conteneur). Necessaire pour l'endpoint /api/system/info.
+    # SECURITE — `pid: host` partage le namespace PID de l'host avec le
+    # conteneur. Consequences :
+    #   - /proc du conteneur expose TOUS les process de l'host (lecture).
+    #   - Un attaquant avec RCE dans l'API peut enumerer les process host
+    #     (pas les killer sauf si UID 0 + capability SYS_PTRACE).
+    # Justification : sysinfo a besoin de /proc de l'host pour remonter
+    # le CPU/RAM reel de la machine (endpoint /api/system/info), pas du
+    # conteneur (toujours biaise par cgroups).
+    # Mitigations appliquees :
+    #   - `no-new-privileges` bloque toute escalade via setuid/fscaps.
+    #   - Conteneur en read-only non active car sqlx/tonic ecrivent dans
+    #     /tmp ; si besoin, ajouter `read_only: true` + `tmpfs: /tmp`.
+    # Alternative long terme : extraire l'endpoint /api/system/info vers
+    # un node_exporter et supprimer `pid: host` cote API.
     pid: host
+    security_opt:
+      - no-new-privileges:true
     ports:
       - "3000:3000"     # HTTP/Axum (legacy + endpoints non migres)
       - "50051:50051"   # Phase 7A : gRPC/tonic interne aux bots
@@ -173,10 +188,18 @@ services:
     build:
       context: .
       dockerfile: services/gateway/Dockerfile
-    container_name: sentinel-gateway
+    # container_name retire : scalable horizontalement derriere un LB WS.
     restart: unless-stopped
     ports:
       - "3001:3001"
+    # Healthcheck via endpoint HTTP /health (services/gateway/src/health.rs).
+    # Utilise le wget de BusyBox (image alpine) — pas de curl installe.
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:3001/health || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 15s
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
@@ -194,8 +217,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/moderation-worker/Dockerfile
-    container_name: sentinel-moderation-worker
+    # container_name retire pour scaling horizontal (--scale moderation-worker=N).
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-moderation-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       # Phase 4 B — Redis requis pour publier les events sanction_expiry_reminder
@@ -213,8 +242,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/analytics-worker/Dockerfile
-    container_name: sentinel-analytics-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-analytics-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
@@ -228,8 +263,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/monitoring-worker/Dockerfile
-    container_name: sentinel-monitoring-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-monitoring-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_URL: http://api:3000
@@ -244,8 +285,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/cache-worker/Dockerfile
-    container_name: sentinel-cache-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-cache-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
@@ -266,8 +313,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/ai-worker/Dockerfile
-    container_name: sentinel-ai-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-ai-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
@@ -287,8 +340,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/temp-roles-worker/Dockerfile
-    container_name: sentinel-temp-roles-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-temp-roles-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
@@ -307,8 +366,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/appeal-sla-worker/Dockerfile
-    container_name: sentinel-appeal-sla-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-appeal-sla-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
@@ -327,8 +392,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/export-worker/Dockerfile
-    container_name: sentinel-export-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-export-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
@@ -345,8 +416,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/audit-cache-worker/Dockerfile
-    container_name: sentinel-audit-cache-worker
+    # container_name retire pour scaling horizontal (Phase 6A).
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-audit-cache-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
@@ -365,8 +442,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/blackjack-cleanup-worker/Dockerfile
-    container_name: sentinel-blackjack-cleanup-worker
+    # container_name retire pour scaling horizontal (Phase 6A).
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-blackjack-cleanup-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
@@ -385,8 +468,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/discord-audit-sync-worker/Dockerfile
-    container_name: sentinel-discord-audit-sync-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-discord-audit-sync-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
@@ -403,8 +492,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/cleanup-worker/Dockerfile
-    container_name: sentinel-cleanup-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-cleanup-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
@@ -419,25 +514,6 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-
-  # ──────────────────────────────────────────────
-  # AI
-  # ──────────────────────────────────────────────
-
-  ai-api:
-    build:
-      context: .
-      dockerfile: ai/api/Dockerfile
-    container_name: sentinel-ai-api
-    restart: unless-stopped
-    ports:
-      - "8000:8000"
-    environment:
-      AI_API_PORT: "8000"
-    volumes:
-      - ./ai/training:/app/training
-    profiles:
-      - ai
 
   # ──────────────────────────────────────────────
   # Bot unifie
@@ -459,8 +535,15 @@ services:
     build:
       context: .
       dockerfile: bots/sentinel-bot/Dockerfile
-    container_name: sentinel-bot
+    # container_name retire : Phase 7C sharding multi-replica requiert
+    # plusieurs instances (SHARD_MODE=manual + SHARD_ID/SHARD_TOTAL distincts).
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-bot"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
     environment:
       # Token Discord unifie (fallback sur DISCORD_TOKEN si non defini)
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
@@ -492,8 +575,14 @@ services:
     build:
       context: .
       dockerfile: services/workers/coude-worker/Dockerfile
-    container_name: sentinel-coude-worker
+    # container_name retire pour scaling horizontal.
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "pidof", "sentinel-coude-worker"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
     environment:
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       API_URL: http://api:3000
@@ -506,6 +595,130 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
+  # ──────────────────────────────────────────────
+  # Web (SPA Vue 3 servie par nginx, HTTPS)
+  # ──────────────────────────────────────────────
+  #
+  # nginx sert le build Vite et reverse-proxy :
+  #   /api/*                         -> api:3000       (routes Axum)
+  #   /ws                            -> gateway:3001   (WebSocket)
+  #   /.well-known/acme-challenge/   -> /var/www/certbot (Let's Encrypt HTTP-01)
+  #   /  (HTTP 80)                   -> redirect 301 vers HTTPS 443
+  #
+  # TLS :
+  #   - Au demarrage, l'entrypoint cherche un cert Let's Encrypt dans
+  #     /etc/letsencrypt/live/${WEB_DOMAIN}/. S'il existe, il est utilise ;
+  #     sinon, un cert self-signed 30j est genere automatiquement (dev).
+  #   - Pour obtenir un vrai cert LE : `docker compose --profile tls up -d certbot`
+  #     apres avoir defini WEB_DOMAIN + LETSENCRYPT_EMAIL dans .env.
+  #
+  # VITE_API_URL vide par defaut => fetch relatif, tout passe par nginx (zero CORS).
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-}
+    # container_name retire : scalable horizontalement derriere un LB externe.
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP (redirect + ACME challenge)
+      - "443:443"   # HTTPS
+    environment:
+      # Utilise pour le CN du cert self-signed ET pour retrouver le cert LE
+      # au bon chemin (/etc/letsencrypt/live/<WEB_DOMAIN>/).
+      WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
+    volumes:
+      # Partage le dossier de certs avec certbot. En RW car l'entrypoint
+      # ecrit les symlinks et les certs self-signed sous /etc/nginx/self-signed.
+      - letsencrypt_etc:/etc/letsencrypt
+      # Webroot pour les challenges HTTP-01.
+      - letsencrypt_www:/var/www/certbot
+    healthcheck:
+      # On tape le /healthz HTTP (port 80) plutot que HTTPS : evite le cas
+      # self-signed non trustable par wget dans busybox.
+      test: ["CMD-SHELL", "wget --spider -q http://localhost/healthz || exit 1"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      api:
+        condition: service_healthy
+      gateway:
+        condition: service_started
+
+  # Certbot Let's Encrypt — obtient et renouvelle automatiquement les certs.
+  # Active via profile : `docker compose --profile tls up -d certbot`.
+  # Prerequis .env : WEB_DOMAIN=ton-domaine.com, LETSENCRYPT_EMAIL=toi@exemple.com
+  # Optionnel      : LETSENCRYPT_STAGING=1 pour tester sans rate-limit.
+  #
+  # Comportement :
+  #   1. Obtient un cert la premiere fois (si pas deja present).
+  #   2. Boucle `certbot renew` toutes les 12h (LE renouvelle a 30j avant expiry).
+  #   3. Apres renouvellement, envoie SIGHUP au conteneur web via socket Docker.
+  #
+  # Note securite : l'acces au socket Docker donne un privilege equivalent root
+  # sur l'host. Acceptable pour un sidecar de confiance. Alternative sans socket :
+  # supprimer le --deploy-hook et lancer `docker compose restart web` en cron host.
+  certbot:
+    image: certbot/certbot:latest
+    restart: unless-stopped
+    volumes:
+      - letsencrypt_etc:/etc/letsencrypt
+      - letsencrypt_www:/var/www/certbot
+      # Socket Docker (RW) : requis pour envoyer SIGHUP au conteneur web via
+      # `docker kill`. L'API Docker n'honore pas le flag :ro sur un socket unix.
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WEB_DOMAIN: ${WEB_DOMAIN:-}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL:-}
+      LETSENCRYPT_STAGING: ${LETSENCRYPT_STAGING:-}
+    entrypoint: /bin/sh
+    command:
+      - -c
+      - |
+        set -eu
+        # L'image certbot/certbot est alpine-based mais sans CLI docker.
+        # On l'installe pour pouvoir envoyer un SIGHUP au conteneur web lors du
+        # deploy-hook (reload nginx sans restart => pas de downtime).
+        apk add --no-cache docker-cli >/dev/null
+        if [ -z "$${WEB_DOMAIN:-}" ] || [ -z "$${LETSENCRYPT_EMAIL:-}" ]; then
+          echo "[certbot] WEB_DOMAIN et LETSENCRYPT_EMAIL requis dans .env"
+          sleep infinity
+        fi
+        STAGING_FLAG=""
+        if [ -n "$${LETSENCRYPT_STAGING:-}" ]; then
+          STAGING_FLAG="--staging"
+          echo "[certbot] STAGING mode actif (certs non trustables, pour tests)"
+        fi
+        # Deploy hook : reload nginx dans le(s) conteneur(s) web sans restart.
+        # Le label compose permet de cibler tous les replicas en cas de scaling.
+        # Certbot execute le hook via `sh -c`, donc $(...) est expanse a ce moment.
+        DEPLOY_HOOK='docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) || true'
+        # Obtention initiale (idempotent grace a --keep-until-expiring).
+        certbot certonly --webroot -w /var/www/certbot \
+          --non-interactive --agree-tos --email "$$LETSENCRYPT_EMAIL" \
+          $$STAGING_FLAG --keep-until-expiring \
+          -d "$$WEB_DOMAIN" || echo "[certbot] premiere obtention echouee, retry au prochain cycle"
+        # Apres la premiere obtention, on signale le conteneur web pour qu'il
+        # recharge le cert (sinon il reste sur le self-signed jusqu'au prochain
+        # redemarrage).
+        docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) 2>/dev/null || true
+        # Boucle de renouvellement.
+        trap exit TERM
+        while :; do
+          certbot renew --webroot -w /var/www/certbot --quiet \
+            --deploy-hook "$$DEPLOY_HOOK" || true
+          sleep 12h & wait $${!}
+        done
+    depends_on:
+      web:
+        condition: service_started
+    profiles:
+      - tls
 
   # ──────────────────────────────────────────────
   # Monitoring
@@ -543,7 +756,8 @@ services:
   # Phase 0 — Observabilité : Prometheus + Grafana
   # Démarrage : `docker compose --profile monitoring up -d prometheus grafana`
   # Cible Prometheus → API (port 3000) + workers (port 9100 chacun)
-  # Grafana → http://localhost:3001 (admin/admin par défaut, à changer)
+  # Grafana → http://localhost:3002 (admin/admin par défaut, à changer)
+  # Note : port host 3002 car 3001 est utilise par le service `gateway`.
   prometheus:
     image: prom/prometheus:latest
     container_name: sentinel-prometheus
@@ -585,3 +799,18 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  # TLS — /etc/letsencrypt persistant (certs + config certbot + accounts).
+  letsencrypt_etc:
+  # TLS — webroot pour les challenges ACME HTTP-01 (partage web <-> certbot).
+  letsencrypt_www:
+
+# Network explicite : isole la stack des autres projets Compose de la machine
+# et donne un nom lisible aux conteneurs (`sentinel` au lieu de
+# `discordsentinel_default`). Tous les services s'y rattachent implicitement
+# via le network `default`, donc pas besoin de `networks:` par service.
+# Pour une segmentation plus fine (ex: DMZ api/gateway vs infra interne),
+# declarer plusieurs networks et attribuer chaque service explicitement.
+networks:
+  default:
+    name: sentinel
+    driver: bridge

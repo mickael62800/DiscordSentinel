@@ -93,3 +93,7 @@ impl From<MessageAnalysis> for AnalyzeResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/analyze.rs"]
+mod tests;

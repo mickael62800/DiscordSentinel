@@ -149,7 +149,7 @@ async function handlePurgeAll() {
 .search-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  box-shadow: var(--focus-ring);
 }
 
 .event-select {
@@ -178,7 +178,7 @@ async function handlePurgeAll() {
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .purge-btn:hover:not(:disabled) {

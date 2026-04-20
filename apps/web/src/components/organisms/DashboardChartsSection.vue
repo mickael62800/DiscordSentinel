@@ -262,53 +262,53 @@ const membersChartData = computed(() => ({
 
     <div v-if="error" class="error-msg">Erreur chargement graphiques : {{ error }}</div>
     <div v-else-if="!loading && activity.length > 0" class="charts-grid">
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Messages</h3>
         <div class="chart-container"><Line :data="messagesChartData" :options="chartOptions" /></div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Activite vocale</h3>
         <div class="chart-container"><Line :data="voiceChartData" :options="chartOptions" /></div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Infractions</h3>
         <div class="chart-container"><Bar :data="infractionsChartData" :options="chartOptions" /></div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Repartition des infractions</h3>
         <div class="chart-container chart-container--small">
           <Doughnut :data="doughnutData" :options="doughnutOptions" />
         </div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Croissance membres</h3>
         <div class="chart-container"><Line :data="memberGrowthData" :options="chartOptions" /></div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Croissance nette du serveur</h3>
         <div class="chart-container"><Line :data="netGrowthData" :options="chartOptions" /></div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Engagement (messages / membre)</h3>
         <div class="chart-container"><Line :data="engagementData" :options="chartOptions" /></div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Sante du serveur</h3>
         <div class="chart-container"><Line :data="serverHealthData" :options="chartOptions" /></div>
       </div>
-      <div v-if="topUsers.length > 0" class="chart-card">
+      <div v-if="topUsers.length > 0" class="card chart-card">
         <h3>Top membres (messages)</h3>
         <div class="chart-container chart-container--tall">
           <Bar :data="topMessagesData" :options="horizontalBarOptions" />
         </div>
       </div>
-      <div v-if="topUsers.length > 0" class="chart-card">
+      <div v-if="topUsers.length > 0" class="card chart-card">
         <h3>Top membres (vocal)</h3>
         <div class="chart-container chart-container--tall">
           <Bar :data="topVoiceData" :options="horizontalBarOptions" />
         </div>
       </div>
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Membres actifs</h3>
         <div class="chart-container"><Line :data="membersChartData" :options="chartOptions" /></div>
       </div>
@@ -357,10 +357,7 @@ const membersChartData = computed(() => ({
 }
 
 .chart-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  padding: var(--space-xl); /* override .card : plus d'espace pour les graphes */
   min-width: 0; /* empeche l'expansion due au contenu */
 }
 

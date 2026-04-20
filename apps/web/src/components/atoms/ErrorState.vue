@@ -59,7 +59,7 @@ defineEmits<{
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-base);
 }
 
 .retry-btn:hover {

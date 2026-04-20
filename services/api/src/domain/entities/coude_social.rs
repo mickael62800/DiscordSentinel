@@ -93,3 +93,7 @@ pub struct CoudeCurrentSeason {
     pub ends_at: DateTime<Utc>,
     pub days_remaining: i64,
 }
+
+#[cfg(test)]
+#[path = "tests/coude_social.rs"]
+mod tests;

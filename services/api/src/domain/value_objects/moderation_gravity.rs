@@ -33,3 +33,7 @@ impl ModerationGravity {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/moderation_gravity.rs"]
+mod tests;

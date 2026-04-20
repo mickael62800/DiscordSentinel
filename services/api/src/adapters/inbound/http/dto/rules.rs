@@ -68,3 +68,7 @@ impl From<Rule> for RuleResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/rules.rs"]
+mod tests;

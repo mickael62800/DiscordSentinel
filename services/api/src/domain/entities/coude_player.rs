@@ -99,3 +99,7 @@ impl CombatStat {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coude_player.rs"]
+mod tests;

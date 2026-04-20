@@ -148,3 +148,7 @@ impl From<StrikeResult> for StrikeResultDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/strikes.rs"]
+mod tests;

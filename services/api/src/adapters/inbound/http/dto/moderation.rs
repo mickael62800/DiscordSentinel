@@ -123,3 +123,7 @@ impl From<UserModerationHistory> for UserHistoryDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/moderation.rs"]
+mod tests;

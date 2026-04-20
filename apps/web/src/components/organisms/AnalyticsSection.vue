@@ -191,14 +191,14 @@ function heatColor(value: number, max: number): string {
     <div v-else-if="loading" class="loading">Chargement des analytics...</div>
 
     <div v-else-if="analytics" class="analytics-grid">
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Tendance de moderation</h3>
         <div class="chart-container">
           <Line v-if="trendData" :data="trendData" :options="chartOptions" />
         </div>
       </div>
 
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Repartition des actions</h3>
         <div class="chart-container chart-container--small">
           <Doughnut v-if="distributionData" :data="distributionData" :options="doughnutOptions" />
@@ -213,21 +213,21 @@ function heatColor(value: number, max: number): string {
         </div>
       </div>
 
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Top infracteurs</h3>
         <div class="chart-container">
           <Bar v-if="topInfractorsData" :data="topInfractorsData" :options="stackedBarOptions" />
         </div>
       </div>
 
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Activite par heure</h3>
         <div class="chart-container">
           <Bar v-if="peakHoursData" :data="peakHoursData" :options="chartOptions" />
         </div>
       </div>
 
-      <div v-if="heatmapGrid" class="chart-card">
+      <div v-if="heatmapGrid" class="card chart-card">
         <h3>Heatmap activite (messages)</h3>
         <div class="heatmap-wrapper">
           <table class="heatmap-table">
@@ -253,7 +253,7 @@ function heatColor(value: number, max: number): string {
         </div>
       </div>
 
-      <div class="chart-card">
+      <div class="card chart-card">
         <h3>Infractions par jour de la semaine</h3>
         <div class="chart-container">
           <Bar v-if="weekdayInfractionsData" :data="weekdayInfractionsData" :options="weekdayBarOptions" />
@@ -300,10 +300,7 @@ function heatColor(value: number, max: number): string {
 }
 
 .chart-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  padding: var(--space-xl); /* override .card : plus d'espace pour les graphes */
   min-width: 0;
 }
 

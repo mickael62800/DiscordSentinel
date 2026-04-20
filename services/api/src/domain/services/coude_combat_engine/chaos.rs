@@ -74,3 +74,7 @@ pub fn roll_chaos() -> Option<ChaosEvent> {
     }
 }
 
+
+#[cfg(test)]
+#[path = "tests/chaos.rs"]
+mod tests;

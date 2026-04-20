@@ -100,3 +100,7 @@ impl AppConfig {
         format!("{}:{}", self.host, self.grpc_port)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/config.rs"]
+mod tests;

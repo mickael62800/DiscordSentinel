@@ -122,7 +122,7 @@ function backToList() {
         </div>
       </div>
 
-      <div class="tickets-toolbar">
+      <div class="card tickets-toolbar">
         <div class="filter-grid">
           <div class="filter-field filter-search">
             <label>Auteur (ID ou nom)</label>
@@ -189,7 +189,7 @@ function backToList() {
       <ErrorState v-if="error" :message="error" :retryable="true" @retry="fetchTickets" />
       <div v-else-if="loading" class="loading">Chargement...</div>
 
-      <div v-else class="ticket-list">
+      <div v-else class="card ticket-list">
         <div
           v-for="ticket in paginatedTickets"
           :key="ticket.id"
@@ -278,7 +278,7 @@ function backToList() {
         </div>
 
         <!-- Reply box -->
-        <div v-if="detail.ticket.status !== 'closed'" class="reply-box">
+        <div v-if="detail.ticket.status !== 'closed'" class="card reply-box">
           <textarea
             v-model="replyContent"
             placeholder="Tapez votre reponse..."
@@ -323,11 +323,7 @@ function backToList() {
 }
 
 .tickets-toolbar {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-lg);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -399,7 +395,7 @@ function backToList() {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .reset-btn:hover {
@@ -416,7 +412,7 @@ function backToList() {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .bulk-delete-btn:hover:not(:disabled) {
@@ -432,9 +428,7 @@ function backToList() {
 .ticket-list {
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 0; /* override .card : chaque ticket-row gere son propre padding */
   overflow: hidden;
 }
 
@@ -445,7 +439,7 @@ function backToList() {
   padding: 16px 20px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--transition-fast);
 }
 
 .ticket-row:last-child {
@@ -571,11 +565,11 @@ function backToList() {
   margin: 0 auto 20px;
   max-width: 900px;
   width: 100%;
-  padding: 24px;
+  padding: var(--space-xl);
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .message {
@@ -623,10 +617,6 @@ function backToList() {
 
 /* Reply box */
 .reply-box {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
   max-width: 900px;
   width: 100%;
   margin: 0 auto;
@@ -643,7 +633,7 @@ function backToList() {
   font-size: 14px;
   resize: vertical;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition-base);
 }
 
 .reply-box textarea:focus {
@@ -674,7 +664,7 @@ function backToList() {
   color: var(--text-secondary);
   background-color: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   max-width: 900px;
   width: 100%;
   margin: 0 auto;

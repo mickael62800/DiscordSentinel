@@ -7,7 +7,7 @@ defineProps<{
 </script>
 
 <template>
-  <div class="stat-card">
+  <div class="card card--lg stat-card">
     <span class="stat-value" :style="color ? { color } : {}">{{ value }}</span>
     <span class="stat-label">{{ label }}</span>
   </div>
@@ -15,13 +15,9 @@ defineProps<{
 
 <style scoped>
 .stat-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-xs);
 }
 
 .stat-value {

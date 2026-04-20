@@ -79,3 +79,7 @@ impl From<SanctionReminder> for SanctionReminderDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/reminders.rs"]
+mod tests;

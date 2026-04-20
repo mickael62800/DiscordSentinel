@@ -175,3 +175,7 @@ impl WatchedUserRepository for PgWatchedUserRepository {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "tests/watched_user_repository.rs"]
+mod tests;

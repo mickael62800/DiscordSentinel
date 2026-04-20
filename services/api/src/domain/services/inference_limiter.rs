@@ -83,44 +83,7 @@ impl InferenceRateLimiter {
     }
 }
 
+
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_acquire_within_limits() {
-        let limiter = InferenceRateLimiter::new(4, 100);
-        let permit = limiter.acquire().await;
-        assert!(permit.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_concurrent_limit() {
-        let limiter = InferenceRateLimiter::new(2, 0);
-        let _p1 = limiter.acquire().await.unwrap();
-        let _p2 = limiter.acquire().await.unwrap();
-        // 3rd should timeout (semaphore full, 5s timeout)
-        // We test with a short timeout override via try_acquire
-        assert!(limiter.semaphore.try_acquire().is_err());
-    }
-
-    #[tokio::test]
-    async fn test_rate_limit_zero_unlimited() {
-        let limiter = InferenceRateLimiter::new(10, 0);
-        // Should always succeed when max_per_sec = 0
-        for _ in 0..20 {
-            assert!(limiter.acquire().await.is_ok());
-        }
-    }
-
-    #[tokio::test]
-    async fn test_token_bucket_depletes() {
-        let limiter = InferenceRateLimiter::new(100, 1); // 1/s, burst 5
-        // Drain all 5 burst tokens
-        for _ in 0..5 {
-            assert!(limiter.acquire().await.is_ok());
-        }
-        // 6th should fail
-        assert!(limiter.acquire().await.is_err());
-    }
-}
+#[path = "tests/inference_limiter.rs"]
+mod tests;

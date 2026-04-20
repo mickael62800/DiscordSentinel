@@ -133,7 +133,7 @@ function handleReset() {
 </script>
 
 <template>
-  <div :class="['rule-card', { disabled: !rule.enabled, dirty }]">
+  <div :class="['card', 'rule-card', { disabled: !rule.enabled, dirty }]">
     <div class="rule-header">
       <div class="rule-title">
         <h3>{{ ruleName(rule) }}</h3>
@@ -209,14 +209,10 @@ function handleReset() {
 
 <style scoped>
 .rule-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
-  transition: opacity 0.2s, border-color 0.15s;
+  transition: opacity var(--transition-base), border-color var(--transition-fast);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-md);
   min-width: 0; /* evite qu'un contenu long force l'expansion au-dela de la col */
 }
 
@@ -233,14 +229,14 @@ function handleReset() {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  gap: 10px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .rule-title {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   flex: 1;
   min-width: 0;
   flex-wrap: wrap;
@@ -263,9 +259,9 @@ function handleReset() {
 .params {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px;
-  border-radius: 8px;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
   background-color: var(--bg-primary);
   border: 1px solid var(--border);
 }
@@ -273,7 +269,7 @@ function handleReset() {
 .param-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-xs);
 }
 
 .param-row label {
@@ -287,7 +283,7 @@ function handleReset() {
 .range-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
 }
 
 .range-row input[type="range"] {
@@ -305,13 +301,13 @@ function handleReset() {
   font-size: 12px;
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
   padding: 3px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   background-color: var(--bg-hover);
 }
 
 .range-value.warn { color: var(--info); }
 .range-value.delete { color: var(--warning); }
-.range-value.mute { color: #ff9500; }
+.range-value.mute { color: var(--severity-mute); }
 .range-value.ban { color: var(--danger); }
 
 .separator {
@@ -321,16 +317,17 @@ function handleReset() {
   letter-spacing: 0.5px;
   color: var(--text-secondary);
   opacity: 0.7;
-  padding-top: 4px;
+  padding-top: var(--space-xs);
   border-top: 1px dashed var(--border);
 }
 
 .thresholds-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px 14px;
+  gap: var(--space-sm) 14px;
 }
 
+/* Breakpoint --bp-sm (480px) : stack vertical sur mobile landscape */
 @media (max-width: 480px) {
   .thresholds-grid {
     grid-template-columns: 1fr;
@@ -347,13 +344,13 @@ function handleReset() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-sm);
   flex-wrap: wrap;
 }
 
 .actions {
   display: inline-flex;
-  gap: 6px;
+  gap: var(--space-xs);
   flex-wrap: wrap;
 }
 
@@ -364,9 +361,9 @@ function handleReset() {
   font-size: 12px;
   font-weight: 600;
   padding: 5px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
 }
 
 .save-btn:disabled {
@@ -387,9 +384,9 @@ function handleReset() {
   font-size: 12px;
   font-weight: 600;
   padding: 5px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .reset-btn:hover:not(:disabled) {

@@ -7,8 +7,8 @@ const { visible, title, message, resolve } = useConfirm();
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="confirm-overlay" @click.self="resolve(false)">
-      <div class="confirm-dialog">
+    <div v-if="visible" class="modal-overlay confirm-overlay" @click.self="resolve(false)">
+      <div class="card card--lg confirm-dialog">
         <h3>{{ title }}</h3>
         <p>{{ message }}</p>
         <div class="confirm-actions">
@@ -21,21 +21,12 @@ const { visible, title, message, resolve } = useConfirm();
 </template>
 
 <style scoped>
+/* override du z-index utilitaire : dialog de confirmation au-dessus des autres modales */
 .confirm-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 9999;
 }
 
 .confirm-dialog {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
   min-width: 360px;
   max-width: 480px;
 }
@@ -43,20 +34,20 @@ const { visible, title, message, resolve } = useConfirm();
 .confirm-dialog h3 {
   font-size: 16px;
   font-weight: 600;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-md);
 }
 
 .confirm-dialog p {
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.5;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-lg);
   white-space: pre-line;
 }
 
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--space-sm);
 }
 </style>

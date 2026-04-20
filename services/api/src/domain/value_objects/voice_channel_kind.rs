@@ -29,3 +29,7 @@ impl VoiceChannelKind {
     }
 }
 
+
+#[cfg(test)]
+#[path = "tests/voice_channel_kind.rs"]
+mod tests;

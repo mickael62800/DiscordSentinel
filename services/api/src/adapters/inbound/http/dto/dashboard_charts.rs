@@ -38,3 +38,7 @@ impl From<DailyActivity> for DailyActivityDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/dashboard_charts.rs"]
+mod tests;

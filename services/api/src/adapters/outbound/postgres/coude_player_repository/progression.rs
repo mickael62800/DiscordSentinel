@@ -108,13 +108,19 @@ pub(super) async fn spend_stat_point(
     // `cp.guild_id` / `cp.user_id` dans la sous-requete wallet — sans
     // cet alias sur la table cible, Postgres jette "missing FROM-clause
     // entry for table cp" et toute la commande /train tombe en 500.
+    // Investir en DEF gonfle aussi hp_max (+2 HP) et hp_current (le joueur
+    // profite immediatement du bonus). Invariant : `hp_max` DB doit toujours
+    // correspondre a `100 + effective_def * 2` pour que /repos restaure au
+    // bon max et que le moteur de combat ne cape pas les HP a tort.
     let col = stat.column();
+    let hp_delta = if col == "def" { ", hp_max = hp_max + 2, hp_current = hp_current + 2" } else { "" };
     let sql = format!(
         r#"UPDATE coude_players AS cp
-           SET {col} = {col} + 1, stat_points = stat_points - 1, updated_at = NOW()
+           SET {col} = {col} + 1, stat_points = stat_points - 1{hp_delta}, updated_at = NOW()
            WHERE cp.guild_id = $1 AND cp.user_id = $2 AND cp.stat_points >= 1
            RETURNING {cols}"#,
         col = col,
+        hp_delta = hp_delta,
         cols = PLAYER_COLUMNS
     );
     let row: Option<PlayerRow> = sqlx::query_as(&sql)
@@ -147,10 +153,15 @@ pub(super) async fn reset_stats(
         return Ok(None);
     }
 
-    // Reset les stats dans coude_players.
+    // Reset les stats dans coude_players. Retrancher `def * 2` de hp_max
+    // (chaque point DEF avait ajoute +2 HP via spend_stat_point) et clamper
+    // hp_current au nouveau plafond — sinon le joueur conserverait une
+    // barre HP > hp_max, ce que /repos et le moteur de combat n'acceptent pas.
     sqlx::query(
         r#"UPDATE coude_players
            SET stat_points = stat_points + atk + def,
+               hp_max = hp_max - (def * 2),
+               hp_current = LEAST(hp_current, hp_max - (def * 2)),
                atk = 0, def = 0, updated_at = NOW()
            WHERE guild_id = $1 AND user_id = $2 AND (atk > 0 OR def > 0)"#,
     )

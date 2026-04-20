@@ -250,7 +250,7 @@ onMounted(() => {
 .logo-icon {
   width: 36px;
   height: 36px;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
+  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -305,7 +305,7 @@ onMounted(() => {
 .guild-select:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+  box-shadow: var(--focus-ring);
 }
 
 .sidebar-nav {

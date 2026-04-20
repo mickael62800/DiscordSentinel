@@ -234,12 +234,12 @@ function levelToXp(level: number): string {
           <div
             v-for="(user, index) in sortedLeaderboard()"
             :key="user.id"
-            :class="['user-row', { 'top-3': index < 3 }]"
+            :class="['card', 'user-row', { 'top-3': index < 3 }]"
           >
             <div class="rank">
               <span :class="['rank-number', `rank-${index + 1}`]">{{ index + 1 }}</span>
             </div>
-            <div class="user-avatar-placeholder">{{ user.username.charAt(0).toUpperCase() }}</div>
+            <div class="avatar-placeholder user-avatar-placeholder">{{ user.username.charAt(0).toUpperCase() }}</div>
             <div class="user-info">
               <div class="user-header">
                 <span class="user-name">{{ user.username }}</span>
@@ -563,7 +563,7 @@ function levelToXp(level: number): string {
   font-size: 14px;
   cursor: pointer;
   border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .page-tab.active {
@@ -591,7 +591,7 @@ function levelToXp(level: number): string {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .tab:hover {
@@ -622,10 +622,7 @@ function levelToXp(level: number): string {
 }
 
 .user-row {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 18px;
+  padding: 14px 18px; /* override .card : padding horizontal plus large pour listings */
   display: flex;
   align-items: center;
   gap: 14px;
@@ -653,15 +650,7 @@ function levelToXp(level: number): string {
 .user-avatar-placeholder {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
   font-size: 16px;
-  color: white;
-  flex-shrink: 0;
 }
 
 .user-info {
@@ -707,7 +696,7 @@ function levelToXp(level: number): string {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), #7c5cfc);
+  background: linear-gradient(90deg, var(--accent), var(--accent-alt));
   border-radius: 4px;
   transition: width 0.3s;
 }

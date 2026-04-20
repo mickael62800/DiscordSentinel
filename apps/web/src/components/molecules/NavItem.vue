@@ -97,7 +97,7 @@ defineProps<{
   color: var(--text-secondary);
   text-decoration: none;
   font-weight: 500;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .nav-item:hover {

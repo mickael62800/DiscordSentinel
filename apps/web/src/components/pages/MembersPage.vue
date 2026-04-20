@@ -245,12 +245,12 @@ function rolesCount(roles: unknown): number {
         <div
           v-for="member in paginatedMembers"
           :key="member.user_id"
-          :class="['member-card', { selected: selectedMember?.member.user_id === member.user_id }]"
+          :class="['card', 'member-card', { selected: selectedMember?.member.user_id === member.user_id }]"
           @click="onSelectMember(member.user_id)"
         >
           <div class="member-card-header">
             <div class="member-identity">
-              <div class="member-avatar">{{ member.username.charAt(0).toUpperCase() }}</div>
+              <div class="avatar-placeholder member-avatar">{{ member.username.charAt(0).toUpperCase() }}</div>
               <div class="member-names">
                 <span class="member-name">{{ member.display_name || member.username }}</span>
                 <span class="member-id">{{ member.username }}</span>
@@ -279,7 +279,7 @@ function rolesCount(roles: unknown): number {
       </div>
 
       <!-- ===== RIGHT: Detail panel ===== -->
-      <div v-if="selectedMember" class="detail-panel">
+      <div v-if="selectedMember" class="card card--lg detail-panel">
         <div class="panel-top-actions">
           <button
             v-if="!isWatched(selectedMember.member.user_id)"
@@ -312,7 +312,7 @@ function rolesCount(roles: unknown): number {
         <template v-else>
           <!-- Profile header (always visible) -->
           <div class="profile-header">
-            <div class="profile-avatar">{{ selectedMember.member.username.charAt(0).toUpperCase() }}</div>
+            <div class="avatar-placeholder profile-avatar">{{ selectedMember.member.username.charAt(0).toUpperCase() }}</div>
             <div class="profile-info">
               <h2>{{ selectedMember.member.display_name || selectedMember.member.username }}</h2>
               <span class="profile-id">{{ selectedMember.member.user_id }}</span>
@@ -533,7 +533,7 @@ function rolesCount(roles: unknown): number {
       </div>
 
       <!-- Placeholder -->
-      <div v-else class="detail-placeholder">
+      <div v-else class="card card--xl detail-placeholder">
         <div class="placeholder-icon">&#x1f465;</div>
         <p>Selectionnez un membre pour voir son profil</p>
       </div>
@@ -583,7 +583,7 @@ function rolesCount(roles: unknown): number {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .tab:hover, .dtab:hover {
@@ -617,7 +617,7 @@ function rolesCount(roles: unknown): number {
 .search-input:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.2);
+  box-shadow: var(--focus-ring);
 }
 
 .sort-select {
@@ -657,16 +657,13 @@ function rolesCount(roles: unknown): number {
 }
 
 .member-card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px 16px;
+  padding: 14px 16px; /* override .card : plus compact que le default */
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .member-card:hover { border-color: var(--accent); background: var(--bg-hover); }
-.member-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.25); }
+.member-card.selected { border-color: var(--accent); box-shadow: var(--focus-ring); }
 
 .member-card-header {
   display: flex;
@@ -680,15 +677,7 @@ function rolesCount(roles: unknown): number {
 .member-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
   font-size: 14px;
-  color: white;
-  flex-shrink: 0;
 }
 
 .member-names { display: flex; flex-direction: column; gap: 1px; }
@@ -700,10 +689,6 @@ function rolesCount(roles: unknown): number {
 /* Right panel */
 .detail-panel {
   flex: 1;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
   overflow-y: auto;
   max-height: calc(100vh - 240px);
   position: relative;
@@ -727,7 +712,7 @@ function rolesCount(roles: unknown): number {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -750,7 +735,7 @@ function rolesCount(roles: unknown): number {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -773,7 +758,7 @@ function rolesCount(roles: unknown): number {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -799,7 +784,7 @@ function rolesCount(roles: unknown): number {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
@@ -814,15 +799,7 @@ function rolesCount(roles: unknown): number {
 .profile-avatar {
   width: 56px;
   height: 56px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
   font-size: 24px;
-  color: white;
-  flex-shrink: 0;
 }
 
 .profile-info h2 { margin: 0; font-size: 20px; }
@@ -939,7 +916,7 @@ function rolesCount(roles: unknown): number {
 .adjust-input:focus, .adjust-reason:focus {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(88, 101, 242, 0.2);
+  box-shadow: var(--focus-ring);
 }
 
 .adjust-btn {
@@ -949,7 +926,7 @@ function rolesCount(roles: unknown): number {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s;
+  transition: opacity var(--transition-fast);
   white-space: nowrap;
 }
 
@@ -984,7 +961,7 @@ function rolesCount(roles: unknown): number {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .watch-btn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -1021,10 +998,6 @@ function rolesCount(roles: unknown): number {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 48px;
   color: var(--text-secondary);
 }
 

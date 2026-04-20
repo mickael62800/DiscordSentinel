@@ -82,7 +82,7 @@ async function confirmAddWatch() {
 
 <template>
     <div v-if="visible" class="modal-overlay" @click.self="closeModal">
-      <div class="modal-content">
+      <div class="card modal-content">
         <div class="modal-header">
           <h3>Surveiller un membre</h3>
           <button class="modal-close" @click="closeModal">&times;</button>
@@ -109,7 +109,7 @@ async function confirmAddWatch() {
                 @mousedown="selectAddMember(member)"
               >
                 <img v-if="member.avatar_url" :src="member.avatar_url" class="autocomplete-avatar" />
-                <div v-else class="autocomplete-avatar-placeholder">
+                <div v-else class="avatar-placeholder autocomplete-avatar-placeholder">
                   {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
                 </div>
                 <div class="autocomplete-info">
@@ -122,7 +122,7 @@ async function confirmAddWatch() {
 
           <div v-if="addSelectedMember" class="selected-member">
             <img v-if="addSelectedMember.avatar_url" :src="addSelectedMember.avatar_url" class="selected-avatar" />
-            <div v-else class="autocomplete-avatar-placeholder">
+            <div v-else class="avatar-placeholder autocomplete-avatar-placeholder">
               {{ (addSelectedMember.display_name || addSelectedMember.username).charAt(0).toUpperCase() }}
             </div>
             <div>
@@ -131,7 +131,7 @@ async function confirmAddWatch() {
             </div>
           </div>
 
-          <label class="modal-label" style="margin-top: 16px;">Raison de la surveillance</label>
+          <label class="modal-label modal-label--spaced">Raison de la surveillance</label>
           <textarea
             v-model="addReason"
             class="modal-textarea"
@@ -155,30 +155,18 @@ async function confirmAddWatch() {
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
 .modal-content {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 0;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: var(--space-lg) var(--space-xl);
   border-bottom: 1px solid var(--border);
 }
 
@@ -186,15 +174,16 @@ async function confirmAddWatch() {
 .modal-close { background: none; border: none; color: var(--text-secondary); font-size: 24px; cursor: pointer; }
 .modal-close:hover { color: var(--text-primary); }
 
-.modal-body { padding: 20px; }
-.modal-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
+.modal-body { padding: var(--space-xl); }
+.modal-label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: var(--space-sm); }
+.modal-label--spaced { margin-top: var(--space-lg); }
 
 .modal-input {
   width: 100%;
-  background: var(--bg-input, var(--bg-card));
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-md);
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
@@ -204,10 +193,10 @@ async function confirmAddWatch() {
 
 .modal-textarea {
   width: 100%;
-  background: var(--bg-input, var(--bg-card));
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-md);
   color: var(--text-primary);
   font-size: 14px;
   font-family: inherit;
@@ -220,16 +209,16 @@ async function confirmAddWatch() {
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 20px;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-xl);
   border-top: 1px solid var(--border);
 }
 
 .modal-cancel {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-lg);
   color: var(--text-primary);
   font-size: 13px;
   cursor: pointer;
@@ -241,8 +230,8 @@ async function confirmAddWatch() {
   background: var(--accent);
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-lg);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -253,11 +242,11 @@ async function confirmAddWatch() {
 .selected-member {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-top: 12px;
-  padding: 12px;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+  padding: var(--space-md);
   background: var(--bg-hover);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .selected-avatar {
@@ -276,19 +265,19 @@ async function confirmAddWatch() {
   right: 0;
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  margin-top: 4px;
+  border-radius: var(--radius-md);
+  margin-top: var(--space-xs);
   max-height: 200px;
   overflow-y: auto;
   z-index: 1001;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-lg);
 }
 
 .autocomplete-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
   cursor: pointer;
 }
 
@@ -298,15 +287,7 @@ async function confirmAddWatch() {
 .autocomplete-avatar-placeholder {
   width: 28px;
   height: 28px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #6366f1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   font-size: 12px;
-  font-weight: 700;
-  color: white;
-  flex-shrink: 0;
 }
 
 .autocomplete-info { display: flex; flex-direction: column; gap: 1px; }

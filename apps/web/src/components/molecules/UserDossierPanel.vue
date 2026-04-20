@@ -82,7 +82,7 @@ const dossierConductColumns: TableColumn[] = [
 
 <template>
   <!-- Panneau dossier -->
-  <div v-if="user" class="dossier-panel">
+  <div v-if="user" class="card card--lg dossier-panel">
     <div class="dossier-header">
       <div class="dossier-title">
         <h2>Dossier : {{ user.username }}</h2>
@@ -196,7 +196,7 @@ const dossierConductColumns: TableColumn[] = [
   </div>
 
   <!-- Placeholder quand aucun user selectionne -->
-  <div v-else class="dossier-placeholder">
+  <div v-else class="card dossier-placeholder">
     <div class="placeholder-content">
       <svg class="placeholder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
         <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
@@ -210,10 +210,6 @@ const dossierConductColumns: TableColumn[] = [
 <style scoped>
 .dossier-panel {
   flex: 1;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
   overflow-y: auto;
   max-height: calc(100vh - 200px);
 }
@@ -251,7 +247,7 @@ const dossierConductColumns: TableColumn[] = [
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .remove-watch-btn:hover {
@@ -374,9 +370,6 @@ const dossierConductColumns: TableColumn[] = [
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
   min-height: 400px;
 }
 

@@ -322,6 +322,6 @@ async function handleSave() {
 
 /* Cross-link */
 .page-header-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem; }
-.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all 0.15s; }
+.cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all var(--transition-fast); }
 .cross-link:hover { background: var(--accent); color: white; }
 </style>

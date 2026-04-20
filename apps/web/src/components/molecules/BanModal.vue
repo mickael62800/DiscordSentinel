@@ -46,7 +46,7 @@ defineExpose({ setError });
 <template>
   <teleport to="body">
     <div v-if="visible && target" class="modal-overlay" @click.self="close">
-      <div class="modal-content">
+      <div class="card modal-content">
         <div class="modal-header">
           <h3>Bannir un utilisateur</h3>
           <button class="modal-close" @click="close">&times;</button>
@@ -54,7 +54,7 @@ defineExpose({ setError });
 
         <div class="modal-body">
           <div class="modal-user">
-            <div class="user-avatar-placeholder">
+            <div class="avatar-placeholder user-avatar-placeholder">
               {{ target.username.charAt(0).toUpperCase() }}
             </div>
             <div class="user-info">
@@ -90,30 +90,18 @@ defineExpose({ setError });
 </template>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
 .modal-content {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
+  padding: 0;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: var(--space-lg) var(--space-xl);
   border-bottom: 1px solid var(--border);
 }
 
@@ -137,31 +125,23 @@ defineExpose({ setError });
 }
 
 .modal-body {
-  padding: 20px;
+  padding: var(--space-xl);
 }
 
 .modal-user {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
-  padding: 12px;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-md);
   background: var(--bg-hover);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
 }
 
 .user-avatar-placeholder {
   width: 36px;
   height: 36px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #7c5cfc);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
   font-size: 14px;
-  color: white;
-  flex-shrink: 0;
 }
 
 .user-info {
@@ -186,21 +166,21 @@ defineExpose({ setError });
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-sm);
 }
 
 .modal-textarea {
   width: 100%;
-  background: var(--bg-input, var(--bg-card));
+  background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-md);
   color: var(--text-primary);
   font-size: 14px;
   font-family: inherit;
   resize: vertical;
   outline: none;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition-base);
 }
 
 .modal-textarea:focus {
@@ -221,21 +201,21 @@ defineExpose({ setError });
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 20px;
+  gap: var(--space-sm);
+  padding: var(--space-lg) var(--space-xl);
   border-top: 1px solid var(--border);
 }
 
 .modal-cancel {
   background: transparent;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-lg);
   color: var(--text-primary);
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background var(--transition-base);
 }
 
 .modal-cancel:hover {
@@ -246,12 +226,12 @@ defineExpose({ setError });
   background: var(--danger);
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 8px 20px;
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-lg);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.2s;
+  transition: opacity var(--transition-base);
 }
 
 .ban-btn:hover:not(:disabled) {

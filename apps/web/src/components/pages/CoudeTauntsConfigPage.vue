@@ -111,7 +111,7 @@ watch(selectedGuildId, () => {
     <LoadingState v-if="loading" message="Chargement…" />
     <ErrorState v-else-if="error" :message="error" @retry="fetchConfig" />
 
-    <div v-else-if="config" class="card config-card">
+    <div v-else-if="config" class="card card--lg config-card">
       <h2>Configuration</h2>
 
       <FormField
@@ -137,7 +137,7 @@ watch(selectedGuildId, () => {
       </div>
     </div>
 
-    <div v-if="config" class="card opt-outs-card">
+    <div v-if="config" class="card card--lg opt-outs-card">
       <h2>Joueurs opt-out ({{ config.opt_outs.length }})</h2>
       <p class="hint">
         Ces joueurs ont tape <code>/no-taunts on</code>. Tu peux forcer le
@@ -188,18 +188,17 @@ watch(selectedGuildId, () => {
   line-height: 1.5;
 }
 
-.card {
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 24px;
+/* Override : structure flex verticale pour les deux cards de la page. */
+.config-card,
+.opt-outs-card {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-lg);
 }
 
-.card h2 {
-  margin: 0 0 4px;
+.config-card h2,
+.opt-outs-card h2 {
+  margin: 0 0 var(--space-xs);
   font-size: 18px;
 }
 

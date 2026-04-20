@@ -2,7 +2,7 @@
 //!
 //! Une fois par semaine, un joueur peut tenter un gros coup sur la
 //! caisse communautaire. Taux de base tres bas (5 %), boost par items
-//! consommables (+5 % chacun, cap 50 %). Succes : gain aleatoire
+//! consommables (+5 % chacun, cap 55 %). Succes : gain aleatoire
 //! 30-75 % de la caisse. Echec : prison 24 h, blocage total du jeu.
 //!
 //! **Choix d'architecture** : constantes hardcodees ici avec notes.
@@ -22,7 +22,11 @@ pub const HEIST_BASE_SUCCESS_PERCENT: u32 = 5;
 pub const HEIST_ITEM_BONUS_PERCENT: u32 = 5;
 
 /// Plafond maximum du taux de succes (avec tous les items).
-pub const HEIST_MAX_SUCCESS_PERCENT: u32 = 50;
+/// Aligne sur `HEIST_BASE_SUCCESS_PERCENT (5) + sum(HEIST_TOOLS.bonus_percent) (50) = 55`
+/// pour que le joueur qui possede tous les outils touche son bonus complet.
+/// Avant : 50, ce qui jetait silencieusement 5 points de bonus (voir test
+/// `catalog_bonus_sum_equals_max` pour le garde-fou).
+pub const HEIST_MAX_SUCCESS_PERCENT: u32 = 55;
 
 /// Duree de la prison sur un echec.
 pub const HEIST_PRISON_HOURS: i64 = 24;
@@ -45,8 +49,8 @@ pub struct HeistToolDef {
 
 /// 9 items consommables. Chacun apporte un bonus de chance proportionnel
 /// a son prix (2 % a 10 %). Somme des 9 bonus = 50 % (avec base 5 % →
-/// cap 50 % atteint pile). Tous les items actifs sont consommes quel
-/// que soit le resultat du roll.
+/// cap 55 % atteint pile avec tous les outils). Tous les items actifs
+/// sont consommes quel que soit le resultat du roll.
 ///
 /// **Choix d'architecture** : catalog et prix hardcodes. Modifier ici
 /// puis redeployer. Grille de prix en gradient pour que les meilleurs
@@ -196,69 +200,5 @@ pub struct HeistOutcome {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn compute_chance_no_items_is_base() {
-        let empty: Vec<&str> = vec![];
-        assert_eq!(compute_success_chance(empty), HEIST_BASE_SUCCESS_PERCENT);
-    }
-
-    #[test]
-    fn compute_chance_adds_individual_bonus() {
-        // masque +2%, pied_de_biche +3% → 5 + 2 + 3 = 10
-        let v = vec!["masque_braquage", "pied_de_biche"];
-        assert_eq!(compute_success_chance(v), 10);
-    }
-
-    #[test]
-    fn compute_chance_ignores_unknown_items() {
-        // masque +2%, unknown 0 → 5 + 2 = 7
-        let v = vec!["masque_braquage", "unknown_tool"];
-        assert_eq!(compute_success_chance(v), 7);
-    }
-
-    #[test]
-    fn compute_chance_deduplicates_items() {
-        // masque +2% une seule fois → 5 + 2 = 7
-        let v = vec!["masque_braquage", "masque_braquage"];
-        assert_eq!(compute_success_chance(v), 7);
-    }
-
-    #[test]
-    fn compute_chance_caps_at_max() {
-        // Tous les 9 items : 5 + 9*5 = 50 (cap atteint pile).
-        let v: Vec<&str> = HEIST_TOOLS.iter().map(|t| t.key).collect();
-        assert_eq!(compute_success_chance(v), HEIST_MAX_SUCCESS_PERCENT);
-    }
-
-    #[test]
-    fn catalog_has_exactly_9_tools() {
-        assert_eq!(HEIST_TOOLS.len(), 9);
-    }
-
-    #[test]
-    fn catalog_prices_are_ascending() {
-        for pair in HEIST_TOOLS.windows(2) {
-            assert!(
-                pair[0].price <= pair[1].price,
-                "catalog heist tools non tries par prix ascending : {} ({}) vs {} ({})",
-                pair[0].key, pair[0].price, pair[1].key, pair[1].price
-            );
-        }
-    }
-
-    #[test]
-    fn find_heist_tool_works() {
-        assert!(find_heist_tool("masque_braquage").is_some());
-        assert!(find_heist_tool("equipe_de_pros").is_some());
-        assert!(find_heist_tool("unknown").is_none());
-    }
-
-    #[test]
-    fn gain_range_is_sensible() {
-        assert!(HEIST_GAIN_MIN_PERCENT < HEIST_GAIN_MAX_PERCENT);
-        assert!(HEIST_GAIN_MAX_PERCENT <= 100);
-    }
-}
+#[path = "tests/coude_heist.rs"]
+mod tests;

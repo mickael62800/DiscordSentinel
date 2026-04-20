@@ -414,7 +414,7 @@ onMounted(() => fetchGames());
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .danger-btn:hover:not(:disabled) {
@@ -460,7 +460,7 @@ onMounted(() => fetchGames());
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .kpi-card:hover {
@@ -529,7 +529,7 @@ onMounted(() => fetchGames());
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .tab:hover {
@@ -582,7 +582,7 @@ onMounted(() => fetchGames());
 
 .row-main {
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--transition-fast);
 }
 
 .row-main:hover {
@@ -823,7 +823,7 @@ onMounted(() => fetchGames());
   font-size: 0.85rem;
 }
 
-/* Responsive */
+/* Responsive — breakpoints standards --bp-xl (1200px) et --bp-md (768px) */
 @media (max-width: 1200px) {
   .table-header,
   .row-main {

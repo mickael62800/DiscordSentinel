@@ -108,29 +108,5 @@ pub fn xp_progress(xp: i64) -> (i64, i64) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_xp_for_level() {
-        assert_eq!(xp_for_level(0), 0);
-        assert_eq!(xp_for_level(1), 155); // 5 + 50 + 100
-        assert_eq!(xp_for_level(2), 220); // 20 + 100 + 100
-    }
-
-    #[test]
-    fn test_level_from_xp() {
-        assert_eq!(level_from_xp(0), 0);
-        assert_eq!(level_from_xp(154), 0);
-        assert_eq!(level_from_xp(155), 1);
-        assert_eq!(level_from_xp(374), 1);
-        assert_eq!(level_from_xp(375), 2);
-    }
-
-    #[test]
-    fn test_xp_progress() {
-        let (current, needed) = xp_progress(200);
-        assert_eq!(current, 200 - 155); // 45 dans le niveau 2
-        assert_eq!(needed, 220); // besoin de 220 pour passer au niveau 2→3
-    }
-}
+#[path = "tests/level.rs"]
+mod tests;

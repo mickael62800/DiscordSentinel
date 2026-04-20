@@ -70,3 +70,7 @@ pub struct ConductPointsLog {
     pub points_after: i32,
     pub created_at: DateTime<Utc>,
 }
+
+#[cfg(test)]
+#[path = "tests/conduct.rs"]
+mod tests;

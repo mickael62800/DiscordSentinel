@@ -42,3 +42,7 @@ impl From<IaConfig> for IaConfigDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/ia_config.rs"]
+mod tests;

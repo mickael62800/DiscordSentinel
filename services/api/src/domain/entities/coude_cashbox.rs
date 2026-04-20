@@ -71,3 +71,7 @@ impl CashboxSource {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/coude_cashbox.rs"]
+mod tests;

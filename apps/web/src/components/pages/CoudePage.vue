@@ -713,7 +713,7 @@ onMounted(() => fetchCombats());
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .danger-btn:hover:not(:disabled) {
@@ -762,7 +762,7 @@ onMounted(() => fetchCombats());
   font-size: 0.95rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .main-tab:hover {
@@ -793,7 +793,7 @@ onMounted(() => fetchCombats());
   display: flex;
   align-items: center;
   gap: 16px;
-  transition: transform 0.15s, border-color 0.15s;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
 }
 
 .kpi-card:hover {
@@ -866,7 +866,7 @@ onMounted(() => fetchCombats());
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .tab:hover {
@@ -928,7 +928,7 @@ onMounted(() => fetchCombats());
 
 .row-main {
   cursor: pointer;
-  transition: background-color 0.15s;
+  transition: background-color var(--transition-fast);
 }
 
 .row-main:hover {
@@ -1264,7 +1264,7 @@ onMounted(() => fetchCombats());
   text-align: center;
 }
 
-/* Responsive */
+/* Responsive — breakpoints standards --bp-xl (1200px) et --bp-md (768px) */
 @media (max-width: 1200px) {
   .table-header--combats,
   .row-main--combats {

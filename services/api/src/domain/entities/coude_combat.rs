@@ -62,3 +62,7 @@ pub struct CombatResolution {
     pub result_message: Option<String>,
     pub coins_transferred: i64,
 }
+
+#[cfg(test)]
+#[path = "tests/coude_combat.rs"]
+mod tests;

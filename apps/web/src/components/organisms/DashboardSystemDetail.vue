@@ -34,7 +34,7 @@ function formatMemory(mb: number): string {
     <div v-else-if="error" class="error-msg">Erreur : {{ error }}</div>
     <div v-else-if="info" class="detail-grid">
       <!-- Bots Discord -->
-      <div class="detail-card">
+      <div class="card detail-card">
         <div class="card-header">
           <h3>Bots Discord</h3>
           <span class="count-pill">
@@ -58,7 +58,7 @@ function formatMemory(mb: number): string {
       </div>
 
       <!-- Workers -->
-      <div class="detail-card">
+      <div class="card detail-card">
         <div class="card-header">
           <h3>Workers</h3>
           <span class="count-pill">
@@ -82,7 +82,7 @@ function formatMemory(mb: number): string {
       </div>
 
       <!-- Ressources systeme (host) -->
-      <div class="detail-card">
+      <div class="card detail-card">
         <div class="card-header">
           <h3>Ressources</h3>
         </div>
@@ -178,10 +178,7 @@ function formatMemory(mb: number): string {
 }
 
 .detail-card {
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 18px 20px;
+  padding: 18px 20px; /* override .card (var(--space-lg)=16px) pour mieux aligner les metriques */
   min-width: 0;
 }
 
@@ -205,8 +202,8 @@ function formatMemory(mb: number): string {
   font-size: 11px;
   font-weight: 600;
   padding: 3px 10px;
-  border-radius: 999px;
-  background-color: rgba(88, 101, 242, 0.15);
+  border-radius: var(--radius-pill);
+  background-color: var(--accent-bg);
   color: var(--accent);
 }
 
@@ -231,7 +228,7 @@ function formatMemory(mb: number): string {
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 12px;
-  transition: background-color 0.15s;
+  transition: background-color var(--transition-fast);
 }
 
 .service-row:hover {
@@ -246,12 +243,12 @@ function formatMemory(mb: number): string {
 }
 
 .service-row.online .service-dot {
-  background-color: #57f287;
-  box-shadow: 0 0 6px rgba(87, 242, 135, 0.6);
+  background-color: var(--success);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--success) 60%, transparent);
 }
 
 .service-row.offline .service-dot {
-  background-color: #ed4245;
+  background-color: var(--danger);
 }
 
 .service-name {
@@ -273,7 +270,7 @@ function formatMemory(mb: number): string {
 }
 
 .service-row.online .service-status {
-  color: #57f287;
+  color: var(--success);
 }
 
 .service-row.offline .service-status {
@@ -324,11 +321,11 @@ function formatMemory(mb: number): string {
 }
 
 .metric-bar-fill.cpu {
-  background: linear-gradient(90deg, #5865f2, #7c5cfc);
+  background: linear-gradient(90deg, var(--accent), var(--accent-alt));
 }
 
 .metric-bar-fill.mem {
-  background: linear-gradient(90deg, #57f287, #2ecc71);
+  background: linear-gradient(90deg, var(--success), #2ecc71);
 }
 
 .metric-row {

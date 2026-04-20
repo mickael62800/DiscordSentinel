@@ -469,7 +469,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .cleanup-btn:hover:not(:disabled) {
@@ -491,7 +491,7 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   font-size: 11px;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
   white-space: nowrap;
 }
 
