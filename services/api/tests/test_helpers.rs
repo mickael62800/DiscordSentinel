@@ -475,6 +475,8 @@ pub struct StubCoudeTaunts;
     async fn get_config(&self, _: &str) -> Result<CoudeTauntsConfig, DomainError> { unimplemented!() }
     async fn set_channel(&self, _: &str, _: Option<&str>) -> Result<(), DomainError> { unimplemented!() }
     async fn set_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { unimplemented!() }
+    async fn set_rename_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { unimplemented!() }
+    async fn set_messages_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { unimplemented!() }
     async fn set_opt_out(&self, _: &str, _: &str, _: bool) -> Result<(), DomainError> { unimplemented!() }
     async fn is_opted_out(&self, _: &str, _: &str) -> Result<bool, DomainError> { unimplemented!() }
     async fn list_opt_outs(&self, _: &str) -> Result<Vec<String>, DomainError> { unimplemented!() }

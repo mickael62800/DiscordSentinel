@@ -119,6 +119,10 @@ pub trait ManageCoudeTauntsUseCase: Send + Sync {
 
     async fn set_enabled(&self, guild_id: &str, enabled: bool) -> Result<(), DomainError>;
 
+    async fn set_rename_enabled(&self, guild_id: &str, rename_enabled: bool) -> Result<(), DomainError>;
+
+    async fn set_messages_enabled(&self, guild_id: &str, messages_enabled: bool) -> Result<(), DomainError>;
+
     async fn set_opt_out(
         &self,
         guild_id: &str,

@@ -20,6 +20,12 @@ pub trait CoudeTauntsRepository: Send + Sync {
     /// Active/desactive globalement la feature pour une guild.
     async fn set_enabled(&self, guild_id: &str, enabled: bool) -> Result<(), DomainError>;
 
+    /// Active/desactive uniquement le rename des pseudos (les messages restent).
+    async fn set_rename_enabled(&self, guild_id: &str, rename_enabled: bool) -> Result<(), DomainError>;
+
+    /// Active/desactive uniquement le post des messages (les renames restent).
+    async fn set_messages_enabled(&self, guild_id: &str, messages_enabled: bool) -> Result<(), DomainError>;
+
     /// True si le joueur est opted out des taunts.
     async fn is_opted_out(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError>;
 

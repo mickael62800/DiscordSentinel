@@ -7,12 +7,16 @@ export interface TauntsConfig {
   guild_id: string;
   channel_id: string | null;
   enabled: boolean;
+  rename_enabled: boolean;
+  messages_enabled: boolean;
   opt_outs: string[];
 }
 
 export interface UpdateTauntsConfigPayload {
   channel_id: string | null;
   enabled: boolean;
+  rename_enabled?: boolean;
+  messages_enabled?: boolean;
 }
 
 export const coudeService = {

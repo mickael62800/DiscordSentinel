@@ -29,6 +29,11 @@ pub async fn dispatch_all(ctx: &Context, guild_id: GuildId, events: &[TauntEvent
 }
 
 async fn post_taunt_message(ctx: &Context, ev: &TauntEvent) {
+    // Si le message est vide, messages_enabled=false cote API : on skippe
+    // le post sans toucher au rename.
+    if ev.message.is_empty() {
+        return;
+    }
     let channel_id: u64 = match ev.channel_id.parse() {
         Ok(v) => v,
         Err(e) => {
@@ -59,6 +64,10 @@ async fn post_taunt_message(ctx: &Context, ev: &TauntEvent) {
 }
 
 async fn apply_nickname_suffix(ctx: &Context, guild_id: GuildId, ev: &TauntEvent) {
+    // Si le suffixe est vide, rename_enabled=false cote API : aucun rename.
+    if ev.nickname_suffix.is_empty() {
+        return;
+    }
     let user_id: u64 = match ev.target_user_id.parse() {
         Ok(v) => v,
         Err(e) => {

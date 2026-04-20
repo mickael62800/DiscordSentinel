@@ -89,6 +89,13 @@ pub struct CoudeTauntsConfig {
     pub guild_id: String,
     pub channel_id: Option<String>,
     pub enabled: bool,
+    /// Si false, le nickname_suffix dans TauntEvent est vide → le worker/bot
+    /// skippe le rename mais poste toujours le message.
+    pub rename_enabled: bool,
+    /// Si false, le message dans TauntEvent est vide → le worker/bot skippe
+    /// le post du message mais peut toujours renommer. Si rename_enabled et
+    /// messages_enabled sont tous les deux false, aucun TauntEvent n'est emis.
+    pub messages_enabled: bool,
 }
 
 /// Evenement emis par l'API quand un seuil est franchi. Tout est deja
@@ -456,8 +463,23 @@ pub fn build_taunt_event(
         let mut rng = rand::thread_rng();
         *messages.choose(&mut rng).unwrap_or(&"")
     };
-    let message = chosen.replace("{user}", &format!("<@{target_user_id}>"));
-    let nickname_suffix = nickname_suffix_for(kind, threshold).to_string();
+    // Si messages_enabled=false, on emet potentiellement l'event uniquement
+    // pour le rename (message vide → bot skippe le post).
+    let message = if config.messages_enabled {
+        chosen.replace("{user}", &format!("<@{target_user_id}>"))
+    } else {
+        String::new()
+    };
+    // Si rename_enabled=false, on emet le taunt mais sans suffixe (pas de rename).
+    let nickname_suffix = if config.rename_enabled {
+        nickname_suffix_for(kind, threshold).to_string()
+    } else {
+        String::new()
+    };
+    // Si les deux sont vides, aucun dispatch a faire : ne produit rien.
+    if nickname_suffix.is_empty() && message.is_empty() {
+        return None;
+    }
 
     Some(TauntEvent {
         channel_id,
@@ -503,12 +525,24 @@ pub fn build_taunt_event_deterministic(
     };
     let messages = messages_for(kind, threshold);
     let first = *messages.first()?;
-    let message = first.replace("{user}", &format!("<@{target_user_id}>"));
+    let message = if config.messages_enabled {
+        first.replace("{user}", &format!("<@{target_user_id}>"))
+    } else {
+        String::new()
+    };
+    let nickname_suffix = if config.rename_enabled {
+        nickname_suffix_for(kind, threshold).to_string()
+    } else {
+        String::new()
+    };
+    if nickname_suffix.is_empty() && message.is_empty() {
+        return None;
+    }
     Some(TauntEvent {
         channel_id,
         target_user_id: target_user_id.to_string(),
         message,
-        nickname_suffix: nickname_suffix_for(kind, threshold).to_string(),
+        nickname_suffix,
         streak_kind: kind.as_str(),
         streak_value: new_streak,
     })

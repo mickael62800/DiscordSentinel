@@ -271,6 +271,14 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         self.taunts_repo.set_enabled(guild_id, enabled).await
     }
 
+    async fn set_rename_enabled(&self, guild_id: &str, rename_enabled: bool) -> Result<(), DomainError> {
+        self.taunts_repo.set_rename_enabled(guild_id, rename_enabled).await
+    }
+
+    async fn set_messages_enabled(&self, guild_id: &str, messages_enabled: bool) -> Result<(), DomainError> {
+        self.taunts_repo.set_messages_enabled(guild_id, messages_enabled).await
+    }
+
     async fn set_opt_out(
         &self,
         guild_id: &str,

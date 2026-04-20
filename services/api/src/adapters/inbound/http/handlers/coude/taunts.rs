@@ -57,6 +57,8 @@ pub struct TauntsConfigDto {
     pub guild_id: String,
     pub channel_id: Option<String>,
     pub enabled: bool,
+    pub rename_enabled: bool,
+    pub messages_enabled: bool,
     pub opt_outs: Vec<String>,
 }
 
@@ -64,6 +66,10 @@ pub struct TauntsConfigDto {
 pub struct UpdateTauntsConfigDto {
     pub channel_id: Option<String>,
     pub enabled: bool,
+    #[serde(default)]
+    pub rename_enabled: Option<bool>,
+    #[serde(default)]
+    pub messages_enabled: Option<bool>,
 }
 
 /// GET /api/coude/{guild_id}/config/taunts
@@ -77,6 +83,8 @@ pub async fn get_taunts_config(
         guild_id: config.guild_id,
         channel_id: config.channel_id,
         enabled: config.enabled,
+        rename_enabled: config.rename_enabled,
+        messages_enabled: config.messages_enabled,
         opt_outs,
     }))
 }
@@ -103,6 +111,18 @@ pub async fn update_taunts_config(
         .coude_taunts_uc
         .set_enabled(&guild_id, dto.enabled)
         .await?;
+    if let Some(rename_enabled) = dto.rename_enabled {
+        state
+            .coude_taunts_uc
+            .set_rename_enabled(&guild_id, rename_enabled)
+            .await?;
+    }
+    if let Some(messages_enabled) = dto.messages_enabled {
+        state
+            .coude_taunts_uc
+            .set_messages_enabled(&guild_id, messages_enabled)
+            .await?;
+    }
     Ok(StatusCode::NO_CONTENT)
 }
 

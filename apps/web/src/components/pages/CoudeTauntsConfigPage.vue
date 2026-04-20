@@ -24,6 +24,8 @@ const config = ref<TauntsConfig | null>(null);
 const channels = ref<DiscordTextChannel[]>([]);
 const channelInput = ref("");
 const enabledInput = ref(true);
+const renameEnabledInput = ref(true);
+const messagesEnabledInput = ref(true);
 const loading = ref(false);
 const saving = ref(false);
 const error = ref<string | null>(null);
@@ -47,6 +49,8 @@ async function fetchConfig() {
     channels.value = chans;
     channelInput.value = cfg.channel_id ?? "";
     enabledInput.value = cfg.enabled;
+    renameEnabledInput.value = cfg.rename_enabled;
+    messagesEnabledInput.value = cfg.messages_enabled;
   } catch (e) {
     error.value = String(e);
   } finally {
@@ -61,6 +65,8 @@ async function save() {
     await coudeService.updateTauntsConfig(selectedGuildId.value, {
       channel_id: channelInput.value.length > 0 ? channelInput.value : null,
       enabled: enabledInput.value,
+      rename_enabled: renameEnabledInput.value,
+      messages_enabled: messagesEnabledInput.value,
     });
     success("Config railleries sauvegardee.");
     await fetchConfig();
@@ -129,6 +135,26 @@ watch(selectedGuildId, () => {
           </span>
         </div>
       </FormField>
+
+      <div class="toggles-grid">
+        <FormField label="Messages de raillerie">
+          <div class="toggle-row">
+            <AppToggle v-model="messagesEnabledInput" :disabled="!enabledInput" />
+            <span class="toggle-label">
+              {{ messagesEnabledInput ? "Les messages sont postes dans le salon" : "Aucun message poste" }}
+            </span>
+          </div>
+        </FormField>
+
+        <FormField label="Renommer les pseudos">
+          <div class="toggle-row">
+            <AppToggle v-model="renameEnabledInput" :disabled="!enabledInput" />
+            <span class="toggle-label">
+              {{ renameEnabledInput ? "Les pseudos sont renommes sur palier" : "Aucun rename applique" }}
+            </span>
+          </div>
+        </FormField>
+      </div>
 
       <div class="actions">
         <AppButton :disabled="saving" @click="save">
@@ -221,6 +247,12 @@ watch(selectedGuildId, () => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.toggles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-lg);
 }
 
 .toggle-label {

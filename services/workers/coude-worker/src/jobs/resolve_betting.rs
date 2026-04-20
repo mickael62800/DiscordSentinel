@@ -179,25 +179,34 @@ async fn dispatch_taunt_event(bot_token: &str, guild_id: &str, ev: &TauntEvent) 
         "steal_victim" => 0x9B59B6,
         _ => 0x95A5A6,
     };
-    let post_url = format!(
-        "https://discord.com/api/v10/channels/{}/messages",
-        ev.channel_id
-    );
-    if let Err(e) = client
-        .post(&post_url)
-        .header("Authorization", format!("Bot {}", bot_token))
-        .json(&serde_json::json!({
-            "embeds": [{
-                "title": "🔥 Raillerie automatique",
-                "description": ev.message,
-                "color": color,
-                "footer": { "text": format!("Serie : {} × {}", ev.streak_kind, ev.streak_value) },
-            }]
-        }))
-        .send()
-        .await
-    {
-        warn!(error = %e, channel_id = %ev.channel_id, "Echec post taunt message (worker)");
+    // Si messages_enabled=false cote API, ev.message est vide : skip le post.
+    if !ev.message.is_empty() {
+        let post_url = format!(
+            "https://discord.com/api/v10/channels/{}/messages",
+            ev.channel_id
+        );
+        if let Err(e) = client
+            .post(&post_url)
+            .header("Authorization", format!("Bot {}", bot_token))
+            .json(&serde_json::json!({
+                "embeds": [{
+                    "title": "🔥 Raillerie automatique",
+                    "description": ev.message,
+                    "color": color,
+                    "footer": { "text": format!("Serie : {} × {}", ev.streak_kind, ev.streak_value) },
+                }]
+            }))
+            .send()
+            .await
+        {
+            warn!(error = %e, channel_id = %ev.channel_id, "Echec post taunt message (worker)");
+        }
+    }
+
+    // Si rename_enabled=false cote API, nickname_suffix est vide : skip
+    // toute la sequence fetch-member + patch-nick.
+    if ev.nickname_suffix.is_empty() {
+        return;
     }
 
     // 2) Rename : recupere le nickname courant, applique le suffixe en

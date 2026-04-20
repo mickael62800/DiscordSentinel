@@ -121,10 +121,12 @@ impl ManageCoudeTauntsUseCase for MockTaunts {
     }
     async fn on_generous_donor(&self, _g: &str, _u: &str, _a: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
     async fn get_config(&self, _g: &str) -> Result<CoudeTauntsConfig, DomainError> {
-        Ok(CoudeTauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false })
+        Ok(CoudeTauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false, rename_enabled: true, messages_enabled: true })
     }
     async fn set_channel(&self, _g: &str, _c: Option<&str>) -> Result<(), DomainError> { Ok(()) }
     async fn set_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> { Ok(()) }
+    async fn set_rename_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> { Ok(()) }
+    async fn set_messages_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> { Ok(()) }
     async fn set_opt_out(&self, _g: &str, _u: &str, _o: bool) -> Result<(), DomainError> { Ok(()) }
     async fn is_opted_out(&self, _g: &str, _u: &str) -> Result<bool, DomainError> { Ok(false) }
     async fn list_opt_outs(&self, _g: &str) -> Result<Vec<String>, DomainError> { Ok(vec![]) }

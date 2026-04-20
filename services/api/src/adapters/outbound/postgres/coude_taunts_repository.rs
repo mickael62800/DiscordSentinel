@@ -27,11 +27,11 @@ impl CoudeTauntsRepository for PgCoudeTauntsRepository {
         &self,
         guild_id: &str,
     ) -> Result<CoudeTauntsConfig, DomainError> {
-        let row: (String, Option<String>, bool) = sqlx::query_as(
+        let row: (String, Option<String>, bool, bool, bool) = sqlx::query_as(
             r#"INSERT INTO coude_taunts_config (guild_id)
                VALUES ($1)
                ON CONFLICT (guild_id) DO UPDATE SET updated_at = coude_taunts_config.updated_at
-               RETURNING guild_id, channel_id, enabled"#,
+               RETURNING guild_id, channel_id, enabled, rename_enabled, messages_enabled"#,
         )
         .bind(guild_id)
         .fetch_one(&self.pool)
@@ -41,6 +41,8 @@ impl CoudeTauntsRepository for PgCoudeTauntsRepository {
             guild_id: row.0,
             channel_id: row.1,
             enabled: row.2,
+            rename_enabled: row.3,
+            messages_enabled: row.4,
         })
     }
 
@@ -74,6 +76,38 @@ impl CoudeTauntsRepository for PgCoudeTauntsRepository {
         )
         .bind(guild_id)
         .bind(enabled)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn set_rename_enabled(&self, guild_id: &str, rename_enabled: bool) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"INSERT INTO coude_taunts_config (guild_id, rename_enabled)
+               VALUES ($1, $2)
+               ON CONFLICT (guild_id) DO UPDATE
+                 SET rename_enabled = EXCLUDED.rename_enabled,
+                     updated_at = NOW()"#,
+        )
+        .bind(guild_id)
+        .bind(rename_enabled)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn set_messages_enabled(&self, guild_id: &str, messages_enabled: bool) -> Result<(), DomainError> {
+        sqlx::query(
+            r#"INSERT INTO coude_taunts_config (guild_id, messages_enabled)
+               VALUES ($1, $2)
+               ON CONFLICT (guild_id) DO UPDATE
+                 SET messages_enabled = EXCLUDED.messages_enabled,
+                     updated_at = NOW()"#,
+        )
+        .bind(guild_id)
+        .bind(messages_enabled)
         .execute(&self.pool)
         .await
         .map_err(pg_err)?;

@@ -5,6 +5,8 @@ fn cfg_with_channel() -> CoudeTauntsConfig {
         guild_id: "g1".into(),
         channel_id: Some("123".into()),
         enabled: true,
+        rename_enabled: true,
+        messages_enabled: true,
     }
 }
 
