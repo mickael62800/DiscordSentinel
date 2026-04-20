@@ -73,26 +73,54 @@ def load_existing_keys() -> set[str]:
 # ── Filtres par source ──
 
 def jigsaw_filter(ds):
-    """Jigsaw Unintended Bias : on filtre severe_toxicity >= 0.5 ou threat >= 0.5.
-    Returns iter of (text, sentinel_label).
+    """Civil Comments (Jigsaw Unintended Bias). Seuils ajustes pour nourrir
+    les classes sous-representees (rage, threat) et capper les classes deja
+    saturees (anger, neutral).
+
+    Seuils :
+    - threat >= 0.3 (classe tres rare, on baisse le seuil)
+    - severe >= 0.3 (rage, idem)
+    - identity >= 0.5 -> harassment
+    - insult >= 0.7 -> anger (seuil haut car deja 35k en banque)
+    - toxicity < 0.1 -> neutral (seuil tres strict pour ne pas polluer)
+
+    Caps :
+    - anger cap 15k
+    - neutral cap 3k
+    - pas de cap sur threat/rage/harassment (on en veut plus)
     """
+    caps = {0: 3000, 1: 15000}
+    counts = {0: 0, 1: 0}
     for row in ds:
-        text = (row.get("comment_text") or "").strip()
+        text = (row.get("text") or row.get("comment_text") or "").strip()
         if not text or len(text) > 2000:
             continue
+        toxicity = float(row.get("toxicity", 0) or 0)
         threat = float(row.get("threat", 0) or 0)
         severe = float(row.get("severe_toxicity", 0) or 0)
         insult = float(row.get("insult", 0) or 0)
-        identity_hate = float(row.get("identity_attack", 0) or row.get("identity_hate", 0) or 0)
+        identity = float(row.get("identity_attack", 0) or 0)
 
-        if threat >= 0.5:
-            yield text, 3  # threat
-        elif severe >= 0.5:
-            yield text, 2  # rage
-        elif identity_hate >= 0.5:
-            yield text, 4  # harassment
-        elif insult >= 0.5:
-            yield text, 1  # anger
+        label = None
+        if threat >= 0.3:
+            label = 3  # threat — priorite absolue
+        elif severe >= 0.2:
+            label = 2  # rage (seuil bas car classe tres sous-representee)
+        elif identity >= 0.5:
+            label = 4  # harassment
+        elif insult >= 0.7:
+            label = 1  # anger (seuil haut)
+        elif toxicity < 0.1:
+            label = 0  # neutral (tres strict)
+        else:
+            continue
+
+        # Cap sur classes saturees
+        if label in caps:
+            if counts[label] >= caps[label]:
+                continue
+            counts[label] += 1
+        yield text, label
 
 
 def hatexplain_filter(ds):
@@ -140,22 +168,26 @@ def dynahate_filter(ds):
 
 SOURCES = {
     "jigsaw": {
-        "hf_name": "google/civil_comments",  # alternative libre à Jigsaw Unintended Bias
+        "hf_name": "google/civil_comments",
         "split": "train",
         "filter": jigsaw_filter,
         "description": "Jigsaw Unintended Bias (via Civil Comments, CC0)",
     },
+    # HateXplain & DynaHate utilisent d'anciens dataset scripts non supportes
+    # par datasets >= 4.x. On les skip sauf si l'user rollback vers datasets 2.x
+    # ou utilise load_dataset(trust_remote_code=True) avec datasets <= 3.x.
+    # Alternatives modernes proposees ci-dessous.
     "hatexplain": {
-        "hf_name": "Hate-speech-CNERG/hatexplain",
-        "split": "train",
+        "hf_name": "Paul/hatecheck-french",  # hatecheck FR deja multilingue
+        "split": "test",
         "filter": hatexplain_filter,
-        "description": "HateXplain (CC-BY 4.0)",
+        "description": "HateCheck French (CC-BY 4.0)",
     },
     "dynahate": {
         "hf_name": "aps/dynahate",
         "split": "train",
         "filter": dynahate_filter,
-        "description": "DynaHate v0.2.3 (CC-BY 4.0)",
+        "description": "DynaHate v0.2.3 (peut necessiter datasets 2.x)",
     },
 }
 
