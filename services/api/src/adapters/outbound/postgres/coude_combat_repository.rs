@@ -357,7 +357,7 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
                    result_message = $7,
                    coins_transferred = $8,
                    resolved_at = NOW()
-               WHERE id = $1 AND status IN ('pending', 'accepted', 'betting')"#,
+               WHERE id = $1 AND status IN ('pending', 'accepted', 'betting', 'resolving')"#,
         )
         .bind(id)
         .bind(&resolution.status)
