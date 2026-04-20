@@ -61,6 +61,9 @@ pub struct CoudeBalanceParams {
     pub bouclier_def_bonus_pct: u64,
     /// PV perdus par round avec Poison.
     pub poison_damage_per_round: u64,
+    /// PV min (%) requis pour les DEUX combattants pour engager un combat.
+    /// 0 = desactive. Empeche un joueur a 0 HP de se faire defier.
+    pub combat_min_hp_pct: u64,
 }
 
 impl Default for CoudeBalanceParams {
@@ -77,6 +80,7 @@ impl Default for CoudeBalanceParams {
             coup_traitre_def_malus_pct: 40,
             bouclier_def_bonus_pct: 20,
             poison_damage_per_round: 5,
+            combat_min_hp_pct: 40,
         }
     }
 }
@@ -130,6 +134,7 @@ impl CoudeBalanceParams {
                 "poison_damage_per_round",
                 d.poison_damage_per_round,
             ),
+            combat_min_hp_pct: parse_u64(cfg, "combat_min_hp_pct", d.combat_min_hp_pct),
         }
     }
 }

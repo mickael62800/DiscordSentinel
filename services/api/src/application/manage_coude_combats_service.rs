@@ -119,18 +119,39 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
             ));
         }
 
-        // Gate : pour l'attaque surprise, verifier que l'attaquant a au
-        // moins `surprise_min_hp_percent` % de ses HP max. Empeche
-        // l'attaquant de finir le combat a 1 HP en bypassant la defense.
-        if new.special_attack.as_deref() == Some("surprise") {
-            if let (Some(players_uc), Some(_)) =
-                (self.players_uc.as_ref(), self.bot_config_repo.as_ref())
-            {
-                let params = self.load_balance(&new.guild_id).await;
+        // Gate 1 : verifier que les DEUX combattants ont au moins
+        // `combat_min_hp_pct` % de HP. Empeche un joueur a 0 HP d etre
+        // defie ou de defier (combat ferait 0 round et bug la resolution).
+        if let (Some(players_uc), Some(_)) =
+            (self.players_uc.as_ref(), self.bot_config_repo.as_ref())
+        {
+            let params = self.load_balance(&new.guild_id).await;
+            let min_pct = params.combat_min_hp_pct;
+            if min_pct > 0 {
+                let attacker = players_uc.get(&new.guild_id, &new.attacker_id).await?;
+                let defender = players_uc.get(&new.guild_id, &new.defender_id).await?;
+
+                let check = |who: &str, hp_cur: i32, hp_max: i32| -> Result<(), DomainError> {
+                    let hp_max_u = (hp_max.max(1)) as u64;
+                    let hp_cur_u = (hp_cur.max(0)) as u64;
+                    let cur_pct = hp_cur_u.saturating_mul(100) / hp_max_u;
+                    if cur_pct < min_pct {
+                        return Err(DomainError::ValidationError(format!(
+                            "{who} n'a pas assez de PV pour combattre : {hp_cur_u}/{hp_max_u} ({cur_pct}%), minimum requis {min_pct}%. Utilise /repos pour te soigner."
+                        )));
+                    }
+                    Ok(())
+                };
+                check("L'attaquant", attacker.hp_current, attacker.hp_max)?;
+                check("Le defenseur", defender.hp_current, defender.hp_max)?;
+            }
+
+            // Gate 2 : pour l'attaque surprise, verification supplementaire
+            // que l'attaquant a au moins `surprise_min_hp_percent` % de ses HP.
+            if new.special_attack.as_deref() == Some("surprise") {
                 let min_pct = params.surprise_min_hp_pct;
                 if min_pct > 0 {
-                    let attacker =
-                        players_uc.get(&new.guild_id, &new.attacker_id).await?;
+                    let attacker = players_uc.get(&new.guild_id, &new.attacker_id).await?;
                     let hp_max = attacker.hp_max.max(1) as u64;
                     let hp_cur = attacker.hp_current.max(0) as u64;
                     let cur_pct = hp_cur.saturating_mul(100) / hp_max;
