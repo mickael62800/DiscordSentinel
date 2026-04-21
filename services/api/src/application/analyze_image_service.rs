@@ -6,7 +6,8 @@ use uuid::Uuid;
 
 use crate::domain::entities::{ImageAnalysis, ImageClassification, Infraction};
 use crate::domain::errors::DomainError;
-use crate::domain::services::{InferenceRateLimiter, InferenceService};
+use crate::adapters::outbound::InferenceService;
+use crate::domain::services::InferenceRateLimiter;
 use crate::domain::value_objects::{Action, DetectionFlags, FlagType};
 use crate::ports::inbound::{AnalyzeImageCommand, AnalyzeImageUseCase, DeductPointsCommand, ManageConductUseCase};
 use crate::ports::outbound::{CachePort, IaConfigRepository, InfractionRepository, RuleRepository};

@@ -90,7 +90,7 @@ fn test_classify_text_without_model_returns_error() {
 const ONNX_PATH: &str = "../../ai/training/text/exports/text_sentinel.onnx";
 const TOKENIZER_PATH: &str = "../../ai/training/text/exports/tokenizer.json";
 
-use crate::domain::services::TextTokenizer;
+use crate::adapters::outbound::TextTokenizer;
 
 fn load_real_pipeline() -> Option<(InferenceService, TextTokenizer)> {
     let service = InferenceService::new(None, Some(ONNX_PATH));

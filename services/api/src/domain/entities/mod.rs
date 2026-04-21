@@ -26,7 +26,7 @@ pub mod analytics;
 
 pub use ia_config::IaConfig;
 pub use audit_log::AuditLog;
-pub use image_analysis::{ImageAnalysis, ImageClassification};
+pub use image_analysis::{is_allowed_image_content_type, is_image_size_acceptable, ImageAnalysis, ImageClassification, ALLOWED_IMAGE_CONTENT_TYPES, MAX_IMAGE_BASE64_LEN};
 pub use bot_config::{BotDefinition, BotGuildConfig};
 pub use conduct::{ConductConfig, ConductPointsLog, UserConductPoints};
 pub use daily_activity::DailyActivity;
@@ -47,7 +47,7 @@ pub use voice_channel::{
     VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme,
     VoiceChannelWhitelistEntry,
 };
-pub use watched_user::WatchedUser;
+pub use watched_user::{classify_risk_level, WatchedUser};
 pub use discord_role::DiscordRole;
 pub use strikes::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
 pub use sanction_reminder::SanctionReminder;
@@ -60,10 +60,10 @@ mod guild_member;
 pub use guild_member::{GuildMember, MemberSummary, MemberConduct, MemberInfractions, MemberModeration, MemberStats};
 
 mod blackjack;
-pub use blackjack::{BlackjackGame, Card, calculate_score, create_deck};
+pub use blackjack::{BlackjackConfig, BlackjackGame, Card, calculate_score, create_deck};
 
 mod wallet;
-pub use wallet::{Wallet, WalletTransaction};
+pub use wallet::{clamp_debit_to_balance, Wallet, WalletTransaction};
 
 mod coude_player;
 pub use coude_player::{

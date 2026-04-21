@@ -59,6 +59,18 @@ impl ModerationActionType {
         matches!(self, Self::MuteTemp | Self::MutePermanent)
     }
 
+    /// True si l'action est une sanction temporaire (avec duration).
+    /// Utilisee pour decider s'il faut creer un rappel de fin de sanction.
+    pub fn is_temporary(&self) -> bool {
+        matches!(self, Self::MuteTemp | Self::BanTemp)
+    }
+
+    /// Helper pour appelants qui travaillent avec un `&str` au lieu de l'enum
+    /// (ex: handlers HTTP avec DTO brut). `false` pour une chaine inconnue.
+    pub fn is_temporary_str(action_type: &str) -> bool {
+        matches!(action_type, "mute_temp" | "ban_temp")
+    }
+
     /// Liste des valeurs valides.
     pub const VALID_VALUES: &'static [&'static str] = &[
         "warn", "mute_temp", "mute_permanent", "unmute",

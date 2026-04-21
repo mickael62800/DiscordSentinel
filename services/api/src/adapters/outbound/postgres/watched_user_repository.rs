@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::WatchedUser;
+use crate::domain::entities::{classify_risk_level, WatchedUser};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::WatchedUserRepository;
 
@@ -33,16 +33,9 @@ struct WatchedUserRow {
 
 impl From<WatchedUserRow> for WatchedUser {
     fn from(row: WatchedUserRow) -> Self {
-        let total = row.total_warns + row.total_mutes + row.total_bans;
-        let risk_level = if row.total_bans > 0 || total >= 5 {
-            "critical".to_string()
-        } else if row.total_mutes > 0 || total >= 3 {
-            "high".to_string()
-        } else if total >= 2 {
-            "medium".to_string()
-        } else {
-            "low".to_string()
-        };
+        // La regle de classification de risque est en `domain/entities/watched_user.rs`.
+        // Cet adapter se contente de mapper row → entity + appel de la fn pure.
+        let risk_level = classify_risk_level(row.total_warns, row.total_mutes, row.total_bans).to_string();
 
         Self {
             user_id: row.user_id,

@@ -6,7 +6,8 @@ use uuid::Uuid;
 
 use crate::domain::entities::{Infraction, MessageAnalysis};
 use crate::domain::errors::DomainError;
-use crate::domain::services::{InferenceRateLimiter, InferenceService, ScoringService, TextTokenizer};
+use crate::adapters::outbound::{InferenceService, TextTokenizer};
+use crate::domain::services::{InferenceRateLimiter, ScoringService};
 use crate::domain::value_objects::{Action, FlagType};
 use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, DeductPointsCommand, ManageConductUseCase};
 use crate::ports::outbound::{CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
@@ -246,7 +247,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 /// Fonction pure : transforme les classifications IA en score, flags et raison.
 /// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.
 pub fn score_classifications(
-    classifications: &[crate::domain::services::InferenceClassification],
+    classifications: &[crate::adapters::outbound::InferenceClassification],
     rules: &[crate::domain::entities::Rule],
     threshold: f32,
 ) -> Option<(f64, Vec<FlagType>, String)> {

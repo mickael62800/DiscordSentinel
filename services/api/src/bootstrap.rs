@@ -50,7 +50,8 @@ use crate::application::{
     ManageWatchedUsersService, ResolveBettingBatchService, ResolveCombatNowService,
 };
 use crate::config::AppConfig;
-use crate::domain::services::{DiscordApiService, InferenceRateLimiter, InferenceService, TextTokenizer};
+use crate::adapters::outbound::{DiscordApiService, InferenceService, TextTokenizer};
+use crate::domain::services::InferenceRateLimiter;
 
 /// Connecte a PostgreSQL avec pgbouncer transaction pooling compat.
 ///

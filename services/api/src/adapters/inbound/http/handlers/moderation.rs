@@ -93,8 +93,9 @@ pub async fn log_action(
         }
     }
 
-    // Auto-create reminder for temporary sanctions (mute_temp, ban_temp)
-    if action_type == "mute_temp" || action_type == "ban_temp" {
+    // Auto-create reminder for temporary sanctions (regle metier : voir
+    // `ModerationActionType::is_temporary` dans domain/value_objects).
+    if crate::domain::value_objects::ModerationActionType::is_temporary_str(&action_type) {
         if let Some(dur) = duration {
             let action_uuid = match dto.id.parse() {
                 Ok(uuid) => uuid,

@@ -16,3 +16,28 @@ pub struct WatchedUser {
     pub security_events_count: i64,
     pub first_seen_at: DateTime<Utc>,
 }
+
+/// Classification de risque d'un utilisateur surveille selon ses compteurs
+/// d'infractions. Regle metier pure (pas d'I/O).
+///
+/// Seuils :
+/// - `critical` : au moins 1 ban OU total >= 5
+/// - `high`     : au moins 1 mute OU total >= 3
+/// - `medium`   : total >= 2
+/// - `low`      : sinon
+pub fn classify_risk_level(total_warns: i64, total_mutes: i64, total_bans: i64) -> &'static str {
+    let total = total_warns + total_mutes + total_bans;
+    if total_bans > 0 || total >= 5 {
+        "critical"
+    } else if total_mutes > 0 || total >= 3 {
+        "high"
+    } else if total >= 2 {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+#[cfg(test)]
+#[path = "tests/watched_user.rs"]
+mod tests;

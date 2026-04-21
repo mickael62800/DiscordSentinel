@@ -51,3 +51,27 @@ fn display_trait_uses_as_str() {
         assert_eq!(format!("{}", action), *s);
     }
 }
+
+#[test]
+fn is_temporary_enum() {
+    assert!(ModerationActionType::MuteTemp.is_temporary());
+    assert!(ModerationActionType::BanTemp.is_temporary());
+    assert!(!ModerationActionType::MutePermanent.is_temporary());
+    assert!(!ModerationActionType::BanPermanent.is_temporary());
+    assert!(!ModerationActionType::Warn.is_temporary());
+    assert!(!ModerationActionType::Unmute.is_temporary());
+    assert!(!ModerationActionType::Unban.is_temporary());
+    assert!(!ModerationActionType::Call.is_temporary());
+}
+
+#[test]
+fn is_temporary_str_matches_enum() {
+    assert!(ModerationActionType::is_temporary_str("mute_temp"));
+    assert!(ModerationActionType::is_temporary_str("ban_temp"));
+    assert!(!ModerationActionType::is_temporary_str("mute_permanent"));
+    assert!(!ModerationActionType::is_temporary_str("ban_permanent"));
+    assert!(!ModerationActionType::is_temporary_str("warn"));
+    assert!(!ModerationActionType::is_temporary_str(""));
+    assert!(!ModerationActionType::is_temporary_str("unknown"));
+    assert!(!ModerationActionType::is_temporary_str("MUTE_TEMP")); // case-sensitive
+}

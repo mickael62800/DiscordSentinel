@@ -134,6 +134,107 @@ fn deck_shuffled_across_multiple_calls() {
     assert!(!same, "two shuffled decks should not be identical");
 }
 
+// ── BlackjackConfig ──
+
+#[test]
+fn config_default_sane_values() {
+    let c = BlackjackConfig::default();
+    assert_eq!(c.min_bet, 10);
+    assert_eq!(c.max_bet, 1000);
+    assert_eq!(c.starting_coins, 200);
+    assert_eq!(c.blackjack_payout, 1.5);
+    assert!(c.min_bet < c.max_bet);
+}
+
+#[test]
+fn config_from_kv_pairs_empty_returns_default() {
+    let c = BlackjackConfig::from_kv_pairs(&[]);
+    assert_eq!(c, BlackjackConfig::default());
+}
+
+#[test]
+fn config_from_kv_pairs_parses_known_keys() {
+    let pairs = vec![
+        ("min_bet".into(), "20".into()),
+        ("max_bet".into(), "5000".into()),
+        ("starting_coins".into(), "500".into()),
+        ("blackjack_payout".into(), "2.0".into()),
+    ];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c.min_bet, 20);
+    assert_eq!(c.max_bet, 5000);
+    assert_eq!(c.starting_coins, 500);
+    assert_eq!(c.blackjack_payout, 2.0);
+}
+
+#[test]
+fn config_ignores_invalid_parse() {
+    let pairs = vec![
+        ("min_bet".into(), "abc".into()),
+        ("max_bet".into(), "".into()),
+    ];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c, BlackjackConfig::default());
+}
+
+#[test]
+fn config_rejects_non_positive_bets() {
+    // min_bet = 0 ou negatif → ignore (garde default).
+    let pairs = vec![
+        ("min_bet".into(), "0".into()),
+        ("max_bet".into(), "-10".into()),
+    ];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c.min_bet, 10); // default
+    assert_eq!(c.max_bet, 1000); // default
+}
+
+#[test]
+fn config_rejects_non_positive_payout() {
+    let pairs = vec![
+        ("blackjack_payout".into(), "0".into()),
+    ];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c.blackjack_payout, 1.5); // default
+}
+
+#[test]
+fn config_accepts_zero_starting_coins() {
+    let pairs = vec![("starting_coins".into(), "0".into())];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c.starting_coins, 0);
+}
+
+#[test]
+fn config_rejects_negative_starting_coins() {
+    let pairs = vec![("starting_coins".into(), "-100".into())];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c.starting_coins, 200); // default
+}
+
+#[test]
+fn config_fallback_defaults_when_min_exceeds_max() {
+    // min_bet=500, max_bet=100 → incoherent → reset des deux aux defauts.
+    let pairs = vec![
+        ("min_bet".into(), "500".into()),
+        ("max_bet".into(), "100".into()),
+    ];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c.min_bet, 10);
+    assert_eq!(c.max_bet, 1000);
+}
+
+#[test]
+fn config_ignores_unknown_keys() {
+    let pairs = vec![
+        ("unknown_key".into(), "42".into()),
+        ("min_bet".into(), "25".into()),
+    ];
+    let c = BlackjackConfig::from_kv_pairs(&pairs);
+    assert_eq!(c.min_bet, 25);
+    assert_eq!(c.max_bet, 1000);
+}
+
 #[test]
 fn deck_total_value_matches_expected_sum() {
     // Sans reduction des As : 4 * (2+3+4+5+6+7+8+9+10+10+10+10+11) = 4 * 95 = 380

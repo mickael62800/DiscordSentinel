@@ -37,6 +37,49 @@ impl IaConfig {
             updated_at: now,
         }
     }
+
+    /// Construit un IaConfig en normalisant/validant les entrees selon les
+    /// invariants metier :
+    /// - thresholds et dampening clampes dans [0.0, 1.0]
+    /// - context_max_messages clampe dans [0, 10]
+    /// - context_max_chars clampe dans [50, 500]
+    /// - context_format : "natural" ou "tagged" ; toute autre valeur retombe
+    ///   sur "natural"
+    ///
+    /// Regle metier pure. Les handlers HTTP/gRPC qui recoivent du DTO brut
+    /// doivent passer par cette fonction au lieu d'appliquer les clamps
+    /// localement.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_normalized(
+        guild_id: String,
+        text_enabled: bool,
+        text_threshold: f64,
+        vision_enabled: bool,
+        vision_threshold: f64,
+        context_dampening: f64,
+        context_format: String,
+        context_max_messages: i32,
+        context_max_chars: i32,
+    ) -> Self {
+        let context_format = match context_format.as_str() {
+            "natural" | "tagged" => context_format,
+            _ => "natural".to_string(),
+        };
+        let now = Utc::now();
+        Self {
+            guild_id,
+            text_enabled,
+            text_threshold: text_threshold.clamp(0.0, 1.0),
+            vision_enabled,
+            vision_threshold: vision_threshold.clamp(0.0, 1.0),
+            context_dampening: context_dampening.clamp(0.0, 1.0),
+            context_format,
+            context_max_messages: context_max_messages.clamp(0, 10),
+            context_max_chars: context_max_chars.clamp(50, 500),
+            created_at: now,
+            updated_at: now,
+        }
+    }
 }
 
 #[cfg(test)]

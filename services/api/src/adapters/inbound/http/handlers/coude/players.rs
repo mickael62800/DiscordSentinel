@@ -273,11 +273,10 @@ pub async fn record_coins_lost(
             "Le montant doit etre positif".into(),
         )));
     }
-    // Clamp au solde reel pour preserver le comportement legacy
-    // (GREATEST(0, coins - amount)) : `wallet_uc.debit` echoue si solde
-    // insuffisant, on reduit le montant pour ne jamais echouer ici.
+    // Clamp au solde reel pour preserver le comportement legacy.
+    // Regle metier : `domain/entities/wallet.rs::clamp_debit_to_balance`.
     let balance = state.wallet_uc.get_balance(&guild_id, &user_id).await?;
-    let actual = dto.amount.min(balance).max(0);
+    let actual = crate::domain::entities::clamp_debit_to_balance(dto.amount, balance);
     if actual > 0 {
         state
             .wallet_uc

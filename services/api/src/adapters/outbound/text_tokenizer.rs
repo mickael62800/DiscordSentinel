@@ -71,17 +71,26 @@ impl TextTokenizer {
         let encoding = tokenizer.encode(text, true)
             .map_err(|e| format!("Erreur tokenisation: {e}"))?;
 
-        let ids = encoding.get_ids();
-        let mask = encoding.get_attention_mask();
-
-        // Convertir en ndarray (1, seq_len)
-        let seq_len = ids.len().min(self.max_length);
-
-        let input_ids = Array2::from_shape_fn((1, seq_len), |(_, j)| ids[j] as i64);
-        let attention_mask = Array2::from_shape_fn((1, seq_len), |(_, j)| mask[j] as i64);
-
-        Ok((input_ids, attention_mask))
+        Ok(build_arrays_from_encoding(
+            encoding.get_ids(),
+            encoding.get_attention_mask(),
+            self.max_length,
+        ))
     }
+}
+
+/// Helper pur : convertit les slices ids/mask d'une encoding en Array2<i64>
+/// de shape (1, min(len, max_length)). Extrait de `tokenize` pour permettre
+/// le test unitaire sans charger un vrai Tokenizer.
+pub(super) fn build_arrays_from_encoding(
+    ids: &[u32],
+    mask: &[u32],
+    max_length: usize,
+) -> (Array2<i64>, Array2<i64>) {
+    let seq_len = ids.len().min(max_length);
+    let input_ids = Array2::from_shape_fn((1, seq_len), |(_, j)| ids[j] as i64);
+    let attention_mask = Array2::from_shape_fn((1, seq_len), |(_, j)| mask[j] as i64);
+    (input_ids, attention_mask)
 }
 
 

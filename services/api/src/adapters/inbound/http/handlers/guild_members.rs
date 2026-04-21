@@ -11,7 +11,7 @@ use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, req
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::{GuildMember, MemberSummary};
 use crate::domain::errors::DomainError;
-use crate::domain::services::DiscordMember;
+use crate::adapters::outbound::DiscordMember;
 use crate::ports::inbound::{RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand};
 
 const MEMBERS_TTL: u64 = 600; // 10 minutes

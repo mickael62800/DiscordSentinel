@@ -57,6 +57,56 @@ pub fn create_deck() -> Vec<Card> {
     deck
 }
 
+/// Parametres metier du blackjack (mise min/max, solde initial, payout
+/// blackjack naturel). Valeurs par defaut et bornes definies dans le
+/// domaine, alimentees par `bot_guild_config` dans les adapters.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BlackjackConfig {
+    pub min_bet: i64,
+    pub max_bet: i64,
+    pub starting_coins: i64,
+    pub blackjack_payout: f64,
+}
+
+impl Default for BlackjackConfig {
+    fn default() -> Self {
+        Self {
+            min_bet: 10,
+            max_bet: 1000,
+            starting_coins: 200,
+            blackjack_payout: 1.5,
+        }
+    }
+}
+
+impl BlackjackConfig {
+    /// Construit une config a partir de paires (key, value) lues depuis
+    /// `bot_guild_config`. Les valeurs manquantes ou malformees retombent
+    /// sur les defauts du domaine.
+    ///
+    /// Invariants metier :
+    /// - `min_bet > 0`, `max_bet > 0`, `starting_coins >= 0`, `blackjack_payout > 0`.
+    /// - `min_bet <= max_bet` (sinon, retombe sur defauts pour cette paire).
+    pub fn from_kv_pairs(pairs: &[(String, String)]) -> Self {
+        let d = Self::default();
+        let mut cfg = d;
+        for (k, v) in pairs {
+            match k.as_str() {
+                "min_bet" => { if let Ok(n) = v.parse::<i64>() { if n > 0 { cfg.min_bet = n; } } }
+                "max_bet" => { if let Ok(n) = v.parse::<i64>() { if n > 0 { cfg.max_bet = n; } } }
+                "starting_coins" => { if let Ok(n) = v.parse::<i64>() { if n >= 0 { cfg.starting_coins = n; } } }
+                "blackjack_payout" => { if let Ok(n) = v.parse::<f64>() { if n > 0.0 { cfg.blackjack_payout = n; } } }
+                _ => {}
+            }
+        }
+        if cfg.min_bet > cfg.max_bet {
+            cfg.min_bet = d.min_bet;
+            cfg.max_bet = d.max_bet;
+        }
+        cfg
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlackjackGame {
     pub id: Uuid,

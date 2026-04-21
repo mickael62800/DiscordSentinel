@@ -11,7 +11,7 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::services::DiscordChannel;
+use crate::adapters::outbound::DiscordChannel;
 
 const CHANNELS_TTL: u64 = 600;
 

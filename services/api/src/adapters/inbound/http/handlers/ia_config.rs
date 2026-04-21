@@ -26,25 +26,19 @@ pub async fn save_ia_config(
     Path(guild_id): Path<String>,
     Json(dto): Json<SaveIaConfigDto>,
 ) -> Result<Json<IaConfigDto>, ApiError> {
-    // Valider context_format
-    let context_format = match dto.context_format.as_str() {
-        "natural" | "tagged" => dto.context_format,
-        _ => "natural".to_string(),
-    };
-
-    let config = IaConfig {
-        guild_id: guild_id.clone(),
-        text_enabled: dto.text_enabled,
-        text_threshold: dto.text_threshold.clamp(0.0, 1.0),
-        vision_enabled: dto.vision_enabled,
-        vision_threshold: dto.vision_threshold.clamp(0.0, 1.0),
-        context_dampening: dto.context_dampening.clamp(0.0, 1.0),
-        context_format,
-        context_max_messages: dto.context_max_messages.clamp(0, 10),
-        context_max_chars: dto.context_max_chars.clamp(50, 500),
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
-    };
+    // La normalisation (clamp thresholds/max_*, fallback context_format) est
+    // une regle metier : voir `IaConfig::new_normalized` dans domain/entities.
+    let config = IaConfig::new_normalized(
+        guild_id,
+        dto.text_enabled,
+        dto.text_threshold,
+        dto.vision_enabled,
+        dto.vision_threshold,
+        dto.context_dampening,
+        dto.context_format,
+        dto.context_max_messages,
+        dto.context_max_chars,
+    );
 
     let saved = state.ia_config_repo.save(&config).await?;
     Ok(Json(IaConfigDto::from(saved)))
