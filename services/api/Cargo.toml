@@ -252,6 +252,11 @@ path = "tests/integration/system_misc/http.rs"
 name = "integration_bot_config_http"
 path = "tests/integration/bot_config/http.rs"
 
+# role_panels
+[[test]]
+name = "integration_role_panels_http"
+path = "tests/integration/role_panels/http.rs"
+
 # strikes
 [[test]]
 name = "integration_strikes_http"
