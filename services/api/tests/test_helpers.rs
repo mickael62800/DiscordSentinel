@@ -786,6 +786,46 @@ pub fn build_test_state_conduct(conduct_uc: Arc<dyn ManageConductUseCase>) -> Ap
     state
 }
 
+/// Construit un AppState avec un mock levels use case injecte.
+#[allow(dead_code)]
+pub fn build_test_state_levels(levels_uc: Arc<dyn ManageLevelsUseCase>) -> AppState {
+    let mut state = base_state();
+    state.levels_uc = levels_uc;
+    state
+}
+
+/// Construit un AppState avec un mock stats use case injecte.
+#[allow(dead_code)]
+pub fn build_test_state_stats(stats_uc: Arc<dyn ManageStatsUseCase>) -> AppState {
+    let mut state = base_state();
+    state.stats_uc = stats_uc;
+    state
+}
+
+/// Construit un AppState avec un mock log repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_logs(log_repo: Arc<dyn LogRepository>) -> AppState {
+    let mut state = base_state();
+    state.log_repo = log_repo;
+    state
+}
+
+/// Construit un AppState avec un mock guild repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_guilds(guild_repo: Arc<dyn GuildRepository>) -> AppState {
+    let mut state = base_state();
+    state.guild_repo = guild_repo;
+    state
+}
+
+/// Construit un AppState avec un mock daily activity repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_daily_activity(daily_activity_repo: Arc<dyn DailyActivityRepository>) -> AppState {
+    let mut state = base_state();
+    state.daily_activity_repo = daily_activity_repo;
+    state
+}
+
 // ── Stub Voice Channels (needed for base_state) ──
 
 pub struct StubVoiceChannels;

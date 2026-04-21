@@ -212,6 +212,26 @@ path = "tests/integration/security/http.rs"
 name = "integration_conduct_http"
 path = "tests/integration/conduct/http.rs"
 
+# levels
+[[test]]
+name = "integration_levels_http"
+path = "tests/integration/levels/http.rs"
+
+# stats
+[[test]]
+name = "integration_stats_http"
+path = "tests/integration/stats/http.rs"
+
+# dashboard
+[[test]]
+name = "integration_dashboard_http"
+path = "tests/integration/dashboard/http.rs"
+
+# dashboard_charts
+[[test]]
+name = "integration_dashboard_charts_http"
+path = "tests/integration/dashboard_charts/http.rs"
+
 # strikes
 [[test]]
 name = "integration_strikes_http"
