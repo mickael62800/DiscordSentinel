@@ -92,3 +92,30 @@ fn suspicious_account_future_timestamp() {
     let future = chrono::Utc::now().timestamp() + 3600;
     assert!(is_account_suspicious(future, 86400));
 }
+
+#[test]
+fn alt_detection_breaks_when_both_conditions_on_same_ban() {
+    // Couvre le `break` (line 152-153) : quand un seul ban satisfait les 2
+    // conditions (similaire + creation proche), on sort de la boucle sans
+    // visiter les bans suivants.
+    let bans = vec![
+        BannedUserInfo { username: "raider1".into(), account_created_timestamp: 5000 },
+        BannedUserInfo { username: "other_completely_different_name".into(), account_created_timestamp: 999_999 },
+    ];
+    let result = check_alt_account("raider2", 5100, &bans, 2, 3600);
+    assert_eq!(result.similar_to_banned, Some("raider1".into()));
+    assert_eq!(result.creation_near_banned, Some("raider1".into()));
+}
+
+#[test]
+fn alt_detection_similar_and_creation_from_different_bans() {
+    // Cas ou les 2 conditions sont satisfaites mais par des bans differents
+    // (pas de break apres la 1re iteration).
+    let bans = vec![
+        BannedUserInfo { username: "raider".into(), account_created_timestamp: 999_999 },
+        BannedUserInfo { username: "total_diff".into(), account_created_timestamp: 5100 },
+    ];
+    let result = check_alt_account("ra1der", 5000, &bans, 2, 3600);
+    assert_eq!(result.similar_to_banned, Some("raider".into()));
+    assert_eq!(result.creation_near_banned, Some("total_diff".into()));
+}

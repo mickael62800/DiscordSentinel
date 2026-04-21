@@ -161,6 +161,125 @@ fn build_taunt_event_deterministic_one_shot_kinds() {
 }
 
 #[test]
+fn build_taunt_event_deterministic_opt_out_returns_none() {
+    let ev = build_taunt_event_deterministic(&cfg_with_channel(), "u1", StreakKind::Win, 3, true);
+    assert!(ev.is_none());
+}
+
+#[test]
+fn build_taunt_event_deterministic_disabled_returns_none() {
+    let mut cfg = cfg_with_channel();
+    cfg.enabled = false;
+    let ev = build_taunt_event_deterministic(&cfg, "u1", StreakKind::Win, 3, false);
+    assert!(ev.is_none());
+}
+
+#[test]
+fn build_taunt_event_deterministic_no_channel_returns_none() {
+    let mut cfg = cfg_with_channel();
+    cfg.channel_id = None;
+    let ev = build_taunt_event_deterministic(&cfg, "u1", StreakKind::Win, 3, false);
+    assert!(ev.is_none());
+}
+
+#[test]
+fn build_taunt_event_deterministic_below_threshold_returns_none() {
+    // Threshold-based kind + streak hors 3/5/10 → None.
+    let ev = build_taunt_event_deterministic(&cfg_with_channel(), "u1", StreakKind::Win, 2, false);
+    assert!(ev.is_none());
+    let ev = build_taunt_event_deterministic(&cfg_with_channel(), "u1", StreakKind::Loss, 11, false);
+    assert!(ev.is_none());
+}
+
+#[test]
+fn build_taunt_event_below_threshold_for_threshold_based_kind() {
+    // build_taunt_event (non deterministe) doit aussi retourner None si
+    // new_streak n'est pas 3/5/10 pour un kind threshold-based.
+    let ev = build_taunt_event(&cfg_with_channel(), "u1", StreakKind::Loss, 2, false);
+    assert!(ev.is_none());
+    let ev = build_taunt_event(&cfg_with_channel(), "u1", StreakKind::StealVictim, 4, false);
+    assert!(ev.is_none());
+}
+
+#[test]
+fn build_taunt_event_threshold_match_returns_some() {
+    // Cas positif pour couvrir le chemin nominal du build_taunt_event (non deterministe).
+    let ev = build_taunt_event(&cfg_with_channel(), "u1", StreakKind::StealVictim, 5, false);
+    assert!(ev.is_some());
+    let unwrapped = ev.unwrap();
+    assert_eq!(unwrapped.streak_kind, "steal_victim");
+    assert_eq!(unwrapped.streak_value, 5);
+    assert!(unwrapped.message.contains("<@u1>"));
+}
+
+// ── Couverture des branches messages_enabled / rename_enabled ──
+
+#[test]
+fn build_taunt_event_messages_disabled_emits_empty_message_with_suffix() {
+    let mut cfg = cfg_with_channel();
+    cfg.messages_enabled = false;
+    cfg.rename_enabled = true;
+    let ev = build_taunt_event(&cfg, "u1", StreakKind::Win, 3, false).expect("should build");
+    assert_eq!(ev.message, "");
+    assert!(!ev.nickname_suffix.is_empty());
+}
+
+#[test]
+fn build_taunt_event_rename_disabled_emits_empty_suffix_with_message() {
+    let mut cfg = cfg_with_channel();
+    cfg.messages_enabled = true;
+    cfg.rename_enabled = false;
+    let ev = build_taunt_event(&cfg, "u1", StreakKind::Win, 3, false).expect("should build");
+    assert!(!ev.message.is_empty());
+    assert_eq!(ev.nickname_suffix, "");
+}
+
+#[test]
+fn build_taunt_event_both_disabled_returns_none() {
+    // rename_enabled=false + messages_enabled=false → les deux vides → None.
+    let mut cfg = cfg_with_channel();
+    cfg.messages_enabled = false;
+    cfg.rename_enabled = false;
+    let ev = build_taunt_event(&cfg, "u1", StreakKind::Win, 3, false);
+    assert!(ev.is_none());
+}
+
+#[test]
+fn build_taunt_event_deterministic_messages_disabled() {
+    let mut cfg = cfg_with_channel();
+    cfg.messages_enabled = false;
+    let ev = build_taunt_event_deterministic(&cfg, "u1", StreakKind::Win, 3, false)
+        .expect("should build with empty message but valid suffix");
+    assert_eq!(ev.message, "");
+    assert!(!ev.nickname_suffix.is_empty());
+}
+
+#[test]
+fn build_taunt_event_deterministic_rename_disabled() {
+    let mut cfg = cfg_with_channel();
+    cfg.rename_enabled = false;
+    let ev = build_taunt_event_deterministic(&cfg, "u1", StreakKind::Win, 3, false)
+        .expect("should build with empty suffix but valid message");
+    assert!(!ev.message.is_empty());
+    assert_eq!(ev.nickname_suffix, "");
+}
+
+#[test]
+fn build_taunt_event_deterministic_both_disabled_returns_none() {
+    let mut cfg = cfg_with_channel();
+    cfg.messages_enabled = false;
+    cfg.rename_enabled = false;
+    let ev = build_taunt_event_deterministic(&cfg, "u1", StreakKind::Win, 3, false);
+    assert!(ev.is_none());
+}
+
+// Note : les branches `_ => &[]` dans messages_for et `_ => ""` dans
+// nickname_suffix_for sont des fallbacks defensifs. Les atteindre
+// necessite des combinaisons (kind, threshold) qui ne peuvent pas etre
+// produites par le code normal. On les couvrira indirectement via les
+// nombreux tests deja existants.
+
+#[test]
 fn streak_kind_as_str_all_variants() {
     // Couvre les branches non touchees de StreakKind::as_str.
     assert_eq!(StreakKind::Win.as_str(), "win");

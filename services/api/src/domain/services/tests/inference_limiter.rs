@@ -71,6 +71,27 @@ async fn test_refill_tokens_restores_capacity_after_wait() {
 }
 
 #[tokio::test]
+async fn test_acquire_via_timeout_path_succeeds() {
+    // Couvre la branche `Err(_) => timeout + acquire.await` quand try_acquire
+    // echoue mais le permit se libere avant le timeout de 5s.
+    let limiter = InferenceRateLimiter::new(1, 0);
+    // Acquiert via un OwnedSemaphorePermit pour pouvoir le move dans une task.
+    let sem = limiter.semaphore.clone();
+    let owned_permit = sem.try_acquire_owned().unwrap();
+
+    // Task qui libere le permit apres 80ms.
+    let release = tokio::spawn(async move {
+        tokio::time::sleep(tokio::time::Duration::from_millis(80)).await;
+        drop(owned_permit);
+    });
+
+    // limiter.acquire() doit : try_acquire fail → timeout path → acquire.await → Ok.
+    let result = limiter.acquire().await;
+    assert!(result.is_ok());
+    release.await.unwrap();
+}
+
+#[tokio::test]
 async fn test_rate_limit_error_variant() {
     // Verifier que c'est bien RateLimited (pas Internal ou autre).
     let limiter = InferenceRateLimiter::new(100, 1);

@@ -352,6 +352,35 @@ fn fourbe_defender_vampirisme_branch() {
 }
 
 #[test]
+fn fourbe_attacker_vampirisme_branch() {
+    // Fourbe en attaquant → branche vampirisme attacker (lines 571-581).
+    let atk = player("a", "fourbe", 5);
+    let def = player("d", "bourrin", 5);
+    let mut revealed = false;
+    for _ in 0..50 {
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        if r.attacker_class_revealed.as_deref() == Some("fourbe") {
+            revealed = true;
+            break;
+        }
+    }
+    assert!(revealed, "fourbe attaquant doit declencher son passif au moins une fois sur 50 runs");
+}
+
+#[test]
+fn defender_poison_applies_to_attacker_hp() {
+    // Le defenseur a du poison → attaquant prend poison_damage_per_round HP chaque round.
+    let atk = player("a", "tank", 5);
+    let def = player("d", "bourrin", 5);
+    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("poison"), &[], &CoudeBalanceParams::default());
+    // Au moins un round doit mentionner le poison subi par l'attaquant.
+    let any_poison_hit_atk = r.rounds.iter().any(|rd| {
+        rd.message.contains(&format!("<@{}>", "a")) && rd.message.contains("poison")
+    });
+    assert!(any_poison_hit_atk || r.rounds.is_empty(), "defender poison doit toucher attacker");
+}
+
+#[test]
 fn small_combat_limited_to_3_rounds() {
     // combined_hp < 250 → max_rounds = 3.
     let atk = player("a", "bourrin", 1);
