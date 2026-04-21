@@ -576,6 +576,125 @@ async fn delete_action_warn_no_discord_call() {
     assert_eq!(status, StatusCode::NO_CONTENT);
 }
 
+// ══════════════════════════════════════════════════════════
+// Branches `rbac.is_some()` couvertes via RoleContext injecte
+// directement dans les extensions de la requete (evite le middleware
+// rbac_middleware qui exigerait un token Discord + api_users seede).
+// ══════════════════════════════════════════════════════════
+
+async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (StatusCode, serde_json::Value) {
+    let resp = app.oneshot(req).await.unwrap();
+    let s = resp.status();
+    let b = resp.into_body().collect().await.unwrap().to_bytes();
+    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_evidence_with_rbac_admin_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+
+    // Insere une action pour que le lookup sqlx trouve le guild_id.
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let action_id = insert_action(&p, &guild_id, "warn").await;
+
+    // Seede un api_user_guilds avec role=admin pour que check_role_for_guild
+    // passe (sinon fallback = viewer → 403 sur require Moderator).
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'TestAdmin') ON CONFLICT DO NOTHING")
+        .bind(&user_id).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'admin')")
+        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({
+        "action_id": action_id.to_string(),
+        "url": "https://example.com/proof.png",
+        "uploaded_by": "444444444444444444",
+        "uploaded_by_name": "Alice"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/moderation/evidence",
+        &user_id, Some(Role::Admin), Some(guild_id),
+        Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_evidence_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let action_id = insert_action(&p, &guild_id, "warn").await;
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'Viewer') ON CONFLICT DO NOTHING")
+        .bind(&user_id).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'viewer')")
+        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({
+        "action_id": action_id.to_string(),
+        "url": "https://example.com/p.png",
+        "uploaded_by": "444444444444444444",
+        "uploaded_by_name": "V"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/moderation/evidence",
+        &user_id, Some(Role::Viewer), Some(guild_id),
+        Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn resolve_review_with_rbac_admin_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'Admin') ON CONFLICT DO NOTHING")
+        .bind(&user_id).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'admin')")
+        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+
+    // Seed une review dans le mock (repo.get_guild_id retourne guild_id).
+    let review_id = Uuid::new_v4();
+    let review = Arc::new(MockReviewRepo::default());
+    review.items.lock().unwrap().push(ReviewEntry {
+        id: review_id, action_id: Uuid::new_v4(),
+        guild_id: guild_id.clone(),
+        added_by: "u".into(), added_by_name: "X".into(),
+        reason: None, status: "pending".into(),
+        reviewer_id: None, reviewer_name: None, reviewer_notes: None,
+        added_at: Utc::now(), resolved_at: None,
+        action_type: None, target_name: None, action_reason: None,
+    });
+
+    let app = router::build_for_test(build_state(Arc::new(MockEvidenceRepo::default()), review));
+    let body = serde_json::json!({
+        "status": "approved",
+        "reviewer_id": "555555555555555555",
+        "reviewer_name": "Admin"
+    });
+    let req = test_helpers::request_with_rbac(
+        "PATCH", &format!("/api/moderation/review/{review_id}/resolve"),
+        &user_id, Some(Role::Admin), Some(guild_id),
+        Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_ban_invalid_guild_422() {
     let app = router::build_for_test(build_state(

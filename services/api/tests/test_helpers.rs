@@ -874,6 +874,41 @@ pub fn build_test_state_discord_api(discord_api: Arc<dyn DiscordApi>) -> AppStat
     state
 }
 
+/// Construit une requete axum avec un RoleContext pre-injecte dans les
+/// extensions. Permet de couvrir les branches `rbac.is_some()` des handlers
+/// sans passer par le middleware rbac_middleware (qui requerrait un token
+/// Discord valide + Redis + api_users seede).
+///
+/// axum preserve les extensions du Request a travers les middlewares, donc
+/// un Extension<RoleContext> pose ici sera vu par les handlers via
+/// `Option<Extension<RoleContext>>`.
+#[allow(dead_code)]
+pub fn request_with_rbac(
+    method: &str,
+    uri: &str,
+    user_id: &str,
+    role: Option<sentinel_api::adapters::inbound::http::middleware::rbac::Role>,
+    guild_id: Option<String>,
+    body: Option<serde_json::Value>,
+) -> axum::http::Request<axum::body::Body> {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::RoleContext;
+    let mut builder = axum::http::Request::builder().method(method).uri(uri);
+    if body.is_some() {
+        builder = builder.header("content-type", "application/json");
+    }
+    let body = match body {
+        Some(v) => axum::body::Body::from(serde_json::to_string(&v).unwrap()),
+        None => axum::body::Body::empty(),
+    };
+    let mut req = builder.body(body).unwrap();
+    req.extensions_mut().insert(RoleContext {
+        discord_user_id: user_id.to_string(),
+        role,
+        guild_id,
+    });
+    req
+}
+
 // ══════════════════════════════════════════════════════════
 // Mock DiscordApi — retourne Ok(()) par defaut pour tous les appels.
 // Utilise par les tests qui veulent couvrir le code APRES discord_api
