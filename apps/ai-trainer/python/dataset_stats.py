@@ -16,7 +16,9 @@ if sys.stdout.encoding != "utf-8":
 
 TEXT_EXTS = {".jsonl", ".txt"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
-LABEL_NAMES = {0: "neutral", 1: "anger", 2: "rage", 3: "threat", 4: "harassment"}
+LABEL_NAMES = {0: "neutral", 1: "toxic_light", 2: "toxic_severe"}
+# Projette les labels bruts du dataset (toxifrench 5 classes) sur 3 classes.
+_LABEL_REMAP = {0: 0, 1: 1, 2: 2, 3: 2, 4: 1}
 
 
 def scan_text(root: Path) -> dict:
@@ -45,7 +47,8 @@ def scan_text(root: Path) -> dict:
                         except json.JSONDecodeError:
                             continue
                         label_id = entry.get("label", 1)
-                        labels[LABEL_NAMES.get(label_id, str(label_id))] += 1
+                        mapped = _LABEL_REMAP.get(label_id, label_id)
+                        labels[LABEL_NAMES.get(mapped, str(mapped))] += 1
             elif f.suffix == ".txt":
                 labels["anger"] += sum(1 for line in f.read_text(encoding="utf-8").splitlines() if line.strip())
             mod = f.stat().st_mtime

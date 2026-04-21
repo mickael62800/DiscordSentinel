@@ -11,11 +11,13 @@ logger = logging.getLogger("sentinel.trainer.dataset.text")
 
 CLASS_MAP: dict[str, int] = {
     "neutral": 0,
-    "anger": 1,
-    "rage": 2,
-    "threat": 3,
-    "harassment": 4,
+    "toxic_light": 1,
+    "toxic_severe": 2,
 }
+
+# Projette les 5 labels bruts du dataset (toxifrench) sur 3 classes regroupees.
+# anger + harassment -> toxic_light ; rage + threat -> toxic_severe.
+_LABEL_REMAP: dict[int, int] = {0: 0, 1: 1, 2: 2, 3: 2, 4: 1}
 
 
 class TextSentinelDataset(Dataset):
@@ -52,7 +54,9 @@ class TextSentinelDataset(Dataset):
                     if line:
                         try:
                             entry = json.loads(line)
-                            self.samples.append((entry["text"], entry["label"]))
+                            raw_label = entry["label"]
+                            label = _LABEL_REMAP.get(raw_label, raw_label)
+                            self.samples.append((entry["text"], label))
                         except (json.JSONDecodeError, KeyError):
                             continue
             elif file.suffix == ".txt":

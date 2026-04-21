@@ -17,6 +17,14 @@ Bienvenue ! Le principe : tu te bagarres contre d'autres joueurs, tu voles des c
 3. **Les vols** : plus ta victime a de coins, plus tu gagnes. Mais elle peut activer une **Protection** (shop) pour bloquer.
 4. **Les classes** (`/classe`) changent tes stats : Guerrier = tank, Fourbe = vampirise les dégâts, Voleur = bonus sur `/voler`, etc.
 5. **Attention aux streaks** : 3 défaites ou 3 vols subis d'affilée = le bot te rebaptise avec un emoji humiliant. `/no-taunts on` si tu veux échapper aux pseudos modifiés.
-6. **Tournoi hebdo** : le joueur avec le plus de gains nets sur la semaine empoche un pourcentage de la caisse commune. Chaque dimanche 23h UTC.
+
+## La caisse commune (cagnotte)
+
+Chaque fois que quelqu'un fuit un combat (lâcheté), paie une taxe de don ou explosion, les coins tombent dans une **caisse communautaire**. Elle grossit au fil des jours.
+
+- **Tournoi hebdo** : chaque dimanche 23h UTC, le joueur avec le plus de gains nets sur la semaine empoche un pourcentage de la caisse (`/coude` → page tournoi dans la web UI).
+- **Braquage** (`/braquage`) : toi-même tu peux tenter de voler la caisse ! Une fois par semaine max. Plus tu as d'outils du shop (masque, pied-de-biche, crochet, explosif, drone, équipe de pros…) plus ta chance monte, cap à 50%. Si tu réussis → tu empoches jusqu'à 75% de la caisse. Si tu rates → **24h de prison** + tu perds une partie de tes outils (aucune action pendant ce temps).
+
+Le braquage est le gros coup : risqué mais jackpot. Assure tes arrières avec quelques potions avant de tenter.
 
 Amuse-toi bien. Si le bot dit "Echec de l'interaction", re-clique — c'est juste Discord qui boude.

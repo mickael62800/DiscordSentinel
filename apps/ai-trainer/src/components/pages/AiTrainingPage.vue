@@ -136,8 +136,8 @@ onMounted(async () => {
           <template v-if="activeTab === 'text-sentiment'">
             <h2>CamemBERT — Sentiment / Toxicite</h2>
             <p>
-              Fine-tuning d'un modele CamemBERT (138 Go de francais natif) pour detecter
-              la colere, la rage, les menaces et le harcelement dans les messages.
+              Fine-tuning d'un modele CamemBERT (138 Go de francais natif) pour classer
+              les messages en 3 niveaux : neutre, toxicite legere, toxicite severe.
             </p>
             <div class="model-tags">
               <span class="tag">NLP</span>
@@ -218,7 +218,7 @@ onMounted(async () => {
             <label class="toggle">
               <input type="checkbox" v-model="useClassWeights" :disabled="status.running" />
               <span>Class weights (inverse freq)</span>
-              <small>Compense le desequilibre neutral/threat</small>
+              <small>Compense le desequilibre entre les 3 classes</small>
             </label>
             <label class="toggle">
               <input type="checkbox" v-model="useMixedPrecision" :disabled="status.running" />
