@@ -111,7 +111,7 @@ def train_text(args, emitter: Emitter, data_root: Path) -> None:
 
     emitter.emit("phase", phase="preparation donnees")
     test_ratio = config.get("data", {}).get("test_split", 0.1)
-    all_labels = [dataset[i]["labels"] for i in range(len(dataset))]
+    all_labels = [lbl for _, lbl in dataset.samples]
     train_indices, val_indices, test_indices = _create_stratified_splits(
         len(dataset), lambda i: all_labels[i], args.validation_split, test_ratio,
     )

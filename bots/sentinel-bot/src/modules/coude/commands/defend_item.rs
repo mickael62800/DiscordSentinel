@@ -142,6 +142,22 @@ pub async fn handle_defend_button(ctx: &Context, component: &ComponentInteractio
 
 /// Gere la selection d'un objet defensif → accepte le combat avec l'objet.
 pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteraction) {
+    // Defer immediate : le handler enchaine 5 RPC (get_combat, use_item,
+    // set_defender_special, delete_response, resolve_combat_internal) qui
+    // depassent facilement le timeout Discord de 3s. On acknowledge
+    // immediatement puis on delete la reponse a la fin.
+    if let Err(e) = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec defer defend_select");
+    }
+
     let rest = match component.data.custom_id.strip_prefix(DEFEND_SELECT_PREFIX) {
         Some(id) => id,
         None => return,

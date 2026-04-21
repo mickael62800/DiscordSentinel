@@ -25,16 +25,16 @@ const {
 
 const activeTab = ref<ModelType>("text-sentiment");
 
-const epochs = ref(10);
+const epochs = ref(5);
 const batchSize = ref(32);
-const learningRate = ref(0.001);
-const validationSplit = ref(0.2);
-const earlyStoppingPatience = ref(3);
+const learningRate = ref(0.00002);
+const validationSplit = ref(0.1);
+const earlyStoppingPatience = ref(2);
 const useClassWeights = ref(true);
 const useMixedPrecision = ref(true);
-const labelSmoothing = ref(0.1);
+const labelSmoothing = ref(0.05);
 const weightDecay = ref(0.01);
-const warmupRatio = ref(0.1);
+const warmupRatio = ref(0.06);
 const maxLength = ref(128);
 const neutralCap = ref(0);
 
