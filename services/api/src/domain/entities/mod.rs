@@ -63,7 +63,10 @@ mod blackjack;
 pub use blackjack::{BlackjackConfig, BlackjackGame, Card, calculate_score, create_deck};
 
 mod wallet;
-pub use wallet::{clamp_debit_to_balance, Wallet, WalletTransaction};
+pub use wallet::{
+    clamp_debit_to_balance, resolve_reset_balance, resolve_starting_coins,
+    validate_positive_amount, validate_transfer_distinct_users, Wallet, WalletTransaction,
+};
 
 mod coude_player;
 pub use coude_player::{

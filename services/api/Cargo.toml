@@ -257,6 +257,11 @@ path = "tests/integration/bot_config/http.rs"
 name = "integration_role_panels_http"
 path = "tests/integration/role_panels/http.rs"
 
+# wallet HTTP (handler-level, avec logique metier extraite dans le domain)
+[[test]]
+name = "integration_wallet_http"
+path = "tests/integration/wallet_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"

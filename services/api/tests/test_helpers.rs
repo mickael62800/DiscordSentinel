@@ -866,6 +866,14 @@ pub fn build_test_state_bot_config(bot_config_repo: Arc<dyn BotConfigRepository>
     state
 }
 
+/// Construit un AppState avec un mock wallet repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_wallet(wallet_repo: Arc<dyn WalletRepository>) -> AppState {
+    let mut state = base_state();
+    state.wallet_repo = wallet_repo;
+    state
+}
+
 /// Construit un AppState avec un mock DiscordApi injecte.
 #[allow(dead_code)]
 pub fn build_test_state_discord_api(discord_api: Arc<dyn DiscordApi>) -> AppState {

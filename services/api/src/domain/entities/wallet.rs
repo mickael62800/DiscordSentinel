@@ -41,6 +41,47 @@ pub fn clamp_debit_to_balance(amount: i64, balance: i64) -> i64 {
     amount.min(balance).max(0)
 }
 
+/// Solde de depart par defaut d'un wallet (coins offerts au premier
+/// `get_or_create`).
+pub const DEFAULT_STARTING_COINS: i64 = 100;
+
+/// Resout le solde de depart d'un wallet, en respectant l'override
+/// environnement `WALLET_STARTING_COINS`. Regle metier pure.
+///
+/// Le parametre `env_override` correspond a la valeur lue depuis l'env
+/// (None si non defini). Un parsing invalide (non-numerique) retombe sur
+/// la valeur par defaut.
+pub fn resolve_starting_coins(env_override: Option<&str>) -> i64 {
+    env_override
+        .and_then(|v| v.parse::<i64>().ok())
+        .unwrap_or(DEFAULT_STARTING_COINS)
+}
+
+/// Valide qu'un montant pour credit/debit/transfer est strictement positif.
+/// Regle metier : on n'accepte ni zero ni negatif (utiliser le handler
+/// specifique `reset` pour remettre a zero).
+pub fn validate_positive_amount(amount: i64) -> Result<(), &'static str> {
+    if amount <= 0 {
+        Err("Le montant doit etre positif")
+    } else {
+        Ok(())
+    }
+}
+
+/// Valide qu'un transfert ne vise pas l'utilisateur lui-meme.
+pub fn validate_transfer_distinct_users(from: &str, to: &str) -> Result<(), &'static str> {
+    if from == to {
+        Err("Impossible de transferer vers soi-meme")
+    } else {
+        Ok(())
+    }
+}
+
+/// Resout le solde apres reset : valeur fournie ou default 100, floor 0.
+pub fn resolve_reset_balance(input: Option<i64>) -> i64 {
+    input.unwrap_or(DEFAULT_STARTING_COINS).max(0)
+}
+
 #[cfg(test)]
 #[path = "tests/wallet.rs"]
 mod tests;

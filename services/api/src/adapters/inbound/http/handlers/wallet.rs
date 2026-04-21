@@ -7,7 +7,11 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::{normalize_limit, ok_response};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::domain::entities::{Wallet, WalletTransaction};
+use crate::domain::entities::{
+    resolve_reset_balance, resolve_starting_coins, validate_positive_amount,
+    validate_transfer_distinct_users, Wallet, WalletTransaction,
+};
+use crate::domain::errors::DomainError;
 
 // ── DTOs ──
 
@@ -42,10 +46,8 @@ pub async fn get_wallet(
 ) -> Result<Json<Wallet>, ApiError> {
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
-    let starting_coins: i64 = std::env::var("WALLET_STARTING_COINS")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(100);
+    let env = std::env::var("WALLET_STARTING_COINS").ok();
+    let starting_coins = resolve_starting_coins(env.as_deref());
 
     let wallet = state.wallet_repo.get_or_create(&guild_id, &user_id, &user_id, starting_coins).await?;
     Ok(Json(wallet))
@@ -58,12 +60,8 @@ pub async fn credit(
     Json(dto): Json<CreditDebitDto>,
 ) -> Result<Json<Wallet>, ApiError> {
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
-
-    if dto.amount <= 0 {
-        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
-            "Le montant doit etre positif".into(),
-        )));
-    }
+    validate_positive_amount(dto.amount)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     let wallet = state.wallet_repo.credit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description).await?;
 
@@ -88,12 +86,8 @@ pub async fn debit(
     Json(dto): Json<CreditDebitDto>,
 ) -> Result<Json<Wallet>, ApiError> {
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
-
-    if dto.amount <= 0 {
-        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
-            "Le montant doit etre positif".into(),
-        )));
-    }
+    validate_positive_amount(dto.amount)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     let wallet = state.wallet_repo.debit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description).await?;
 
@@ -119,18 +113,10 @@ pub async fn transfer(
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("from_user_id", &dto.from_user_id).map_err(ApiError)?;
     validation::validate_discord_id("to_user_id", &dto.to_user_id).map_err(ApiError)?;
-
-    if dto.amount <= 0 {
-        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
-            "Le montant doit etre positif".into(),
-        )));
-    }
-
-    if dto.from_user_id == dto.to_user_id {
-        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
-            "Impossible de transferer vers soi-meme".into(),
-        )));
-    }
+    validate_positive_amount(dto.amount)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
+    validate_transfer_distinct_users(&dto.from_user_id, &dto.to_user_id)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     state.wallet_repo.transfer(
         &dto.guild_id, &dto.from_user_id, &dto.to_user_id,
@@ -209,7 +195,7 @@ pub async fn reset_wallet(
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<Wallet>, ApiError> {
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
-    let new_balance = dto.new_balance.unwrap_or(100).max(0);
+    let new_balance = resolve_reset_balance(dto.new_balance);
 
     let wallet = state.wallet_repo.reset_wallet(&guild_id, &user_id, new_balance).await?;
 
@@ -232,7 +218,7 @@ pub async fn reset_all_wallets(
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
-    let new_balance = dto.new_balance.unwrap_or(100).max(0);
+    let new_balance = resolve_reset_balance(dto.new_balance);
 
     let affected = state.wallet_repo.reset_all_wallets(&guild_id, new_balance).await?;
 
