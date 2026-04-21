@@ -192,6 +192,26 @@ path = "tests/integration/watched_users/http.rs"
 name = "integration_user_activity_http"
 path = "tests/integration/user_activity/http.rs"
 
+# analyze
+[[test]]
+name = "integration_analyze_http"
+path = "tests/integration/analyze/http.rs"
+
+# ia_config
+[[test]]
+name = "integration_ia_config_http"
+path = "tests/integration/ia_config/http.rs"
+
+# security
+[[test]]
+name = "integration_security_http"
+path = "tests/integration/security/http.rs"
+
+# conduct
+[[test]]
+name = "integration_conduct_http"
+path = "tests/integration/conduct/http.rs"
+
 # strikes
 [[test]]
 name = "integration_strikes_http"

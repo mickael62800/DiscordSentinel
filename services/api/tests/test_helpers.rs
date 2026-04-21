@@ -754,6 +754,38 @@ pub fn build_test_state_user_activity(user_activity_repo: Arc<dyn UserActivityRe
     state
 }
 
+/// Construit un AppState avec un mock analyze (text) use case injecte.
+#[allow(dead_code)]
+pub fn build_test_state_analyze(analyze_uc: Arc<dyn AnalyzeMessageUseCase>) -> AppState {
+    let mut state = base_state();
+    state.analyze_uc = analyze_uc;
+    state
+}
+
+/// Construit un AppState avec un mock security use case injecte.
+#[allow(dead_code)]
+pub fn build_test_state_security(security_uc: Arc<dyn ManageSecurityUseCase>) -> AppState {
+    let mut state = base_state();
+    state.security_uc = security_uc;
+    state
+}
+
+/// Construit un AppState avec un mock ia_config repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_ia_config(ia_config_repo: Arc<dyn IaConfigRepository>) -> AppState {
+    let mut state = base_state();
+    state.ia_config_repo = ia_config_repo;
+    state
+}
+
+/// Construit un AppState avec un mock conduct use case injecte.
+#[allow(dead_code)]
+pub fn build_test_state_conduct(conduct_uc: Arc<dyn ManageConductUseCase>) -> AppState {
+    let mut state = base_state();
+    state.conduct_uc = conduct_uc;
+    state
+}
+
 // ── Stub Voice Channels (needed for base_state) ──
 
 pub struct StubVoiceChannels;
