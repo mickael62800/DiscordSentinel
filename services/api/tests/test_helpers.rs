@@ -12,7 +12,8 @@ use sentinel_api::adapters::outbound::job_client::JobClient;
 use sentinel_api::domain::entities::*;
 use sentinel_api::domain::entities::analytics::*;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::adapters::outbound::DiscordApiService;
+use sentinel_api::adapters::outbound::{DiscordApi, DiscordApiService, DiscordChannel, DiscordMember, DiscordUser};
+use sentinel_api::adapters::outbound::discord_api::UserGuild;
 use sentinel_api::ports::inbound::*;
 use sentinel_api::ports::outbound::*;
 
@@ -863,6 +864,90 @@ pub fn build_test_state_bot_config(bot_config_repo: Arc<dyn BotConfigRepository>
     let mut state = base_state();
     state.bot_config_repo = bot_config_repo;
     state
+}
+
+/// Construit un AppState avec un mock DiscordApi injecte.
+#[allow(dead_code)]
+pub fn build_test_state_discord_api(discord_api: Arc<dyn DiscordApi>) -> AppState {
+    let mut state = base_state();
+    state.discord_api = discord_api;
+    state
+}
+
+// ══════════════════════════════════════════════════════════
+// Mock DiscordApi — retourne Ok(()) par defaut pour tous les appels.
+// Utilise par les tests qui veulent couvrir le code APRES discord_api
+// (log_action + broadcast dans execute_ban/mute/unban, etc.).
+// ══════════════════════════════════════════════════════════
+
+#[derive(Default)]
+pub struct MockDiscordApi {
+    pub calls: std::sync::Mutex<Vec<String>>,
+}
+
+impl MockDiscordApi {
+    #[allow(dead_code)]
+    pub fn new() -> Self { Self::default() }
+    #[allow(dead_code)]
+    fn record(&self, call: &str) {
+        self.calls.lock().unwrap().push(call.into());
+    }
+}
+
+#[async_trait]
+impl DiscordApi for MockDiscordApi {
+    async fn list_text_channels(&self, _: &str) -> Result<Vec<DiscordChannel>, DomainError> {
+        self.record("list_text_channels");
+        Ok(vec![])
+    }
+    async fn upload_emoji(&self, _: &str, _: &str, _: &[u8], _: &str) -> Result<(String, String, bool), DomainError> {
+        self.record("upload_emoji");
+        Ok(("emoji_id".into(), "emoji_name".into(), false))
+    }
+    async fn ban_user(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> {
+        self.record("ban_user");
+        Ok(())
+    }
+    async fn list_members(&self, _: &str, _: u32) -> Result<Vec<DiscordMember>, DomainError> {
+        self.record("list_members");
+        Ok(vec![])
+    }
+    async fn send_dm(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        self.record("send_dm");
+        Ok(())
+    }
+    async fn create_role(&self, _: &str, _: &str, _: u32, _: Option<&str>) -> Result<serde_json::Value, DomainError> {
+        self.record("create_role");
+        Ok(serde_json::json!({"id": "r1", "name": "role"}))
+    }
+    async fn edit_role(&self, _: &str, _: &str, _: Option<&str>, _: Option<u32>, _: Option<&str>, _: Option<bool>, _: Option<bool>) -> Result<serde_json::Value, DomainError> {
+        self.record("edit_role");
+        Ok(serde_json::json!({"id": "r1"}))
+    }
+    async fn delete_role(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        self.record("delete_role");
+        Ok(())
+    }
+    async fn unban_user(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        self.record("unban_user");
+        Ok(())
+    }
+    async fn remove_timeout(&self, _: &str, _: &str) -> Result<(), DomainError> {
+        self.record("remove_timeout");
+        Ok(())
+    }
+    async fn apply_timeout(&self, _: &str, _: &str, _: u64) -> Result<(), DomainError> {
+        self.record("apply_timeout");
+        Ok(())
+    }
+    async fn get_user_guilds(&self, _: &str) -> Result<Vec<UserGuild>, DomainError> {
+        self.record("get_user_guilds");
+        Ok(vec![])
+    }
+    async fn get_user_me(&self, _: &str) -> Result<DiscordUser, DomainError> {
+        self.record("get_user_me");
+        Ok(DiscordUser { id: "u1".into(), username: "mock".into(), avatar: None })
+    }
 }
 
 // ── Stub Voice Channels (needed for base_state) ──

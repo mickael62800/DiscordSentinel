@@ -1,6 +1,52 @@
+use async_trait::async_trait;
 use serde::Deserialize;
 
 use crate::domain::errors::DomainError;
+
+/// Trait pour les appels a l'API Discord. Permet de mocker le service
+/// dans les tests d'integration HTTP sans taper la vraie API.
+#[async_trait]
+pub trait DiscordApi: Send + Sync {
+    async fn list_text_channels(&self, guild_id: &str) -> Result<Vec<DiscordChannel>, DomainError>;
+    async fn upload_emoji(
+        &self,
+        guild_id: &str,
+        name: &str,
+        image_bytes: &[u8],
+        mime: &str,
+    ) -> Result<(String, String, bool), DomainError>;
+    async fn ban_user(&self, guild_id: &str, user_id: &str, reason: &str) -> Result<(), DomainError>;
+    async fn list_members(&self, guild_id: &str, limit: u32) -> Result<Vec<DiscordMember>, DomainError>;
+    async fn send_dm(&self, user_id: &str, content: &str) -> Result<(), DomainError>;
+    async fn create_role(
+        &self,
+        guild_id: &str,
+        name: &str,
+        color: u32,
+        permissions: Option<&str>,
+    ) -> Result<serde_json::Value, DomainError>;
+    async fn edit_role(
+        &self,
+        guild_id: &str,
+        role_id: &str,
+        name: Option<&str>,
+        color: Option<u32>,
+        permissions: Option<&str>,
+        mentionable: Option<bool>,
+        hoist: Option<bool>,
+    ) -> Result<serde_json::Value, DomainError>;
+    async fn delete_role(&self, guild_id: &str, role_id: &str) -> Result<(), DomainError>;
+    async fn unban_user(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn remove_timeout(&self, guild_id: &str, user_id: &str) -> Result<(), DomainError>;
+    async fn apply_timeout(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        duration_seconds: u64,
+    ) -> Result<(), DomainError>;
+    async fn get_user_guilds(&self, access_token: &str) -> Result<Vec<UserGuild>, DomainError>;
+    async fn get_user_me(&self, access_token: &str) -> Result<DiscordUser, DomainError>;
+}
 
 #[derive(Debug, Clone, serde::Serialize, Deserialize)]
 pub struct DiscordMember {
@@ -63,11 +109,14 @@ impl DiscordApiService {
         }
         Ok(())
     }
+}
 
+#[async_trait]
+impl DiscordApi for DiscordApiService {
     /// Liste les salons texte d'un serveur Discord (id + name).
     /// Phase 9 Part E : utilise par la page web de config des railleries
     /// pour afficher un dropdown au lieu d'un input ID.
-    pub async fn list_text_channels(
+    async fn list_text_channels(
         &self,
         guild_id: &str,
     ) -> Result<Vec<DiscordChannel>, DomainError> {
@@ -117,7 +166,7 @@ impl DiscordApiService {
     /// Upload un emoji custom sur un serveur Discord.
     /// `image_bytes` : PNG/JPG/GIF < 256 KB. Retourne (emoji_id, emoji_name).
     /// Le bot doit avoir la permission MANAGE_GUILD_EXPRESSIONS sur la guild.
-    pub async fn upload_emoji(
+    async fn upload_emoji(
         &self,
         guild_id: &str,
         name: &str,
@@ -193,7 +242,7 @@ impl DiscordApiService {
     }
 
     /// Bannir un utilisateur d'un serveur Discord.
-    pub async fn ban_user(
+    async fn ban_user(
         &self,
         guild_id: &str,
         user_id: &str,
@@ -230,7 +279,7 @@ impl DiscordApiService {
     }
 
     /// Recuperer la liste des membres d'un serveur Discord (id + username).
-    pub async fn list_members(
+    async fn list_members(
         &self,
         guild_id: &str,
         limit: u32,
@@ -312,7 +361,7 @@ impl DiscordApiService {
     }
 
     /// Envoyer un message prive a un utilisateur Discord.
-    pub async fn send_dm(
+    async fn send_dm(
         &self,
         user_id: &str,
         content: &str,
@@ -360,7 +409,7 @@ impl DiscordApiService {
     // ── Gestion des roles ──
 
     /// Creer un role Discord.
-    pub async fn create_role(
+    async fn create_role(
         &self,
         guild_id: &str,
         name: &str,
@@ -398,7 +447,7 @@ impl DiscordApiService {
     }
 
     /// Modifier un role Discord.
-    pub async fn edit_role(
+    async fn edit_role(
         &self,
         guild_id: &str,
         role_id: &str,
@@ -437,7 +486,7 @@ impl DiscordApiService {
     }
 
     /// Supprimer un role Discord.
-    pub async fn delete_role(
+    async fn delete_role(
         &self,
         guild_id: &str,
         role_id: &str,
@@ -461,7 +510,7 @@ impl DiscordApiService {
     }
 
     /// Debannir un utilisateur d'un serveur Discord.
-    pub async fn unban_user(
+    async fn unban_user(
         &self,
         guild_id: &str,
         user_id: &str,
@@ -498,7 +547,7 @@ impl DiscordApiService {
     /// Si le membre n'a pas de timeout actif, Discord accepte quand meme la
     /// requete (no-op). Un 404 (user pas dans la guild) est tolere comme un
     /// succes logique — on veut juste qu'il n'y ait plus de timeout actif.
-    pub async fn remove_timeout(
+    async fn remove_timeout(
         &self,
         guild_id: &str,
         user_id: &str,
@@ -535,7 +584,7 @@ impl DiscordApiService {
     /// `communication_disabled_until = now + duration`.
     ///
     /// Discord limite le timeout a 28 jours max — on clamp automatiquement.
-    pub async fn apply_timeout(
+    async fn apply_timeout(
         &self,
         guild_id: &str,
         user_id: &str,
@@ -577,7 +626,7 @@ impl DiscordApiService {
     /// Phase 2 B — Recupere la liste des guilds auxquelles un user appartient.
     /// Utilise le `access_token` OAuth2 (Bearer) du user, PAS le bot token.
     /// Endpoint Discord : `GET /users/@me/guilds` (scope `identify` ou `guilds`).
-    pub async fn get_user_guilds(
+    async fn get_user_guilds(
         &self,
         access_token: &str,
     ) -> Result<Vec<UserGuild>, DomainError> {
@@ -605,7 +654,7 @@ impl DiscordApiService {
 
     /// Phase 7 B — Recupere l'identite du user associe a un `access_token`.
     /// Endpoint Discord : `GET /users/@me` (scope `identify`).
-    pub async fn get_user_me(&self, access_token: &str) -> Result<DiscordUser, DomainError> {
+    async fn get_user_me(&self, access_token: &str) -> Result<DiscordUser, DomainError> {
         let url = "https://discord.com/api/v10/users/@me";
         let resp = self
             .client

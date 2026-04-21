@@ -103,6 +103,51 @@ fn build_state(evidence: Arc<MockEvidenceRepo>, review: Arc<MockReviewRepo>) -> 
     state
 }
 
+/// Construit un state avec un MockDiscordApi + mock moderation UC pour
+/// couvrir le code apres discord_api.ban_user().await? dans execute_ban/mute/unban.
+fn build_state_with_discord_mock() -> AppState {
+    use sentinel_api::domain::entities::ModerationAction;
+    use sentinel_api::domain::value_objects::ModerationGravity;
+    use sentinel_api::ports::inbound::{
+        LogModerationCommand, ManageModerationUseCase,
+    };
+    use sentinel_api::domain::entities::UserModerationHistory;
+    use chrono::Utc;
+    use async_trait::async_trait;
+
+    struct MockModerationUC;
+    #[async_trait]
+    impl ManageModerationUseCase for MockModerationUC {
+        async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+        async fn log_action(&self, cmd: LogModerationCommand) -> Result<ModerationAction, DomainError> {
+            Ok(ModerationAction {
+                id: Uuid::new_v4(),
+                guild_id: cmd.guild_id, channel_id: cmd.channel_id,
+                moderator_id: cmd.moderator_id, moderator_name: cmd.moderator_name,
+                target_id: cmd.target_id, target_name: cmd.target_name,
+                action_type: cmd.action_type, reason: cmd.reason,
+                gravity: cmd.gravity.as_deref().and_then(ModerationGravity::from_str_lossy),
+                duration: cmd.duration,
+                created_at: Utc::now(),
+            })
+        }
+        async fn get_history(&self, _: &str, _: &str) -> Result<UserModerationHistory, DomainError> {
+            Ok(UserModerationHistory {
+                target_id: String::new(), target_name: String::new(),
+                total_warns: 0, total_mutes: 0, total_bans: 0, actions: vec![],
+            })
+        }
+        async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+        async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+    }
+
+    let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
+    state.discord_api = Arc::new(test_helpers::MockDiscordApi::new());
+    state.moderation_uc = Arc::new(MockModerationUC);
+    state
+}
+
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
     let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();
     let resp = app.oneshot(req).await.unwrap();
@@ -419,6 +464,116 @@ async fn execute_ban_without_token_returns_500() {
     });
     let (status, _) = post_json(app, "/api/moderation/execute-ban", body).await;
     assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_ban_success_with_mock_discord() {
+    let app = router::build_for_test(build_state_with_discord_mock());
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
+        "reason": "Spam"
+    });
+    let (status, json) = post_json(app, "/api/moderation/execute-ban", body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["ok"], true);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_mute_success_with_mock_discord() {
+    let app = router::build_for_test(build_state_with_discord_mock());
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
+        "reason": "Flood",
+        "duration": 1800,
+        "target_name": "alice"
+    });
+    let (status, json) = post_json(app, "/api/moderation/execute-mute", body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["ok"], true);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_mute_success_default_duration() {
+    // Path default 3600s quand duration absent.
+    let app = router::build_for_test(build_state_with_discord_mock());
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
+        "reason": "r"
+    });
+    let (status, _) = post_json(app, "/api/moderation/execute-mute", body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_unban_success_with_mock_discord() {
+    let app = router::build_for_test(build_state_with_discord_mock());
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444"
+    });
+    let (status, json) = post_json(app, "/api/moderation/execute-unban", body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["ok"], true);
+}
+
+// ══════════════════════════════════════════════════════════
+// delete_action : insert une vraie ligne puis supprime-la
+// (couvre les branches ban*/mute*/default du reversal Discord)
+// ══════════════════════════════════════════════════════════
+
+async fn insert_action(pool: &sqlx::PgPool, guild_id: &str, action_type: &str) -> Uuid {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO moderation_actions \
+         (id, guild_id, channel_id, moderator_id, moderator_name, target_id, target_name, action_type, reason, created_at) \
+         VALUES ($1, $2, '555555555555555555', 'desktop', 'Desktop', '444444444444444444', 'Alice', $3, 'test', NOW())",
+    )
+    .bind(id)
+    .bind(guild_id)
+    .bind(action_type)
+    .execute(pool)
+    .await
+    .unwrap();
+    id
+}
+
+async fn pool() -> sqlx::PgPool {
+    let url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    sqlx::PgPool::connect(&url).await.unwrap()
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_action_ban_triggers_discord_unban_and_succeeds() {
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let id = insert_action(&p, &guild_id, "ban_permanent").await;
+    let app = router::build_for_test(build_state_with_discord_mock());
+    let (status, _) = delete_req(app, &format!("/api/moderation/actions/{id}")).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_action_mute_triggers_discord_remove_timeout() {
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let id = insert_action(&p, &guild_id, "mute_temp").await;
+    let app = router::build_for_test(build_state_with_discord_mock());
+    let (status, _) = delete_req(app, &format!("/api/moderation/actions/{id}")).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_action_warn_no_discord_call() {
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let id = insert_action(&p, &guild_id, "warn").await;
+    let app = router::build_for_test(build_state_with_discord_mock());
+    let (status, _) = delete_req(app, &format!("/api/moderation/actions/{id}")).await;
+    assert_eq!(status, StatusCode::NO_CONTENT);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

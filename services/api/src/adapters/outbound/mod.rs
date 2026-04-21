@@ -7,6 +7,6 @@ pub mod postgres;
 pub mod redis_cache;
 pub mod text_tokenizer;
 
-pub use discord_api::{DiscordApiService, DiscordChannel, DiscordMember, DiscordUser};
+pub use discord_api::{DiscordApi, DiscordApiService, DiscordChannel, DiscordMember, DiscordUser};
 pub use inference_service::{InferenceClassification, InferenceService};
 pub use text_tokenizer::TextTokenizer;

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::redis_cache::RedisCache;
-use crate::adapters::outbound::{DiscordApiService, InferenceService};
+use crate::adapters::outbound::{DiscordApi, InferenceService};
 use crate::ports::inbound::{
     AnalyzeImageUseCase, AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
     ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
@@ -68,7 +68,7 @@ pub struct AppState {
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,
-    pub discord_api: Arc<DiscordApiService>,
+    pub discord_api: Arc<dyn DiscordApi>,
     pub inference: Arc<InferenceService>,
     pub api_key: String,
     #[allow(dead_code)]
