@@ -50,8 +50,10 @@ pub async fn run(_pool: &PgPool, api_url: &str, bot_token: &str) -> Result<(), S
         let mut req = Request::new(TriggerDailyChaosRequest {
             guild_id: guild_id.clone(),
         });
-        if let Ok(v) = api_key.parse::<MetadataValue<_>>() {
-            req.metadata_mut().insert("x-api-key", v);
+        // API_middleware attend Authorization: Bearer <key> (pattern utilise
+        // par tous les autres workers gRPC : resolve_betting, hp_regen, etc.)
+        if let Ok(v) = format!("Bearer {api_key}").parse::<MetadataValue<_>>() {
+            req.metadata_mut().insert("authorization", v);
         }
 
         let resp = match client.trigger_daily_chaos(req).await {

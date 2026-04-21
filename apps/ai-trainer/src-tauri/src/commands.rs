@@ -133,6 +133,7 @@ pub struct StartTrainingArgs {
     pub warmupRatio: Option<f64>,
     pub maxLength: Option<u32>,
     pub neutralCap: Option<u32>,
+    pub backbone: Option<String>,
 }
 
 #[tauri::command]

@@ -19,6 +19,7 @@ export interface TrainingConfig {
   warmup_ratio?: number;
   max_length?: number;
   neutral_cap?: number;
+  backbone?: string;
 }
 
 export interface PerClassMetrics {
@@ -258,6 +259,7 @@ async function startTraining(config: TrainingConfig) {
       warmupRatio: config.warmup_ratio,
       maxLength: config.max_length,
       neutralCap: config.neutral_cap,
+      backbone: config.backbone,
     });
   } catch (e) {
     error.value = String(e);
