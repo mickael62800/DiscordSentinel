@@ -232,6 +232,26 @@ path = "tests/integration/dashboard/http.rs"
 name = "integration_dashboard_charts_http"
 path = "tests/integration/dashboard_charts/http.rs"
 
+# analytics
+[[test]]
+name = "integration_analytics_http"
+path = "tests/integration/analytics/http.rs"
+
+# welcome
+[[test]]
+name = "integration_welcome_http"
+path = "tests/integration/welcome/http.rs"
+
+# system_misc (models status / cache stats)
+[[test]]
+name = "integration_system_misc_http"
+path = "tests/integration/system_misc/http.rs"
+
+# bot_config
+[[test]]
+name = "integration_bot_config_http"
+path = "tests/integration/bot_config/http.rs"
+
 # strikes
 [[test]]
 name = "integration_strikes_http"

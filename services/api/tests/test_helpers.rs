@@ -826,6 +826,38 @@ pub fn build_test_state_daily_activity(daily_activity_repo: Arc<dyn DailyActivit
     state
 }
 
+/// Construit un AppState avec un mock analytics repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_analytics(analytics_repo: Arc<dyn AnalyticsRepository>) -> AppState {
+    let mut state = base_state();
+    state.analytics_repo = analytics_repo;
+    state
+}
+
+/// Construit un AppState avec un mock role panels use case injecte.
+#[allow(dead_code)]
+pub fn build_test_state_role_panels(role_panels_uc: Arc<dyn ManageRolePanelsUseCase>) -> AppState {
+    let mut state = base_state();
+    state.role_panels_uc = role_panels_uc;
+    state
+}
+
+/// Construit un AppState avec un mock welcome config repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_welcome(welcome_config_repo: Arc<dyn WelcomeConfigRepository>) -> AppState {
+    let mut state = base_state();
+    state.welcome_config_repo = welcome_config_repo;
+    state
+}
+
+/// Construit un AppState avec un mock bot_config repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_bot_config(bot_config_repo: Arc<dyn BotConfigRepository>) -> AppState {
+    let mut state = base_state();
+    state.bot_config_repo = bot_config_repo;
+    state
+}
+
 // ── Stub Voice Channels (needed for base_state) ──
 
 pub struct StubVoiceChannels;
