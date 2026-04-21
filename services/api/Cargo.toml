@@ -167,6 +167,31 @@ path = "tests/integration/progression/db.rs"
 name = "integration_reminders_http"
 path = "tests/integration/reminders/http.rs"
 
+# rules
+[[test]]
+name = "integration_rules_http"
+path = "tests/integration/rules/http.rs"
+
+# infractions
+[[test]]
+name = "integration_infractions_http"
+path = "tests/integration/infractions/http.rs"
+
+# audit_logs
+[[test]]
+name = "integration_audit_logs_http"
+path = "tests/integration/audit_logs/http.rs"
+
+# watched_users
+[[test]]
+name = "integration_watched_users_http"
+path = "tests/integration/watched_users/http.rs"
+
+# user_activity
+[[test]]
+name = "integration_user_activity_http"
+path = "tests/integration/user_activity/http.rs"
+
 # strikes
 [[test]]
 name = "integration_strikes_http"

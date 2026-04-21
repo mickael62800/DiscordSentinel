@@ -714,6 +714,46 @@ pub fn build_test_state_strikes(strikes_uc: Arc<dyn ManageStrikesUseCase>) -> Ap
     state
 }
 
+/// Construit un AppState avec un mock rules injecte.
+#[allow(dead_code)]
+pub fn build_test_state_rules(rules_uc: Arc<dyn ManageRulesUseCase>) -> AppState {
+    let mut state = base_state();
+    state.rules_uc = rules_uc;
+    state
+}
+
+/// Construit un AppState avec un mock infractions injecte.
+#[allow(dead_code)]
+pub fn build_test_state_infractions(infractions_uc: Arc<dyn ManageInfractionsUseCase>) -> AppState {
+    let mut state = base_state();
+    state.infractions_uc = infractions_uc;
+    state
+}
+
+/// Construit un AppState avec un mock audit logs injecte.
+#[allow(dead_code)]
+pub fn build_test_state_audit_logs(audit_logs_uc: Arc<dyn ManageAuditLogsUseCase>) -> AppState {
+    let mut state = base_state();
+    state.audit_logs_uc = audit_logs_uc;
+    state
+}
+
+/// Construit un AppState avec un mock watched users injecte.
+#[allow(dead_code)]
+pub fn build_test_state_watched_users(watched_users_uc: Arc<dyn ManageWatchedUsersUseCase>) -> AppState {
+    let mut state = base_state();
+    state.watched_users_uc = watched_users_uc;
+    state
+}
+
+/// Construit un AppState avec un mock user activity repository injecte.
+#[allow(dead_code)]
+pub fn build_test_state_user_activity(user_activity_repo: Arc<dyn UserActivityRepository>) -> AppState {
+    let mut state = base_state();
+    state.user_activity_repo = user_activity_repo;
+    state
+}
+
 // ── Stub Voice Channels (needed for base_state) ──
 
 pub struct StubVoiceChannels;
