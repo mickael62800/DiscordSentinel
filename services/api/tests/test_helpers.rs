@@ -12,7 +12,7 @@ use sentinel_api::adapters::outbound::job_client::JobClient;
 use sentinel_api::domain::entities::*;
 use sentinel_api::domain::entities::analytics::*;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::domain::services::DiscordApiService;
+use sentinel_api::adapters::outbound::DiscordApiService;
 use sentinel_api::ports::inbound::*;
 use sentinel_api::ports::outbound::*;
 
@@ -128,7 +128,21 @@ impl ManageWatchedUsersUseCase for StubWatchedUsers {
 pub struct StubAuditLogs;
 #[async_trait]
 impl ManageAuditLogsUseCase for StubAuditLogs {
-    async fn create(&self, _: manage_audit_logs::CreateAuditLogCommand) -> Result<AuditLog, DomainError> { unimplemented!() }
+    async fn create(&self, cmd: manage_audit_logs::CreateAuditLogCommand) -> Result<AuditLog, DomainError> {
+        Ok(AuditLog {
+            id: Uuid::new_v4(),
+            guild_id: cmd.guild_id,
+            event_type: cmd.event_type,
+            actor_id: cmd.actor_id,
+            actor_name: cmd.actor_name,
+            target_id: cmd.target_id,
+            target_name: cmd.target_name,
+            channel_id: cmd.channel_id,
+            channel_name: cmd.channel_name,
+            details: cmd.details,
+            created_at: chrono::Utc::now(),
+        })
+    }
     async fn list(&self, _: Option<&str>, _: manage_audit_logs::AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> { unimplemented!() }
     async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { unimplemented!() }
 }
@@ -265,7 +279,7 @@ pub struct StubBotConfigRepo;
 #[async_trait]
 impl BotConfigRepository for StubBotConfigRepo {
     async fn get_definitions(&self) -> Result<Vec<BotDefinition>, DomainError> { unimplemented!() }
-    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { unimplemented!() }
+    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { Ok(vec![]) }
     async fn get_all_config(&self, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> { unimplemented!() }
     async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
@@ -662,7 +676,7 @@ fn base_state() -> AppState {
         broadcaster: Arc::new(EventBroadcaster::new()),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
         discord_api: Arc::new(DiscordApiService::new(String::new())),
-        inference: Arc::new(sentinel_api::domain::services::InferenceService::new(None, None)),
+        inference: Arc::new(sentinel_api::adapters::outbound::InferenceService::new(None, None)),
         api_key: String::new(),
         discord_bot_token: String::new(),
         pg_pool,

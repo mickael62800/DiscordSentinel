@@ -9,7 +9,8 @@ use sentinel_api::adapters::outbound::postgres::{
 };
 use sentinel_api::application::AnalyzeMessageService;
 use sentinel_api::domain::entities::IaConfig;
-use sentinel_api::domain::services::{InferenceService, InferenceRateLimiter, TextTokenizer};
+use sentinel_api::adapters::outbound::{InferenceService, TextTokenizer};
+use sentinel_api::domain::services::InferenceRateLimiter;
 use sentinel_api::domain::value_objects::DetectionFlags;
 use sentinel_api::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, ContextMessageEntry};
 use sentinel_api::ports::outbound::{IaConfigRepository, RuleRepository};

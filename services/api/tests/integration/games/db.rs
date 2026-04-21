@@ -1,4 +1,7 @@
-//! Tests d'integration pour le systeme de jeux (games + subscriptions).
+//! Tests d'integration pour le systeme de jeux (table `games`).
+//!
+//! Note : la table `game_subscriptions` a ete supprimee (migration 137),
+//! donc plus de tests sur les souscriptions ici.
 
 use sqlx::PgPool;
 
@@ -56,101 +59,6 @@ async fn game_same_name_different_guild() {
 }
 
 #[tokio::test]
-async fn game_delete_cascades_subscriptions() {
-    let p = pool().await;
-    let gid = ugid();
-    let game_id = create_game(&p, &gid, "ArcRiders").await;
-
-    // Inscrire 3 joueurs
-    for user in &["111", "222", "333"] {
-        sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, $3)")
-            .bind(&gid).bind(game_id).bind(user).execute(&p).await.unwrap();
-    }
-
-    // Supprimer le jeu → subscriptions en cascade
-    sqlx::query("DELETE FROM games WHERE id = $1").bind(game_id).execute(&p).await.unwrap();
-
-    let subs = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM game_subscriptions WHERE game_id = $1")
-        .bind(game_id).fetch_one(&p).await.unwrap().0;
-    assert_eq!(subs, 0, "Les subscriptions doivent etre supprimees en cascade");
-}
-
-// ══════════════════════════════════════════════════════════
-//  Subscriptions
-// ══════════════════════════════════════════════════════════
-
-#[tokio::test]
-async fn subscribe_and_list_subscribers() {
-    let p = pool().await;
-    let gid = ugid();
-    let game_id = create_game(&p, &gid, "Valorant").await;
-
-    sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, '111')")
-        .bind(&gid).bind(game_id).execute(&p).await.unwrap();
-    sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, '222')")
-        .bind(&gid).bind(game_id).execute(&p).await.unwrap();
-
-    let subs = sqlx::query_as::<_, (String,)>("SELECT user_id FROM game_subscriptions WHERE game_id = $1")
-        .bind(game_id).fetch_all(&p).await.unwrap();
-    assert_eq!(subs.len(), 2);
-}
-
-#[tokio::test]
-async fn subscribe_idempotent() {
-    let p = pool().await;
-    let gid = ugid();
-    let game_id = create_game(&p, &gid, "Minecraft").await;
-
-    // Double inscription — ON CONFLICT DO NOTHING
-    sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, '111') ON CONFLICT DO NOTHING")
-        .bind(&gid).bind(game_id).execute(&p).await.unwrap();
-    sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, '111') ON CONFLICT DO NOTHING")
-        .bind(&gid).bind(game_id).execute(&p).await.unwrap();
-
-    let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM game_subscriptions WHERE game_id = $1 AND user_id = '111'")
-        .bind(game_id).fetch_one(&p).await.unwrap().0;
-    assert_eq!(count, 1, "Double inscription ne doit creer qu'une seule entree");
-}
-
-#[tokio::test]
-async fn unsubscribe() {
-    let p = pool().await;
-    let gid = ugid();
-    let game_id = create_game(&p, &gid, "Apex").await;
-
-    sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, '111')")
-        .bind(&gid).bind(game_id).execute(&p).await.unwrap();
-    sqlx::query("DELETE FROM game_subscriptions WHERE game_id = $1 AND user_id = '111'")
-        .bind(game_id).execute(&p).await.unwrap();
-
-    let count = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM game_subscriptions WHERE game_id = $1")
-        .bind(game_id).fetch_one(&p).await.unwrap().0;
-    assert_eq!(count, 0);
-}
-
-#[tokio::test]
-async fn get_user_games_via_join() {
-    let p = pool().await;
-    let gid = ugid();
-    let g1 = create_game(&p, &gid, "Fortnite").await;
-    let g2 = create_game(&p, &gid, "Valorant").await;
-    let _g3 = create_game(&p, &gid, "Apex").await; // pas inscrit
-
-    sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, '111')")
-        .bind(&gid).bind(g1).execute(&p).await.unwrap();
-    sqlx::query("INSERT INTO game_subscriptions (guild_id, game_id, user_id) VALUES ($1, $2, '111')")
-        .bind(&gid).bind(g2).execute(&p).await.unwrap();
-
-    let games = sqlx::query_as::<_, (String,)>(
-        "SELECT g.game_name FROM games g INNER JOIN game_subscriptions gs ON gs.game_id = g.id WHERE g.guild_id = $1 AND gs.user_id = '111' ORDER BY g.game_name",
-    ).bind(&gid).fetch_all(&p).await.unwrap();
-
-    assert_eq!(games.len(), 2);
-    assert_eq!(games[0].0, "Fortnite");
-    assert_eq!(games[1].0, "Valorant");
-}
-
-#[tokio::test]
 async fn find_game_by_name_case_insensitive() {
     let p = pool().await;
     let gid = ugid();
@@ -177,6 +85,6 @@ async fn game_bot_definition_exists() {
 
     assert!(def.is_some(), "game-bot doit etre seed dans bot_definitions");
     let (name, desc) = def.unwrap();
-    assert_eq!(name, "Game Bot");
-    assert!(desc.contains("jeux"));
+    assert_eq!(name, "Games");
+    assert!(desc.to_lowercase().contains("jeu"));
 }

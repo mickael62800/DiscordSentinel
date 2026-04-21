@@ -6,12 +6,12 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::{
-    PgEvidenceRepository, PgGameRepository, PgPendingActionRepository,
-    PgReviewRepository, PgSponsorshipRepository, PgTempRoleRepository,
+    PgGameRepository, PgPendingActionRepository,
+    PgSponsorshipRepository, PgTempRoleRepository,
 };
 use sentinel_api::ports::outbound::{
-    EvidenceRepository, GameRepository, PendingActionRepository,
-    ReviewRepository, SponsorshipRepository, TempRoleRepository,
+    GameRepository, PendingActionRepository,
+    SponsorshipRepository, TempRoleRepository,
 };
 
 async fn pool() -> PgPool {
@@ -32,8 +32,8 @@ async fn game_repo_create_and_list() {
     let repo = PgGameRepository::new(p);
     let gid = ugid();
 
-    repo.create(&gid, "Fortnite", "user1").await.unwrap();
-    repo.create(&gid, "Valorant", "user1").await.unwrap();
+    repo.create(&gid, "Fortnite", "user1", None, None, None).await.unwrap();
+    repo.create(&gid, "Valorant", "user1", None, None, None).await.unwrap();
 
     let games = repo.list(&gid).await.unwrap();
     assert_eq!(games.len(), 2);
@@ -45,38 +45,21 @@ async fn game_repo_find_by_name() {
     let repo = PgGameRepository::new(p);
     let gid = ugid();
 
-    repo.create(&gid, "Rocket League", "user1").await.unwrap();
+    repo.create(&gid, "Rocket League", "user1", None, None, None).await.unwrap();
     let found = repo.find_by_name(&gid, "rocket league").await.unwrap();
     assert!(found.is_some());
     assert_eq!(found.unwrap().game_name, "Rocket League");
 }
 
 #[tokio::test]
-async fn game_repo_subscribe_and_get_subscribers() {
+async fn game_repo_delete_removes_entry() {
     let p = pool().await;
     let repo = PgGameRepository::new(p);
     let gid = ugid();
 
-    let game = repo.create(&gid, "Apex", "user1").await.unwrap();
-    repo.subscribe(&gid, &game.id, "u1").await.unwrap();
-    repo.subscribe(&gid, &game.id, "u2").await.unwrap();
-
-    let subs = repo.get_subscribers(&game.id).await.unwrap();
-    assert_eq!(subs.len(), 2);
-}
-
-#[tokio::test]
-async fn game_repo_delete_cascades() {
-    let p = pool().await;
-    let repo = PgGameRepository::new(p);
-    let gid = ugid();
-
-    let game = repo.create(&gid, "Minecraft", "user1").await.unwrap();
-    repo.subscribe(&gid, &game.id, "u1").await.unwrap();
+    let game = repo.create(&gid, "Minecraft", "user1", None, None, None).await.unwrap();
     assert!(repo.delete(&gid, &game.id).await.unwrap());
-
-    let subs = repo.get_subscribers(&game.id).await.unwrap();
-    assert_eq!(subs.len(), 0);
+    assert!(repo.find_by_name(&gid, "Minecraft").await.unwrap().is_none());
 }
 
 // ══════════════════════════════════════════════════════════
