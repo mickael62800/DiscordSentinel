@@ -44,3 +44,4 @@ desktop.ini
 
 # Claude Code local files
 .claude/
+coverage-html/

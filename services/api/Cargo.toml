@@ -257,6 +257,16 @@ path = "tests/integration/bot_config/http.rs"
 name = "integration_role_panels_http"
 path = "tests/integration/role_panels/http.rs"
 
+# dashboard_aggregate (stats, infractions merge, rules)
+[[test]]
+name = "integration_dashboard_aggregate_http"
+path = "tests/integration/dashboard_aggregate/http.rs"
+
+# moderation_extra (evidence, review, modstats)
+[[test]]
+name = "integration_moderation_extra_http"
+path = "tests/integration/moderation_extra/http.rs"
+
 # strikes
 [[test]]
 name = "integration_strikes_http"
