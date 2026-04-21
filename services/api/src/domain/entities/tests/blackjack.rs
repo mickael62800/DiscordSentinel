@@ -242,3 +242,9 @@ fn deck_total_value_matches_expected_sum() {
     let total: i32 = deck.iter().map(|c| c.value()).sum();
     assert_eq!(total, 380);
 }
+
+#[test]
+fn default_blackjack_max_players_is_seven() {
+    // Regle metier : une table blackjack accueille par defaut 7 joueurs max.
+    assert_eq!(DEFAULT_BLACKJACK_MAX_PLAYERS, 7);
+}

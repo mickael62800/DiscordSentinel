@@ -68,16 +68,13 @@ pub async fn create_export_job(
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("requested_by", &dto.requested_by).map_err(ApiError)?;
 
-    if !matches!(
-        dto.job_type.as_str(),
-        "infractions" | "audit_logs" | "moderation_actions"
-    ) {
+    if !crate::domain::entities::is_valid_export_job_type(&dto.job_type) {
         return Err(ApiError(DomainError::ValidationError(format!(
             "job_type invalide : '{}'",
             dto.job_type
         ))));
     }
-    if !matches!(dto.format.as_str(), "csv" | "json") {
+    if !crate::domain::entities::is_valid_export_format(&dto.format) {
         return Err(ApiError(DomainError::ValidationError(format!(
             "format invalide : '{}' (attendu csv|json)",
             dto.format

@@ -60,7 +60,25 @@ mod guild_member;
 pub use guild_member::{GuildMember, MemberSummary, MemberConduct, MemberInfractions, MemberModeration, MemberStats};
 
 mod blackjack;
-pub use blackjack::{BlackjackConfig, BlackjackGame, Card, calculate_score, create_deck};
+pub use blackjack::{BlackjackConfig, BlackjackGame, Card, calculate_score, create_deck, DEFAULT_BLACKJACK_MAX_PLAYERS};
+
+mod moderation_review;
+pub use moderation_review::{
+    is_valid_review_status, truncate_review_text, validate_evidence_url,
+    DEFAULT_MUTE_DURATION_SECS, MAX_EVIDENCE_URL_LEN, MAX_REVIEW_TEXT_LEN, VALID_REVIEW_STATUSES,
+};
+
+mod coude_tournament;
+pub use coude_tournament::{
+    current_week_bounds, estimate_tournament_prize_pool, week_bounds_for,
+    TOURNAMENT_PRIZE_POOL_PERCENT,
+};
+
+mod job_whitelists;
+pub use job_whitelists::{
+    is_valid_ai_job_type, is_valid_export_format, is_valid_export_job_type,
+    VALID_AI_JOB_TYPES, VALID_EXPORT_FORMATS, VALID_EXPORT_JOB_TYPES,
+};
 
 mod game;
 pub use game::{

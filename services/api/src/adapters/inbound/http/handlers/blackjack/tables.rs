@@ -50,7 +50,8 @@ pub async fn join_table(
     let max_players: i64 = state.bot_config_repo
         .get_config(&guild_id, "blackjack-bot").await.unwrap_or_default()
         .iter().find(|c| c.config_key == "max_players_per_table")
-        .and_then(|c| c.config_value.parse().ok()).unwrap_or(7);
+        .and_then(|c| c.config_value.parse().ok())
+        .unwrap_or(crate::domain::entities::DEFAULT_BLACKJACK_MAX_PLAYERS);
 
     if current_count >= max_players {
         return Err(DomainError::ValidationError(format!("Table pleine ({current_count}/{max_players} joueurs)")).into());

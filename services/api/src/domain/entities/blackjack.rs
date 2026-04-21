@@ -60,6 +60,11 @@ pub fn create_deck() -> Vec<Card> {
 /// Parametres metier du blackjack (mise min/max, solde initial, payout
 /// blackjack naturel). Valeurs par defaut et bornes definies dans le
 /// domaine, alimentees par `bot_guild_config` dans les adapters.
+///
+/// Nombre max de joueurs par defaut sur une table blackjack multijoueur.
+/// Override possible via bot_config key `max_players_per_table`.
+pub const DEFAULT_BLACKJACK_MAX_PLAYERS: i64 = 7;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BlackjackConfig {
     pub min_bet: i64,

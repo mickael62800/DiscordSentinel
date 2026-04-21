@@ -48,18 +48,9 @@ pub struct PastTournamentDto {
     pub resolved_at: Option<DateTime<Utc>>,
 }
 
-/// Calcule [lundi 00:00 UTC, dimanche 23:59:59 UTC] de la semaine courante.
-fn current_week_bounds() -> (DateTime<Utc>, DateTime<Utc>) {
-    let now = Utc::now();
-    // weekday: Mon=0..Sun=6 via num_days_from_monday
-    let dow = now.weekday().num_days_from_monday() as i64;
-    let start_date = now.date_naive() - Duration::days(dow);
-    let start = Utc
-        .from_utc_datetime(&start_date.and_hms_opt(0, 0, 0).unwrap())
-        .to_utc();
-    let end = start + Duration::days(7) - Duration::seconds(1);
-    (start, end)
-}
+// Bornes de semaine + prize_pool : regles metier extraites vers
+// `domain/entities/coude_tournament.rs` (purement testables).
+use crate::domain::entities::{current_week_bounds, estimate_tournament_prize_pool};
 
 /// GET /api/coude/{guild_id}/tournaments/current
 pub async fn get_current_tournament(
@@ -120,7 +111,7 @@ pub async fn get_current_tournament(
     .ok()
     .flatten();
 
-    let prize_pool_estimated = cashbox.unwrap_or(0) / 10;
+    let prize_pool_estimated = estimate_tournament_prize_pool(cashbox);
 
     Ok(Json(CurrentTournamentDto {
         guild_id,

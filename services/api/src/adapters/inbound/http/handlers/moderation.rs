@@ -241,7 +241,7 @@ pub async fn execute_mute(
     )
     .await?;
 
-    let duration = dto.duration.unwrap_or(3600); // defaut : 1 heure
+    let duration = dto.duration.unwrap_or(crate::domain::entities::DEFAULT_MUTE_DURATION_SECS);
     state
         .discord_api
         .apply_timeout(&dto.guild_id, &dto.user_id, duration)
@@ -428,19 +428,16 @@ pub async fn add_evidence(
             }
         }
     }
-    // Validation minimale — l'URL n'est pas verifiee, le moderateur est responsable
-    if dto.url.trim().is_empty() || dto.url.len() > 2000 {
-        return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
-            "url vide ou trop longue (max 2000)".into(),
-        )));
-    }
+    // Validation URL — regle metier dans `domain/entities/moderation_review.rs`.
+    crate::domain::entities::validate_evidence_url(&dto.url)
+        .map_err(|m| ApiError(crate::domain::errors::DomainError::ValidationError(m.into())))?;
     let action_uuid = uuid::Uuid::parse_str(&dto.action_id).map_err(|_| {
         ApiError(crate::domain::errors::DomainError::ValidationError(
             "action_id invalide".into(),
         ))
     })?;
     validation::validate_discord_id("uploaded_by", &dto.uploaded_by).map_err(ApiError)?;
-    let description = dto.description.as_ref().map(|d| d.chars().take(500).collect::<String>());
+    let description = dto.description.as_deref().map(crate::domain::entities::truncate_review_text);
 
     let entry = state.evidence_repo
         .add(action_uuid, &dto.url, description.as_deref(), &dto.uploaded_by, &dto.uploaded_by_name)
@@ -559,7 +556,7 @@ pub async fn add_review(
         "moderator+ requis pour ajouter une review",
     )
     .await?;
-    let reason = dto.reason.as_ref().map(|r| r.chars().take(500).collect::<String>());
+    let reason = dto.reason.as_deref().map(crate::domain::entities::truncate_review_text);
 
     let entry = state.review_repo
         .add(action_uuid, &dto.guild_id, &dto.added_by, &dto.added_by_name, reason.as_deref())
@@ -613,13 +610,13 @@ pub async fn resolve_review(
         }
     }
 
-    if !matches!(dto.status.as_str(), "approved" | "rejected" | "changed") {
+    if !crate::domain::entities::is_valid_review_status(&dto.status) {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
             "status doit etre approved/rejected/changed".into(),
         )));
     }
     validation::validate_discord_id("reviewer_id", &dto.reviewer_id).map_err(ApiError)?;
-    let notes = dto.reviewer_notes.as_ref().map(|n| n.chars().take(500).collect::<String>());
+    let notes = dto.reviewer_notes.as_deref().map(crate::domain::entities::truncate_review_text);
 
     let resolved = state.review_repo
         .resolve(review_uuid, &dto.reviewer_id, &dto.reviewer_name, notes.as_deref(), &dto.status)

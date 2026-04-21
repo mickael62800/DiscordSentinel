@@ -52,7 +52,7 @@ pub async fn create_ai_job(
     State(state): State<AppState>,
     Json(dto): Json<CreateAiJobDto>,
 ) -> Result<(StatusCode, Json<AiJobCreatedDto>), ApiError> {
-    if dto.job_type != "analyze_text" && dto.job_type != "analyze_image" {
+    if !crate::domain::entities::is_valid_ai_job_type(&dto.job_type) {
         return Err(ApiError::from(DomainError::ValidationError(format!(
             "job_type invalide : '{}', attendu 'analyze_text' ou 'analyze_image'",
             dto.job_type
