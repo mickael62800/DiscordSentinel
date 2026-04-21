@@ -170,6 +170,16 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
     }
     let _ = guild_id_early; // supprime via shadowing ci-dessous
 
+    // Defer en mode UPDATE_MESSAGE : acquittement du menu avant les 3s. La
+    // fin du handler editera le message d'origine (menu de classes) avec le
+    // recap de la classe choisie.
+    if let Err(e) = component
+        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+        .await
+    {
+        tracing::warn!(error = %e, "Echec defer handle_select classe");
+    }
+
     let guild_id = match component.guild_id {
         Some(id) => id.to_string(),
         None => return,
@@ -183,10 +193,22 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
         None => return,
     };
 
+    // Helper closure-like : envoyer un followup ephemere (on est apres le defer).
+    async fn followup_err(ctx: &Context, component: &ComponentInteraction, msg: String) {
+        let _ = component
+            .create_followup(
+                &ctx.http,
+                serenity::all::CreateInteractionResponseFollowup::new()
+                    .content(msg)
+                    .ephemeral(true),
+            )
+            .await;
+    }
+
     let player = match api.get_or_create_player(&guild_id, &user_id, &component.user.name).await {
         Ok(p) => p,
         Err(e) => {
-            reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            followup_err(ctx, component, format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -199,11 +221,11 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
     let class_cost = config.class_change_cost();
     if has_chosen {
         if player.coins < class_cost {
-            reply_component_ephemeral(ctx, component, &format!("Pas assez de coins ! ({} requis)", class_cost)).await;
+            followup_err(ctx, component, format!("Pas assez de coins ! ({} requis)", class_cost)).await;
             return;
         }
         if let Err(e) = api.update_player_coins(&guild_id, &user_id, -class_cost).await {
-            reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            followup_err(ctx, component, format!("Erreur API : {e}")).await;
             return;
         }
         // Phase 9 : le cout de changement de classe alimente la caisse.
@@ -221,7 +243,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
 
     // Changer la classe
     if let Err(e) = api.update_player_class(&guild_id, &user_id, &class_name).await {
-        reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+        followup_err(ctx, component, format!("Erreur API : {e}")).await;
         return;
     }
 
@@ -238,14 +260,13 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
         .color(0x57F287)
         .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"));
 
+    // Apres Acknowledge (DEFERRED_UPDATE_MESSAGE), on edite le message d'origine.
     component
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::UpdateMessage(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(vec![]),
-            ),
+            serenity::all::EditInteractionResponse::new()
+                .embed(embed)
+                .components(vec![]),
         )
         .await
         .ok();

@@ -259,11 +259,33 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         None => return,
     };
 
+    // Defer UPDATE_MESSAGE : 2 gRPC (get_active + hit/stand/double) avant la
+    // mise a jour finale, risque de timeout 3s. Acquittement sans loader.
+    // La mise a jour finale utilisera `edit_response` pour editer le message
+    // d'origine (embed + boutons). Les erreurs ephemeral deviennent followup.
+    if let Err(e) = component
+        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+        .await
+    {
+        tracing::warn!(error = %e, "Echec defer blackjack handle_component");
+    }
+
+    async fn followup_err(ctx: &Context, component: &ComponentInteraction, msg: String) {
+        let _ = component
+            .create_followup(
+                &ctx.http,
+                serenity::all::CreateInteractionResponseFollowup::new()
+                    .content(msg)
+                    .ephemeral(true),
+            )
+            .await;
+    }
+
     let data = ctx.data.read().await;
     let api = match data.get::<GameApiKey>() {
         Some(a) => a,
         None => {
-            reply_component_ephemeral(ctx, component, "Erreur interne.").await;
+            followup_err(ctx, component, "Erreur interne.".to_string()).await;
             return;
         }
     };
@@ -279,10 +301,10 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         _ => false,
     };
     if !owns_game {
-        reply_component_ephemeral(
+        followup_err(
             ctx,
             component,
-            "Ce n'est pas ta partie — tu ne peux pas jouer a la place d'un autre.",
+            "Ce n'est pas ta partie — tu ne peux pas jouer a la place d'un autre.".to_string(),
         )
         .await;
         return;
@@ -298,7 +320,7 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
     let (game, wallet_taunts) = match result {
         Ok(g) => g,
         Err(e) => {
-            reply_component_ephemeral(ctx, component, &format!("Erreur : {e}")).await;
+            followup_err(ctx, component, format!("Erreur : {e}")).await;
             return;
         }
     };
@@ -307,16 +329,15 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
     let game_over = is_game_over(&game.status);
     let components = if game_over { vec![] } else { build_buttons(&game) };
 
-    let mut msg = CreateInteractionResponseMessage::new()
+    let mut edit = serenity::all::EditInteractionResponse::new()
         .embed(embed)
         .components(components);
     if let Some(a) = attachment {
-        msg = msg.add_file(a);
+        edit = edit.new_attachment(a);
     }
-    component
-        .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(msg))
-        .await
-        .ok();
+    if let Err(e) = component.edit_response(&ctx.http, edit).await {
+        tracing::warn!(error = %e, "Echec edit_response blackjack");
+    }
 
     // Migration 139 + #4 : si la main se termine, declenche les taunts
     // specifiques blackjack (natural 21, win, bust streak) et concatene les

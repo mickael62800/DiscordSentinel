@@ -25,7 +25,8 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 // ── Toggle Queue ──
 
 async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
-    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
+    super::defer_ephemeral(ctx, component).await;
+    let Some((voice_channel_id, ch)) = super::require_admin_deferred(ctx, component).await else {
         return;
     };
 
@@ -94,7 +95,7 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             }
         }
 
-        super::respond_ephemeral(ctx, component, "La file d'attente a ete **desactivee**.").await;
+        super::respond_followup_ephemeral(ctx, component, "La file d'attente a ete **desactivee**.").await;
         info!(voice = %voice_channel_id, "File d'attente desactivee");
     } else {
         // Enable queue: create a queue voice channel in the same category
@@ -113,7 +114,7 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             Ok(c) => c,
             Err(e) => {
                 error!(error = %e, "Erreur creation queue channel");
-                super::respond_ephemeral(ctx, component, "Erreur lors de la creation de la file d'attente.").await;
+                super::respond_followup_ephemeral(ctx, component, "Erreur lors de la creation de la file d'attente.").await;
                 return;
             }
         };
@@ -185,7 +186,7 @@ async fn handle_toggle_queue(ctx: &Context, component: &ComponentInteraction) {
             }
         }
 
-        super::respond_ephemeral(ctx, component, "La file d'attente a ete **activee**.").await;
+        super::respond_followup_ephemeral(ctx, component, "La file d'attente a ete **activee**.").await;
         info!(voice = %voice_channel_id, queue = %queue_channel_id, "File d'attente activee");
     }
 }

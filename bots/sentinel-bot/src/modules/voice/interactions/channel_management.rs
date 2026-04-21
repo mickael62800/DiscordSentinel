@@ -43,7 +43,8 @@ pub async fn handle_modal(ctx: &Context, modal: &ModalInteraction) {
 // ── Hide / Show ──
 
 async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
-    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
+    super::defer_ephemeral(ctx, component).await;
+    let Some((voice_channel_id, ch)) = super::require_admin_deferred(ctx, component).await else {
         return;
     };
 
@@ -98,7 +99,7 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
         "Le salon est maintenant **cache**."
     };
 
-    super::respond_ephemeral(ctx, component, status_text).await;
+    super::respond_followup_ephemeral(ctx, component, status_text).await;
 
     info!(
         voice = %voice_channel_id,
@@ -110,7 +111,8 @@ async fn handle_hide(ctx: &Context, component: &ComponentInteraction) {
 // ── Lock / Unlock ──
 
 async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
-    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
+    super::defer_ephemeral(ctx, component).await;
+    let Some((voice_channel_id, ch)) = super::require_admin_deferred(ctx, component).await else {
         return;
     };
 
@@ -216,7 +218,7 @@ async fn handle_lock(ctx: &Context, component: &ComponentInteraction) {
         "Le salon est maintenant **deverrouille**."
     };
 
-    super::respond_ephemeral(ctx, component, status_text).await;
+    super::respond_followup_ephemeral(ctx, component, status_text).await;
 
     info!(voice = %voice_channel_id, locked = new_locked, "Lock change");
 }

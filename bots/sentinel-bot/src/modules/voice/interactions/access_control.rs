@@ -31,7 +31,8 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 // ── Invite ──
 
 async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
-    let Some((voice_channel_id, ch)) = super::require_admin(ctx, component).await else {
+    super::defer_ephemeral(ctx, component).await;
+    let Some((voice_channel_id, ch)) = super::require_admin_deferred(ctx, component).await else {
         return;
     };
 
@@ -40,13 +41,13 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
     let selected_users = match &component.data.kind {
         ComponentInteractionDataKind::UserSelect { values } => values.clone(),
         _ => {
-            super::respond_ephemeral(ctx, component, "Erreur: type de composant inattendu.").await;
+            super::respond_followup_ephemeral(ctx, component, "Erreur: type de composant inattendu.").await;
             return;
         }
     };
 
     if selected_users.is_empty() {
-        super::respond_ephemeral(ctx, component, "Aucun utilisateur selectionne.").await;
+        super::respond_followup_ephemeral(ctx, component, "Aucun utilisateur selectionne.").await;
         return;
     }
 
@@ -59,7 +60,7 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
     };
     if let Err(e) = voice_channel_id.create_permission(&ctx.http, overwrite).await {
         error!(error = %e, "Erreur permission invite");
-        super::respond_ephemeral(ctx, component, "Erreur lors de l'invitation.").await;
+        super::respond_followup_ephemeral(ctx, component, "Erreur lors de l'invitation.").await;
         return;
     }
 
@@ -113,7 +114,7 @@ async fn handle_invite(ctx: &Context, component: &ComponentInteraction) {
         }
     }
 
-    super::respond_ephemeral(
+    super::respond_followup_ephemeral(
         ctx,
         component,
         &format!("<@{target_id}> a ete invite dans le salon."),
@@ -165,7 +166,8 @@ async fn handle_kick_menu(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
-    let Some((_voice_channel_id_check, _ch)) = super::require_admin(ctx, component).await else {
+    super::defer_ephemeral(ctx, component).await;
+    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await else {
         return;
     };
 
@@ -174,7 +176,7 @@ async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
     let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
         vc
     } else {
-        super::respond_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_followup_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
         return;
     };
 
@@ -185,13 +187,13 @@ async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
             match values.first() {
                 Some(v) => v.clone(),
                 None => {
-                    super::respond_ephemeral(ctx, component, "Aucun membre selectionne.").await;
+                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.").await;
                     return;
                 }
             }
         }
         _ => {
-            super::respond_ephemeral(ctx, component, "Selection invalide.").await;
+            super::respond_followup_ephemeral(ctx, component, "Selection invalide.").await;
             return;
         }
     };
@@ -199,7 +201,7 @@ async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
     let target_id: u64 = match selected_value.parse() {
         Ok(id) => id,
         Err(_) => {
-            super::respond_ephemeral(ctx, component, "Selection invalide.").await;
+            super::respond_followup_ephemeral(ctx, component, "Selection invalide.").await;
             return;
         }
     };
@@ -215,12 +217,12 @@ async fn handle_kick_select(ctx: &Context, component: &ComponentInteraction) {
         }
         Err(e) => {
             error!(error = %e, "Erreur disconnect membre");
-            super::respond_ephemeral(ctx, component, "Erreur lors de l'expulsion.").await;
+            super::respond_followup_ephemeral(ctx, component, "Erreur lors de l'expulsion.").await;
             return;
         }
     }
 
-    super::respond_ephemeral(
+    super::respond_followup_ephemeral(
         ctx,
         component,
         &format!("<@{target_id}> a ete expulse du salon."),
@@ -313,7 +315,8 @@ async fn handle_ban_select(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
-    let Some((_voice_channel_id_check, _ch)) = super::require_admin(ctx, component).await else {
+    super::defer_ephemeral(ctx, component).await;
+    let Some((_voice_channel_id_check, _ch)) = super::require_admin_deferred(ctx, component).await else {
         return;
     };
 
@@ -321,7 +324,7 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
 
     let parts: Vec<&str> = custom_id.strip_prefix("ban_duration_").unwrap_or("").rsplitn(2, '_').collect();
     if parts.len() < 2 {
-        super::respond_ephemeral(ctx, component, "Format invalide.").await;
+        super::respond_followup_ephemeral(ctx, component, "Format invalide.").await;
         return;
     }
 
@@ -330,7 +333,7 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     let target_id: u64 = match target_id_str.parse() {
         Ok(id) => id,
         Err(_) => {
-            super::respond_ephemeral(ctx, component, "ID utilisateur invalide.").await;
+            super::respond_followup_ephemeral(ctx, component, "ID utilisateur invalide.").await;
             return;
         }
     };
@@ -341,7 +344,7 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
     let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
         vc
     } else {
-        super::respond_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_followup_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
         return;
     };
 
@@ -400,7 +403,7 @@ async fn handle_ban_duration(ctx: &Context, component: &ComponentInteraction) {
         s => format!("{s} secondes"),
     };
 
-    super::respond_ephemeral(
+    super::respond_followup_ephemeral(
         ctx,
         component,
         &format!(

@@ -105,6 +105,86 @@ pub async fn respond_ephemeral(
     }
 }
 
+/// Acquitte le component avant une operation potentiellement longue (>3s).
+/// Apres cet appel, utilise `respond_followup_ephemeral` pour repondre.
+pub async fn defer_ephemeral(ctx: &Context, component: &ComponentInteraction) {
+    use serenity::builder::CreateInteractionResponse;
+    use serenity::builder::CreateInteractionResponseMessage;
+
+    let response = CreateInteractionResponse::Defer(
+        CreateInteractionResponseMessage::new().ephemeral(true),
+    );
+
+    if let Err(e) = component.create_response(&ctx.http, response).await {
+        warn!(error = %e, "Erreur defer ephemere");
+    }
+}
+
+/// Envoie un followup ephemere apres `defer_ephemeral`.
+pub async fn respond_followup_ephemeral(
+    ctx: &Context,
+    component: &ComponentInteraction,
+    content: &str,
+) {
+    use serenity::builder::CreateInteractionResponseFollowup;
+
+    let msg = CreateInteractionResponseFollowup::new()
+        .content(content)
+        .ephemeral(true);
+
+    if let Err(e) = component.create_followup(&ctx.http, msg).await {
+        warn!(error = %e, "Erreur envoi followup ephemere");
+    }
+}
+
+/// Variante de `require_admin` a utiliser apres `defer_ephemeral` : les
+/// erreurs sont envoyees en followup (pas create_response).
+pub async fn require_admin_deferred(
+    ctx: &Context,
+    component: &ComponentInteraction,
+) -> Option<(ChannelId, VoiceChannelResponse)> {
+    let channel_id = component.channel_id;
+    let user_id = component.user.id;
+
+    let voice_channel_id = match find_voice_from_text(ctx, channel_id).await {
+        Some(vc) => vc,
+        None => {
+            respond_followup_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
+            return None;
+        }
+    };
+
+    let channel_resp = {
+        let data = ctx.data.read().await;
+        let Some(api) = ApiClient::from_data(&data) else {
+            warn!("ApiClient ou GrpcClient manquants dans TypeMap");
+            respond_followup_ephemeral(ctx, component, "Erreur interne (client API indisponible).").await;
+            return None;
+        };
+        api.get_channel(&voice_channel_id.get().to_string()).await
+    };
+
+    let ch = match channel_resp {
+        Ok(Some(ch)) => ch,
+        Ok(None) => {
+            respond_followup_ephemeral(ctx, component, "Ce salon vocal n'existe plus dans la base.").await;
+            return None;
+        }
+        Err(e) => {
+            warn!(error = %e, "Erreur API get_channel dans require_admin_deferred");
+            respond_followup_ephemeral(ctx, component, "Erreur lors de la verification des droits.").await;
+            return None;
+        }
+    };
+
+    if ch.owner_id != user_id.get().to_string() {
+        respond_followup_ephemeral(ctx, component, "Seul le proprietaire du salon peut effectuer cette action.").await;
+        return None;
+    }
+
+    Some((voice_channel_id, ch))
+}
+
 /// Send an ephemeral response to a modal interaction.
 pub async fn respond_ephemeral_modal(
     ctx: &Context,

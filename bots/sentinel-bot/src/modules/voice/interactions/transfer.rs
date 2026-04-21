@@ -64,12 +64,13 @@ async fn handle_transfer_menu(ctx: &Context, component: &ComponentInteraction) {
 }
 
 async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction) {
+    super::defer_ephemeral(ctx, component).await;
     let text_channel_id = component.channel_id;
 
     let voice_channel_id = if let Some(vc) = super::find_voice_from_text(ctx, text_channel_id).await {
         vc
     } else {
-        super::respond_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
+        super::respond_followup_ephemeral(ctx, component, "Impossible de trouver le salon vocal associe.").await;
         return;
     };
 
@@ -82,7 +83,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
         match api.get_channel(&voice_channel_id.get().to_string()).await {
             Ok(Some(ch)) => ch,
             _ => {
-                super::respond_ephemeral(ctx, component, "Salon introuvable.").await;
+                super::respond_followup_ephemeral(ctx, component, "Salon introuvable.").await;
                 return;
             }
         }
@@ -90,7 +91,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
 
     let old_owner_id = component.user.id;
     if ch.owner_id != old_owner_id.get().to_string() {
-        super::respond_ephemeral(ctx, component, "Seul le proprietaire peut transferer le salon.").await;
+        super::respond_followup_ephemeral(ctx, component, "Seul le proprietaire peut transferer le salon.").await;
         return;
     }
 
@@ -99,13 +100,13 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
             match values.first() {
                 Some(v) => v.clone(),
                 None => {
-                    super::respond_ephemeral(ctx, component, "Aucun membre selectionne.").await;
+                    super::respond_followup_ephemeral(ctx, component, "Aucun membre selectionne.").await;
                     return;
                 }
             }
         }
         _ => {
-            super::respond_ephemeral(ctx, component, "Selection invalide.").await;
+            super::respond_followup_ephemeral(ctx, component, "Selection invalide.").await;
             return;
         }
     };
@@ -113,7 +114,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
     let new_owner_id: u64 = match selected_value.parse() {
         Ok(id) => id,
         Err(_) => {
-            super::respond_ephemeral(ctx, component, "Selection invalide.").await;
+            super::respond_followup_ephemeral(ctx, component, "Selection invalide.").await;
             return;
         }
     };
@@ -142,7 +143,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
             .await
         {
             error!(error = %e, "Erreur API transfer ownership -- abort");
-            super::respond_ephemeral(
+            super::respond_followup_ephemeral(
                 ctx, component,
                 "Echec du transfert cote serveur. Aucune modification appliquee.",
             ).await;
@@ -211,7 +212,7 @@ async fn handle_transfer_select(ctx: &Context, component: &ComponentInteraction)
         }
     }
 
-    super::respond_ephemeral(
+    super::respond_followup_ephemeral(
         ctx,
         component,
         &format!(

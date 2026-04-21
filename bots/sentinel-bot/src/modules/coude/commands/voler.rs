@@ -7,9 +7,7 @@ use serenity::all::{
 };
 use std::time::Duration;
 
-use sentinel_shared::discord_helpers::{
-    component_reply_ephemeral as reply_component_ephemeral, reply_ephemeral,
-};
+use sentinel_shared::discord_helpers::reply_ephemeral;
 
 use crate::modules::coude::api_client::ApiClient;
 use crate::modules::coude::catalog::{CatalogCache, CatalogCacheKey};
@@ -694,6 +692,15 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
         return;
     }
 
+    // Defer en mode UPDATE_MESSAGE : on acquitte le bouton avant les 3s sans
+    // afficher de loader au user ; on editera le message original a la fin.
+    if let Err(e) = component
+        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+        .await
+    {
+        tracing::warn!(error = %e, "Echec defer handle_defend");
+    }
+
     let config = load_guild_config(ctx, guild_id).await;
     let failure_penalty_pct = config.steal_failure_penalty_pct();
 
@@ -708,7 +715,14 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            let _ = component
+                .create_followup(
+                    &ctx.http,
+                    serenity::all::CreateInteractionResponseFollowup::new()
+                        .content(format!("Erreur API : {e}"))
+                        .ephemeral(true),
+                )
+                .await;
             return;
         }
     };
@@ -719,7 +733,14 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_component_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            let _ = component
+                .create_followup(
+                    &ctx.http,
+                    serenity::all::CreateInteractionResponseFollowup::new()
+                        .content(format!("Erreur API : {e}"))
+                        .ephemeral(true),
+                )
+                .await;
             return;
         }
     };
@@ -737,19 +758,19 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     )
     .await;
 
-    // Acknowledge the interaction by updating the original message
+    // Apres Acknowledge (DEFERRED_UPDATE_MESSAGE), edit_response edite le
+    // message d'origine (le challenge de vol) pour afficher le resultat et
+    // retirer les boutons.
     if let Err(e) = component
-        .create_response(
+        .edit_response(
             &ctx.http,
-            CreateInteractionResponse::UpdateMessage(
-                CreateInteractionResponseMessage::new()
-                    .embed(embed)
-                    .components(vec![]),
-            ),
+            serenity::all::EditInteractionResponse::new()
+                .embed(embed)
+                .components(vec![]),
         )
         .await
     {
-        tracing::warn!(error = %e, "Echec response Discord (defend vol)");
+        tracing::warn!(error = %e, "Echec edit_response Discord (defend vol)");
     }
 
     // Drop le data guard avant le dispatch async (il lock TypeMap).

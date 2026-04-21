@@ -260,6 +260,16 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
     // kind == "accept" : on re-valide les gardes avant d'enregistrer.
     // Entre la demande initiale et le clic d'acceptation, les conditions
     // ont pu changer (limite atteinte, filleul a deja un parrain, etc.).
+    // Defer UPDATE_MESSAGE : le handler peut depasser 3s (validate_sponsorship
+    // + API create_sponsorship + send_log + publish_event + DM). On acquitte
+    // immediatement et on editera le message d'origine a la fin.
+    if let Err(e) = component
+        .create_response(&ctx.http, CreateInteractionResponse::Acknowledge)
+        .await
+    {
+        warn!(error = %e, "Echec defer sponsor_accept");
+    }
+
     let parrain_uid = serenity::model::id::UserId::new(parrain_id);
     let target_uid = serenity::model::id::UserId::new(target_id);
 
@@ -268,11 +278,13 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
             .title("\u{274c} Parrainage impossible")
             .description(msg)
             .color(0xED4245);
-        let response = CreateInteractionResponseMessage::new()
-            .embed(embed)
-            .components(vec![]);
         if let Err(e) = component
-            .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(response))
+            .edit_response(
+                &ctx.http,
+                serenity::all::EditInteractionResponse::new()
+                    .embed(embed)
+                    .components(vec![]),
+            )
             .await
         {
             warn!(error = %e, "Failed to update sponsorship invalid");
@@ -306,11 +318,13 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
             .title("\u{274c} Parrainage impossible")
             .description(msg)
             .color(0xED4245);
-        let response = CreateInteractionResponseMessage::new()
-            .embed(embed)
-            .components(vec![]);
         if let Err(e) = component
-            .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(response))
+            .edit_response(
+                &ctx.http,
+                serenity::all::EditInteractionResponse::new()
+                    .embed(embed)
+                    .components(vec![]),
+            )
             .await
         {
             warn!(error = %e, "Failed to update sponsorship tracker error");
@@ -337,11 +351,13 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
             .title("\u{274c} Erreur serveur")
             .description("Echec d'enregistrement du parrainage. Rien n'a ete applique.")
             .color(0xED4245);
-        let response = CreateInteractionResponseMessage::new()
-            .embed(embed)
-            .components(vec![]);
         let _ = component
-            .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(response))
+            .edit_response(
+                &ctx.http,
+                serenity::all::EditInteractionResponse::new()
+                    .embed(embed)
+                    .components(vec![]),
+            )
             .await;
         return;
     }
@@ -355,11 +371,13 @@ pub async fn handle_button(ctx: &Context, component: &ComponentInteraction) {
         .field("Parrain", format!("<@{parrain_id}>"), true)
         .field("Filleul", format!("<@{target_id}>"), true);
 
-    let response = CreateInteractionResponseMessage::new()
-        .embed(embed)
-        .components(vec![]);
     if let Err(e) = component
-        .create_response(&ctx.http, CreateInteractionResponse::UpdateMessage(response))
+        .edit_response(
+            &ctx.http,
+            serenity::all::EditInteractionResponse::new()
+                .embed(embed)
+                .components(vec![]),
+        )
         .await
     {
         warn!(error = %e, "Failed to send sponsorship confirmation");
