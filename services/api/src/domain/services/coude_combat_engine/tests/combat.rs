@@ -368,6 +368,25 @@ fn fourbe_attacker_vampirisme_branch() {
 }
 
 #[test]
+fn agile_as_defender_can_dodge_attacker() {
+    // Couvre lines 477-483 : def_dodged → atk_dmg=0 + def_passif esquive.
+    let atk = player("a", "bourrin", 10);
+    let def = player("d", "agile", 10);
+    let mut any_def_dodge = false;
+    for _ in 0..200 {
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        // Pattern du message : "{def_name} esquive le coup"
+        if r.rounds.iter().any(|rd| {
+            rd.message.contains(&format!("<@{}>", "d")) && rd.message.contains("esquive")
+        }) {
+            any_def_dodge = true;
+            break;
+        }
+    }
+    assert!(any_def_dodge, "agile defenseur doit esquiver au moins une fois sur 200 combats");
+}
+
+#[test]
 fn defender_poison_applies_to_attacker_hp() {
     // Le defenseur a du poison → attaquant prend poison_damage_per_round HP chaque round.
     let atk = player("a", "tank", 5);
@@ -383,10 +402,51 @@ fn defender_poison_applies_to_attacker_hp() {
 #[test]
 fn small_combat_limited_to_3_rounds() {
     // combined_hp < 250 → max_rounds = 3.
-    let atk = player("a", "bourrin", 1);
-    let def = player("d", "bourrin", 1);
-    let r = resolve_combat(&atk, &def, 50, 50, 50, None, None, &[], &CoudeBalanceParams::default());
+    // Avec bourrin (base_def 8) + atk_def/def_def=0 → hp_max = 100 + 8*2 = 116.
+    // Deux bourrins = 232 < 250 → cap 3 rounds.
+    let atk = Player {
+        user_id: "a".into(), class: Some("bourrin".into()), level: 1,
+        atk: 0, def: 0, cowardice_count: 0, hp_current: Some(116),
+    };
+    let def = Player {
+        user_id: "d".into(), class: Some("bourrin".into()), level: 1,
+        atk: 0, def: 0, cowardice_count: 0, hp_current: Some(116),
+    };
+    let r = resolve_combat(&atk, &def, 116, 116, 50, None, None, &[], &CoudeBalanceParams::default());
     assert!(r.total_rounds <= 3, "petit combat cap a 3 rounds, obtenu {}", r.total_rounds);
+}
+
+#[test]
+fn mise_zero_produces_minimum_one_coin_won() {
+    // mise=0 → coins_won calc = 0, clamp a min 1.
+    let atk = player("a", "tank", 10);
+    let def = player("d", "bourrin", 1);
+    let mut any_min_1 = false;
+    for _ in 0..30 {
+        let r = resolve_combat(&atk, &def, 100, 1, 0, None, None, &[], &CoudeBalanceParams::default());
+        if r.winner_id.is_some() && r.coins_won == 1 {
+            any_min_1 = true;
+            break;
+        }
+    }
+    assert!(any_min_1, "mise=0 et victoire doit clamper coins_won a >=1");
+}
+
+#[test]
+fn fourbe_winner_gets_steal_bonus_message() {
+    // Fourbe a steal_bonus = 0.20 → quand fourbe gagne, stolen_bonus_val > 0
+    // et le message inclut "Bonus fourbe".
+    let atk = player("a", "fourbe", 10);
+    let def = player("d", "bourrin", 1);
+    let mut found = false;
+    for _ in 0..30 {
+        let r = resolve_combat(&atk, &def, 100, 1, 1000, None, None, &[], &CoudeBalanceParams::default());
+        if r.winner_id.as_deref() == Some("a") && r.message.contains("Bonus fourbe") {
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "fourbe gagnant avec mise=1000 doit afficher Bonus fourbe");
 }
 
 #[test]

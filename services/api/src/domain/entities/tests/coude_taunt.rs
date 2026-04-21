@@ -279,6 +279,34 @@ fn build_taunt_event_deterministic_both_disabled_returns_none() {
 // produites par le code normal. On les couvrira indirectement via les
 // nombreux tests deja existants.
 
+// ── Fallbacks defensifs (appels directs depuis le submodule) ──
+
+#[test]
+fn messages_for_threshold_based_with_invalid_threshold_returns_empty() {
+    // Kind threshold-based + threshold != 3/5/10 → fallback `_ => &[]`.
+    assert!(messages_for(StreakKind::Win, 7).is_empty());
+    assert!(messages_for(StreakKind::Loss, 0).is_empty());
+    assert!(messages_for(StreakKind::StealVictim, 999).is_empty());
+    assert!(messages_for(StreakKind::BjBustStreak, 2).is_empty());
+    assert!(messages_for(StreakKind::BjWinStreak, 11).is_empty());
+}
+
+#[test]
+fn nickname_suffix_for_threshold_based_with_invalid_threshold_returns_empty() {
+    assert_eq!(nickname_suffix_for(StreakKind::Win, 7), "");
+    assert_eq!(nickname_suffix_for(StreakKind::Loss, 0), "");
+    assert_eq!(nickname_suffix_for(StreakKind::StealVictim, 2), "");
+    assert_eq!(nickname_suffix_for(StreakKind::BjBustStreak, 99), "");
+    assert_eq!(nickname_suffix_for(StreakKind::BjWinStreak, 4), "");
+}
+
+#[test]
+fn keep_rng_used_is_callable() {
+    // Couvre la fn helper `_keep_rng_used` (marker no-op pour l'import Rng).
+    let mut rng = rand::thread_rng();
+    _keep_rng_used(&mut rng);
+}
+
 #[test]
 fn streak_kind_as_str_all_variants() {
     // Couvre les branches non touchees de StreakKind::as_str.

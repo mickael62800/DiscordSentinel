@@ -51,6 +51,42 @@ fn penalty_for_action_unknown_returns_zero() {
 }
 
 #[test]
+fn penalty_for_action_unknown_with_subscriber_hits_tracing_branch() {
+    // Couvre la branche d'expansion du tracing::warn! (100% coverage : la
+    // macro contient un test d'enabled interne non execute sans subscriber).
+    use tracing_subscriber::fmt::MakeWriter;
+    use std::sync::{Arc, Mutex};
+
+    // Writer in-memory pour eviter le spam stdout pendant les tests.
+    #[derive(Clone, Default)]
+    struct SinkWriter(Arc<Mutex<Vec<u8>>>);
+    impl std::io::Write for SinkWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            self.0.lock().unwrap().extend_from_slice(buf); Ok(buf.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+    }
+    impl<'a> MakeWriter<'a> for SinkWriter {
+        type Writer = SinkWriter;
+        fn make_writer(&'a self) -> Self::Writer { self.clone() }
+    }
+
+    let writer = SinkWriter::default();
+    let sub = tracing_subscriber::fmt()
+        .with_writer(writer.clone())
+        .with_max_level(tracing::Level::WARN)
+        .finish();
+    let _guard = tracing::subscriber::set_default(sub);
+
+    let c = default_cfg();
+    assert_eq!(c.penalty_for_action("unknown"), 0);
+    // Le buffer doit contenir le log de warn (la branche d'enabled a ete hit).
+    let buf = writer.0.lock().unwrap();
+    let s = String::from_utf8_lossy(&buf);
+    assert!(s.contains("Action inconnue") || !buf.is_empty());
+}
+
+#[test]
 fn penalty_uses_configured_values_not_hardcoded() {
     let mut c = default_cfg();
     c.penalty_warn = 42;

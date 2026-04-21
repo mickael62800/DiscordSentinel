@@ -91,6 +91,32 @@ async fn test_acquire_via_timeout_path_succeeds() {
     release.await.unwrap();
 }
 
+#[tokio::test(start_paused = true)]
+async fn test_acquire_timeout_returns_rate_limited_error() {
+    // Couvre la branche `_ => Err(RateLimited(...))` du chemin timeout :
+    // try_acquire echoue + tokio::time::timeout(5s) expire.
+    // `start_paused = true` permet d'avancer le temps virtuellement.
+    let limiter = InferenceRateLimiter::new(1, 0);
+    let sem = limiter.semaphore.clone();
+    // Garder le permit actif pour que try_acquire echoue.
+    let _permit = sem.try_acquire_owned().unwrap();
+
+    // Pin le future et avance le temps virtuel pour faire expirer le timeout de 5s.
+    let acquire_fut = limiter.acquire();
+    tokio::pin!(acquire_fut);
+
+    // Poll une fois pour armer le timer interne.
+    let result = tokio::select! {
+        r = &mut acquire_fut => r,
+        _ = tokio::time::sleep(tokio::time::Duration::from_secs(6)) => {
+            // Le timer de acquire (5s) devrait avoir expire avant ce sleep.
+            acquire_fut.await
+        }
+    };
+    assert!(result.is_err());
+    assert!(matches!(result.unwrap_err(), DomainError::RateLimited(_)));
+}
+
 #[tokio::test]
 async fn test_rate_limit_error_variant() {
     // Verifier que c'est bien RateLimited (pas Internal ou autre).

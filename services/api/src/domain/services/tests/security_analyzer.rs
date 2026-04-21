@@ -119,3 +119,53 @@ fn alt_detection_similar_and_creation_from_different_bans() {
     assert_eq!(result.similar_to_banned, Some("raider".into()));
     assert_eq!(result.creation_near_banned, Some("total_diff".into()));
 }
+
+// ── Couverture des branches restantes ──
+
+#[test]
+fn levenshtein_a_non_empty_b_empty() {
+    // Couvre la branche `if b_len == 0 { return a_len; }`.
+    assert_eq!(levenshtein("abc", ""), 3);
+    assert_eq!(levenshtein("hello", ""), 5);
+}
+
+#[test]
+fn has_similar_usernames_caps_to_50() {
+    // Couvre la branche `names.len() > 50 { &names[..50] }`.
+    let mut names: Vec<String> = (0..60).map(|i| format!("user{i}")).collect();
+    // Ajouter deux doublons dans les 50 premiers pour forcer match.
+    names[5] = "duplicate".into();
+    names[10] = "duplicate".into();
+    assert!(has_similar_usernames(&names, 0));
+}
+
+#[test]
+fn has_similar_usernames_caps_ignores_items_above_50() {
+    // Les doublons sont au-dela de 50 → pas de match (capped).
+    let mut names: Vec<String> = (0..60).map(|i| format!("uniq{i}")).collect();
+    names[55] = "same".into();
+    names[56] = "same".into();
+    assert!(!has_similar_usernames(&names, 0));
+}
+
+#[test]
+fn are_creations_clustered_less_than_two_returns_false() {
+    // Couvre `timestamps.len() < 2 → return false`.
+    assert!(!are_creations_clustered(&[], 3600));
+    assert!(!are_creations_clustered(&[1000], 3600));
+}
+
+#[test]
+fn analyze_joins_no_raid_indicator_score_zero() {
+    // Couvre les branches `score += X` quand la condition est false :
+    // deux joins tres espaces, avatars differents, noms differents → score=0.
+    let joins = vec![
+        JoinInfo { username: "alice".into(), has_avatar: true, account_created_timestamp: 0 },
+        JoinInfo { username: "zebra".into(), has_avatar: true, account_created_timestamp: 999_999_999 },
+    ];
+    let analysis = analyze_joins(&joins, 0, 60);
+    assert_eq!(analysis.score, 0);
+    assert!(!analysis.similar_names);
+    assert!(!analysis.high_default_avatar_ratio);
+    assert!(!analysis.clustered_creation);
+}
