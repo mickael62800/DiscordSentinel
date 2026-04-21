@@ -611,8 +611,15 @@ pub struct StubBlackjackTableRepo;
 
 /// Construit un AppState de base avec tous les stubs.
 fn base_state() -> AppState {
-    let redis_client = redis::Client::open("redis://localhost:6379").unwrap();
-    let pg_pool = sqlx::PgPool::connect_lazy("postgres://localhost/fake_test_db").unwrap();
+    // On branche sur le compose de test (6380/5433) pour que les branches
+    // redis/sqlx direct des handlers (caches, api_user_guilds, modstats, etc.)
+    // soient reellement executees pendant les tests d'integration HTTP.
+    let redis_url = std::env::var("REDIS_URL")
+        .unwrap_or_else(|_| "redis://localhost:6380".to_string());
+    let redis_client = redis::Client::open(redis_url).unwrap();
+    let db_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".to_string());
+    let pg_pool = sqlx::PgPool::connect_lazy(&db_url).unwrap();
 
     AppState {
         analyze_uc: Arc::new(StubAnalyzeMessage),

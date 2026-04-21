@@ -346,3 +346,140 @@ async fn resolve_review_invalid_uuid_422() {
     let (status, _) = patch_json(app, "/api/moderation/review/not-a-uuid/resolve", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+// ══════════════════════════════════════════════════════════
+// modstats (sqlx direct -> utilise la vraie DB de test)
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn get_modstats_empty_when_no_actions() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let (status, json) = get(app, &format!("/api/moderation/modstats/{guild_id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn get_modstats_invalid_guild_422() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let (status, _) = get(app, "/api/moderation/modstats/not-a-snowflake").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+// ══════════════════════════════════════════════════════════
+// delete_action (sqlx direct + discord API)
+// ══════════════════════════════════════════════════════════
+
+async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    let s = resp.status();
+    let b = resp.into_body().collect().await.unwrap().to_bytes();
+    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_action_invalid_uuid_422() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let (status, _) = delete_req(app, "/api/moderation/actions/not-a-uuid").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_action_not_found_returns_404() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let id = Uuid::new_v4();
+    let (status, _) = delete_req(app, &format!("/api/moderation/actions/{id}")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+// ══════════════════════════════════════════════════════════
+// execute_ban / execute_mute / execute_unban
+// (Discord API non configure -> 500, mais validation + flux ok)
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_ban_without_token_returns_500() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
+        "reason": "Spam repete"
+    });
+    let (status, _) = post_json(app, "/api/moderation/execute-ban", body).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_ban_invalid_guild_422() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({"guild_id": "bad", "user_id": "444444444444444444", "reason": "r"});
+    let (status, _) = post_json(app, "/api/moderation/execute-ban", body).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_mute_without_token_returns_500() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
+        "reason": "Flood",
+        "duration": 1800
+    });
+    let (status, _) = post_json(app, "/api/moderation/execute-mute", body).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_mute_default_duration_1h() {
+    // Sans champ duration -> handler applique 3600s par defaut.
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444",
+        "reason": "r"
+    });
+    let (status, _) = post_json(app, "/api/moderation/execute-mute", body).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_unban_without_token_returns_500() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "user_id": "444444444444444444"
+    });
+    let (status, _) = post_json(app, "/api/moderation/execute-unban", body).await;
+    assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_unban_invalid_path_422() {
+    let app = router::build_for_test(build_state(
+        Arc::new(MockEvidenceRepo::default()), Arc::new(MockReviewRepo::default()),
+    ));
+    let body = serde_json::json!({"guild_id": "bad", "user_id": "x"});
+    let (status, _) = post_json(app, "/api/moderation/execute-unban", body).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+}

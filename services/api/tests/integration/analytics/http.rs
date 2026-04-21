@@ -144,9 +144,11 @@ async fn peak_hours_endpoint() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn analytics_params_accept_days_and_guild_and_limit() {
+    // guild_id unique → cache Redis miss → repo.get_top_infractors appele.
     let repo = Arc::new(MockAnalyticsRepo::new());
     let app = build_app(repo.clone());
-    let (status, _) = get(app, "/api/analytics/top-infractors?guild_id=111111111111111111&days=14&limit=5").await;
+    let uniq = uuid::Uuid::new_v4().to_string().replace('-', "");
+    let (status, _) = get(app, &format!("/api/analytics/top-infractors?guild_id={uniq}&days=14&limit=5")).await;
     assert_eq!(status, StatusCode::OK);
     assert!(repo.calls.lock().unwrap().contains(&"infractors".to_string()));
 }
