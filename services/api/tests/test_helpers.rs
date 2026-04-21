@@ -874,6 +874,16 @@ pub fn build_test_state_wallet(wallet_repo: Arc<dyn WalletRepository>) -> AppSta
     state
 }
 
+/// Construit un AppState avec un mock game repository + MockDiscordApi injectes
+/// (create_game appelle discord_api.create_role + edit_role en plus du repo).
+#[allow(dead_code)]
+pub fn build_test_state_game(game_repo: Arc<dyn GameRepository>) -> AppState {
+    let mut state = base_state();
+    state.game_repo = game_repo;
+    state.discord_api = Arc::new(MockDiscordApi::new());
+    state
+}
+
 /// Construit un AppState avec un mock DiscordApi injecte.
 #[allow(dead_code)]
 pub fn build_test_state_discord_api(discord_api: Arc<dyn DiscordApi>) -> AppState {

@@ -6,6 +6,10 @@ use serde::{Deserialize, Serialize};
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::entities::{
+    format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, normalize_optional_tag,
+    parse_role_color_hex, slugify_emoji_name, DEFAULT_GAME_ROLE_COLOR, MAX_EMOJI_IMAGE_BYTES,
+};
 use crate::domain::errors::DomainError;
 
 // ── DTOs ──
@@ -102,15 +106,12 @@ pub async fn create_game(
     State(state): State<AppState>,
     Json(dto): Json<CreateGameDto>,
 ) -> Result<Json<GameDto>, ApiError> {
-    let name = dto.game_name.trim().to_string();
-    if name.is_empty() {
-        return Err(DomainError::ValidationError("Le nom du jeu ne peut pas etre vide".into()).into());
-    }
-    if name.len() > 100 {
-        return Err(DomainError::ValidationError("Le nom du jeu ne peut pas depasser 100 caracteres".into()).into());
-    }
-    let emoji = dto.emoji.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let category = dto.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let name = normalize_game_name(&dto.game_name)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
+    let emoji_owned = normalize_optional_tag(dto.emoji.as_deref());
+    let category_owned = normalize_optional_tag(dto.category.as_deref());
+    let emoji = emoji_owned.as_deref();
+    let category = category_owned.as_deref();
 
     // Si le DTO fournit un role_id (workflow bot qui a deja cree le role),
     // on l'utilise tel quel. Sinon (workflow UI web), on cree le role
@@ -131,8 +132,8 @@ pub async fn create_game(
                     .find(|e| e.config_key == "role_color")
                     .map(|e| e.config_value)
             })
-            .unwrap_or_else(|| "3498db".to_string());
-        let color = u32::from_str_radix(color_hex.trim().trim_start_matches('#'), 16).unwrap_or(0x3498db);
+            .unwrap_or_else(|| format!("{:06x}", DEFAULT_GAME_ROLE_COLOR));
+        let color = parse_role_color_hex(&color_hex, DEFAULT_GAME_ROLE_COLOR);
 
         let created = state
             .discord_api
@@ -202,31 +203,28 @@ pub async fn update_game(
         })?;
     }
 
-    let name_owned = dto
-        .game_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|s| !s.is_empty())
-        .map(str::to_string);
-    if let Some(ref n) = name_owned {
-        if n.len() > 100 {
-            return Err(DomainError::ValidationError(
-                "Le nom du jeu ne peut pas depasser 100 caracteres".into(),
-            )
-            .into());
-        }
-    }
+    let name_owned: Option<String> = match dto.game_name.as_deref() {
+        Some(raw) if !raw.trim().is_empty() => Some(
+            normalize_game_name(raw)
+                .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?,
+        ),
+        _ => None,
+    };
 
-    let emoji = dto.emoji.as_ref().map(|opt| {
-        opt.as_deref().map(str::trim).filter(|s| !s.is_empty())
-    });
-    let category = dto.category.as_ref().map(|opt| {
-        opt.as_deref().map(str::trim).filter(|s| !s.is_empty())
-    });
+    let emoji: Option<Option<String>> =
+        dto.emoji.as_ref().map(|opt| normalize_optional_tag(opt.as_deref()));
+    let category: Option<Option<String>> =
+        dto.category.as_ref().map(|opt| normalize_optional_tag(opt.as_deref()));
 
     let updated = state
         .game_repo
-        .update(&guild_id, &game_id, name_owned.as_deref(), emoji, category)
+        .update(
+            &guild_id,
+            &game_id,
+            name_owned.as_deref(),
+            emoji.as_ref().map(|o| o.as_deref()),
+            category.as_ref().map(|o| o.as_deref()),
+        )
         .await?;
     match updated {
         Some(g) => Ok(Json(g.into())),
@@ -258,10 +256,10 @@ pub async fn set_role_id(
     Path((guild_id, game_id)): Path<(String, String)>,
     Json(dto): Json<SetRoleIdDto>,
 ) -> Result<Json<GameDto>, ApiError> {
-    let role_ref = dto.role_id.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let role_owned = normalize_optional_tag(dto.role_id.as_deref());
     let updated = state
         .game_repo
-        .set_role_id(&guild_id, &game_id, role_ref)
+        .set_role_id(&guild_id, &game_id, role_owned.as_deref())
         .await?;
     match updated {
         Some(g) => Ok(Json(g.into())),
@@ -284,10 +282,10 @@ pub async fn save_panel(
     Path(guild_id): Path<String>,
     Json(dto): Json<SavePanelDto>,
 ) -> Result<Json<GamePanelDto>, ApiError> {
-    let category = dto.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
+    let category_owned = normalize_optional_tag(dto.category.as_deref());
     let panel = state
         .game_repo
-        .save_panel(&guild_id, &dto.channel_id, &dto.message_id, category)
+        .save_panel(&guild_id, &dto.channel_id, &dto.message_id, category_owned.as_deref())
         .await?;
     Ok(Json(panel.into()))
 }
@@ -313,8 +311,8 @@ pub async fn list_games_by_category(
     Path(guild_id): Path<String>,
     axum::extract::Query(q): axum::extract::Query<CategoryQuery>,
 ) -> Result<Json<Vec<GameDto>>, ApiError> {
-    let cat = q.category.as_deref().map(str::trim).filter(|s| !s.is_empty());
-    let games = state.game_repo.list_by_category(&guild_id, cat).await?;
+    let cat_owned = normalize_optional_tag(q.category.as_deref());
+    let games = state.game_repo.list_by_category(&guild_id, cat_owned.as_deref()).await?;
     Ok(Json(games.into_iter().map(Into::into).collect()))
 }
 
@@ -332,34 +330,6 @@ pub struct UploadEmojiResponse {
     pub emoji_id: String,
     pub name: String,
     pub animated: bool,
-}
-
-fn slugify_emoji_name(raw: &str) -> String {
-    let mut out = String::with_capacity(raw.len());
-    for ch in raw.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-        } else if ch == '_' {
-            out.push('_');
-        } else if ch.is_whitespace() || ch == '-' || ch == '.' {
-            if !out.ends_with('_') {
-                out.push('_');
-            }
-        }
-    }
-    let trimmed = out.trim_matches('_').to_string();
-    // Discord impose 2..=32 chars [A-Za-z0-9_]
-    let mut s = trimmed;
-    if s.len() > 32 {
-        s.truncate(32);
-    }
-    if s.len() < 2 {
-        // Padding trivial pour rester valide ; l'UI devrait prevenir ce cas.
-        while s.len() < 2 {
-            s.push('_');
-        }
-    }
-    s
 }
 
 pub async fn upload_emoji(
@@ -420,7 +390,7 @@ pub async fn upload_emoji(
         ))
     })?;
 
-    if bytes.len() > 256 * 1024 {
+    if bytes.len() > MAX_EMOJI_IMAGE_BYTES {
         return Err(DomainError::ValidationError(
             "L'image depasse 256 KB (limite Discord).".into(),
         )
@@ -428,10 +398,7 @@ pub async fn upload_emoji(
     }
 
     let mime = mime.unwrap_or_else(|| "image/png".to_string());
-    if !matches!(
-        mime.as_str(),
-        "image/png" | "image/jpeg" | "image/jpg" | "image/gif" | "image/webp"
-    ) {
+    if !is_allowed_emoji_mime(&mime) {
         return Err(DomainError::ValidationError(format!(
             "Type d'image non supporte : {mime}"
         ))
@@ -460,11 +427,7 @@ pub async fn upload_emoji(
         .upload_emoji(&host_guild, &emoji_name, &bytes, &mime)
         .await?;
 
-    let formatted = if animated {
-        format!("<a:{}:{}>", final_name, emoji_id)
-    } else {
-        format!("<:{}:{}>", final_name, emoji_id)
-    };
+    let formatted = format_custom_emoji(&final_name, &emoji_id, animated);
 
     Ok(Json(UploadEmojiResponse {
         emoji: formatted,
@@ -474,6 +437,3 @@ pub async fn upload_emoji(
     }))
 }
 
-#[cfg(test)]
-#[path = "tests/games.rs"]
-mod tests;

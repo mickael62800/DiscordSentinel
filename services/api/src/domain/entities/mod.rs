@@ -62,6 +62,12 @@ pub use guild_member::{GuildMember, MemberSummary, MemberConduct, MemberInfracti
 mod blackjack;
 pub use blackjack::{BlackjackConfig, BlackjackGame, Card, calculate_score, create_deck};
 
+mod game;
+pub use game::{
+    format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, normalize_optional_tag,
+    parse_role_color_hex, slugify_emoji_name, DEFAULT_GAME_ROLE_COLOR, MAX_EMOJI_IMAGE_BYTES,
+};
+
 mod wallet;
 pub use wallet::{
     clamp_debit_to_balance, resolve_reset_balance, resolve_starting_coins,

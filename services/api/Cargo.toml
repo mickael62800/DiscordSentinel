@@ -262,6 +262,11 @@ path = "tests/integration/role_panels/http.rs"
 name = "integration_wallet_http"
 path = "tests/integration/wallet_http/http.rs"
 
+# games HTTP
+[[test]]
+name = "integration_games_http"
+path = "tests/integration/games_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
