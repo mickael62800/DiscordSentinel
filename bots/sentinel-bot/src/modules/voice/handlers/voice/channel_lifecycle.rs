@@ -1,9 +1,9 @@
 //! Creation et suppression des salons vocaux temporaires.
 //!
-//! Un salon temporaire = categorie + salon vocal + panel admin (si prive)
-//! + panel membres. La creation est atomique "best effort" (rollback manuel
-//! si une etape echoue). La suppression detecte l'etat "vide + temp" avant
-//! de nettoyer toute la famille de salons.
+//! Un salon temporaire = un vocal unique dont le panneau admin est poste
+//! dans le chat integre du vocal (text-in-voice natif Discord). Plus de
+//! categorie ni de salon texte separe. Pour les salons `game`, une file
+//! d'attente (vocal secondaire) est creee en parallele.
 
 use serenity::all::ButtonStyle;
 use serenity::builder::{
@@ -20,12 +20,11 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use crate::modules::voice::api_client::{ApiClient, CreateVoiceChannelRequest};
 use crate::modules::voice::embeds;
-use crate::modules::voice::{
-    CooldownTrackerKey, MembersToVoiceMapKey, TextToVoiceMapKey, VoiceOwnerMapKey,
-};
+use crate::modules::voice::{CooldownTrackerKey, VoiceOwnerMapKey};
 
-/// Cree un salon temporaire complet (categorie + vocal + admin panel + panel membres)
-/// et deplace l'utilisateur dedans. `kind` = `"public"` ou `"private"`.
+/// Cree un salon vocal temporaire (et sa queue si `kind == "game"`), deplace
+/// l'utilisateur dedans et poste le panneau admin dans le chat integre du
+/// vocal. `kind` = `"public"`, `"private"` ou `"game"`.
 pub(super) async fn create_temp_channel(
     ctx: &Context,
     guild_id: GuildId,
@@ -49,8 +48,8 @@ pub(super) async fn create_temp_channel(
         Err(_) => return,
     };
     let display_name = member.display_name().to_string();
-    // Nom de la categorie : prefix special pour les salons game
-    let cat_name = if kind == "game" {
+    // Nom du vocal : prefix special pour les salons game
+    let voice_name = if kind == "game" {
         format!("\u{1f3ae} {display_name}")
     } else {
         format!("Salon de {display_name}")
@@ -66,7 +65,7 @@ pub(super) async fn create_temp_channel(
             .unwrap_or(0) as u32
     };
 
-    // Lire la categorie ancre depuis la config guild.
+    // Lire la categorie ancre depuis la config guild (pour le positionnement).
     let anchor_category_id: Option<u64> = {
         let data = ctx.data.read().await;
         if let Some(base) = data.get::<ApiClientKey>() {
@@ -92,34 +91,8 @@ pub(super) async fn create_temp_channel(
         })
     });
 
-    // 1. Creer la categorie
-    let create_cat = CreateChannel::new(&cat_name).kind(ChannelType::Category);
-    let cat = match guild_id.create_channel(&ctx.http, create_cat).await {
-        Ok(ch) => ch,
-        Err(why) => {
-            error!(error = %why, "Erreur creation categorie");
-            return;
-        }
-    };
-
-    if let Some(pos) = target_position {
-        if let Err(e) = guild_id
-            .reorder_channels(&ctx.http, [(cat.id, pos as u64)])
-            .await
-        {
-            warn!(
-                error = %e,
-                cat_id = %cat.id,
-                target_pos = pos,
-                "reorder_channels echoue — la nouvelle categorie sera en bas pour certains clients"
-            );
-        }
-    }
-
-    // 2. Creer le salon vocal
-    let mut voice_builder = CreateChannel::new("vocal")
-        .kind(ChannelType::Voice)
-        .category(cat.id);
+    // 1. Creer le salon vocal (sans categorie, a la racine).
+    let mut voice_builder = CreateChannel::new(&voice_name).kind(ChannelType::Voice);
     if default_user_limit > 0 {
         voice_builder = voice_builder.user_limit(default_user_limit);
     }
@@ -130,19 +103,31 @@ pub(super) async fn create_temp_channel(
         Ok(ch) => ch,
         Err(why) => {
             error!(error = %why, "Erreur creation salon vocal");
-            if let Err(e) = cat.id.delete(&ctx.http).await {
-                tracing::warn!(error = %e, "failed to delete category after voice channel creation error");
-            }
             return;
         }
     };
     let voice_channel_id = voice_channel.id;
 
-    // Permissions owner sur le vocal
+    if let Some(pos) = target_position {
+        if let Err(e) = guild_id
+            .reorder_channels(&ctx.http, [(voice_channel_id, pos as u64)])
+            .await
+        {
+            warn!(
+                error = %e,
+                voice_id = %voice_channel_id,
+                target_pos = pos,
+                "reorder_channels echoue — le nouveau vocal sera en bas pour certains clients"
+            );
+        }
+    }
+
+    // Permissions owner sur le vocal (inclut SEND_MESSAGES pour le chat integre).
     let owner_perm = PermissionOverwrite {
         allow: Permissions::CONNECT
             | Permissions::VIEW_CHANNEL
             | Permissions::SPEAK
+            | Permissions::SEND_MESSAGES
             | Permissions::MOVE_MEMBERS
             | Permissions::MUTE_MEMBERS
             | Permissions::DEAFEN_MEMBERS
@@ -154,110 +139,25 @@ pub(super) async fn create_temp_channel(
         tracing::warn!(error = %e, "failed to set owner permission on voice channel");
     }
 
-    // 3. Panel admin config (prive + game)
-    let admin_channel_id = if kind == "private" || kind == "game" {
-        match guild_id
-            .create_channel(
-                &ctx.http,
-                CreateChannel::new("config")
-                    .kind(ChannelType::Text)
-                    .category(cat.id)
-                    .permissions(vec![
-                        PermissionOverwrite {
-                            allow: Permissions::empty(),
-                            deny: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES,
-                            kind: PermissionOverwriteType::Role(everyone_role),
-                        },
-                        PermissionOverwrite {
-                            allow: Permissions::VIEW_CHANNEL
-                                | Permissions::SEND_MESSAGES
-                                | Permissions::READ_MESSAGE_HISTORY,
-                            deny: Permissions::empty(),
-                            kind: PermissionOverwriteType::Member(user_id),
-                        },
-                    ]),
-            )
-            .await
-        {
-            Ok(ch) => Some(ch.id),
-            Err(why) => {
-                error!(error = %why, "Erreur creation panel admin");
-                None
-            }
-        }
-    } else {
-        None
-    };
+    info!(channel = %voice_name, kind = %kind, "Salon vocal temporaire cree");
 
-    // 4. Panel membres (salon texte avec vote kick)
-    let members_channel = match guild_id
-        .create_channel(
-            &ctx.http,
-            CreateChannel::new("salon")
-                .kind(ChannelType::Text)
-                .category(cat.id)
-                .permissions(vec![
-                    PermissionOverwrite {
-                        allow: Permissions::empty(),
-                        deny: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES,
-                        kind: PermissionOverwriteType::Role(everyone_role),
-                    },
-                    PermissionOverwrite {
-                        allow: Permissions::VIEW_CHANNEL | Permissions::SEND_MESSAGES,
-                        deny: Permissions::empty(),
-                        kind: PermissionOverwriteType::Member(user_id),
-                    },
-                ]),
-        )
-        .await
-    {
-        Ok(ch) => ch,
-        Err(why) => {
-            error!(error = %why, "Erreur creation panel membres");
-            if let Some(aid) = admin_channel_id {
-                if let Err(e) = aid.delete(&ctx.http).await {
-                    tracing::warn!(error = %e, "failed to delete admin channel during cleanup");
-                }
-            }
-            if let Err(e) = voice_channel_id.delete(&ctx.http).await {
-                tracing::warn!(error = %e, "failed to delete voice channel during cleanup");
-            }
-            if let Err(e) = cat.id.delete(&ctx.http).await {
-                tracing::warn!(error = %e, "failed to delete category during cleanup");
-            }
-            return;
-        }
-    };
-
-    info!(channel = %cat_name, kind = %kind, "Salon temporaire cree");
-
-    // Stocker les mappings locaux AVANT le move
+    // Stocker les mappings locaux AVANT le move.
     {
         let data = ctx.data.read().await;
         if let Some(map) = data.get::<VoiceOwnerMapKey>() {
             map.insert(voice_channel_id, user_id);
         }
-        if let Some(aid) = admin_channel_id {
-            if let Some(map) = data.get::<TextToVoiceMapKey>() {
-                map.insert(aid, voice_channel_id);
-            }
-        }
-        if let Some(map) = data.get::<MembersToVoiceMapKey>() {
-            map.insert(members_channel.id, voice_channel_id);
-        }
     }
 
-    // Deplacer l'utilisateur dans le vocal
+    // Deplacer l'utilisateur dans le vocal.
     if let Err(why) = guild_id.move_member(&ctx.http, user_id, voice_channel_id).await {
         warn!(error = %why, "Erreur deplacement membre");
     }
 
-    // 5. Pour les salons "game", creer automatiquement la file d'attente
+    // Pour les salons "game", creer automatiquement la file d'attente.
     let queue_channel_id: Option<ChannelId> = if kind == "game" {
         let queue_name = format!("File d'attente - {display_name}");
-        let queue_builder = CreateChannel::new(&queue_name)
-            .kind(ChannelType::Voice)
-            .category(cat.id);
+        let queue_builder = CreateChannel::new(&queue_name).kind(ChannelType::Voice);
         match guild_id.create_channel(&ctx.http, queue_builder).await {
             Ok(qch) => {
                 let queue_overwrite = PermissionOverwrite {
@@ -288,16 +188,15 @@ pub(super) async fn create_temp_channel(
         None
     };
 
-    // Envoyer le panneau de controle (prive + game)
-    if let Some(aid) = admin_channel_id {
+    // Envoyer le panneau de controle dans le chat integre du vocal
+    // (prive + game uniquement ; les publics n'ont pas de panneau).
+    if kind == "private" || kind == "game" {
         let queue_enabled_init = queue_channel_id.is_some();
-        send_control_panel(ctx, aid, false, queue_enabled_init, false, user_id.get()).await;
+        send_control_panel(ctx, voice_channel_id, false, queue_enabled_init, false, user_id.get()).await;
     }
 
-    // Envoyer le panel membres avec vote kick
-    send_members_panel(ctx, members_channel.id).await;
-
-    // Enregistrer via l'API
+    // Enregistrer via l'API (les champs texte/membres/categorie sont None
+    // dans cette architecture simplifiee).
     {
         let data = ctx.data.read().await;
         if let Some(api) = ApiClient::from_data(&data) {
@@ -306,11 +205,11 @@ pub(super) async fn create_temp_channel(
                 owner_id: user_id.get().to_string(),
                 owner_name: display_name.clone(),
                 channel_id: voice_channel_id.get().to_string(),
-                text_channel_id: admin_channel_id.map(|id| id.get().to_string()),
-                members_channel_id: Some(members_channel.id.get().to_string()),
+                text_channel_id: None,
+                members_channel_id: None,
                 queue_channel_id: queue_channel_id.map(|id| id.get().to_string()),
-                category_id: Some(cat.id.get().to_string()),
-                channel_name: cat_name.clone(),
+                category_id: None,
+                channel_name: voice_name.clone(),
                 kind: kind.to_string(),
                 visibility: "visible".to_string(),
                 queue_enabled: queue_channel_id.is_some(),
@@ -322,7 +221,7 @@ pub(super) async fn create_temp_channel(
         }
     }
 
-    // Creer la carte de session dans le salon de logs
+    // Creer la carte de session dans le salon de logs.
     let creator_label = {
         let name = user_id
             .to_user(&ctx.http)
@@ -335,7 +234,11 @@ pub(super) async fn create_temp_channel(
 }
 
 /// Detecte si un salon temporaire est maintenant vide et, le cas echeant,
-/// supprime toute la famille (categorie + vocal + panels + queue).
+/// supprime le vocal (et la queue associee s'il y en a une).
+///
+/// Pour preserver la compat avec des salons pre-refacto encore en circulation,
+/// on nettoie aussi les eventuels `text_channel_id` / `members_channel_id` /
+/// `category_id` presents cote API mais nouvellement crees en vocal pur.
 pub(super) async fn check_and_delete_empty(
     ctx: &Context,
     voice_channel_id: ChannelId,
@@ -377,22 +280,33 @@ pub(super) async fn check_and_delete_empty(
 
     let channel_name = embeds::get_channel_name(ctx, voice_channel_id).await;
 
-    let queue_channel_id = {
+    // Recupere les eventuels salons annexes legacy (queue + text + members + cat).
+    let (queue_channel_id, legacy_text_id, legacy_members_id) = {
         let data = ctx.data.read().await;
         if let Some(api) = ApiClient::from_data(&data) {
-            api.get_channel(&voice_channel_id.get().to_string())
-                .await
-                .ok()
-                .flatten()
-                .and_then(|ch| ch.queue_channel_id)
-                .and_then(|id| id.parse::<u64>().ok())
-                .map(ChannelId::new)
+            if let Ok(Some(ch)) = api.get_channel(&voice_channel_id.get().to_string()).await {
+                let queue = ch
+                    .queue_channel_id
+                    .and_then(|id| id.parse::<u64>().ok())
+                    .map(ChannelId::new);
+                let text = ch
+                    .text_channel_id
+                    .and_then(|id| id.parse::<u64>().ok())
+                    .map(ChannelId::new);
+                let members = ch
+                    .members_channel_id
+                    .and_then(|id| id.parse::<u64>().ok())
+                    .map(ChannelId::new);
+                (queue, text, members)
+            } else {
+                (None, None, None)
+            }
         } else {
-            None
+            (None, None, None)
         }
     };
 
-    // Supprimer via l'API
+    // Supprimer via l'API.
     {
         let data = ctx.data.read().await;
         if let Some(api) = ApiClient::from_data(&data) {
@@ -405,31 +319,7 @@ pub(super) async fn check_and_delete_empty(
         }
     }
 
-    let text_channel_id = {
-        let data = ctx.data.read().await;
-        data.get::<TextToVoiceMapKey>().and_then(|map| {
-            map.iter()
-                .find(|entry| *entry.value() == voice_channel_id)
-                .map(|entry| *entry.key())
-        })
-    };
-
-    let members_channel_id = {
-        let data = ctx.data.read().await;
-        data.get::<MembersToVoiceMapKey>().and_then(|map| {
-            map.iter()
-                .find(|entry| *entry.value() == voice_channel_id)
-                .map(|entry| *entry.key())
-        })
-    };
-
-    let category_id = voice_channel_id
-        .to_channel(&ctx.http)
-        .await
-        .ok()
-        .and_then(|ch| ch.guild())
-        .and_then(|gc| gc.parent_id);
-
+    // Queue associee (game) : deconnecter les membres et supprimer.
     if let Some(queue_id) = queue_channel_id {
         let queue_members: Vec<_> = ctx
             .cache
@@ -455,26 +345,31 @@ pub(super) async fn check_and_delete_empty(
         info!("Salon d'attente supprime: {queue_id}");
     }
 
-    if let Some(mid) = members_channel_id {
+    // Legacy text/members channels : si presents (salon cree avant la refonte),
+    // on les supprime aussi pour que le menage reste complet.
+    let legacy_category_id = if legacy_text_id.is_some() || legacy_members_id.is_some() {
+        voice_channel_id
+            .to_channel(&ctx.http)
+            .await
+            .ok()
+            .and_then(|ch| ch.guild())
+            .and_then(|gc| gc.parent_id)
+    } else {
+        None
+    };
+
+    if let Some(mid) = legacy_members_id {
         if let Err(e) = mid.delete(&ctx.http).await {
-            warn!(error = %e, channel = %mid, "Erreur suppression panel membres");
-        } else {
-            info!(channel = %mid, "Panel membres supprime");
-        }
-        let data = ctx.data.read().await;
-        if let Some(map) = data.get::<MembersToVoiceMapKey>() {
-            map.remove(&mid);
+            warn!(error = %e, channel = %mid, "Erreur suppression panel membres legacy");
         }
     }
 
-    if let Some(text_id) = text_channel_id {
+    if let Some(text_id) = legacy_text_id {
         if let Err(e) = text_id.delete(&ctx.http).await {
-            warn!(error = %e, channel = %text_id, "Erreur suppression panel config");
-        } else {
-            info!(channel = %text_id, "Panel config supprime");
+            warn!(error = %e, channel = %text_id, "Erreur suppression panel config legacy");
         }
         let data = ctx.data.read().await;
-        if let Some(map) = data.get::<TextToVoiceMapKey>() {
+        if let Some(map) = data.get::<crate::modules::voice::TextToVoiceMapKey>() {
             map.remove(&text_id);
         }
     }
@@ -486,11 +381,9 @@ pub(super) async fn check_and_delete_empty(
         embeds::session_closed(ctx, voice_channel_id, "session terminee").await;
     }
 
-    if let Some(cat_id) = category_id {
+    if let Some(cat_id) = legacy_category_id {
         if let Err(e) = cat_id.delete(&ctx.http).await {
-            warn!(error = %e, "Erreur suppression categorie");
-        } else {
-            info!(category = %cat_id, "Categorie supprimee");
+            warn!(error = %e, "Erreur suppression categorie legacy");
         }
     }
 
@@ -532,7 +425,7 @@ pub async fn place_queue_above_voice(
     }
 }
 
-// ── Builders UI pour les panels ──
+// ── Builders UI pour le panneau admin ──
 
 async fn send_control_panel(
     ctx: &Context,
@@ -646,35 +539,5 @@ async fn send_control_panel(
 
     if let Err(why) = text_channel_id.send_message(&ctx.http, message).await {
         error!(error = %why, "Erreur envoi panneau de controle");
-    }
-}
-
-async fn send_members_panel(ctx: &Context, members_channel_id: ChannelId) {
-    let embed = CreateEmbed::new()
-        .title("Salon vocal")
-        .description(
-            "Bienvenue dans le salon !\n\n\
-            Ce chat est reserve aux membres presents dans le vocal.\n\
-            Quand tu quittes le vocal, tu perds l'acces a ce salon.\n\n\
-            Si quelqu'un pose probleme et qu'il n'y a pas d'admin, utilise le **Vote Kick**.",
-        )
-        .color(0x3498db);
-
-    let vote_select = CreateSelectMenu::new(
-        "select_votekick",
-        CreateSelectMenuKind::User {
-            default_users: None,
-        },
-    )
-    .placeholder("Vote Kick -- Selectionner un membre a expulser")
-    .min_values(1)
-    .max_values(1);
-
-    let message = CreateMessage::new()
-        .embed(embed)
-        .components(vec![CreateActionRow::SelectMenu(vote_select)]);
-
-    if let Err(why) = members_channel_id.send_message(&ctx.http, message).await {
-        error!(error = %why, "Erreur envoi panel membres");
     }
 }

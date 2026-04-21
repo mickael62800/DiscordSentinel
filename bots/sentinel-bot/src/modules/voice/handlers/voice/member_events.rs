@@ -14,7 +14,6 @@ use crate::modules::voice::embeds;
 use crate::modules::voice::{AfkTrackerKey, ConfigKey};
 
 use super::channel_lifecycle::{check_and_delete_empty, create_temp_channel};
-use super::channel_permissions::{grant_members_panel_access, revoke_members_panel_access};
 
 /// Point d'entree appele par le handler Discord sur chaque changement de voice state.
 pub async fn handle_voice_state_update(
@@ -103,14 +102,12 @@ pub async fn handle_voice_state_update(
             create_temp_channel(ctx, guild_id, user_id, "game").await;
         } else {
             check_queue_join(ctx, guild_id, channel_id, user_id).await;
-            grant_members_panel_access(ctx, channel_id, user_id).await;
         }
     }
 
     if let Some(old_state) = old {
         if let Some(old_channel_id) = old_state.channel_id {
             if old_channel_id != public_creator_id && old_channel_id != private_creator_id {
-                revoke_members_panel_access(ctx, old_channel_id, user_id).await;
                 maybe_auto_transfer_ownership(ctx, guild_id, old_channel_id, user_id).await;
                 check_and_delete_empty(ctx, old_channel_id, guild_id).await;
             }
@@ -159,6 +156,8 @@ async fn maybe_auto_transfer_ownership(
         tracing::warn!(error = %e, "failed to downgrade old owner permissions");
     }
 
+    // Legacy : si ce vocal a encore un text_channel_id associe (cree avant la
+    // refonte), on retire l'acces ; sinon on cible directement le vocal.
     let text_channel_id = {
         let data = ctx.data.read().await;
         data.get::<crate::modules::voice::TextToVoiceMapKey>().and_then(|map| {
@@ -181,21 +180,15 @@ async fn maybe_auto_transfer_ownership(
     let co_admin_candidate = find_co_admin_in_voice(ctx, guild_id, voice_channel_id, leaving_user).await;
 
     if let Some(new_owner) = co_admin_candidate {
-        do_direct_transfer(ctx, voice_channel_id, new_owner, text_channel_id).await;
+        // On passe le chat integre du vocal comme cible pour le message de
+        // notification (fallback sur l'eventuel legacy text_channel_id).
+        let panel_target = text_channel_id.unwrap_or(voice_channel_id);
+        do_direct_transfer(ctx, voice_channel_id, new_owner, Some(panel_target)).await;
         return;
     }
 
-    let members_channel_id = {
-        let data = ctx.data.read().await;
-        data.get::<crate::modules::voice::MembersToVoiceMapKey>().and_then(|map| {
-            map.iter()
-                .find(|entry| *entry.value() == voice_channel_id)
-                .map(|entry| *entry.key())
-        })
-    };
-    let Some(mid) = members_channel_id else {
-        return;
-    };
+    // Prompt de reprise : on poste dans le chat integre du vocal.
+    let prompt_target = text_channel_id.unwrap_or(voice_channel_id);
 
     let embed = serenity::builder::CreateEmbed::new()
         .title("\u{1f6a8} Le proprietaire a quitte le salon !")
@@ -216,7 +209,7 @@ async fn maybe_auto_transfer_ownership(
         .embed(embed)
         .components(vec![serenity::builder::CreateActionRow::Buttons(vec![button])]);
 
-    if let Err(e) = mid.send_message(&ctx.http, msg).await {
+    if let Err(e) = prompt_target.send_message(&ctx.http, msg).await {
         tracing::warn!(error = %e, "failed to send claim ownership prompt");
     }
 

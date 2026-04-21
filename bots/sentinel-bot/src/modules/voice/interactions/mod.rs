@@ -4,12 +4,11 @@ pub mod claim_ownership;
 pub mod co_admin;
 pub mod queue;
 pub mod transfer;
-pub mod vote_kick;
 
 // Re-exports pour les enfants de interactions/ (evite les super::super::)
 pub(super) use super::api_client;
 pub(super) use super::handlers;
-pub(super) use super::{VoiceOwnerMapKey, VoteTrackerKey, VoiceConfigKey, TextToVoiceMapKey};
+pub(super) use super::{VoiceOwnerMapKey, TextToVoiceMapKey};
 
 use serenity::model::application::ComponentInteraction;
 use serenity::model::application::ModalInteraction;
@@ -18,22 +17,25 @@ use serenity::prelude::*;
 use tracing::{info, warn};
 
 use super::api_client::{ApiClient, VoiceChannelResponse};
-use super::MembersToVoiceMapKey;
 
 // ── Helpers ──
 
-/// Find the voice channel ID associated with a text panel channel.
-pub async fn find_voice_from_text(ctx: &Context, text_channel_id: ChannelId) -> Option<ChannelId> {
+/// Resout le voice channel associe a une interaction. Depuis la refonte, le
+/// panneau admin est poste dans le chat integre du vocal, donc
+/// `component.channel_id` = le vocal lui-meme dans la majorite des cas.
+///
+/// Ordre de resolution :
+/// 1. Si `channel_id` est directement un voice owner connu → return it.
+/// 2. Sinon, lookup legacy `TextToVoiceMap` (salons pre-refonte).
+pub async fn find_voice_from_text(ctx: &Context, channel_id: ChannelId) -> Option<ChannelId> {
     let data = ctx.data.read().await;
+    if let Some(owners) = data.get::<VoiceOwnerMapKey>() {
+        if owners.contains_key(&channel_id) {
+            return Some(channel_id);
+        }
+    }
     let map = data.get::<TextToVoiceMapKey>()?;
-    map.get(&text_channel_id).map(|e| *e.value())
-}
-
-/// Find the voice channel ID associated with a members panel channel.
-pub async fn find_voice_from_members(ctx: &Context, members_channel_id: ChannelId) -> Option<ChannelId> {
-    let data = ctx.data.read().await;
-    let map = data.get::<MembersToVoiceMapKey>()?;
-    map.get(&members_channel_id).map(|e| *e.value())
+    map.get(&channel_id).map(|e| *e.value())
 }
 
 /// Helper that checks admin + returns (voice_channel_id, channel_response).
@@ -41,16 +43,15 @@ pub async fn require_admin(
     ctx: &Context,
     component: &ComponentInteraction,
 ) -> Option<(ChannelId, VoiceChannelResponse)> {
-    let text_channel_id = component.channel_id;
+    let channel_id = component.channel_id;
     let user_id = component.user.id;
 
-    let voice_channel_id = if let Some(vc) = find_voice_from_text(ctx, text_channel_id).await {
-        vc
-    } else if let Some(vc) = find_voice_from_members(ctx, text_channel_id).await {
-        vc
-    } else {
-        respond_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
-        return None;
+    let voice_channel_id = match find_voice_from_text(ctx, channel_id).await {
+        Some(vc) => vc,
+        None => {
+            respond_ephemeral(ctx, component, "Ce salon n'est pas lie a un salon vocal temporaire.").await;
+            return None;
+        }
     };
 
     let channel_resp = {
@@ -147,9 +148,6 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         }
         "btn_queue" => {
             queue::handle(ctx, component).await;
-        }
-        "select_votekick" | "votekick_yes" | "votekick_no" => {
-            vote_kick::handle(ctx, component).await;
         }
         other => {
             if other.starts_with("limit_") {

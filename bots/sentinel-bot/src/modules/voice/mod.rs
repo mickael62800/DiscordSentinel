@@ -29,7 +29,7 @@ use sentinel_shared::discord_helpers::{is_module_enabled, is_module_enabled_or_r
 
 use api_client::{ApiClient, VoiceConfigResponse, VoiceThemeResponse};
 use config::Config;
-use state::{AfkTracker, CooldownTracker, FloodTracker, VoteTracker};
+use state::{AfkTracker, CooldownTracker, FloodTracker};
 
 // ── TypeMapKeys ──
 
@@ -43,11 +43,6 @@ impl TypeMapKey for FloodTrackerKey {
     type Value = Arc<FloodTracker>;
 }
 
-pub struct VoteTrackerKey;
-impl TypeMapKey for VoteTrackerKey {
-    type Value = Arc<VoteTracker>;
-}
-
 pub struct CooldownTrackerKey;
 impl TypeMapKey for CooldownTrackerKey {
     type Value = Arc<CooldownTracker>;
@@ -55,11 +50,6 @@ impl TypeMapKey for CooldownTrackerKey {
 
 pub struct TextToVoiceMapKey;
 impl TypeMapKey for TextToVoiceMapKey {
-    type Value = Arc<DashMap<ChannelId, ChannelId>>;
-}
-
-pub struct MembersToVoiceMapKey;
-impl TypeMapKey for MembersToVoiceMapKey {
     type Value = Arc<DashMap<ChannelId, ChannelId>>;
 }
 
@@ -109,7 +99,6 @@ pub fn handles_component(cid: &str) -> bool {
             | "btn_coadmin" | "select_coadmin"
             | "btn_transfer" | "select_transfer"
             | "btn_queue"
-            | "select_votekick" | "votekick_yes" | "votekick_no"
     ) || cid.starts_with("limit_")
         || cid.starts_with("ban_duration_")
         || cid.starts_with("queue_accept_")
@@ -160,7 +149,7 @@ pub async fn on_ready(ctx: &Context, ready: &Ready) {
 
 /// Charge les salons vocaux ouverts depuis l'API et verifie leur existence Discord.
 async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
-    let (api, voice_owner, text_to_voice, members_to_voice) = {
+    let (api, voice_owner, text_to_voice) = {
         let data = ctx.data.read().await;
         let api = match api_client::ApiClient::from_data(&data) {
             Some(a) => a,
@@ -173,9 +162,7 @@ async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
             data.get::<VoiceOwnerMapKey>().cloned();
         let text_to_voice: Option<Arc<DashMap<ChannelId, ChannelId>>> =
             data.get::<TextToVoiceMapKey>().cloned();
-        let members_to_voice: Option<Arc<DashMap<ChannelId, ChannelId>>> =
-            data.get::<MembersToVoiceMapKey>().cloned();
-        (api, voice_owner, text_to_voice, members_to_voice)
+        (api, voice_owner, text_to_voice)
     };
 
     let mut reloaded = 0usize;
@@ -223,13 +210,6 @@ async fn reconcile_voice_channels(ctx: &Context, ready: &Ready) {
                     }
                 }
             }
-            if let Some(ref map) = members_to_voice {
-                if let Some(members_id_str) = ch.members_channel_id.as_deref() {
-                    if let Ok(n) = members_id_str.parse::<u64>() {
-                        map.insert(ChannelId::new(n), voice_cid);
-                    }
-                }
-            }
             reloaded += 1;
         }
     }
@@ -252,7 +232,6 @@ pub async fn init_typemap(
     let voice_api = ApiClient::new(Arc::clone(api), Arc::clone(grpc));
 
     let text_to_voice: Arc<DashMap<ChannelId, ChannelId>> = Arc::new(DashMap::new());
-    let members_to_voice: Arc<DashMap<ChannelId, ChannelId>> = Arc::new(DashMap::new());
     let voice_owner: Arc<DashMap<ChannelId, UserId>> = Arc::new(DashMap::new());
 
     if config.guild_id > 0 {
@@ -273,13 +252,6 @@ pub async fn init_typemap(
                     if let Ok(id) = tid.parse::<u64>() {
                         if id > 0 {
                             text_to_voice.insert(ChannelId::new(id), voice_id);
-                        }
-                    }
-                }
-                if let Some(ref mid) = ch.members_channel_id {
-                    if let Ok(id) = mid.parse::<u64>() {
-                        if id > 0 {
-                            members_to_voice.insert(ChannelId::new(id), voice_id);
                         }
                     }
                 }
@@ -316,10 +288,8 @@ pub async fn init_typemap(
 
     data.insert::<ConfigKey>(config);
     data.insert::<FloodTrackerKey>(flood_tracker);
-    data.insert::<VoteTrackerKey>(Arc::new(VoteTracker::new()));
     data.insert::<CooldownTrackerKey>(cooldown_tracker);
     data.insert::<TextToVoiceMapKey>(text_to_voice);
-    data.insert::<MembersToVoiceMapKey>(members_to_voice);
     data.insert::<VoiceOwnerMapKey>(voice_owner);
     data.insert::<AfkTrackerKey>(Arc::new(AfkTracker::new()));
     data.insert::<VoiceConfigKey>(voice_config);

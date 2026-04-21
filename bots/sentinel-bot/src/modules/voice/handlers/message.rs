@@ -3,7 +3,7 @@ use serenity::prelude::*;
 use tracing::{error, info};
 
 use super::api_client::{ApiClient, LogModerationActionRequest};
-use super::{FloodTrackerKey, MembersToVoiceMapKey};
+use super::{FloodTrackerKey, VoiceOwnerMapKey};
 
 pub async fn handle_message(ctx: &Context, msg: &Message) {
     if msg.author.bot {
@@ -13,15 +13,15 @@ pub async fn handle_message(ctx: &Context, msg: &Message) {
     let channel_id = msg.channel_id;
     let user_id = msg.author.id;
 
-    // Verifier si le message est dans un panel membres d'un salon temporaire
-    let is_members_panel = {
+    // Verifier si le message est dans le chat integre d'un vocal temporaire.
+    let is_temp_voice_chat = {
         let data = ctx.data.read().await;
-        data.get::<MembersToVoiceMapKey>()
+        data.get::<VoiceOwnerMapKey>()
             .map(|map| map.contains_key(&channel_id))
             .unwrap_or(false)
     };
 
-    if !is_members_panel {
+    if !is_temp_voice_chat {
         return;
     }
 
