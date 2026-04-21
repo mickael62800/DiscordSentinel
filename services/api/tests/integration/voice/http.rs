@@ -778,6 +778,61 @@ async fn delete_channel_with_rbac_viewer_forbidden() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn purge_channel_closed_deletes_row() {
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query(
+        "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, channel_status, closed_at) \
+         VALUES ($1, $2, 'o', 'Owner', $3, 'VC', 'closed', NOW())",
+    ).bind(Uuid::new_v4()).bind(&guild_id).bind(&channel_id).execute(&p).await.unwrap();
+
+    let app = build_app(MockVoiceUC::new());
+    let status = delete(app, &format!("/api/voice-channels/by-channel/{channel_id}/purge")).await;
+    assert!(status.is_success() || status == StatusCode::NO_CONTENT);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn purge_channel_still_open_returns_error() {
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_voice_channel(&p, &guild_id, &channel_id).await;
+    let app = build_app(MockVoiceUC::new());
+    let status = delete(app, &format!("/api/voice-channels/by-channel/{channel_id}/purge")).await;
+    assert!(status.is_client_error() || status.is_server_error());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn purge_history_deletes_closed_channels() {
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let cid1 = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let cid2 = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query(
+        "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, channel_status, closed_at) \
+         VALUES ($1, $2, 'o', 'O', $3, 'A', 'closed', NOW())",
+    ).bind(Uuid::new_v4()).bind(&guild_id).bind(&cid1).execute(&p).await.unwrap();
+    sqlx::query(
+        "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name, channel_status, closed_at) \
+         VALUES ($1, $2, 'o', 'O', $3, 'B', 'closed', NOW())",
+    ).bind(Uuid::new_v4()).bind(&guild_id).bind(&cid2).execute(&p).await.unwrap();
+
+    let app = build_app(MockVoiceUC::new());
+    let status = delete(app, &format!("/api/voice-channels/{guild_id}/history")).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn list_channel_events_empty_returns_array() {
+    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let app = build_app(MockVoiceUC::new());
+    let (status, json) = get(app, &format!("/api/voice-channels/by-channel/{channel_id}/events")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json.as_array().is_some());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn transfer_ownership_with_rbac_moderator_succeeds() {
     use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
     let p = pool().await;

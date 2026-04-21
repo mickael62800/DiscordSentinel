@@ -757,3 +757,227 @@ async fn execute_unban_invalid_path_422() {
     let (status, _) = post_json(app, "/api/moderation/execute-unban", body).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+// ══════════════════════════════════════════════════════════
+// Coverage supplementaire : execute_* avec RBAC, delete_action avec RBAC,
+// add_review avec RBAC, list_pending_reviews avec RBAC, get_modstats avec RBAC
+// ══════════════════════════════════════════════════════════
+
+async fn seed_rbac(pool: &sqlx::PgPool, user_id: &str, guild_id: &str, role: &str) {
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'T') ON CONFLICT DO NOTHING")
+        .bind(user_id).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, $3)")
+        .bind(user_id).bind(guild_id).bind(role).execute(pool).await.unwrap();
+}
+
+fn build_state_full_mocks() -> AppState {
+    use sentinel_api::domain::entities::ModerationAction;
+    use sentinel_api::domain::value_objects::ModerationGravity;
+    use sentinel_api::ports::inbound::{LogModerationCommand, ManageModerationUseCase};
+    use sentinel_api::domain::entities::UserModerationHistory;
+    use chrono::Utc;
+    use async_trait::async_trait;
+
+    struct MockMod;
+    #[async_trait]
+    impl ManageModerationUseCase for MockMod {
+        async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+        async fn log_action(&self, cmd: LogModerationCommand) -> Result<ModerationAction, DomainError> {
+            Ok(ModerationAction {
+                id: Uuid::new_v4(),
+                guild_id: cmd.guild_id, channel_id: cmd.channel_id,
+                moderator_id: cmd.moderator_id, moderator_name: cmd.moderator_name,
+                target_id: cmd.target_id, target_name: cmd.target_name,
+                action_type: cmd.action_type, reason: cmd.reason,
+                gravity: cmd.gravity.as_deref().and_then(ModerationGravity::from_str_lossy),
+                duration: cmd.duration, created_at: Utc::now(),
+            })
+        }
+        async fn get_history(&self, _: &str, _: &str) -> Result<UserModerationHistory, DomainError> {
+            Ok(UserModerationHistory { target_id: "".into(), target_name: "".into(), total_warns:0, total_mutes:0, total_bans:0, actions: vec![] })
+        }
+        async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+        async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+    }
+
+    let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
+    state.evidence_repo = Arc::new(MockEvidenceRepo::default());
+    state.review_repo = Arc::new(MockReviewRepo::default());
+    state.discord_api = Arc::new(test_helpers::MockDiscordApi::new());
+    state.moderation_uc = Arc::new(MockMod);
+    state
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_ban_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_rbac(&p, &user_id, &guild_id, "moderator").await;
+
+    let app = router::build_for_test(build_state_full_mocks());
+    let body = serde_json::json!({
+        "guild_id": guild_id, "user_id": "444444444444444444",
+        "reason": "Spam repete"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/moderation/execute-ban",
+        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_ban_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_rbac(&p, &user_id, &guild_id, "viewer").await;
+
+    let app = router::build_for_test(build_state_full_mocks());
+    let body = serde_json::json!({
+        "guild_id": guild_id, "user_id": "444444444444444444", "reason": "r"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/moderation/execute-ban",
+        &user_id, Some(Role::Viewer), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_mute_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_rbac(&p, &user_id, &guild_id, "moderator").await;
+
+    let app = router::build_for_test(build_state_full_mocks());
+    let body = serde_json::json!({
+        "guild_id": guild_id, "user_id": "444444444444444444",
+        "reason": "Flood", "duration": 600
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/moderation/execute-mute",
+        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_unban_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_rbac(&p, &user_id, &guild_id, "moderator").await;
+
+    let app = router::build_for_test(build_state_full_mocks());
+    let body = serde_json::json!({
+        "guild_id": guild_id, "user_id": "444444444444444444"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/moderation/execute-unban",
+        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_action_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let action_id = insert_action(&p, &guild_id, "warn").await;
+    seed_rbac(&p, &user_id, &guild_id, "viewer").await;
+
+    let app = router::build_for_test(build_state_full_mocks());
+    let req = test_helpers::request_with_rbac(
+        "DELETE", &format!("/api/moderation/actions/{action_id}"),
+        &user_id, Some(Role::Viewer), Some(guild_id), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_review_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_rbac(&p, &user_id, &guild_id, "moderator").await;
+
+    let app = router::build_for_test(build_state_full_mocks());
+    let body = serde_json::json!({
+        "action_id": Uuid::new_v4().to_string(),
+        "guild_id": guild_id, "added_by": "444444444444444444", "added_by_name": "Mod"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/moderation/review",
+        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn list_pending_reviews_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let guild_id = "111111111111111111";
+    let app = router::build_for_test(build_state_full_mocks());
+    let req = test_helpers::request_with_rbac(
+        "GET", &format!("/api/moderation/review/{guild_id}/pending"),
+        "555555555555555555", Some(Role::Moderator), Some(guild_id.into()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn list_pending_reviews_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let guild_id = "111111111111111111";
+    let app = router::build_for_test(build_state_full_mocks());
+    let req = test_helpers::request_with_rbac(
+        "GET", &format!("/api/moderation/review/{guild_id}/pending"),
+        "555555555555555555", Some(Role::Viewer), Some(guild_id.into()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn get_modstats_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let app = router::build_for_test(build_state_full_mocks());
+    let req = test_helpers::request_with_rbac(
+        "GET", &format!("/api/moderation/modstats/{guild_id}"),
+        "555555555555555555", Some(Role::Moderator), Some(guild_id.clone()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn get_modstats_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let app = router::build_for_test(build_state_full_mocks());
+    let req = test_helpers::request_with_rbac(
+        "GET", &format!("/api/moderation/modstats/{guild_id}"),
+        "555555555555555555", Some(Role::Viewer), Some(guild_id.clone()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

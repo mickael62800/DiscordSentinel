@@ -284,6 +284,86 @@ async fn delete_note_with_rbac_invalid_uuid_422() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_note_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'M') ON CONFLICT DO NOTHING")
+        .bind(&user_id).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'moderator')")
+        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+
+    let app = build_app(MockNotesUC::new());
+    let body = serde_json::json!({
+        "guild_id": guild_id,
+        "user_id": "444444444444444444",
+        "content": "Note via RBAC",
+        "author_id": "444444444444444444",
+        "author_name": "Mod",
+        "category": "general"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/notes",
+        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_note_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let p = pool().await;
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'V') ON CONFLICT DO NOTHING")
+        .bind(&user_id).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'viewer')")
+        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+
+    let app = build_app(MockNotesUC::new());
+    let body = serde_json::json!({
+        "guild_id": guild_id,
+        "user_id": "444444444444444444",
+        "content": "Blocked",
+        "author_id": "444444444444444444",
+        "author_name": "V",
+        "category": "general"
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/notes",
+        &user_id, Some(Role::Viewer), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn get_notes_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let app = build_app(MockNotesUC::new());
+    let req = test_helpers::request_with_rbac(
+        "GET", "/api/notes/111111111111111111/444444444444444444",
+        "555555555555555555", Some(Role::Moderator), Some("111111111111111111".into()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn get_notes_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let app = build_app(MockNotesUC::new());
+    let req = test_helpers::request_with_rbac(
+        "GET", "/api/notes/111111111111111111/444444444444444444",
+        "555555555555555555", Some(Role::Viewer), Some("111111111111111111".into()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_note_with_rbac_viewer_forbidden() {
     use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
