@@ -54,3 +54,7 @@ pub struct DeleteConfigDto {
     pub bot_name: String,
     pub config_key: String,
 }
+
+#[cfg(test)]
+#[path = "tests/bot_config.rs"]
+mod tests;

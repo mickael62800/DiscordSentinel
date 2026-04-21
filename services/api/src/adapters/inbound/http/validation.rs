@@ -160,6 +160,10 @@ pub fn validate_guild_user_path(guild_id: &str, user_id: &str) -> Result<(), Dom
 }
 
 /// Valide les champs d'un SetConfigDto.
+#[cfg(test)]
+#[path = "tests/validation.rs"]
+mod tests;
+
 pub fn validate_bot_config(
     guild_id: &str,
     bot_name: &str,

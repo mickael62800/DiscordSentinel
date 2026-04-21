@@ -44,3 +44,7 @@ impl From<Infraction> for InfractionResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/infractions.rs"]
+mod tests;

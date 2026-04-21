@@ -333,3 +333,8 @@ fn status_to_err(status: StatusCode, context: &str) -> ApiError {
         ))),
     }
 }
+
+#[cfg(test)]
+#[path = "tests/rbac.rs"]
+mod tests;
+

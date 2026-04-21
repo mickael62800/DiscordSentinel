@@ -289,9 +289,7 @@ impl DiscordApiService {
                     .map(|s| s.to_string());
 
                 let avatar_hash = user.get("avatar").and_then(|v| v.as_str());
-                let avatar_url = avatar_hash.map(|h| {
-                    format!("https://cdn.discordapp.com/avatars/{}/{}.png?size=64", id, h)
-                });
+                let avatar_url = discord_avatar_url(&id, avatar_hash);
 
                 if !id.is_empty() {
                     all_members.push(DiscordMember {
@@ -630,3 +628,15 @@ impl DiscordApiService {
             .map_err(|e| DomainError::Internal(format!("Discord /users/@me parse: {e}")))
     }
 }
+
+/// Construit l'URL d'avatar Discord (CDN) pour un user.
+/// Retourne `None` si le user n'a pas d'avatar custom (hash absent).
+pub(super) fn discord_avatar_url(user_id: &str, avatar_hash: Option<&str>) -> Option<String> {
+    avatar_hash
+        .map(|h| format!("https://cdn.discordapp.com/avatars/{}/{}.png?size=64", user_id, h))
+}
+
+#[cfg(test)]
+#[path = "tests/discord_api.rs"]
+mod tests;
+

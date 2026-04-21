@@ -782,3 +782,7 @@ pub async fn delete_action(
         Err(ApiError(crate::domain::errors::DomainError::NotFound("Action introuvable".into())))
     }
 }
+
+#[cfg(test)]
+#[path = "tests/moderation.rs"]
+mod tests;

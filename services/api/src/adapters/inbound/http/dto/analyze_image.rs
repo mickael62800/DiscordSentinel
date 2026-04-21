@@ -52,3 +52,8 @@ impl From<ImageAnalysis> for AnalyzeImageResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/analyze_image.rs"]
+mod tests;
+

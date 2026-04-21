@@ -30,3 +30,7 @@ pub fn internal_with<E: std::fmt::Display>(ctx: &str) -> impl FnOnce(E) -> Domai
 pub fn validation_with<E: std::fmt::Display>(ctx: &str) -> impl FnOnce(E) -> DomainError + '_ {
     move |e| DomainError::ValidationError(format!("{ctx}: {e}"))
 }
+
+#[cfg(test)]
+#[path = "tests/errors_helpers.rs"]
+mod tests;

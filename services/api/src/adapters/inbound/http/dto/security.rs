@@ -54,3 +54,7 @@ impl From<SecurityEvent> for SecurityEventResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/security.rs"]
+mod tests;

@@ -209,3 +209,7 @@ pub async fn get_system_info(
         db_size_mb,
     }))
 }
+
+#[cfg(test)]
+#[path = "tests/system.rs"]
+mod tests;

@@ -184,3 +184,7 @@ pub async fn get_peak_hours(
 
     Ok(Json(dtos))
 }
+
+#[cfg(test)]
+#[path = "tests/analytics.rs"]
+mod tests;

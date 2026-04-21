@@ -67,3 +67,7 @@ impl From<UserDossier> for UserDossierResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/watched_users.rs"]
+mod tests;

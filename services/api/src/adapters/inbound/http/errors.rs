@@ -54,3 +54,7 @@ impl From<DomainError> for ApiError {
         ApiError(err)
     }
 }
+
+#[cfg(test)]
+#[path = "tests/errors.rs"]
+mod tests;

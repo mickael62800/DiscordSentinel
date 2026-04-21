@@ -79,3 +79,7 @@ impl From<AuditLog> for AuditLogResponseDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/audit_logs.rs"]
+mod tests;

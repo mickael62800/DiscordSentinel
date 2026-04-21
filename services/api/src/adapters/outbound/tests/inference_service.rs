@@ -87,6 +87,47 @@ fn test_classify_text_without_model_returns_error() {
     assert!(result.unwrap_err().contains("non charge"));
 }
 
+#[test]
+fn reload_unknown_type_returns_error() {
+    let service = InferenceService::new(None, None);
+    let err = service.reload("llm-sentiment").unwrap_err();
+    assert!(err.contains("inconnu"));
+}
+
+#[test]
+fn reload_text_without_env_var_returns_error() {
+    let service = InferenceService::new(None, None);
+    // SAFETY: env mutation only for this test. Autres tests ne touchent pas TEXT_MODEL_PATH.
+    unsafe { std::env::remove_var("TEXT_MODEL_PATH") };
+    let err = service.reload("text").unwrap_err();
+    assert!(err.contains("TEXT_MODEL_PATH"));
+}
+
+#[test]
+fn reload_vision_without_env_var_returns_error() {
+    let service = InferenceService::new(None, None);
+    unsafe { std::env::remove_var("VISION_MODEL_PATH") };
+    let err = service.reload("image-classification").unwrap_err();
+    assert!(err.contains("VISION_MODEL_PATH"));
+}
+
+#[test]
+fn reload_text_alias_text_sentiment_recognized() {
+    let service = InferenceService::new(None, None);
+    unsafe { std::env::remove_var("TEXT_MODEL_PATH") };
+    // L'alias "text-sentiment" doit suivre le meme chemin que "text".
+    let err = service.reload("text-sentiment").unwrap_err();
+    assert!(err.contains("TEXT_MODEL_PATH"));
+}
+
+#[test]
+fn reload_vision_alias_vision_recognized() {
+    let service = InferenceService::new(None, None);
+    unsafe { std::env::remove_var("VISION_MODEL_PATH") };
+    let err = service.reload("vision").unwrap_err();
+    assert!(err.contains("VISION_MODEL_PATH"));
+}
+
 const ONNX_PATH: &str = "../../ai/training/text/exports/text_sentinel.onnx";
 const TOKENIZER_PATH: &str = "../../ai/training/text/exports/tokenizer.json";
 

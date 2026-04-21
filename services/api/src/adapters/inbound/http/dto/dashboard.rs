@@ -224,3 +224,7 @@ pub struct RegisterGuildDto {
 pub struct GuildFilterParams {
     pub guild_id: Option<String>,
 }
+
+#[cfg(test)]
+#[path = "tests/dashboard.rs"]
+mod tests;

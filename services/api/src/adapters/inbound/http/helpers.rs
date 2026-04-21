@@ -33,3 +33,7 @@ pub fn ok_response() -> Json<serde_json::Value> {
 pub fn single_dto<T, D: From<T> + Serialize>(entity: T) -> Json<D> {
     Json(D::from(entity))
 }
+
+#[cfg(test)]
+#[path = "tests/helpers.rs"]
+mod tests;

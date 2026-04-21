@@ -269,3 +269,7 @@ pub async fn callback(
 
     redirect_to(&target)
 }
+
+#[cfg(test)]
+#[path = "tests/oauth.rs"]
+mod tests;

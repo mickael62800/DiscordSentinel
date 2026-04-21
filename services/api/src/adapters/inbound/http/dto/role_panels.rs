@@ -126,3 +126,7 @@ impl From<AutoRole> for AutoRoleDto {
         Self { id: a.id.to_string(), guild_id: a.guild_id, role_id: a.role_id, role_name: a.role_name, delay_secs: a.delay_secs, enabled: a.enabled }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/role_panels.rs"]
+mod tests;
