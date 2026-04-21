@@ -724,9 +724,13 @@ pub fn resolve_combat(
         (1.00, 1.00)
     };
 
+    // ── Resume des items utilises (prepend both winner + draw paths) ──
+    let items_summary = build_items_summary(&atk_name, &def_name, special, defender_special, params);
+
     if is_draw {
         // ── Draw path ──
         let mut final_msg = format!("{}\n\n", start_msg);
+        final_msg.push_str(&items_summary);
         for r in &rounds {
             final_msg.push_str(&r.message);
             final_msg.push_str("\n\n");
@@ -819,6 +823,7 @@ pub fn resolve_combat(
     };
 
     let mut final_msg = format!("{}\n\n", start_msg);
+    final_msg.push_str(&items_summary);
 
     // Append round summaries
     for r in &rounds {
@@ -925,6 +930,71 @@ pub fn resolve_combat(
         is_giant_killer: is_giant,
         attacker_class_revealed,
         defender_class_revealed,
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// ── Helpers ──
+// ══════════════════════════════════════════════════════════════════════
+
+/// Construit le resume "items utilises" affiche en tete du message combat.
+/// Liste les specials (rage, bouclier, poison, etc.) utilises par chaque
+/// camp pour que le joueur voie l impact mecanique du combat.
+fn build_items_summary(
+    atk_name: &str,
+    def_name: &str,
+    atk_special: Option<&str>,
+    def_special: Option<&str>,
+    params: &CoudeBalanceParams,
+) -> String {
+    let fmt = |who: &str, sp: &str| -> Option<String> {
+        match sp {
+            "rage" => Some(format!(
+                "\u{1f525} **{who}** utilise **Rage** (+{}% ATK / -{}% DEF)",
+                params.rage_atk_bonus_pct, params.rage_def_malus_pct
+            )),
+            "coup_traitre" => Some(format!(
+                "\u{1f5e1}\u{fe0f} **{who}** utilise **Coup Traitre** (-{}% DEF adverse)",
+                params.coup_traitre_def_malus_pct
+            )),
+            "bouclier" => Some(format!(
+                "\u{1f6e1}\u{fe0f} **{who}** utilise **Bouclier** (+{}% DEF)",
+                params.bouclier_def_bonus_pct
+            )),
+            "double_coup" => Some(format!(
+                "\u{1f94a} **{who}** utilise **Double Coup** (2d20 par round)"
+            )),
+            "poison" => Some(format!(
+                "\u{2620}\u{fe0f} **{who}** empoisonne l'adversaire (-{} HP/round)",
+                params.poison_damage_per_round
+            )),
+            "antidote" => Some(format!(
+                "\u{1f33f} **{who}** utilise **Antidote** (immunise au poison)"
+            )),
+            "explosion" => Some(format!(
+                "\u{1f4a5} **{who}** utilise **Explosion** (-50% mise pour les deux)"
+            )),
+            "surprise" => Some(format!(
+                "\u{1f631} **{who}** utilise **Attaque Surprise** (resolution auto)"
+            )),
+            "mindgame" => Some(format!(
+                "\u{1f9e0} **{who}** utilise **Mindgame** (revele classe + HP)"
+            )),
+            _ => None,
+        }
+    };
+
+    let mut lines: Vec<String> = Vec::new();
+    if let Some(s) = atk_special.and_then(|sp| fmt(atk_name, sp)) {
+        lines.push(s);
+    }
+    if let Some(s) = def_special.and_then(|sp| fmt(def_name, sp)) {
+        lines.push(s);
+    }
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!("{}\n\n", lines.join("\n"))
     }
 }
 

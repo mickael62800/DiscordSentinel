@@ -16,9 +16,9 @@ if sys.stdout.encoding != "utf-8":
 
 TEXT_EXTS = {".jsonl", ".txt"}
 IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
-LABEL_NAMES = {0: "neutral", 1: "toxic_light", 2: "toxic_severe"}
-# Projette les labels bruts du dataset (toxifrench 5 classes) sur 3 classes.
-_LABEL_REMAP = {0: 0, 1: 1, 2: 2, 3: 2, 4: 1}
+LABEL_NAMES = {0: "safe", 1: "severe"}
+# Projette les labels bruts du dataset (toxifrench 5 classes) sur 2 classes binaires.
+_LABEL_REMAP = {0: 0, 1: 0, 2: 1, 3: 1, 4: 0}
 
 
 def scan_text(root: Path) -> dict:

@@ -21,7 +21,7 @@ const pct = (v: number) => `${(v * 100).toFixed(1)}%`;
 
 const CANONICAL_ORDER: Record<ModelType, string[]> = {
   "image-classification": ["safe", "nsfw", "illicit"],
-  "text-sentiment": ["neutral", "toxic_light", "toxic_severe"],
+  "text-sentiment": ["safe", "severe"],
 };
 
 const classNames = computed(() => {

@@ -10,14 +10,13 @@ from torch.utils.data import Dataset
 logger = logging.getLogger("sentinel.trainer.dataset.text")
 
 CLASS_MAP: dict[str, int] = {
-    "neutral": 0,
-    "toxic_light": 1,
-    "toxic_severe": 2,
+    "safe": 0,
+    "severe": 1,
 }
 
-# Projette les 5 labels bruts du dataset (toxifrench) sur 3 classes regroupees.
-# anger + harassment -> toxic_light ; rage + threat -> toxic_severe.
-_LABEL_REMAP: dict[int, int] = {0: 0, 1: 1, 2: 2, 3: 2, 4: 1}
+# Projette les 5 labels bruts du dataset (toxifrench) sur 2 classes binaires.
+# neutral + anger + harassment -> safe ; rage + threat -> severe.
+_LABEL_REMAP: dict[int, int] = {0: 0, 1: 0, 2: 1, 3: 1, 4: 0}
 
 
 class TextSentinelDataset(Dataset):
