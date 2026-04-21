@@ -91,7 +91,7 @@ def train_text(args, emitter: Emitter, data_root: Path) -> None:
     scaler = torch.amp.GradScaler("cuda") if use_amp else None
     emitter.emit("phase", phase=f"chargement modele ({device}{' + AMP' if use_amp else ''})")
 
-    backbone = config["model"]["backbone"]
+    backbone = args.backbone if args.backbone else config["model"]["backbone"]
     max_length = args.max_length if args.max_length else config["model"]["max_length"]
     num_classes = config["model"]["num_classes"]
     class_names = [config["classes"][i] for i in range(num_classes)]
@@ -482,6 +482,7 @@ def main() -> int:
     parser.add_argument("--warmup-ratio", type=float, default=0.1)
     parser.add_argument("--max-length", type=int, default=None)
     parser.add_argument("--neutral-cap", type=int, default=0)
+    parser.add_argument("--backbone", type=str, default=None, help="Override config model.backbone (ex: camembert-base, camembert-large)")
     parser.add_argument("--stop-flag", default=None, help="Chemin d'un fichier-flag. Sa presence demande l'arret.")
     args = parser.parse_args()
 

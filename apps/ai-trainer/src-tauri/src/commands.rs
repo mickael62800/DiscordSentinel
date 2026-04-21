@@ -153,6 +153,7 @@ pub async fn ai_start_training(
     warmup_ratio: Option<f64>,
     max_length: Option<u32>,
     neutral_cap: Option<u32>,
+    backbone: Option<String>,
 ) -> Result<(), String> {
     // Refuse si deja en cours
     {
@@ -194,6 +195,9 @@ pub async fn ai_start_training(
     }
     if let Some(v) = neutral_cap {
         cmd.arg("--neutral-cap").arg(v.to_string());
+    }
+    if let Some(v) = backbone {
+        cmd.arg("--backbone").arg(v);
     }
 
     cmd.stdout(std::process::Stdio::piped())

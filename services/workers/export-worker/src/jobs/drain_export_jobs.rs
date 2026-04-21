@@ -150,8 +150,8 @@ async fn call_export_api(
         filters_json: filters.to_string(),
         max_rows: MAX_ROWS_PER_EXPORT,
     });
-    if let Ok(v) = api_key.parse::<MetadataValue<_>>() {
-        req.metadata_mut().insert("x-api-key", v);
+    if let Ok(v) = format!("Bearer {api_key}").parse::<MetadataValue<_>>() {
+        req.metadata_mut().insert("authorization", v);
     }
 
     let resp = client
