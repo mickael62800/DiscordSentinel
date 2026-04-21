@@ -82,19 +82,15 @@ pub(super) async fn create_temp_channel(
         }
     };
 
-    let target_position: Option<u16> = anchor_category_id.and_then(|anchor_id| {
-        let anchor_channel = ChannelId::new(anchor_id);
-        ctx.cache.guild(guild_id).and_then(|g| {
-            g.channels
-                .get(&anchor_channel)
-                .map(|ch| ch.position.saturating_add(1))
-        })
-    });
-
-    // 1. Creer le salon vocal (sans categorie, a la racine).
+    // 1. Creer le salon vocal. Si voice_anchor_category_id est configure,
+    // on place le salon DANS cette categorie (Discord le met automatiquement
+    // en bas de la categorie). Sinon, salon a la racine du serveur.
     let mut voice_builder = CreateChannel::new(&voice_name).kind(ChannelType::Voice);
     if default_user_limit > 0 {
         voice_builder = voice_builder.user_limit(default_user_limit);
+    }
+    if let Some(cat_id) = anchor_category_id {
+        voice_builder = voice_builder.category(ChannelId::new(cat_id));
     }
     let voice_channel = match guild_id
         .create_channel(&ctx.http, voice_builder)
@@ -107,20 +103,6 @@ pub(super) async fn create_temp_channel(
         }
     };
     let voice_channel_id = voice_channel.id;
-
-    if let Some(pos) = target_position {
-        if let Err(e) = guild_id
-            .reorder_channels(&ctx.http, [(voice_channel_id, pos as u64)])
-            .await
-        {
-            warn!(
-                error = %e,
-                voice_id = %voice_channel_id,
-                target_pos = pos,
-                "reorder_channels echoue — le nouveau vocal sera en bas pour certains clients"
-            );
-        }
-    }
 
     // Permissions owner sur le vocal (inclut SEND_MESSAGES pour le chat integre).
     let owner_perm = PermissionOverwrite {
@@ -157,7 +139,10 @@ pub(super) async fn create_temp_channel(
     // Pour les salons "game", creer automatiquement la file d'attente.
     let queue_channel_id: Option<ChannelId> = if kind == "game" {
         let queue_name = format!("File d'attente - {display_name}");
-        let queue_builder = CreateChannel::new(&queue_name).kind(ChannelType::Voice);
+        let mut queue_builder = CreateChannel::new(&queue_name).kind(ChannelType::Voice);
+        if let Some(cat_id) = anchor_category_id {
+            queue_builder = queue_builder.category(ChannelId::new(cat_id));
+        }
         match guild_id.create_channel(&ctx.http, queue_builder).await {
             Ok(qch) => {
                 let queue_overwrite = PermissionOverwrite {
