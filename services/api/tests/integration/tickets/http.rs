@@ -374,3 +374,155 @@ async fn update_ticket_channel_success() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(json["ok"], true);
 }
+
+// ══════════════════════════════════════════════════════════
+// bulk_delete_tickets (sqlx direct -> utilise la vraie DB test)
+// ══════════════════════════════════════════════════════════
+
+async fn pool() -> sqlx::PgPool {
+    let url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    sqlx::PgPool::connect(&url).await.unwrap()
+}
+
+async fn insert_ticket(
+    pool: &sqlx::PgPool, server: &str, author_id: &str,
+    created_at: Option<chrono::DateTime<chrono::Utc>>,
+) -> Uuid {
+    let id = Uuid::new_v4();
+    match created_at {
+        Some(dt) => {
+            sqlx::query(
+                "INSERT INTO tickets (id, title, status, priority, author_id, author_name, server, category, created_at) \
+                 VALUES ($1, 'Test', 'open', 'medium', $2, 'User', $3, 'general', $4)",
+            ).bind(id).bind(author_id).bind(server).bind(dt).execute(pool).await.unwrap();
+        }
+        None => {
+            sqlx::query(
+                "INSERT INTO tickets (id, title, status, priority, author_id, author_name, server, category) \
+                 VALUES ($1, 'Test', 'open', 'medium', $2, 'User', $3, 'general')",
+            ).bind(id).bind(author_id).bind(server).execute(pool).await.unwrap();
+        }
+    }
+    id
+}
+
+async fn count_tickets_for_server(pool: &sqlx::PgPool, server: &str) -> i64 {
+    sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM tickets WHERE server = $1")
+        .bind(server).fetch_one(pool).await.unwrap().0
+}
+
+async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    let s = resp.status();
+    let b = resp.into_body().collect().await.unwrap().to_bytes();
+    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_delete_requires_filter_or_all_flag_422() {
+    let app = build_app(MockTicketsUC::new());
+    let (status, json) = delete_req(app, "/api/tickets/bulk").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(json["error"].as_str().unwrap().contains("Aucun filtre"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_delete_filter_by_author_id_targeted() {
+    let p = pool().await;
+    let server = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let author_target = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let author_other = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    insert_ticket(&p, &server, &author_target, None).await;
+    insert_ticket(&p, &server, &author_target, None).await;
+    insert_ticket(&p, &server, &author_other, None).await;
+
+    let app = build_app(MockTicketsUC::new());
+    let (status, json) = delete_req(app, &format!("/api/tickets/bulk?author_id={author_target}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["deleted"], 2);
+    let remaining = sqlx::query_as::<_, (i64,)>("SELECT COUNT(*) FROM tickets WHERE server = $1 AND author_id = $2")
+        .bind(&server).bind(&author_other).fetch_one(&p).await.unwrap().0;
+    assert_eq!(remaining, 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_delete_filter_by_date_range_rfc3339() {
+    let p = pool().await;
+    let server = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let author = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let old_dt = chrono::DateTime::parse_from_rfc3339("2020-06-15T12:00:00Z").unwrap().with_timezone(&Utc);
+    insert_ticket(&p, &server, &author, Some(old_dt)).await;
+    insert_ticket(&p, &server, &author, None).await;
+
+    let app = build_app(MockTicketsUC::new());
+    let (status, json) = delete_req(
+        app,
+        &format!("/api/tickets/bulk?author_id={author}&from=2020-01-01T00:00:00Z&to=2020-12-31T23:59:59Z"),
+    ).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["deleted"], 1);
+    assert_eq!(count_tickets_for_server(&p, &server).await, 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_delete_filter_by_date_range_yyyy_mm_dd() {
+    // Le format YYYY-MM-DD emprunte la branche 2 de parse_date.
+    let p = pool().await;
+    let server = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let author = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let old_dt = chrono::DateTime::parse_from_rfc3339("2021-03-15T12:00:00Z").unwrap().with_timezone(&Utc);
+    insert_ticket(&p, &server, &author, Some(old_dt)).await;
+
+    let app = build_app(MockTicketsUC::new());
+    let (status, _) = delete_req(
+        app,
+        &format!("/api/tickets/bulk?author_id={author}&from=2021-01-01&to=2021-12-31"),
+    ).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(count_tickets_for_server(&p, &server).await, 0);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_delete_invalid_date_format_422() {
+    let app = build_app(MockTicketsUC::new());
+    let (status, json) = delete_req(app, "/api/tickets/bulk?from=not-a-date").await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert!(json["error"].as_str().unwrap().contains("Date invalide"));
+}
+
+// bulk_delete avec RBAC injecte
+
+async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (StatusCode, serde_json::Value) {
+    let resp = app.oneshot(req).await.unwrap();
+    let s = resp.status();
+    let b = resp.into_body().collect().await.unwrap().to_bytes();
+    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_delete_with_rbac_admin_allowed() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let author = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let app = build_app(MockTicketsUC::new());
+    let req = test_helpers::request_with_rbac(
+        "DELETE", &format!("/api/tickets/bulk?author_id={author}"),
+        "444444444444444444", Some(Role::Admin), None, None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn bulk_delete_with_rbac_moderator_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let app = build_app(MockTicketsUC::new());
+    let req = test_helpers::request_with_rbac(
+        "DELETE", "/api/tickets/bulk?all=true",
+        "444444444444444444", Some(Role::Moderator), None, None,
+    );
+    let (status, json) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert!(json["error"].as_str().unwrap().contains("admin+"));
+}

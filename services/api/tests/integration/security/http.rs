@@ -190,3 +190,134 @@ async fn list_events_filter_by_guild() {
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0]["severity"], "high");
 }
+
+// ══════════════════════════════════════════════════════════
+// purge_events (sqlx direct -> utilise la vraie DB test)
+// ══════════════════════════════════════════════════════════
+
+async fn pool() -> sqlx::PgPool {
+    let url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    sqlx::PgPool::connect(&url).await.unwrap()
+}
+
+async fn insert_audit_security_event(pool: &sqlx::PgPool, guild_id: &str, event_type: &str) {
+    sqlx::query(
+        "INSERT INTO audit_logs (id, guild_id, event_type, details, created_at) \
+         VALUES ($1, $2, $3, '{}'::jsonb, NOW())",
+    )
+    .bind(Uuid::new_v4()).bind(guild_id).bind(event_type)
+    .execute(pool).await.unwrap();
+}
+
+async fn insert_manual_watch(pool: &sqlx::PgPool, guild_id: &str, user_id: &str, added_by: &str) {
+    sqlx::query(
+        "INSERT INTO manual_watched_users (guild_id, user_id, username, added_by) \
+         VALUES ($1, $2, 'User', $3)",
+    )
+    .bind(guild_id).bind(user_id).bind(added_by)
+    .execute(pool).await.unwrap();
+}
+
+async fn delete_req(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
+    let req = Request::builder().method("DELETE").uri(uri).body(Body::empty()).unwrap();
+    let resp = app.oneshot(req).await.unwrap();
+    let s = resp.status();
+    let b = resp.into_body().collect().await.unwrap().to_bytes();
+    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn purge_events_removes_audit_and_manual_watches() {
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+
+    // Audit logs security_* : 2 a purger
+    insert_audit_security_event(&p, &guild_id, "security_raid").await;
+    insert_audit_security_event(&p, &guild_id, "security_alt").await;
+    // Audit logs non security : doit survivre
+    insert_audit_security_event(&p, &guild_id, "config_update").await;
+
+    // manual_watched_users cree par security_event : a purger
+    insert_manual_watch(&p, &guild_id, &user_id, "security_event").await;
+    // manual_watched_users manuels : survivent
+    let other_user = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    insert_manual_watch(&p, &guild_id, &other_user, "desktop").await;
+
+    let app = build_app(MockSecurityUC::new());
+    let (status, json) = delete_req(app, &format!("/api/security/events/{guild_id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["deleted_events"], 2);
+    assert_eq!(json["deleted_watches"], 1);
+
+    // Audit config_update doit rester
+    let remaining_audit = sqlx::query_as::<_, (i64,)>(
+        "SELECT COUNT(*) FROM audit_logs WHERE guild_id = $1 AND event_type = 'config_update'",
+    ).bind(&guild_id).fetch_one(&p).await.unwrap().0;
+    assert_eq!(remaining_audit, 1);
+    // manual_watch desktop doit rester
+    let remaining_watch = sqlx::query_as::<_, (i64,)>(
+        "SELECT COUNT(*) FROM manual_watched_users WHERE guild_id = $1 AND added_by = 'desktop'",
+    ).bind(&guild_id).fetch_one(&p).await.unwrap().0;
+    assert_eq!(remaining_watch, 1);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn purge_events_empty_returns_zero() {
+    let app = build_app(MockSecurityUC::new());
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let (status, json) = delete_req(app, &format!("/api/security/events/{guild_id}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["deleted_events"], 0);
+    assert_eq!(json["deleted_watches"], 0);
+}
+
+// RBAC : viewer forbidden, admin allowed via injection manuelle
+
+async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (StatusCode, serde_json::Value) {
+    let resp = app.oneshot(req).await.unwrap();
+    let s = resp.status();
+    let b = resp.into_body().collect().await.unwrap().to_bytes();
+    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn purge_events_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'M') ON CONFLICT DO NOTHING")
+        .bind(&user_id).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'moderator')")
+        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+
+    let app = build_app(MockSecurityUC::new());
+    let req = test_helpers::request_with_rbac(
+        "DELETE", &format!("/api/security/events/{guild_id}"),
+        &user_id, Some(Role::Moderator), Some(guild_id.clone()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn purge_events_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'V') ON CONFLICT DO NOTHING")
+        .bind(&user_id).execute(&p).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, 'viewer')")
+        .bind(&user_id).bind(&guild_id).execute(&p).await.unwrap();
+
+    let app = build_app(MockSecurityUC::new());
+    let req = test_helpers::request_with_rbac(
+        "DELETE", &format!("/api/security/events/{guild_id}"),
+        &user_id, Some(Role::Viewer), Some(guild_id.clone()), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}

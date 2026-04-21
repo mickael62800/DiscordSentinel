@@ -236,7 +236,17 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
         })
     }
 
-    async fn update_theme(&self, _: &str, _: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> { unimplemented!() }
+    async fn update_theme(&self, theme_id: &str, cmd: CreateThemeCommand) -> Result<VoiceChannelTheme, DomainError> {
+        Ok(VoiceChannelTheme {
+            id: uuid::Uuid::parse_str(theme_id).unwrap_or_else(|_| Uuid::new_v4()),
+            guild_id: cmd.guild_id, name: cmd.name, emoji: cmd.emoji,
+            channel_name_template: cmd.channel_name_template, member_limit: cmd.member_limit,
+            visibility: cmd.visibility, locked: cmd.locked, queue_enabled: cmd.queue_enabled,
+            bitrate: cmd.bitrate, slowmode_secs: cmd.slowmode_secs,
+            stage_enabled: cmd.stage_enabled, is_default: cmd.is_default,
+            sort_order: cmd.sort_order, created_at: Utc::now(),
+        })
+    }
     async fn delete_theme(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
 }
 
@@ -564,6 +574,231 @@ async fn detail_includes_invite_links() {
     let links = json["invite_links"].as_array().unwrap();
     assert_eq!(links.len(), 1);
     assert_eq!(links[0]["code"], "DETAIL01");
+}
+
+// ══════════════════════════════════════════════════════════
+// Tests HTTP — endpoints supplementaires + RBAC
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn list_history_channels_empty() {
+    let app = build_app(MockVoiceUC::new());
+    let (status, json) = get(app, "/api/voice-channels/111111111111111111/history").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json.as_array().unwrap().len(), 0);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn update_channel_success() {
+    let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
+    let app = build_app(uc);
+    let body = serde_json::json!({
+        "channel_name": "New Name",
+        "visibility": "hidden"
+    });
+    let (status, _) = patch_json(app, "/api/voice-channels/by-channel/c1", body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn transfer_ownership_success() {
+    let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
+    let app = build_app(uc);
+    let body = serde_json::json!({
+        "new_owner_id": "555555555555555555",
+        "new_owner_name": "NewOwner"
+    });
+    let (status, _) = patch_json(app, "/api/voice-channels/by-channel/c1/transfer", body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_co_admin_success() {
+    let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
+    let app = build_app(uc);
+    let body = serde_json::json!({
+        "user_id": "555555555555555555",
+        "user_name": "CoAdmin"
+    });
+    let (status, _) = post_json(app, "/api/voice-channels/by-channel/c1/co-admins", body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn remove_co_admin_success() {
+    let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
+    let app = build_app(uc);
+    let status = delete(app, "/api/voice-channels/by-channel/c1/co-admins/555555555555555555").await;
+    assert!(status.is_success() || status == StatusCode::NO_CONTENT);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_to_whitelist_success() {
+    let app = build_app(MockVoiceUC::new());
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "owner_id": "444444444444444444",
+        "target_id": "555555555555555555",
+        "target_name": "Target"
+    });
+    let (status, _) = post_json(app, "/api/voice-channels/whitelist", body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn remove_from_whitelist_success() {
+    let app = build_app(MockVoiceUC::new());
+    let status = delete(app, "/api/voice-channels/whitelist/111111111111111111/444444444444444444/555555555555555555").await;
+    assert!(status.is_success() || status == StatusCode::NO_CONTENT);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn ban_from_channel_success() {
+    let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
+    let app = build_app(uc);
+    let body = serde_json::json!({
+        "user_id": "555555555555555555",
+        "user_name": "Banned",
+        "banned_by": "444444444444444444",
+        "reason": "toxic"
+    });
+    let (status, _) = post_json(app, "/api/voice-channels/by-channel/c1/bans", body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn unban_from_channel_success() {
+    let uc = MockVoiceUC::new().with_channel(make_channel("111111111111111111", "c1"));
+    let app = build_app(uc);
+    let status = delete(app, "/api/voice-channels/by-channel/c1/bans/555555555555555555").await;
+    assert!(status.is_success() || status == StatusCode::NO_CONTENT);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn update_theme_success() {
+    let theme_id = Uuid::new_v4();
+    let uc = MockVoiceUC::new();
+    let app = build_app(uc);
+    let body = serde_json::json!({
+        "guild_id": "111111111111111111",
+        "name": "Updated Theme",
+        "emoji": "🎯",
+        "channel_name_template": "{user}-updated",
+        "member_limit": 5,
+        "visibility": "visible",
+        "locked": false,
+        "queue_enabled": false,
+        "bitrate": null,
+        "slowmode_secs": null,
+        "stage_enabled": false,
+        "is_default": false,
+        "sort_order": 0
+    });
+    let (status, _) = patch_json(app, &format!("/api/voice-channels/themes/111111111111111111/{theme_id}"), body).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+// ── RBAC injecte ────────────────────────────────────────
+
+async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (StatusCode, serde_json::Value) {
+    let resp = app.oneshot(req).await.unwrap();
+    let s = resp.status();
+    let b = resp.into_body().collect().await.unwrap().to_bytes();
+    (s, serde_json::from_slice(&b).unwrap_or(serde_json::Value::Null))
+}
+
+async fn pool() -> sqlx::PgPool {
+    let url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());
+    sqlx::PgPool::connect(&url).await.unwrap()
+}
+
+async fn seed_role(pool: &sqlx::PgPool, user_id: &str, guild_id: &str, role: &str) {
+    sqlx::query("INSERT INTO api_users (discord_user_id, display_name) VALUES ($1, 'T') ON CONFLICT DO NOTHING")
+        .bind(user_id).execute(pool).await.unwrap();
+    sqlx::query("INSERT INTO api_user_guilds (discord_user_id, guild_id, role) VALUES ($1, $2, $3)")
+        .bind(user_id).bind(guild_id).bind(role).execute(pool).await.unwrap();
+}
+
+async fn seed_voice_channel(pool: &sqlx::PgPool, guild_id: &str, channel_id: &str) {
+    sqlx::query(
+        "INSERT INTO voice_channels (id, guild_id, owner_id, owner_name, channel_id, channel_name) \
+         VALUES ($1, $2, '444444444444444444', 'Owner', $3, 'VC')",
+    )
+    .bind(Uuid::new_v4()).bind(guild_id).bind(channel_id).execute(pool).await.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn create_channel_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_role(&p, &user_id, &guild_id, "moderator").await;
+
+    let app = build_app(MockVoiceUC::new());
+    let body = serde_json::json!({
+        "guild_id": guild_id,
+        "owner_id": "444444444444444444",
+        "owner_name": "Owner",
+        "channel_id": "c-new",
+        "channel_name": "New VC",
+        "kind": "private",
+        "visibility": "visible",
+        "queue_enabled": false,
+        "stage_enabled": false
+    });
+    let req = test_helpers::request_with_rbac(
+        "POST", "/api/voice-channels",
+        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_channel_with_rbac_viewer_forbidden() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_role(&p, &user_id, &guild_id, "viewer").await;
+    // gate_by_channel_id fait un SELECT sur voice_channels → il faut une row en DB.
+    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_voice_channel(&p, &guild_id, &channel_id).await;
+
+    let uc = MockVoiceUC::new().with_channel(make_channel(&guild_id, &channel_id));
+    let app = build_app(uc);
+    let req = test_helpers::request_with_rbac(
+        "DELETE", &format!("/api/voice-channels/by-channel/{channel_id}"),
+        &user_id, Some(Role::Viewer), Some(guild_id), None,
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn transfer_ownership_with_rbac_moderator_succeeds() {
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    let p = pool().await;
+    let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_role(&p, &user_id, &guild_id, "moderator").await;
+
+    let channel_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
+    seed_voice_channel(&p, &guild_id, &channel_id).await;
+    let uc = MockVoiceUC::new().with_channel(make_channel(&guild_id, &channel_id));
+    let app = build_app(uc);
+    let body = serde_json::json!({
+        "new_owner_id": "555555555555555555",
+        "new_owner_name": "NewOwner"
+    });
+    let req = test_helpers::request_with_rbac(
+        "PATCH", &format!("/api/voice-channels/by-channel/{channel_id}/transfer"),
+        &user_id, Some(Role::Moderator), Some(guild_id), Some(body),
+    );
+    let (status, _) = send_request(app, req).await;
+    assert_eq!(status, StatusCode::OK);
 }
 
 // ══════════════════════════════════════════════════════════
