@@ -87,6 +87,11 @@ fn test_classify_text_without_model_returns_error() {
     assert!(result.unwrap_err().contains("non charge"));
 }
 
+/// Serialise les tests qui manipulent TEXT_MODEL_PATH / VISION_MODEL_PATH
+/// car cargo test lance les tests en parallele par defaut — et les env vars
+/// sont partages au niveau du process.
+static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
 #[test]
 fn reload_unknown_type_returns_error() {
     let service = InferenceService::new(None, None);
@@ -96,8 +101,8 @@ fn reload_unknown_type_returns_error() {
 
 #[test]
 fn reload_text_without_env_var_returns_error() {
+    let _g = ENV_LOCK.lock().unwrap();
     let service = InferenceService::new(None, None);
-    // SAFETY: env mutation only for this test. Autres tests ne touchent pas TEXT_MODEL_PATH.
     unsafe { std::env::remove_var("TEXT_MODEL_PATH") };
     let err = service.reload("text").unwrap_err();
     assert!(err.contains("TEXT_MODEL_PATH"));
@@ -105,6 +110,7 @@ fn reload_text_without_env_var_returns_error() {
 
 #[test]
 fn reload_vision_without_env_var_returns_error() {
+    let _g = ENV_LOCK.lock().unwrap();
     let service = InferenceService::new(None, None);
     unsafe { std::env::remove_var("VISION_MODEL_PATH") };
     let err = service.reload("image-classification").unwrap_err();
@@ -113,6 +119,7 @@ fn reload_vision_without_env_var_returns_error() {
 
 #[test]
 fn reload_text_alias_text_sentiment_recognized() {
+    let _g = ENV_LOCK.lock().unwrap();
     let service = InferenceService::new(None, None);
     unsafe { std::env::remove_var("TEXT_MODEL_PATH") };
     // L'alias "text-sentiment" doit suivre le meme chemin que "text".
@@ -122,10 +129,44 @@ fn reload_text_alias_text_sentiment_recognized() {
 
 #[test]
 fn reload_vision_alias_vision_recognized() {
+    let _g = ENV_LOCK.lock().unwrap();
     let service = InferenceService::new(None, None);
     unsafe { std::env::remove_var("VISION_MODEL_PATH") };
     let err = service.reload("vision").unwrap_err();
     assert!(err.contains("VISION_MODEL_PATH"));
+}
+
+#[test]
+fn reload_text_with_nonexistent_path_returns_error_but_clears_session() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let service = InferenceService::new(None, None);
+    unsafe { std::env::set_var("TEXT_MODEL_PATH", "/tmp/nonexistent_text_model.onnx") };
+    let err = service.reload("text").unwrap_err();
+    unsafe { std::env::remove_var("TEXT_MODEL_PATH") };
+    assert!(err.contains("Echec rechargement text"), "err={err}");
+    assert!(!service.text_available());
+}
+
+#[test]
+fn reload_vision_with_nonexistent_path_returns_error() {
+    let _g = ENV_LOCK.lock().unwrap();
+    let service = InferenceService::new(None, None);
+    unsafe { std::env::set_var("VISION_MODEL_PATH", "/tmp/nonexistent_vision.onnx") };
+    let err = service.reload("image-classification").unwrap_err();
+    unsafe { std::env::remove_var("VISION_MODEL_PATH") };
+    assert!(err.contains("Echec rechargement vision"));
+    assert!(!service.vision_available());
+}
+
+#[test]
+fn load_session_with_invalid_file_content_fails_gracefully() {
+    // Ecrit un fichier bidon non-ONNX — load_session doit renvoyer None sans paniquer.
+    let dir = std::env::temp_dir();
+    let path = dir.join("sentinel_invalid.onnx");
+    std::fs::write(&path, b"not-a-real-onnx-model").unwrap();
+    let service = InferenceService::new(Some(path.to_str().unwrap()), None);
+    assert!(!service.vision_available(), "file invalide doit etre rejete");
+    let _ = std::fs::remove_file(&path);
 }
 
 const ONNX_PATH: &str = "../../ai/training/text/exports/text_sentinel.onnx";
