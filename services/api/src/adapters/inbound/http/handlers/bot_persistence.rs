@@ -40,7 +40,7 @@ pub async fn create_name_history(
 
     state.audit_logs_uc.create(crate::ports::inbound::CreateAuditLogCommand {
         guild_id: dto.guild_id,
-        event_type: "member_nickname_history".into(),
+        event_type: crate::domain::entities::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.into(),
         actor_id: None,
         actor_name: None,
         target_id: Some(dto.user_id.clone()),

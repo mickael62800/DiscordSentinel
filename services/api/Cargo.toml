@@ -282,6 +282,11 @@ path = "tests/integration/discord_roles_http/http.rs"
 name = "integration_members_http"
 path = "tests/integration/members_http/http.rs"
 
+# bot_persistence HTTP
+[[test]]
+name = "integration_bot_persistence_http"
+path = "tests/integration/bot_persistence_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"

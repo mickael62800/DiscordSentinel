@@ -70,7 +70,7 @@ impl ManageTicketsUseCase for StubTickets {
     async fn update_status(&self, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn update_ticket_channel(&self, _: UpdateTicketChannelCommand) -> Result<(), DomainError> { unimplemented!() }
     async fn update_priority(&self, _: Uuid, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn update_sla(&self, _: Uuid, _: Option<&str>, _: Option<&str>, _: Option<i32>) -> Result<(), DomainError> { unimplemented!() }
+    async fn update_sla(&self, _: Uuid, _: Option<&str>, _: Option<&str>, _: Option<i32>) -> Result<(), DomainError> { Ok(()) }
 }
 
 pub struct StubSecurity;

@@ -25,7 +25,10 @@ mod user_note;
 pub mod analytics;
 
 pub use ia_config::IaConfig;
-pub use audit_log::AuditLog;
+pub use audit_log::{
+    is_security_audit_event, AuditLog, AUDIT_EVENT_MEMBER_NICKNAME_HISTORY,
+    AUDIT_EVENT_SECURITY_PREFIX,
+};
 pub use image_analysis::{is_allowed_image_content_type, is_image_size_acceptable, ImageAnalysis, ImageClassification, ALLOWED_IMAGE_CONTENT_TYPES, MAX_IMAGE_BASE64_LEN};
 pub use bot_config::{BotDefinition, BotGuildConfig};
 pub use conduct::{ConductConfig, ConductPointsLog, UserConductPoints};

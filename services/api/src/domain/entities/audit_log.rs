@@ -15,3 +15,20 @@ pub struct AuditLog {
     pub details: serde_json::Value,
     pub created_at: DateTime<Utc>,
 }
+
+/// Event type pour l'historique des changements de nickname d'un membre.
+/// Regle metier : identifiant stable consomme par le desktop et les exports.
+pub const AUDIT_EVENT_MEMBER_NICKNAME_HISTORY: &str = "member_nickname_history";
+
+/// Prefixe commun aux events de securite (auto-detection, raid, alt, etc.).
+/// Utilise par le handler security::purge_events pour cibler le DELETE.
+pub const AUDIT_EVENT_SECURITY_PREFIX: &str = "security_";
+
+/// Verifie qu'un event_type est un event de securite (commence par "security_").
+pub fn is_security_audit_event(event_type: &str) -> bool {
+    event_type.starts_with(AUDIT_EVENT_SECURITY_PREFIX)
+}
+
+#[cfg(test)]
+#[path = "tests/audit_log.rs"]
+mod tests;
