@@ -13,6 +13,10 @@
 //! Respect strict de l'architecture hexagonale : aucun SQL direct ici, tout
 //! passe par les ports outbound. Le combat_engine est pur domain (pas d'IO).
 
+#[cfg(test)]
+#[path = "tests/resolve_betting_batch.rs"]
+mod tests;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
