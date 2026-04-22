@@ -144,3 +144,7 @@ pub struct JoinTableDto {
     pub user_id: String,
     pub user_name: String,
 }
+
+#[cfg(test)]
+#[path = "tests/dto.rs"]
+mod tests;

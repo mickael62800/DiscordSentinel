@@ -873,3 +873,63 @@
         // We can't easily access the inner repo after Arc wrapping,
         // but the test passing without error confirms add_to_whitelist was called
     }
+
+    // ══════════════════════════════════════════════════════════
+    // co_admin
+    // ══════════════════════════════════════════════════════════
+
+    use crate::ports::inbound::ManageCoAdminCommand;
+
+    #[tokio::test]
+    async fn add_co_admin_success() {
+        let repo = MockVoiceRepo::new().with_channel(make_test_channel());
+        let svc = make_service(repo);
+        let result = svc.add_co_admin(ManageCoAdminCommand {
+            channel_id: "chan1".into(),
+            user_id: "co1".into(),
+            user_name: "Co Admin".into(),
+        }).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn add_co_admin_channel_not_found() {
+        let repo = MockVoiceRepo::new(); // no channel
+        let svc = make_service(repo);
+        let err = svc.add_co_admin(ManageCoAdminCommand {
+            channel_id: "ghost".into(),
+            user_id: "co1".into(),
+            user_name: "Co".into(),
+        }).await.unwrap_err();
+        assert!(matches!(err, DomainError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn remove_co_admin_success() {
+        let repo = MockVoiceRepo::new().with_channel(make_test_channel());
+        let svc = make_service(repo);
+        assert!(svc.remove_co_admin("chan1", "co1").await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn remove_co_admin_channel_not_found() {
+        let repo = MockVoiceRepo::new();
+        let svc = make_service(repo);
+        let err = svc.remove_co_admin("ghost", "co1").await.unwrap_err();
+        assert!(matches!(err, DomainError::NotFound(_)));
+    }
+
+    // ══════════════════════════════════════════════════════════
+    // get_voice_config
+    // ══════════════════════════════════════════════════════════
+
+    #[tokio::test]
+    async fn get_voice_config_returns_default_when_no_rows() {
+        let repo = MockVoiceRepo::new();
+        let svc = make_service(repo);
+        // MockBotConfig retourne vec![] par défaut → config par défaut du domain.
+        let cfg = svc.get_voice_config("guild1").await.unwrap();
+        // On ne fait pas d'assertion sur les valeurs specifiques — on verifie
+        // juste que ça ne panique pas et qu'un ConfigVoice est renvoye.
+        let _ = cfg;
+    }
