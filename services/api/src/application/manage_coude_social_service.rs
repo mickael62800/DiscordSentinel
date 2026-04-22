@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[path = "tests/manage_coude_social.rs"]
+mod tests;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
