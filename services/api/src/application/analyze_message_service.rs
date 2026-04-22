@@ -255,6 +255,12 @@ pub fn score_classifications(
 
     for c in classifications {
         let flag = match c.label.as_str() {
+            // Modele 2 classes : severe = rage + threat agreges.
+            // On mappe sur FlagType::Harassment (la plus generique des flags
+            // toxiques) pour que le scoring existant fonctionne sans ajouter
+            // un nouveau type.
+            "severe" if c.confidence >= threshold => Some(FlagType::Harassment),
+            // Legacy 5 classes (si vieux modele encore charge).
             "anger" if c.confidence >= threshold => Some(FlagType::Anger),
             "rage" if c.confidence >= threshold => Some(FlagType::Rage),
             "threat" if c.confidence >= threshold => Some(FlagType::Threat),

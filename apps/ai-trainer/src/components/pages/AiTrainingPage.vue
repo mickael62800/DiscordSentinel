@@ -27,7 +27,7 @@ const activeTab = ref<ModelType>("text-sentiment");
 
 const epochs = ref(5);
 const batchSize = ref(32);
-const backbone = ref<"camembert-base" | "camembert-large">("camembert-base");
+const backbone = ref<"camembert-base" | "camembert/camembert-large">("camembert-base");
 const learningRate = ref(0.00002);
 const validationSplit = ref(0.1);
 const earlyStoppingPatience = ref(2);
@@ -178,7 +178,7 @@ onMounted(async () => {
               <label>Backbone</label>
               <select v-model="backbone" :disabled="status.running">
                 <option value="camembert-base">camembert-base (~430 Mo, rapide)</option>
-                <option value="camembert-large">camembert-large (~1,3 Go, +2-3% accuracy)</option>
+                <option value="camembert/camembert-large">camembert-large (~1,3 Go, +2-3% accuracy)</option>
               </select>
             </div>
             <div class="param">
