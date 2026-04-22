@@ -387,6 +387,11 @@ path = "tests/integration/postgres_moderation/repo.rs"
 name = "integration_postgres_conduct"
 path = "tests/integration/postgres_conduct/repo.rs"
 
+# postgres levels repo
+[[test]]
+name = "integration_postgres_levels"
+path = "tests/integration/postgres_levels/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
