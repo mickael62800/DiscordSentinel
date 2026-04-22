@@ -317,6 +317,16 @@ path = "tests/integration/exports_http/http.rs"
 name = "integration_system_endpoints_http"
 path = "tests/integration/system_endpoints_http/http.rs"
 
+# coude/bets HTTP
+[[test]]
+name = "integration_coude_bets_http"
+path = "tests/integration/coude_bets_http/http.rs"
+
+# coude/social HTTP
+[[test]]
+name = "integration_coude_social_http"
+path = "tests/integration/coude_social_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
