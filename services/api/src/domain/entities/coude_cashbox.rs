@@ -43,7 +43,7 @@ pub struct CashboxRedistributionEntry {
 
 /// Source du deposit dans la cashbox (pour tracing / audit).
 /// Pas persiste directement — utilise par le service comme label de log.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CashboxSource {
     ShopPurchase,
     InsurancePurchase,

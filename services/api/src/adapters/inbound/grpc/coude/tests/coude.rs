@@ -307,3 +307,94 @@ use super::*;
         assert_eq!(pr.id, id.to_string());
         assert!(pr.active);
     }
+
+    // ── redistribution_to_proto + proto_source_to_domain ──
+
+    #[test]
+    fn redistribution_to_proto_mapping_with_winners() {
+        use crate::ports::inbound::RedistributionOutcome;
+        let rid = Uuid::new_v4();
+        let outcome = RedistributionOutcome {
+            redistribution_id: rid,
+            total_amount: 5000,
+            winners: vec![
+                ("u1".to_string(), "Alice".to_string(), 3000),
+                ("u2".to_string(), "Bob".to_string(), 2000),
+            ],
+        };
+        let pr = social::redistribution_to_proto("g1".into(), outcome);
+        assert!(pr.executed);
+        assert_eq!(pr.redistribution_id.as_deref(), Some(rid.to_string().as_str()));
+        assert_eq!(pr.total_amount, 5000);
+        assert_eq!(pr.guild_id, "g1");
+        assert_eq!(pr.winners.len(), 2);
+        assert_eq!(pr.winners[0].user_id, "u1");
+        assert_eq!(pr.winners[0].username, "Alice");
+        assert_eq!(pr.winners[0].amount_won, 3000);
+        assert_eq!(pr.winners[1].amount_won, 2000);
+    }
+
+    #[test]
+    fn redistribution_to_proto_empty_winners() {
+        use crate::ports::inbound::RedistributionOutcome;
+        let outcome = RedistributionOutcome {
+            redistribution_id: Uuid::nil(),
+            total_amount: 0,
+            winners: vec![],
+        };
+        let pr = social::redistribution_to_proto("g".into(), outcome);
+        assert!(pr.executed);
+        assert_eq!(pr.total_amount, 0);
+        assert!(pr.winners.is_empty());
+    }
+
+    #[test]
+    fn proto_source_to_domain_all_variants() {
+        use crate::domain::entities::CashboxSource;
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceShopPurchase as i32),
+            Some(CashboxSource::ShopPurchase)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceInsurancePurchase as i32),
+            Some(CashboxSource::InsurancePurchase)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceProtectionPurchase as i32),
+            Some(CashboxSource::ProtectionPurchase)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceBoostPurchase as i32),
+            Some(CashboxSource::BoostPurchase)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceClassChangeCost as i32),
+            Some(CashboxSource::ClassChangeCost)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceResetStatsCost as i32),
+            Some(CashboxSource::ResetStatsCost)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceDonationTax as i32),
+            Some(CashboxSource::DonationTax)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceCowardicePenalty as i32),
+            Some(CashboxSource::CowardicePenalty)
+        );
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceBetCommission as i32),
+            Some(CashboxSource::BetCommission)
+        );
+    }
+
+    #[test]
+    fn proto_source_to_domain_unspecified_and_invalid() {
+        assert_eq!(
+            social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceUnspecified as i32),
+            None
+        );
+        // Valeur hors enum → try_from echoue → None
+        assert_eq!(social::proto_source_to_domain(99999), None);
+    }
