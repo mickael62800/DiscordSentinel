@@ -99,6 +99,66 @@ use super::*;
     }
 
     #[test]
+    fn taunt_to_proto_mapping() {
+        let t = TauntEvent {
+            channel_id: "c1".into(),
+            target_user_id: "u1".into(),
+            message: "mocking".into(),
+            nickname_suffix: "le naze".into(),
+            streak_kind: "bj_bust_streak",
+            streak_value: 5,
+        };
+        let p = taunt_to_proto(t);
+        assert_eq!(p.channel_id, "c1");
+        assert_eq!(p.target_user_id, "u1");
+        assert_eq!(p.message, "mocking");
+        assert_eq!(p.nickname_suffix, "le naze");
+        assert_eq!(p.streak_value, 5);
+        assert_eq!(p.streak_kind, "bj_bust_streak");
+    }
+
+    #[test]
+    fn action_result_to_proto_bundles_game_and_taunts() {
+        use crate::application::BlackjackActionResult;
+        let game = BlackjackGame {
+            id: Uuid::nil(), guild_id: "g".into(), user_id: "u".into(),
+            username: "x".into(), bet: 10,
+            player_hand: vec![], dealer_hand: vec![], deck: vec![],
+            status: "player_win".into(), player_score: 20, dealer_score: 18,
+            doubled: false, payout: 20,
+            created_at: ts(), finished_at: Some(ts()),
+        };
+        let taunt = TauntEvent {
+            channel_id: "c".into(), target_user_id: "t".into(),
+            message: "m".into(), nickname_suffix: "".into(),
+            streak_kind: "bj_win_streak", streak_value: 3,
+        };
+        let result = BlackjackActionResult {
+            game,
+            taunt_events: vec![taunt],
+        };
+        let p = action_result_to_proto(result);
+        assert!(p.game.is_some());
+        assert_eq!(p.game.unwrap().status, "player_win");
+        assert_eq!(p.taunt_events.len(), 1);
+    }
+
+    #[test]
+    fn action_result_to_proto_no_taunts() {
+        use crate::application::BlackjackActionResult;
+        let game = BlackjackGame {
+            id: Uuid::nil(), guild_id: "g".into(), user_id: "u".into(),
+            username: "x".into(), bet: 0,
+            player_hand: vec![], dealer_hand: vec![], deck: vec![],
+            status: "in_progress".into(), player_score: 0, dealer_score: 0,
+            doubled: false, payout: 0,
+            created_at: ts(), finished_at: None,
+        };
+        let p = action_result_to_proto(BlackjackActionResult { game, taunt_events: vec![] });
+        assert!(p.taunt_events.is_empty());
+    }
+
+    #[test]
     fn wallet_to_proto_full_mapping() {
         let w = Wallet {
             id: Uuid::nil(),
