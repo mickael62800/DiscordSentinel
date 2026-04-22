@@ -90,3 +90,48 @@ fn status_label(status: u16) -> &'static str {
         _ => "Unknown",
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn is_mutation_detects_write_methods() {
+        assert!(is_mutation("POST"));
+        assert!(is_mutation("PUT"));
+        assert!(is_mutation("PATCH"));
+        assert!(is_mutation("DELETE"));
+    }
+
+    #[test]
+    fn is_mutation_rejects_read_methods() {
+        assert!(!is_mutation("GET"));
+        assert!(!is_mutation("HEAD"));
+        assert!(!is_mutation("OPTIONS"));
+        assert!(!is_mutation("post")); // case-sensitive
+    }
+
+    #[test]
+    fn status_label_known_codes() {
+        assert_eq!(status_label(200), "OK");
+        assert_eq!(status_label(201), "Created");
+        assert_eq!(status_label(204), "No Content");
+        assert_eq!(status_label(400), "Bad Request");
+        assert_eq!(status_label(401), "Unauthorized");
+        assert_eq!(status_label(403), "Forbidden");
+        assert_eq!(status_label(404), "Not Found");
+        assert_eq!(status_label(422), "Unprocessable Entity");
+        assert_eq!(status_label(429), "Too Many Requests");
+        assert_eq!(status_label(500), "Internal Server Error");
+        assert_eq!(status_label(502), "Bad Gateway");
+        assert_eq!(status_label(503), "Service Unavailable");
+    }
+
+    #[test]
+    fn status_label_unknown_returns_unknown() {
+        assert_eq!(status_label(100), "Unknown");
+        assert_eq!(status_label(302), "Unknown");
+        assert_eq!(status_label(418), "Unknown");
+        assert_eq!(status_label(999), "Unknown");
+    }
+}
