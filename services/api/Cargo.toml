@@ -457,6 +457,11 @@ path = "tests/integration/postgres_misc_2/repo.rs"
 name = "integration_postgres_misc_3"
 path = "tests/integration/postgres_misc_3/repo.rs"
 
+# postgres misc_4 repos (guild + coude_heist + coude_steal_protection/boost + blackjack_table)
+[[test]]
+name = "integration_postgres_misc_4"
+path = "tests/integration/postgres_misc_4/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
