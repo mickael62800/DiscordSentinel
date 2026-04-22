@@ -207,17 +207,9 @@ pub async fn purge_all(
         .await
         .map_err(|e| ApiError(DomainError::Internal(format!("begin tx: {e}"))))?;
 
-    // Ordre : tables filles d'abord (meme si la plupart ont CASCADE).
+    // Tables + ordre : regle metier dans `domain/entities/coude_purge.rs`.
     let mut totals = serde_json::Map::new();
-    for table in &[
-        "coude_insurances",
-        "coude_bets",
-        "coude_combats",
-        "coude_primes",
-        "coude_inventory",
-        "coude_events",
-        "coude_players",
-    ] {
+    for table in crate::domain::entities::COUDE_PURGE_TABLES {
         let sql = format!("DELETE FROM {table} WHERE guild_id = $1");
         let res = sqlx::query(&sql)
             .bind(&guild_id)

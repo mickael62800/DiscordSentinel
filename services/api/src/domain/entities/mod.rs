@@ -23,11 +23,13 @@ mod strikes;
 mod sanction_reminder;
 mod user_note;
 mod ai_models;
+mod coude_purge;
 pub mod analytics;
 
 pub use ai_models::{
     format_model_display_name, is_valid_model_type, path_basename, SUPPORTED_MODEL_TYPES,
 };
+pub use coude_purge::COUDE_PURGE_TABLES;
 
 pub use ia_config::IaConfig;
 pub use audit_log::{
