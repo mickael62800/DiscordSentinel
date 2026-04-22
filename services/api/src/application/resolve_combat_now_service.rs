@@ -230,25 +230,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
 
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
-                // Assurance (regles pures → domain::apply_insurance_to_loss)
-                let active_insurance = self
-                    .inventory_uc
-                    .get_active_insurance(&combat.guild_id, loser_id)
-                    .await
-                    .ok()
-                    .flatten();
-                let adj = apply_insurance_to_loss(
-                    result.coins_lost_by_loser,
-                    active_insurance.as_ref(),
-                    loser_id,
-                );
-                if let Some(ins_id) = adj.consumed_insurance_id {
-                    let _ = self.inventory_uc.expire_insurance(ins_id).await;
-                }
-                insurance_msg = adj.message;
-                let mut actual_loss = adj.actual_loss;
-
-                // Cap sur solde reel du perdant
+                // Cap sur solde reel du perdant (pre-requis pour l'assurance
+                // qui clamp d'abord, cf. Flow B dans apply_insurance_to_loss).
                 let loser_wallet = self
                     .wallet_repo
                     .get(&combat.guild_id, loser_id)
@@ -257,7 +240,26 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .flatten();
                 let loser_balance = loser_wallet.map(|w| w.coins).unwrap_or(0);
                 let coins_transferred = result.coins_won.min(loser_balance);
-                let actual_loss = actual_loss.min(loser_balance);
+
+                // Assurance : clamp-then-apply dans le domain pour que les
+                // joueurs fauches beneficient effectivement de la protection.
+                let active_insurance = self
+                    .inventory_uc
+                    .get_active_insurance(&combat.guild_id, loser_id)
+                    .await
+                    .ok()
+                    .flatten();
+                let adj = apply_insurance_to_loss(
+                    result.coins_lost_by_loser,
+                    loser_balance,
+                    active_insurance.as_ref(),
+                    loser_id,
+                );
+                if let Some(ins_id) = adj.consumed_insurance_id {
+                    let _ = self.inventory_uc.expire_insurance(ins_id).await;
+                }
+                insurance_msg = adj.message;
+                let actual_loss = adj.actual_loss;
 
                 // Wallet transfers
                 let desc = format!("Combat {} vs {}", winner_id, loser_id);

@@ -15,25 +15,40 @@ pub struct InsuranceAdjustment {
     pub consumed_insurance_id: Option<uuid::Uuid>,
 }
 
-/// Applique l'effet d'une assurance sur une perte de combat :
-/// - Pas d'assurance → perte inchangée, pas de message.
-/// - Assurance légitime → perte divisée par 2.
-/// - Assurance scam → perte doublée (saturating).
+/// Applique l'effet d'une assurance sur une perte de combat, en tenant
+/// compte du solde réel du perdant.
 ///
-/// Le `loser_id` sert uniquement à générer le message d'embed.
+/// **Ordre des opérations** (sémantique "Flow B", cf. commit unification) :
+/// 1. Clamp `coins_lost` au solde réel du perdant (pas de découvert).
+/// 2. Applique l'effet d'assurance sur le montant clampé :
+///    - Pas d'assurance → perte = montant clampé.
+///    - Assurance légitime → perte = clampé / 2 (protection effective même
+///      si le joueur est fauché).
+///    - Assurance scam → perte = (clampé × 2).min(balance) (double, re-clamp).
+///
+/// Rationale : l'assurance doit réduire ce que le joueur paie *réellement*,
+/// pas un nombre théorique. Si on halve avant le clamp, un joueur fauché
+/// voit son assurance annulée par le clamp final — anti-intuitif et punitif
+/// envers ceux qui en ont le plus besoin.
+///
+/// Historique : avant unification, `resolve_combat_now` halvait avant clamp
+/// (Flow A) tandis que `resolve_betting` clampait avant halving (Flow B).
+/// Flow B retenu comme sémantique officielle.
 pub fn apply_insurance_to_loss(
     coins_lost: i64,
+    loser_balance: i64,
     insurance: Option<&CoudeInsurance>,
     loser_id: &str,
 ) -> InsuranceAdjustment {
+    let clamped = coins_lost.min(loser_balance).max(0);
     match insurance {
         None => InsuranceAdjustment {
-            actual_loss: coins_lost,
+            actual_loss: clamped,
             message: None,
             consumed_insurance_id: None,
         },
         Some(ins) if ins.is_scam => {
-            let doubled = coins_lost.saturating_mul(2);
+            let doubled = clamped.saturating_mul(2).min(loser_balance);
             InsuranceAdjustment {
                 actual_loss: doubled,
                 message: Some(format!(
@@ -44,12 +59,12 @@ pub fn apply_insurance_to_loss(
             }
         }
         Some(ins) => {
-            let halved = coins_lost / 2;
+            let halved = clamped / 2;
             InsuranceAdjustment {
                 actual_loss: halved,
                 message: Some(format!(
                     "\u{1f6e1}\u{fe0f} L'assurance a amorti le coup pour <@{}> ! Perte reduite : **-{} coins** (au lieu de {})",
-                    loser_id, halved, coins_lost
+                    loser_id, halved, clamped
                 )),
                 consumed_insurance_id: Some(ins.id),
             }
@@ -113,68 +128,112 @@ mod tests {
     }
 
     // ── apply_insurance_to_loss ──
+    // Sémantique Flow B : clamp(coins_lost, balance) d'abord, puis apply.
 
     #[test]
-    fn insurance_none_leaves_loss_unchanged() {
-        let adj = apply_insurance_to_loss(1000, None, "user1");
-        assert_eq!(adj.actual_loss, 1000);
+    fn insurance_none_clamps_to_balance() {
+        // balance < coins_lost → loss = balance
+        let adj = apply_insurance_to_loss(1000, 600, None, "user1");
+        assert_eq!(adj.actual_loss, 600);
         assert!(adj.message.is_none());
-        assert!(adj.consumed_insurance_id.is_none());
     }
 
     #[test]
-    fn insurance_legitimate_halves_loss() {
-        let ins = make_insurance(false);
-        let adj = apply_insurance_to_loss(1000, Some(&ins), "user1");
+    fn insurance_none_solvent_player_pays_full() {
+        let adj = apply_insurance_to_loss(500, 10_000, None, "user1");
         assert_eq!(adj.actual_loss, 500);
+    }
+
+    #[test]
+    fn insurance_legitimate_halves_after_clamp() {
+        // Le point critique de la correction : balance 100, coins_lost 1000
+        // → clamp à 100, halve → 50 (pas 500 clampé à 100).
+        let ins = make_insurance(false);
+        let adj = apply_insurance_to_loss(1000, 100, Some(&ins), "user1");
+        assert_eq!(adj.actual_loss, 50);
         assert!(adj.message.as_ref().unwrap().contains("amorti"));
-        assert!(adj.message.as_ref().unwrap().contains("500"));
         assert_eq!(adj.consumed_insurance_id, Some(ins.id));
     }
 
     #[test]
-    fn insurance_scam_doubles_loss() {
+    fn insurance_legitimate_halves_when_solvent() {
+        // Joueur solvable : clamp ne s'applique pas, halving du raw.
+        let ins = make_insurance(false);
+        let adj = apply_insurance_to_loss(1000, 10_000, Some(&ins), "user1");
+        assert_eq!(adj.actual_loss, 500);
+    }
+
+    #[test]
+    fn insurance_scam_doubles_then_caps_at_balance() {
         let ins = make_insurance(true);
-        let adj = apply_insurance_to_loss(1000, Some(&ins), "user1");
-        assert_eq!(adj.actual_loss, 2000);
+        // coins 1000, balance 100 : clamp 100, x2 = 200, cap 100.
+        let adj = apply_insurance_to_loss(1000, 100, Some(&ins), "u");
+        assert_eq!(adj.actual_loss, 100);
         assert!(adj.message.as_ref().unwrap().contains("ARNAQUE"));
-        assert_eq!(adj.consumed_insurance_id, Some(ins.id));
+    }
+
+    #[test]
+    fn insurance_scam_solvent_player_loses_double_raw() {
+        let ins = make_insurance(true);
+        // coins 500, balance 10000 : clamp 500, x2 = 1000 (<balance).
+        let adj = apply_insurance_to_loss(500, 10_000, Some(&ins), "u");
+        assert_eq!(adj.actual_loss, 1000);
     }
 
     #[test]
     fn insurance_scam_saturates_on_overflow() {
         let ins = make_insurance(true);
-        let adj = apply_insurance_to_loss(i64::MAX, Some(&ins), "u");
-        assert_eq!(adj.actual_loss, i64::MAX); // saturated
+        // Balance très élevée, coins_lost énorme : la saturation mul ne doit
+        // pas panic, et le clamp final réaligne sur balance.
+        let adj = apply_insurance_to_loss(i64::MAX, i64::MAX, Some(&ins), "u");
+        assert_eq!(adj.actual_loss, i64::MAX);
     }
 
     #[test]
     fn insurance_halves_odd_number_floor_division() {
-        // 999 / 2 = 499 (division entiere)
         let ins = make_insurance(false);
-        let adj = apply_insurance_to_loss(999, Some(&ins), "u");
+        // 999 clampé à 10_000 = 999, /2 = 499
+        let adj = apply_insurance_to_loss(999, 10_000, Some(&ins), "u");
         assert_eq!(adj.actual_loss, 499);
     }
 
     #[test]
-    fn insurance_halves_zero_remains_zero() {
+    fn insurance_on_zero_balance_is_zero() {
         let ins = make_insurance(false);
-        let adj = apply_insurance_to_loss(0, Some(&ins), "u");
+        let adj = apply_insurance_to_loss(1000, 0, Some(&ins), "u");
         assert_eq!(adj.actual_loss, 0);
     }
 
     #[test]
-    fn insurance_scam_on_zero_remains_zero() {
+    fn insurance_scam_on_zero_balance_is_zero() {
         let ins = make_insurance(true);
-        let adj = apply_insurance_to_loss(0, Some(&ins), "u");
+        let adj = apply_insurance_to_loss(1000, 0, Some(&ins), "u");
+        assert_eq!(adj.actual_loss, 0);
+    }
+
+    #[test]
+    fn insurance_negative_balance_treated_as_zero() {
+        // Défensif : si un repo retourne un solde négatif corrompu, on clamp à 0.
+        let ins = make_insurance(false);
+        let adj = apply_insurance_to_loss(100, -50, Some(&ins), "u");
         assert_eq!(adj.actual_loss, 0);
     }
 
     #[test]
     fn insurance_message_contains_user_mention() {
         let ins = make_insurance(false);
-        let adj = apply_insurance_to_loss(100, Some(&ins), "12345");
+        let adj = apply_insurance_to_loss(100, 10_000, Some(&ins), "12345");
         assert!(adj.message.as_ref().unwrap().contains("<@12345>"));
+    }
+
+    #[test]
+    fn insurance_broke_player_with_legit_insurance_gets_protected() {
+        // Regression test pour le bug Flow A : auparavant, un joueur à 100
+        // coins avec assurance légitime et perte théorique 1000 payait 100
+        // (assurance inefficace). Maintenant il paie 50.
+        let ins = make_insurance(false);
+        let adj = apply_insurance_to_loss(1000, 100, Some(&ins), "broke_user");
+        assert_eq!(adj.actual_loss, 50, "l'assurance doit proteger meme les joueurs fauches");
     }
 
     // ── compute_combat_xp ──

@@ -18,7 +18,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::{CoudeBalanceParams, CoudeCombat};
+use crate::domain::entities::{apply_insurance_to_loss, CoudeBalanceParams, CoudeCombat};
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{
     self as engine, PlayerLite, ServerEventLite,
@@ -285,31 +285,26 @@ impl ResolveBettingBatchService {
             .ok_or_else(|| DomainError::NotFound(format!("Wallet perdant {loser_id} introuvable")))?;
         let loser_balance = loser_wallet.coins;
 
-        // Assurance : cherche et consomme.
-        let mut actual_loss = result.coins_lost_by_loser.min(loser_balance);
+        // Assurance : regles pures → domain::apply_insurance_to_loss
+        // (clamp-then-apply, sémantique unifiée avec resolve_combat_now).
         let insurance = self
             .inventory_uc
             .get_active_insurance(&combat.guild_id, &loser_id)
             .await
             .unwrap_or(None);
-        let insurance_msg = if let Some(ins) = insurance.as_ref() {
-            if let Err(e) = self.inventory_uc.expire_insurance(ins.id).await {
+        let adj = apply_insurance_to_loss(
+            result.coins_lost_by_loser,
+            loser_balance,
+            insurance.as_ref(),
+            &loser_id,
+        );
+        if let Some(ins_id) = adj.consumed_insurance_id {
+            if let Err(e) = self.inventory_uc.expire_insurance(ins_id).await {
                 warn!(error = %e, "Echec expire_insurance");
             }
-            if ins.is_scam {
-                actual_loss = actual_loss.saturating_mul(2).min(loser_balance);
-                Some(format!(
-                    "\u{1f480} L'assurance de <@{loser_id}> etait une ARNAQUE ! Double perte : -{actual_loss} coins",
-                ))
-            } else {
-                actual_loss /= 2;
-                Some(format!(
-                    "\u{1f6e1}\u{fe0f} L'assurance amortit le coup pour <@{loser_id}> ! Perte reduite : -{actual_loss} coins",
-                ))
-            }
-        } else {
-            None
-        };
+        }
+        let actual_loss = adj.actual_loss;
+        let insurance_msg = adj.message;
 
         let coins_transferred = result.coins_won.min(loser_balance);
 
