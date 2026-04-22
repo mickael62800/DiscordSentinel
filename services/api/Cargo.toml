@@ -452,6 +452,11 @@ path = "tests/integration/postgres_voice_channel/repo.rs"
 name = "integration_postgres_misc_2"
 path = "tests/integration/postgres_misc_2/repo.rs"
 
+# postgres misc_3 repos (role_panel + welcome_config + coude_taunts)
+[[test]]
+name = "integration_postgres_misc_3"
+path = "tests/integration/postgres_misc_3/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
