@@ -51,6 +51,72 @@ use super::*;
     }
 
     #[test]
+    fn voice_theme_to_proto_full_mapping() {
+        use crate::domain::entities::VoiceChannelTheme;
+        let id = Uuid::new_v4();
+        let theme = VoiceChannelTheme {
+            id,
+            guild_id: "g1".into(),
+            name: "Gaming".into(),
+            emoji: Some("🎮".into()),
+            channel_name_template: "{user}'s Game".into(),
+            member_limit: Some(5),
+            visibility: "visible".into(),
+            locked: false,
+            queue_enabled: true,
+            bitrate: Some(96000),
+            slowmode_secs: Some(10),
+            stage_enabled: false,
+            is_default: true,
+            sort_order: 3,
+            created_at: ts(),
+        };
+        let p = voice_theme_to_proto(theme);
+        assert_eq!(p.id, id.to_string());
+        assert_eq!(p.guild_id, "g1");
+        assert_eq!(p.name, "Gaming");
+        assert_eq!(p.emoji.as_deref(), Some("🎮"));
+        assert_eq!(p.channel_name_template, "{user}'s Game");
+        assert_eq!(p.member_limit, Some(5));
+        assert_eq!(p.visibility, "visible");
+        assert!(p.queue_enabled);
+        assert_eq!(p.bitrate, Some(96000));
+        assert_eq!(p.slowmode_secs, Some(10));
+        assert!(p.is_default);
+        assert_eq!(p.sort_order, 3);
+        assert_eq!(p.created_at, ts().to_rfc3339());
+    }
+
+    #[test]
+    fn voice_theme_to_proto_minimal_optionals() {
+        use crate::domain::entities::VoiceChannelTheme;
+        let theme = VoiceChannelTheme {
+            id: Uuid::nil(),
+            guild_id: "g".into(),
+            name: "Basic".into(),
+            emoji: None,
+            channel_name_template: "{user}".into(),
+            member_limit: None,
+            visibility: "hidden".into(),
+            locked: true,
+            queue_enabled: false,
+            bitrate: None,
+            slowmode_secs: None,
+            stage_enabled: true,
+            is_default: false,
+            sort_order: 0,
+            created_at: ts(),
+        };
+        let p = voice_theme_to_proto(theme);
+        assert!(p.emoji.is_none());
+        assert!(p.member_limit.is_none());
+        assert!(p.bitrate.is_none());
+        assert!(p.slowmode_secs.is_none());
+        assert!(p.locked);
+        assert!(p.stage_enabled);
+    }
+
+    #[test]
     fn voice_channel_to_proto_locked_with_no_limit() {
         let mut c = sample_channel(VoiceChannelKind::Public);
         c.locked = true;
