@@ -16,6 +16,10 @@ use crate::ports::inbound::{
 };
 use crate::ports::outbound::{ConductRepository, InfractionRepository};
 
+#[cfg(test)]
+#[path = "tests/manage_conduct.rs"]
+mod tests;
+
 pub struct ManageConductService {
     repo: Arc<dyn ConductRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
