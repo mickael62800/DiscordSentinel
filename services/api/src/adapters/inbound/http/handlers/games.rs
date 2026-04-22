@@ -391,9 +391,12 @@ pub async fn upload_emoji(
     })?;
 
     if bytes.len() > MAX_EMOJI_IMAGE_BYTES {
-        return Err(DomainError::ValidationError(
-            "L'image depasse 256 KB (limite Discord).".into(),
-        )
+        // Compute le KB depuis la constante pour eviter toute derive
+        // si la limite change un jour.
+        return Err(DomainError::ValidationError(format!(
+            "L'image depasse {} KB (limite Discord).",
+            MAX_EMOJI_IMAGE_BYTES / 1024
+        ))
         .into());
     }
 
