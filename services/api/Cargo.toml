@@ -427,6 +427,11 @@ path = "tests/integration/postgres_cashbox/repo.rs"
 name = "integration_postgres_blackjack"
 path = "tests/integration/postgres_blackjack/repo.rs"
 
+# postgres coude_social repo
+[[test]]
+name = "integration_postgres_coude_social"
+path = "tests/integration/postgres_coude_social/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
