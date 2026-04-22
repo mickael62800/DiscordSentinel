@@ -95,6 +95,12 @@ pub use guild_member_reset::{
     MemberResetTable, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES, MEMBERS_CACHE_TTL_SECS,
 };
 
+mod coude_limits;
+pub use coude_limits::{
+    DEFAULT_COUDE_COMBATS_LIMIT, DEFAULT_COUDE_OPPONENT_COUNT,
+    DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT,
+};
+
 mod game;
 pub use game::{
     format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, normalize_optional_tag,

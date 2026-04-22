@@ -25,7 +25,7 @@ pub async fn list_combats(
     Path(guild_id): Path<String>,
     Query(params): Query<CombatQueryParams>,
 ) -> Result<Json<Vec<CombatDto>>, ApiError> {
-    let limit = params.limit.unwrap_or(50);
+    let limit = params.limit.unwrap_or(crate::domain::entities::DEFAULT_COUDE_COMBATS_LIMIT);
     let combats = state
         .coude_combats_uc
         .list(&guild_id, params.status.as_deref(), limit)

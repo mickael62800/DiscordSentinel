@@ -40,7 +40,7 @@ pub async fn get_random_players(
     Path(guild_id): Path<String>,
     Query(params): Query<RandomPlayersQuery>,
 ) -> Result<Json<Vec<FullPlayerDto>>, ApiError> {
-    let count = params.count.unwrap_or(2);
+    let count = params.count.unwrap_or(crate::domain::entities::DEFAULT_COUDE_OPPONENT_COUNT);
     let players = state
         .coude_players_uc
         .random_active(&guild_id, count)

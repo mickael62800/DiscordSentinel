@@ -58,7 +58,7 @@ pub async fn leaderboard(
     })?;
     let entries = state
         .coude_social_uc
-        .leaderboard(&guild_id, cat, params.limit.unwrap_or(10))
+        .leaderboard(&guild_id, cat, params.limit.unwrap_or(crate::domain::entities::DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT))
         .await?;
     Ok(Json(entries.into_iter().map(LeaderboardEntry::from).collect()))
 }
