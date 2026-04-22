@@ -65,6 +65,31 @@ pub fn create_deck() -> Vec<Card> {
 /// Override possible via bot_config key `max_players_per_table`.
 pub const DEFAULT_BLACKJACK_MAX_PLAYERS: i64 = 7;
 
+/// Statuts finaux d'une partie de blackjack (plus d'action possible).
+/// Regle metier : cette liste definit la fin de partie (affichage dealer
+/// complet, payout final, broadcast blackjack_result).
+pub const BLACKJACK_FINAL_STATUSES: &[&str] = &[
+    "player_bust",
+    "player_win",
+    "dealer_win",
+    "dealer_bust",
+    "push",
+    "player_blackjack",
+];
+
+/// `true` si le statut correspond a une partie terminee.
+pub fn is_blackjack_game_over(status: &str) -> bool {
+    BLACKJACK_FINAL_STATUSES.contains(&status)
+}
+
+/// Nombre de decks dans un shoe de blackjack multiplayer. Regle standard
+/// casino (6 decks = 312 cartes) : ratisse le cardcount pour diluer les
+/// avantages statistiques et eviter les sessions trop longues.
+pub const BLACKJACK_SHOE_DECKS: usize = 6;
+
+/// Nombre total de cartes dans un shoe neuf : 6 decks * 52 cartes.
+pub const BLACKJACK_SHOE_TOTAL_CARDS: usize = BLACKJACK_SHOE_DECKS * 52;
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BlackjackConfig {
     pub min_bet: i64,

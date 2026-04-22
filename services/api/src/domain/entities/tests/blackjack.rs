@@ -248,3 +248,30 @@ fn default_blackjack_max_players_is_seven() {
     // Regle metier : une table blackjack accueille par defaut 7 joueurs max.
     assert_eq!(DEFAULT_BLACKJACK_MAX_PLAYERS, 7);
 }
+
+#[test]
+fn final_statuses_has_six_entries() {
+    assert_eq!(BLACKJACK_FINAL_STATUSES.len(), 6);
+}
+
+#[test]
+fn game_over_accepts_all_final_statuses() {
+    for s in BLACKJACK_FINAL_STATUSES {
+        assert!(is_blackjack_game_over(s), "expected {} to be final", s);
+    }
+}
+
+#[test]
+fn game_over_rejects_in_progress_statuses() {
+    assert!(!is_blackjack_game_over("playing"));
+    assert!(!is_blackjack_game_over("waiting"));
+    assert!(!is_blackjack_game_over(""));
+    assert!(!is_blackjack_game_over("PLAYER_WIN")); // case-sensitive
+}
+
+#[test]
+fn shoe_has_six_decks_of_standard_52() {
+    assert_eq!(BLACKJACK_SHOE_DECKS, 6);
+    assert_eq!(BLACKJACK_SHOE_TOTAL_CARDS, 312);
+    assert_eq!(BLACKJACK_SHOE_TOTAL_CARDS, BLACKJACK_SHOE_DECKS * 52);
+}

@@ -16,11 +16,12 @@ pub async fn create_table(
     State(state): State<AppState>,
     Json(dto): Json<CreateTableDto>,
 ) -> Result<Json<BlackjackTable>, ApiError> {
-    use crate::domain::entities::create_deck;
+    use crate::domain::entities::{create_deck, BLACKJACK_SHOE_DECKS, BLACKJACK_SHOE_TOTAL_CARDS};
     use rand::seq::SliceRandom;
 
-    let mut shoe: Vec<crate::domain::entities::Card> = Vec::with_capacity(312);
-    for _ in 0..6 { shoe.extend(create_deck()); }
+    // Regle metier : shoe de 6 decks standard casino (cf. domain::entities::blackjack).
+    let mut shoe: Vec<crate::domain::entities::Card> = Vec::with_capacity(BLACKJACK_SHOE_TOTAL_CARDS);
+    for _ in 0..BLACKJACK_SHOE_DECKS { shoe.extend(create_deck()); }
     shoe.shuffle(&mut rand::thread_rng());
 
     let shoe_json = serde_json::to_value(&shoe)

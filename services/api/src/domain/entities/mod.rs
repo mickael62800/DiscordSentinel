@@ -63,7 +63,11 @@ mod guild_member;
 pub use guild_member::{GuildMember, MemberSummary, MemberConduct, MemberInfractions, MemberModeration, MemberStats};
 
 mod blackjack;
-pub use blackjack::{BlackjackConfig, BlackjackGame, Card, calculate_score, create_deck, DEFAULT_BLACKJACK_MAX_PLAYERS};
+pub use blackjack::{
+    calculate_score, create_deck, is_blackjack_game_over, BlackjackConfig, BlackjackGame, Card,
+    BLACKJACK_FINAL_STATUSES, BLACKJACK_SHOE_DECKS, BLACKJACK_SHOE_TOTAL_CARDS,
+    DEFAULT_BLACKJACK_MAX_PLAYERS,
+};
 
 mod moderation_review;
 pub use moderation_review::{

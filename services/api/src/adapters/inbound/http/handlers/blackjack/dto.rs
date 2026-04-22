@@ -52,11 +52,9 @@ pub struct BlackjackGameDto {
 }
 
 /// `true` si la partie est dans un état final (plus d'action possible).
+/// Delegue a la regle metier dans `domain::entities::is_blackjack_game_over`.
 pub fn game_is_over(status: &str) -> bool {
-    matches!(
-        status,
-        "player_bust" | "player_win" | "dealer_win" | "dealer_bust" | "push" | "player_blackjack"
-    )
+    crate::domain::entities::is_blackjack_game_over(status)
 }
 
 /// Convertit un `BlackjackGame` domaine vers un DTO HTTP.

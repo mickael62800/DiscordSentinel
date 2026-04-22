@@ -335,7 +335,7 @@ impl BlackjackRepository for StubBlackjackRepo {
     async fn get_active(&self, _: &str, _: &str) -> Result<Option<BlackjackGame>, DomainError> { unimplemented!() }
     async fn update(&self, _: &BlackjackGame) -> Result<(), DomainError> { unimplemented!() }
     async fn get_by_id(&self, _: Uuid) -> Result<Option<BlackjackGame>, DomainError> { unimplemented!() }
-    async fn list_by_guild(&self, _: &str, _: Option<&str>) -> Result<Vec<BlackjackGame>, DomainError> { unimplemented!() }
+    async fn list_by_guild(&self, _: &str, _: Option<&str>) -> Result<Vec<BlackjackGame>, DomainError> { Ok(vec![]) }
     async fn cancel_game(&self, _: Uuid) -> Result<(), DomainError> { unimplemented!() }
 }
 

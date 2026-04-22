@@ -287,6 +287,11 @@ path = "tests/integration/members_http/http.rs"
 name = "integration_bot_persistence_http"
 path = "tests/integration/bot_persistence_http/http.rs"
 
+# blackjack HTTP
+[[test]]
+name = "integration_blackjack_http"
+path = "tests/integration/blackjack_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
