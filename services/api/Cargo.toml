@@ -492,6 +492,11 @@ path = "tests/integration/postgres_analytics/repo.rs"
 name = "integration_postgres_coude_bet"
 path = "tests/integration/postgres_coude_bet/repo.rs"
 
+# redis cache infra (CachePort impl)
+[[test]]
+name = "integration_redis_cache"
+path = "tests/integration/redis_cache/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
