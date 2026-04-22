@@ -30,9 +30,8 @@ pub async fn purge_infractions(
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
-    if dto.days < 0 {
-        return Err(ApiError(DomainError::ValidationError("days doit etre >= 0".into())));
-    }
+    crate::domain::entities::validate_purge_days_allow_zero(dto.days)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate RBAC : owner requis pour une purge massive.
     check_role_for_guild(
@@ -64,9 +63,8 @@ pub async fn purge_audit_logs(
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
-    if dto.days < 1 {
-        return Err(ApiError(DomainError::ValidationError("days doit etre >= 1".into())));
-    }
+    crate::domain::entities::validate_purge_days_strictly_positive(dto.days)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate RBAC : owner requis pour purger l'audit log.
     check_role_for_guild(
@@ -103,9 +101,8 @@ pub async fn purge_logs(
     rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<PurgeLogsDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    if dto.days < 1 {
-        return Err(ApiError(DomainError::ValidationError("days doit etre >= 1".into())));
-    }
+    crate::domain::entities::validate_purge_days_strictly_positive(dto.days)
+        .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate superadmin pour les appels desktop.
     if let Some(Extension(ctx)) = rbac {

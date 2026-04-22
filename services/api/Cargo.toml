@@ -267,6 +267,16 @@ path = "tests/integration/wallet_http/http.rs"
 name = "integration_games_http"
 path = "tests/integration/games_http/http.rs"
 
+# purge HTTP
+[[test]]
+name = "integration_purge_http"
+path = "tests/integration/purge_http/http.rs"
+
+# discord_roles HTTP
+[[test]]
+name = "integration_discord_roles_http"
+path = "tests/integration/discord_roles_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"

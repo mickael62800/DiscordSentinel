@@ -6,7 +6,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::DiscordRole;
+use crate::domain::entities::{parse_discord_permissions_bitfield, DiscordRole};
 
 #[derive(Debug, Serialize)]
 pub struct DiscordRoleDto {
@@ -137,8 +137,8 @@ pub async fn sync_roles(
             name: r.name,
             color: r.color,
             position: r.position,
-            // Phase 2 A.3 — parse string -> i64 (fallback 0 si invalide)
-            permissions: r.permissions.parse::<i64>().unwrap_or(0),
+            // Regle metier : parse bitfield permissions -> `domain::entities::parse_discord_permissions_bitfield`
+            permissions: parse_discord_permissions_bitfield(&r.permissions),
             mentionable: r.mentionable,
             managed: r.managed,
             icon: r.icon,

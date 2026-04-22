@@ -48,7 +48,7 @@ pub use voice_channel::{
     VoiceChannelWhitelistEntry,
 };
 pub use watched_user::{classify_risk_level, WatchedUser};
-pub use discord_role::DiscordRole;
+pub use discord_role::{parse_discord_permissions_bitfield, DiscordRole};
 pub use strikes::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
 pub use sanction_reminder::SanctionReminder;
 pub use user_note::UserNote;
@@ -79,6 +79,9 @@ pub use job_whitelists::{
     is_valid_ai_job_type, is_valid_export_format, is_valid_export_job_type,
     VALID_AI_JOB_TYPES, VALID_EXPORT_FORMATS, VALID_EXPORT_JOB_TYPES,
 };
+
+mod purge;
+pub use purge::{validate_purge_days_allow_zero, validate_purge_days_strictly_positive};
 
 mod game;
 pub use game::{
