@@ -12,6 +12,11 @@ fn members_cache_ttl_is_10_minutes() {
 }
 
 #[test]
+fn channels_cache_ttl_is_10_minutes() {
+    assert_eq!(CHANNELS_CACHE_TTL_SECS, 600);
+}
+
+#[test]
 fn reset_tables_has_eight_entries() {
     // Regle metier : reset_member touche exactement 8 tables.
     assert_eq!(MEMBER_RESET_TABLES.len(), 8);

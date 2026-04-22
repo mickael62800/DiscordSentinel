@@ -11,6 +11,9 @@ pub const DISCORD_LIST_MEMBERS_CAP: u32 = 1000;
 /// TTL du cache Redis pour `guild:members:{guild_id}` (10 minutes).
 pub const MEMBERS_CACHE_TTL_SECS: u64 = 600;
 
+/// TTL du cache Redis pour `guild:channels:{guild_id}` (10 minutes).
+pub const CHANNELS_CACHE_TTL_SECS: u64 = 600;
+
 /// Table impactee par un reset de membre : nom SQL + colonne de clef
 /// user + cle de sortie dans le JSON de reponse.
 #[derive(Debug, Clone, Copy)]

@@ -92,7 +92,8 @@ pub use purge::{validate_purge_days_allow_zero, validate_purge_days_strictly_pos
 
 mod guild_member_reset;
 pub use guild_member_reset::{
-    MemberResetTable, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES, MEMBERS_CACHE_TTL_SECS,
+    MemberResetTable, CHANNELS_CACHE_TTL_SECS, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES,
+    MEMBERS_CACHE_TTL_SECS,
 };
 
 mod coude_limits;

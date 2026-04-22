@@ -292,6 +292,26 @@ path = "tests/integration/bot_persistence_http/http.rs"
 name = "integration_blackjack_http"
 path = "tests/integration/blackjack_http/http.rs"
 
+# guild_channels HTTP
+[[test]]
+name = "integration_guild_channels_http"
+path = "tests/integration/guild_channels_http/http.rs"
+
+# analyze_image HTTP
+[[test]]
+name = "integration_analyze_image_http"
+path = "tests/integration/analyze_image_http/http.rs"
+
+# ai_jobs HTTP
+[[test]]
+name = "integration_ai_jobs_http"
+path = "tests/integration/ai_jobs_http/http.rs"
+
+# exports HTTP
+[[test]]
+name = "integration_exports_http"
+path = "tests/integration/exports_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"

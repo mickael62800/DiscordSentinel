@@ -12,8 +12,7 @@ use tracing::warn;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::outbound::DiscordChannel;
-
-const CHANNELS_TTL: u64 = 600;
+use crate::domain::entities::CHANNELS_CACHE_TTL_SECS;
 
 /// GET /api/guilds/{guild_id}/channels — liste les salons texte.
 pub async fn list_text_channels(
@@ -35,7 +34,7 @@ pub async fn list_text_channels(
 
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&channels) {
-            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, CHANNELS_TTL).await {
+            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, CHANNELS_CACHE_TTL_SECS).await {
                 warn!(error = %e, cache_key = %cache_key, "Echec cache set channels");
             }
         }
