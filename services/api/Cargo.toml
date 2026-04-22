@@ -377,6 +377,16 @@ path = "tests/integration/postgres_strikes/repo.rs"
 name = "integration_postgres_members"
 path = "tests/integration/postgres_members/repo.rs"
 
+# postgres moderation repo
+[[test]]
+name = "integration_postgres_moderation"
+path = "tests/integration/postgres_moderation/repo.rs"
+
+# postgres conduct repo
+[[test]]
+name = "integration_postgres_conduct"
+path = "tests/integration/postgres_conduct/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
