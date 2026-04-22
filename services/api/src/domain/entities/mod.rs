@@ -26,7 +26,10 @@ mod ai_models;
 mod coude_purge;
 mod rbac;
 mod config_parsers;
+mod coude_expire;
 pub mod analytics;
+
+pub use coude_expire::cowardice_penalty;
 
 pub use ai_models::{
     format_model_display_name, is_valid_model_type, path_basename, SUPPORTED_MODEL_TYPES,

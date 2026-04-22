@@ -10,7 +10,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::CashboxSource;
+use crate::domain::entities::{cowardice_penalty, CashboxSource};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::expire_combats_batch::{
     ExpireCombatsBatchUseCase, ExpiredCombatOutput,
@@ -54,8 +54,8 @@ impl ExpireCombatsBatchUseCase for ExpireCombatsBatchService {
 
         let mut out = Vec::with_capacity(expired.len());
         for combat in &expired {
-            // Penalite defenseur : 20% de la mise, minimum 1 coin.
-            let penalty = ((combat.mise as f64 * 0.20).max(1.0)) as i64;
+            // Penalite defenseur : domain rule dans coude_expire.rs
+            let penalty = cowardice_penalty(combat.mise);
             let desc = format!("Penalite lachete combat {}", combat.id);
 
             let debit_ok = match self

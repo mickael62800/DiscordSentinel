@@ -151,3 +151,7 @@ impl ManageMembersUseCase for ManageMembersService {
         self.member_repo.upsert(&member).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_members.rs"]
+mod tests;
