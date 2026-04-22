@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::domain::errors::DomainError;
 
 /// Resultat d'un export : donnees serialisees + nombre de lignes.
+#[derive(Debug)]
 pub struct ExportResult {
     pub data: String,
     pub row_count: usize,
