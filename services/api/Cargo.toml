@@ -397,6 +397,11 @@ path = "tests/integration/postgres_levels/repo.rs"
 name = "integration_postgres_stats"
 path = "tests/integration/postgres_stats/repo.rs"
 
+# postgres wallet repo
+[[test]]
+name = "integration_postgres_wallet"
+path = "tests/integration/postgres_wallet/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
