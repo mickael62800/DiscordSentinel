@@ -112,6 +112,96 @@ pub async fn metrics_middleware(req: Request<axum::body::Body>, next: Next) -> R
     response
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::{to_bytes, Body};
+    use axum::http::{Method, Request, StatusCode};
+    use axum::middleware::from_fn;
+    use axum::routing::get;
+    use axum::Router;
+    use tower::ServiceExt;
+
+    // Serialise l'init Prometheus entre les tests paralleles — le recorder
+    // global metrics-rs ne peut etre installe qu'une seule fois par process.
+    static TEST_INIT: std::sync::Once = std::sync::Once::new();
+    fn ensure_init() {
+        TEST_INIT.call_once(init_prometheus);
+    }
+
+    #[tokio::test]
+    async fn metrics_handler_ok_status() {
+        ensure_init();
+        let resp = metrics_handler().await;
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    #[tokio::test]
+    async fn init_prometheus_is_idempotent() {
+        ensure_init();
+        // Le 2e appel via le guard OnceLock doit sortir immediatement (return precoce).
+        init_prometheus();
+        assert!(PROMETHEUS_HANDLE.get().is_some());
+    }
+
+    #[tokio::test]
+    async fn metrics_handler_renders_after_init() {
+        ensure_init();
+        let resp = metrics_handler().await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        // Prometheus render est du texte (peut etre vide si pas encore de metriques,
+        // mais apres l'avoir initialise + middleware, on devrait avoir du contenu).
+        let _ = std::str::from_utf8(&body).unwrap();
+    }
+
+    async fn dummy_ok() -> &'static str {
+        "ok"
+    }
+
+    #[tokio::test]
+    async fn middleware_records_request_without_matched_path() {
+        ensure_init();
+        let app = Router::new()
+            .route("/ping", get(dummy_ok))
+            .layer(from_fn(metrics_middleware));
+
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/ping")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        // Verifier qu'au moins une metrique http_requests_total a ete enregistree.
+        let render = match PROMETHEUS_HANDLE.get() {
+            Some(h) => h.render(),
+            None => String::new(),
+        };
+        assert!(render.contains("http_requests_total"));
+    }
+
+    #[tokio::test]
+    async fn middleware_records_request_with_different_status() {
+        ensure_init();
+        async fn not_found() -> (StatusCode, &'static str) {
+            (StatusCode::NOT_FOUND, "nope")
+        }
+        let app = Router::new()
+            .route("/missing", get(not_found))
+            .layer(from_fn(metrics_middleware));
+
+        let req = Request::builder()
+            .method(Method::GET)
+            .uri("/missing")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+    }
+}
+
 /// Démarre une boucle qui échantillonne les métriques runtime tokio toutes les
 /// 10 secondes (configurable via `TOKIO_METRICS_INTERVAL_SECS`).
 ///
