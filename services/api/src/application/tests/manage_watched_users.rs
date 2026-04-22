@@ -1,0 +1,196 @@
+//! Tests ManageWatchedUsersService : pass-throughs + 404 dossier.
+//! get_user_dossier est couvert par integration HTTP watched_users_http.
+
+use super::*;
+use std::sync::{Arc, Mutex};
+
+use async_trait::async_trait;
+
+use crate::application::ManageWatchedUsersService;
+use crate::domain::entities::{
+    ConductConfig, ConductPointsLog, DashboardStats, GuildStatsOverview, GuildVoiceStats,
+    Infraction, ModerationAction, SecurityEvent, UserConductPoints, UserModerationHistory,
+    UserNote, UserStats, WatchedUser,
+};
+use crate::domain::errors::DomainError;
+use crate::ports::inbound::{
+    AddPointsCommand, AnalyzeNewMemberCommand, DeductPointsCommand, InfractionFilters,
+    LogModerationCommand, ManageConductUseCase, ManageInfractionsUseCase,
+    ManageModerationUseCase, ManageSecurityUseCase, ManageStatsUseCase,
+    ReportSecurityEventCommand, SaveConductConfigCommand, SecurityDecision,
+};
+use crate::ports::inbound::manage_notes::{AddNoteCommand, ManageNotesUseCase};
+use crate::ports::inbound::manage_stats::{RecordMessagesCommand, RecordVoiceCommand};
+use crate::ports::inbound::manage_watched_users::ManageWatchedUsersUseCase;
+use crate::ports::outbound::WatchedUserRepository;
+
+fn sample_watched(uid: &str) -> WatchedUser {
+    WatchedUser {
+        user_id: uid.into(), username: uid.into(),
+        guild_id: "g".into(), guild_name: "Guild".into(),
+        risk_level: "low".into(),
+        total_warns: 0, total_mutes: 0, total_bans: 0,
+        conduct_points: None, max_conduct_points: None,
+        last_incident_at: None, security_events_count: 0,
+        first_seen_at: chrono::Utc::now(),
+    }
+}
+
+#[derive(Default)]
+struct MockRepo {
+    users: Mutex<Vec<WatchedUser>>,
+    adds: Mutex<Vec<(String, String, String, String, String)>>,
+    removes: Mutex<Vec<(String, String)>>,
+}
+#[async_trait]
+impl WatchedUserRepository for MockRepo {
+    async fn find_watched_users(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<WatchedUser>, DomainError> {
+        Ok(self.users.lock().unwrap().clone())
+    }
+    async fn add_manual_watch(&self, g: &str, u: &str, n: &str, r: &str, a: &str) -> Result<(), DomainError> {
+        self.adds.lock().unwrap().push((g.into(), u.into(), n.into(), r.into(), a.into()));
+        Ok(())
+    }
+    async fn remove_manual_watch(&self, g: &str, u: &str) -> Result<(), DomainError> {
+        self.removes.lock().unwrap().push((g.into(), u.into()));
+        Ok(())
+    }
+}
+
+// ── Stubs UC ──
+
+struct StubInf;
+#[async_trait]
+impl ManageInfractionsUseCase for StubInf {
+    async fn list_infractions(&self, _: &str, _: InfractionFilters) -> Result<Vec<Infraction>, DomainError> { Ok(vec![]) }
+    async fn list_all_infractions(&self, _: i64, _: i64) -> Result<Vec<Infraction>, DomainError> { Ok(vec![]) }
+    async fn count_today(&self) -> Result<u64, DomainError> { Ok(0) }
+    async fn find_by_id(&self, _: &str) -> Result<Option<Infraction>, DomainError> { Ok(None) }
+    async fn delete_infraction(&self, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { Ok(0) }
+}
+
+struct StubMod;
+#[async_trait]
+impl ManageModerationUseCase for StubMod {
+    async fn log_action(&self, _: LogModerationCommand) -> Result<ModerationAction, DomainError> { unimplemented!() }
+    async fn get_history(&self, _: &str, t: &str) -> Result<UserModerationHistory, DomainError> {
+        Ok(UserModerationHistory {
+            target_id: t.into(), target_name: "t".into(),
+            total_warns: 0, total_mutes: 0, total_bans: 0, actions: vec![],
+        })
+    }
+    async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+    async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn delete_action(&self, _: uuid::Uuid) -> Result<bool, DomainError> { Ok(false) }
+}
+
+struct StubSec;
+#[async_trait]
+impl ManageSecurityUseCase for StubSec {
+    async fn report_event(&self, _: ReportSecurityEventCommand) -> Result<SecurityEvent, DomainError> { unimplemented!() }
+    async fn list_events(&self, _: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> { Ok(vec![]) }
+    async fn analyze_new_member(&self, _: AnalyzeNewMemberCommand) -> Result<SecurityDecision, DomainError> { unimplemented!() }
+}
+
+struct StubConduct;
+#[async_trait]
+impl ManageConductUseCase for StubConduct {
+    async fn get_config(&self, g: &str) -> Result<ConductConfig, DomainError> {
+        Ok(ConductConfig::default_for_guild(g))
+    }
+    async fn save_config(&self, _: SaveConductConfigCommand) -> Result<ConductConfig, DomainError> { unimplemented!() }
+    async fn get_points(&self, _: &str, _: &str) -> Result<UserConductPoints, DomainError> { unimplemented!() }
+    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
+    async fn add_points(&self, _: AddPointsCommand) -> Result<UserConductPoints, DomainError> { unimplemented!() }
+    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<UserConductPoints>, DomainError> { Ok(vec![]) }
+    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<ConductPointsLog>, DomainError> { Ok(vec![]) }
+    async fn run_regen(&self) -> Result<u64, DomainError> { Ok(0) }
+}
+
+struct StubNotes;
+#[async_trait]
+impl ManageNotesUseCase for StubNotes {
+    async fn add_note(&self, _: AddNoteCommand) -> Result<UserNote, DomainError> { unimplemented!() }
+    async fn get_notes(&self, _: &str, _: &str) -> Result<Vec<UserNote>, DomainError> { Ok(vec![]) }
+    async fn delete_note(&self, _: &str) -> Result<(), DomainError> { Ok(()) }
+}
+
+// Stats pas utilise par WatchedUsersService, on laisse tomber.
+
+fn make_service(repo: Arc<MockRepo>) -> ManageWatchedUsersService {
+    ManageWatchedUsersService::new(
+        repo,
+        Arc::new(StubInf),
+        Arc::new(StubMod),
+        Arc::new(StubSec),
+        Arc::new(StubConduct),
+        Arc::new(StubNotes),
+    )
+}
+
+// Silence unused imports warnings pour le Stats UC non utilise.
+#[allow(dead_code)]
+fn _silence_unused(_: UserStats, _: DashboardStats, _: GuildStatsOverview, _: GuildVoiceStats,
+    _: RecordMessagesCommand, _: RecordVoiceCommand) {}
+
+#[tokio::test]
+async fn list_watched_users_returns_repo_data() {
+    let r = Arc::new(MockRepo::default());
+    r.users.lock().unwrap().push(sample_watched("u1"));
+    r.users.lock().unwrap().push(sample_watched("u2"));
+    let svc = make_service(r);
+    assert_eq!(svc.list_watched_users(Some("g"), 50, 0).await.unwrap().len(), 2);
+}
+
+#[tokio::test]
+async fn list_watched_users_none_guild_forwards() {
+    let svc = make_service(Arc::new(MockRepo::default()));
+    assert!(svc.list_watched_users(None, 10, 0).await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn add_manual_watch_forwards_with_desktop_source() {
+    let r = Arc::new(MockRepo::default());
+    let svc = make_service(r.clone());
+    svc.add_manual_watch("g1", "u1", "Alice", "Raid suspicion").await.unwrap();
+    let adds = r.adds.lock().unwrap();
+    assert_eq!(adds[0].0, "g1");
+    assert_eq!(adds[0].1, "u1");
+    assert_eq!(adds[0].2, "Alice");
+    assert_eq!(adds[0].3, "Raid suspicion");
+    // Source hardcode "desktop" (origine UI admin).
+    assert_eq!(adds[0].4, "desktop");
+}
+
+#[tokio::test]
+async fn remove_manual_watch_forwards() {
+    let r = Arc::new(MockRepo::default());
+    let svc = make_service(r.clone());
+    svc.remove_manual_watch("g1", "u1").await.unwrap();
+    assert_eq!(r.removes.lock().unwrap()[0], ("g1".into(), "u1".into()));
+}
+
+#[tokio::test]
+async fn get_user_dossier_not_found_returns_404() {
+    // Repo renvoie vec vide -> .find(...).ok_or_else -> NotFound.
+    let svc = make_service(Arc::new(MockRepo::default()));
+    let err = svc.get_user_dossier("g", "u1").await.unwrap_err();
+    assert!(matches!(err, DomainError::NotFound(_)));
+}
+
+#[tokio::test]
+async fn get_user_dossier_found_returns_empty_dossier() {
+    // Repo renvoie le user mais tous les stubs retournent vide -> dossier vide.
+    let r = Arc::new(MockRepo::default());
+    r.users.lock().unwrap().push(sample_watched("u1"));
+    let svc = make_service(r);
+    let d = svc.get_user_dossier("g", "u1").await.unwrap();
+    assert_eq!(d.user.user_id, "u1");
+    assert!(d.infractions.is_empty());
+    assert!(d.moderation_actions.is_empty());
+    assert!(d.security_events.is_empty());
+    assert!(d.conduct_log.is_empty());
+    assert!(d.notes.is_empty());
+}
