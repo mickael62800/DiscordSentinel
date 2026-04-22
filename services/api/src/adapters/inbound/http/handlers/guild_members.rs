@@ -9,12 +9,13 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, require_role, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{GuildMember, MemberSummary};
+use crate::domain::entities::{
+    GuildMember, MemberSummary, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES,
+    MEMBERS_CACHE_TTL_SECS,
+};
 use crate::domain::errors::DomainError;
 use crate::adapters::outbound::DiscordMember;
 use crate::ports::inbound::{RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand};
-
-const MEMBERS_TTL: u64 = 600; // 10 minutes
 
 /// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
@@ -32,12 +33,12 @@ pub async fn list_members(
         }
     }
 
-    let members = state.discord_api.list_members(&guild_id, 1000).await?;
+    let members = state.discord_api.list_members(&guild_id, DISCORD_LIST_MEMBERS_CAP).await?;
 
     // Populate cache
     if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
         if let Ok(json) = serde_json::to_string(&members) {
-            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, MEMBERS_TTL).await {
+            if let Err(e) = conn.set_ex::<_, _, ()>(&cache_key, json, MEMBERS_CACHE_TTL_SECS).await {
                 warn!(error = %e, cache_key = %cache_key, "Echec cache set members");
             }
         }
@@ -167,128 +168,24 @@ pub async fn reset_member(
         .await
         .map_err(|e| ApiError(DomainError::Internal(format!("begin tx reset: {e}"))))?;
 
-    // Helper pour exec un DELETE et renvoyer rows_affected.
-    async fn del(
-        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
-        sql: &str,
-        guild_id: &str,
-        user_id: &str,
-        tag: &str,
-    ) -> Result<u64, ApiError> {
-        let res = sqlx::query(sql)
-            .bind(guild_id)
-            .bind(user_id)
-            .execute(&mut **tx)
-            .await
-            .map_err(|e| ApiError(DomainError::Internal(format!("reset_member {tag}: {e}"))))?;
-        Ok(res.rows_affected())
-    }
-
+    // Liste des tables a purger : regle metier dans
+    // `domain/entities/guild_member_reset.rs::MEMBER_RESET_TABLES`.
     let mut totals = serde_json::Map::new();
-
-    totals.insert(
-        "infractions".into(),
-        del(
-            &mut tx,
-            "DELETE FROM infractions WHERE guild_id = $1 AND user_id = $2",
-            &guild_id,
-            &user_id,
-            "infractions",
-        )
-        .await?
-        .into(),
-    );
-
-    totals.insert(
-        "moderation_actions".into(),
-        del(
-            &mut tx,
-            "DELETE FROM moderation_actions WHERE guild_id = $1 AND target_id = $2",
-            &guild_id,
-            &user_id,
-            "moderation_actions",
-        )
-        .await?
-        .into(),
-    );
-
-    totals.insert(
-        "conduct_points".into(),
-        del(
-            &mut tx,
-            "DELETE FROM user_conduct_points WHERE guild_id = $1 AND user_id = $2",
-            &guild_id,
-            &user_id,
-            "user_conduct_points",
-        )
-        .await?
-        .into(),
-    );
-
-    totals.insert(
-        "conduct_log".into(),
-        del(
-            &mut tx,
-            "DELETE FROM conduct_points_log WHERE guild_id = $1 AND user_id = $2",
-            &guild_id,
-            &user_id,
-            "conduct_points_log",
-        )
-        .await?
-        .into(),
-    );
-
-    totals.insert(
-        "strikes".into(),
-        del(
-            &mut tx,
-            "DELETE FROM user_strikes WHERE guild_id = $1 AND user_id = $2",
-            &guild_id,
-            &user_id,
-            "user_strikes",
-        )
-        .await?
-        .into(),
-    );
-
-    totals.insert(
-        "notes".into(),
-        del(
-            &mut tx,
-            "DELETE FROM user_notes WHERE guild_id = $1 AND user_id = $2",
-            &guild_id,
-            &user_id,
-            "user_notes",
-        )
-        .await?
-        .into(),
-    );
-
-    totals.insert(
-        "manual_watched".into(),
-        del(
-            &mut tx,
-            "DELETE FROM manual_watched_users WHERE guild_id = $1 AND user_id = $2",
-            &guild_id,
-            &user_id,
-            "manual_watched_users",
-        )
-        .await?
-        .into(),
-    );
-
-    totals.insert(
-        "sanction_reminders".into(),
-        del(
-            &mut tx,
-            "DELETE FROM sanction_reminders WHERE guild_id = $1 AND target_id = $2",
-            &guild_id,
-            &user_id,
-            "sanction_reminders",
-        )
-        .await?
-        .into(),
-    );
+    for entry in MEMBER_RESET_TABLES {
+        let sql = format!(
+            "DELETE FROM {} WHERE guild_id = $1 AND {} = $2",
+            entry.sql_table, entry.user_column,
+        );
+        let res = sqlx::query(&sql)
+            .bind(&guild_id)
+            .bind(&user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApiError(DomainError::Internal(format!(
+                "reset_member {}: {e}", entry.sql_table,
+            ))))?;
+        totals.insert(entry.response_key.into(), res.rows_affected().into());
+    }
 
     tx.commit()
         .await

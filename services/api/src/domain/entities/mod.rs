@@ -83,6 +83,11 @@ pub use job_whitelists::{
 mod purge;
 pub use purge::{validate_purge_days_allow_zero, validate_purge_days_strictly_positive};
 
+mod guild_member_reset;
+pub use guild_member_reset::{
+    MemberResetTable, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES, MEMBERS_CACHE_TTL_SECS,
+};
+
 mod game;
 pub use game::{
     format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, normalize_optional_tag,
