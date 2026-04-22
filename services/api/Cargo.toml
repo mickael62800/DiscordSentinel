@@ -442,6 +442,11 @@ path = "tests/integration/postgres_coude_economy/repo.rs"
 name = "integration_postgres_coude_player"
 path = "tests/integration/postgres_coude_player/repo.rs"
 
+# postgres voice_channel repo (790L : channels + co-admins + whitelist + bans + invites + themes)
+[[test]]
+name = "integration_postgres_voice_channel"
+path = "tests/integration/postgres_voice_channel/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
