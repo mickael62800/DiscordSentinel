@@ -2,6 +2,35 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 // ══════════════════════════════════════════════════════════════════════
+// ── Daily chaos : regles metier ──
+// ══════════════════════════════════════════════════════════════════════
+
+/// Cap journalier d'evenements `daily chaos` par guild (5/jour).
+pub const DAILY_CHAOS_MAX: i64 = 5;
+
+/// Pourcentage des coins de la victime transferes par defaut (20%).
+pub const DEFAULT_CHAOS_PERCENT: f64 = 0.20;
+
+/// Solde minimum pour qu'un joueur soit eligible au tirage chaos.
+pub const MIN_COINS_ELIGIBLE: i64 = 10;
+
+/// Limites du parametre `limit` du leaderboard (clamp [1, 100]).
+pub const LEADERBOARD_MIN_LIMIT: i64 = 1;
+pub const LEADERBOARD_MAX_LIMIT: i64 = 100;
+
+/// Calcule le montant a transferer pour un daily chaos. Retourne None
+/// si le montant calcule est < 1 (chaos invisible -> skip).
+pub fn daily_chaos_amount(victim_coins: i64, chaos_percent: f64) -> Option<i64> {
+    let amount = ((victim_coins as f64) * chaos_percent).floor() as i64;
+    if amount >= 1 { Some(amount) } else { None }
+}
+
+/// Clamp d'un parametre `limit` de leaderboard dans [1, 100].
+pub fn clamp_leaderboard_limit(limit: i64) -> i64 {
+    limit.clamp(LEADERBOARD_MIN_LIMIT, LEADERBOARD_MAX_LIMIT)
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // ── Leaderboard ──
 // ══════════════════════════════════════════════════════════════════════
 

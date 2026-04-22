@@ -153,8 +153,10 @@ pub use coude_inventory::{
 
 mod coude_social;
 pub use coude_social::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, DailyChaosOutcome,
-    LeaderboardCategory, NewDailyChaos,
+    clamp_leaderboard_limit, daily_chaos_amount, CoudeCurrentSeason, CoudeEvent,
+    CoudeLeaderboardEntry, DailyChaosOutcome, LeaderboardCategory, NewDailyChaos,
+    DAILY_CHAOS_MAX, DEFAULT_CHAOS_PERCENT, LEADERBOARD_MAX_LIMIT, LEADERBOARD_MIN_LIMIT,
+    MIN_COINS_ELIGIBLE,
 };
 
 mod coude_cashbox;

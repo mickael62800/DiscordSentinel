@@ -5,8 +5,9 @@ use chrono::{DateTime, Utc};
 use tracing::info;
 
 use crate::domain::entities::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, DailyChaosOutcome,
-    LeaderboardCategory, NewDailyChaos,
+    clamp_leaderboard_limit, daily_chaos_amount, CoudeCurrentSeason, CoudeEvent,
+    CoudeLeaderboardEntry, DailyChaosOutcome, LeaderboardCategory, NewDailyChaos,
+    DAILY_CHAOS_MAX, DEFAULT_CHAOS_PERCENT, MIN_COINS_ELIGIBLE,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
@@ -15,12 +16,8 @@ use crate::ports::outbound::{
     BotConfigRepository, CoudeEconomyRepository, CoudePlayerRepository, CoudeSocialRepository,
 };
 
-/// Cap journalier du nombre d'events chaos par guild.
-const DAILY_CHAOS_MAX: i64 = 5;
-/// Pourcentage des coins de la victime transferes par defaut.
-const DEFAULT_CHAOS_PERCENT: f64 = 0.20;
-/// Minimum de coins requis pour etre eligible (evite les chaos a 0).
-const MIN_COINS_ELIGIBLE: i64 = 10;
+// DAILY_CHAOS_MAX / DEFAULT_CHAOS_PERCENT / MIN_COINS_ELIGIBLE vivent
+// dans domain/entities/coude_social.rs (regles metier reutilisables).
 
 pub struct ManageCoudeSocialService {
     repo: Arc<dyn CoudeSocialRepository>,
@@ -76,7 +73,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         category: LeaderboardCategory,
         limit: i64,
     ) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> {
-        let limit = limit.clamp(1, 100);
+        let limit = clamp_leaderboard_limit(limit);
         self.repo.leaderboard(guild_id, category, limit).await
     }
 
@@ -128,11 +125,10 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         let victim = &players[0];
         let winner = &players[1];
 
-        // 4. Calculer le montant.
-        let amount = ((victim.coins as f64) * chaos_percent).floor() as i64;
-        if amount < 1 {
+        // 4. Calculer le montant via regle domain (None si < 1 coin).
+        let Some(amount) = daily_chaos_amount(victim.coins, chaos_percent) else {
             return Ok(None);
-        }
+        };
 
         // 5. Migration #5 : transfert via ManageWalletUseCase (faillite
         //    victime + jackpot winner auto-detectes, log atomique dans
