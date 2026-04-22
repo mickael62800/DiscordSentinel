@@ -5,6 +5,10 @@
 //! Respect strict de l'hexagonal : tout passe par les ports outbound et
 //! les use cases satellites (bets). Aucun SQL direct ici.
 
+#[cfg(test)]
+#[path = "tests/expire_combats_batch.rs"]
+mod tests;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
