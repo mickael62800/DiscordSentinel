@@ -5,7 +5,10 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::domain::entities::{ConductConfig, ConductPointsLog, Infraction, UserConductPoints};
+use crate::domain::entities::{
+    apply_conduct_penalty, apply_conduct_regen, ConductConfig, ConductPointsLog, Infraction,
+    UserConductPoints, MUTE_AT_ZERO_POINTS_DURATION_MINS,
+};
 use crate::domain::errors::DomainError;
 use crate::domain::value_objects::{Action, DetectionFlags};
 use crate::ports::inbound::{
@@ -33,7 +36,7 @@ impl ManageConductService {
             return;
         }
 
-        let timeout_until = Utc::now() + chrono::Duration::minutes(10);
+        let timeout_until = Utc::now() + chrono::Duration::minutes(MUTE_AT_ZERO_POINTS_DURATION_MINS);
         let url = format!("https://discord.com/api/v10/guilds/{}/members/{}", guild_id, user_id);
 
         match self.http_client
@@ -147,7 +150,7 @@ impl ManageConductUseCase for ManageConductService {
             .await?;
 
         let points_before = user_points.points;
-        let points_after = (points_before - penalty).max(0);
+        let points_after = apply_conduct_penalty(points_before, penalty);
 
         self.repo
             .update_points(&cmd.guild_id, &cmd.user_id, points_after)
@@ -219,7 +222,7 @@ impl ManageConductUseCase for ManageConductService {
             .await?;
 
         let points_before = user_points.points;
-        let points_after = (points_before + cmd.amount).min(config.max_points);
+        let points_after = apply_conduct_regen(points_before, cmd.amount, config.max_points);
 
         self.repo
             .update_points(&cmd.guild_id, &cmd.user_id, points_after)
@@ -283,7 +286,7 @@ impl ManageConductUseCase for ManageConductService {
                 }
 
                 let points_before = user.points;
-                let points_after = (points_before + config.regen_amount).min(config.max_points);
+                let points_after = apply_conduct_regen(points_before, config.regen_amount, config.max_points);
 
                 if points_after >= config.max_points {
                     // Revenu au max → supprimer de la table

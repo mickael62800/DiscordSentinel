@@ -47,6 +47,21 @@ impl ConductConfig {
     }
 }
 
+/// Duree du mute auto declenche quand un utilisateur atteint 0 points de
+/// conduite (regle metier). Appliquee via PATCH /guilds/.../members/...
+/// avec `communication_disabled_until`.
+pub const MUTE_AT_ZERO_POINTS_DURATION_MINS: i64 = 10;
+
+/// Retire `penalty` points a `current`, clampe a 0 (jamais negatif).
+pub fn apply_conduct_penalty(current: i32, penalty: i32) -> i32 {
+    (current - penalty).max(0)
+}
+
+/// Ajoute `amount` points a `current`, clampe a `max_points`.
+pub fn apply_conduct_regen(current: i32, amount: i32, max_points: i32) -> i32 {
+    (current + amount).min(max_points)
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserConductPoints {
     pub id: Uuid,

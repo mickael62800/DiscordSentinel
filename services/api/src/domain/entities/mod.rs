@@ -48,7 +48,10 @@ pub use audit_log::{
 };
 pub use image_analysis::{is_allowed_image_content_type, is_image_size_acceptable, ImageAnalysis, ImageClassification, ALLOWED_IMAGE_CONTENT_TYPES, MAX_IMAGE_BASE64_LEN};
 pub use bot_config::{BotDefinition, BotGuildConfig};
-pub use conduct::{ConductConfig, ConductPointsLog, UserConductPoints};
+pub use conduct::{
+    apply_conduct_penalty, apply_conduct_regen, ConductConfig, ConductPointsLog,
+    UserConductPoints, MUTE_AT_ZERO_POINTS_DURATION_MINS,
+};
 pub use daily_activity::DailyActivity;
 pub use role_panel::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
 pub use dashboard_stats::DashboardStats;

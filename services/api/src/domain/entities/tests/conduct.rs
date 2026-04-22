@@ -103,3 +103,35 @@ fn penalty_gradient_escalates() {
     assert!(c.penalty_delete < c.penalty_mute);
     assert!(c.penalty_mute < c.penalty_ban);
 }
+
+
+// -- Extractions (MUTE_AT_ZERO_POINTS_DURATION_MINS + apply_conduct_penalty/regen) --
+
+#[test]
+fn mute_duration_constant_is_10_minutes() {
+    assert_eq!(MUTE_AT_ZERO_POINTS_DURATION_MINS, 10);
+}
+
+#[test]
+fn apply_penalty_clamps_at_zero() {
+    assert_eq!(apply_conduct_penalty(10, 3), 7);
+    assert_eq!(apply_conduct_penalty(5, 10), 0); // clamp
+    assert_eq!(apply_conduct_penalty(0, 5), 0);
+}
+
+#[test]
+fn apply_penalty_zero_is_noop() {
+    assert_eq!(apply_conduct_penalty(7, 0), 7);
+}
+
+#[test]
+fn apply_regen_clamps_at_max() {
+    assert_eq!(apply_conduct_regen(5, 3, 12), 8);
+    assert_eq!(apply_conduct_regen(10, 5, 12), 12); // clamp
+    assert_eq!(apply_conduct_regen(12, 1, 12), 12); // deja max
+}
+
+#[test]
+fn apply_regen_zero_amount_is_noop() {
+    assert_eq!(apply_conduct_regen(5, 0, 12), 5);
+}
