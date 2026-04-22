@@ -367,6 +367,16 @@ path = "tests/integration/rbac_http/http.rs"
 name = "integration_coude_players_http"
 path = "tests/integration/coude_players_http/http.rs"
 
+# postgres strikes repo
+[[test]]
+name = "integration_postgres_strikes"
+path = "tests/integration/postgres_strikes/repo.rs"
+
+# postgres members repo
+[[test]]
+name = "integration_postgres_members"
+path = "tests/integration/postgres_members/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
