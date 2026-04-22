@@ -145,8 +145,9 @@ pub use coude_combat::{CombatResolution, CoudeCombat, NewCoudeCombat};
 
 mod combat_resolution_rules;
 pub use combat_resolution_rules::{
-    apply_insurance_to_loss, compute_combat_xp, CombatXpAwards, InsuranceAdjustment,
-    COMBAT_XP_LOSER, COMBAT_XP_WINNER_BASE, COMBAT_XP_WINNER_UNDERDOG, UNDERDOG_LEVEL_GAP,
+    apply_insurance_to_loss, compute_combat_xp, format_bet_payout_lines, CombatXpAwards,
+    InsuranceAdjustment, COMBAT_XP_LOSER, COMBAT_XP_WINNER_BASE, COMBAT_XP_WINNER_UNDERDOG,
+    UNDERDOG_LEVEL_GAP,
 };
 
 mod coude_bet;

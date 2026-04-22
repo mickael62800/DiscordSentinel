@@ -1,8 +1,9 @@
 //! Règles domain pures extraites de `resolve_combat_now_service`.
 //! Logique de calcul métier autour de la résolution d'un combat :
-//! application d'assurance sur les pertes + calcul des XP (Giant Killer).
+//! application d'assurance sur les pertes + calcul des XP (Giant Killer)
+//! + formatage des résultats de paris.
 
-use crate::domain::entities::CoudeInsurance;
+use crate::domain::entities::{BetResolutionPlan, CoudeInsurance};
 
 /// Résultat de l'ajustement d'une perte par une assurance.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -111,6 +112,55 @@ pub fn compute_combat_xp(
         loser_xp: COMBAT_XP_LOSER,
         winner_is_underdog,
     }
+}
+
+/// Formate les lignes de résultats de paris pour un combat résolu.
+/// Retourne None si aucun payout (rien à afficher).
+///
+/// - `plan` : résultat de `bets_uc.resolve` (payouts + bonus éventuel).
+/// - `winner_id` / `loser_id` : None si draw (tous les parieurs perdent).
+///
+/// Utilisé par resolve_combat_now pour l'embed Discord.
+pub fn format_bet_payout_lines(
+    plan: &BetResolutionPlan,
+    winner_id: Option<&str>,
+    loser_id: Option<&str>,
+) -> Option<String> {
+    if plan.payouts.is_empty() {
+        return None;
+    }
+    let mut lines = vec!["\u{1f3b2} **Resultats des paris :**".to_string()];
+    for p in &plan.payouts {
+        if p.won && winner_id.is_some() {
+            lines.push(format!(
+                "\u{2705} **{}** gagne **{} coins** !",
+                p.bettor_name, p.payout
+            ));
+        } else {
+            lines.push(format!(
+                "\u{274c} **{}** perd sa mise de **{} coins**",
+                p.bettor_name, p.amount_bet
+            ));
+        }
+    }
+    if let (Some(bonus), Some(winner), Some(loser)) =
+        (plan.fighter_bonus.as_ref(), winner_id, loser_id)
+    {
+        lines.push(String::new());
+        lines.push(format!(
+            "\u{1f4b0} **Pot des paris : {} coins**",
+            bonus.total_pot
+        ));
+        lines.push(format!(
+            "\u{1f451} <@{}> recoit **+{} coins** (10% du pot)",
+            winner, bonus.winner_bonus
+        ));
+        lines.push(format!(
+            "\u{1f3c5} <@{}> recoit **+{} coins** (5% du pot, merci d'avoir participe)",
+            loser, bonus.loser_bonus
+        ));
+    }
+    Some(lines.join("\n"))
 }
 
 #[cfg(test)]
@@ -292,5 +342,95 @@ mod tests {
             let awards = compute_combat_xp(10, 10 + gap, true);
             assert_eq!(awards.loser_xp, COMBAT_XP_LOSER);
         }
+    }
+
+    // ── format_bet_payout_lines ──
+
+    use crate::domain::entities::{BetPayout, CoudeFighterBetBonus};
+
+    fn payout(name: &str, amount: i64, payout_amt: i64, won: bool) -> BetPayout {
+        BetPayout {
+            bet_id: Uuid::new_v4(),
+            bettor_id: "u".into(),
+            bettor_name: name.into(),
+            backed_id: "a".into(),
+            amount_bet: amount,
+            payout: payout_amt,
+            won,
+        }
+    }
+
+    #[test]
+    fn format_bet_payouts_empty_returns_none() {
+        let plan = BetResolutionPlan { payouts: vec![], fighter_bonus: None };
+        assert!(format_bet_payout_lines(&plan, Some("w"), Some("l")).is_none());
+    }
+
+    #[test]
+    fn format_bet_payouts_win_lines() {
+        let plan = BetResolutionPlan {
+            payouts: vec![
+                payout("Alice", 100, 250, true),
+                payout("Bob", 50, 0, false),
+            ],
+            fighter_bonus: None,
+        };
+        let out = format_bet_payout_lines(&plan, Some("w"), Some("l")).unwrap();
+        assert!(out.contains("Alice"));
+        assert!(out.contains("gagne"));
+        assert!(out.contains("250"));
+        assert!(out.contains("Bob"));
+        assert!(out.contains("perd"));
+        assert!(out.contains("50"));
+        assert!(out.starts_with("\u{1f3b2} **Resultats des paris"));
+    }
+
+    #[test]
+    fn format_bet_payouts_draw_all_bettors_lose() {
+        // En cas de draw, winner_id/loser_id = None → toutes les lignes
+        // affichent "perd sa mise", même pour p.won=true (défensif).
+        let plan = BetResolutionPlan {
+            payouts: vec![payout("Carol", 200, 500, true)],
+            fighter_bonus: None,
+        };
+        let out = format_bet_payout_lines(&plan, None, None).unwrap();
+        assert!(out.contains("Carol"));
+        assert!(out.contains("perd"));
+        assert!(!out.contains("gagne"));
+    }
+
+    #[test]
+    fn format_bet_payouts_with_fighter_bonus() {
+        let plan = BetResolutionPlan {
+            payouts: vec![payout("A", 10, 20, true)],
+            fighter_bonus: Some(CoudeFighterBetBonus {
+                winner_id: "w".into(), winner_bonus: 1000,
+                loser_id: "l".into(), loser_bonus: 500,
+                total_pot: 5000,
+            }),
+        };
+        let out = format_bet_payout_lines(&plan, Some("w"), Some("l")).unwrap();
+        assert!(out.contains("Pot des paris"));
+        assert!(out.contains("5000"));
+        assert!(out.contains("1000")); // winner bonus
+        assert!(out.contains("500"));  // loser bonus
+        assert!(out.contains("<@w>"));
+        assert!(out.contains("<@l>"));
+    }
+
+    #[test]
+    fn format_bet_payouts_bonus_skipped_on_draw() {
+        // Draw (winner_id=None) → bonus ignoré même si présent dans le plan.
+        let plan = BetResolutionPlan {
+            payouts: vec![payout("A", 10, 0, false)],
+            fighter_bonus: Some(CoudeFighterBetBonus {
+                winner_id: "w".into(), winner_bonus: 1000,
+                loser_id: "l".into(), loser_bonus: 500,
+                total_pot: 5000,
+            }),
+        };
+        let out = format_bet_payout_lines(&plan, None, None).unwrap();
+        assert!(!out.contains("Pot des paris"));
+        assert!(!out.contains("1000"));
     }
 }

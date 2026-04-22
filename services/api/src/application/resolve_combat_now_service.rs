@@ -15,7 +15,9 @@ use async_trait::async_trait;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::domain::entities::{apply_insurance_to_loss, compute_combat_xp, CoudeBalanceParams};
+use crate::domain::entities::{
+    apply_insurance_to_loss, compute_combat_xp, format_bet_payout_lines, CoudeBalanceParams,
+};
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{
     self as engine, PlayerLite, ServerEventLite,
@@ -395,45 +397,17 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .ok();
                 if let Some(outcome) = outcome {
                     bets_draw_taunts = outcome.taunt_events;
-                    let plan = outcome.plan;
-                    if !plan.payouts.is_empty() {
-                        let mut lines = vec!["\u{1f3b2} **Resultats des paris :**".to_string()];
-                        for p in &plan.payouts {
-                            if p.won {
-                                lines.push(format!(
-                                    "\u{2705} **{}** gagne **{} coins** !",
-                                    p.bettor_name, p.payout
-                                ));
-                            } else {
-                                lines.push(format!(
-                                    "\u{274c} **{}** perd sa mise de **{} coins**",
-                                    p.bettor_name, p.amount_bet
-                                ));
-                            }
-                        }
-                        if let Some(bonus) = plan.fighter_bonus {
-                            lines.push(String::new());
-                            lines.push(format!(
-                                "\u{1f4b0} **Pot des paris : {} coins**",
-                                bonus.total_pot
-                            ));
-                            lines.push(format!(
-                                "\u{1f451} <@{}> recoit **+{} coins** (10% du pot)",
-                                winner_id, bonus.winner_bonus
-                            ));
-                            let loser_display = if *winner_id == combat.attacker_id {
-                                &combat.defender_id
-                            } else {
-                                &combat.attacker_id
-                            };
-                            lines.push(format!(
-                                "\u{1f3c5} <@{}> recoit **+{} coins** (5% du pot, merci d'avoir participe)",
-                                loser_display, bonus.loser_bonus
-                            ));
-                        }
+                    let loser_display: &str = if *winner_id == combat.attacker_id {
+                        &combat.defender_id
+                    } else {
+                        &combat.attacker_id
+                    };
+                    if let Some(lines) = format_bet_payout_lines(
+                        &outcome.plan, Some(winner_id), Some(loser_display),
+                    ) {
                         fields.push(ResolvedCombatEmbedField {
                             name: "\u{1f3b2} Paris".into(),
-                            value: lines.join("\n"),
+                            value: lines,
                             inline: false,
                         });
                     }
@@ -484,17 +458,10 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // Paris (refund tout le monde)
                 let outcome = self.bets_uc.resolve(combat.id, None).await.ok();
                 if let Some(outcome) = outcome {
-                    if !outcome.plan.payouts.is_empty() {
-                        let mut lines = vec!["\u{1f3b2} **Resultats des paris :**".to_string()];
-                        for p in &outcome.plan.payouts {
-                            lines.push(format!(
-                                "\u{274c} **{}** perd sa mise de **{} coins**",
-                                p.bettor_name, p.amount_bet
-                            ));
-                        }
+                    if let Some(lines) = format_bet_payout_lines(&outcome.plan, None, None) {
                         fields.push(ResolvedCombatEmbedField {
                             name: "\u{1f3b2} Paris".into(),
-                            value: lines.join("\n"),
+                            value: lines,
                             inline: false,
                         });
                     }
