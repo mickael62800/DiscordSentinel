@@ -1,0 +1,76 @@
+use super::*;
+
+fn make_map(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+    pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+}
+
+// ── parse_bool_config ──
+
+#[test]
+fn parse_bool_missing_key_returns_default() {
+    let m = make_map(&[]);
+    assert!(parse_bool_config(&m, "flag", true));
+    assert!(!parse_bool_config(&m, "flag", false));
+}
+
+#[test]
+fn parse_bool_accepts_true_1_yes_case_insensitive() {
+    for v in ["true", "TRUE", "True", "1", "yes", "YES", "Yes"] {
+        let m = make_map(&[("f", v)]);
+        assert!(parse_bool_config(&m, "f", false), "should be true for {v}");
+    }
+}
+
+#[test]
+fn parse_bool_rejects_other_strings() {
+    for v in ["false", "0", "no", "nope", "", "2"] {
+        let m = make_map(&[("f", v)]);
+        assert!(!parse_bool_config(&m, "f", true), "should be false for '{v}'");
+    }
+}
+
+// ── parse_i64_config ──
+
+#[test]
+fn parse_i64_missing_key_returns_default() {
+    let m = make_map(&[]);
+    assert_eq!(parse_i64_config(&m, "n", 42), 42);
+    assert_eq!(parse_i64_config(&m, "n", -1), -1);
+}
+
+#[test]
+fn parse_i64_parses_positive_integer() {
+    let m = make_map(&[("n", "10000")]);
+    assert_eq!(parse_i64_config(&m, "n", 0), 10000);
+}
+
+#[test]
+fn parse_i64_parses_negative_integer() {
+    let m = make_map(&[("n", "-123")]);
+    assert_eq!(parse_i64_config(&m, "n", 0), -123);
+}
+
+#[test]
+fn parse_i64_invalid_value_returns_default() {
+    for v in ["abc", "", "1.5", "12a", " 10"] {
+        let m = make_map(&[("n", v)]);
+        assert_eq!(parse_i64_config(&m, "n", 99), 99, "default for '{v}'");
+    }
+}
+
+// ── is_worker_service ──
+
+#[test]
+fn is_worker_true_when_name_contains_worker() {
+    assert!(is_worker_service("moderation-worker"));
+    assert!(is_worker_service("coude-worker"));
+    assert!(is_worker_service("worker-common"));
+}
+
+#[test]
+fn is_worker_false_for_bot_names() {
+    assert!(!is_worker_service("coude-bot"));
+    assert!(!is_worker_service("moderation-bot"));
+    assert!(!is_worker_service("game-bot"));
+    assert!(!is_worker_service(""));
+}

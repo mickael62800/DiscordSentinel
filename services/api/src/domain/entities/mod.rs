@@ -25,6 +25,7 @@ mod user_note;
 mod ai_models;
 mod coude_purge;
 mod rbac;
+mod config_parsers;
 pub mod analytics;
 
 pub use ai_models::{
@@ -35,6 +36,7 @@ pub use rbac::{
     is_owner_self_demotion, truncate_display_name, would_revoke_last_owner,
     RBAC_DISPLAY_NAME_MAX,
 };
+pub use config_parsers::{is_worker_service, parse_bool_config, parse_i64_config};
 
 pub use ia_config::IaConfig;
 pub use audit_log::{

@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use tracing::{debug, warn};
 
 use crate::domain::entities::{
-    build_taunt_event, build_taunt_event_single, crossed_threshold, CoudeTauntsConfig, StreakKind,
-    TauntEvent,
+    build_taunt_event, build_taunt_event_single, crossed_threshold, parse_bool_config,
+    parse_i64_config, CoudeTauntsConfig, StreakKind, TauntEvent,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
@@ -113,15 +113,8 @@ impl ManageCoudeTauntsService {
     }
 }
 
-fn parse_bool(map: &HashMap<String, String>, key: &str, default: bool) -> bool {
-    map.get(key)
-        .map(|v| matches!(v.to_ascii_lowercase().as_str(), "true" | "1" | "yes"))
-        .unwrap_or(default)
-}
-
-fn parse_i64(map: &HashMap<String, String>, key: &str, default: i64) -> i64 {
-    map.get(key).and_then(|v| v.parse::<i64>().ok()).unwrap_or(default)
-}
+// parse_bool_config / parse_i64_config vivent dans domain/entities/config_parsers.rs
+// (purs et reutilisables par d'autres services qui lisent bot_guild_config).
 
 #[async_trait]
 impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
@@ -217,7 +210,7 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         user_id: &str,
     ) -> Result<Option<TauntEvent>, DomainError> {
         let cfg = self.load_eco_config(guild_id).await;
-        if !parse_bool(&cfg, CFG_BANKRUPTCY_ENABLED, true) {
+        if !parse_bool_config(&cfg, CFG_BANKRUPTCY_ENABLED, true) {
             debug!(guild_id, user_id, "taunt: bankruptcy desactive par config");
             return Ok(None);
         }
@@ -232,7 +225,7 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         amount: i64,
     ) -> Result<Option<TauntEvent>, DomainError> {
         let cfg = self.load_eco_config(guild_id).await;
-        let threshold = parse_i64(&cfg, CFG_JACKPOT_THRESHOLD, DEFAULT_JACKPOT_THRESHOLD);
+        let threshold = parse_i64_config(&cfg, CFG_JACKPOT_THRESHOLD, DEFAULT_JACKPOT_THRESHOLD);
         if amount < threshold {
             return Ok(None);
         }
@@ -247,7 +240,7 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         amount: i64,
     ) -> Result<Option<TauntEvent>, DomainError> {
         let cfg = self.load_eco_config(guild_id).await;
-        let threshold = parse_i64(&cfg, CFG_DONOR_THRESHOLD, DEFAULT_DONOR_THRESHOLD);
+        let threshold = parse_i64_config(&cfg, CFG_DONOR_THRESHOLD, DEFAULT_DONOR_THRESHOLD);
         if amount < threshold {
             return Ok(None);
         }
@@ -298,3 +291,7 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
         self.taunts_repo.list_opt_outs(guild_id).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_coude_taunts.rs"]
+mod tests;

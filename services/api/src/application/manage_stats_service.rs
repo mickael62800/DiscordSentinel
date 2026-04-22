@@ -54,7 +54,7 @@ impl ManageStatsService {
         let mut workers_total = 0u32;
 
         for name in &known {
-            let is_worker = name.contains("worker");
+            let is_worker = crate::domain::entities::is_worker_service(name);
             let exists: bool = match conn.exists(format!("bot:online:{}", name)).await {
                 Ok(v) => v,
                 Err(e) => {
@@ -249,3 +249,8 @@ impl ManageStatsUseCase for ManageStatsService {
         .await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_stats.rs"]
+mod tests;
+
