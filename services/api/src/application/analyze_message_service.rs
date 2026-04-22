@@ -7,10 +7,12 @@ use uuid::Uuid;
 use crate::domain::entities::{Infraction, MessageAnalysis};
 use crate::domain::errors::DomainError;
 use crate::adapters::outbound::{InferenceService, TextTokenizer};
-use crate::domain::services::{InferenceRateLimiter, ScoringService};
+use crate::domain::services::{
+    ChannelTensionBuffer, InferenceRateLimiter, ScoringService, TensionAction, TensionEntry,
+};
 use crate::domain::value_objects::{Action, FlagType};
 use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::ports::outbound::{CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
+use crate::ports::outbound::{BotConfigRepository, CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
 
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
 const DEFAULT_TEXT_THRESHOLD: f32 = 0.5;
@@ -24,6 +26,11 @@ pub struct AnalyzeMessageService {
     inference_limiter: Arc<InferenceRateLimiter>,
     inference: Option<Arc<InferenceService>>,
     tokenizer: Option<Arc<TextTokenizer>>,
+    /// Buffer in-memory pour la "tension de salon" (option : si None, la
+    /// feature est desactivee quel que soit le contenu de la config).
+    tension_buffer: Option<Arc<ChannelTensionBuffer>>,
+    /// Repo pour lire la config automod-bot (tension enable + seuils).
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl AnalyzeMessageService {
@@ -44,6 +51,8 @@ impl AnalyzeMessageService {
             inference_limiter,
             inference: None,
             tokenizer: None,
+            tension_buffer: None,
+            bot_config_repo: None,
         }
     }
 
@@ -57,6 +66,99 @@ impl AnalyzeMessageService {
         self.tokenizer = Some(tokenizer);
         self
     }
+
+    /// Ajoute la feature "tension de salon" (buffer glissant + seuils
+    /// lus depuis `bot_guild_config` pour `automod-bot`).
+    pub fn with_channel_tension(
+        mut self,
+        buffer: Arc<ChannelTensionBuffer>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
+    ) -> Self {
+        self.tension_buffer = Some(buffer);
+        self.bot_config_repo = Some(bot_config_repo);
+        self
+    }
+}
+
+/// Config resolue pour la feature "tension de salon".
+#[derive(Debug, Clone)]
+struct TensionConfig {
+    enabled: bool,
+    buffer_size: usize,
+    threshold_warn: f64,
+    threshold_delete: f64,
+    threshold_mute: f64,
+    mute_duration_secs: u64,
+}
+
+impl Default for TensionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            buffer_size: 5,
+            threshold_warn: 3.0,
+            threshold_delete: 5.0,
+            threshold_mute: 7.0,
+            mute_duration_secs: 300,
+        }
+    }
+}
+
+/// Parse la config tension depuis la liste des `BotGuildConfig` de
+/// `automod-bot`. Defaut si cles absentes/mal formees.
+fn parse_tension_config(entries: &[crate::domain::entities::BotGuildConfig]) -> TensionConfig {
+    let mut cfg = TensionConfig::default();
+    for e in entries {
+        match e.config_key.as_str() {
+            "channel_tension_enabled" => {
+                let v = e.config_value.to_ascii_lowercase();
+                cfg.enabled = matches!(v.as_str(), "true" | "1" | "yes");
+            }
+            "channel_tension_buffer_size" => {
+                if let Ok(n) = e.config_value.parse::<usize>() {
+                    if n >= 1 {
+                        cfg.buffer_size = n;
+                    }
+                }
+            }
+            "channel_tension_threshold_warn" => {
+                if let Ok(n) = e.config_value.parse::<f64>() { cfg.threshold_warn = n; }
+            }
+            "channel_tension_threshold_delete" => {
+                if let Ok(n) = e.config_value.parse::<f64>() { cfg.threshold_delete = n; }
+            }
+            "channel_tension_threshold_mute" => {
+                if let Ok(n) = e.config_value.parse::<f64>() { cfg.threshold_mute = n; }
+            }
+            "channel_tension_mute_duration_secs" => {
+                if let Ok(n) = e.config_value.parse::<u64>() { cfg.mute_duration_secs = n; }
+            }
+            _ => {}
+        }
+    }
+    cfg
+}
+
+/// Compare la severite d'une action existante et d'une `TensionAction`
+/// pour garder la plus forte si les deux declenchent. Retourne `true`
+/// si la tension est strictement plus severe.
+fn tension_is_stronger(current: &Action, tension: TensionAction) -> bool {
+    let sev = |a: &Action| -> u8 {
+        match a {
+            Action::None => 0,
+            Action::Warn => 1,
+            Action::Delete => 2,
+            Action::Mute => 3,
+            Action::Ban => 4,
+        }
+    };
+    let tsev = match tension {
+        TensionAction::None => 0,
+        TensionAction::Warn => 1,
+        TensionAction::Delete => 2,
+        TensionAction::Mute => 3,
+    };
+    tsev > sev(current)
 }
 
 #[async_trait]
@@ -76,6 +178,9 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 
         // 2. Scoring basique (flags bot : spam, insult, link, phishing)
         let mut result = ScoringService::score(&cmd.flags, &rules);
+        // Score IA individuel de CE message (0.0 si pas d'inference ou non
+        // toxique). Alimente le buffer "tension de salon" apres l'inference.
+        let mut ia_score_individual: f64 = 0.0;
 
         // 3. Inference text IA (sentiment : anger, rage, threat, harassment)
         // Charger la config IA per-guild pour le seuil de confiance
@@ -190,6 +295,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                         result.action = action;
                         result.reason = reason;
                         result.duration = duration;
+                        ia_score_individual = ia_score;
                     }
                     Ok(None) => {
                         // Pas de sentiment toxique detecte
@@ -197,6 +303,75 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
                     Err(e) => {
                         tracing::warn!(error = %e, "Inference text echouee — scoring bot seul");
                     }
+                }
+            }
+        }
+
+        // 3b. Tension de salon (somme glissante des scores IA des N derniers
+        // messages du channel). S'ajoute comme second declencheur : si la
+        // tension declenche une action plus severe que l'analyse individuelle,
+        // on override. Sinon, l'action individuelle est gardee.
+        if let (Some(buffer), Some(bot_cfg_repo)) =
+            (self.tension_buffer.as_ref(), self.bot_config_repo.as_ref())
+        {
+            let entries = match bot_cfg_repo.get_config(&cmd.guild_id, "automod-bot").await {
+                Ok(e) => e,
+                Err(e) => {
+                    tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec lecture config automod-bot pour tension, skip");
+                    vec![]
+                }
+            };
+            let tcfg = parse_tension_config(&entries);
+            if tcfg.enabled {
+                let entry = TensionEntry {
+                    score: ia_score_individual,
+                    user_id: cmd.user_id.clone(),
+                    message_id: cmd.message_id.clone(),
+                    timestamp_ms: chrono::Utc::now().timestamp_millis(),
+                };
+                let total = buffer.push_and_sum(
+                    &cmd.guild_id,
+                    &cmd.channel_id,
+                    entry,
+                    tcfg.buffer_size,
+                );
+                let action = ChannelTensionBuffer::decide_action(
+                    total,
+                    tcfg.threshold_warn,
+                    tcfg.threshold_delete,
+                    tcfg.threshold_mute,
+                );
+                if action != TensionAction::None {
+                    info!(
+                        guild_id = %cmd.guild_id,
+                        channel_id = %cmd.channel_id,
+                        tension_total = total,
+                        tension_action = ?action,
+                        "Tension de salon declenchee"
+                    );
+                    if tension_is_stronger(&result.action, action) {
+                        let (new_action, duration) = match action {
+                            TensionAction::Mute => (Action::Mute, Some(tcfg.mute_duration_secs)),
+                            TensionAction::Delete => (Action::Delete, None),
+                            TensionAction::Warn => (Action::Warn, None),
+                            TensionAction::None => (Action::None, None),
+                        };
+                        let tension_reason = format!(
+                            "Tension de salon (somme glissante {:.2} sur {} derniers messages)",
+                            total, tcfg.buffer_size
+                        );
+                        result.reason = if result.reason.is_empty() {
+                            tension_reason
+                        } else {
+                            format!("{} + {}", result.reason, tension_reason)
+                        };
+                        result.action = new_action;
+                        result.duration = duration;
+                    }
+                    // Vider le buffer apres declenchement pour eviter le
+                    // re-trigger immediat au message suivant (laisse la
+                    // conversation redescendre).
+                    buffer.clear_channel(&cmd.guild_id, &cmd.channel_id);
                 }
             }
         }

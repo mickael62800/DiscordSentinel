@@ -208,6 +208,10 @@ pub async fn build_app_state(
         config.discord_bot_token.clone(),
     ));
 
+    // Buffer in-memory partage (tension de salon). Pas de persistance :
+    // reset au restart bot, c'est OK car seulement les N derniers messages.
+    let channel_tension_buffer = Arc::new(crate::domain::services::ChannelTensionBuffer::new());
+
     let analyze_uc = Arc::new(
         AnalyzeMessageService::new(
             rule_repo.clone(),
@@ -217,7 +221,8 @@ pub async fn build_app_state(
             ia_config_repo.clone(),
             inference_limiter.clone(),
         )
-        .with_text_inference(inference.clone(), tokenizer),
+        .with_text_inference(inference.clone(), tokenizer)
+        .with_channel_tension(channel_tension_buffer.clone(), bot_config_repo.clone()),
     );
     let analyze_image_uc = Arc::new(AnalyzeImageService::new(
         inference.clone(),
