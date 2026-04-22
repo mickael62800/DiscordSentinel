@@ -51,3 +51,7 @@ impl ManageInfractionsUseCase for ManageInfractionsService {
         self.infraction_repo.delete_older_than_days(guild_id, days).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_infractions.rs"]
+mod tests;

@@ -123,3 +123,7 @@ pub async fn rate_limit_middleware(
             .into_response()
     }
 }
+
+#[cfg(test)]
+#[path = "tests/rate_limit.rs"]
+mod tests;

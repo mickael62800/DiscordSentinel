@@ -106,3 +106,7 @@ impl ManageRolePanelsUseCase for ManageRolePanelsService {
         self.repo.delete_auto_role(guild_id, role_id).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_role_panels.rs"]
+mod tests;

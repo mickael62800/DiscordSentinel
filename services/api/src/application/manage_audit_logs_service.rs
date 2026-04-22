@@ -47,3 +47,7 @@ impl ManageAuditLogsUseCase for ManageAuditLogsService {
         self.repo.delete_older_than_days(guild_id, days).await
     }
 }
+
+#[cfg(test)]
+#[path = "tests/manage_audit_logs.rs"]
+mod tests;
