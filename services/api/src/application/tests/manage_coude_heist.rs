@@ -382,8 +382,16 @@ async fn attempt_heist_failure_sends_to_prison() {
 
 #[tokio::test]
 async fn attempt_heist_success_withdraws_and_credits() {
-    // Meme strategie : loop jusqu'a voir un succes.
+    // Seed avec tous les outils HEIST_TOOLS -> chance maximale (55%).
+    // Rend le test stable : P(aucun succes en 50 iterations) ~= 1e-18.
     let (h, c, i, w, b) = default_service_parts();
+    use crate::domain::entities::HEIST_TOOLS;
+    for tool in HEIST_TOOLS {
+        i.inventory.lock().unwrap().push(CoudeInventoryItem {
+            guild_id: "g".into(), user_id: "u".into(),
+            item_key: tool.key.to_string(), quantity: 10,
+        });
+    }
     let svc = build_service(h.clone(), c.clone(), i, w.clone(), b);
 
     let mut saw_success = false;
@@ -408,7 +416,7 @@ async fn attempt_heist_success_withdraws_and_credits() {
             break;
         }
     }
-    assert!(saw_success, "devrait voir au moins un succes en 50 iterations");
+    assert!(saw_success, "devrait voir au moins un succes en 50 iterations avec tous les outils");
 }
 
 #[tokio::test]
