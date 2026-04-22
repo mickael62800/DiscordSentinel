@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::domain::entities::CoudeBalanceParams;
+use crate::domain::entities::{apply_insurance_to_loss, compute_combat_xp, CoudeBalanceParams};
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{
     self as engine, PlayerLite, ServerEventLite,
@@ -230,26 +230,23 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
 
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
-                // Assurance
-                let mut actual_loss = result.coins_lost_by_loser;
-                if let Ok(Some(ins)) =
-                    self.inventory_uc.get_active_insurance(&combat.guild_id, loser_id).await
-                {
-                    let _ = self.inventory_uc.expire_insurance(ins.id).await;
-                    if ins.is_scam {
-                        actual_loss = result.coins_lost_by_loser.saturating_mul(2);
-                        insurance_msg = Some(format!(
-                            "\u{1f480} L'assurance de <@{}> etait une **ARNAQUE** ! Double perte : **-{} coins** !",
-                            loser_id, actual_loss
-                        ));
-                    } else {
-                        actual_loss = result.coins_lost_by_loser / 2;
-                        insurance_msg = Some(format!(
-                            "\u{1f6e1}\u{fe0f} L'assurance a amorti le coup pour <@{}> ! Perte reduite : **-{} coins** (au lieu de {})",
-                            loser_id, actual_loss, result.coins_lost_by_loser
-                        ));
-                    }
+                // Assurance (regles pures → domain::apply_insurance_to_loss)
+                let active_insurance = self
+                    .inventory_uc
+                    .get_active_insurance(&combat.guild_id, loser_id)
+                    .await
+                    .ok()
+                    .flatten();
+                let adj = apply_insurance_to_loss(
+                    result.coins_lost_by_loser,
+                    active_insurance.as_ref(),
+                    loser_id,
+                );
+                if let Some(ins_id) = adj.consumed_insurance_id {
+                    let _ = self.inventory_uc.expire_insurance(ins_id).await;
                 }
+                insurance_msg = adj.message;
+                let mut actual_loss = adj.actual_loss;
 
                 // Cap sur solde reel du perdant
                 let loser_wallet = self
@@ -343,11 +340,13 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         .await;
                 }
 
-                // XP
-                let level_gap = (attacker.level - defender.level).abs();
-                let winner_is_underdog = level_gap >= 3 && result.is_giant_killer;
-                let winner_xp = if winner_is_underdog { 30 } else { 15 };
-                let loser_xp = 5i64;
+                // XP (regles pures → domain::compute_combat_xp)
+                let awards = compute_combat_xp(
+                    attacker.level, defender.level, result.is_giant_killer,
+                );
+                let winner_is_underdog = awards.winner_is_underdog;
+                let winner_xp = awards.winner_xp;
+                let loser_xp = awards.loser_xp;
 
                 if let Ok(xp) = self
                     .players_uc
@@ -604,16 +603,4 @@ async fn load_balance_params(
     }
 }
 
-/// Pure helper (duplicata volontaire avec domain/entities/coude_player.rs
-/// `title_for_level`) pour rester self-contained dans l'orchestration.
-fn title_for_level(level: i32) -> &'static str {
-    match level {
-        1..=4 => "Debutant",
-        5..=9 => "Bagarreur",
-        10..=14 => "Guerrier",
-        15..=19 => "Veteran",
-        20..=24 => "Champion",
-        25 => "Inarretable",
-        _ => "Debutant",
-    }
-}
+use crate::domain::entities::coude_title_for_level as title_for_level;
