@@ -9,6 +9,10 @@
 //! le bot appelle juste le RPC `ResolveCombatNow` et poste l'embed
 //! retourne pret a l'emploi.
 
+#[cfg(test)]
+#[path = "tests/resolve_combat_now.rs"]
+mod tests;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
