@@ -64,6 +64,10 @@ pub struct CoudeBalanceParams {
     /// PV min (%) requis pour les DEUX combattants pour engager un combat.
     /// 0 = desactive. Empeche un joueur a 0 HP de se faire defier.
     pub combat_min_hp_pct: u64,
+    /// Delai entre 2 tentatives de braquage par joueur (en jours).
+    pub heist_cooldown_days: u64,
+    /// Duree de prison apres un braquage rate (en heures).
+    pub heist_prison_hours: u64,
 }
 
 impl Default for CoudeBalanceParams {
@@ -81,6 +85,8 @@ impl Default for CoudeBalanceParams {
             bouclier_def_bonus_pct: 20,
             poison_damage_per_round: 5,
             combat_min_hp_pct: 40,
+            heist_cooldown_days: 7,
+            heist_prison_hours: 24,
         }
     }
 }
@@ -135,6 +141,8 @@ impl CoudeBalanceParams {
                 d.poison_damage_per_round,
             ),
             combat_min_hp_pct: parse_u64(cfg, "combat_min_hp_pct", d.combat_min_hp_pct),
+            heist_cooldown_days: parse_u64(cfg, "heist_cooldown_days", d.heist_cooldown_days),
+            heist_prison_hours: parse_u64(cfg, "heist_prison_hours", d.heist_prison_hours),
         }
     }
 }

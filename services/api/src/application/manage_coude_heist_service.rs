@@ -88,7 +88,9 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
                 last_success: None,
             });
         };
-        let next = last.attempted_at + ChronoDuration::days(HEIST_COOLDOWN_DAYS);
+        let params = self.load_balance(guild_id).await;
+        let cooldown_days = params.heist_cooldown_days.max(1) as i64;
+        let next = last.attempted_at + ChronoDuration::days(cooldown_days);
         let ready = Utc::now() >= next;
         Ok(HeistCooldownStatus {
             ready,
@@ -131,12 +133,13 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             ));
         }
 
-        // 2. Check cooldown hebdo
+        // 2. Check cooldown configurable (default 7 jours, cf. CoudeBalanceParams)
+        let params_early = self.load_balance(guild_id).await;
         let cooldown = self.get_cooldown_status(guild_id, user_id).await?;
         if !cooldown.ready {
             return Err(DomainError::Forbidden(format!(
                 "Cooldown {} jours non ecoule.",
-                HEIST_COOLDOWN_DAYS
+                params_early.heist_cooldown_days
             )));
         }
 
@@ -253,9 +256,10 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             )
             .await?;
 
-        // 10. Si echec → prison 24h.
+        // 10. Si echec → prison (duree configurable, default 24h).
         let prison_released_at = if !success {
-            let released = Utc::now() + ChronoDuration::hours(HEIST_PRISON_HOURS);
+            let prison_hours = params_early.heist_prison_hours.max(1) as i64;
+            let released = Utc::now() + ChronoDuration::hours(prison_hours);
             self.heist_repo
                 .send_to_prison(guild_id, user_id, released, "heist_failed")
                 .await?;
