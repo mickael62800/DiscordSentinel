@@ -407,6 +407,11 @@ path = "tests/integration/postgres_wallet/repo.rs"
 name = "integration_postgres_tickets"
 path = "tests/integration/postgres_tickets/repo.rs"
 
+# postgres games repo
+[[test]]
+name = "integration_postgres_games"
+path = "tests/integration/postgres_games/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
