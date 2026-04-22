@@ -72,13 +72,9 @@ pub async fn grant_role(
     validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
     let role = parse_role(&dto.role)?;
-    let display_name = dto
-        .display_name
-        .as_deref()
-        .unwrap_or("user")
-        .chars()
-        .take(100)
-        .collect::<String>();
+    let display_name = crate::domain::entities::truncate_display_name(
+        dto.display_name.as_deref().unwrap_or("user"),
+    );
 
     // Upsert api_users (garantit la FK)
     sqlx::query(
@@ -140,8 +136,8 @@ pub async fn update_role(
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
-    // Un owner ne peut PAS retirer son propre role d'owner (eviter le lockout)
-    if user_id == ctx.discord_user_id && dto.role != "owner" {
+    // Regle metier : anti-lockout du dernier owner-caller.
+    if crate::domain::entities::is_owner_self_demotion(&ctx.discord_user_id, &user_id, &dto.role) {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
             "un owner ne peut pas se retrograder (lockout risk)".into(),
         )));
@@ -203,7 +199,7 @@ pub async fn revoke_role(
     .await
     .map_err(|e| internal(format!("check target owner: {e}")))?;
 
-    if is_target_owner && total_owners <= 1 {
+    if crate::domain::entities::would_revoke_last_owner(is_target_owner, total_owners) {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
             "impossible de revoquer le dernier owner de la guild".into(),
         )));
