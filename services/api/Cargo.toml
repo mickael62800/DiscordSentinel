@@ -447,6 +447,11 @@ path = "tests/integration/postgres_coude_player/repo.rs"
 name = "integration_postgres_voice_channel"
 path = "tests/integration/postgres_voice_channel/repo.rs"
 
+# postgres misc_2 repos (discord_role + log + user_activity + rule)
+[[test]]
+name = "integration_postgres_misc_2"
+path = "tests/integration/postgres_misc_2/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
