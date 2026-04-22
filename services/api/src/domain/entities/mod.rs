@@ -22,7 +22,12 @@ mod ia_config;
 mod strikes;
 mod sanction_reminder;
 mod user_note;
+mod ai_models;
 pub mod analytics;
+
+pub use ai_models::{
+    format_model_display_name, is_valid_model_type, path_basename, SUPPORTED_MODEL_TYPES,
+};
 
 pub use ia_config::IaConfig;
 pub use audit_log::{

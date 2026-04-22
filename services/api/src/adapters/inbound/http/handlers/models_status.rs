@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::entities::format_model_display_name;
 
 #[derive(Debug, Serialize)]
 pub struct ModelInfo {
@@ -27,20 +28,12 @@ pub async fn get_models_status(
 
     let models = vec![
         ModelInfo {
-            name: if vision_path.is_empty() {
-                "Vision ONNX (non configure)".to_string()
-            } else {
-                format!("Vision ONNX ({})", vision_path.rsplit('/').next().unwrap_or(&vision_path))
-            },
+            name: format_model_display_name("Vision", &vision_path),
             model_type: "vision".to_string(),
             loaded: state.inference.vision_available(),
         },
         ModelInfo {
-            name: if text_path.is_empty() {
-                "Text ONNX (non configure)".to_string()
-            } else {
-                format!("Text ONNX ({})", text_path.rsplit('/').next().unwrap_or(&text_path))
-            },
+            name: format_model_display_name("Text", &text_path),
             model_type: "text".to_string(),
             loaded: state.inference.text_available(),
         },
