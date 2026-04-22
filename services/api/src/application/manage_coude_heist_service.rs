@@ -10,6 +10,10 @@
 //! - wallet du joueur (wallet_repo.credit/debit)
 //! - consommation des outils (inventory_uc.use_item)
 
+#[cfg(test)]
+#[path = "tests/manage_coude_heist.rs"]
+mod tests;
+
 use std::sync::Arc;
 
 use async_trait::async_trait;
