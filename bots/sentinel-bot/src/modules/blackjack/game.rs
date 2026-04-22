@@ -42,7 +42,7 @@ pub(super) async fn handle_bet_select(ctx: &Context, component: &ComponentIntera
         None => return,
     };
 
-    let (game, wallet_taunts) = match api
+    let (game, wallet_taunts, wallet_balance) = match api
         .start_game(
             &guild_id,
             &component.user.id.to_string(),
@@ -69,7 +69,7 @@ pub(super) async fn handle_bet_select(ctx: &Context, component: &ComponentIntera
     }
     drop(data);
 
-    let (embed, attachment) = game_logic::build_game_message(&game);
+    let (embed, attachment) = game_logic::build_game_message(&game, wallet_balance);
     let components = if game_logic::is_game_over(&game.status) {
         vec![]
     } else {

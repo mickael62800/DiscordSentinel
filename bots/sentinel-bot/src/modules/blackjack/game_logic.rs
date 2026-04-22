@@ -178,8 +178,14 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     // Verifier s'il y a une partie en cours
     match api.get_active(&guild_id, &user_id).await {
         Ok(Some(game)) if game.status == "playing" => {
-            // Reprendre la partie en cours
-            let (embed, attachment) = build_game_message(&game);
+            // Reprendre la partie en cours — fetch le solde live pour
+            // l'afficher a cote de l'embed.
+            let wallet_balance = api
+                .get_wallet(&guild_id, &user_id)
+                .await
+                .map(|w| w.coins)
+                .unwrap_or(0);
+            let (embed, attachment) = build_game_message(&game, wallet_balance);
             let components = build_buttons(&game);
             let mut msg = CreateInteractionResponseMessage::new()
                 .embed(embed)
@@ -197,7 +203,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     // Nouvelle partie
-    let (game, wallet_taunts) = match api.start_game(&guild_id, &user_id, &username, mise).await {
+    let (game, wallet_taunts, wallet_balance) = match api.start_game(&guild_id, &user_id, &username, mise).await {
         Ok(g) => g,
         Err(e) => {
             reply_ephemeral(ctx, command, &format!("Erreur : {e}")).await;
@@ -205,7 +211,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let (embed, attachment) = build_game_message(&game);
+    let (embed, attachment) = build_game_message(&game, wallet_balance);
     let game_over = is_game_over(&game.status);
     let components = if game_over { vec![] } else { build_buttons(&game) };
 
@@ -317,7 +323,7 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         _ => return,
     };
 
-    let (game, wallet_taunts) = match result {
+    let (game, wallet_taunts, wallet_balance) = match result {
         Ok(g) => g,
         Err(e) => {
             followup_err(ctx, component, format!("Erreur : {e}")).await;
@@ -325,7 +331,7 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    let (embed, attachment) = build_game_message(&game);
+    let (embed, attachment) = build_game_message(&game, wallet_balance);
     let game_over = is_game_over(&game.status);
     let components = if game_over { vec![] } else { build_buttons(&game) };
 

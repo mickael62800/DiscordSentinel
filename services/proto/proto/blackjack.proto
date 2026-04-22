@@ -96,4 +96,7 @@ message TauntEvent {
 message BlackjackGameResult {
   BlackjackGame game = 1;
   repeated TauntEvent taunt_events = 2;
+  // Solde du joueur apres l action (apres debit mise / credit gain).
+  // Affiche dans l embed pour que le joueur voie combien il peut miser.
+  int64 wallet_balance = 3;
 }

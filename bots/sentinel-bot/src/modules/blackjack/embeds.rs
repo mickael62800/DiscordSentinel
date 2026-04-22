@@ -55,8 +55,9 @@ fn hand_to_string(hand: &[CardDto]) -> String {
 /// sur une representation texte.
 pub fn build_game_message(
     game: &BlackjackGameDto,
+    wallet_balance: i64,
 ) -> (CreateEmbed, Option<CreateAttachment>) {
-    let embed = build_game_embed(game);
+    let embed = build_game_embed(game, wallet_balance);
     match card_image::render_table(&game.player_hand, &game.dealer_hand) {
         Some(bytes) => {
             let embed_with_image = embed.image(format!("attachment://{}", TABLE_IMAGE_NAME));
@@ -68,7 +69,7 @@ pub fn build_game_message(
 }
 
 /// Embed principal d'une partie — en cours ou terminee (victoire / bust / push / ...).
-pub fn build_game_embed(game: &BlackjackGameDto) -> CreateEmbed {
+pub fn build_game_embed(game: &BlackjackGameDto, wallet_balance: i64) -> CreateEmbed {
     let over = is_game_over(&game.status);
 
     let player_hand_str = hand_to_string(&game.player_hand);
@@ -160,6 +161,11 @@ pub fn build_game_embed(game: &BlackjackGameDto) -> CreateEmbed {
             "\u{1f3e6} Croupier",
             format!("{}\n**Score : {}**", dealer_hand_str, dealer_score_str),
             true,
+        )
+        .field(
+            "\u{1f4b0} Porte-monnaie",
+            format!("{} coins", wallet_balance),
+            false,
         )
         .color(color)
         .footer(CreateEmbedFooter::new("Blackjack | Sentinel"))

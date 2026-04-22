@@ -136,11 +136,13 @@ use super::*;
         let result = BlackjackActionResult {
             game,
             taunt_events: vec![taunt],
+            wallet_balance: 1234,
         };
         let p = action_result_to_proto(result);
         assert!(p.game.is_some());
         assert_eq!(p.game.unwrap().status, "player_win");
         assert_eq!(p.taunt_events.len(), 1);
+        assert_eq!(p.wallet_balance, 1234);
     }
 
     #[test]
@@ -154,8 +156,9 @@ use super::*;
             doubled: false, payout: 0,
             created_at: ts(), finished_at: None,
         };
-        let p = action_result_to_proto(BlackjackActionResult { game, taunt_events: vec![] });
+        let p = action_result_to_proto(BlackjackActionResult { game, taunt_events: vec![], wallet_balance: 0 });
         assert!(p.taunt_events.is_empty());
+        assert_eq!(p.wallet_balance, 0);
     }
 
     #[test]

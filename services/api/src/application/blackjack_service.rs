@@ -16,6 +16,8 @@ use crate::ports::outbound::{BlackjackRepository, WalletRepository};
 pub struct BlackjackActionResult {
     pub game: BlackjackGame,
     pub taunt_events: Vec<TauntEvent>,
+    /// Solde du wallet apres l action (pour affichage live dans l embed).
+    pub wallet_balance: i64,
 }
 
 /// # Migration wallet unifie (Migration #4)
@@ -146,7 +148,8 @@ impl BlackjackService {
         };
 
         self.repo.create(&game).await?;
-        Ok(BlackjackActionResult { game, taunt_events })
+        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
+        Ok(BlackjackActionResult { game, taunt_events, wallet_balance })
     }
 
     /// Le joueur tire une carte supplémentaire.
@@ -172,7 +175,8 @@ impl BlackjackService {
         self.repo.update(&game).await?;
         // Hit ne touche pas le wallet (sauf si bust — pas de credit). Aucun
         // taunt wallet a propager ici.
-        Ok(BlackjackActionResult { game, taunt_events: vec![] })
+        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
+        Ok(BlackjackActionResult { game, taunt_events: vec![], wallet_balance })
     }
 
     /// Le joueur reste avec sa main actuelle. Le dealer joue.
@@ -184,7 +188,8 @@ impl BlackjackService {
         let taunt_events = self.resolve_game(&mut game).await?;
 
         self.repo.update(&game).await?;
-        Ok(BlackjackActionResult { game, taunt_events })
+        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
+        Ok(BlackjackActionResult { game, taunt_events, wallet_balance })
     }
 
     /// Double down : doubler la mise, tirer une carte, puis le dealer joue.
@@ -237,7 +242,8 @@ impl BlackjackService {
         }
 
         self.repo.update(&game).await?;
-        Ok(BlackjackActionResult { game, taunt_events })
+        let wallet_balance = self.wallet_uc.get_balance(&game.guild_id, &game.user_id).await?;
+        Ok(BlackjackActionResult { game, taunt_events, wallet_balance })
     }
 
     /// Récupère la partie active d'un joueur.

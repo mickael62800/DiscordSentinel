@@ -126,7 +126,7 @@ impl ApiClient {
         user_id: &str,
         username: &str,
         bet: i64,
-    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
+    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         let req = proto::StartGameRequest {
             guild_id: guild_id.to_string(),
             user_id: user_id.to_string(),
@@ -142,15 +142,15 @@ impl ApiClient {
         Ok(proto_result_to_dto(result))
     }
 
-    pub async fn hit(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
+    pub async fn hit(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         self.game_action(game_id, BlackjackAction::Hit).await
     }
 
-    pub async fn stand(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
+    pub async fn stand(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         self.game_action(game_id, BlackjackAction::Stand).await
     }
 
-    pub async fn double_down(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
+    pub async fn double_down(&self, game_id: &str) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         self.game_action(game_id, BlackjackAction::Double).await
     }
 
@@ -158,7 +158,7 @@ impl ApiClient {
         &self,
         game_id: &str,
         action: BlackjackAction,
-    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>), String> {
+    ) -> Result<(BlackjackGameDto, Vec<TauntEvent>, i64), String> {
         let req = proto::GameIdRequest {
             game_id: game_id.to_string(),
         };
@@ -198,7 +198,6 @@ impl ApiClient {
 
     // ── Wallet (gRPC) ──
 
-    #[allow(dead_code)]
     pub async fn get_wallet(
         &self,
         guild_id: &str,
@@ -400,7 +399,8 @@ fn proto_taunt_to_dto(t: proto::TauntEvent) -> TauntEvent {
 /// squelette vide si jamais le champ manque pour robustesse.
 fn proto_result_to_dto(
     r: proto::BlackjackGameResult,
-) -> (BlackjackGameDto, Vec<TauntEvent>) {
+) -> (BlackjackGameDto, Vec<TauntEvent>, i64) {
+    let wallet_balance = r.wallet_balance;
     let game = r.game.map(proto_game_to_dto).unwrap_or(BlackjackGameDto {
         id: String::new(),
         guild_id: String::new(),
@@ -418,7 +418,7 @@ fn proto_result_to_dto(
         finished_at: None,
     });
     let taunts = r.taunt_events.into_iter().map(proto_taunt_to_dto).collect();
-    (game, taunts)
+    (game, taunts, wallet_balance)
 }
 
 fn proto_game_to_dto(g: proto::BlackjackGame) -> BlackjackGameDto {

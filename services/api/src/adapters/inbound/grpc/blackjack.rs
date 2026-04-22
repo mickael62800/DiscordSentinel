@@ -219,6 +219,7 @@ fn action_result_to_proto(
     proto::BlackjackGameResult {
         game: Some(blackjack_game_to_proto(result.game)),
         taunt_events: result.taunt_events.into_iter().map(taunt_to_proto).collect(),
+        wallet_balance: result.wallet_balance,
     }
 }
 
