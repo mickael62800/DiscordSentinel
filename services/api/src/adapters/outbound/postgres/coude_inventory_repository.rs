@@ -231,7 +231,7 @@ impl CoudeInventoryRepository for PgCoudeInventoryRepository {
                 WHERE guild_id = $1 AND target_id = $2 AND claimed = FALSE
                 RETURNING amount
             )
-            SELECT COALESCE(SUM(amount), 0) FROM claimed"#,
+            SELECT COALESCE(SUM(amount), 0)::BIGINT FROM claimed"#,
         )
         .bind(guild_id)
         .bind(target_id)

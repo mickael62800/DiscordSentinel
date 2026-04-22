@@ -472,6 +472,11 @@ path = "tests/integration/postgres_misc_5/repo.rs"
 name = "integration_postgres_misc_6"
 path = "tests/integration/postgres_misc_6/repo.rs"
 
+# postgres coude_inventory repo
+[[test]]
+name = "integration_postgres_coude_inventory"
+path = "tests/integration/postgres_coude_inventory/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
