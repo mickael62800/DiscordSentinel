@@ -3,7 +3,7 @@ use uuid::Uuid;
 /// Pari posé sur un combat Coup de Coude.
 #[derive(Debug, Clone)]
 pub struct CoudeBet {
-    pub id: i64,
+    pub id: Uuid,
     pub guild_id: String,
     pub combat_id: Uuid,
     pub bettor_id: String,
@@ -29,7 +29,7 @@ pub struct NewCoudeBet {
 /// Résultat de résolution d'un pari : paiement individuel + flag gagné/perdu.
 #[derive(Debug, Clone)]
 pub struct BetPayout {
-    pub bet_id: i64,
+    pub bet_id: Uuid,
     pub bettor_id: String,
     pub bettor_name: String,
     pub backed_id: String,

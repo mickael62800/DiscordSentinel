@@ -2,6 +2,8 @@ use super::*;
 use uuid::Uuid;
 
 fn bet(id: i64, bettor: &str, backed: &str, amount: i64) -> CoudeBet {
+    // Mapper id i64 -> Uuid deterministe pour les tests legacy.
+    let id = Uuid::from_u128(id as u128);
     CoudeBet {
         id,
         guild_id: "g".into(),
@@ -215,9 +217,9 @@ fn payouts_preserve_input_order() {
     ];
     let plan = calculate_bet_resolution(&bets, Some("A"), "A", "B");
     assert_eq!(plan.payouts.len(), 3);
-    assert_eq!(plan.payouts[0].bet_id, 10);
-    assert_eq!(plan.payouts[1].bet_id, 20);
-    assert_eq!(plan.payouts[2].bet_id, 30);
+    assert_eq!(plan.payouts[0].bet_id, Uuid::from_u128(10));
+    assert_eq!(plan.payouts[1].bet_id, Uuid::from_u128(20));
+    assert_eq!(plan.payouts[2].bet_id, Uuid::from_u128(30));
 }
 
 #[test]

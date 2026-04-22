@@ -26,7 +26,7 @@ impl PgCoudeBetRepository {
 
 #[derive(sqlx::FromRow)]
 struct BetRow {
-    id: i64,
+    id: Uuid,
     guild_id: String,
     combat_id: Uuid,
     bettor_id: String,
@@ -288,7 +288,7 @@ impl CoudeBetRepository for PgCoudeBetRepository {
     ) -> Result<RefundSummary, DomainError> {
         let mut tx = self.pool.begin().await.map_err(pg_err)?;
 
-        let bets: Vec<(i64, String, i64)> = sqlx::query_as(
+        let bets: Vec<(Uuid, String, i64)> = sqlx::query_as(
             "SELECT id, bettor_id, amount FROM coude_bets
              WHERE combat_id = $1 AND won IS NULL",
         )

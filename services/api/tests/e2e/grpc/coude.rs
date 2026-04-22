@@ -406,7 +406,7 @@ struct MockBetsUc;
 impl ManageCoudeBetsUseCase for MockBetsUc {
     async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
         Ok(vec![CoudeBet {
-            id: 1, guild_id: "g".into(), combat_id,
+            id: Uuid::from_u128(1), guild_id: "g".into(), combat_id,
             bettor_id: "u".into(), bettor_name: "Joe".into(),
             backed_id: "a".into(), amount: 100, won: None, payout: None,
         }])

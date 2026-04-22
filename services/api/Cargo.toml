@@ -487,6 +487,11 @@ path = "tests/integration/postgres_coude_combat/repo.rs"
 name = "integration_postgres_analytics"
 path = "tests/integration/postgres_analytics/repo.rs"
 
+# postgres coude_bet repo (wallet chain via stub taunts)
+[[test]]
+name = "integration_postgres_coude_bet"
+path = "tests/integration/postgres_coude_bet/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"

@@ -147,8 +147,9 @@ use super::*;
 
     #[test]
     fn bet_to_proto_mapping() {
+        let bid = Uuid::from_u128(42);
         let b = CoudeBet {
-            id: 42,
+            id: bid,
             guild_id: "g".into(),
             combat_id: Uuid::nil(),
             bettor_id: "u".into(),
@@ -159,7 +160,7 @@ use super::*;
             payout: Some(200),
         };
         let pr = bets::bet_to_proto(b);
-        assert_eq!(pr.id, 42);
+        assert_eq!(pr.id, bid.to_string());
         assert_eq!(pr.amount, 100);
         assert_eq!(pr.won, Some(true));
         assert_eq!(pr.payout, Some(200));
@@ -167,12 +168,13 @@ use super::*;
 
     #[test]
     fn bet_payout_to_proto_mapping() {
+        let pid = Uuid::from_u128(1);
         let p = BetPayout {
-            bet_id: 1, bettor_id: "u".into(), bettor_name: "n".into(),
+            bet_id: pid, bettor_id: "u".into(), bettor_name: "n".into(),
             backed_id: "a".into(), amount_bet: 100, payout: 250, won: true,
         };
         let pr = bets::bet_payout_to_proto(p);
-        assert_eq!(pr.bet_id, 1);
+        assert_eq!(pr.bet_id, pid.to_string());
         assert_eq!(pr.amount_bet, 100);
         assert_eq!(pr.payout, 250);
         assert!(pr.won);

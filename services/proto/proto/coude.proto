@@ -308,7 +308,7 @@ service CoudeBetsService {
 }
 
 message CoudeBet {
-  int64 id = 1;
+  string id = 1;
   string guild_id = 2;
   string combat_id = 3;
   string bettor_id = 4;
@@ -346,7 +346,7 @@ message RefundBetsRequest {
 }
 
 message BetPayout {
-  int64 bet_id = 1;
+  string bet_id = 1;
   string bettor_id = 2;
   string bettor_name = 3;
   string backed_id = 4;

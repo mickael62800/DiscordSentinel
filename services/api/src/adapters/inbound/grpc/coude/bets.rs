@@ -25,7 +25,7 @@ pub struct CoudeBetsGrpc {
 
 pub(super) fn bet_to_proto(b: CoudeBet) -> proto::CoudeBet {
     proto::CoudeBet {
-        id: b.id,
+        id: b.id.to_string(),
         guild_id: b.guild_id,
         combat_id: b.combat_id.to_string(),
         bettor_id: b.bettor_id,
@@ -39,7 +39,7 @@ pub(super) fn bet_to_proto(b: CoudeBet) -> proto::CoudeBet {
 
 pub(super) fn bet_payout_to_proto(p: BetPayout) -> proto::BetPayout {
     proto::BetPayout {
-        bet_id: p.bet_id,
+        bet_id: p.bet_id.to_string(),
         bettor_id: p.bettor_id,
         bettor_name: p.bettor_name,
         backed_id: p.backed_id,
