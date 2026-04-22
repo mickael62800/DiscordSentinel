@@ -21,7 +21,6 @@ fn dashboard_inner() -> Router<AppState> {
         .route("/bots/config/{guild_id}", get(handlers::bot_config::get_guild_config))
         .route("/bots/config/{guild_id}/{bot_name}", get(handlers::bot_config::get_bot_config))
         .route("/bots/config", post(handlers::bot_config::set_config).delete(handlers::bot_config::delete_config))
-        .route("/ia-config/{guild_id}", get(handlers::ia_config::get_ia_config).put(handlers::ia_config::save_ia_config))
         .route("/purge/infractions", delete(handlers::purge::purge_infractions))
         .route("/purge/audit-logs", delete(handlers::purge::purge_audit_logs))
         .route("/purge/logs", delete(handlers::purge::purge_logs))

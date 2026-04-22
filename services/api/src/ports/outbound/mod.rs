@@ -17,13 +17,11 @@ mod daily_activity_repository;
 mod role_panel_repository;
 mod analytics_repository;
 mod discord_role_repository;
-mod ia_config_repository;
 mod notes_repository;
 mod reminder_repository;
 mod strike_repository;
 
 pub use analytics_repository::AnalyticsRepository;
-pub use ia_config_repository::IaConfigRepository;
 pub use audit_log_repository::AuditLogRepository;
 pub use daily_activity_repository::DailyActivityRepository;
 pub use role_panel_repository::RolePanelRepository;

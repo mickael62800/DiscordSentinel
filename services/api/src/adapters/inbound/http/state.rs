@@ -17,7 +17,7 @@ use crate::ports::inbound::manage_coude_economy::ManageCoudeEconomyUseCase;
 use crate::ports::inbound::manage_coude_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
 use crate::application::BlackjackService;
-use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, IaConfigRepository, LogRepository, WalletRepository};
+use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, LogRepository, WalletRepository};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -44,7 +44,6 @@ pub struct AppState {
     pub log_repo: Arc<dyn LogRepository>,
     pub guild_repo: Arc<dyn GuildRepository>,
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
-    pub ia_config_repo: Arc<dyn IaConfigRepository>,
     pub discord_role_repo: Arc<dyn DiscordRoleRepository>,
     pub wallet_repo: Arc<dyn WalletRepository>,
     pub wallet_uc: Arc<dyn ManageWalletUseCase>,

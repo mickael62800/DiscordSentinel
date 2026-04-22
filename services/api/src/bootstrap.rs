@@ -28,7 +28,7 @@ use crate::adapters::outbound::postgres::{
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
-    PgIaConfigRepository, PgInfractionRepository, PgLevelRepository, PgMemberRepository,
+    PgInfractionRepository, PgLevelRepository, PgMemberRepository,
     PgModerationRepository, PgModstatsRepository, PgNotesRepository, PgPendingActionRepository,
     PgReminderRepository, PgReviewRepository, PgRolePanelRepository, PgRuleRepository,
     PgSecurityEventRepository, PgSponsorshipRepository, PgStatsRepository, PgStrikeRepository,
@@ -184,7 +184,6 @@ pub async fn build_app_state(
         pg_pool.clone(),
         BatchWriterConfig::default(),
     ));
-    let ia_config_repo = Arc::new(PgIaConfigRepository::new(pg_pool.clone()));
     let notes_repo = Arc::new(PgNotesRepository::new(pg_pool.clone()));
     let reminder_repo = Arc::new(PgReminderRepository::new(pg_pool.clone()));
     let strike_repo = Arc::new(PgStrikeRepository::new(pg_pool.clone()));
@@ -218,11 +217,11 @@ pub async fn build_app_state(
             infraction_repo.clone(),
             cache.clone(),
             conduct_uc.clone(),
-            ia_config_repo.clone(),
+            bot_config_repo.clone(),
             inference_limiter.clone(),
         )
         .with_text_inference(inference.clone(), tokenizer)
-        .with_channel_tension(channel_tension_buffer.clone(), bot_config_repo.clone()),
+        .with_channel_tension(channel_tension_buffer.clone()),
     );
     let analyze_image_uc = Arc::new(AnalyzeImageService::new(
         inference.clone(),
@@ -230,7 +229,7 @@ pub async fn build_app_state(
         infraction_repo.clone(),
         cache.clone(),
         conduct_uc.clone(),
-        ia_config_repo.clone(),
+        bot_config_repo.clone(),
         inference_limiter.clone(),
     ));
     let rules_uc = Arc::new(ManageRulesService::new(rule_repo.clone(), cache.clone()));
@@ -498,7 +497,6 @@ pub async fn build_app_state(
         log_repo,
         guild_repo,
         bot_config_repo,
-        ia_config_repo,
         discord_role_repo,
         wallet_repo,
         wallet_uc: wallet_uc.clone(),

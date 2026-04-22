@@ -302,7 +302,7 @@ Les modèles sont chargés au démarrage de l'API. Mode dégradé automatique si
 
 ### Config IA per-guild
 
-Table `ia_config` : `text_enabled`, `text_threshold`, `vision_enabled`, `vision_threshold` — sliders temps-réel dans le desktop. Endpoints `GET/PUT /api/ia-config/{guild_id}`.
+Configuration IA centralisee dans `bot_guild_config` (bot_name=`automod-bot`) : cles `text_enabled`, `text_threshold`, `vision_enabled`, `vision_threshold`, `context_dampening`, `context_format`, `context_max_messages`, `context_max_chars`. Configurable depuis la page Composants -> Automod. La table historique `ia_config` est conservee en base pour backup (migration 146) mais n'est plus lue par l'API.
 
 ### Mode async (Phase 4)
 

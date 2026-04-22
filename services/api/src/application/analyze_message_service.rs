@@ -12,7 +12,7 @@ use crate::domain::services::{
 };
 use crate::domain::value_objects::{Action, FlagType};
 use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::ports::outbound::{BotConfigRepository, CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
+use crate::ports::outbound::{BotConfigRepository, CachePort, InfractionRepository, RuleRepository};
 
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
 const DEFAULT_TEXT_THRESHOLD: f32 = 0.5;
@@ -22,15 +22,17 @@ pub struct AnalyzeMessageService {
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
     conduct_uc: Arc<dyn ManageConductUseCase>,
-    ia_config_repo: Arc<dyn IaConfigRepository>,
+    /// Repo pour lire la config automod-bot : cles IA (text_enabled,
+    /// text_threshold, context_dampening, context_format) + cles tension
+    /// de salon (activation + seuils). Anciennement lu depuis la table
+    /// dediee `ia_config` ; fusion dans automod-bot via migration 146.
+    bot_config_repo: Arc<dyn BotConfigRepository>,
     inference_limiter: Arc<InferenceRateLimiter>,
     inference: Option<Arc<InferenceService>>,
     tokenizer: Option<Arc<TextTokenizer>>,
     /// Buffer in-memory pour la "tension de salon" (option : si None, la
     /// feature est desactivee quel que soit le contenu de la config).
     tension_buffer: Option<Arc<ChannelTensionBuffer>>,
-    /// Repo pour lire la config automod-bot (tension enable + seuils).
-    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl AnalyzeMessageService {
@@ -39,7 +41,7 @@ impl AnalyzeMessageService {
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
         conduct_uc: Arc<dyn ManageConductUseCase>,
-        ia_config_repo: Arc<dyn IaConfigRepository>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
         inference_limiter: Arc<InferenceRateLimiter>,
     ) -> Self {
         Self {
@@ -47,12 +49,11 @@ impl AnalyzeMessageService {
             infraction_repo,
             cache,
             conduct_uc,
-            ia_config_repo,
+            bot_config_repo,
             inference_limiter,
             inference: None,
             tokenizer: None,
             tension_buffer: None,
-            bot_config_repo: None,
         }
     }
 
@@ -69,15 +70,65 @@ impl AnalyzeMessageService {
 
     /// Ajoute la feature "tension de salon" (buffer glissant + seuils
     /// lus depuis `bot_guild_config` pour `automod-bot`).
-    pub fn with_channel_tension(
-        mut self,
-        buffer: Arc<ChannelTensionBuffer>,
-        bot_config_repo: Arc<dyn BotConfigRepository>,
-    ) -> Self {
+    pub fn with_channel_tension(mut self, buffer: Arc<ChannelTensionBuffer>) -> Self {
         self.tension_buffer = Some(buffer);
-        self.bot_config_repo = Some(bot_config_repo);
         self
     }
+}
+
+/// Config IA resolue depuis la config `automod-bot` (migration 146).
+#[derive(Debug, Clone)]
+pub(crate) struct IaConfigValues {
+    pub text_enabled: bool,
+    pub text_threshold: f32,
+    pub context_dampening: f64,
+    pub context_format: String,
+}
+
+impl Default for IaConfigValues {
+    fn default() -> Self {
+        Self {
+            text_enabled: true,
+            text_threshold: DEFAULT_TEXT_THRESHOLD,
+            context_dampening: 0.65,
+            context_format: "natural".to_string(),
+        }
+    }
+}
+
+/// Parse les cles IA (`text_enabled`, `text_threshold`, `context_dampening`,
+/// `context_format`) depuis la liste des `BotGuildConfig` de `automod-bot`.
+/// Fallback sur les defauts si cles absentes/malformees.
+pub(crate) fn parse_ia_config_from_bot_config(
+    entries: &[crate::domain::entities::BotGuildConfig],
+) -> IaConfigValues {
+    let mut cfg = IaConfigValues::default();
+    for e in entries {
+        match e.config_key.as_str() {
+            "text_enabled" => {
+                let v = e.config_value.to_ascii_lowercase();
+                cfg.text_enabled = matches!(v.as_str(), "true" | "1" | "yes");
+            }
+            "text_threshold" => {
+                if let Ok(n) = e.config_value.parse::<f32>() {
+                    cfg.text_threshold = n.clamp(0.0, 1.0);
+                }
+            }
+            "context_dampening" => {
+                if let Ok(n) = e.config_value.parse::<f64>() {
+                    cfg.context_dampening = n.clamp(0.0, 1.0);
+                }
+            }
+            "context_format" => {
+                let v = e.config_value.as_str();
+                if matches!(v, "natural" | "tagged") {
+                    cfg.context_format = v.to_string();
+                }
+            }
+            _ => {}
+        }
+    }
+    cfg
 }
 
 /// Config resolue pour la feature "tension de salon".
@@ -183,20 +234,23 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         let mut ia_score_individual: f64 = 0.0;
 
         // 3. Inference text IA (sentiment : anger, rage, threat, harassment)
-        // Charger la config IA per-guild pour le seuil de confiance
-        let ia_config = match self.ia_config_repo.get(&cmd.guild_id).await {
-            Ok(cfg) => cfg,
+        // Charger la config automod-bot (fusionnee avec l'ancien `ia_config`
+        // par la migration 146). On recupere toutes les cles une fois pour
+        // partager la lecture avec le bloc "tension de salon" plus bas.
+        let automod_entries = match self.bot_config_repo.get_config(&cmd.guild_id, "automod-bot").await {
+            Ok(e) => e,
             Err(e) => {
-                tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec chargement config IA, utilisation defauts");
-                None
+                tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec lecture config automod-bot, utilisation defauts");
+                vec![]
             }
         };
-        let text_enabled = ia_config.as_ref().map(|c| c.text_enabled).unwrap_or(true);
-        let text_threshold = ia_config.as_ref().map(|c| c.text_threshold as f32).unwrap_or(DEFAULT_TEXT_THRESHOLD);
-        let context_dampening = ia_config.as_ref().map(|c| c.context_dampening).unwrap_or(0.65);
-        let context_format = ia_config.as_ref().map(|c| c.context_format.clone()).unwrap_or_else(|| "natural".to_string());
+        let ia_cfg = parse_ia_config_from_bot_config(&automod_entries);
+        let text_enabled = ia_cfg.text_enabled;
+        let text_threshold = ia_cfg.text_threshold;
+        let context_dampening = ia_cfg.context_dampening;
+        let context_format = ia_cfg.context_format.clone();
         // Duree de mute configurable (defaut 600s = 10 min).
-        // Pas dans ia_config (schema fixe), lu depuis scoring ou defaut.
+        // Pas dans la config IA, lu depuis scoring ou defaut.
         let mute_duration_secs: u64 = 600;
 
         debug!(
@@ -311,17 +365,8 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         // messages du channel). S'ajoute comme second declencheur : si la
         // tension declenche une action plus severe que l'analyse individuelle,
         // on override. Sinon, l'action individuelle est gardee.
-        if let (Some(buffer), Some(bot_cfg_repo)) =
-            (self.tension_buffer.as_ref(), self.bot_config_repo.as_ref())
-        {
-            let entries = match bot_cfg_repo.get_config(&cmd.guild_id, "automod-bot").await {
-                Ok(e) => e,
-                Err(e) => {
-                    tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec lecture config automod-bot pour tension, skip");
-                    vec![]
-                }
-            };
-            let tcfg = parse_tension_config(&entries);
+        if let Some(buffer) = self.tension_buffer.as_ref() {
+            let tcfg = parse_tension_config(&automod_entries);
             if tcfg.enabled {
                 let entry = TensionEntry {
                     score: ia_score_individual,

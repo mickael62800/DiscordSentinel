@@ -1,16 +1,16 @@
-//! Tests d'integration postgres : ia_config + sponsorship + temp_role + daily_activity.
+//! Tests d'integration postgres : sponsorship + temp_role + daily_activity.
+//! (Les tests ia_config ont ete supprimes avec la migration 146 qui fusionne
+//!  les cles IA dans la config automod-bot.)
 
 use chrono::{Duration, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::{
-    PgDailyActivityRepository, PgIaConfigRepository, PgSponsorshipRepository,
-    PgTempRoleRepository,
+    PgDailyActivityRepository, PgSponsorshipRepository, PgTempRoleRepository,
 };
-use sentinel_api::domain::entities::IaConfig;
 use sentinel_api::ports::outbound::{
-    DailyActivityRepository, IaConfigRepository, SponsorshipRepository, TempRoleRepository,
+    DailyActivityRepository, SponsorshipRepository, TempRoleRepository,
 };
 
 async fn pool() -> PgPool {
@@ -20,56 +20,6 @@ async fn pool() -> PgPool {
 }
 fn fresh_id() -> String {
     format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128)
-}
-
-// ══════════════════════════════════════════════════════════
-// IaConfig
-// ══════════════════════════════════════════════════════════
-
-fn sample_ia_config(guild: &str) -> IaConfig {
-    let now = Utc::now();
-    IaConfig {
-        guild_id: guild.into(),
-        text_enabled: true, text_threshold: 0.7,
-        vision_enabled: false, vision_threshold: 0.5,
-        context_dampening: 0.3,
-        context_format: "natural".into(),
-        context_max_messages: 5,
-        context_max_chars: 2000,
-        created_at: now, updated_at: now,
-    }
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn ia_config_get_none_when_absent() {
-    let repo = PgIaConfigRepository::new(pool().await);
-    assert!(repo.get(&fresh_id()).await.unwrap().is_none());
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn ia_config_save_and_get_roundtrip() {
-    let repo = PgIaConfigRepository::new(pool().await);
-    let g = fresh_id();
-    let saved = repo.save(&sample_ia_config(&g)).await.unwrap();
-    assert_eq!(saved.guild_id, g);
-    assert_eq!(saved.text_threshold, 0.7);
-    assert_eq!(saved.context_max_messages, 5);
-    let got = repo.get(&g).await.unwrap().unwrap();
-    assert_eq!(got.context_format, "natural");
-}
-
-#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-async fn ia_config_save_is_upsert() {
-    let repo = PgIaConfigRepository::new(pool().await);
-    let g = fresh_id();
-    repo.save(&sample_ia_config(&g)).await.unwrap();
-    let mut updated = sample_ia_config(&g);
-    updated.text_threshold = 0.95;
-    updated.vision_enabled = true;
-    repo.save(&updated).await.unwrap();
-    let got = repo.get(&g).await.unwrap().unwrap();
-    assert_eq!(got.text_threshold, 0.95);
-    assert!(got.vision_enabled);
 }
 
 // ══════════════════════════════════════════════════════════

@@ -286,13 +286,6 @@ impl BotConfigRepository for StubBotConfigRepo {
     async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
 }
 
-pub struct StubIaConfigRepo;
-#[async_trait]
-impl IaConfigRepository for StubIaConfigRepo {
-    async fn get(&self, _: &str) -> Result<Option<IaConfig>, DomainError> { unimplemented!() }
-    async fn save(&self, _: &IaConfig) -> Result<IaConfig, DomainError> { unimplemented!() }
-}
-
 pub struct StubDiscordRoleRepo;
 #[async_trait]
 impl DiscordRoleRepository for StubDiscordRoleRepo {
@@ -645,7 +638,6 @@ fn base_state() -> AppState {
         log_repo: Arc::new(StubLogRepo),
         guild_repo: Arc::new(StubGuildRepo),
         bot_config_repo: Arc::new(StubBotConfigRepo),
-        ia_config_repo: Arc::new(StubIaConfigRepo),
         discord_role_repo: Arc::new(StubDiscordRoleRepo),
         members_uc: Arc::new(StubMembers),
         wallet_repo: Arc::new(StubWalletRepo),
@@ -775,14 +767,6 @@ pub fn build_test_state_analyze(analyze_uc: Arc<dyn AnalyzeMessageUseCase>) -> A
 pub fn build_test_state_security(security_uc: Arc<dyn ManageSecurityUseCase>) -> AppState {
     let mut state = base_state();
     state.security_uc = security_uc;
-    state
-}
-
-/// Construit un AppState avec un mock ia_config repository injecte.
-#[allow(dead_code)]
-pub fn build_test_state_ia_config(ia_config_repo: Arc<dyn IaConfigRepository>) -> AppState {
-    let mut state = base_state();
-    state.ia_config_repo = ia_config_repo;
     state
 }
 

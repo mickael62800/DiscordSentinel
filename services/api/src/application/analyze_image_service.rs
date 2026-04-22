@@ -10,7 +10,7 @@ use crate::adapters::outbound::InferenceService;
 use crate::domain::services::InferenceRateLimiter;
 use crate::domain::value_objects::{Action, DetectionFlags, FlagType};
 use crate::ports::inbound::{AnalyzeImageCommand, AnalyzeImageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::ports::outbound::{CachePort, IaConfigRepository, InfractionRepository, RuleRepository};
+use crate::ports::outbound::{BotConfigRepository, CachePort, InfractionRepository, RuleRepository};
 
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
 const DEFAULT_VISION_THRESHOLD: f32 = 0.5;
@@ -21,7 +21,10 @@ pub struct AnalyzeImageService {
     infraction_repo: Arc<dyn InfractionRepository>,
     cache: Arc<dyn CachePort>,
     conduct_uc: Arc<dyn ManageConductUseCase>,
-    ia_config_repo: Arc<dyn IaConfigRepository>,
+    /// Lecture des cles `vision_enabled` / `vision_threshold` depuis la
+    /// config `automod-bot` (fusionnee avec l'ancien `ia_config` par la
+    /// migration 146).
+    bot_config_repo: Arc<dyn BotConfigRepository>,
     inference_limiter: Arc<InferenceRateLimiter>,
 }
 
@@ -32,7 +35,7 @@ impl AnalyzeImageService {
         infraction_repo: Arc<dyn InfractionRepository>,
         cache: Arc<dyn CachePort>,
         conduct_uc: Arc<dyn ManageConductUseCase>,
-        ia_config_repo: Arc<dyn IaConfigRepository>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
         inference_limiter: Arc<InferenceRateLimiter>,
     ) -> Self {
         Self {
@@ -41,25 +44,49 @@ impl AnalyzeImageService {
             infraction_repo,
             cache,
             conduct_uc,
-            ia_config_repo,
+            bot_config_repo,
             inference_limiter,
         }
     }
 }
 
+/// Parse les cles vision (`vision_enabled`, `vision_threshold`) depuis la
+/// config automod-bot. Defaut : enabled=true, threshold=0.5.
+fn parse_vision_config(
+    entries: &[crate::domain::entities::BotGuildConfig],
+) -> (bool, f32) {
+    let mut enabled = true;
+    let mut threshold = DEFAULT_VISION_THRESHOLD;
+    for e in entries {
+        match e.config_key.as_str() {
+            "vision_enabled" => {
+                let v = e.config_value.to_ascii_lowercase();
+                enabled = matches!(v.as_str(), "true" | "1" | "yes");
+            }
+            "vision_threshold" => {
+                if let Ok(n) = e.config_value.parse::<f32>() {
+                    threshold = n.clamp(0.0, 1.0);
+                }
+            }
+            _ => {}
+        }
+    }
+    (enabled, threshold)
+}
+
 #[async_trait]
 impl AnalyzeImageUseCase for AnalyzeImageService {
     async fn analyze_image(&self, cmd: AnalyzeImageCommand) -> Result<ImageAnalysis, DomainError> {
-        // 0. Charger la config IA per-guild
-        let ia_config = match self.ia_config_repo.get(&cmd.guild_id).await {
-            Ok(cfg) => cfg,
+        // 0. Charger la config automod-bot (cles vision_enabled + vision_threshold,
+        //    fusionnees depuis l'ancien ia_config via la migration 146).
+        let automod_entries = match self.bot_config_repo.get_config(&cmd.guild_id, "automod-bot").await {
+            Ok(e) => e,
             Err(e) => {
-                tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec chargement config IA vision, utilisation defauts");
-                None
+                tracing::warn!(error = %e, guild_id = %cmd.guild_id, "Echec chargement config automod-bot (vision), utilisation defauts");
+                vec![]
             }
         };
-        let vision_enabled = ia_config.as_ref().map(|c| c.vision_enabled).unwrap_or(true);
-        let vision_threshold = ia_config.as_ref().map(|c| c.vision_threshold as f32).unwrap_or(DEFAULT_VISION_THRESHOLD);
+        let (vision_enabled, vision_threshold) = parse_vision_config(&automod_entries);
 
         // 1. Verifier que le modele vision est disponible et active
         if !vision_enabled || !self.inference.vision_available() {

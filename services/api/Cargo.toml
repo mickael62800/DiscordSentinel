@@ -139,11 +139,6 @@ path = "tests/integration/coude/advanced.rs"
 name = "integration_games_db"
 path = "tests/integration/games/db.rs"
 
-# ia
-[[test]]
-name = "integration_ia_config"
-path = "tests/integration/ia/config.rs"
-
 # moderation
 [[test]]
 name = "integration_moderation_db"
@@ -196,11 +191,6 @@ path = "tests/integration/user_activity/http.rs"
 [[test]]
 name = "integration_analyze_http"
 path = "tests/integration/analyze/http.rs"
-
-# ia_config
-[[test]]
-name = "integration_ia_config_http"
-path = "tests/integration/ia_config/http.rs"
 
 # security
 [[test]]

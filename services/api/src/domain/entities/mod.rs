@@ -18,7 +18,6 @@ mod level;
 mod daily_activity;
 mod role_panel;
 mod discord_role;
-mod ia_config;
 mod strikes;
 mod sanction_reminder;
 mod user_note;
@@ -41,7 +40,6 @@ pub use rbac::{
 };
 pub use config_parsers::{is_worker_service, parse_bool_config, parse_i64_config};
 
-pub use ia_config::IaConfig;
 pub use audit_log::{
     is_security_audit_event, AuditLog, AUDIT_EVENT_MEMBER_NICKNAME_HISTORY,
     AUDIT_EVENT_SECURITY_PREFIX,

@@ -13,7 +13,6 @@ import LevelsPage from "../components/pages/LevelsPage.vue";
 import RolePanelsPage from "../components/pages/RolePanelsPage.vue";
 import DiscordRolesPage from "../components/pages/DiscordRolesPage.vue";
 import AuditPage from "../components/pages/AuditPage.vue";
-import IaConfigPage from "../components/pages/IaConfigPage.vue";
 import MembersPage from "../components/pages/MembersPage.vue";
 import CoudePage from "../components/pages/CoudePage.vue";
 import TauntsConfigPage from "../components/pages/TauntsConfigPage.vue";
@@ -44,7 +43,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/role-panels", name: "role-panels", component: RolePanelsPage },
   { path: "/discord-roles", name: "discord-roles", component: DiscordRolesPage },
   { path: "/audit", name: "audit", component: AuditPage },
-  { path: "/ia-config", name: "ia-config", component: IaConfigPage },
   { path: "/coude", name: "coude", component: CoudePage },
   { path: "/taunts", name: "taunts", component: TauntsConfigPage },
   // Redirection de l'ancienne URL pour conserver les bookmarks.

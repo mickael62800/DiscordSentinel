@@ -51,10 +51,6 @@ const gameItems = [
   { path: "/taunts", label: "Railleries", icon: "zap" },
 ];
 
-const aiItems = [
-  { path: "/ia-config", label: "Config IA", icon: "brain" },
-];
-
 const configItems = [
   { path: "/component-config", label: "Composants", icon: "cpu" },
   { path: "/rbac", label: "Acces RBAC", icon: "shield" },
@@ -157,16 +153,6 @@ onMounted(() => {
       <div class="nav-separator"><span>Jeu</span></div>
       <NavItem
         v-for="item in gameItems"
-        :key="item.path"
-        :path="item.path"
-        :label="item.label"
-        :icon="item.icon"
-        :active="route.path === item.path"
-      />
-
-      <div class="nav-separator"><span>Intelligence Artificielle</span></div>
-      <NavItem
-        v-for="item in aiItems"
         :key="item.path"
         :path="item.path"
         :label="item.label"

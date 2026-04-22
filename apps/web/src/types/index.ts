@@ -461,31 +461,6 @@ export interface UserDossier {
   notes?: DossierNote[];
 }
 
-// ── IA Config (seuils confiance per-guild) ──
-
-export interface IaConfig {
-  guild_id: string;
-  text_enabled: boolean;
-  text_threshold: number;
-  vision_enabled: boolean;
-  vision_threshold: number;
-  context_dampening: number;
-  context_format: string;
-  context_max_messages: number;
-  context_max_chars: number;
-}
-
-export interface SaveIaConfigParams {
-  text_enabled: boolean;
-  text_threshold: number;
-  vision_enabled: boolean;
-  vision_threshold: number;
-  context_dampening: number;
-  context_format: string;
-  context_max_messages: number;
-  context_max_chars: number;
-}
-
 // ── Analytics ──
 
 export interface HeatmapPoint {

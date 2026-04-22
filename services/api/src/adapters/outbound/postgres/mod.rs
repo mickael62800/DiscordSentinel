@@ -24,13 +24,11 @@ mod daily_activity_repository;
 mod role_panel_repository;
 mod analytics_repository;
 mod discord_role_repository;
-mod ia_config_repository;
 mod notes_repository;
 mod reminder_repository;
 mod strike_repository;
 
 pub use analytics_repository::PgAnalyticsRepository;
-pub use ia_config_repository::PgIaConfigRepository;
 pub use audit_log_repository::PgAuditLogRepository;
 pub use daily_activity_repository::PgDailyActivityRepository;
 pub use role_panel_repository::PgRolePanelRepository;

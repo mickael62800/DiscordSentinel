@@ -5,15 +5,14 @@ use std::sync::Arc;
 use sqlx::PgPool;
 
 use sentinel_api::adapters::outbound::postgres::{
-    PgRuleRepository, PgInfractionRepository, PgIaConfigRepository,
+    PgBotConfigRepository, PgRuleRepository, PgInfractionRepository,
 };
 use sentinel_api::application::AnalyzeMessageService;
-use sentinel_api::domain::entities::IaConfig;
 use sentinel_api::adapters::outbound::{InferenceService, TextTokenizer};
 use sentinel_api::domain::services::InferenceRateLimiter;
 use sentinel_api::domain::value_objects::DetectionFlags;
 use sentinel_api::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, ContextMessageEntry};
-use sentinel_api::ports::outbound::{IaConfigRepository, RuleRepository};
+use sentinel_api::ports::outbound::RuleRepository;
 
 async fn setup_pool() -> PgPool {
     let url = std::env::var("DATABASE_URL")
@@ -168,7 +167,7 @@ async fn full_analyze_spam_creates_infraction() {
     // Build service (no IA inference — just scoring)
     let rule_repo = Arc::new(PgRuleRepository::new(pool.clone()));
     let infraction_repo = Arc::new(PgInfractionRepository::new(pool.clone()));
-    let ia_config_repo = Arc::new(PgIaConfigRepository::new(pool.clone()));
+    let bot_config_repo = Arc::new(PgBotConfigRepository::new(pool.clone()));
 
     // Mock conduct UC (minimal) et cache
     let conduct_uc = Arc::new(StubConductUC);
@@ -178,7 +177,7 @@ async fn full_analyze_spam_creates_infraction() {
     let limiter = Arc::new(InferenceRateLimiter::new(4, 0));
 
     let service = AnalyzeMessageService::new(
-        rule_repo, infraction_repo, cache, conduct_uc, ia_config_repo, limiter,
+        rule_repo, infraction_repo, cache, conduct_uc, bot_config_repo, limiter,
     ).with_text_inference(inference, tokenizer);
 
     // Analyze a spam message
@@ -243,22 +242,12 @@ async fn full_analyze_no_flags_returns_none() {
     let pool = setup_pool().await;
     let gid = unique_guild();
 
-    // Desactiver l'IA pour cette guild
-    let ia_repo = PgIaConfigRepository::new(pool.clone());
-    let config = IaConfig {
-        guild_id: gid.clone(),
-        text_enabled: false,
-        text_threshold: 0.5,
-        vision_enabled: false,
-        vision_threshold: 0.5,
-        context_dampening: 0.65,
-        context_format: "natural".into(),
-        context_max_messages: 3,
-        context_max_chars: 200,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
-    };
-    ia_repo.save(&config).await.unwrap();
+    // Desactiver l'IA texte pour cette guild (cle automod-bot, ex-ia_config).
+    sqlx::query(
+        r#"INSERT INTO bot_guild_config (guild_id, bot_name, config_key, config_value)
+           VALUES ($1, 'automod-bot', 'text_enabled', 'false')
+           ON CONFLICT (guild_id, bot_name, config_key) DO UPDATE SET config_value = EXCLUDED.config_value"#,
+    ).bind(&gid).execute(&pool).await.unwrap();
 
     let service = build_analyze_service(pool.clone());
 
@@ -319,29 +308,22 @@ async fn full_analyze_with_context_messages() {
 }
 
 #[tokio::test]
-async fn ia_config_dampening_applied() {
+async fn ia_config_dampening_roundtrip_via_automod_bot() {
+    // Post-migration 146 : les cles IA sont stockees dans bot_guild_config
+    // (bot_name=automod-bot). Le test verifie un simple roundtrip DB.
     let pool = setup_pool().await;
-    let gid = unique_guild();
+    let gid = short_guild_id();
 
-    // Config IA avec dampening fort
-    let ia_repo = PgIaConfigRepository::new(pool.clone());
-    let config = IaConfig {
-        guild_id: gid.clone(),
-        text_enabled: true,
-        text_threshold: 0.5,
-        vision_enabled: false,
-        vision_threshold: 0.5,
-        context_dampening: 0.3, // dampening tres fort
-        context_format: "natural".into(),
-        context_max_messages: 5,
-        context_max_chars: 300,
-        created_at: chrono::Utc::now(),
-        updated_at: chrono::Utc::now(),
-    };
-    let saved = ia_repo.save(&config).await.unwrap();
+    sqlx::query(
+        r#"INSERT INTO bot_guild_config (guild_id, bot_name, config_key, config_value)
+           VALUES ($1, 'automod-bot', 'context_dampening', '0.3')
+           ON CONFLICT (guild_id, bot_name, config_key) DO UPDATE SET config_value = EXCLUDED.config_value"#,
+    ).bind(&gid).execute(&pool).await.unwrap();
 
-    assert!((saved.context_dampening - 0.3).abs() < 0.01);
-    assert_eq!(saved.context_max_messages, 5);
+    let val = sqlx::query_as::<_, (String,)>(
+        "SELECT config_value FROM bot_guild_config WHERE guild_id = $1 AND bot_name = 'automod-bot' AND config_key = 'context_dampening'",
+    ).bind(&gid).fetch_one(&pool).await.unwrap().0;
+    assert_eq!(val, "0.3");
 }
 
 // ══════════════════════════════════════════════════════════
@@ -351,7 +333,7 @@ async fn ia_config_dampening_applied() {
 fn build_analyze_service(pool: PgPool) -> AnalyzeMessageService {
     let rule_repo = Arc::new(PgRuleRepository::new(pool.clone()));
     let infraction_repo = Arc::new(PgInfractionRepository::new(pool.clone()));
-    let ia_config_repo = Arc::new(PgIaConfigRepository::new(pool.clone()));
+    let bot_config_repo = Arc::new(PgBotConfigRepository::new(pool.clone()));
     let conduct_uc = Arc::new(StubConductUC);
     let cache = Arc::new(NoCache);
     let inference = Arc::new(InferenceService::new(None, None));
@@ -359,7 +341,7 @@ fn build_analyze_service(pool: PgPool) -> AnalyzeMessageService {
     let limiter = Arc::new(InferenceRateLimiter::new(4, 0));
 
     AnalyzeMessageService::new(
-        rule_repo, infraction_repo, cache, conduct_uc, ia_config_repo, limiter,
+        rule_repo, infraction_repo, cache, conduct_uc, bot_config_repo, limiter,
     ).with_text_inference(inference, tokenizer)
 }
 

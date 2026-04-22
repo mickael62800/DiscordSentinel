@@ -1,13 +1,17 @@
 use super::*;
+use crate::ports::outbound::BotConfigRepository;
 
 
-struct MockIaConfigRepo;
+struct MockBotConfigRepo;
 
 
 #[async_trait]
-impl IaConfigRepository for MockIaConfigRepo {
-    async fn get(&self, _: &str) -> Result<Option<crate::domain::entities::IaConfig>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn save(&self, config: &crate::domain::entities::IaConfig) -> Result<crate::domain::entities::IaConfig, crate::domain::errors::DomainError> { Ok(config.clone()) }
+impl BotConfigRepository for MockBotConfigRepo {
+    async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::BotDefinition>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
 }
 
 
@@ -165,9 +169,75 @@ impl ManageConductUseCase for MockConduct {
             Arc::new(MockInfractionRepo),
             Arc::new(MockCache),
             Arc::new(MockConduct),
-            Arc::new(MockIaConfigRepo),
+            Arc::new(MockBotConfigRepo),
             Arc::new(InferenceRateLimiter::new(4, 0)),
         ).with_text_inference(inference, tokenizer);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Tests parse_ia_config_from_bot_config
+    // ══════════════════════════════════════════════════════════
+
+    fn bot_entry(key: &str, value: &str) -> crate::domain::entities::BotGuildConfig {
+        crate::domain::entities::BotGuildConfig {
+            id: uuid::Uuid::new_v4(),
+            guild_id: "g".to_string(),
+            bot_name: "automod-bot".to_string(),
+            config_key: key.to_string(),
+            config_value: value.to_string(),
+            updated_at: chrono::Utc::now(),
+        }
+    }
+
+    #[test]
+    fn parse_ia_config_empty_returns_defaults() {
+        let cfg = parse_ia_config_from_bot_config(&[]);
+        assert!(cfg.text_enabled);
+        assert!((cfg.text_threshold - 0.5).abs() < 1e-6);
+        assert!((cfg.context_dampening - 0.65).abs() < 1e-6);
+        assert_eq!(cfg.context_format, "natural");
+    }
+
+    #[test]
+    fn parse_ia_config_reads_all_keys() {
+        let entries = vec![
+            bot_entry("text_enabled", "false"),
+            bot_entry("text_threshold", "0.8"),
+            bot_entry("context_dampening", "0.3"),
+            bot_entry("context_format", "tagged"),
+        ];
+        let cfg = parse_ia_config_from_bot_config(&entries);
+        assert!(!cfg.text_enabled);
+        assert!((cfg.text_threshold - 0.8).abs() < 1e-6);
+        assert!((cfg.context_dampening - 0.3).abs() < 1e-6);
+        assert_eq!(cfg.context_format, "tagged");
+    }
+
+    #[test]
+    fn parse_ia_config_clamps_out_of_range() {
+        let entries = vec![
+            bot_entry("text_threshold", "5.0"),
+            bot_entry("context_dampening", "-1.0"),
+        ];
+        let cfg = parse_ia_config_from_bot_config(&entries);
+        assert!((cfg.text_threshold - 1.0).abs() < 1e-6);
+        assert!((cfg.context_dampening - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn parse_ia_config_ignores_invalid_values_and_format() {
+        let entries = vec![
+            bot_entry("text_threshold", "not-a-number"),
+            bot_entry("context_dampening", "abc"),
+            bot_entry("context_format", "unknown"),
+            bot_entry("text_enabled", "yes"),
+        ];
+        let cfg = parse_ia_config_from_bot_config(&entries);
+        // Les cles invalides retombent sur defaut
+        assert!((cfg.text_threshold - 0.5).abs() < 1e-6);
+        assert!((cfg.context_dampening - 0.65).abs() < 1e-6);
+        assert_eq!(cfg.context_format, "natural");
+        assert!(cfg.text_enabled); // "yes" reconnu
     }
 
     // ══════════════════════════════════════════════════════════
