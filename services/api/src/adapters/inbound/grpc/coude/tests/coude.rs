@@ -389,6 +389,71 @@ use super::*;
         );
     }
 
+    // ── inventory: steal_boost / steal_protection / proto_steal_duration ──
+
+    #[test]
+    fn steal_boost_to_proto_mapping() {
+        use crate::domain::entities::CoudeStealBoost;
+        let id = Uuid::new_v4();
+        let b = CoudeStealBoost {
+            id,
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            item_key: "boost_7d".into(),
+            expires_at: ts(),
+            created_at: ts(),
+        };
+        let pr = inventory::steal_boost_to_proto(b);
+        assert_eq!(pr.id, id.to_string());
+        assert_eq!(pr.item_key, "boost_7d");
+        assert_eq!(pr.expires_at, ts().to_rfc3339());
+        assert_eq!(pr.created_at, ts().to_rfc3339());
+    }
+
+    #[test]
+    fn steal_protection_to_proto_mapping() {
+        use crate::domain::entities::CoudeStealProtection;
+        let id = Uuid::new_v4();
+        let p = CoudeStealProtection {
+            id,
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            item_key: "shield_3d".into(),
+            expires_at: ts(),
+            created_at: ts(),
+        };
+        let pr = inventory::steal_protection_to_proto(p);
+        assert_eq!(pr.id, id.to_string());
+        assert_eq!(pr.user_id, "u");
+        assert_eq!(pr.item_key, "shield_3d");
+    }
+
+    #[test]
+    fn proto_steal_duration_to_domain_all_variants() {
+        use crate::domain::entities::StealProtectionDuration as D;
+        assert_eq!(
+            inventory::proto_steal_duration_to_domain(proto::StealProtectionDurationKind::StealProtectionDurationOneDay as i32),
+            Some(D::OneDay)
+        );
+        assert_eq!(
+            inventory::proto_steal_duration_to_domain(proto::StealProtectionDurationKind::StealProtectionDurationThreeDays as i32),
+            Some(D::ThreeDays)
+        );
+        assert_eq!(
+            inventory::proto_steal_duration_to_domain(proto::StealProtectionDurationKind::StealProtectionDurationFiveDays as i32),
+            Some(D::FiveDays)
+        );
+        assert_eq!(
+            inventory::proto_steal_duration_to_domain(proto::StealProtectionDurationKind::StealProtectionDurationSevenDays as i32),
+            Some(D::SevenDays)
+        );
+        assert_eq!(
+            inventory::proto_steal_duration_to_domain(proto::StealProtectionDurationKind::StealProtectionDurationUnspecified as i32),
+            None
+        );
+        assert_eq!(inventory::proto_steal_duration_to_domain(99999), None);
+    }
+
     #[test]
     fn proto_source_to_domain_unspecified_and_invalid() {
         assert_eq!(
