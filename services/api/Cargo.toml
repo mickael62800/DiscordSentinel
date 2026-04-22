@@ -327,6 +327,16 @@ path = "tests/integration/coude_bets_http/http.rs"
 name = "integration_coude_social_http"
 path = "tests/integration/coude_social_http/http.rs"
 
+# coude/inventory HTTP
+[[test]]
+name = "integration_coude_inventory_http"
+path = "tests/integration/coude_inventory_http/http.rs"
+
+# coude/economy HTTP
+[[test]]
+name = "integration_coude_economy_http"
+path = "tests/integration/coude_economy_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
