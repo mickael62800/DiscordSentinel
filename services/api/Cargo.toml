@@ -467,6 +467,11 @@ path = "tests/integration/postgres_misc_4/repo.rs"
 name = "integration_postgres_misc_5"
 path = "tests/integration/postgres_misc_5/repo.rs"
 
+# postgres misc_6 repos (evidence + pending_action + review + modstats)
+[[test]]
+name = "integration_postgres_misc_6"
+path = "tests/integration/postgres_misc_6/repo.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
