@@ -198,6 +198,45 @@ use super::*;
     }
 
     #[test]
+    fn bet_resolution_plan_to_proto_with_payouts_and_no_bonus() {
+        let plan = BetResolutionPlan {
+            payouts: vec![
+                BetPayout {
+                    bet_id: Uuid::from_u128(1),
+                    bettor_id: "u1".into(), bettor_name: "Alice".into(),
+                    backed_id: "a".into(), amount_bet: 100, payout: 250, won: true,
+                },
+                BetPayout {
+                    bet_id: Uuid::from_u128(2),
+                    bettor_id: "u2".into(), bettor_name: "Bob".into(),
+                    backed_id: "b".into(), amount_bet: 50, payout: 0, won: false,
+                },
+            ],
+            fighter_bonus: None,
+        };
+        let pr = bets::bet_resolution_plan_to_proto(plan);
+        assert_eq!(pr.payouts.len(), 2);
+        assert!(pr.payouts[0].won);
+        assert!(!pr.payouts[1].won);
+        assert!(pr.fighter_bonus.is_none());
+    }
+
+    #[test]
+    fn fighter_bonus_to_proto_mapping() {
+        let b = CoudeFighterBetBonus {
+            winner_id: "winner".into(), winner_bonus: 1500,
+            loser_id: "loser".into(), loser_bonus: 250,
+            total_pot: 3000,
+        };
+        let pr = bets::fighter_bonus_to_proto(b);
+        assert_eq!(pr.winner_id, "winner");
+        assert_eq!(pr.winner_bonus, 1500);
+        assert_eq!(pr.loser_id, "loser");
+        assert_eq!(pr.loser_bonus, 250);
+        assert_eq!(pr.total_pot, 3000);
+    }
+
+    #[test]
     fn refund_summary_to_proto_mapping() {
         let s = RefundSummary { refunded_count: 3, refunded_total: 750 };
         let pr = bets::refund_summary_to_proto(s);
