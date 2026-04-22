@@ -362,6 +362,11 @@ path = "tests/integration/oauth_http/http.rs"
 name = "integration_rbac_http"
 path = "tests/integration/rbac_http/http.rs"
 
+# coude/players HTTP
+[[test]]
+name = "integration_coude_players_http"
+path = "tests/integration/coude_players_http/http.rs"
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"
