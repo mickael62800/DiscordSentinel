@@ -100,7 +100,10 @@ pub fn build_for_test(state: AppState) -> Router {
             auth_middleware,
         ));
 
-    let public = Router::new().route("/health", get(handlers::health::health));
+    let public = Router::new()
+        .route("/health", get(handlers::health::health))
+        .route("/auth/discord/authorize", get(handlers::oauth::authorize))
+        .route("/auth/discord/callback", get(handlers::oauth::callback));
 
     Router::new()
         .merge(protected)
