@@ -549,12 +549,14 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
     }
 }
 
-/// Attribue le role par defaut au nouveau membre (config guild).
+/// Attribue les roles par defaut au nouveau membre (config guild).
+/// La config `default_role_ids` est une liste d IDs de roles separes par
+/// des virgules ; chaque ID valide est attribue dans l ordre.
 pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
     let guild_id = new_member.guild_id;
 
     let data = ctx.data.read().await;
-    let default_role_id = if let Some(base) = data.get::<ApiClientKey>() {
+    let role_ids: Vec<u64> = if let Some(base) = data.get::<ApiClientKey>() {
         let config = match base.get_guild_config_for(&guild_id.to_string(), MODULE_BOT_NAME).await {
             Ok(cfg) => cfg,
             Err(e) => {
@@ -562,14 +564,18 @@ pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
                 HashMap::new()
             }
         };
-        let role_str = BaseApiClient::config_or(&config, "default_role_id", "");
-        if role_str.is_empty() { None } else { role_str.parse::<u64>().ok() }
+        let raw = BaseApiClient::config_or(&config, "default_role_ids", "");
+        raw.split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .filter_map(|s| s.parse::<u64>().ok())
+            .collect()
     } else {
-        None
+        Vec::new()
     };
     drop(data);
 
-    if let Some(role_id) = default_role_id {
+    for role_id in role_ids {
         match new_member.add_role(&ctx.http, RoleId::new(role_id)).await {
             Ok(_) => info!(guild=%guild_id, user=%new_member.user.id, role=%role_id, "Role par defaut attribue"),
             Err(e) => warn!(guild=%guild_id, user=%new_member.user.id, error=%e, "Echec attribution role par defaut"),
