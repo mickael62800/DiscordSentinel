@@ -150,3 +150,7 @@ impl CoudeEconomyService for CoudeEconomyGrpc {
     }
 }
 
+#[cfg(test)]
+#[path = "tests/economy.rs"]
+mod tests;
+

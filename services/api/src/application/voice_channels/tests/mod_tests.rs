@@ -933,3 +933,116 @@
         // juste que ça ne panique pas et qu'un ConfigVoice est renvoye.
         let _ = cfg;
     }
+
+    // ══════════════════════════════════════════════════════════
+    // access_control : whitelist, ban, is_banned
+    // ══════════════════════════════════════════════════════════
+
+    use crate::ports::inbound::{BanFromChannelCommand, ManageWhitelistCommand};
+
+    #[tokio::test]
+    async fn get_whitelist_passes_through_repo() {
+        let repo = MockVoiceRepo::new();
+        let svc = make_service(repo);
+        let list = svc.get_whitelist("g1", "owner1").await.unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[tokio::test]
+    async fn add_to_whitelist_success() {
+        let repo = MockVoiceRepo::new();
+        let svc = make_service(repo);
+        let result = svc.add_to_whitelist(ManageWhitelistCommand {
+            guild_id: "g1".into(),
+            owner_id: "owner1".into(),
+            target_id: "target1".into(),
+            target_name: "Target".into(),
+        }).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn remove_from_whitelist_success() {
+        let repo = MockVoiceRepo::new();
+        let svc = make_service(repo);
+        let result = svc.remove_from_whitelist("g1", "owner1", "target1").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn ban_from_channel_without_duration_creates_permanent_ban() {
+        let repo = MockVoiceRepo::new().with_channel(make_test_channel());
+        let svc = make_service(repo);
+        let result = svc.ban_from_channel(BanFromChannelCommand {
+            channel_id: "chan1".into(),
+            user_id: "baduser".into(),
+            user_name: "BadUser".into(),
+            banned_by: "owner1".into(),
+            reason: Some("toxic".into()),
+            duration_secs: None,
+        }).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn ban_from_channel_with_duration_sets_expires_at() {
+        let repo = MockVoiceRepo::new().with_channel(make_test_channel());
+        let svc = make_service(repo);
+        let result = svc.ban_from_channel(BanFromChannelCommand {
+            channel_id: "chan1".into(),
+            user_id: "baduser".into(),
+            user_name: "BadUser".into(),
+            banned_by: "owner1".into(),
+            reason: Some("spam".into()),
+            duration_secs: Some(3600),
+        }).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn ban_from_channel_not_found() {
+        let repo = MockVoiceRepo::new(); // no channel
+        let svc = make_service(repo);
+        let err = svc.ban_from_channel(BanFromChannelCommand {
+            channel_id: "ghost".into(),
+            user_id: "u".into(),
+            user_name: "U".into(),
+            banned_by: "o".into(),
+            reason: Some("r".into()),
+            duration_secs: None,
+        }).await.unwrap_err();
+        assert!(matches!(err, DomainError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn unban_from_channel_success() {
+        let repo = MockVoiceRepo::new().with_channel(make_test_channel());
+        let svc = make_service(repo);
+        let result = svc.unban_from_channel("chan1", "baduser").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn unban_from_channel_not_found() {
+        let repo = MockVoiceRepo::new();
+        let svc = make_service(repo);
+        let err = svc.unban_from_channel("ghost", "u").await.unwrap_err();
+        assert!(matches!(err, DomainError::NotFound(_)));
+    }
+
+    #[tokio::test]
+    async fn is_banned_returns_false_when_no_active_ban() {
+        // MockVoiceRepo.find_active_ban retourne toujours None.
+        let repo = MockVoiceRepo::new().with_channel(make_test_channel());
+        let svc = make_service(repo);
+        let banned = svc.is_banned("chan1", "u").await.unwrap();
+        assert!(!banned);
+    }
+
+    #[tokio::test]
+    async fn is_banned_channel_not_found_propagates() {
+        let repo = MockVoiceRepo::new();
+        let svc = make_service(repo);
+        let err = svc.is_banned("ghost", "u").await.unwrap_err();
+        assert!(matches!(err, DomainError::NotFound(_)));
+    }
