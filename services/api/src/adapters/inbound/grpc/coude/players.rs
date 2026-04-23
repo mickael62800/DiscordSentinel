@@ -172,3 +172,7 @@ pub(super) fn xp_progress_to_proto(x: XpProgress) -> proto::XpProgress {
         stat_points_gained: x.stat_points_gained,
     }
 }
+
+#[cfg(test)]
+#[path = "tests/players.rs"]
+mod tests;
