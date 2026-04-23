@@ -487,6 +487,11 @@ path = "tests/integration/postgres_coude_bet/repo.rs"
 name = "integration_redis_cache"
 path = "tests/integration/redis_cache/http.rs"
 
+# job_client (enqueue jobs vers Redis queue pour le worker)
+[[test]]
+name = "integration_job_client"
+path = "tests/integration/job_client/redis.rs"
+
 # export service (application layer, DB queries + serialization)
 [[test]]
 name = "integration_export_service"
