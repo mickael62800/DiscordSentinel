@@ -567,7 +567,7 @@ watch(selectedComponent, loadFormValues);
                   v-for="field in group.fields"
                   :key="field.key"
                   class="field-card field-card-wide"
-                  :class="{ modified: isFieldModified(field.key) }"
+                  :class="{ modified: isFieldModified(field.key), 'field-card-full': isMultilineField(field.key) }"
                 >
                   <label :for="field.key" class="form-label">
                     {{ field.label }}
@@ -582,7 +582,7 @@ watch(selectedComponent, loadFormValues);
                     :id="field.key"
                     v-model="formValues[field.key]"
                     class="form-input form-textarea"
-                    rows="4"
+                    rows="8"
                     :placeholder="field.default !== undefined ? String(field.default) : ''"
                   />
                   <div v-if="templateVarsFor(field.key)" class="template-vars">
@@ -905,6 +905,15 @@ watch(selectedComponent, loadFormValues);
 
 .field-card-wide {
   grid-column: span 1;
+}
+
+/* Pleine largeur pour les gros textareas (messages welcome, rules, etc.) */
+.field-card-full {
+  grid-column: 1 / -1;
+}
+
+.field-card-full .form-textarea {
+  min-height: 180px;
 }
 
 .form-group {
