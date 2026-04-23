@@ -301,3 +301,7 @@ pub async fn bulk_delete_tickets(
         "to": params.to,
     })))
 }
+
+#[cfg(test)]
+#[path = "tests/tickets.rs"]
+mod tests;

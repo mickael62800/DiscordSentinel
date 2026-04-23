@@ -116,3 +116,7 @@ pub async fn delete_reward(
 pub struct DeleteRewardParams {
     pub source: Option<String>,
 }
+
+#[cfg(test)]
+#[path = "tests/levels.rs"]
+mod tests;

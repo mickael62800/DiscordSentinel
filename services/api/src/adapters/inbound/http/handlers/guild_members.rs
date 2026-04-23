@@ -221,3 +221,7 @@ pub struct UpdateMemberPayload {
     pub avatar: Option<String>,
     pub roles: Option<serde_json::Value>,
 }
+
+#[cfg(test)]
+#[path = "tests/guild_members.rs"]
+mod tests;

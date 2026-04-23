@@ -265,3 +265,7 @@ pub async fn register_guild(
 
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[cfg(test)]
+#[path = "tests/dashboard.rs"]
+mod tests;

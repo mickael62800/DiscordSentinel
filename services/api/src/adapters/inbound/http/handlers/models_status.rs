@@ -69,3 +69,7 @@ pub async fn reload_model(
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/models_status.rs"]
+mod tests;

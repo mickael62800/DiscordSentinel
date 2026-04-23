@@ -683,3 +683,7 @@ pub async fn delete_theme(
     state.voice_channels_uc.delete_theme(&guild_id, &theme_id).await?;
     Ok(ok_response())
 }
+
+#[cfg(test)]
+#[path = "tests/voice_channels.rs"]
+mod tests;
