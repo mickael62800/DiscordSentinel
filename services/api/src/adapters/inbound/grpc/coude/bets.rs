@@ -152,3 +152,7 @@ impl CoudeBetsService for CoudeBetsGrpc {
     }
 }
 
+#[cfg(test)]
+#[path = "tests/bets.rs"]
+mod tests;
+

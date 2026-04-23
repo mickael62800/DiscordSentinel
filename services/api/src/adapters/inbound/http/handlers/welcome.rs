@@ -117,3 +117,7 @@ pub async fn save_config(
     let saved = state.welcome_config_repo.save_config(&guild_id, &current).await?;
     Ok(Json(saved.into()))
 }
+
+#[cfg(test)]
+#[path = "tests/welcome.rs"]
+mod tests;

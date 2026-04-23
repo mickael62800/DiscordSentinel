@@ -680,3 +680,7 @@ impl From<CoudeCurrentSeason> for CurrentSeasonDto {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "tests/dto.rs"]
+mod tests;

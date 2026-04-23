@@ -234,3 +234,7 @@ pub async fn reset_all_wallets(
     info!(guild_id = %guild_id, affected, new_balance, "Bulk wallet reset");
     Ok(Json(serde_json::json!({ "affected": affected, "new_balance": new_balance })))
 }
+
+#[cfg(test)]
+#[path = "tests/wallet.rs"]
+mod tests;
