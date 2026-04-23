@@ -6,6 +6,42 @@ pub(crate) fn pg_err(e: sqlx::Error) -> DomainError {
     DomainError::Internal(e.to_string())
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pg_err_wraps_sqlx_row_not_found_into_internal() {
+        let err = pg_err(sqlx::Error::RowNotFound);
+        match err {
+            DomainError::Internal(msg) => {
+                assert!(!msg.is_empty());
+            }
+            other => panic!("expected Internal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pg_err_wraps_protocol_error() {
+        let err = pg_err(sqlx::Error::Protocol("connexion fermee".into()));
+        match err {
+            DomainError::Internal(msg) => assert!(msg.contains("connexion fermee")),
+            other => panic!("expected Internal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn pg_err_message_matches_display() {
+        let source_err = sqlx::Error::PoolClosed;
+        let display = source_err.to_string();
+        let wrapped = pg_err(source_err);
+        match wrapped {
+            DomainError::Internal(msg) => assert_eq!(msg, display),
+            other => panic!("expected Internal, got {other:?}"),
+        }
+    }
+}
+
 mod bot_config_repository;
 mod conduct_repository;
 mod guild_repository;

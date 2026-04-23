@@ -70,3 +70,31 @@ use super::*;
         let s = domain_to_status(DomainError::Internal("oops".into()));
         assert_eq!(s.code(), Code::Internal);
     }
+
+    // ── sqlx_to_status ──
+
+    #[test]
+    fn sqlx_to_status_wraps_with_context() {
+        let mapper = sqlx_to_status("INSERT users");
+        let s = mapper(sqlx::Error::RowNotFound);
+        assert_eq!(s.code(), Code::Internal);
+        assert!(s.message().starts_with("INSERT users: "));
+    }
+
+    #[test]
+    fn sqlx_to_status_different_contexts_are_independent() {
+        let m1 = sqlx_to_status("INSERT A");
+        let m2 = sqlx_to_status("SELECT B");
+        let s1 = m1(sqlx::Error::PoolClosed);
+        let s2 = m2(sqlx::Error::PoolClosed);
+        assert!(s1.message().starts_with("INSERT A:"));
+        assert!(s2.message().starts_with("SELECT B:"));
+    }
+
+    #[test]
+    fn sqlx_to_status_closure_reusable() {
+        let mapper = sqlx_to_status("ctx");
+        // Le closure implemente Fn → reutilisable plusieurs fois.
+        let _s1 = mapper(sqlx::Error::RowNotFound);
+        let _s2 = mapper(sqlx::Error::PoolClosed);
+    }
