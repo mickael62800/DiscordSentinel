@@ -67,3 +67,7 @@ pub async fn get_activity(
         .await?;
     Ok(Json(activities))
 }
+
+#[cfg(test)]
+#[path = "tests/user_activity.rs"]
+mod tests;
