@@ -108,9 +108,9 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
     }
 
     async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
-        if new.mise < 0 {
+        if new.mise <= 0 {
             return Err(DomainError::ValidationError(
-                "La mise ne peut pas etre negative".into(),
+                "La mise doit etre strictement positive".into(),
             ));
         }
         if new.attacker_id == new.defender_id {

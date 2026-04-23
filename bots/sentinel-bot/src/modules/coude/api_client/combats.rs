@@ -274,6 +274,21 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
+    /// Annule un combat SEULEMENT s il est encore en `pending`.
+    /// Contrairement a `expire_combat` qui ecrase n importe quel statut,
+    /// cette methode evite de detruire un combat qui vient de passer en
+    /// `betting` (accepte concurremment par le defenseur).
+    pub async fn cancel_combat(&self, id: &str) -> Result<(), String> {
+        let req = proto_coude::CancelCombatRequest {
+            id: id.to_string(),
+        };
+        let mut client = self.grpc.coude_combats();
+        self.grpc
+            .guarded(|| async move { client.cancel(req).await.map(|_| ()) })
+            .await
+            .map_err(grpc_err_to_string)
+    }
+
     pub async fn set_defender_special(
         &self,
         id: &str,

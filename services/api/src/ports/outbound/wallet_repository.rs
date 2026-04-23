@@ -10,6 +10,23 @@ pub trait WalletRepository: Send + Sync {
     async fn credit(&self, guild_id: &str, user_id: &str, amount: i64, source: &str, description: &str) -> Result<Wallet, DomainError>;
     async fn debit(&self, guild_id: &str, user_id: &str, amount: i64, source: &str, description: &str) -> Result<Wallet, DomainError>;
     async fn transfer(&self, guild_id: &str, from_user: &str, to_user: &str, amount: i64, source: &str, description: &str) -> Result<(), DomainError>;
+
+    /// Paye un combat de maniere atomique : debite `loser_amount` du perdant
+    /// et credite `winner_amount` au gagnant dans la meme transaction Postgres.
+    /// Les deux montants peuvent differer (cas assurance : le perdant paye
+    /// moins que ce que le gagnant recoit, la difference est "absorbee" par
+    /// la protection d assurance). Log les deux wallet_transactions.
+    /// Si le perdant n a pas le solde ou n existe pas, la tx est rollback.
+    async fn pay_combat_atomic(
+        &self,
+        guild_id: &str,
+        winner_id: &str,
+        winner_amount: i64,
+        loser_id: &str,
+        loser_amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(), DomainError>;
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError>;
     async fn get_transactions(&self, guild_id: &str, user_id: &str, limit: i64) -> Result<Vec<WalletTransaction>, DomainError>;
 

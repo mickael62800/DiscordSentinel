@@ -302,6 +302,90 @@ impl WalletRepository for PgWalletRepository {
         Ok(())
     }
 
+    async fn pay_combat_atomic(
+        &self,
+        guild_id: &str,
+        winner_id: &str,
+        winner_amount: i64,
+        loser_id: &str,
+        loser_amount: i64,
+        source: &str,
+        description: &str,
+    ) -> Result<(), DomainError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| DomainError::Internal(format!("pay_combat begin tx: {e}")))?;
+
+        // Debit perdant (si loser_amount > 0). On ne fail pas si le wallet
+        // n existe pas : le combat s est deja resolu en domain, on logge
+        // et on passe.
+        if loser_amount > 0 {
+            let loser_after = sqlx::query_scalar::<_, i64>(
+                "UPDATE user_wallets SET coins = GREATEST(coins - $1, 0), total_spent = total_spent + LEAST($1, coins), updated_at = NOW() \
+                 WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
+            )
+            .bind(loser_amount)
+            .bind(guild_id)
+            .bind(loser_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| DomainError::Internal(format!("pay_combat debit loser: {e}")))?;
+
+            if let Some(balance_after) = loser_after {
+                sqlx::query(
+                    "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
+                )
+                .bind(Uuid::new_v4())
+                .bind(guild_id)
+                .bind(loser_id)
+                .bind(-loser_amount)
+                .bind(balance_after)
+                .bind(source)
+                .bind(description)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DomainError::Internal(format!("pay_combat insert tx loser: {e}")))?;
+            }
+        }
+
+        // Credit gagnant (si winner_amount > 0)
+        if winner_amount > 0 {
+            let winner_after = sqlx::query_scalar::<_, i64>(
+                "UPDATE user_wallets SET coins = coins + $1, total_earned = total_earned + $1, updated_at = NOW() \
+                 WHERE guild_id = $2 AND user_id = $3 RETURNING coins",
+            )
+            .bind(winner_amount)
+            .bind(guild_id)
+            .bind(winner_id)
+            .fetch_optional(&mut *tx)
+            .await
+            .map_err(|e| DomainError::Internal(format!("pay_combat credit winner: {e}")))?;
+
+            if let Some(balance_after) = winner_after {
+                sqlx::query(
+                    "INSERT INTO wallet_transactions (id, guild_id, user_id, amount, balance_after, source, description, created_at) \
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())",
+                )
+                .bind(Uuid::new_v4())
+                .bind(guild_id)
+                .bind(winner_id)
+                .bind(winner_amount)
+                .bind(balance_after)
+                .bind(source)
+                .bind(description)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DomainError::Internal(format!("pay_combat insert tx winner: {e}")))?;
+            }
+        }
+
+        tx.commit().await
+            .map_err(|e| DomainError::Internal(format!("pay_combat commit: {e}")))?;
+
+        info!(guild_id, winner_id, winner_amount, loser_id, loser_amount, source, "Combat payout atomic");
+        Ok(())
+    }
+
     async fn leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<Wallet>, DomainError> {
         // Phase 2 A.2 — Lit depuis la vue materialisee `mv_wallet_leaderboard`
         // refreshee toutes les 5 min par le cache-worker. Le rang est precalcule

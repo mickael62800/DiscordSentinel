@@ -207,6 +207,15 @@ impl WalletRepository for MockWalletRepo {
         })
     }
     async fn transfer(&self, _: &str, _: &str, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn pay_combat_atomic(&self, g: &str, winner: &str, winner_amount: i64, loser: &str, loser_amount: i64, source: &str, _: &str) -> Result<(), DomainError> {
+        if winner_amount > 0 {
+            self.credit_calls.lock().unwrap().push((g.into(), winner.into(), winner_amount, source.into()));
+        }
+        if loser_amount > 0 {
+            self.debit_calls.lock().unwrap().push((g.into(), loser.into(), loser_amount, source.into()));
+        }
+        Ok(())
+    }
     async fn leaderboard(&self, _: &str, _: i64) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
     async fn get_transactions(&self, _: &str, _: &str, _: i64) -> Result<Vec<WalletTransaction>, DomainError> { Ok(vec![]) }
     async fn list_by_guild(&self, _: &str) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }

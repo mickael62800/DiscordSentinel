@@ -62,6 +62,7 @@ impl WalletRepository for MockWalletRepo {
         *b -= amount;
         Ok(())
     }
+    async fn pay_combat_atomic(&self, _: &str, _: &str, _: i64, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn leaderboard(&self, _g: &str, _l: i64) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
     async fn get_transactions(&self, _g: &str, _u: &str, _l: i64) -> Result<Vec<WalletTransaction>, DomainError> { Ok(vec![]) }
     async fn list_by_guild(&self, _g: &str) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }

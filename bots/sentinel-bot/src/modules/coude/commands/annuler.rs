@@ -61,8 +61,10 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
     let penalty = (attacker.coins as f64 * penalty_pct).max(1.0) as i64;
     let penalty_display = (penalty_pct * 100.0) as i32;
 
-    // Annuler le combat
-    if let Err(e) = api.expire_combat(&combat_id).await {
+    // Annuler le combat — utilise Cancel (gate status='pending') plutot
+    // qu Expire (ecrase tout), pour eviter d annuler un combat qui vient
+    // d etre accepte par le defenseur en parallele.
+    if let Err(e) = api.cancel_combat(&combat_id).await {
         respond_ephemeral(ctx, component, &format!("Erreur annulation : {e}")).await;
         return;
     }

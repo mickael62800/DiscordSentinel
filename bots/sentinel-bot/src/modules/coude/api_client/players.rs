@@ -303,14 +303,27 @@ impl ApiClient {
             .map_err(grpc_err_to_string)
     }
 
-    /// HTTP : pas d'equivalent proto.
+    /// HTTP : pas d'equivalent proto. On attend la reponse complete
+    /// (pas de fire-and-forget) — sinon un `/coude` lance juste apres
+    /// lit des HP stale avant que le heal ne soit commit en BDD.
     pub async fn repos(&self, guild_id: &str, user_id: &str) -> Result<(), String> {
-        self.base
-            .post_fire_and_forget(
-                &format!("/api/coude/{guild_id}/players/{user_id}/repos"),
-                &serde_json::json!({}),
-            )
-            .await;
+        let path = format!("/api/coude/{guild_id}/players/{user_id}/repos");
+        let req = self
+            .base
+            .client()
+            .post(format!("{}{}", self.base.base_url(), path))
+            .json(&serde_json::json!({}));
+        let resp = self
+            .base
+            .auth(req)
+            .send()
+            .await
+            .map_err(|e| format!("Erreur reseau POST {path}: {e}"))?;
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let text = resp.text().await.unwrap_or_default();
+            return Err(format!("Erreur API {status} POST {path}: {text}"));
+        }
         Ok(())
     }
 }

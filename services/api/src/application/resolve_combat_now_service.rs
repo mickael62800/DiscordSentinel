@@ -255,36 +255,45 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .await
                     .ok()
                     .flatten();
-                let adj = apply_insurance_to_loss(
+                let mut adj = apply_insurance_to_loss(
                     result.coins_lost_by_loser,
                     loser_balance,
                     active_insurance.as_ref(),
                     loser_id,
                 );
                 if let Some(ins_id) = adj.consumed_insurance_id {
-                    let _ = self.inventory_uc.expire_insurance(ins_id).await;
+                    if let Err(e) = self.inventory_uc.expire_insurance(ins_id).await {
+                        warn!(error = %e, insurance_id = %ins_id, "Echec expire_insurance : reduction non appliquee");
+                        adj = apply_insurance_to_loss(
+                            result.coins_lost_by_loser,
+                            loser_balance,
+                            None,
+                            loser_id,
+                        );
+                    }
                 }
                 insurance_msg = adj.message;
                 let actual_loss = adj.actual_loss;
 
-                // Wallet transfers
+                // Payout atomique : credit winner + debit loser dans la meme
+                // tx Postgres. Evite les etats partiels si le processus crash
+                // entre les deux operations (bug #1 de l audit).
                 let desc = format!("Combat {} vs {}", winner_id, loser_id);
-                if coins_transferred > 0 {
+                if coins_transferred > 0 || actual_loss > 0 {
                     if let Err(e) = self
                         .wallet_repo
-                        .credit(&combat.guild_id, winner_id, coins_transferred, "coude_combat_win", &desc)
+                        .pay_combat_atomic(
+                            &combat.guild_id,
+                            winner_id,
+                            coins_transferred,
+                            loser_id,
+                            actual_loss,
+                            "coude_combat",
+                            &desc,
+                        )
                         .await
                     {
-                        warn!(error = %e, "Echec credit winner");
-                    }
-                }
-                if actual_loss > 0 {
-                    if let Err(e) = self
-                        .wallet_repo
-                        .debit(&combat.guild_id, loser_id, actual_loss, "coude_combat_loss", &desc)
-                        .await
-                    {
-                        warn!(error = %e, "Echec debit loser");
+                        warn!(error = %e, "Echec payout combat atomique");
                     }
                 }
 
@@ -418,13 +427,40 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 }
             }
             _ => {
-                // Draw / accident_debile
+                // Draw / accident_debile / explosion
                 let had_accident = result.rounds.iter().any(|r| {
                     matches!(
                         r.chaos_event,
                         Some(engine::chaos::ChaosEvent::AccidentDebile)
                     )
                 });
+                let is_explosion = combat.defender_special.as_deref() == Some("explosion");
+
+                if is_explosion && result.coins_lost_by_loser > 0 {
+                    // Explosion : les deux joueurs perdent `coins_lost_by_loser`
+                    // (calcule par le moteur : 50% de la mise). On debite le
+                    // wallet explicitement — sans ce debit, le message "EXPLOSION,
+                    // les deux perdent X coins" ne correspondait a rien en BDD.
+                    let desc = format!("Explosion combat {}", combat.id);
+                    let loss = result.coins_lost_by_loser;
+                    let _ = self
+                        .wallet_repo
+                        .debit(&combat.guild_id, &combat.attacker_id, loss, "coude_combat_explosion", &desc)
+                        .await;
+                    let _ = self
+                        .wallet_repo
+                        .debit(&combat.guild_id, &combat.defender_id, loss, "coude_combat_explosion", &desc)
+                        .await;
+                    let _ = self
+                        .players_uc
+                        .record_draw(&combat.guild_id, &combat.attacker_id, loss)
+                        .await;
+                    let _ = self
+                        .players_uc
+                        .record_draw(&combat.guild_id, &combat.defender_id, loss)
+                        .await;
+                }
+
                 if had_accident {
                     // Accident debile : les deux joueurs sont penalises de
                     // `combat.mise`. On debite le wallet explicitement (avant,

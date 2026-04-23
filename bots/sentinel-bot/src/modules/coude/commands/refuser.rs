@@ -64,8 +64,11 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .signed_duration_since(created)
         .num_seconds();
     if elapsed > 86400 {
-        if let Err(e) = api.expire_combat(&combat_id).await {
-            tracing::warn!(error = %e, "Echec API expire_combat");
+        // 24h ecoules : on annule le combat. Utilise cancel_combat (gate
+        // status='pending') pour ne pas ecraser un combat qu un clic
+        // concurrent viendrait de faire passer en betting.
+        if let Err(e) = api.cancel_combat(&combat_id).await {
+            tracing::warn!(error = %e, "Echec API cancel_combat (24h)");
         }
         reply_ephemeral(ctx, component, "Ce defi a expire ! (24h)").await;
         return;
