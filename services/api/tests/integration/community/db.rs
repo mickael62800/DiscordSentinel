@@ -175,3 +175,183 @@ async fn temp_role_unique_constraint() {
         .bind(&gid).execute(&p).await;
     assert!(dup.is_err(), "Duplicate guild+user+role doit etre rejete");
 }
+
+// ══════════════════════════════════════════════════════════
+//  CommunityGrpc handler (wire-up + validation + mapping)
+// ══════════════════════════════════════════════════════════
+
+mod community_grpc {
+    use super::*;
+    use sentinel_api::adapters::inbound::grpc::community::CommunityGrpc;
+    use sentinel_proto::community::v1 as proto;
+    use sentinel_proto::community::v1::community_service_server::CommunityService;
+    use tonic::Request;
+
+    fn grpc(p: PgPool) -> CommunityGrpc { CommunityGrpc { pg_pool: p } }
+
+    #[tokio::test]
+    async fn create_sponsorship_and_list_round_trip() {
+        let p = pool().await;
+        let g = grpc(p.clone());
+        let gid = ugid();
+        let sponsor = ugid();
+        let sponsored = ugid();
+
+        g.create_sponsorship(Request::new(proto::CreateSponsorshipRequest {
+            guild_id: gid.clone(),
+            sponsor_id: sponsor.clone(),
+            sponsored_id: sponsored.clone(),
+        })).await.unwrap();
+
+        let resp = g.list_sponsorships(Request::new(proto::ListSponsorshipsRequest {
+            guild_id: gid.clone(),
+        })).await.unwrap();
+
+        let list = resp.into_inner().sponsorships;
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].sponsor_id, sponsor);
+        assert_eq!(list[0].sponsored_id, sponsored);
+        assert!(!list[0].created_at.is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_sponsorship_duplicate_is_noop_via_on_conflict() {
+        let p = pool().await;
+        let g = grpc(p.clone());
+        let gid = ugid();
+        let sponsored = ugid();
+
+        // 1re insertion
+        g.create_sponsorship(Request::new(proto::CreateSponsorshipRequest {
+            guild_id: gid.clone(),
+            sponsor_id: ugid(),
+            sponsored_id: sponsored.clone(),
+        })).await.unwrap();
+
+        // 2e insertion même (guild, sponsored) → ON CONFLICT DO NOTHING → pas d'erreur
+        let result = g.create_sponsorship(Request::new(proto::CreateSponsorshipRequest {
+            guild_id: gid.clone(),
+            sponsor_id: ugid(),
+            sponsored_id: sponsored.clone(),
+        })).await;
+        assert!(result.is_ok());
+
+        // Une seule row persistée
+        let list = g.list_sponsorships(Request::new(proto::ListSponsorshipsRequest {
+            guild_id: gid,
+        })).await.unwrap().into_inner().sponsorships;
+        assert_eq!(list.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn list_sponsorships_empty_for_fresh_guild() {
+        let p = pool().await;
+        let g = grpc(p);
+        let list = g.list_sponsorships(Request::new(proto::ListSponsorshipsRequest {
+            guild_id: ugid(),
+        })).await.unwrap().into_inner().sponsorships;
+        assert!(list.is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_temp_role_rejects_bad_rfc3339() {
+        let p = pool().await;
+        let g = grpc(p);
+        let err = g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
+            guild_id: ugid(),
+            user_id: ugid(),
+            role_id: ugid(),
+            expires_at: "not-a-date".into(),
+        })).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        assert!(err.message().contains("RFC3339"));
+    }
+
+    #[tokio::test]
+    async fn create_temp_role_and_list_only_active() {
+        let p = pool().await;
+        let g = grpc(p.clone());
+        let gid = ugid();
+        let uid = ugid();
+        let role_future = ugid();
+        let role_past = ugid();
+
+        // Active : dans 1h
+        let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
+            guild_id: gid.clone(),
+            user_id: uid.clone(),
+            role_id: role_future.clone(),
+            expires_at: future,
+        })).await.unwrap();
+
+        // Expire : -1h (insert direct car le handler ne valide pas le passé)
+        let past = (chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339();
+        g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
+            guild_id: gid.clone(),
+            user_id: uid.clone(),
+            role_id: role_past.clone(),
+            expires_at: past,
+        })).await.unwrap();
+
+        // list_temp_roles filtre `expires_at > NOW()` → doit ne renvoyer que le futur
+        let list = g.list_temp_roles(Request::new(proto::ListTempRolesRequest {
+            guild_id: gid.clone(),
+        })).await.unwrap().into_inner().roles;
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].role_id, role_future);
+    }
+
+    #[tokio::test]
+    async fn create_temp_role_upsert_on_conflict() {
+        let p = pool().await;
+        let g = grpc(p.clone());
+        let gid = ugid();
+        let uid = ugid();
+        let role = ugid();
+        let first = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        let second = (chrono::Utc::now() + chrono::Duration::hours(5)).to_rfc3339();
+
+        g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
+            guild_id: gid.clone(), user_id: uid.clone(), role_id: role.clone(),
+            expires_at: first,
+        })).await.unwrap();
+        g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
+            guild_id: gid.clone(), user_id: uid.clone(), role_id: role.clone(),
+            expires_at: second.clone(),
+        })).await.unwrap();
+
+        let list = g.list_temp_roles(Request::new(proto::ListTempRolesRequest {
+            guild_id: gid,
+        })).await.unwrap().into_inner().roles;
+        assert_eq!(list.len(), 1, "upsert doit garder une seule row");
+        // expires_at a été mis à jour (second)
+        assert!(list[0].expires_at.starts_with(&second[..19])); // compare date+heure (sans tz offset formatting)
+    }
+
+    #[tokio::test]
+    async fn delete_temp_role_removes_only_target() {
+        let p = pool().await;
+        let g = grpc(p.clone());
+        let gid = ugid();
+        let uid = ugid();
+        let role1 = ugid();
+        let role2 = ugid();
+        let future = (chrono::Utc::now() + chrono::Duration::hours(1)).to_rfc3339();
+        for r in &[&role1, &role2] {
+            g.create_temp_role(Request::new(proto::CreateTempRoleRequest {
+                guild_id: gid.clone(), user_id: uid.clone(), role_id: (*r).clone(),
+                expires_at: future.clone(),
+            })).await.unwrap();
+        }
+        g.delete_temp_role(Request::new(proto::DeleteTempRoleRequest {
+            guild_id: gid.clone(), user_id: uid.clone(), role_id: role1.clone(),
+        })).await.unwrap();
+
+        let list = g.list_temp_roles(Request::new(proto::ListTempRolesRequest {
+            guild_id: gid,
+        })).await.unwrap().into_inner().roles;
+        assert_eq!(list.len(), 1);
+        assert_eq!(list[0].role_id, role2);
+    }
+}
