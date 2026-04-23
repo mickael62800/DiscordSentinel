@@ -98,3 +98,7 @@ pub async fn add_points(
 
     Ok(single_dto(points))
 }
+
+#[cfg(test)]
+#[path = "tests/conduct.rs"]
+mod tests;

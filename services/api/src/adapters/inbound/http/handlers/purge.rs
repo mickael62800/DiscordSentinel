@@ -121,3 +121,7 @@ pub async fn purge_logs(
 
     Ok(Json(serde_json::json!({ "deleted": count })))
 }
+
+#[cfg(test)]
+#[path = "tests/purge.rs"]
+mod tests;

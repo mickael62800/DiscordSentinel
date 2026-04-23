@@ -175,3 +175,7 @@ pub async fn get_tournament_history(
 
     Ok(Json(out))
 }
+
+#[cfg(test)]
+#[path = "tests/tournaments.rs"]
+mod tests;
