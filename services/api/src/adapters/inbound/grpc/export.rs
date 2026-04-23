@@ -38,3 +38,7 @@ impl ExportService for ExportGrpc {
         }))
     }
 }
+
+#[cfg(test)]
+#[path = "tests/export.rs"]
+mod tests;

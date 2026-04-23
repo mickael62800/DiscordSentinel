@@ -49,3 +49,7 @@ impl WelcomeService for WelcomeGrpc {
         }))
     }
 }
+
+#[cfg(test)]
+#[path = "tests/welcome.rs"]
+mod tests;

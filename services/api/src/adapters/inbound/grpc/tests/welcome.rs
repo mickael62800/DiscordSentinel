@@ -1,0 +1,117 @@
+use super::*;
+use async_trait::async_trait;
+use std::sync::{Arc, Mutex};
+
+use crate::domain::errors::DomainError;
+use crate::ports::outbound::WelcomeConfigData;
+
+struct MockWelcomeRepo {
+    config: Mutex<Result<WelcomeConfigData, DomainError>>,
+}
+
+impl MockWelcomeRepo {
+    fn with_config(cfg: WelcomeConfigData) -> Self {
+        Self { config: Mutex::new(Ok(cfg)) }
+    }
+    fn with_err() -> Self {
+        Self { config: Mutex::new(Err(DomainError::Internal("pg down".into()))) }
+    }
+}
+
+#[async_trait]
+impl WelcomeConfigRepository for MockWelcomeRepo {
+    async fn get_config(&self, _: &str) -> Result<WelcomeConfigData, DomainError> {
+        match &*self.config.lock().unwrap() {
+            Ok(c) => Ok(c.clone()),
+            Err(e) => Err(DomainError::Internal(format!("{e:?}"))),
+        }
+    }
+    async fn save_config(&self, _: &str, _: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> {
+        unimplemented!()
+    }
+}
+
+fn sample_config() -> WelcomeConfigData {
+    WelcomeConfigData {
+        guild_id: "g1".into(),
+        welcome_enabled: true,
+        welcome_channel_id: Some("c-welcome".into()),
+        welcome_message: "Bienvenue!".into(),
+        welcome_embed_color: "0x57F287".into(),
+        welcome_dm_enabled: false,
+        welcome_dm_message: "".into(),
+        leave_enabled: true,
+        leave_channel_id: Some("c-leave".into()),
+        leave_message: "Au revoir".into(),
+        rules_enabled: false,
+        rules_channel_id: None,
+        rules_message: "".into(),
+        rules_role_id: None,
+        rules_button_label: "Accepter".into(),
+        counter_enabled: true,
+        counter_channel_id: Some("c-counter".into()),
+        counter_format: "{count} membres".into(),
+        anniversary_enabled: false,
+        anniversary_channel_id: None,
+        anniversary_message: "".into(),
+        rejoin_message: "De retour!".into(),
+    }
+}
+
+#[tokio::test]
+async fn get_config_maps_all_fields() {
+    let grpc = WelcomeGrpc { repo: Arc::new(MockWelcomeRepo::with_config(sample_config())) };
+    let resp = grpc
+        .get_config(Request::new(proto::GetConfigRequest { guild_id: "g1".into() }))
+        .await
+        .unwrap();
+    let inner = resp.into_inner();
+    assert_eq!(inner.guild_id, "g1");
+    assert!(inner.welcome_enabled);
+    assert_eq!(inner.welcome_channel_id.as_deref(), Some("c-welcome"));
+    assert_eq!(inner.welcome_message, "Bienvenue!");
+    assert_eq!(inner.welcome_embed_color, "0x57F287");
+    assert!(!inner.welcome_dm_enabled);
+    assert!(inner.leave_enabled);
+    assert_eq!(inner.leave_channel_id.as_deref(), Some("c-leave"));
+    assert!(!inner.rules_enabled);
+    assert_eq!(inner.rules_button_label, "Accepter");
+    assert!(inner.counter_enabled);
+    assert_eq!(inner.counter_format, "{count} membres");
+    assert!(!inner.anniversary_enabled);
+    assert_eq!(inner.rejoin_message, "De retour!");
+}
+
+#[tokio::test]
+async fn get_config_repo_error_maps_to_internal() {
+    let grpc = WelcomeGrpc { repo: Arc::new(MockWelcomeRepo::with_err()) };
+    let err = grpc
+        .get_config(Request::new(proto::GetConfigRequest { guild_id: "g".into() }))
+        .await
+        .unwrap_err();
+    assert_eq!(err.code(), tonic::Code::Internal);
+    assert!(err.message().contains("get welcome config"));
+}
+
+#[tokio::test]
+async fn get_config_preserves_none_optionals() {
+    let mut cfg = sample_config();
+    cfg.welcome_channel_id = None;
+    cfg.leave_channel_id = None;
+    cfg.rules_channel_id = None;
+    cfg.rules_role_id = None;
+    cfg.counter_channel_id = None;
+    cfg.anniversary_channel_id = None;
+    let grpc = WelcomeGrpc { repo: Arc::new(MockWelcomeRepo::with_config(cfg)) };
+    let inner = grpc
+        .get_config(Request::new(proto::GetConfigRequest { guild_id: "g".into() }))
+        .await
+        .unwrap()
+        .into_inner();
+    assert!(inner.welcome_channel_id.is_none());
+    assert!(inner.leave_channel_id.is_none());
+    assert!(inner.rules_channel_id.is_none());
+    assert!(inner.rules_role_id.is_none());
+    assert!(inner.counter_channel_id.is_none());
+    assert!(inner.anniversary_channel_id.is_none());
+}

@@ -336,6 +336,42 @@ use super::*;
     }
 
     #[test]
+    fn taunt_event_to_proto_mapping() {
+        use crate::domain::entities::TauntEvent;
+        let t = TauntEvent {
+            channel_id: "chan-42".into(),
+            target_user_id: "u1".into(),
+            message: "hehe".into(),
+            nickname_suffix: "le gros naze".into(),
+            streak_kind: "win",
+            streak_value: 3,
+        };
+        let p = super::taunt_event_to_proto(t);
+        assert_eq!(p.channel_id, "chan-42");
+        assert_eq!(p.target_user_id, "u1");
+        assert_eq!(p.message, "hehe");
+        assert_eq!(p.nickname_suffix, "le gros naze");
+        assert_eq!(p.streak_kind, "win");
+        assert_eq!(p.streak_value, 3);
+    }
+
+    #[test]
+    fn taunt_event_to_proto_empty_suffix() {
+        use crate::domain::entities::TauntEvent;
+        let t = TauntEvent {
+            channel_id: "c".into(),
+            target_user_id: "u".into(),
+            message: "".into(),
+            nickname_suffix: "".into(),
+            streak_kind: "loss",
+            streak_value: 0,
+        };
+        let p = super::taunt_event_to_proto(t);
+        assert!(p.nickname_suffix.is_empty());
+        assert_eq!(p.streak_kind, "loss");
+    }
+
+    #[test]
     fn event_to_proto_mapping() {
         let id = Uuid::new_v4();
         let e = CoudeEvent {
