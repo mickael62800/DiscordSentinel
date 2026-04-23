@@ -112,7 +112,10 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                         .thumbnail(new_member.user.face())
                         .footer(CreateEmbedFooter::new(footer_raw));
                     if !raw_image.is_empty() {
-                        embed = embed.image(raw_image);
+                        info!(url = %raw_image, is_rejoin, "Ajout image banniere a l embed welcome");
+                        embed = embed.image(raw_image.as_str());
+                    } else {
+                        info!(is_rejoin, "Pas d image banniere configuree");
                     }
 
                     if let Err(e) = channel.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {

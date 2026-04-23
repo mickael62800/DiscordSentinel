@@ -191,6 +191,23 @@ function isMultilineField(key: string): boolean {
   return key.endsWith("_message");
 }
 
+/// Liste les variables template supportees par un champ. Retourne null si
+/// aucun templating. Les clics sur une variable l inserent dans le champ.
+function templateVarsFor(key: string): string[] | null {
+  if (key === "anniversary_message") {
+    return ["{user}", "{username}", "{server}", "{count}", "{years}"];
+  }
+  if (key.endsWith("_message") || key === "welcome_footer_text" || key === "rejoin_footer_text" || key === "leave_footer_text" || key === "anniversary_footer_text" || key === "counter_format") {
+    return ["{user}", "{username}", "{server}", "{count}"];
+  }
+  return null;
+}
+
+function insertVar(key: string, variable: string) {
+  const current = formValues.value[key] ?? "";
+  formValues.value[key] = (current.length && !current.endsWith(" ") ? current + " " : current) + variable;
+}
+
 const hasChanges = computed(() =>
   configFields.value.some((f) => isFieldModified(f.key)),
 );
@@ -568,6 +585,15 @@ watch(selectedComponent, loadFormValues);
                     rows="4"
                     :placeholder="field.default !== undefined ? String(field.default) : ''"
                   />
+                  <div v-if="templateVarsFor(field.key)" class="template-vars">
+                    <span class="template-vars-label">Variables disponibles :</span>
+                    <code
+                      v-for="v in templateVarsFor(field.key)"
+                      :key="v"
+                      class="template-var"
+                      @click="insertVar(field.key, v)"
+                    >{{ v }}</code>
+                  </div>
                   <input
                     v-else
                     :id="field.key"
@@ -950,6 +976,39 @@ watch(selectedComponent, loadFormValues);
   white-space: pre-wrap;
   font-family: inherit;
   line-height: 1.5;
+}
+
+.template-vars {
+  margin-top: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.template-vars-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 600;
+}
+
+.template-var {
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--accent);
+  font-size: 12px;
+  font-family: "JetBrains Mono", monospace;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.template-var:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
 }
 
 /* Masquer les fleches up/down des inputs number */
