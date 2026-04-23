@@ -65,6 +65,17 @@ impl From<Row> for WelcomeConfigData {
             anniversary_channel_id: r.anniversary_channel_id,
             anniversary_message: r.anniversary_message,
             rejoin_message: r.rejoin_message,
+            // Row ne contient pas les champs embed enrichi (legacy welcome_config
+            // table, desormais inutilisee en lecture). Valeurs par defaut.
+            welcome_title: "Bienvenue !".into(),
+            welcome_image_url: "".into(),
+            welcome_footer_text: "{count} membres".into(),
+            leave_title: "Au revoir...".into(),
+            leave_image_url: "".into(),
+            leave_footer_text: "{count} membres".into(),
+            anniversary_title: "Joyeux anniversaire !".into(),
+            anniversary_image_url: "".into(),
+            anniversary_footer_text: "{count} membres".into(),
         }
     }
 }
@@ -93,6 +104,15 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         anniversary_channel_id: None,
         anniversary_message: "Felicitations {user}, ca fait **{years} an(s)** que tu es sur **{server}** !".into(),
         rejoin_message: "Content de te revoir {user} ! Tu nous avais manque.".into(),
+        welcome_title: "Bienvenue !".into(),
+        welcome_image_url: "".into(),
+        welcome_footer_text: "{count} membres".into(),
+        leave_title: "Au revoir...".into(),
+        leave_image_url: "".into(),
+        leave_footer_text: "{count} membres".into(),
+        anniversary_title: "Joyeux anniversaire !".into(),
+        anniversary_image_url: "".into(),
+        anniversary_footer_text: "{count} membres".into(),
     }
 }
 
@@ -128,6 +148,15 @@ fn overlay_with_bot_config(
             "anniversary_enabled" => d.anniversary_enabled = parse_bool(&v, d.anniversary_enabled),
             "anniversary_channel_id" => d.anniversary_channel_id = if v.is_empty() { None } else { Some(v) },
             "anniversary_message" => { if !v.is_empty() { d.anniversary_message = v; } }
+            "welcome_title" => { if !v.is_empty() { d.welcome_title = v; } }
+            "welcome_image_url" => d.welcome_image_url = v,
+            "welcome_footer_text" => { if !v.is_empty() { d.welcome_footer_text = v; } }
+            "leave_title" => { if !v.is_empty() { d.leave_title = v; } }
+            "leave_image_url" => d.leave_image_url = v,
+            "leave_footer_text" => { if !v.is_empty() { d.leave_footer_text = v; } }
+            "anniversary_title" => { if !v.is_empty() { d.anniversary_title = v; } }
+            "anniversary_image_url" => d.anniversary_image_url = v,
+            "anniversary_footer_text" => { if !v.is_empty() { d.anniversary_footer_text = v; } }
             _ => {}
         }
     }

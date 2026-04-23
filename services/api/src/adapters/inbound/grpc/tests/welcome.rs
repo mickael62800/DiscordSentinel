@@ -55,6 +55,15 @@ fn sample_config() -> WelcomeConfigData {
         anniversary_channel_id: None,
         anniversary_message: "".into(),
         rejoin_message: "De retour!".into(),
+        welcome_title: "".into(),
+        welcome_image_url: "".into(),
+        welcome_footer_text: "".into(),
+        leave_title: "".into(),
+        leave_image_url: "".into(),
+        leave_footer_text: "".into(),
+        anniversary_title: "".into(),
+        anniversary_image_url: "".into(),
+        anniversary_footer_text: "".into(),
     }
 }
 

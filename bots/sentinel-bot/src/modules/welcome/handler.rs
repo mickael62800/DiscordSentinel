@@ -82,14 +82,28 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                         None,
                     );
 
-                    let title = if is_rejoin { "Bon retour !" } else { "Bienvenue !" };
+                    let title = if is_rejoin {
+                        "Bon retour !".to_string()
+                    } else if !config.welcome_title.is_empty() {
+                        config.welcome_title.clone()
+                    } else {
+                        "Bienvenue !".to_string()
+                    };
                     let color = template::parse_color(&config.welcome_embed_color);
-                    let embed = CreateEmbed::new()
-                        .title(title)
+                    let footer_raw = if config.welcome_footer_text.is_empty() {
+                        format!("{} membres", member_count)
+                    } else {
+                        config.welcome_footer_text.replace("{count}", &member_count.to_string())
+                    };
+                    let mut embed = CreateEmbed::new()
+                        .title(&title)
                         .description(&text)
                         .color(color)
                         .thumbnail(new_member.user.face())
-                        .footer(CreateEmbedFooter::new(format!("{} membres", member_count)));
+                        .footer(CreateEmbedFooter::new(footer_raw));
+                    if !config.welcome_image_url.is_empty() {
+                        embed = embed.image(&config.welcome_image_url);
+                    }
 
                     if let Err(e) = channel.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
                         warn!(error = %e, "Echec envoi message bienvenue");
@@ -199,9 +213,24 @@ pub async fn on_member_remove(ctx: &Context, guild_id: GuildId, user: &User) {
             None,
         );
 
-        let embed = CreateEmbed::new()
+        let leave_title = if config.leave_title.is_empty() {
+            "Au revoir...".to_string()
+        } else {
+            config.leave_title.clone()
+        };
+        let leave_footer = if config.leave_footer_text.is_empty() {
+            format!("{} membres", member_count)
+        } else {
+            config.leave_footer_text.replace("{count}", &member_count.to_string())
+        };
+        let mut embed = CreateEmbed::new()
+            .title(&leave_title)
             .description(&text)
-            .color(0xe74c3c);
+            .color(0xe74c3c)
+            .footer(CreateEmbedFooter::new(leave_footer));
+        if !config.leave_image_url.is_empty() {
+            embed = embed.image(&config.leave_image_url);
+        }
 
         if let Err(e) = ch.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {
             warn!(error = %e, "Echec envoi message depart");

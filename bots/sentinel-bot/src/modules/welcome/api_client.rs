@@ -38,6 +38,15 @@ pub struct WelcomeConfig {
     pub anniversary_channel_id: Option<String>,
     pub anniversary_message: String,
     pub rejoin_message: String,
+    pub welcome_title: String,
+    pub welcome_image_url: String,
+    pub welcome_footer_text: String,
+    pub leave_title: String,
+    pub leave_image_url: String,
+    pub leave_footer_text: String,
+    pub anniversary_title: String,
+    pub anniversary_image_url: String,
+    pub anniversary_footer_text: String,
 }
 
 impl From<proto_welcome::WelcomeConfig> for WelcomeConfig {
@@ -65,6 +74,15 @@ impl From<proto_welcome::WelcomeConfig> for WelcomeConfig {
             anniversary_channel_id: p.anniversary_channel_id,
             anniversary_message: p.anniversary_message,
             rejoin_message: p.rejoin_message,
+            welcome_title: p.welcome_title,
+            welcome_image_url: p.welcome_image_url,
+            welcome_footer_text: p.welcome_footer_text,
+            leave_title: p.leave_title,
+            leave_image_url: p.leave_image_url,
+            leave_footer_text: p.leave_footer_text,
+            anniversary_title: p.anniversary_title,
+            anniversary_image_url: p.anniversary_image_url,
+            anniversary_footer_text: p.anniversary_footer_text,
         }
     }
 }

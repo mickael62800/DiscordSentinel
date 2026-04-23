@@ -30,6 +30,15 @@ pub struct WelcomeConfigDto {
     pub anniversary_channel_id: Option<String>,
     pub anniversary_message: String,
     pub rejoin_message: String,
+    pub welcome_title: String,
+    pub welcome_image_url: String,
+    pub welcome_footer_text: String,
+    pub leave_title: String,
+    pub leave_image_url: String,
+    pub leave_footer_text: String,
+    pub anniversary_title: String,
+    pub anniversary_image_url: String,
+    pub anniversary_footer_text: String,
 }
 
 impl From<WelcomeConfigData> for WelcomeConfigDto {
@@ -46,6 +55,12 @@ impl From<WelcomeConfigData> for WelcomeConfigDto {
             counter_channel_id: c.counter_channel_id, counter_format: c.counter_format,
             anniversary_enabled: c.anniversary_enabled, anniversary_channel_id: c.anniversary_channel_id,
             anniversary_message: c.anniversary_message, rejoin_message: c.rejoin_message,
+            welcome_title: c.welcome_title, welcome_image_url: c.welcome_image_url,
+            welcome_footer_text: c.welcome_footer_text,
+            leave_title: c.leave_title, leave_image_url: c.leave_image_url,
+            leave_footer_text: c.leave_footer_text,
+            anniversary_title: c.anniversary_title, anniversary_image_url: c.anniversary_image_url,
+            anniversary_footer_text: c.anniversary_footer_text,
         }
     }
 }

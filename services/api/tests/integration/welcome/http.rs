@@ -47,6 +47,15 @@ fn default_data(guild_id: &str) -> WelcomeConfigData {
         anniversary_channel_id: None,
         anniversary_message: String::new(),
         rejoin_message: String::new(),
+        welcome_title: String::new(),
+        welcome_image_url: String::new(),
+        welcome_footer_text: String::new(),
+        leave_title: String::new(),
+        leave_image_url: String::new(),
+        leave_footer_text: String::new(),
+        anniversary_title: String::new(),
+        anniversary_image_url: String::new(),
+        anniversary_footer_text: String::new(),
     }
 }
 

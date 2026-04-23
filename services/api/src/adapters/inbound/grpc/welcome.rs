@@ -46,6 +46,15 @@ impl WelcomeService for WelcomeGrpc {
             anniversary_channel_id: cfg.anniversary_channel_id,
             anniversary_message: cfg.anniversary_message,
             rejoin_message: cfg.rejoin_message,
+            welcome_title: cfg.welcome_title,
+            welcome_image_url: cfg.welcome_image_url,
+            welcome_footer_text: cfg.welcome_footer_text,
+            leave_title: cfg.leave_title,
+            leave_image_url: cfg.leave_image_url,
+            leave_footer_text: cfg.leave_footer_text,
+            anniversary_title: cfg.anniversary_title,
+            anniversary_image_url: cfg.anniversary_image_url,
+            anniversary_footer_text: cfg.anniversary_footer_text,
         }))
     }
 }

@@ -28,6 +28,18 @@ pub struct WelcomeConfigData {
     pub anniversary_channel_id: Option<String>,
     pub anniversary_message: String,
     pub rejoin_message: String,
+    // Embed enrichi — bienvenue / retour (rejoin)
+    pub welcome_title: String,
+    pub welcome_image_url: String,
+    pub welcome_footer_text: String,
+    // Embed enrichi — depart
+    pub leave_title: String,
+    pub leave_image_url: String,
+    pub leave_footer_text: String,
+    // Embed enrichi — anniversaire
+    pub anniversary_title: String,
+    pub anniversary_image_url: String,
+    pub anniversary_footer_text: String,
 }
 
 #[async_trait]
