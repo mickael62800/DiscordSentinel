@@ -356,6 +356,10 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
     }
 }
 
+#[cfg(test)]
+#[path = "tests/inventory.rs"]
+mod tests;
+
 pub(super) fn steal_boost_to_proto(b: crate::domain::entities::CoudeStealBoost) -> proto::CoudeStealBoost {
     proto::CoudeStealBoost {
         id: b.id.to_string(),
