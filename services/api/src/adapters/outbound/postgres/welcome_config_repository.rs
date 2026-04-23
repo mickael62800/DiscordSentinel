@@ -96,23 +96,60 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
     }
 }
 
+fn parse_bool(v: &str, default: bool) -> bool {
+    matches!(v, "true" | "1" | "yes" | "on") || (v.is_empty() && default)
+}
+
+fn overlay_with_bot_config(
+    base: WelcomeConfigData,
+    kvs: Vec<(String, String)>,
+) -> WelcomeConfigData {
+    let mut d = base;
+    for (k, v) in kvs {
+        match k.as_str() {
+            "welcome_enabled" => d.welcome_enabled = parse_bool(&v, d.welcome_enabled),
+            "welcome_channel_id" => d.welcome_channel_id = if v.is_empty() { None } else { Some(v) },
+            "welcome_message" => { if !v.is_empty() { d.welcome_message = v; } }
+            "welcome_embed_color" => { if !v.is_empty() { d.welcome_embed_color = v; } }
+            "welcome_dm_enabled" => d.welcome_dm_enabled = parse_bool(&v, d.welcome_dm_enabled),
+            "welcome_dm_message" => { if !v.is_empty() { d.welcome_dm_message = v; } }
+            "rejoin_message" => { if !v.is_empty() { d.rejoin_message = v; } }
+            "leave_enabled" => d.leave_enabled = parse_bool(&v, d.leave_enabled),
+            "leave_channel_id" => d.leave_channel_id = if v.is_empty() { None } else { Some(v) },
+            "leave_message" => { if !v.is_empty() { d.leave_message = v; } }
+            "rules_enabled" => d.rules_enabled = parse_bool(&v, d.rules_enabled),
+            "rules_channel_id" => d.rules_channel_id = if v.is_empty() { None } else { Some(v) },
+            "rules_message" => { if !v.is_empty() { d.rules_message = v; } }
+            "rules_role_id" => d.rules_role_id = if v.is_empty() { None } else { Some(v) },
+            "rules_button_label" => { if !v.is_empty() { d.rules_button_label = v; } }
+            "counter_enabled" => d.counter_enabled = parse_bool(&v, d.counter_enabled),
+            "counter_channel_id" => d.counter_channel_id = if v.is_empty() { None } else { Some(v) },
+            "counter_format" => { if !v.is_empty() { d.counter_format = v; } }
+            "anniversary_enabled" => d.anniversary_enabled = parse_bool(&v, d.anniversary_enabled),
+            "anniversary_channel_id" => d.anniversary_channel_id = if v.is_empty() { None } else { Some(v) },
+            "anniversary_message" => { if !v.is_empty() { d.anniversary_message = v; } }
+            _ => {}
+        }
+    }
+    d
+}
+
 #[async_trait]
 impl WelcomeConfigRepository for PgWelcomeConfigRepository {
+    /// Lit la config welcome depuis `bot_guild_config` (migration 148).
+    /// Fallback sur les defaults si aucune cle n est configuree pour ce
+    /// serveur. L ancienne table `welcome_config` n est plus lue.
     async fn get_config(&self, guild_id: &str) -> Result<WelcomeConfigData, DomainError> {
-        let row = sqlx::query_as::<_, Row>(
-            "SELECT guild_id, welcome_enabled, welcome_channel_id, welcome_message, welcome_embed_color, \
-             welcome_dm_enabled, welcome_dm_message, leave_enabled, leave_channel_id, leave_message, \
-             rules_enabled, rules_channel_id, rules_message, rules_role_id, rules_button_label, \
-             counter_enabled, counter_channel_id, counter_format, \
-             anniversary_enabled, anniversary_channel_id, anniversary_message, rejoin_message \
-             FROM welcome_config WHERE guild_id = $1",
+        let rows: Vec<(String, String)> = sqlx::query_as(
+            "SELECT config_key, config_value FROM bot_guild_config \
+             WHERE guild_id = $1 AND bot_name = 'welcome-bot'",
         )
         .bind(guild_id)
-        .fetch_optional(&self.pool)
+        .fetch_all(&self.pool)
         .await
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
-        Ok(row.map(Into::into).unwrap_or_else(|| default_config(guild_id)))
+        Ok(overlay_with_bot_config(default_config(guild_id), rows))
     }
 
     async fn save_config(&self, guild_id: &str, d: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> {
