@@ -100,3 +100,154 @@ use super::*;
         assert_eq!(err.code(), tonic::Code::InvalidArgument);
         assert!(err.message().contains("date"));
     }
+
+    // ── RPC tests avec mock ──
+
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+    use crate::domain::entities::MemberSummary;
+    use crate::domain::errors::DomainError;
+    use crate::ports::inbound::manage_members::{
+        ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
+    };
+
+    #[derive(Default)]
+    struct MockMembersUc {
+        member: Mutex<Option<GuildMember>>,
+        sync_calls: Mutex<Vec<SyncMembersCommand>>,
+        sync_return: Mutex<u64>,
+        register_calls: Mutex<Vec<RegisterMemberCommand>>,
+        remove_calls: Mutex<Vec<(String, String)>>,
+        update_calls: Mutex<Vec<UpdateMemberCommand>>,
+    }
+
+    #[async_trait]
+    impl ManageMembersUseCase for MockMembersUc {
+        async fn list_members(&self, _: &str) -> Result<Vec<GuildMember>, DomainError> { Ok(vec![]) }
+        async fn get_member(&self, _: &str, _: &str) -> Result<GuildMember, DomainError> {
+            self.member.lock().unwrap().clone()
+                .ok_or_else(|| DomainError::NotFound("member".into()))
+        }
+        async fn get_member_summary(&self, _: &str, _: &str) -> Result<MemberSummary, DomainError> { unimplemented!() }
+        async fn sync_members(&self, cmd: SyncMembersCommand) -> Result<u64, DomainError> {
+            self.sync_calls.lock().unwrap().push(cmd);
+            Ok(*self.sync_return.lock().unwrap())
+        }
+        async fn register_member(&self, cmd: RegisterMemberCommand) -> Result<(), DomainError> {
+            self.register_calls.lock().unwrap().push(cmd);
+            Ok(())
+        }
+        async fn remove_member(&self, g: &str, u: &str) -> Result<(), DomainError> {
+            self.remove_calls.lock().unwrap().push((g.into(), u.into()));
+            Ok(())
+        }
+        async fn update_member(&self, cmd: UpdateMemberCommand) -> Result<(), DomainError> {
+            self.update_calls.lock().unwrap().push(cmd);
+            Ok(())
+        }
+    }
+
+    fn grpc(uc: Arc<MockMembersUc>) -> MembersGrpc { MembersGrpc { uc } }
+
+    #[tokio::test]
+    async fn get_member_returns_none_on_not_found() {
+        let g = grpc(Arc::new(MockMembersUc::default()));
+        let resp = g.get_member(Request::new(proto::GetMemberRequest {
+            guild_id: "g".into(), user_id: "ghost".into(),
+        })).await.unwrap();
+        assert!(resp.into_inner().member.is_none());
+    }
+
+    #[tokio::test]
+    async fn get_member_returns_some_when_found() {
+        let uc = Arc::new(MockMembersUc::default());
+        *uc.member.lock().unwrap() = Some(sample_member());
+        let g = grpc(uc);
+        let resp = g.get_member(Request::new(proto::GetMemberRequest {
+            guild_id: "g1".into(), user_id: "u1".into(),
+        })).await.unwrap();
+        let m = resp.into_inner().member.unwrap();
+        assert_eq!(m.user_id, "u1");
+    }
+
+    #[tokio::test]
+    async fn sync_members_returns_count() {
+        let uc = Arc::new(MockMembersUc::default());
+        *uc.sync_return.lock().unwrap() = 42;
+        let g = grpc(uc.clone());
+        let resp = g.sync_members(Request::new(proto::SyncMembersRequest {
+            guild_id: "g".into(),
+            members: vec![],
+        })).await.unwrap();
+        assert_eq!(resp.into_inner().synced_count, 42);
+        assert_eq!(uc.sync_calls.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn register_member_missing_body_returns_invalid_argument() {
+        let g = grpc(Arc::new(MockMembersUc::default()));
+        let err = g.register_member(Request::new(proto::RegisterMemberRequest {
+            member: None,
+        })).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        assert!(err.message().contains("member manquant"));
+    }
+
+    #[tokio::test]
+    async fn register_member_delegates_to_uc() {
+        let uc = Arc::new(MockMembersUc::default());
+        let g = grpc(uc.clone());
+        let proto_m = member_to_proto(sample_member()).unwrap();
+        let _ = g.register_member(Request::new(proto::RegisterMemberRequest {
+            member: Some(proto_m),
+        })).await.unwrap();
+        assert_eq!(uc.register_calls.lock().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn remove_member_delegates() {
+        let uc = Arc::new(MockMembersUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.remove_member(Request::new(proto::RemoveMemberRequest {
+            guild_id: "g".into(), user_id: "u".into(),
+        })).await.unwrap();
+        assert_eq!(uc.remove_calls.lock().unwrap()[0], ("g".into(), "u".into()));
+    }
+
+    #[tokio::test]
+    async fn update_member_invalid_roles_json_returns_error() {
+        let g = grpc(Arc::new(MockMembersUc::default()));
+        let err = g.update_member(Request::new(proto::UpdateMemberRequest {
+            guild_id: "g".into(), user_id: "u".into(),
+            username: None, display_name: None, avatar: None,
+            roles_json: Some("not-json".into()),
+        })).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+        assert!(err.message().contains("roles_json"));
+    }
+
+    #[tokio::test]
+    async fn update_member_valid_roles_json_delegates() {
+        let uc = Arc::new(MockMembersUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.update_member(Request::new(proto::UpdateMemberRequest {
+            guild_id: "g".into(), user_id: "u".into(),
+            username: Some("new".into()), display_name: None, avatar: None,
+            roles_json: Some(r#"["r1","r2"]"#.into()),
+        })).await.unwrap();
+        let calls = uc.update_calls.lock().unwrap();
+        assert_eq!(calls[0].username.as_deref(), Some("new"));
+        assert!(calls[0].roles.is_some());
+    }
+
+    #[tokio::test]
+    async fn update_member_no_roles_json_is_ok() {
+        let uc = Arc::new(MockMembersUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.update_member(Request::new(proto::UpdateMemberRequest {
+            guild_id: "g".into(), user_id: "u".into(),
+            username: None, display_name: None, avatar: None,
+            roles_json: None,
+        })).await.unwrap();
+        assert!(uc.update_calls.lock().unwrap()[0].roles.is_none());
+    }
