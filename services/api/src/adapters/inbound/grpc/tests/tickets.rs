@@ -91,3 +91,232 @@ use super::*;
         assert_eq!(p.messages.len(), 2);
         assert_eq!(p.messages[1].author_role, "moderator");
     }
+
+    // ── RPC tests avec mock ──
+
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+    use crate::domain::errors::DomainError;
+    use crate::ports::inbound::{
+        AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
+        UpdateTicketChannelCommand,
+    };
+
+    #[derive(Default)]
+    struct MockTicketsUc {
+        list_tickets: Mutex<Vec<Ticket>>,
+        list_calls: Mutex<Vec<(Option<String>, Option<String>, Option<String>, Option<String>, i64, i64)>>,
+        detail: Mutex<Option<TicketDetail>>,
+        create_calls: Mutex<Vec<CreateTicketCommand>>,
+        reply_calls: Mutex<Vec<ReplyTicketCommand>>,
+        close_calls: Mutex<Vec<String>>,
+        assign_calls: Mutex<Vec<AssignTicketCommand>>,
+        update_status_calls: Mutex<Vec<(String, String)>>,
+        update_chan_calls: Mutex<Vec<UpdateTicketChannelCommand>>,
+        update_prio_calls: Mutex<Vec<(Uuid, String)>>,
+        update_sla_calls: Mutex<Vec<(Uuid, Option<String>, Option<String>, Option<i32>)>>,
+    }
+
+    #[async_trait]
+    impl ManageTicketsUseCase for MockTicketsUc {
+        async fn list_tickets(&self, s: Option<String>, p: Option<String>, sch: Option<String>, a: Option<String>, l: i64, o: i64) -> Result<Vec<Ticket>, DomainError> {
+            self.list_calls.lock().unwrap().push((s, p, sch, a, l, o));
+            Ok(self.list_tickets.lock().unwrap().clone())
+        }
+        async fn get_ticket_detail(&self, _: &str) -> Result<TicketDetail, DomainError> {
+            self.detail.lock().unwrap().clone()
+                .ok_or_else(|| DomainError::NotFound("ticket".into()))
+        }
+        async fn create_ticket(&self, cmd: CreateTicketCommand) -> Result<Ticket, DomainError> {
+            let t = sample_ticket();
+            self.create_calls.lock().unwrap().push(cmd);
+            Ok(t)
+        }
+        async fn reply_ticket(&self, cmd: ReplyTicketCommand) -> Result<(), DomainError> {
+            self.reply_calls.lock().unwrap().push(cmd);
+            Ok(())
+        }
+        async fn close_ticket(&self, id: &str) -> Result<(), DomainError> {
+            self.close_calls.lock().unwrap().push(id.into());
+            Ok(())
+        }
+        async fn assign_ticket(&self, cmd: AssignTicketCommand) -> Result<(), DomainError> {
+            self.assign_calls.lock().unwrap().push(cmd);
+            Ok(())
+        }
+        async fn update_status(&self, id: &str, s: &str) -> Result<(), DomainError> {
+            self.update_status_calls.lock().unwrap().push((id.into(), s.into()));
+            Ok(())
+        }
+        async fn update_ticket_channel(&self, cmd: UpdateTicketChannelCommand) -> Result<(), DomainError> {
+            self.update_chan_calls.lock().unwrap().push(cmd);
+            Ok(())
+        }
+        async fn update_priority(&self, id: Uuid, p: &str) -> Result<(), DomainError> {
+            self.update_prio_calls.lock().unwrap().push((id, p.into()));
+            Ok(())
+        }
+        async fn update_sla(&self, id: Uuid, f: Option<&str>, r: Option<&str>, s: Option<i32>) -> Result<(), DomainError> {
+            self.update_sla_calls.lock().unwrap().push((id, f.map(String::from), r.map(String::from), s));
+            Ok(())
+        }
+    }
+
+    fn grpc(uc: Arc<MockTicketsUc>) -> TicketsGrpc { TicketsGrpc { tickets_uc: uc } }
+
+    #[tokio::test]
+    async fn list_tickets_default_limit_when_zero() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.list_tickets(Request::new(proto::ListTicketsRequest {
+            status: None, priority: None, search: None, author_id: None,
+            limit: 0, offset: -5,
+        })).await.unwrap();
+        let calls = uc.list_calls.lock().unwrap();
+        assert_eq!(calls[0].4, 50); // default 50
+        assert_eq!(calls[0].5, 0); // offset floored to 0
+    }
+
+    #[tokio::test]
+    async fn list_tickets_caps_limit_at_200() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.list_tickets(Request::new(proto::ListTicketsRequest {
+            status: Some("open".into()), priority: None, search: None, author_id: None,
+            limit: 5000, offset: 10,
+        })).await.unwrap();
+        let calls = uc.list_calls.lock().unwrap();
+        assert_eq!(calls[0].4, 200); // capped
+        assert_eq!(calls[0].0.as_deref(), Some("open"));
+    }
+
+    #[tokio::test]
+    async fn create_ticket_delegates_command() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.create_ticket(Request::new(proto::CreateTicketRequest {
+            title: "Bug".into(),
+            priority: "high".into(),
+            author_id: "a".into(),
+            author_name: "Alice".into(),
+            server: "main".into(),
+            category: "bug".into(),
+            ticket_type: "support".into(),
+            channel_id: Some("c".into()),
+        })).await.unwrap();
+        let calls = uc.create_calls.lock().unwrap();
+        assert_eq!(calls[0].title, "Bug");
+        assert_eq!(calls[0].author_name, "Alice");
+    }
+
+    #[tokio::test]
+    async fn reply_ticket_delegates_command() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.reply_ticket(Request::new(proto::ReplyTicketRequest {
+            ticket_id: "t1".into(),
+            content: "msg".into(),
+            author_name: "Joe".into(),
+            author_role: "user".into(),
+        })).await.unwrap();
+        assert_eq!(uc.reply_calls.lock().unwrap()[0].content, "msg");
+    }
+
+    #[tokio::test]
+    async fn close_ticket_delegates_id() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.close_ticket(Request::new(proto::CloseTicketRequest {
+            id: "t1".into(),
+        })).await.unwrap();
+        assert_eq!(uc.close_calls.lock().unwrap()[0], "t1");
+    }
+
+    #[tokio::test]
+    async fn update_status_delegates() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.update_status(Request::new(proto::UpdateStatusRequest {
+            id: "t1".into(),
+            status: "resolved".into(),
+        })).await.unwrap();
+        let calls = uc.update_status_calls.lock().unwrap();
+        assert_eq!(calls[0], ("t1".into(), "resolved".into()));
+    }
+
+    #[tokio::test]
+    async fn assign_ticket_delegates() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.assign_ticket(Request::new(proto::AssignTicketRequest {
+            ticket_id: "t1".into(),
+            assignee: "mod1".into(),
+        })).await.unwrap();
+        let calls = uc.assign_calls.lock().unwrap();
+        assert_eq!(calls[0].assignee, "mod1");
+    }
+
+    #[tokio::test]
+    async fn update_priority_rejects_invalid_uuid() {
+        let g = grpc(Arc::new(MockTicketsUc::default()));
+        let err = g.update_priority(Request::new(proto::UpdatePriorityRequest {
+            id: "not-a-uuid".into(),
+            priority: "high".into(),
+        })).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[tokio::test]
+    async fn update_priority_valid_uuid_delegates() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let id = Uuid::new_v4();
+        let _ = g.update_priority(Request::new(proto::UpdatePriorityRequest {
+            id: id.to_string(),
+            priority: "high".into(),
+        })).await.unwrap();
+        let calls = uc.update_prio_calls.lock().unwrap();
+        assert_eq!(calls[0].0, id);
+    }
+
+    #[tokio::test]
+    async fn update_sla_invalid_uuid_rejected() {
+        let g = grpc(Arc::new(MockTicketsUc::default()));
+        let err = g.update_sla(Request::new(proto::UpdateSlaRequest {
+            id: "bad".into(),
+            first_response_at: None,
+            resolved_at: None,
+            satisfaction_rating: None,
+        })).await.unwrap_err();
+        assert_eq!(err.code(), tonic::Code::InvalidArgument);
+    }
+
+    #[tokio::test]
+    async fn update_sla_all_fields_delegate() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let id = Uuid::new_v4();
+        let _ = g.update_sla(Request::new(proto::UpdateSlaRequest {
+            id: id.to_string(),
+            first_response_at: Some("2026-01-01T00:00:00Z".into()),
+            resolved_at: Some("2026-01-02T00:00:00Z".into()),
+            satisfaction_rating: Some(5),
+        })).await.unwrap();
+        let calls = uc.update_sla_calls.lock().unwrap();
+        assert_eq!(calls[0].0, id);
+        assert_eq!(calls[0].3, Some(5));
+    }
+
+    #[tokio::test]
+    async fn update_ticket_channel_delegates_optionals() {
+        let uc = Arc::new(MockTicketsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.update_ticket_channel(Request::new(proto::UpdateTicketChannelRequest {
+            ticket_id: "t".into(),
+            voice_channel_id: Some("vc".into()),
+            invited_user_id: None,
+        })).await.unwrap();
+        let calls = uc.update_chan_calls.lock().unwrap();
+        assert_eq!(calls[0].voice_channel_id.as_deref(), Some("vc"));
+        assert!(calls[0].invited_user_id.is_none());
+    }
