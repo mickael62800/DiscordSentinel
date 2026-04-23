@@ -492,6 +492,11 @@ path = "tests/integration/redis_cache/http.rs"
 name = "integration_job_client"
 path = "tests/integration/job_client/redis.rs"
 
+# batched log repositories (BatchedPgLogRepository + BatchedPgAuditLogRepository)
+[[test]]
+name = "integration_batched_repos"
+path = "tests/integration/batched_repos/db.rs"
+
 # export service (application layer, DB queries + serialization)
 [[test]]
 name = "integration_export_service"
