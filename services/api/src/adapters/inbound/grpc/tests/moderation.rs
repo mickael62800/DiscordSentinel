@@ -87,3 +87,167 @@ use super::*;
         let p = user_history_to_proto(h);
         assert!(p.actions.is_empty());
     }
+
+    // ── RPC tests avec mock ──
+
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+    use chrono::Utc;
+    use crate::domain::entities::{StrikeResult, UserStrike};
+    use crate::domain::errors::DomainError;
+    use crate::ports::inbound::{
+        LogModerationCommand, LoggedModerationAction, ManageModerationUseCase,
+    };
+
+    #[derive(Default)]
+    struct MockModerationUc {
+        log_calls: Mutex<Vec<LogModerationCommand>>,
+        history_return: Mutex<Option<UserModerationHistory>>,
+        strike_result: Mutex<Option<StrikeResult>>,
+    }
+
+    fn sample_strike() -> StrikeResult {
+        StrikeResult {
+            strike: UserStrike {
+                id: Uuid::new_v4(),
+                guild_id: "g".into(),
+                user_id: "u".into(),
+                reason: "warn".into(),
+                source: "moderation".into(),
+                infraction_id: None,
+                expires_at: None,
+                created_at: Utc::now(),
+            },
+            active_count: 3,
+            escalation_action: Some("mute".into()),
+            escalation_duration: Some(1800),
+        }
+    }
+
+    #[async_trait]
+    impl ManageModerationUseCase for MockModerationUc {
+        async fn log_action(&self, cmd: LogModerationCommand) -> Result<ModerationAction, DomainError> {
+            let action = ModerationAction {
+                id: Uuid::new_v4(),
+                guild_id: cmd.guild_id.clone(),
+                channel_id: cmd.channel_id.clone(),
+                moderator_id: cmd.moderator_id.clone(),
+                moderator_name: cmd.moderator_name.clone(),
+                target_id: cmd.target_id.clone(),
+                target_name: cmd.target_name.clone(),
+                action_type: cmd.action_type.clone(),
+                reason: cmd.reason.clone(),
+                gravity: None,
+                duration: cmd.duration,
+                created_at: ts(),
+            };
+            self.log_calls.lock().unwrap().push(cmd);
+            Ok(action)
+        }
+        async fn log_action_with_strike(&self, cmd: LogModerationCommand) -> Result<LoggedModerationAction, DomainError> {
+            let action = self.log_action(cmd).await?;
+            Ok(LoggedModerationAction {
+                action,
+                strike: self.strike_result.lock().unwrap().clone(),
+            })
+        }
+        async fn get_history(&self, _: &str, target_id: &str) -> Result<UserModerationHistory, DomainError> {
+            Ok(self.history_return.lock().unwrap().clone().unwrap_or(UserModerationHistory {
+                target_id: target_id.into(),
+                target_name: "unknown".into(),
+                total_warns: 0, total_mutes: 0, total_bans: 0,
+                actions: vec![],
+            }))
+        }
+        async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+        async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+        async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+        async fn delete_action(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
+    }
+
+    fn grpc(uc: Arc<MockModerationUc>) -> ModerationGrpc {
+        ModerationGrpc { moderation_uc: uc }
+    }
+
+    fn make_log_request(action: &str) -> Request<proto::LogActionRequest> {
+        Request::new(proto::LogActionRequest {
+            guild_id: "g".into(),
+            channel_id: "c".into(),
+            moderator_id: "mod".into(),
+            moderator_name: "Mod".into(),
+            target_id: "t".into(),
+            target_name: "Target".into(),
+            action_type: action.into(),
+            reason: "r".into(),
+            gravity: None,
+            duration: None,
+        })
+    }
+
+    #[tokio::test]
+    async fn log_action_delegates_to_uc() {
+        let uc = Arc::new(MockModerationUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.log_action(make_log_request("warn")).await.unwrap();
+        let calls = uc.log_calls.lock().unwrap();
+        assert_eq!(calls[0].action_type, "warn");
+        assert_eq!(calls[0].moderator_name, "Mod");
+    }
+
+    #[tokio::test]
+    async fn log_action_without_strike_has_none_escalation() {
+        let uc = Arc::new(MockModerationUc::default());
+        let g = grpc(uc);
+        let resp = g.log_action(make_log_request("warn")).await.unwrap();
+        let inner = resp.into_inner();
+        assert!(inner.strikes_count.is_none());
+        assert!(inner.escalation_action.is_none());
+        assert!(inner.escalation_duration.is_none());
+    }
+
+    #[tokio::test]
+    async fn log_action_with_strike_populates_escalation() {
+        let uc = Arc::new(MockModerationUc::default());
+        *uc.strike_result.lock().unwrap() = Some(sample_strike());
+        let g = grpc(uc);
+        let resp = g.log_action(make_log_request("warn")).await.unwrap();
+        let inner = resp.into_inner();
+        assert_eq!(inner.strikes_count, Some(3));
+        assert_eq!(inner.escalation_action.as_deref(), Some("mute"));
+        assert_eq!(inner.escalation_duration, Some(1800));
+    }
+
+    #[tokio::test]
+    async fn get_history_returns_full_user_data() {
+        let uc = Arc::new(MockModerationUc::default());
+        *uc.history_return.lock().unwrap() = Some(UserModerationHistory {
+            target_id: "u".into(),
+            target_name: "Alice".into(),
+            total_warns: 5,
+            total_mutes: 2,
+            total_bans: 1,
+            actions: vec![sample_action()],
+        });
+        let g = grpc(uc);
+        let resp = g.get_history(Request::new(proto::GetHistoryRequest {
+            guild_id: "g".into(), user_id: "u".into(),
+        })).await.unwrap();
+        let h = resp.into_inner();
+        assert_eq!(h.target_name, "Alice");
+        assert_eq!(h.total_warns, 5);
+        assert_eq!(h.actions.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn get_history_clean_user_has_zero_counters() {
+        let uc = Arc::new(MockModerationUc::default());
+        let g = grpc(uc);
+        let resp = g.get_history(Request::new(proto::GetHistoryRequest {
+            guild_id: "g".into(), user_id: "u".into(),
+        })).await.unwrap();
+        let h = resp.into_inner();
+        assert_eq!(h.total_warns, 0);
+        assert_eq!(h.total_mutes, 0);
+        assert_eq!(h.total_bans, 0);
+        assert!(h.actions.is_empty());
+    }

@@ -155,3 +155,158 @@ use super::*;
         assert!(!p.leveled_up);
         assert!(p.reward_role_id.is_none());
     }
+
+    // ── RPC tests avec mock ──
+
+    use async_trait::async_trait;
+    use std::sync::{Arc, Mutex};
+    use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+    use crate::ports::inbound::manage_levels::{AddXpCommand, ManageLevelsUseCase, SaveLevelConfigCommand};
+    use crate::domain::entities::LevelConfig;
+    use crate::domain::errors::DomainError;
+
+    #[derive(Default)]
+    struct MockLevelsUc {
+        add_xp_calls: Mutex<Vec<AddXpCommand>>,
+        user_level_return: Mutex<Option<UserLevel>>,
+        leaderboard_calls: Mutex<Vec<(Option<XpSource>, i64)>>,
+        rewards_return: Mutex<Vec<LevelReward>>,
+    }
+
+    #[async_trait]
+    impl ManageLevelsUseCase for MockLevelsUc {
+        async fn get_config(&self, _: &str) -> Result<LevelConfig, DomainError> { unimplemented!() }
+        async fn save_config(&self, _: SaveLevelConfigCommand) -> Result<LevelConfig, DomainError> { unimplemented!() }
+        async fn add_xp(&self, cmd: AddXpCommand) -> Result<AddXpResult, DomainError> {
+            let source = cmd.source;
+            self.add_xp_calls.lock().unwrap().push(cmd);
+            Ok(AddXpResult {
+                user_level: sample_user_level(),
+                leveled_up: false,
+                old_level: 5,
+                reward_role_id: None,
+                source,
+            })
+        }
+        async fn get_user_level(&self, _: &str, _: &str) -> Result<UserLevel, DomainError> {
+            Ok(self.user_level_return.lock().unwrap().clone().unwrap_or_else(sample_user_level))
+        }
+        async fn get_leaderboard(&self, _: &str, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+            self.leaderboard_calls.lock().unwrap().push((None, limit));
+            Ok(vec![sample_user_level()])
+        }
+        async fn get_leaderboard_by_source(&self, _: &str, source: XpSource, limit: i64) -> Result<Vec<UserLevel>, DomainError> {
+            self.leaderboard_calls.lock().unwrap().push((Some(source), limit));
+            Ok(vec![])
+        }
+        async fn get_rewards(&self, _: &str) -> Result<Vec<LevelReward>, DomainError> {
+            Ok(self.rewards_return.lock().unwrap().clone())
+        }
+        async fn get_rewards_by_source(&self, _: &str, _: XpSource) -> Result<Vec<LevelReward>, DomainError> { Ok(vec![]) }
+        async fn set_reward(&self, _: &str, _: i32, _: &str, _: XpSource) -> Result<LevelReward, DomainError> { unimplemented!() }
+        async fn delete_reward(&self, _: &str, _: i32, _: XpSource) -> Result<(), DomainError> { Ok(()) }
+    }
+
+    fn grpc(uc: Arc<MockLevelsUc>) -> ProgressionGrpc {
+        ProgressionGrpc {
+            levels_uc: uc,
+            broadcaster: Arc::new(EventBroadcaster::new()),
+        }
+    }
+
+    #[tokio::test]
+    async fn add_xp_delegates_to_uc_with_source() {
+        let uc = Arc::new(MockLevelsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.add_xp(Request::new(proto::AddXpRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            username: "alice".into(),
+            amount: 250,
+            source: proto_common::XpSource::Voice as i32,
+        })).await.unwrap();
+        let calls = uc.add_xp_calls.lock().unwrap();
+        assert_eq!(calls[0].amount, 250);
+        assert_eq!(calls[0].source, XpSource::Voice);
+    }
+
+    #[tokio::test]
+    async fn add_xp_unspecified_source_defaults_to_text() {
+        let uc = Arc::new(MockLevelsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.add_xp(Request::new(proto::AddXpRequest {
+            guild_id: "g".into(),
+            user_id: "u".into(),
+            username: "a".into(),
+            amount: 10,
+            source: proto_common::XpSource::Unspecified as i32,
+        })).await.unwrap();
+        assert_eq!(uc.add_xp_calls.lock().unwrap()[0].source, XpSource::Text);
+    }
+
+    #[tokio::test]
+    async fn get_user_level_returns_proto() {
+        let g = grpc(Arc::new(MockLevelsUc::default()));
+        let resp = g.get_user_level(Request::new(proto::GetUserLevelRequest {
+            guild_id: "g1".into(), user_id: "u1".into(),
+        })).await.unwrap();
+        let u = resp.into_inner();
+        assert_eq!(u.xp, 500); // sample_user_level
+    }
+
+    #[tokio::test]
+    async fn get_leaderboard_default_limit_when_zero() {
+        let uc = Arc::new(MockLevelsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.get_leaderboard(Request::new(proto::GetLeaderboardRequest {
+            guild_id: "g".into(),
+            limit: 0,
+            source: proto_common::XpSource::Unspecified as i32,
+        })).await.unwrap();
+        let calls = uc.leaderboard_calls.lock().unwrap();
+        assert_eq!(calls[0].1, 25); // default 25 quand limit=0
+    }
+
+    #[tokio::test]
+    async fn get_leaderboard_caps_at_100() {
+        let uc = Arc::new(MockLevelsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.get_leaderboard(Request::new(proto::GetLeaderboardRequest {
+            guild_id: "g".into(),
+            limit: 500,
+            source: proto_common::XpSource::Unspecified as i32,
+        })).await.unwrap();
+        let calls = uc.leaderboard_calls.lock().unwrap();
+        assert_eq!(calls[0].1, 100);
+    }
+
+    #[tokio::test]
+    async fn get_leaderboard_with_source_filter_delegates_to_by_source() {
+        let uc = Arc::new(MockLevelsUc::default());
+        let g = grpc(uc.clone());
+        let _ = g.get_leaderboard(Request::new(proto::GetLeaderboardRequest {
+            guild_id: "g".into(),
+            limit: 50,
+            source: proto_common::XpSource::Voice as i32,
+        })).await.unwrap();
+        let calls = uc.leaderboard_calls.lock().unwrap();
+        assert_eq!(calls[0].0, Some(XpSource::Voice));
+        assert_eq!(calls[0].1, 50);
+    }
+
+    #[tokio::test]
+    async fn get_rewards_delegates_to_uc() {
+        let uc = Arc::new(MockLevelsUc::default());
+        uc.rewards_return.lock().unwrap().push(LevelReward {
+            id: Uuid::new_v4(),
+            guild_id: "g".into(),
+            level: 10,
+            role_id: "r".into(),
+            source: XpSource::Text,
+        });
+        let g = grpc(uc);
+        let resp = g.get_rewards(Request::new(proto::GetRewardsRequest {
+            guild_id: "g".into(),
+        })).await.unwrap();
+        assert_eq!(resp.into_inner().rewards.len(), 1);
+    }
