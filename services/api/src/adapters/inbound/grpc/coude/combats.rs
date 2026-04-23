@@ -26,6 +26,10 @@ pub struct CoudeCombatsGrpc {
     pub resolve_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase>,
 }
 
+#[cfg(test)]
+#[path = "tests/combats.rs"]
+mod tests;
+
 pub(super) fn combat_to_proto(c: CoudeCombat) -> proto::CoudeCombat {
     proto::CoudeCombat {
         id: c.id.to_string(),
