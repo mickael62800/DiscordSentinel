@@ -1,3 +1,7 @@
+#[cfg(test)]
+#[path = "tests/broadcaster.rs"]
+mod tests;
+
 use serde::Serialize;
 use tracing::warn;
 

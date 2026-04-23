@@ -150,3 +150,130 @@ async fn add_xp_boundary_10000_accepted() {
         amount: 10000, source: XpSource::Voice,
     }).await.is_ok());
 }
+
+// ══════════════════════════════════════════════════════════
+// get_config / get_user_level : NotFound
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn get_config_not_found_maps_to_domain_error() {
+    let svc = make_svc();
+    let err = svc.get_config("ghost").await.unwrap_err();
+    assert!(matches!(err, DomainError::NotFound(_)));
+    assert!(format!("{err:?}").contains("ghost"));
+}
+
+#[tokio::test]
+async fn get_user_level_not_found_when_repo_empty() {
+    let svc = make_svc();
+    let err = svc.get_user_level("g", "ghost").await.unwrap_err();
+    assert!(matches!(err, DomainError::NotFound(_)));
+}
+
+#[tokio::test]
+async fn get_user_level_found_after_add_xp() {
+    let svc = make_svc();
+    svc.add_xp(AddXpCommand {
+        guild_id: "g".into(), user_id: "u1".into(), username: "u1".into(),
+        amount: 50, source: XpSource::Text,
+    }).await.unwrap();
+    let ul = svc.get_user_level("g", "u1").await.unwrap();
+    assert_eq!(ul.xp, 50);
+    assert_eq!(ul.xp_text, 50);
+}
+
+// ══════════════════════════════════════════════════════════
+// Delegates : leaderboard, rewards
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn get_leaderboard_passes_through_repo() {
+    let svc = make_svc();
+    let res = svc.get_leaderboard("g", 10).await.unwrap();
+    assert!(res.is_empty());
+}
+
+#[tokio::test]
+async fn get_leaderboard_by_source_voice() {
+    let svc = make_svc();
+    let res = svc.get_leaderboard_by_source("g", XpSource::Voice, 5).await.unwrap();
+    assert!(res.is_empty());
+}
+
+#[tokio::test]
+async fn get_rewards_passes_through() {
+    let svc = make_svc();
+    assert!(svc.get_rewards("g").await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn get_rewards_by_source_passes_through() {
+    let svc = make_svc();
+    assert!(svc.get_rewards_by_source("g", XpSource::Text).await.unwrap().is_empty());
+}
+
+// ══════════════════════════════════════════════════════════
+// set_reward / delete_reward
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn set_reward_returns_constructed_reward() {
+    let svc = make_svc();
+    let r = svc.set_reward("g1", 10, "role-42", XpSource::Text).await.unwrap();
+    assert_eq!(r.guild_id, "g1");
+    assert_eq!(r.level, 10);
+    assert_eq!(r.role_id, "role-42");
+    assert_eq!(r.source, XpSource::Text);
+    // UUID fresh généré
+    assert_ne!(r.id, uuid::Uuid::nil());
+}
+
+#[tokio::test]
+async fn delete_reward_passes_through() {
+    let svc = make_svc();
+    assert!(svc.delete_reward("g", 5, XpSource::Voice).await.is_ok());
+}
+
+// ══════════════════════════════════════════════════════════
+// add_xp avec level-up : source mapping
+// ══════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn add_xp_text_source_updates_only_xp_text() {
+    let svc = make_svc();
+    let res = svc.add_xp(AddXpCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "u".into(),
+        amount: 200, source: XpSource::Text,
+    }).await.unwrap();
+    assert_eq!(res.user_level.xp_text, 200);
+    assert_eq!(res.user_level.xp_voice, 0);
+    assert_eq!(res.source, XpSource::Text);
+}
+
+#[tokio::test]
+async fn add_xp_voice_source_updates_only_xp_voice() {
+    let svc = make_svc();
+    let res = svc.add_xp(AddXpCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "u".into(),
+        amount: 300, source: XpSource::Voice,
+    }).await.unwrap();
+    assert_eq!(res.user_level.xp_text, 0);
+    assert_eq!(res.user_level.xp_voice, 300);
+    assert_eq!(res.source, XpSource::Voice);
+}
+
+#[tokio::test]
+async fn add_xp_days_source_leaves_both_zero() {
+    // Days n'a pas de colonne dédiée → xp_text et xp_voice restent 0.
+    // Source None pour leveled_up (return (0, 0) case).
+    let svc = make_svc();
+    let res = svc.add_xp(AddXpCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "u".into(),
+        amount: 500, source: XpSource::Days,
+    }).await.unwrap();
+    assert_eq!(res.user_level.xp_text, 0);
+    assert_eq!(res.user_level.xp_voice, 0);
+    assert_eq!(res.user_level.xp, 500); // xp global mis a jour
+    assert!(!res.leveled_up);
+    assert_eq!(res.old_level, 0);
+}
