@@ -497,6 +497,11 @@ path = "tests/integration/job_client/redis.rs"
 name = "integration_batched_repos"
 path = "tests/integration/batched_repos/db.rs"
 
+# middleware + router (auth, health, oauth, 404) — exercise la stack complète
+[[test]]
+name = "integration_middleware_router_http"
+path = "tests/integration/middleware_router/http.rs"
+
 # export service (application layer, DB queries + serialization)
 [[test]]
 name = "integration_export_service"
