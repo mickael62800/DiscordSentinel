@@ -184,6 +184,13 @@ function isFieldModified(key: string): boolean {
   return (formValues.value[key] ?? "") !== (savedValues.value[key] ?? "");
 }
 
+/// Les cles contenant "message" sont affichees en textarea (multi-ligne)
+/// — sinon le navigateur envoie un champ mono-ligne et les retours chariot
+/// tapes par l admin sont perdus.
+function isMultilineField(key: string): boolean {
+  return key.endsWith("_message");
+}
+
 const hasChanges = computed(() =>
   configFields.value.some((f) => isFieldModified(f.key)),
 );
@@ -553,7 +560,16 @@ watch(selectedComponent, loadFormValues);
                     </span>
                     <span v-if="isFieldModified(field.key)" class="modified-dot"></span>
                   </label>
+                  <textarea
+                    v-if="isMultilineField(field.key)"
+                    :id="field.key"
+                    v-model="formValues[field.key]"
+                    class="form-input form-textarea"
+                    rows="4"
+                    :placeholder="field.default !== undefined ? String(field.default) : ''"
+                  />
                   <input
+                    v-else
                     :id="field.key"
                     v-model="formValues[field.key]"
                     class="form-input"
@@ -926,6 +942,14 @@ watch(selectedComponent, loadFormValues);
   font-size: 14px;
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
   margin-top: auto;
+}
+
+.form-textarea {
+  min-height: 96px;
+  resize: vertical;
+  white-space: pre-wrap;
+  font-family: inherit;
+  line-height: 1.5;
 }
 
 /* Masquer les fleches up/down des inputs number */

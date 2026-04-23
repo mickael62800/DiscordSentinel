@@ -28,10 +28,14 @@ pub struct WelcomeConfigData {
     pub anniversary_channel_id: Option<String>,
     pub anniversary_message: String,
     pub rejoin_message: String,
-    // Embed enrichi — bienvenue / retour (rejoin)
+    // Embed enrichi — bienvenue
     pub welcome_title: String,
     pub welcome_image_url: String,
     pub welcome_footer_text: String,
+    // Embed enrichi — retour (rejoin)
+    pub rejoin_title: String,
+    pub rejoin_image_url: String,
+    pub rejoin_footer_text: String,
     // Embed enrichi — depart
     pub leave_title: String,
     pub leave_image_url: String,

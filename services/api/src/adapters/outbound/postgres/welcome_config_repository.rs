@@ -70,6 +70,9 @@ impl From<Row> for WelcomeConfigData {
             welcome_title: "Bienvenue !".into(),
             welcome_image_url: "".into(),
             welcome_footer_text: "{count} membres".into(),
+            rejoin_title: "Bon retour !".into(),
+            rejoin_image_url: "".into(),
+            rejoin_footer_text: "{count} membres".into(),
             leave_title: "Au revoir...".into(),
             leave_image_url: "".into(),
             leave_footer_text: "{count} membres".into(),
@@ -107,6 +110,9 @@ fn default_config(guild_id: &str) -> WelcomeConfigData {
         welcome_title: "Bienvenue !".into(),
         welcome_image_url: "".into(),
         welcome_footer_text: "{count} membres".into(),
+        rejoin_title: "Bon retour !".into(),
+        rejoin_image_url: "".into(),
+        rejoin_footer_text: "{count} membres".into(),
         leave_title: "Au revoir...".into(),
         leave_image_url: "".into(),
         leave_footer_text: "{count} membres".into(),
@@ -151,6 +157,9 @@ fn overlay_with_bot_config(
             "welcome_title" => { if !v.is_empty() { d.welcome_title = v; } }
             "welcome_image_url" => d.welcome_image_url = v,
             "welcome_footer_text" => { if !v.is_empty() { d.welcome_footer_text = v; } }
+            "rejoin_title" => { if !v.is_empty() { d.rejoin_title = v; } }
+            "rejoin_image_url" => d.rejoin_image_url = v,
+            "rejoin_footer_text" => { if !v.is_empty() { d.rejoin_footer_text = v; } }
             "leave_title" => { if !v.is_empty() { d.leave_title = v; } }
             "leave_image_url" => d.leave_image_url = v,
             "leave_footer_text" => { if !v.is_empty() { d.leave_footer_text = v; } }

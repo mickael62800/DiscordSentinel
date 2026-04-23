@@ -82,18 +82,28 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                         None,
                     );
 
-                    let title = if is_rejoin {
-                        "Bon retour !".to_string()
-                    } else if !config.welcome_title.is_empty() {
-                        config.welcome_title.clone()
+                    // Choix title/image/footer selon bienvenue vs retour.
+                    let (raw_title, raw_image, raw_footer, default_title) = if is_rejoin {
+                        (
+                            &config.rejoin_title,
+                            &config.rejoin_image_url,
+                            &config.rejoin_footer_text,
+                            "Bon retour !",
+                        )
                     } else {
-                        "Bienvenue !".to_string()
+                        (
+                            &config.welcome_title,
+                            &config.welcome_image_url,
+                            &config.welcome_footer_text,
+                            "Bienvenue !",
+                        )
                     };
+                    let title = if raw_title.is_empty() { default_title.to_string() } else { raw_title.clone() };
                     let color = template::parse_color(&config.welcome_embed_color);
-                    let footer_raw = if config.welcome_footer_text.is_empty() {
+                    let footer_raw = if raw_footer.is_empty() {
                         format!("{} membres", member_count)
                     } else {
-                        config.welcome_footer_text.replace("{count}", &member_count.to_string())
+                        raw_footer.replace("{count}", &member_count.to_string())
                     };
                     let mut embed = CreateEmbed::new()
                         .title(&title)
@@ -101,8 +111,8 @@ pub async fn on_member_add(ctx: &Context, new_member: &Member) {
                         .color(color)
                         .thumbnail(new_member.user.face())
                         .footer(CreateEmbedFooter::new(footer_raw));
-                    if !config.welcome_image_url.is_empty() {
-                        embed = embed.image(&config.welcome_image_url);
+                    if !raw_image.is_empty() {
+                        embed = embed.image(raw_image);
                     }
 
                     if let Err(e) = channel.send_message(&ctx.http, CreateMessage::new().embed(embed)).await {

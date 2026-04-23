@@ -37,10 +37,14 @@ message WelcomeConfig {
   optional string anniversary_channel_id = 20;
   string anniversary_message = 21;
   string rejoin_message = 22;
-  // Embed enrichi — bienvenue / retour
+  // Embed enrichi — bienvenue
   string welcome_title = 23;
   string welcome_image_url = 24;
   string welcome_footer_text = 25;
+  // Embed enrichi — retour (rejoin)
+  string rejoin_title = 32;
+  string rejoin_image_url = 33;
+  string rejoin_footer_text = 34;
   // Embed enrichi — depart
   string leave_title = 26;
   string leave_image_url = 27;
