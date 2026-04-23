@@ -152,3 +152,7 @@ pub async fn sync_roles(
 
     Ok(Json(serde_json::json!({ "synced": count })))
 }
+
+#[cfg(test)]
+#[path = "tests/discord_roles.rs"]
+mod tests;

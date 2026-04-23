@@ -167,3 +167,7 @@ pub async fn count_steal_today(
         .await?;
     Ok(Json(serde_json::json!({ "count": count })))
 }
+
+#[cfg(test)]
+#[path = "tests/economy.rs"]
+mod tests;

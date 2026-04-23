@@ -95,3 +95,7 @@ pub async fn remove_watched_user(
 
     Ok(ok_response())
 }
+
+#[cfg(test)]
+#[path = "tests/watched_users.rs"]
+mod tests;

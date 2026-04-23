@@ -440,3 +440,7 @@ pub async fn upload_emoji(
     }))
 }
 
+#[cfg(test)]
+#[path = "tests/games.rs"]
+mod tests;
+

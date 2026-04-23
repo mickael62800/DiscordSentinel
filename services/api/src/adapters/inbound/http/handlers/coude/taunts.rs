@@ -234,3 +234,7 @@ pub async fn remove_taunts_opt_out(
         .await?;
     Ok(StatusCode::NO_CONTENT)
 }
+
+#[cfg(test)]
+#[path = "tests/taunts.rs"]
+mod tests;

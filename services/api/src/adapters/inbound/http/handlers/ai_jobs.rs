@@ -108,3 +108,7 @@ pub async fn get_ai_job(
 
     Ok(Json(job))
 }
+
+#[cfg(test)]
+#[path = "tests/ai_jobs.rs"]
+mod tests;

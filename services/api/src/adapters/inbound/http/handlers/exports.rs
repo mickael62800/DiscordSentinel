@@ -134,3 +134,7 @@ pub async fn get_export_job(
 
     Ok(Json(job))
 }
+
+#[cfg(test)]
+#[path = "tests/exports.rs"]
+mod tests;

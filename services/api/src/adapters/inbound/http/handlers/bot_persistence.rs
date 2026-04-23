@@ -389,3 +389,7 @@ pub async fn resolve_pending_action(
 
     Ok(ok_response())
 }
+
+#[cfg(test)]
+#[path = "tests/bot_persistence.rs"]
+mod tests;
