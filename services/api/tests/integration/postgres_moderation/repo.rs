@@ -173,3 +173,141 @@ async fn delete_action_by_action_id_returns_true_when_found() {
     let deleted = repo.delete_action(aid).await.unwrap();
     assert!(!deleted);
 }
+
+// ── find_bans global (None guild) ──
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_bans_global_across_guilds() {
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let g1 = fresh_id();
+    let g2 = fresh_id();
+    seed_audit(&pool, &g1, "mod_ban", &fresh_id(), None, "ban-g1").await;
+    seed_audit(&pool, &g2, "mod_ban", &fresh_id(), None, "ban-g2").await;
+
+    let global = repo.find_bans(None, 50, 0).await.unwrap();
+    // Au moins 2 bans (peut y en avoir d'autres d'autres tests).
+    let g1_found = global.iter().any(|b| b.guild_id == g1);
+    let g2_found = global.iter().any(|b| b.guild_id == g2);
+    assert!(g1_found);
+    assert!(g2_found);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_bans_respects_limit() {
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let guild = fresh_id();
+    for _ in 0..3 {
+        seed_audit(&pool, &guild, "mod_ban", &fresh_id(), None, "x").await;
+    }
+    let got = repo.find_bans(Some(&guild), 2, 0).await.unwrap();
+    assert_eq!(got.len(), 2);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_bans_with_offset_skips_rows() {
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let guild = fresh_id();
+    for _ in 0..3 {
+        seed_audit(&pool, &guild, "mod_ban", &fresh_id(), None, "x").await;
+        tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+    }
+    let page1 = repo.find_bans(Some(&guild), 2, 0).await.unwrap();
+    let page2 = repo.find_bans(Some(&guild), 2, 2).await.unwrap();
+    assert_eq!(page1.len(), 2);
+    assert_eq!(page2.len(), 1);
+}
+
+// ── find_by_target scoping ──
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_by_target_scoped_to_guild() {
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let g1 = fresh_id();
+    let g2 = fresh_id();
+    let target = fresh_id();
+    seed_audit(&pool, &g1, "mod_warn", &target, None, "g1-warn").await;
+    seed_audit(&pool, &g2, "mod_warn", &target, None, "g2-warn").await;
+
+    let got = repo.find_by_target(&g1, &target, 50).await.unwrap();
+    assert_eq!(got.len(), 1);
+    assert_eq!(got[0].reason, "g1-warn");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_bans_excluded_by_unban_stays_excluded_after_new_event() {
+    // unban -> nouveau ban doit reapparaitre.
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let guild = fresh_id();
+    let target = fresh_id();
+    seed_audit(&pool, &guild, "mod_ban", &target, None, "b1").await;
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    seed_audit(&pool, &guild, "mod_unban", &target, None, "u1").await;
+    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+    // Rebanni
+    seed_audit(&pool, &guild, "mod_ban", &target, None, "b2").await;
+
+    let bans = repo.find_bans(Some(&guild), 50, 0).await.unwrap();
+    assert!(bans.iter().any(|b| b.target_id == target));
+}
+
+// ── delete_action sans action_id dans details ──
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_action_no_action_id_returns_false() {
+    // Un audit sans action_id dans details : delete_action cherche
+    // details->>'action_id' = $1 et donc 0 row deleted.
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let guild = fresh_id();
+    seed_audit(&pool, &guild, "mod_warn", &fresh_id(), None, "no-aid").await;
+    let deleted = repo.delete_action(Uuid::new_v4()).await.unwrap();
+    assert!(!deleted);
+}
+
+// ── find_all_for_guild global ──
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_all_for_guild_none_returns_cross_guild() {
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let g1 = fresh_id();
+    let g2 = fresh_id();
+    seed_audit(&pool, &g1, "mod_warn", &fresh_id(), None, "a").await;
+    seed_audit(&pool, &g2, "mod_mute", &fresh_id(), None, "b").await;
+    let all = repo.find_all_for_guild(None, 100).await.unwrap();
+    assert!(all.iter().any(|a| a.guild_id == g1));
+    assert!(all.iter().any(|a| a.guild_id == g2));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_all_for_guild_respects_limit() {
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let guild = fresh_id();
+    for i in 0..5 {
+        seed_audit(&pool, &guild, "mod_warn", &fresh_id(), None, &format!("r{i}")).await;
+    }
+    let got = repo.find_all_for_guild(Some(&guild), 3).await.unwrap();
+    assert_eq!(got.len(), 3);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn delete_bans_for_user_no_bans_is_noop() {
+    // User sans ban -> delete ne fail pas, retourne Ok(())
+    let pool = pool().await;
+    let repo = PgModerationRepository::new(pool.clone());
+    let res = repo.delete_bans_for_user(&fresh_id(), &fresh_id()).await;
+    assert!(res.is_ok());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn find_by_target_empty_returns_empty() {
+    let repo = PgModerationRepository::new(pool().await);
+    let res = repo.find_by_target(&fresh_id(), &fresh_id(), 10).await.unwrap();
+    assert!(res.is_empty());
+}

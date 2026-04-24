@@ -407,6 +407,11 @@ path = "tests/integration/postgres_games/repo.rs"
 name = "integration_postgres_misc"
 path = "tests/integration/postgres_misc/repo.rs"
 
+# postgres infraction repo (CRUD + filtres + pagination)
+[[test]]
+name = "integration_postgres_infraction"
+path = "tests/integration/postgres_infraction/repo.rs"
+
 # postgres cashbox repo
 [[test]]
 name = "integration_postgres_cashbox"

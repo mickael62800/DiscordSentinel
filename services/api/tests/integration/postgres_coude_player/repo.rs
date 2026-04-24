@@ -151,6 +151,42 @@ async fn spend_stat_point_requires_points_available() {
     assert_eq!(after.stat_points, 1);
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn spend_stat_point_def_also_increases_hp_max() {
+    let p = pool().await;
+    let repo = PgCoudePlayerRepository::new(p.clone());
+    let g = fresh_id(); let u = fresh_id();
+    repo.get_or_create(&g, &u, "A").await.unwrap();
+    sqlx::query("UPDATE coude_players SET stat_points = 5 WHERE guild_id = $1 AND user_id = $2")
+        .bind(&g).bind(&u).execute(&p).await.unwrap();
+    let before = repo.get(&g, &u).await.unwrap().unwrap();
+    let after = repo.spend_stat_point(&g, &u, CombatStat::Def).await.unwrap().unwrap();
+    // DEF gives +2 HP max AND +2 HP current
+    assert_eq!(after.def, 1);
+    assert_eq!(after.hp_max, before.hp_max + 2);
+    assert_eq!(after.hp_current, before.hp_current + 2);
+}
+
+// ── add_xp multi-level ──
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn add_xp_no_level_up_when_amount_too_small() {
+    let repo = PgCoudePlayerRepository::new(pool().await);
+    let g = fresh_id(); let u = fresh_id();
+    repo.get_or_create(&g, &u, "A").await.unwrap();
+    let progress = repo.add_xp(&g, &u, 5).await.unwrap().unwrap();
+    assert!(!progress.leveled_up);
+    assert_eq!(progress.stat_points_gained, 0);
+    assert_eq!(progress.new_xp, 5);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn update_class_unknown_player_returns_false() {
+    let repo = PgCoudePlayerRepository::new(pool().await);
+    let ok = repo.update_class(&fresh_id(), &fresh_id(), "tank").await.unwrap();
+    assert!(!ok);
+}
+
 // ── Compteurs combat ──
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

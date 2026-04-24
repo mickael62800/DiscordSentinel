@@ -84,6 +84,60 @@ async fn discord_role_find_by_id() {
     assert!(repo.find_by_id(&g, "nonexistent").await.unwrap().is_none());
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn discord_role_sync_empty_list_clears_guild() {
+    let repo = PgDiscordRoleRepository::new(pool().await);
+    let g = fresh_id();
+    repo.sync_roles(&g, vec![role(&g, &fresh_id(), "A", 1)]).await.unwrap();
+    repo.sync_roles(&g, vec![]).await.unwrap();
+    assert!(repo.find_by_guild(&g).await.unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn discord_role_find_by_guild_empty_returns_empty_vec() {
+    let repo = PgDiscordRoleRepository::new(pool().await);
+    assert!(repo.find_by_guild(&fresh_id()).await.unwrap().is_empty());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn discord_role_preserves_all_fields() {
+    let repo = PgDiscordRoleRepository::new(pool().await);
+    let g = fresh_id();
+    let rid = fresh_id();
+    let r = DiscordRole {
+        id: rid.clone(), guild_id: g.clone(), name: "Special".into(),
+        color: 0xFF0000, position: 42, permissions: 0x8, // ADMINISTRATOR
+        mentionable: false, managed: true,
+        icon: Some("icon_hash".into()),
+        member_count: 99, synced_at: Utc::now(),
+    };
+    repo.sync_roles(&g, vec![r]).await.unwrap();
+    let got = repo.find_by_id(&g, &rid).await.unwrap().unwrap();
+    assert_eq!(got.name, "Special");
+    assert_eq!(got.color, 0xFF0000);
+    assert_eq!(got.position, 42);
+    assert_eq!(got.permissions, 0x8);
+    assert!(!got.mentionable);
+    assert!(got.managed);
+    assert_eq!(got.icon.as_deref(), Some("icon_hash"));
+    assert_eq!(got.member_count, 99);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn discord_role_sync_isolates_per_guild() {
+    let repo = PgDiscordRoleRepository::new(pool().await);
+    let g1 = fresh_id();
+    let g2 = fresh_id();
+    repo.sync_roles(&g1, vec![role(&g1, &fresh_id(), "G1-Role", 1)]).await.unwrap();
+    repo.sync_roles(&g2, vec![role(&g2, &fresh_id(), "G2-Role", 1)]).await.unwrap();
+    assert_eq!(repo.find_by_guild(&g1).await.unwrap().len(), 1);
+    assert_eq!(repo.find_by_guild(&g2).await.unwrap().len(), 1);
+    // Resync g1 doesn't affect g2
+    repo.sync_roles(&g1, vec![]).await.unwrap();
+    assert!(repo.find_by_guild(&g1).await.unwrap().is_empty());
+    assert_eq!(repo.find_by_guild(&g2).await.unwrap().len(), 1);
+}
+
 // ══════════════════════════════════════════════════════════
 // LogEntry
 // ══════════════════════════════════════════════════════════
