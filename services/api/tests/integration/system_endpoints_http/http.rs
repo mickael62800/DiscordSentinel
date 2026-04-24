@@ -108,3 +108,55 @@ async fn reload_model_vision_without_configured_path_returns_500() {
     assert!(json["success"].is_boolean());
     assert!(json["message"].is_string());
 }
+
+// ── /api/system/info ──
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn system_info_returns_full_structure() {
+    // Endpoint admin : retourne bots/workers/host/process/redis/uptime/db_size.
+    // Avec containers test actifs : PG + Redis repondent, sysinfo collecte local.
+    let app = router::build_for_test(state());
+    let (status, json) = json_req(app, "GET", "/api/system/info", None).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(json["bots"].is_array());
+    assert!(json["workers"].is_array());
+    assert!(json["host"].is_object());
+    assert!(json["host"]["cpu_percent"].is_number());
+    assert!(json["host"]["cpu_cores"].is_number());
+    assert!(json["host"]["mem_used_mb"].is_number());
+    assert!(json["host"]["mem_total_mb"].is_number());
+    assert!(json["process"].is_object());
+    assert!(json["process"]["cpu_percent"].is_number());
+    assert!(json["redis"].is_object());
+    assert!(json["uptime_seconds"].is_number());
+    assert!(json["db_size_mb"].is_number());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn system_info_lists_bots_and_workers_from_redis() {
+    use redis::AsyncCommands;
+    // Seed un bot et un worker dans Redis
+    let client = redis::Client::open(
+        std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://localhost:6380".into())
+    ).unwrap();
+    let mut conn = client.get_multiplexed_async_connection().await.unwrap();
+    let bot_name = format!("sysinfo-test-bot-{}", uuid::Uuid::new_v4().as_u128() % 10_000_000);
+    let worker_name = format!("sysinfo-test-worker-{}", uuid::Uuid::new_v4().as_u128() % 10_000_000);
+    let _: () = conn.sadd::<_, _, ()>("bots:known", &bot_name).await.unwrap();
+    let _: () = conn.sadd::<_, _, ()>("bots:known", &worker_name).await.unwrap();
+    let _: () = conn.set_ex::<_, _, ()>(format!("bot:online:{bot_name}"), "1", 60).await.unwrap();
+
+    let app = router::build_for_test(state());
+    let (status, json) = json_req(app, "GET", "/api/system/info", None).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let bots = json["bots"].as_array().unwrap();
+    let workers = json["workers"].as_array().unwrap();
+    assert!(bots.iter().any(|b| b["name"].as_str().unwrap() == bot_name && b["online"] == true));
+    assert!(workers.iter().any(|w| w["name"].as_str().unwrap() == worker_name && w["online"] == false));
+
+    // Cleanup
+    let _: () = conn.srem::<_, _, ()>("bots:known", &bot_name).await.unwrap();
+    let _: () = conn.srem::<_, _, ()>("bots:known", &worker_name).await.unwrap();
+    let _: () = conn.del::<_, ()>(format!("bot:online:{bot_name}")).await.unwrap();
+}

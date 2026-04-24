@@ -19,8 +19,48 @@ use crate::ports::inbound::{
 };
 use crate::ports::inbound::InfractionFilters;
 use crate::ports::outbound::{ConductRepository, InfractionRepository};
+use crate::adapters::outbound::{
+    DiscordApi, DiscordChannel, DiscordMember, DiscordUser,
+};
+use crate::adapters::outbound::discord_api::UserGuild;
 
 // ── Mocks ──
+
+#[derive(Default)]
+struct SpyDiscordApi {
+    timeout_calls: Mutex<Vec<(String, String, u64)>>,
+    timeout_result: Mutex<Option<DomainError>>,
+}
+
+#[async_trait]
+impl DiscordApi for SpyDiscordApi {
+    async fn list_text_channels(&self, _: &str) -> Result<Vec<DiscordChannel>, DomainError> { Ok(vec![]) }
+    async fn upload_emoji(&self, _: &str, _: &str, _: &[u8], _: &str) -> Result<(String, String, bool), DomainError> { unimplemented!() }
+    async fn ban_user(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn list_members(&self, _: &str, _: u32) -> Result<Vec<DiscordMember>, DomainError> { Ok(vec![]) }
+    async fn send_dm(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn create_role(&self, _: &str, _: &str, _: u32, _: Option<&str>) -> Result<serde_json::Value, DomainError> { unimplemented!() }
+    async fn edit_role(&self, _: &str, _: &str, _: Option<&str>, _: Option<u32>, _: Option<&str>, _: Option<bool>, _: Option<bool>) -> Result<serde_json::Value, DomainError> { unimplemented!() }
+    async fn delete_role(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn unban_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn remove_timeout(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn apply_timeout(&self, guild_id: &str, user_id: &str, duration_seconds: u64) -> Result<(), DomainError> {
+        self.timeout_calls.lock().unwrap().push((guild_id.into(), user_id.into(), duration_seconds));
+        let err_opt = {
+            let guard = self.timeout_result.lock().unwrap();
+            guard.as_ref().map(|e| match e {
+                DomainError::Internal(s) => DomainError::Internal(s.clone()),
+                DomainError::ValidationError(s) => DomainError::ValidationError(s.clone()),
+                DomainError::NotFound(s) => DomainError::NotFound(s.clone()),
+                _ => DomainError::Internal("test error".into()),
+            })
+        };
+        if let Some(err) = err_opt { return Err(err); }
+        Ok(())
+    }
+    async fn get_user_guilds(&self, _: &str) -> Result<Vec<UserGuild>, DomainError> { Ok(vec![]) }
+    async fn get_user_me(&self, _: &str) -> Result<DiscordUser, DomainError> { unimplemented!() }
+}
 
 #[derive(Default)]
 struct MockConductRepo {
@@ -96,7 +136,15 @@ impl InfractionRepository for MockInfRepo {
 }
 
 fn make_svc(repo: Arc<MockConductRepo>, inf: Arc<MockInfRepo>) -> ManageConductService {
-    ManageConductService::new(repo, inf, Arc::new(EventBroadcaster::new()), "".into())
+    ManageConductService::new(repo, inf, Arc::new(EventBroadcaster::new()), Arc::new(SpyDiscordApi::default()))
+}
+
+fn make_svc_with_spy(
+    repo: Arc<MockConductRepo>,
+    inf: Arc<MockInfRepo>,
+    spy: Arc<SpyDiscordApi>,
+) -> ManageConductService {
+    ManageConductService::new(repo, inf, Arc::new(EventBroadcaster::new()), spy)
 }
 
 // ── Tests ──
@@ -248,6 +296,68 @@ async fn get_points_log_forwards() {
     let svc = make_svc(repo, Arc::new(MockInfRepo::default()));
     let logs = svc.get_points_log("g", "u", 50).await.unwrap();
     assert!(logs.is_empty());
+}
+
+// ── mute_user via DiscordApi (timeout) ──
+
+#[tokio::test]
+async fn deduct_points_to_zero_calls_discord_timeout() {
+    let repo = Arc::new(MockConductRepo::default());
+    let now = Utc::now();
+    *repo.points.lock().unwrap() = Some(UserConductPoints {
+        id: Uuid::new_v4(), guild_id: "g".into(), user_id: "u".into(),
+        username: "A".into(), points: 6,
+        last_regen_at: now, created_at: now, updated_at: now,
+    });
+    let spy = Arc::new(SpyDiscordApi::default());
+    let svc = make_svc_with_spy(repo, Arc::new(MockInfRepo::default()), spy.clone());
+    svc.deduct_points(DeductPointsCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "A".into(),
+        action: "ban".into(),
+    }).await.unwrap();
+    let calls = spy.timeout_calls.lock().unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].0, "g");
+    assert_eq!(calls[0].1, "u");
+    // Duration = MUTE_AT_ZERO_POINTS_DURATION_MINS * 60 secondes.
+    assert!(calls[0].2 > 0);
+}
+
+#[tokio::test]
+async fn deduct_points_to_zero_swallows_discord_error() {
+    let repo = Arc::new(MockConductRepo::default());
+    let now = Utc::now();
+    *repo.points.lock().unwrap() = Some(UserConductPoints {
+        id: Uuid::new_v4(), guild_id: "g".into(), user_id: "u".into(),
+        username: "A".into(), points: 6,
+        last_regen_at: now, created_at: now, updated_at: now,
+    });
+    let spy = Arc::new(SpyDiscordApi::default());
+    *spy.timeout_result.lock().unwrap() = Some(DomainError::Internal("discord 401".into()));
+    let inf = Arc::new(MockInfRepo::default());
+    let svc = make_svc_with_spy(repo, inf.clone(), spy.clone());
+    // L'erreur Discord doit etre avalee, deduct_points reussit quand meme.
+    let out = svc.deduct_points(DeductPointsCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "A".into(),
+        action: "ban".into(),
+    }).await.unwrap();
+    assert_eq!(out.points, 0);
+    assert_eq!(spy.timeout_calls.lock().unwrap().len(), 1);
+    // L'infraction auto-ban est quand meme persistee malgre l'erreur Discord.
+    assert_eq!(inf.saved.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn deduct_points_non_zero_does_not_call_discord() {
+    let repo = Arc::new(MockConductRepo::default());
+    let spy = Arc::new(SpyDiscordApi::default());
+    let svc = make_svc_with_spy(repo, Arc::new(MockInfRepo::default()), spy.clone());
+    // Warn : 12 → 11, pas de mute
+    svc.deduct_points(DeductPointsCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "A".into(),
+        action: "warn".into(),
+    }).await.unwrap();
+    assert!(spy.timeout_calls.lock().unwrap().is_empty());
 }
 
 #[tokio::test]

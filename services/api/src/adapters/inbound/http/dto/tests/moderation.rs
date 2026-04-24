@@ -96,3 +96,129 @@ fn user_history_to_dto_aggregates() {
     assert_eq!(dto.total_warns, 3);
     assert_eq!(dto.actions.len(), 2);
 }
+
+#[test]
+fn log_action_dto_deserializes_from_json() {
+    let dto: LogActionDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g", "channel_id": "c",
+        "moderator_id": "mod", "moderator_name": "Mod",
+        "target_id": "t", "target_name": "T",
+        "action_type": "mute", "reason": "spam",
+        "gravity": "high", "duration": 1800
+    })).unwrap();
+    assert_eq!(dto.action_type, "mute");
+    assert_eq!(dto.gravity.as_deref(), Some("high"));
+    assert_eq!(dto.duration, Some(1800));
+}
+
+#[test]
+fn log_action_dto_deserializes_without_optionals() {
+    let dto: LogActionDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g", "channel_id": "c",
+        "moderator_id": "m", "moderator_name": "M",
+        "target_id": "t", "target_name": "T",
+        "action_type": "warn", "reason": "r"
+    })).unwrap();
+    assert!(dto.gravity.is_none());
+    assert!(dto.duration.is_none());
+}
+
+#[test]
+fn moderation_action_response_dto_serializes_skipping_none_escalation() {
+    let dto = ModerationActionResponseDto {
+        id: "id-1".into(),
+        action_type: "warn".into(),
+        target_name: "Alice".into(),
+        reason: "test".into(),
+        escalation_action: None,
+        escalation_duration: None,
+        strikes_count: None,
+    };
+    let json = serde_json::to_string(&dto).unwrap();
+    assert!(json.contains("\"id\":\"id-1\""));
+    // skip_serializing_if skips optional None fields
+    assert!(!json.contains("escalation_action"));
+    assert!(!json.contains("escalation_duration"));
+    assert!(!json.contains("strikes_count"));
+}
+
+#[test]
+fn moderation_action_response_dto_with_escalation_serializes_fields() {
+    let dto = ModerationActionResponseDto {
+        id: "id-1".into(),
+        action_type: "warn".into(),
+        target_name: "Alice".into(),
+        reason: "test".into(),
+        escalation_action: Some("ban".into()),
+        escalation_duration: Some(7200),
+        strikes_count: Some(3),
+    };
+    let json = serde_json::to_string(&dto).unwrap();
+    assert!(json.contains("\"escalation_action\":\"ban\""));
+    assert!(json.contains("\"escalation_duration\":7200"));
+    assert!(json.contains("\"strikes_count\":3"));
+}
+
+#[test]
+fn ban_entry_dto_serializes_rfc3339_date() {
+    let a = sample_action();
+    let dto: BanEntryDto = a.into();
+    let json = serde_json::to_string(&dto).unwrap();
+    assert!(json.contains("\"created_at\":"));
+    assert!(json.contains("T"));
+}
+
+#[test]
+fn mod_stats_entry_dto_serializes() {
+    let dto = ModStatsEntryDto {
+        moderator_id: "m1".into(),
+        moderator_name: "ModOne".into(),
+        total: 42,
+        warns: 20,
+        mutes: 10,
+        bans: 5,
+        kicks: 7,
+    };
+    let json = serde_json::to_string(&dto).unwrap();
+    assert!(json.contains("\"moderator_id\":\"m1\""));
+    assert!(json.contains("\"total\":42"));
+    assert!(json.contains("\"warns\":20"));
+    assert!(json.contains("\"kicks\":7"));
+}
+
+#[test]
+fn user_history_empty_actions() {
+    let history = UserModerationHistory {
+        target_id: "u".into(),
+        target_name: "X".into(),
+        total_warns: 0, total_mutes: 0, total_bans: 0,
+        actions: vec![],
+    };
+    let dto: UserHistoryDto = history.into();
+    assert!(dto.actions.is_empty());
+}
+
+#[test]
+fn action_to_response_dto_preserves_target_name() {
+    let mut a = sample_action();
+    a.target_name = "Bob The Slayer".into();
+    let dto: ModerationActionResponseDto = a.into();
+    assert_eq!(dto.target_name, "Bob The Slayer");
+}
+
+#[test]
+fn log_action_dto_long_reason_truncation_is_service_side() {
+    // Le DTO ne fait pas la truncation : il passe le texte tel quel.
+    // Le service ManageModerationService truncate a 500 chars.
+    let long = "x".repeat(1000);
+    let dto = LogActionDto {
+        guild_id: "g".into(), channel_id: "c".into(),
+        moderator_id: "m".into(), moderator_name: "M".into(),
+        target_id: "t".into(), target_name: "T".into(),
+        action_type: "warn".into(),
+        reason: long.clone(),
+        gravity: None, duration: None,
+    };
+    let cmd: LogModerationCommand = dto.into();
+    assert_eq!(cmd.reason.len(), 1000);
+}

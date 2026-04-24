@@ -413,3 +413,61 @@ async fn casino_faillite_on_empty_wallet_only_records_stats() {
     assert_eq!(stats.len(), 1);
     assert_eq!(stats[0].2, 0);
 }
+
+// ── Validation et chemins zero ──
+
+#[tokio::test]
+async fn casino_win_rejects_negative_gain() {
+    let (svc, _, _, _) = build_service(vec![], false, 1);
+    let err = svc.record_casino_win("g1", "alice", -100).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn casino_win_zero_gain_skips_credit_but_records_stats() {
+    let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+    svc.record_casino_win("g1", "alice", 0).await.unwrap();
+    assert!(wallet.credit_calls.lock().unwrap().is_empty());
+    assert_eq!(repo.casino_win_stats.lock().unwrap().len(), 1);
+    assert_eq!(repo.casino_win_stats.lock().unwrap()[0].2, 0);
+}
+
+#[tokio::test]
+async fn casino_loss_rejects_negative() {
+    let (svc, _, _, _) = build_service(vec![], false, 1);
+    let err = svc.record_casino_loss("g1", "alice", -50).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn casino_loss_zero_skips_debit_but_records_stats() {
+    let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+    svc.record_casino_loss("g1", "alice", 0).await.unwrap();
+    assert!(wallet.debit_calls.lock().unwrap().is_empty());
+    assert_eq!(repo.casino_loss_stats.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn casino_loss_with_zero_balance_skips_debit() {
+    let (svc, repo, wallet, _) = build_service(vec![], false, 1);
+    wallet.set_balance("g1", "alice", 0);
+    svc.record_casino_loss("g1", "alice", 500).await.unwrap();
+    assert!(wallet.debit_calls.lock().unwrap().is_empty());
+    // Stats quand meme enregistrees avec le montant nominal
+    assert_eq!(repo.casino_loss_stats.lock().unwrap()[0].2, 500);
+}
+
+#[tokio::test]
+async fn steal_fail_penalty_zero_amount_returns_empty() {
+    let (svc, _, _, _) = build_service(vec![], false, 1);
+    let (lost, taunts) = svc.steal_fail_penalty("g1", "thief", 0).await.unwrap();
+    assert_eq!(lost, 0);
+    assert!(taunts.is_empty());
+}
+
+#[tokio::test]
+async fn steal_fail_penalty_negative_amount_returns_empty() {
+    let (svc, _, _, _) = build_service(vec![], false, 1);
+    let (lost, _) = svc.steal_fail_penalty("g1", "thief", -100).await.unwrap();
+    assert_eq!(lost, 0);
+}

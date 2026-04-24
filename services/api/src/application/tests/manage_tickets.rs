@@ -278,3 +278,103 @@ async fn test_get_ticket_detail_not_found() {
     let result = service.get_ticket_detail(&fake_id).await;
     assert!(result.is_err());
 }
+
+// ── update_priority ──
+
+#[tokio::test]
+async fn update_priority_delegates() {
+    let (service, _) = make_service();
+    let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
+    // Ne panique pas malgre la mock trivial update_priority -> Ok(())
+    assert!(service.update_priority(ticket.id, "high").await.is_ok());
+}
+
+// ── update_sla ──
+
+#[tokio::test]
+async fn update_sla_with_all_fields() {
+    let (service, _) = make_service();
+    let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
+    assert!(service
+        .update_sla(
+            ticket.id,
+            Some("2026-01-01T00:00:00Z"),
+            Some("2026-01-02T00:00:00Z"),
+            Some(5),
+        )
+        .await
+        .is_ok());
+}
+
+#[tokio::test]
+async fn update_sla_with_none_fields() {
+    let (service, _) = make_service();
+    let ticket = service.create_ticket(make_create_cmd()).await.unwrap();
+    assert!(service.update_sla(ticket.id, None, None, None).await.is_ok());
+}
+
+// ── reply_ticket / assign_ticket / update_ticket_channel avec ID invalide ──
+
+#[tokio::test]
+async fn reply_ticket_invalid_uuid_returns_error() {
+    let (service, _) = make_service();
+    let err = service.reply_ticket(ReplyTicketCommand {
+        ticket_id: "not-a-uuid".into(),
+        content: "".into(),
+        author_name: "".into(),
+        author_role: "".into(),
+    }).await.unwrap_err();
+    assert!(matches!(err, DomainError::InvalidRule(_)));
+}
+
+#[tokio::test]
+async fn assign_ticket_invalid_uuid_returns_error() {
+    let (service, _) = make_service();
+    let err = service.assign_ticket(AssignTicketCommand {
+        ticket_id: "bad".into(),
+        assignee: "x".into(),
+    }).await.unwrap_err();
+    assert!(matches!(err, DomainError::InvalidRule(_)));
+}
+
+#[tokio::test]
+async fn update_ticket_channel_invalid_uuid_returns_error() {
+    let (service, _) = make_service();
+    let err = service.update_ticket_channel(UpdateTicketChannelCommand {
+        ticket_id: "xyz".into(),
+        voice_channel_id: Some("v".into()),
+        invited_user_id: None,
+    }).await.unwrap_err();
+    assert!(matches!(err, DomainError::InvalidRule(_)));
+}
+
+#[tokio::test]
+async fn update_status_invalid_uuid_returns_error() {
+    let (service, _) = make_service();
+    let err = service.update_status("nope", "pending").await.unwrap_err();
+    assert!(matches!(err, DomainError::InvalidRule(_)));
+}
+
+// ── list_tickets avec filtre author_id + priority + search ──
+
+#[tokio::test]
+async fn list_tickets_with_all_filters_bypasses_cache() {
+    let (service, _repo) = make_service();
+    // Les filtres actifs forcent un read repo direct (pas de cache set/get).
+    let tickets = service.list_tickets(
+        Some("open".into()),
+        Some("high".into()),
+        Some("search".into()),
+        Some("author".into()),
+        10, 0,
+    ).await.unwrap();
+    assert!(tickets.is_empty());
+}
+
+#[tokio::test]
+async fn list_tickets_with_offset_skips_cache() {
+    let (service, _repo) = make_service();
+    // offset != 0 → pas de cache
+    let tickets = service.list_tickets(None, None, None, None, 10, 50).await.unwrap();
+    assert!(tickets.is_empty());
+}

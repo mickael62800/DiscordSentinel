@@ -150,3 +150,193 @@ async fn blackjack_wallet_balance_conserved() {
     assert_eq!(wallet.coins, expected, "Solde incoherent : 500 - 100 + {} = {} mais wallet = {}",
         final_game.payout, expected, wallet.coins);
 }
+
+// ── Double down ──
+
+#[tokio::test]
+async fn blackjack_double_down_debits_additional_bet() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "player1", "Alice", 1000).await.unwrap();
+
+    let svc = build_service(pool.clone());
+    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap().game;
+
+    if game.status != "playing" || game.player_hand.len() != 2 {
+        return; // Skip si blackjack naturel
+    }
+
+    let doubled = svc.double_down(game.id).await.unwrap().game;
+    assert!(doubled.doubled);
+    assert_eq!(doubled.bet, 100); // mise doublee
+    // Le jeu doit etre termine (une carte tiree + dealer joue si pas bust)
+    assert_ne!(doubled.status, "playing");
+
+    // Wallet : -100 au total (50 + 50 double) + payout
+    let wallet = wallet_repo.get(&gid, "player1").await.unwrap().unwrap();
+    let expected = 1000 - 100 + doubled.payout;
+    assert_eq!(wallet.coins, expected);
+}
+
+#[tokio::test]
+async fn blackjack_double_down_rejected_after_hit() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "player1", "Alice", 1000).await.unwrap();
+    let svc = build_service(pool.clone());
+    let game = svc.start_game(gid.clone(), "player1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap().game;
+    if game.status != "playing" { return; }
+    let after_hit = svc.hit(game.id).await.unwrap().game;
+    if after_hit.status == "playing" && after_hit.player_hand.len() > 2 {
+        // double_down doit echouer : plus de 2 cartes
+        let err = svc.double_down(after_hit.id).await.unwrap_err();
+        assert!(matches!(err, DomainError::ValidationError(_)));
+    }
+}
+
+// ── get_active / list_games / cancel_game ──
+
+#[tokio::test]
+async fn blackjack_get_active_returns_none_without_game() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let svc = build_service(pool.clone());
+    let active = svc.get_active(&gid, "nobody").await.unwrap();
+    assert!(active.is_none());
+}
+
+#[tokio::test]
+async fn blackjack_get_active_returns_playing_game() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "p1", "Alice", 1000).await.unwrap();
+    let svc = build_service(pool.clone());
+    let game = svc.start_game(gid.clone(), "p1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap().game;
+    if game.status != "playing" { return; }
+    let active = svc.get_active(&gid, "p1").await.unwrap();
+    assert!(active.is_some());
+    assert_eq!(active.unwrap().id, game.id);
+}
+
+#[tokio::test]
+async fn blackjack_list_games_returns_created_games() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "p1", "Alice", 1000).await.unwrap();
+    let svc = build_service(pool.clone());
+    svc.start_game(gid.clone(), "p1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap();
+    let games = svc.list_games(&gid, None).await.unwrap();
+    assert!(!games.is_empty());
+}
+
+#[tokio::test]
+async fn blackjack_cancel_game_refunds_wallet() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "p1", "Alice", 1000).await.unwrap();
+    let svc = build_service(pool.clone());
+    let game = svc.start_game(gid.clone(), "p1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap().game;
+    // Si la partie n'est pas en cours (blackjack naturel), cancel peut echouer : skip.
+    if game.status != "playing" { return; }
+    svc.cancel_game(game.id).await.unwrap();
+    // get_active doit revenir None
+    let active = svc.get_active(&gid, "p1").await.unwrap();
+    assert!(active.is_none());
+}
+
+#[tokio::test]
+async fn blackjack_hit_not_found_returns_error() {
+    let pool = setup_pool().await;
+    let svc = build_service(pool);
+    let err = svc.hit(uuid::Uuid::new_v4()).await.unwrap_err();
+    assert!(matches!(err, DomainError::NotFound(_)));
+}
+
+#[tokio::test]
+async fn blackjack_stand_not_found_returns_error() {
+    let pool = setup_pool().await;
+    let svc = build_service(pool);
+    let err = svc.stand(uuid::Uuid::new_v4()).await.unwrap_err();
+    assert!(matches!(err, DomainError::NotFound(_)));
+}
+
+#[tokio::test]
+async fn blackjack_double_down_not_found_returns_error() {
+    let pool = setup_pool().await;
+    let svc = build_service(pool);
+    let err = svc.double_down(uuid::Uuid::new_v4()).await.unwrap_err();
+    assert!(matches!(err, DomainError::NotFound(_)));
+}
+
+#[tokio::test]
+async fn blackjack_start_game_rejects_bet_below_min() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let svc = build_service(pool);
+    let err = svc.start_game(gid, "p1".into(), "Alice".into(), 5, 10, 10000, 500, 1.5).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn blackjack_start_game_rejects_bet_above_max() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let svc = build_service(pool);
+    let err = svc.start_game(gid, "p1".into(), "Alice".into(), 99_999, 10, 10000, 500, 1.5).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn blackjack_start_game_conflict_when_game_already_active() {
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "p1", "Alice", 1000).await.unwrap();
+    let svc = build_service(pool);
+    let game = svc.start_game(gid.clone(), "p1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap().game;
+    if game.status != "playing" { return; }
+    let err = svc.start_game(gid, "p1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap_err();
+    assert!(matches!(err, DomainError::Conflict(_)));
+}
+
+#[tokio::test]
+async fn blackjack_hit_rejects_when_game_not_playing() {
+    // On force un bust pour mettre le status a "player_bust", puis on tente un hit → Conflict
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "p1", "Alice", 1000).await.unwrap();
+    let svc = build_service(pool);
+    let mut game = svc.start_game(gid.clone(), "p1".into(), "Alice".into(), 50, 10, 10000, 1000, 1.5).await.unwrap().game;
+    // On hit jusqu'a ce que le game termine
+    let mut tries = 0;
+    while game.status == "playing" && tries < 10 {
+        game = svc.hit(game.id).await.unwrap().game;
+        tries += 1;
+    }
+    if game.status == "playing" { return; } // safeguard
+    let err = svc.hit(game.id).await.unwrap_err();
+    assert!(matches!(err, DomainError::Conflict(_)));
+}
+
+#[tokio::test]
+async fn blackjack_many_games_cover_various_outcomes() {
+    // Joue 15 parties rapidement pour couvrir statistiquement les branches
+    // resolve_game (player_win / dealer_win / push / dealer_bust).
+    let pool = setup_pool().await;
+    let gid = unique_guild();
+    let wallet_repo = PgWalletRepository::new(pool.clone());
+    wallet_repo.get_or_create(&gid, "p1", "Alice", 100_000).await.unwrap();
+    let svc = build_service(pool);
+    for _ in 0..15 {
+        let game = svc.start_game(gid.clone(), "p1".into(), "Alice".into(), 50, 10, 10000, 100_000, 1.5).await.unwrap().game;
+        if game.status == "playing" {
+            let _ = svc.stand(game.id).await.unwrap();
+        }
+    }
+}

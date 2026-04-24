@@ -110,3 +110,145 @@ fn level_reward_dto_source_as_str() {
     assert_eq!(dto.source, "voice");
     assert_eq!(dto.level, 5);
 }
+
+use crate::ports::inbound::manage_levels::AddXpResult;
+
+#[test]
+fn save_config_dto_deserializes_with_defaults() {
+    let dto: SaveLevelConfigDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g"
+    })).unwrap();
+    assert_eq!(dto.xp_per_message, 15);
+    assert_eq!(dto.xp_per_voice_minute, 5);
+    assert_eq!(dto.xp_cooldown_secs, 60);
+    assert!(dto.enabled);
+    assert!(dto.excluded_channels.is_empty());
+    assert!(dto.level_up_message.contains("{user}"));
+}
+
+#[test]
+fn save_config_dto_deserializes_with_overrides() {
+    let dto: SaveLevelConfigDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g",
+        "xp_per_message": 25,
+        "xp_per_voice_minute": 8,
+        "xp_cooldown_secs": 30,
+        "level_up_channel_id": "c1",
+        "excluded_channels": ["ex1", "ex2"],
+        "enabled": false
+    })).unwrap();
+    assert_eq!(dto.xp_per_message, 25);
+    assert_eq!(dto.level_up_channel_id.as_deref(), Some("c1"));
+    assert_eq!(dto.excluded_channels.len(), 2);
+    assert!(!dto.enabled);
+}
+
+#[test]
+fn add_xp_dto_default_source_is_text() {
+    let dto: AddXpDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g", "user_id": "u", "username": "alice", "amount": 100
+    })).unwrap();
+    assert_eq!(dto.source, "text");
+}
+
+#[test]
+fn add_xp_dto_with_voice_source() {
+    let dto: AddXpDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g", "user_id": "u", "username": "alice",
+        "amount": 50, "source": "voice"
+    })).unwrap();
+    assert_eq!(dto.source, "voice");
+    assert_eq!(dto.amount, 50);
+}
+
+#[test]
+fn set_reward_dto_defaults_source_to_text() {
+    let dto: SetRewardDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g", "level": 10, "role_id": "role-1"
+    })).unwrap();
+    assert_eq!(dto.source, "text");
+    assert_eq!(dto.level, 10);
+}
+
+#[test]
+fn level_leaderboard_params_all_optional() {
+    let p: LevelLeaderboardParams = serde_json::from_str("{}").unwrap();
+    assert!(p.limit.is_none());
+    assert!(p.source.is_none());
+}
+
+#[test]
+fn level_leaderboard_params_with_source() {
+    let p: LevelLeaderboardParams = serde_json::from_value(serde_json::json!({
+        "limit": 20, "source": "voice"
+    })).unwrap();
+    assert_eq!(p.limit, Some(20));
+    assert_eq!(p.source.as_deref(), Some("voice"));
+}
+
+#[test]
+fn level_reward_text_source_maps_correctly() {
+    let r = LevelReward {
+        id: Uuid::new_v4(), guild_id: "g".into(),
+        level: 5, role_id: "r".into(), source: XpSource::Text,
+    };
+    let dto: LevelRewardDto = r.into();
+    assert_eq!(dto.source, "text");
+}
+
+#[test]
+fn level_reward_days_source_maps_correctly() {
+    let r = LevelReward {
+        id: Uuid::new_v4(), guild_id: "g".into(),
+        level: 5, role_id: "r".into(), source: XpSource::Days,
+    };
+    let dto: LevelRewardDto = r.into();
+    assert_eq!(dto.source, "days");
+}
+
+#[test]
+fn add_xp_response_dto_from_result_with_level_up() {
+    let now = Utc::now();
+    let result = AddXpResult {
+        user_level: UserLevel {
+            id: Uuid::new_v4(), guild_id: "g".into(), user_id: "u".into(),
+            username: "alice".into(),
+            xp: 500, level: 3,
+            xp_text: 400, level_text: 2,
+            xp_voice: 100, level_voice: 1,
+            last_xp_at: now, created_at: now, updated_at: now,
+        },
+        leveled_up: true,
+        old_level: 2,
+        reward_role_id: Some("role-level-3".into()),
+        source: XpSource::Text,
+    };
+    let dto: AddXpResponseDto = result.into();
+    assert!(dto.leveled_up);
+    assert_eq!(dto.old_level, 2);
+    assert_eq!(dto.reward_role_id.as_deref(), Some("role-level-3"));
+    assert_eq!(dto.source, "text");
+    assert_eq!(dto.user.xp, 500);
+}
+
+#[test]
+fn add_xp_response_dto_no_level_up_no_reward() {
+    let now = Utc::now();
+    let result = AddXpResult {
+        user_level: UserLevel {
+            id: Uuid::new_v4(), guild_id: "g".into(), user_id: "u".into(),
+            username: "alice".into(),
+            xp: 50, level: 0, xp_text: 50, level_text: 0,
+            xp_voice: 0, level_voice: 0,
+            last_xp_at: now, created_at: now, updated_at: now,
+        },
+        leveled_up: false,
+        old_level: 0,
+        reward_role_id: None,
+        source: XpSource::Voice,
+    };
+    let dto: AddXpResponseDto = result.into();
+    assert!(!dto.leveled_up);
+    assert!(dto.reward_role_id.is_none());
+    assert_eq!(dto.source, "voice");
+}

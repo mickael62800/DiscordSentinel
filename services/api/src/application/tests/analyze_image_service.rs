@@ -47,3 +47,64 @@ fn test_preprocess_black_pixel_normalization() {
     let val_r = tensor[[0, 0, 0, 0]];
     assert!((val_r - (-2.118)).abs() < 0.01);
 }
+
+// ── parse_vision_config (pure helper) ──
+
+use crate::domain::entities::BotGuildConfig;
+
+fn cfg(key: &str, value: &str) -> BotGuildConfig {
+    BotGuildConfig {
+        id: uuid::Uuid::new_v4(),
+        guild_id: "g".into(),
+        bot_name: "automod-bot".into(),
+        config_key: key.into(),
+        config_value: value.into(),
+        updated_at: chrono::Utc::now(),
+    }
+}
+
+#[test]
+fn parse_vision_config_defaults_when_no_entries() {
+    let (enabled, threshold) = parse_vision_config(&[]);
+    assert!(enabled);
+    assert!((threshold - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn parse_vision_config_reads_enabled_truthy_variants() {
+    for v in ["true", "1", "yes", "TRUE", "Yes"] {
+        let (e, _) = parse_vision_config(&[cfg("vision_enabled", v)]);
+        assert!(e, "expected enabled for {v}");
+    }
+}
+
+#[test]
+fn parse_vision_config_enabled_false_for_other_values() {
+    for v in ["false", "0", "no", "off", ""] {
+        let (e, _) = parse_vision_config(&[cfg("vision_enabled", v)]);
+        assert!(!e, "expected disabled for {v}");
+    }
+}
+
+#[test]
+fn parse_vision_config_threshold_clamps_to_0_1() {
+    let (_, t1) = parse_vision_config(&[cfg("vision_threshold", "2.5")]);
+    assert_eq!(t1, 1.0);
+    let (_, t2) = parse_vision_config(&[cfg("vision_threshold", "-0.3")]);
+    assert_eq!(t2, 0.0);
+    let (_, t3) = parse_vision_config(&[cfg("vision_threshold", "0.75")]);
+    assert!((t3 - 0.75).abs() < 1e-6);
+}
+
+#[test]
+fn parse_vision_config_ignores_invalid_threshold() {
+    let (_, t) = parse_vision_config(&[cfg("vision_threshold", "not_a_number")]);
+    assert!((t - 0.5).abs() < 1e-6);
+}
+
+#[test]
+fn parse_vision_config_ignores_unknown_keys() {
+    let (e, t) = parse_vision_config(&[cfg("some_other_key", "true")]);
+    assert!(e);
+    assert!((t - 0.5).abs() < 1e-6);
+}

@@ -82,6 +82,7 @@ impl ManageConductUseCase for MockConduct {
     use chrono::Utc;
     use uuid::Uuid;
     use crate::domain::entities::Rule;
+    use crate::domain::services::TensionAction;
     use crate::adapters::outbound::InferenceClassification;
 
     fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
@@ -675,4 +676,91 @@ impl ManageConductUseCase for MockConduct {
         let ctx = vec![ctx_msg("X", "y")];
         let result = build_contextual_content("z", &ctx, "unknown");
         assert!(result.contains("---")); // natural format
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Tests parse_tension_config
+    // ══════════════════════════════════════════════════════════
+
+    #[test]
+    fn parse_tension_config_defaults_when_empty() {
+        let cfg = parse_tension_config(&[]);
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.buffer_size, 5);
+        assert_eq!(cfg.threshold_warn, 3.0);
+        assert_eq!(cfg.threshold_delete, 5.0);
+        assert_eq!(cfg.threshold_mute, 7.0);
+        assert_eq!(cfg.mute_duration_secs, 300);
+    }
+
+    #[test]
+    fn parse_tension_config_reads_all_keys() {
+        let entries = vec![
+            bot_entry("channel_tension_enabled", "true"),
+            bot_entry("channel_tension_buffer_size", "10"),
+            bot_entry("channel_tension_threshold_warn", "2.0"),
+            bot_entry("channel_tension_threshold_delete", "4.5"),
+            bot_entry("channel_tension_threshold_mute", "8.0"),
+            bot_entry("channel_tension_mute_duration_secs", "600"),
+        ];
+        let cfg = parse_tension_config(&entries);
+        assert!(cfg.enabled);
+        assert_eq!(cfg.buffer_size, 10);
+        assert_eq!(cfg.threshold_warn, 2.0);
+        assert_eq!(cfg.threshold_delete, 4.5);
+        assert_eq!(cfg.threshold_mute, 8.0);
+        assert_eq!(cfg.mute_duration_secs, 600);
+    }
+
+    #[test]
+    fn parse_tension_config_rejects_buffer_size_zero() {
+        let entries = vec![bot_entry("channel_tension_buffer_size", "0")];
+        let cfg = parse_tension_config(&entries);
+        assert_eq!(cfg.buffer_size, 5); // defaut conserve
+    }
+
+    #[test]
+    fn parse_tension_config_ignores_malformed_values() {
+        let entries = vec![
+            bot_entry("channel_tension_enabled", "nope"),
+            bot_entry("channel_tension_buffer_size", "abc"),
+            bot_entry("channel_tension_threshold_warn", "not_a_number"),
+            bot_entry("channel_tension_mute_duration_secs", "bad"),
+        ];
+        let cfg = parse_tension_config(&entries);
+        assert!(!cfg.enabled);
+        assert_eq!(cfg.buffer_size, 5);
+        assert_eq!(cfg.threshold_warn, 3.0);
+        assert_eq!(cfg.mute_duration_secs, 300);
+    }
+
+    // ══════════════════════════════════════════════════════════
+    //  Tests tension_is_stronger (ordre de severite)
+    // ══════════════════════════════════════════════════════════
+
+    #[test]
+    fn tension_is_stronger_ban_not_overridden() {
+        // Aucun TensionAction ne peut depasser Ban (4).
+        assert!(!tension_is_stronger(&Action::Ban, TensionAction::Mute));
+        assert!(!tension_is_stronger(&Action::Ban, TensionAction::None));
+    }
+
+    #[test]
+    fn tension_is_stronger_escalates_from_none() {
+        assert!(tension_is_stronger(&Action::None, TensionAction::Warn));
+        assert!(tension_is_stronger(&Action::None, TensionAction::Delete));
+        assert!(tension_is_stronger(&Action::None, TensionAction::Mute));
+        assert!(!tension_is_stronger(&Action::None, TensionAction::None));
+    }
+
+    #[test]
+    fn tension_is_stronger_equal_severity_returns_false() {
+        assert!(!tension_is_stronger(&Action::Warn, TensionAction::Warn));
+        assert!(!tension_is_stronger(&Action::Mute, TensionAction::Mute));
+    }
+
+    #[test]
+    fn tension_is_stronger_downgrade_returns_false() {
+        assert!(!tension_is_stronger(&Action::Mute, TensionAction::Warn));
+        assert!(!tension_is_stronger(&Action::Delete, TensionAction::Warn));
     }

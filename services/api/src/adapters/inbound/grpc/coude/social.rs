@@ -501,6 +501,10 @@ pub(super) fn redistribution_to_proto(
     }
 }
 
+#[cfg(test)]
+#[path = "tests/social.rs"]
+mod tests;
+
 pub(super) fn proto_source_to_domain(
     source: i32,
 ) -> Option<crate::domain::entities::CashboxSource> {

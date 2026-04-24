@@ -151,3 +151,51 @@ async fn put_empty_body_keeps_defaults() {
     assert_eq!(json["welcome_enabled"], false);
     assert_eq!(json["welcome_message"], "Welcome!");
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn put_full_body_updates_every_mergeable_field() {
+    // Ce test couvre toutes les branches `if let Some(v) = dto.xxx` de save_config.
+    let (app, repo) = build_app();
+    let body = serde_json::json!({
+        "welcome_enabled": true,
+        "welcome_channel_id": "w-ch",
+        "welcome_message": "Hi",
+        "welcome_embed_color": "#FF0000",
+        "welcome_dm_enabled": true,
+        "welcome_dm_message": "DM",
+        "leave_enabled": true,
+        "leave_channel_id": "l-ch",
+        "leave_message": "Bye",
+        "rules_enabled": true,
+        "rules_channel_id": "r-ch",
+        "rules_message": "Rules",
+        "rules_role_id": "role-1",
+        "rules_button_label": "OK",
+        "counter_enabled": true,
+        "counter_channel_id": "c-ch",
+        "counter_format": "{count}",
+        "anniversary_enabled": true,
+        "anniversary_channel_id": "a-ch",
+        "anniversary_message": "Happy",
+        "rejoin_message": "Welcome back"
+    });
+    let (status, json) = put_json(app, "/api/welcome/111111111111111111", body).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["welcome_channel_id"], "w-ch");
+    assert_eq!(json["welcome_dm_message"], "DM");
+    assert_eq!(json["leave_channel_id"], "l-ch");
+    assert_eq!(json["rules_role_id"], "role-1");
+    assert_eq!(json["rules_button_label"], "OK");
+    assert_eq!(json["counter_channel_id"], "c-ch");
+    assert_eq!(json["counter_format"], "{count}");
+    assert_eq!(json["anniversary_enabled"], true);
+    assert_eq!(json["anniversary_message"], "Happy");
+    assert_eq!(json["rejoin_message"], "Welcome back");
+
+    let saved = repo.data.lock().unwrap().clone().unwrap();
+    assert_eq!(saved.welcome_channel_id.as_deref(), Some("w-ch"));
+    assert_eq!(saved.leave_channel_id.as_deref(), Some("l-ch"));
+    assert_eq!(saved.rules_role_id.as_deref(), Some("role-1"));
+    assert_eq!(saved.counter_channel_id.as_deref(), Some("c-ch"));
+    assert_eq!(saved.anniversary_channel_id.as_deref(), Some("a-ch"));
+}

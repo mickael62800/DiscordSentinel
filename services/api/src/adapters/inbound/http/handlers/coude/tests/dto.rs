@@ -279,3 +279,333 @@ fn current_season_dto_from_domain() {
     assert_eq!(dto.season_number, 3);
     assert_eq!(dto.days_remaining, 15);
 }
+
+// ── FullPlayerDto ──
+
+#[test]
+fn full_player_dto_from_domain_maps_all_fields() {
+    let p = sample_player();
+    let dto = FullPlayerDto::from(p);
+    assert_eq!(dto.guild_id, "g");
+    assert_eq!(dto.user_id, "u1");
+    assert_eq!(dto.class.as_deref(), Some("tank"));
+    assert_eq!(dto.hp_current, 80);
+    assert_eq!(dto.hp_max, 100);
+    assert_eq!(dto.season, 2);
+    assert!(dto.created_at.contains('T'));
+}
+
+#[test]
+fn full_player_dto_preserves_none_optional_dates() {
+    let p = sample_player();
+    let dto = FullPlayerDto::from(p);
+    assert!(dto.hp_last_regen.is_none());
+    assert!(dto.repos_last_used.is_none());
+    assert!(dto.class_changed_at.is_none());
+}
+
+// ── FullCombatDto ──
+
+fn sample_combat() -> CoudeCombat {
+    let now = Utc::now();
+    CoudeCombat {
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        channel_id: Some("c1".into()),
+        attacker_id: "a".into(), attacker_name: "A".into(),
+        defender_id: "d".into(), defender_name: "D".into(),
+        mise: 100, status: "betting".into(),
+        winner_id: None, attacker_roll: None, defender_roll: None,
+        chaos_event: None, special_attack: None, defender_special: None,
+        coins_transferred: None, result_message: None,
+        message_id: Some("msg".into()),
+        created_at: now, accepted_at: None, resolved_at: None,
+    }
+}
+
+#[test]
+fn full_combat_dto_from_domain_maps_all_fields() {
+    let c = sample_combat();
+    let id = c.id.to_string();
+    let dto = FullCombatDto::from(c);
+    assert_eq!(dto.id, id);
+    assert_eq!(dto.channel_id.as_deref(), Some("c1"));
+    assert_eq!(dto.message_id.as_deref(), Some("msg"));
+    assert_eq!(dto.mise, 100);
+    assert_eq!(dto.status, "betting");
+}
+
+// ── PrimeDto ──
+
+#[test]
+fn prime_dto_from_domain_maps_all_fields() {
+    let now = Utc::now();
+    let p = CoudePrime {
+        id: Uuid::new_v4(), guild_id: "g".into(),
+        target_id: "t".into(), target_name: "T".into(),
+        placed_by_id: "p".into(), placed_by_name: "P".into(),
+        amount: 500, claimed: false,
+        claimed_by_id: None, claimed_by_name: None, claimed_at: None,
+        created_at: now,
+    };
+    let dto = PrimeDto::from(p);
+    assert_eq!(dto.amount, 500);
+    assert!(!dto.claimed);
+    assert!(dto.claimed_at.is_none());
+    assert!(dto.created_at.contains('T'));
+}
+
+#[test]
+fn prime_dto_claimed_carries_metadata() {
+    let now = Utc::now();
+    let p = CoudePrime {
+        id: Uuid::new_v4(), guild_id: "g".into(),
+        target_id: "t".into(), target_name: "T".into(),
+        placed_by_id: "p".into(), placed_by_name: "P".into(),
+        amount: 500, claimed: true,
+        claimed_by_id: Some("c".into()),
+        claimed_by_name: Some("C".into()),
+        claimed_at: Some(now),
+        created_at: now,
+    };
+    let dto = PrimeDto::from(p);
+    assert!(dto.claimed);
+    assert_eq!(dto.claimed_by_id.as_deref(), Some("c"));
+    assert!(dto.claimed_at.is_some());
+}
+
+// ── InsuranceDto ──
+
+#[test]
+fn insurance_dto_from_domain() {
+    let now = Utc::now();
+    let i = CoudeInsurance {
+        id: Uuid::new_v4(),
+        is_scam: true,
+        expires_at: now,
+    };
+    let _ = now;
+    let id = i.id.to_string();
+    let dto = InsuranceDto::from(i);
+    assert_eq!(dto.id, id);
+    assert!(dto.is_scam);
+    assert!(dto.expires_at.contains('T'));
+}
+
+// ── AddXpResponse ──
+
+#[test]
+fn add_xp_response_from_xp_progress() {
+    let p = XpProgress {
+        new_xp: 1500, new_level: 9, leveled_up: true, stat_points_gained: 2,
+    };
+    let r: AddXpResponse = p.into();
+    assert_eq!(r.new_xp, 1500);
+    assert_eq!(r.new_level, 9);
+    assert!(r.leveled_up);
+    assert_eq!(r.stat_points_gained, 2);
+}
+
+// ── LeaderboardEntry ──
+
+#[test]
+fn leaderboard_entry_from_domain() {
+    let e = CoudeLeaderboardEntry {
+        user_id: "u".into(), username: "Alice".into(), value: 12345,
+    };
+    let dto: LeaderboardEntry = e.into();
+    assert_eq!(dto.user_id, "u");
+    assert_eq!(dto.value, 12345);
+}
+
+// ── FighterBetBonus ──
+
+#[test]
+fn fighter_bet_bonus_from_domain() {
+    let b = CoudeFighterBetBonus {
+        winner_id: "w".into(), winner_bonus: 100,
+        loser_id: "l".into(), loser_bonus: 50,
+        total_pot: 200,
+    };
+    let dto: FighterBetBonus = b.into();
+    assert_eq!(dto.winner_bonus, 100);
+    assert_eq!(dto.loser_bonus, 50);
+    assert_eq!(dto.total_pot, 200);
+}
+
+// ── ResolveBetsResponse from BetResolutionPlan ──
+
+#[test]
+fn resolve_bets_response_maps_payouts_and_bonus() {
+    let plan = BetResolutionPlan {
+        payouts: vec![BetPayout {
+            bet_id: Uuid::new_v4(),
+            bettor_id: "u1".into(), bettor_name: "U1".into(),
+            backed_id: "att".into(), amount_bet: 100,
+            payout: 200, won: true,
+        }],
+        fighter_bonus: Some(CoudeFighterBetBonus {
+            winner_id: "att".into(), winner_bonus: 50,
+            loser_id: "def".into(), loser_bonus: 0,
+            total_pot: 100,
+        }),
+    };
+    let resp: ResolveBetsResponse = plan.into();
+    assert_eq!(resp.results.len(), 1);
+    assert_eq!(resp.results[0].payout, 200);
+    assert!(resp.results[0].won);
+    assert!(resp.fighter_bonus.is_some());
+    assert!(resp.taunt_events.is_empty());
+}
+
+#[test]
+fn resolve_bets_response_empty_plan() {
+    let plan = BetResolutionPlan { payouts: vec![], fighter_bonus: None };
+    let resp: ResolveBetsResponse = plan.into();
+    assert!(resp.results.is_empty());
+    assert!(resp.fighter_bonus.is_none());
+}
+
+// ── CombatQueryParams / LeaderboardQueryParams ──
+
+#[test]
+fn combat_query_params_deserializes() {
+    let q: CombatQueryParams = serde_json::from_value(
+        serde_json::json!({"status": "resolved", "limit": 25})
+    ).unwrap();
+    assert_eq!(q.status.as_deref(), Some("resolved"));
+    assert_eq!(q.limit, Some(25));
+
+    let empty: CombatQueryParams = serde_json::from_str("{}").unwrap();
+    assert!(empty.status.is_none());
+    assert!(empty.limit.is_none());
+}
+
+#[test]
+fn leaderboard_query_params_deserializes() {
+    let q: LeaderboardQueryParams = serde_json::from_value(
+        serde_json::json!({"limit": 50})
+    ).unwrap();
+    assert_eq!(q.limit, Some(50));
+    let empty: LeaderboardQueryParams = serde_json::from_str("{}").unwrap();
+    assert!(empty.limit.is_none());
+}
+
+// ── BuyInsuranceDto ──
+
+#[test]
+fn buy_insurance_dto_default_duration_zero() {
+    let dto: BuyInsuranceDto = serde_json::from_value(
+        serde_json::json!({"user_id": "u", "is_scam": true})
+    ).unwrap();
+    assert_eq!(dto.user_id, "u");
+    assert!(dto.is_scam);
+    // Default est 0 avec #[serde(default)] (i64::default()).
+    assert_eq!(dto.duration_seconds, 0);
+}
+
+#[test]
+fn buy_insurance_dto_with_duration() {
+    let dto: BuyInsuranceDto = serde_json::from_value(
+        serde_json::json!({"user_id": "u", "is_scam": false, "duration_seconds": 7200})
+    ).unwrap();
+    assert_eq!(dto.duration_seconds, 7200);
+}
+
+// ── CreatePrimeDto / ClaimPrimesDto / UseItemDto ──
+
+#[test]
+fn create_prime_dto_deserializes() {
+    let dto: CreatePrimeDto = serde_json::from_value(
+        serde_json::json!({
+            "target_id": "t", "target_name": "T",
+            "placed_by_id": "p", "placed_by_name": "P",
+            "amount": 500
+        })
+    ).unwrap();
+    assert_eq!(dto.amount, 500);
+    assert_eq!(dto.target_id, "t");
+}
+
+#[test]
+fn claim_primes_dto_deserializes() {
+    let dto: ClaimPrimesDto = serde_json::from_value(
+        serde_json::json!({
+            "target_id": "t", "claimer_id": "c", "claimer_name": "C"
+        })
+    ).unwrap();
+    assert_eq!(dto.target_id, "t");
+    assert_eq!(dto.claimer_name, "C");
+}
+
+#[test]
+fn use_item_dto_deserializes() {
+    let dto: UseItemDto = serde_json::from_value(
+        serde_json::json!({"item_key": "potion"})
+    ).unwrap();
+    assert_eq!(dto.item_key, "potion");
+}
+
+#[test]
+fn defender_special_dto_deserializes() {
+    let dto: DefenderSpecialDto = serde_json::from_value(
+        serde_json::json!({"item_key": "fake_plaque"})
+    ).unwrap();
+    assert_eq!(dto.item_key, "fake_plaque");
+}
+
+#[test]
+fn set_betting_dto_deserializes() {
+    let dto: SetBettingDto = serde_json::from_value(
+        serde_json::json!({"message_id": "123"})
+    ).unwrap();
+    assert_eq!(dto.message_id, "123");
+}
+
+#[test]
+fn resolve_combat_dto_all_optional_except_status() {
+    let dto: ResolveCombatDto = serde_json::from_value(
+        serde_json::json!({"status": "resolved"})
+    ).unwrap();
+    assert_eq!(dto.status, "resolved");
+    assert!(dto.winner_id.is_none());
+    assert!(dto.coins_transferred.is_none());
+}
+
+#[test]
+fn gain_lost_dtos_deserialize() {
+    let g: GainDto = serde_json::from_value(serde_json::json!({"gain": 500})).unwrap();
+    assert_eq!(g.gain, 500);
+    let l: LostDto = serde_json::from_value(serde_json::json!({"lost": 300})).unwrap();
+    assert_eq!(l.lost, 300);
+}
+
+#[test]
+fn daily_chaos_dto_deserializes() {
+    let dto: DailyChaosDto = serde_json::from_value(serde_json::json!({
+        "loser_id": "l", "loser_name": "L",
+        "winner_id": "w", "winner_name": "W",
+        "amount": 500,
+    })).unwrap();
+    assert_eq!(dto.amount, 500);
+}
+
+#[test]
+fn duration_dto_deserializes() {
+    let d: DurationDto = serde_json::from_value(serde_json::json!({"duration_secs": 3600})).unwrap();
+    assert_eq!(d.duration_secs, 3600);
+}
+
+#[test]
+fn random_players_query_default_none() {
+    let q: RandomPlayersQuery = serde_json::from_str("{}").unwrap();
+    assert!(q.count.is_none());
+    let q2: RandomPlayersQuery = serde_json::from_value(serde_json::json!({"count": 5})).unwrap();
+    assert_eq!(q2.count, Some(5));
+}
+
+#[test]
+fn adjust_coins_dto_deserializes() {
+    let d: AdjustCoinsDto = serde_json::from_value(serde_json::json!({"amount": -100})).unwrap();
+    assert_eq!(d.amount, -100);
+}

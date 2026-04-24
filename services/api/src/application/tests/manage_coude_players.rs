@@ -219,3 +219,145 @@ async fn get_not_found_returns_not_found_error() {
     let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
     assert!(matches!(svc.get("g", "u").await, Err(DomainError::NotFound(_))));
 }
+
+// ── Validation negative amounts ──
+
+#[tokio::test]
+async fn record_win_rejects_negative_amounts() {
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    assert!(matches!(svc.record_win("g", "u", -1, 0).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(svc.record_win("g", "u", 0, -5).await, Err(DomainError::ValidationError(_))));
+}
+
+#[tokio::test]
+async fn record_win_ok_with_zero_amounts() {
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    assert!(svc.record_win("g", "u", 0, 0).await.is_ok());
+}
+
+#[tokio::test]
+async fn record_coins_earned_rejects_zero_and_negative() {
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    assert!(matches!(svc.record_coins_earned("g", "u", 0).await, Err(DomainError::ValidationError(_))));
+    assert!(matches!(svc.record_coins_earned("g", "u", -10).await, Err(DomainError::ValidationError(_))));
+}
+
+#[tokio::test]
+async fn record_coins_earned_ok_with_positive() {
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    assert!(svc.record_coins_earned("g", "u", 100).await.is_ok());
+}
+
+// ── NotFound mapping when repo returns false ──
+
+#[derive(Default)]
+struct FalseRepo;
+#[async_trait]
+impl CoudePlayerRepository for FalseRepo {
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { Ok(sample_player()) }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
+    async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { Ok(None) }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
+    async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
+    async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
+    async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(false) }
+    async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
+    async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
+    async fn touch_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
+    async fn touch_loss_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
+    async fn reset_combat_streaks(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn touch_steal_victim_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
+    async fn reset_steal_victim_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn touch_bj_win_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
+    async fn touch_bj_bust_streak(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
+    async fn reset_bj_bust_streak(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn increment_cowardice(&self, _: &str, _: &str) -> Result<Option<i32>, DomainError> { Ok(None) }
+    async fn increment_chaos(&self, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn update_hp(&self, _: &str, _: &str, _: i32, _: i32) -> Result<(), DomainError> { Ok(()) }
+    async fn full_heal(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
+}
+
+#[tokio::test]
+async fn record_win_not_found_when_repo_false() {
+    let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
+    assert!(matches!(svc.record_win("g", "u", 10, 5).await, Err(DomainError::NotFound(_))));
+}
+
+#[tokio::test]
+async fn record_loss_not_found_when_repo_false() {
+    let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
+    assert!(matches!(svc.record_loss("g", "u", 10).await, Err(DomainError::NotFound(_))));
+}
+
+#[tokio::test]
+async fn record_draw_not_found_when_repo_false() {
+    let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
+    assert!(matches!(svc.record_draw("g", "u", 10).await, Err(DomainError::NotFound(_))));
+}
+
+#[tokio::test]
+async fn record_coins_lost_not_found_when_repo_false() {
+    let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
+    assert!(matches!(svc.record_coins_lost("g", "u", 10).await, Err(DomainError::NotFound(_))));
+}
+
+#[tokio::test]
+async fn record_coins_earned_not_found_when_repo_false() {
+    let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
+    assert!(matches!(svc.record_coins_earned("g", "u", 10).await, Err(DomainError::NotFound(_))));
+}
+
+#[tokio::test]
+async fn increment_cowardice_none_returns_not_found() {
+    let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
+    assert!(matches!(svc.increment_cowardice("g", "u").await, Err(DomainError::NotFound(_))));
+}
+
+#[tokio::test]
+async fn increment_chaos_false_returns_not_found() {
+    let svc = ManageCoudePlayersService::new(Arc::new(FalseRepo));
+    assert!(matches!(svc.increment_chaos("g", "u").await, Err(DomainError::NotFound(_))));
+}
+
+#[tokio::test]
+async fn reset_stats_none_returns_validation_error() {
+    // MockRepo default : reset_stats_returns_some == false → None → ValidationError.
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    let err = svc.reset_stats("g", "u", 100).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn update_hp_full_heal_regen_delegate() {
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    assert!(svc.update_hp("g", "u", 50, 100).await.is_ok());
+    assert!(svc.full_heal("g", "u").await.is_ok());
+    assert_eq!(svc.regen_hp_tick(0.1, 0.2, 0.3, 0.4).await.unwrap(), 0);
+}
+
+#[tokio::test]
+async fn get_or_create_delegates() {
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    let p = svc.get_or_create("g".into(), "u".into(), "Alice".into()).await.unwrap();
+    assert_eq!(p.username, "alice"); // sample_player renvoie "alice"
+}
+
+#[tokio::test]
+async fn get_with_player_returns_it() {
+    let repo = Arc::new(MockRepo::default());
+    *repo.player.lock().unwrap() = Some(sample_player());
+    let svc = ManageCoudePlayersService::new(repo);
+    assert!(svc.get("g", "u").await.is_ok());
+}
+
+#[tokio::test]
+async fn list_guild_ids_delegates() {
+    let svc = ManageCoudePlayersService::new(Arc::new(MockRepo::default()));
+    assert!(svc.list_guild_ids().await.unwrap().is_empty());
+}

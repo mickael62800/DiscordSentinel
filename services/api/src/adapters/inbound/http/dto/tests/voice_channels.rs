@@ -199,3 +199,218 @@ use super::*;
     fn default_channel_name_template_is_user() {
         assert_eq!(default_channel_name_template(), "{user}");
     }
+
+    // ── CreateVoiceChannelDto deserialize + From ──
+
+    #[test]
+    fn create_voice_channel_dto_deserializes_with_defaults() {
+        let dto: CreateVoiceChannelDto = serde_json::from_value(serde_json::json!({
+            "guild_id": "g", "owner_id": "o", "owner_name": "O",
+            "channel_id": "c", "channel_name": "Salon"
+        })).unwrap();
+        assert_eq!(dto.kind, "public");
+        assert_eq!(dto.visibility, "visible");
+        assert!(!dto.queue_enabled);
+        assert!(!dto.stage_enabled);
+    }
+
+    #[test]
+    fn create_voice_channel_dto_to_command() {
+        let dto = CreateVoiceChannelDto {
+            guild_id: "g".into(), owner_id: "o".into(), owner_name: "Own".into(),
+            channel_id: "c".into(), text_channel_id: Some("t".into()),
+            members_channel_id: None, queue_channel_id: None, category_id: None,
+            channel_name: "Salon".into(),
+            kind: "private".into(), visibility: "hidden".into(),
+            queue_enabled: true, stage_enabled: true,
+        };
+        let cmd: CreateVoiceChannelCommand = dto.into();
+        assert_eq!(cmd.guild_id, "g");
+        assert_eq!(cmd.kind, "private");
+        assert!(cmd.queue_enabled);
+        assert!(cmd.stage_enabled);
+        assert_eq!(cmd.text_channel_id.as_deref(), Some("t"));
+    }
+
+    // ── UpdateVoiceChannelDto ──
+
+    #[test]
+    fn update_dto_all_optional() {
+        let dto: UpdateVoiceChannelDto = serde_json::from_str("{}").unwrap();
+        assert!(dto.visibility.is_none());
+        assert!(dto.locked.is_none());
+        assert!(dto.queue_enabled.is_none());
+        assert!(dto.name.is_none());
+        assert!(dto.status.is_none());
+        assert!(dto.member_limit.is_none());
+        assert!(dto.queue_channel_id.is_none());
+        assert!(dto.stage_enabled.is_none());
+    }
+
+    #[test]
+    fn update_dto_member_limit_present() {
+        let dto: UpdateVoiceChannelDto = serde_json::from_value(
+            serde_json::json!({"member_limit": 10})
+        ).unwrap();
+        assert_eq!(dto.member_limit, Some(Some(10)));
+    }
+
+    #[test]
+    fn update_dto_name_and_status_set() {
+        let dto: UpdateVoiceChannelDto = serde_json::from_value(serde_json::json!({
+            "name": "Nouveau nom",
+            "status": "AFK"
+        })).unwrap();
+        assert_eq!(dto.name.as_deref(), Some("Nouveau nom"));
+        assert_eq!(dto.status.as_deref(), Some("AFK"));
+    }
+
+    // ── TransferOwnership / AddCoAdmin / AddWhitelist / BanFromChannel ──
+
+    #[test]
+    fn transfer_ownership_dto_deserializes() {
+        let dto: TransferOwnershipDto = serde_json::from_value(
+            serde_json::json!({"new_owner_id": "u1", "new_owner_name": "U1"})
+        ).unwrap();
+        assert_eq!(dto.new_owner_id, "u1");
+    }
+
+    #[test]
+    fn add_co_admin_dto_deserializes() {
+        let dto: AddCoAdminDto = serde_json::from_value(
+            serde_json::json!({"user_id": "u", "user_name": "U"})
+        ).unwrap();
+        assert_eq!(dto.user_id, "u");
+    }
+
+    #[test]
+    fn add_whitelist_dto_deserializes() {
+        let dto: AddWhitelistDto = serde_json::from_value(
+            serde_json::json!({"guild_id": "g", "owner_id": "o", "target_id": "t", "target_name": "T"})
+        ).unwrap();
+        assert_eq!(dto.target_name, "T");
+    }
+
+    #[test]
+    fn ban_from_channel_dto_with_reason_and_duration() {
+        let dto: BanFromChannelDto = serde_json::from_value(serde_json::json!({
+            "user_id": "u", "user_name": "U", "banned_by": "m",
+            "reason": "spam", "duration_secs": 3600
+        })).unwrap();
+        assert_eq!(dto.reason.as_deref(), Some("spam"));
+        assert_eq!(dto.duration_secs, Some(3600));
+    }
+
+    #[test]
+    fn ban_from_channel_dto_permanent() {
+        let dto: BanFromChannelDto = serde_json::from_value(serde_json::json!({
+            "user_id": "u", "user_name": "U", "banned_by": "m"
+        })).unwrap();
+        assert!(dto.reason.is_none());
+        assert!(dto.duration_secs.is_none());
+    }
+
+    // ── CreateInviteLink / UseInviteLink ──
+
+    #[test]
+    fn create_invite_link_dto_defaults_and_to_command() {
+        let dto = CreateInviteLinkDto {
+            created_by: "u".into(),
+            created_by_name: "U".into(),
+            duration_secs: Some(1800),
+            max_uses: Some(5),
+        };
+        let cmd: CreateInviteLinkCommand = dto.into();
+        assert_eq!(cmd.channel_id, ""); // set by handler
+        assert_eq!(cmd.duration_secs, Some(1800));
+        assert_eq!(cmd.max_uses, Some(5));
+    }
+
+    #[test]
+    fn use_invite_link_dto_deserializes() {
+        let dto: UseInviteLinkDto = serde_json::from_value(
+            serde_json::json!({"user_id": "u", "user_name": "U"})
+        ).unwrap();
+        assert_eq!(dto.user_id, "u");
+    }
+
+    // ── CoAdmin / Whitelist / Ban response DTOs ──
+
+    #[test]
+    fn co_admin_to_dto_preserves_fields() {
+        let ca = VoiceChannelCoAdmin {
+            id: Uuid::new_v4(),
+            voice_channel_id: Uuid::new_v4(),
+            user_id: "u".into(),
+            user_name: "Name".into(),
+            granted_at: Utc::now(),
+        };
+        let dto: CoAdminResponseDto = ca.into();
+        assert_eq!(dto.user_id, "u");
+        assert_eq!(dto.user_name, "Name");
+        assert!(dto.granted_at.contains("T"));
+    }
+
+    #[test]
+    fn whitelist_entry_to_dto_preserves_fields() {
+        let w = VoiceChannelWhitelistEntry {
+            id: Uuid::new_v4(),
+            guild_id: "g".into(),
+            owner_id: "o".into(),
+            target_id: "t".into(),
+            target_name: "T".into(),
+            created_at: Utc::now(),
+        };
+        let dto: WhitelistEntryResponseDto = w.into();
+        assert_eq!(dto.target_id, "t");
+        assert_eq!(dto.target_name, "T");
+    }
+
+    #[test]
+    fn ban_to_dto_preserves_fields() {
+        let b = VoiceChannelBan {
+            id: Uuid::new_v4(),
+            voice_channel_id: Uuid::new_v4(),
+            user_id: "bad".into(),
+            user_name: "BadGuy".into(),
+            banned_by: "mod".into(),
+            reason: Some("toxic".into()),
+            expires_at: Some(Utc::now() + chrono::Duration::hours(1)),
+            created_at: Utc::now(),
+        };
+        let dto: BanResponseDto = b.into();
+        assert_eq!(dto.user_id, "bad");
+        assert_eq!(dto.reason.as_deref(), Some("toxic"));
+        assert!(dto.expires_at.is_some());
+    }
+
+    #[test]
+    fn ban_permanent_to_dto_preserves_none_expires() {
+        let b = VoiceChannelBan {
+            id: Uuid::new_v4(),
+            voice_channel_id: Uuid::new_v4(),
+            user_id: "u".into(),
+            user_name: "U".into(),
+            banned_by: "m".into(),
+            reason: None,
+            expires_at: None,
+            created_at: Utc::now(),
+        };
+        let dto: BanResponseDto = b.into();
+        assert!(dto.reason.is_none());
+        assert!(dto.expires_at.is_none());
+    }
+
+    #[test]
+    fn create_theme_dto_defaults_when_fields_omitted() {
+        let dto: CreateThemeDto = serde_json::from_value(serde_json::json!({
+            "name": "X"
+        })).unwrap();
+        assert_eq!(dto.channel_name_template, "{user}");
+        assert_eq!(dto.visibility, "visible");
+        assert!(!dto.locked);
+        assert!(!dto.queue_enabled);
+        assert!(!dto.stage_enabled);
+        assert!(!dto.is_default);
+        assert_eq!(dto.sort_order, 0);
+    }

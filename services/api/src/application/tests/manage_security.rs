@@ -356,3 +356,143 @@ async fn list_events_empty_on_fresh_repo() {
     let events = svc.list_events(Some("nonexistent")).await.unwrap();
     assert!(events.is_empty());
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// analyze_new_member — paths actives (raid / compte suspect / alt)
+// ═══════════════════════════════════════════════════════════════════
+
+fn cfg_entry(key: &str, value: &str) -> BotGuildConfig {
+    BotGuildConfig {
+        id: Uuid::new_v4(), guild_id: "g".into(),
+        bot_name: "security-bot".into(),
+        config_key: key.into(), config_value: value.into(),
+        updated_at: Utc::now(),
+    }
+}
+
+fn build_service_with_configs(configs: Vec<BotGuildConfig>, bans: Vec<ModerationAction>) -> (
+    ManageSecurityService,
+    Arc<MockSecurityRepo>,
+    Arc<MockWatchedRepo>,
+    Arc<MockAuditLogsUc>,
+) {
+    let repo = Arc::new(MockSecurityRepo::default());
+    let cache = Arc::new(MockCache::default());
+    let watched = Arc::new(MockWatchedRepo::default());
+    let audit = Arc::new(MockAuditLogsUc::default());
+    let bot_config = Arc::new(MockBotConfig::default());
+    *bot_config.rows.lock().unwrap() = configs;
+    let moderation = Arc::new(MockModerationRepo::default());
+    *moderation.bans.lock().unwrap() = bans;
+
+    let svc = ManageSecurityService::new(
+        repo.clone(), cache, watched.clone(), bot_config, moderation,
+    ).with_audit_logs_uc(audit.clone());
+    (svc, repo, watched, audit)
+}
+
+#[tokio::test]
+async fn analyze_new_member_suspicious_account_triggers_event() {
+    // min_account_age_secs par defaut = 86400 (1 jour). Compte cree il y a 1h.
+    let (svc, repo, watched, audit) = build_service_with_configs(
+        vec![cfg_entry("quarantine_enabled", "true"), cfg_entry("captcha_enabled", "true")],
+        vec![],
+    );
+    let cmd = AnalyzeNewMemberCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "alice".into(),
+        has_avatar: false,
+        account_created_timestamp: Utc::now().timestamp() - 3600, // 1h -> suspect
+        is_bot: false,
+        recent_joins: vec![],
+    };
+    let decision = svc.analyze_new_member(cmd).await.unwrap();
+    assert!(decision.is_suspicious_account);
+    assert!(decision.quarantine);
+    assert!(decision.send_captcha);
+    assert_eq!(decision.event_type, "suspicious_account");
+    // Un event auto-reporte
+    assert_eq!(repo.saved.lock().unwrap().len(), 1);
+    assert_eq!(audit.create_calls.lock().unwrap().len(), 1);
+    assert_eq!(watched.watch_calls.lock().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn analyze_new_member_raid_pattern_overrides_suspicious() {
+    use crate::domain::services::security_analyzer::JoinInfo;
+    // Config : raid enabled + lockdown + slowmode
+    let (svc, repo, _watched, _audit) = build_service_with_configs(
+        vec![
+            cfg_entry("raid_pattern_enabled", "true"),
+            cfg_entry("raid_pattern_score_threshold", "0"),
+            cfg_entry("lockdown_enabled", "true"),
+            cfg_entry("slowmode_seconds", "30"),
+            cfg_entry("quarantine_enabled", "true"),
+            cfg_entry("captcha_enabled", "true"),
+        ],
+        vec![],
+    );
+    let now = Utc::now().timestamp();
+    let cmd = AnalyzeNewMemberCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "alice".into(),
+        has_avatar: true,
+        account_created_timestamp: now - 3600, // compte jeune mais RAID prioritaire
+        is_bot: false,
+        recent_joins: vec![
+            JoinInfo { username: "alice01".into(), account_created_timestamp: now - 3600, has_avatar: false },
+            JoinInfo { username: "alice02".into(), account_created_timestamp: now - 3600, has_avatar: false },
+            JoinInfo { username: "alice03".into(), account_created_timestamp: now - 3600, has_avatar: false },
+        ],
+    };
+    let decision = svc.analyze_new_member(cmd).await.unwrap();
+    assert!(decision.is_raid);
+    assert!(decision.activate_lockdown);
+    assert_eq!(decision.slowmode_secs, 30);
+    assert_eq!(decision.event_type, "raid_detected");
+    // Meme s'il aurait aussi ete suspect, la detection raid gagne
+    assert!(!decision.is_suspicious_account);
+    // Event reportee avec severity "critical"
+    assert_eq!(repo.saved.lock().unwrap()[0].severity, "critical");
+}
+
+#[tokio::test]
+async fn analyze_new_member_config_bool_various_formats() {
+    // Tester que les config bools acceptent 1/true/other.
+    let (svc, _, _, _) = build_service_with_configs(
+        vec![
+            cfg_entry("quarantine_enabled", "1"),
+            cfg_entry("captcha_enabled", "true"),
+        ],
+        vec![],
+    );
+    // Compte suspect pour declencher le chemin
+    let cmd = AnalyzeNewMemberCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "x".into(),
+        has_avatar: true,
+        account_created_timestamp: Utc::now().timestamp() - 60,
+        is_bot: false, recent_joins: vec![],
+    };
+    let d = svc.analyze_new_member(cmd).await.unwrap();
+    assert!(d.quarantine);
+    assert!(d.send_captcha);
+}
+
+#[tokio::test]
+async fn analyze_new_member_invalid_numeric_config_falls_back_to_defaults() {
+    let (svc, _, _, _) = build_service_with_configs(
+        vec![
+            cfg_entry("min_account_age_secs", "not_a_number"),
+            cfg_entry("slowmode_seconds", "abc"),
+        ],
+        vec![],
+    );
+    // Compte ancien → pas suspect (default 86400).
+    let cmd = AnalyzeNewMemberCommand {
+        guild_id: "g".into(), user_id: "u".into(), username: "x".into(),
+        has_avatar: true,
+        account_created_timestamp: Utc::now().timestamp() - 86400 * 30,
+        is_bot: false, recent_joins: vec![],
+    };
+    let d = svc.analyze_new_member(cmd).await.unwrap();
+    assert!(!d.is_suspicious_account);
+    assert!(d.event_type.is_empty());
+}

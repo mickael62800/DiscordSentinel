@@ -206,7 +206,11 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
 }
 
 #[derive(Default)]
-struct MockInventoryUc;
+struct MockInventoryUc {
+    active_insurance: Mutex<Option<CoudeInsurance>>,
+    primes_amount: Mutex<i64>,
+    expire_calls: Mutex<Vec<Uuid>>,
+}
 
 #[async_trait]
 impl ManageCoudeInventoryUseCase for MockInventoryUc {
@@ -216,21 +220,32 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
     async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
     async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { Ok(vec![]) }
-    async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
+    async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
+        Ok(*self.primes_amount.lock().unwrap())
+    }
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> { Ok(None) }
-    async fn expire_insurance(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> {
+        Ok(self.active_insurance.lock().unwrap().clone())
+    }
+    async fn expire_insurance(&self, id: Uuid) -> Result<(), DomainError> {
+        self.expire_calls.lock().unwrap().push(id);
+        Ok(())
+    }
 }
 
 #[derive(Default)]
-struct MockSocialUc;
+struct MockSocialUc {
+    active_events: Mutex<Vec<CoudeEvent>>,
+}
 
 #[async_trait]
 impl ManageCoudeSocialUseCase for MockSocialUc {
     async fn check_cooldown(&self, _: &str, _: &str, _: &str) -> Result<Option<DateTime<Utc>>, DomainError> { Ok(None) }
     async fn set_cooldown(&self, _: &str, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
     async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> { Ok(vec![]) }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> { Ok(vec![]) }
+    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> {
+        Ok(self.active_events.lock().unwrap().clone())
+    }
     async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> { Ok(()) }
     async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<DailyChaosOutcome>, DomainError> { Ok(None) }
     async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
@@ -483,4 +498,162 @@ async fn resolve_batch_output_preserves_combat_metadata() {
     assert_eq!(out[0].guild_id, "g");
     assert_eq!(out[0].channel_id.as_deref(), Some("c1"));
     assert_eq!(out[0].message_id.as_deref(), Some("msg1"));
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Tests elargis : branches alternatives
+// ══════════════════════════════════════════════════════════════════════
+
+#[tokio::test]
+async fn resolve_batch_with_active_insurance_on_loser() {
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service_cfg(|cfg| {
+        *cfg.inventory.active_insurance.lock().unwrap() = Some(CoudeInsurance {
+            id: Uuid::new_v4(),
+            is_scam: false,
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+        });
+    });
+    combat_repo.due.lock().unwrap().push(make_combat("atk", "def", 500));
+    player_repo.insert(make_player("atk", 10, 100));
+    player_repo.insert(make_player("def", 10, 100));
+    wallet_repo.set_balance("g", "atk", 10_000);
+    wallet_repo.set_balance("g", "def", 10_000);
+
+    // Doit reussir (pas de panic) : le path d'insurance est parcouru.
+    svc.resolve_batch().await.unwrap();
+}
+
+#[tokio::test]
+async fn resolve_batch_with_primes_to_claim() {
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service_cfg(|cfg| {
+        *cfg.inventory.primes_amount.lock().unwrap() = 250;
+    });
+    combat_repo.due.lock().unwrap().push(make_combat("atk", "def", 100));
+    player_repo.insert(make_player("atk", 10, 100));
+    player_repo.insert(make_player("def", 10, 100));
+    wallet_repo.set_balance("g", "atk", 5_000);
+    wallet_repo.set_balance("g", "def", 5_000);
+    svc.resolve_batch().await.unwrap();
+    // Au moins un credit pour les primes devrait apparaitre (si qq a gagne).
+}
+
+#[tokio::test]
+async fn resolve_batch_explosion_path_defender_special() {
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service();
+    let mut combat = make_combat("atk", "def", 200);
+    combat.special_attack = Some("surprise".into());
+    combat.defender_special = Some("explosion".into());
+    combat_repo.due.lock().unwrap().push(combat);
+    player_repo.insert(make_player("atk", 10, 100));
+    player_repo.insert(make_player("def", 10, 100));
+    wallet_repo.set_balance("g", "atk", 5_000);
+    wallet_repo.set_balance("g", "def", 5_000);
+    // Pas de panic, engine gere cette combinaison.
+    svc.resolve_batch().await.unwrap();
+}
+
+#[tokio::test]
+async fn resolve_batch_giant_killer_underdog_scenario() {
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service();
+    combat_repo.due.lock().unwrap().push(make_combat("weakling", "boss", 100));
+    // weakling niveau 1, boss niveau 20 : giant-killer bonus possible
+    player_repo.insert(make_player("weakling", 1, 100));
+    player_repo.insert(make_player("boss", 20, 100));
+    wallet_repo.set_balance("g", "weakling", 5_000);
+    wallet_repo.set_balance("g", "boss", 50_000);
+    svc.resolve_batch().await.unwrap();
+    // Peu importe le resultat, le path giant_killer est exercise.
+}
+
+#[tokio::test]
+async fn resolve_batch_with_active_server_events() {
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service_cfg(|cfg| {
+        cfg.social.active_events.lock().unwrap().push(CoudeEvent {
+            id: Uuid::new_v4(),
+            guild_id: "g".into(),
+            event_type: "chaos".into(),
+            active: true,
+            expires_at: Utc::now() + chrono::Duration::hours(1),
+            created_at: Utc::now(),
+        });
+    });
+    combat_repo.due.lock().unwrap().push(make_combat("atk", "def", 100));
+    player_repo.insert(make_player("atk", 10, 100));
+    player_repo.insert(make_player("def", 10, 100));
+    wallet_repo.set_balance("g", "atk", 5_000);
+    wallet_repo.set_balance("g", "def", 5_000);
+    svc.resolve_batch().await.unwrap();
+}
+
+#[tokio::test]
+async fn resolve_batch_handles_multiple_combats_in_one_pass() {
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service();
+    // 5 combats d'un coup
+    for i in 0..5 {
+        let a = format!("a{i}");
+        let d = format!("d{i}");
+        combat_repo.due.lock().unwrap().push(make_combat(&a, &d, 100));
+        player_repo.insert(make_player(&a, 5, 100));
+        player_repo.insert(make_player(&d, 5, 100));
+        wallet_repo.set_balance("g", &a, 5_000);
+        wallet_repo.set_balance("g", &d, 5_000);
+    }
+    let out = svc.resolve_batch().await.unwrap();
+    assert_eq!(out.len(), 5);
+}
+
+#[tokio::test]
+async fn resolve_batch_with_low_hp_defender() {
+    // Defender a 1 HP → risque de mourir au premier round → impacte path coins_lost
+    let (svc, combat_repo, player_repo, wallet_repo, _, _) = build_service();
+    combat_repo.due.lock().unwrap().push(make_combat("atk", "def", 500));
+    player_repo.insert(make_player("atk", 10, 100));
+    player_repo.insert(make_player("def", 10, 1));
+    wallet_repo.set_balance("g", "atk", 10_000);
+    wallet_repo.set_balance("g", "def", 10_000);
+    svc.resolve_batch().await.unwrap();
+}
+
+// Builder avec config custom des mocks inventory/social
+struct BatchCfg {
+    inventory: Arc<MockInventoryUc>,
+    social: Arc<MockSocialUc>,
+}
+
+fn build_service_cfg(
+    setup: impl FnOnce(&mut BatchCfg),
+) -> (
+    ResolveBettingBatchService,
+    Arc<MockCombatRepo>,
+    Arc<MockPlayerRepo>,
+    Arc<MockWalletRepo>,
+    Arc<MockBetsUc>,
+    Arc<MockTauntsUc>,
+) {
+    let combat_repo = Arc::new(MockCombatRepo::default());
+    let player_repo = Arc::new(MockPlayerRepo::default());
+    let wallet_repo = Arc::new(MockWalletRepo::default());
+    let bets_uc = Arc::new(MockBetsUc::default());
+    let inventory_uc = Arc::new(MockInventoryUc::default());
+    let social_uc = Arc::new(MockSocialUc::default());
+    let taunts_uc = Arc::new(MockTauntsUc::default());
+    let bot_config_repo = Arc::new(MockBotConfig::default());
+
+    let mut cfg = BatchCfg {
+        inventory: inventory_uc.clone(),
+        social: social_uc.clone(),
+    };
+    setup(&mut cfg);
+
+    let svc = ResolveBettingBatchService::new(
+        combat_repo.clone(),
+        player_repo.clone(),
+        wallet_repo.clone(),
+        bets_uc.clone(),
+        inventory_uc,
+        social_uc,
+        taunts_uc.clone(),
+        bot_config_repo,
+    );
+    (svc, combat_repo, player_repo, wallet_repo, bets_uc, taunts_uc)
 }

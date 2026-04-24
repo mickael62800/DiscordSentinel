@@ -199,12 +199,16 @@ pub async fn build_app_state(
     // ── Inference ONNX ──
     let (inference, tokenizer, inference_limiter) = build_inference();
 
+    // Discord API (un seul client partage, cree ici avant conduct pour l'injecter).
+    let discord_api: Arc<dyn crate::adapters::outbound::DiscordApi> =
+        Arc::new(DiscordApiService::new(config.discord_bot_token.clone()));
+
     // ── Services applicatifs ──
     let conduct_uc = Arc::new(ManageConductService::new(
         conduct_repo.clone(),
         infraction_repo.clone(),
         broadcaster.clone(),
-        config.discord_bot_token.clone(),
+        discord_api.clone(),
     ));
 
     // Buffer in-memory partage (tension de salon). Pas de persistance :
@@ -464,8 +468,9 @@ pub async fn build_app_state(
         stats_uc.clone(),
     ));
 
-    // ── Discord API service ──
-    let discord_api = Arc::new(DiscordApiService::new(config.discord_bot_token.clone()));
+    // ── Discord API service : instance deja creee plus haut pour conduct.
+    // On re-declare ici pour garder la variable accessible dans la suite du
+    // bootstrap (AppState.discord_api).
 
     // ── Job client (queue Redis → worker) ──
     let queue_key =

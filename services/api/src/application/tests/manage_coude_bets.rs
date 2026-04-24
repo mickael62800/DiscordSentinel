@@ -9,21 +9,39 @@ use uuid::Uuid;
 
 struct MockBetRepo {
     placed: StdMutex<Vec<NewCoudeBet>>,
+    bets: StdMutex<Vec<CoudeBet>>,
+    apply_calls: StdMutex<Vec<(String, BetResolutionPlan)>>,
+    refund_summary: StdMutex<RefundSummary>,
+    refund_calls: StdMutex<Vec<(String, Uuid)>>,
 }
 impl MockBetRepo {
-    fn new() -> Self { Self { placed: StdMutex::new(vec![]) } }
+    fn new() -> Self {
+        Self {
+            placed: StdMutex::new(vec![]),
+            bets: StdMutex::new(vec![]),
+            apply_calls: StdMutex::new(vec![]),
+            refund_summary: StdMutex::new(RefundSummary { refunded_count: 0, refunded_total: 0 }),
+            refund_calls: StdMutex::new(vec![]),
+        }
+    }
 }
 
 #[async_trait]
 impl CoudeBetRepository for MockBetRepo {
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> { Ok(vec![]) }
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
+        Ok(self.bets.lock().unwrap().clone())
+    }
     async fn place(&self, new: NewCoudeBet) -> Result<Vec<TauntEvent>, DomainError> {
         self.placed.lock().unwrap().push(new);
         Ok(vec![])
     }
-    async fn apply_resolution(&self, _: &str, _: BetResolutionPlan) -> Result<Vec<TauntEvent>, DomainError> { Ok(vec![]) }
-    async fn refund_unresolved(&self, _: &str, _: Uuid) -> Result<RefundSummary, DomainError> {
-        Ok(RefundSummary { refunded_count: 0, refunded_total: 0 })
+    async fn apply_resolution(&self, g: &str, p: BetResolutionPlan) -> Result<Vec<TauntEvent>, DomainError> {
+        self.apply_calls.lock().unwrap().push((g.into(), p));
+        Ok(vec![])
+    }
+    async fn refund_unresolved(&self, g: &str, id: Uuid) -> Result<RefundSummary, DomainError> {
+        self.refund_calls.lock().unwrap().push((g.into(), id));
+        Ok(self.refund_summary.lock().unwrap().clone())
     }
 }
 
@@ -174,4 +192,57 @@ async fn resolve_empty_bets_returns_empty_plan() {
     let outcome = svc.resolve(Uuid::new_v4(), Some("att".into())).await.unwrap();
     assert!(outcome.plan.payouts.is_empty());
     assert!(outcome.taunt_events.is_empty());
+}
+
+// ── list_for_combat / refund ──
+
+#[tokio::test]
+async fn list_for_combat_delegates_repo() {
+    let (svc, repo) = make_svc("betting");
+    repo.bets.lock().unwrap().push(CoudeBet {
+        id: Uuid::new_v4(), guild_id: "g".into(), combat_id: Uuid::new_v4(),
+        bettor_id: "u1".into(), bettor_name: "U1".into(),
+        backed_id: "att".into(), amount: 100,
+        won: None, payout: None,
+    });
+    let bets = svc.list_for_combat(Uuid::new_v4()).await.unwrap();
+    assert_eq!(bets.len(), 1);
+    assert_eq!(bets[0].amount, 100);
+}
+
+#[tokio::test]
+async fn refund_delegates_to_repo_with_guild_id() {
+    let (svc, repo) = make_svc("betting");
+    *repo.refund_summary.lock().unwrap() = RefundSummary { refunded_count: 3, refunded_total: 900 };
+    let combat_id = Uuid::new_v4();
+    let summary = svc.refund(combat_id).await.unwrap();
+    assert_eq!(summary.refunded_count, 3);
+    assert_eq!(summary.refunded_total, 900);
+    let calls = repo.refund_calls.lock().unwrap();
+    assert_eq!(calls[0].0, "g");
+    assert_eq!(calls[0].1, combat_id);
+}
+
+#[tokio::test]
+async fn resolve_with_bets_invokes_apply_resolution() {
+    let (svc, repo) = make_svc("betting");
+    let combat_id = Uuid::new_v4();
+    // Un pari sur l'attaquant pour qu'un payout soit calcule.
+    repo.bets.lock().unwrap().push(CoudeBet {
+        id: Uuid::new_v4(), guild_id: "g".into(), combat_id,
+        bettor_id: "u1".into(), bettor_name: "U1".into(),
+        backed_id: "att".into(), amount: 100,
+        won: None, payout: None,
+    });
+    let _outcome = svc.resolve(combat_id, Some("att".into())).await.unwrap();
+    assert_eq!(repo.apply_calls.lock().unwrap().len(), 1);
+    assert_eq!(repo.apply_calls.lock().unwrap()[0].0, "g");
+}
+
+#[tokio::test]
+async fn refund_propagates_combat_not_found() {
+    let repo = Arc::new(MockBetRepo::new());
+    let combats = Arc::new(MockCombatsUc::failing());
+    let svc = ManageCoudeBetsService::new(repo, combats);
+    assert!(matches!(svc.refund(Uuid::new_v4()).await, Err(DomainError::NotFound(_))));
 }

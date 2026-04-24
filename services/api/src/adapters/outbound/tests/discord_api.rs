@@ -94,3 +94,134 @@ fn discord_member_roundtrip_json() {
     assert_eq!(back.id, "u");
     assert_eq!(back.display_name.as_deref(), Some("Alice"));
 }
+
+// ── Toutes les methodes DiscordApi retournent Internal error avec token vide ──
+//
+// Chaque methode appelle `ensure_configured()` en premier : avec un token vide,
+// elle doit retourner DomainError::Internal sans tenter d'appel HTTP.
+
+use crate::adapters::outbound::DiscordApi;
+
+async fn unconfigured_service() -> DiscordApiService {
+    DiscordApiService::new(String::new())
+}
+
+#[tokio::test]
+async fn list_text_channels_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.list_text_channels("g").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn upload_emoji_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.upload_emoji("g", "name", &[0u8; 10], "image/png").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn ban_user_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.ban_user("g", "u", "reason").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn list_members_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.list_members("g", 100).await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn send_dm_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.send_dm("u", "hello").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn create_role_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.create_role("g", "Role", 0xFF0000, None).await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn edit_role_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.edit_role("g", "r", Some("New"), Some(0), None, None, None).await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn delete_role_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.delete_role("g", "r").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn unban_user_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.unban_user("g", "u").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn remove_timeout_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.remove_timeout("g", "u").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn apply_timeout_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.apply_timeout("g", "u", 600).await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn get_user_guilds_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.get_user_guilds("access_token").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+#[tokio::test]
+async fn get_user_me_unconfigured_returns_internal_error() {
+    let svc = unconfigured_service().await;
+    let err = svc.get_user_me("access_token").await.unwrap_err();
+    assert!(matches!(err, DomainError::Internal(_)));
+}
+
+// ── Sanity checks sur les DTOs et options de serde ──
+
+#[test]
+fn discord_user_with_null_avatar_in_json() {
+    let raw = serde_json::json!({"id": "u", "username": "alice", "avatar": null});
+    let u: DiscordUser = serde_json::from_value(raw).unwrap();
+    assert!(u.avatar.is_none());
+}
+
+#[test]
+fn discord_channel_serializes_roundtrip() {
+    let c = DiscordChannel { id: "c".into(), name: "general".into(), position: 5 };
+    let json = serde_json::to_value(&c).unwrap();
+    let back: DiscordChannel = serde_json::from_value(json).unwrap();
+    assert_eq!(back.position, 5);
+}
+
+#[test]
+fn avatar_url_includes_size_64() {
+    let url = discord_avatar_url("123", Some("hash")).unwrap();
+    assert!(url.contains("size=64"));
+}
+
+#[test]
+fn avatar_url_uses_png_extension() {
+    let url = discord_avatar_url("123", Some("hash")).unwrap();
+    assert!(url.contains(".png?"));
+}

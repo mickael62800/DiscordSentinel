@@ -44,3 +44,64 @@ fn user_note_to_dto_formats_dates_rfc3339() {
     assert_eq!(dto.content, "hi");
     assert_eq!(dto.category, "general");
 }
+
+#[test]
+fn add_note_dto_deserializes_with_default_category() {
+    let dto: AddNoteDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g", "user_id": "u",
+        "author_id": "m", "author_name": "Mod",
+        "content": "note sans category"
+    })).unwrap();
+    assert_eq!(dto.category, "general");
+}
+
+#[test]
+fn add_note_dto_deserializes_with_custom_category() {
+    let dto: AddNoteDto = serde_json::from_value(serde_json::json!({
+        "guild_id": "g", "user_id": "u",
+        "author_id": "m", "author_name": "Mod",
+        "content": "security note",
+        "category": "security"
+    })).unwrap();
+    assert_eq!(dto.category, "security");
+}
+
+#[test]
+fn add_note_dto_preserves_all_fields_into_command() {
+    let dto = AddNoteDto {
+        guild_id: "guild-42".into(),
+        user_id: "user-99".into(),
+        author_id: "mod-7".into(),
+        author_name: "ModName".into(),
+        content: "multiline\ncontent\nwith\nbreaks".into(),
+        category: "watch".into(),
+    };
+    let cmd: AddNoteCommand = dto.into();
+    assert_eq!(cmd.guild_id, "guild-42");
+    assert_eq!(cmd.user_id, "user-99");
+    assert_eq!(cmd.author_id, "mod-7");
+    assert_eq!(cmd.content, "multiline\ncontent\nwith\nbreaks");
+    assert_eq!(cmd.category, "watch");
+}
+
+#[test]
+fn user_note_dto_serializes_with_all_fields() {
+    let now = Utc::now();
+    let note = UserNote {
+        id: Uuid::new_v4(),
+        guild_id: "g1".into(),
+        user_id: "u1".into(),
+        author_id: "a1".into(),
+        author_name: "A1".into(),
+        content: "test".into(),
+        category: "security".into(),
+        created_at: now,
+        updated_at: now,
+    };
+    let dto: UserNoteDto = note.into();
+    let json = serde_json::to_string(&dto).unwrap();
+    assert!(json.contains("\"guild_id\":\"g1\""));
+    assert!(json.contains("\"user_id\":\"u1\""));
+    assert!(json.contains("\"category\":\"security\""));
+    assert!(json.contains("\"content\":\"test\""));
+}

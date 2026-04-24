@@ -121,3 +121,48 @@ async fn subscribe_sans_config_repo_applique_default_3() {
     let res = svc.subscribe("g", "u", "crochet", StealBoostDuration::OneDay).await;
     assert!(res.is_ok());
 }
+
+#[tokio::test]
+async fn list_active_passes_through() {
+    let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
+        actives: vec![mk_boost("crochet")],
+    }));
+    let list = svc.list_active("g", "u").await.unwrap();
+    assert_eq!(list.len(), 1);
+    assert_eq!(list[0].item_key, "crochet");
+}
+
+#[tokio::test]
+async fn price_for_unknown_item_returns_validation_error() {
+    let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
+    let err = svc.price_for("wibble", StealBoostDuration::OneDay).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn subscribe_unknown_item_returns_validation_error() {
+    let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
+    let err = svc.subscribe("g", "u", "wibble", StealBoostDuration::OneDay).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn price_for_all_durations_returns_positive() {
+    let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo { actives: vec![] }));
+    for d in [StealBoostDuration::OneDay, StealBoostDuration::ThreeDays, StealBoostDuration::SevenDays] {
+        let p = svc.price_for("crochet", d).await.unwrap();
+        assert!(p > 0);
+    }
+}
+
+#[tokio::test]
+async fn subscribe_cap_config_invalid_fallback_to_default() {
+    // Config avec valeur non-parseable → fallback au defaut (3).
+    let svc = ManageCoudeStealBoostsService::new(Arc::new(MockRepo {
+        actives: vec![mk_boost("crochet"), mk_boost("marteau")],
+    }))
+    .with_bot_config_repo(Arc::new(MockBotConfigRepo { cap: Some("not_a_number") }));
+    // Default 3 : 2 actifs, ajout OK.
+    let res = svc.subscribe("g", "u", "fumigene", StealBoostDuration::OneDay).await;
+    assert!(res.is_ok());
+}

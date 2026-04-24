@@ -5,6 +5,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
+use crate::adapters::outbound::DiscordApi;
 use crate::domain::entities::{
     apply_conduct_penalty, apply_conduct_regen, ConductConfig, ConductPointsLog, Infraction,
     UserConductPoints, MUTE_AT_ZERO_POINTS_DURATION_MINS,
@@ -24,44 +25,30 @@ pub struct ManageConductService {
     repo: Arc<dyn ConductRepository>,
     infraction_repo: Arc<dyn InfractionRepository>,
     broadcaster: Arc<EventBroadcaster>,
-    discord_bot_token: String,
-    http_client: reqwest::Client,
+    discord_api: Arc<dyn DiscordApi>,
 }
 
 impl ManageConductService {
-    pub fn new(repo: Arc<dyn ConductRepository>, infraction_repo: Arc<dyn InfractionRepository>, broadcaster: Arc<EventBroadcaster>, discord_bot_token: String) -> Self {
-        Self { repo, infraction_repo, broadcaster, discord_bot_token, http_client: reqwest::Client::new() }
+    pub fn new(
+        repo: Arc<dyn ConductRepository>,
+        infraction_repo: Arc<dyn InfractionRepository>,
+        broadcaster: Arc<EventBroadcaster>,
+        discord_api: Arc<dyn DiscordApi>,
+    ) -> Self {
+        Self { repo, infraction_repo, broadcaster, discord_api }
     }
 
-    /// Mute un utilisateur via l'API Discord (timeout 10 minutes)
+    /// Mute un utilisateur via l'API Discord (timeout 10 minutes).
+    /// Les erreurs Discord sont loggees mais n'interrompent pas le flow
+    /// (l'infraction de ban est deja persistee).
     async fn mute_user(&self, guild_id: &str, user_id: &str) {
-        if self.discord_bot_token.is_empty() {
-            tracing::warn!("SENTINEL_DISCORD_TOKEN non configure, mute impossible");
-            return;
-        }
-
-        let timeout_until = Utc::now() + chrono::Duration::minutes(MUTE_AT_ZERO_POINTS_DURATION_MINS);
-        let url = format!("https://discord.com/api/v10/guilds/{}/members/{}", guild_id, user_id);
-
-        match self.http_client
-            .patch(&url)
-            .header("Authorization", format!("Bot {}", self.discord_bot_token))
-            .json(&serde_json::json!({
-                "communication_disabled_until": timeout_until.to_rfc3339(),
-            }))
-            .send()
-            .await
-        {
-            Ok(resp) if resp.status().is_success() => {
+        let duration = (MUTE_AT_ZERO_POINTS_DURATION_MINS * 60) as u64;
+        match self.discord_api.apply_timeout(guild_id, user_id, duration).await {
+            Ok(()) => {
                 tracing::info!(guild_id, user_id, "Utilisateur mute (0 points)");
             }
-            Ok(resp) => {
-                let status = resp.status();
-                let body = resp.text().await.unwrap_or_default();
-                tracing::error!(guild_id, user_id, %status, %body, "Echec mute Discord");
-            }
             Err(e) => {
-                tracing::error!(guild_id, user_id, error = %e, "Erreur connexion Discord pour mute");
+                tracing::error!(guild_id, user_id, error = %e, "Echec mute Discord");
             }
         }
     }

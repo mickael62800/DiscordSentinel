@@ -180,6 +180,43 @@ async fn get_user_dossier_not_found_returns_404() {
     assert!(matches!(err, DomainError::NotFound(_)));
 }
 
+// ── dossier avec donnees ──
+
+struct RichSec;
+#[async_trait]
+impl ManageSecurityUseCase for RichSec {
+    async fn report_event(&self, _: ReportSecurityEventCommand) -> Result<SecurityEvent, DomainError> { unimplemented!() }
+    async fn list_events(&self, _: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> {
+        Ok(vec![
+            SecurityEvent {
+                id: uuid::Uuid::new_v4(), guild_id: "g".into(), event_type: "raid".into(),
+                severity: "high".into(), user_ids: vec!["u1".into()],
+                description: "".into(), created_at: chrono::Utc::now(),
+            },
+            SecurityEvent {
+                id: uuid::Uuid::new_v4(), guild_id: "g".into(), event_type: "raid".into(),
+                severity: "high".into(), user_ids: vec!["other".into()],
+                description: "".into(), created_at: chrono::Utc::now(),
+            },
+        ])
+    }
+    async fn analyze_new_member(&self, _: AnalyzeNewMemberCommand) -> Result<SecurityDecision, DomainError> { unimplemented!() }
+}
+
+#[tokio::test]
+async fn get_user_dossier_filters_security_events_by_user_id() {
+    let r = Arc::new(MockRepo::default());
+    r.users.lock().unwrap().push(sample_watched("u1"));
+    let svc = ManageWatchedUsersService::new(
+        r, Arc::new(StubInf), Arc::new(StubMod), Arc::new(RichSec),
+        Arc::new(StubConduct), Arc::new(StubNotes),
+    );
+    let d = svc.get_user_dossier("g", "u1").await.unwrap();
+    // Seul l'evenement qui contient "u1" dans user_ids doit etre retenu.
+    assert_eq!(d.security_events.len(), 1);
+    assert!(d.security_events[0].user_ids.contains(&"u1".to_string()));
+}
+
 #[tokio::test]
 async fn get_user_dossier_found_returns_empty_dossier() {
     // Repo renvoie le user mais tous les stubs retournent vide -> dossier vide.

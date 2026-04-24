@@ -79,3 +79,58 @@ async fn try_trigger_with_forteresse_high_probability() {
     }
     assert!(any_blocked, "forteresse n'a jamais bloque sur 50 essais (tres improbable)");
 }
+
+#[tokio::test]
+async fn list_active_passes_through() {
+    let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo {
+        actives: vec![mk_protection("coffre_fort"), mk_protection("chien_garde")],
+    }));
+    let list = svc.list_active("g", "u").await.unwrap();
+    assert_eq!(list.len(), 2);
+}
+
+#[tokio::test]
+async fn subscribe_known_item_returns_future_date() {
+    let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo { actives: vec![] }));
+    let expires = svc.subscribe("g", "u", "chien_garde", StealProtectionDuration::SevenDays).await.unwrap();
+    assert!(expires > Utc::now());
+}
+
+#[tokio::test]
+async fn subscribe_unknown_item_returns_validation_error() {
+    let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo { actives: vec![] }));
+    let err = svc.subscribe("g", "u", "wibble", StealProtectionDuration::OneDay).await.unwrap_err();
+    assert!(matches!(err, DomainError::ValidationError(_)));
+}
+
+#[tokio::test]
+async fn price_for_all_durations() {
+    let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo { actives: vec![] }));
+    for duration in [
+        StealProtectionDuration::OneDay,
+        StealProtectionDuration::ThreeDays,
+        StealProtectionDuration::FiveDays,
+        StealProtectionDuration::SevenDays,
+    ] {
+        let p = svc.price_for("chien_garde", duration).await.unwrap();
+        assert!(p > 0);
+    }
+}
+
+#[tokio::test]
+async fn try_trigger_skips_non_active_items() {
+    // Un seul item actif (chien_garde = lowest block chance), les autres
+    // ne sont pas roll meme s'ils sont dans le catalogue.
+    let svc = ManageCoudeStealProtectionsService::new(Arc::new(MockRepo {
+        actives: vec![mk_protection("chien_garde")],
+    }));
+    // Sur 200 iterations, on attend statistiquement qu'au moins 1 echec (miss).
+    let mut misses = 0;
+    for _ in 0..200 {
+        if svc.try_trigger("g", "u").await.unwrap().is_none() {
+            misses += 1;
+        }
+    }
+    // chien_garde a une block_chance < 100%, donc quelques miss attendus.
+    assert!(misses > 0, "chien_garde devrait louper au moins une fois sur 200");
+}

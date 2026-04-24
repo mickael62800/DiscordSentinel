@@ -101,3 +101,44 @@ async fn analyze_image_rejects_invalid_base64() {
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
     assert!(json["error"].as_str().unwrap().contains("Base64"));
 }
+
+struct FlaggedAnalyzeImage;
+#[async_trait]
+impl AnalyzeImageUseCase for FlaggedAnalyzeImage {
+    async fn analyze_image(&self, _: AnalyzeImageCommand) -> Result<ImageAnalysis, DomainError> {
+        Ok(ImageAnalysis {
+            action: Action::Delete,
+            reason: "NSFW detecte".into(),
+            score: 0.95,
+            duration: None,
+            classifications: vec![ImageClassification { label: "nsfw".into(), confidence: 0.95 }],
+        })
+    }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn analyze_image_with_action_broadcasts_infraction() {
+    // Exerce la branche `action != "none"` du handler (broadcast infraction_new).
+    let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
+    state.analyze_image_uc = Arc::new(FlaggedAnalyzeImage);
+    let app = router::build_for_test(state);
+    let data = base64::engine::general_purpose::STANDARD.encode(b"png");
+    let (status, json) = post(app, payload(&data, "image/jpeg")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(json["action"], "delete");
+    assert_eq!(json["reason"], "NSFW detecte");
+    assert_eq!(json["classifications"][0]["label"], "nsfw");
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn analyze_image_accepts_webp_and_gif() {
+    // Couvre plusieurs branches de is_allowed_image_content_type.
+    let mut state = test_helpers::build_test_state(Arc::new(test_helpers::StubVoiceChannels));
+    state.analyze_image_uc = Arc::new(OkAnalyzeImage);
+    let app = router::build_for_test(state);
+    let data = base64::engine::general_purpose::STANDARD.encode(b"x");
+    for ct in ["image/webp", "image/gif", "image/jpeg"] {
+        let (status, _) = post(app.clone(), payload(&data, ct)).await;
+        assert_eq!(status, StatusCode::OK, "content_type {ct} devrait etre accepte");
+    }
+}

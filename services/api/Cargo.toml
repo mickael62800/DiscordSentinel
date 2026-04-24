@@ -507,6 +507,32 @@ path = "tests/integration/middleware_router/http.rs"
 name = "integration_export_service"
 path = "tests/integration/export_service/repo.rs"
 
+# voice_channels application service (crud avec vrai PG repo)
+[[test]]
+name = "integration_voice_channels_service"
+path = "tests/integration/voice_channels_service/repo.rs"
+
+# wallet application service (credit/debit/transfer + tx mode)
+[[test]]
+name = "integration_wallet_service"
+path = "tests/integration/wallet_service/repo.rs"
+
+# stats application service (Redis + PG bootstrap)
+[[test]]
+name = "integration_stats_service"
+path = "tests/integration/stats_service/repo.rs"
+
+# security application service (raid + alt detection avec bans reels)
+[[test]]
+name = "integration_security_service"
+path = "tests/integration/security_service/repo.rs"
+
+# conduct application service (config + points + regen + Discord mute path)
+[[test]]
+name = "integration_conduct_service"
+path = "tests/integration/conduct_service/repo.rs"
+
+
 # dashboard_aggregate (stats, infractions merge, rules)
 [[test]]
 name = "integration_dashboard_aggregate_http"

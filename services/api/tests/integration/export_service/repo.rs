@@ -124,3 +124,57 @@ async fn execute_empty_guild_returns_header_only_csv() {
     assert_eq!(res.row_count, 0);
     assert_eq!(res.data, "id,channel_id,user_id,username,message_id,content,score,action,reason,duration_secs,created_at\n");
 }
+
+// ── Couverture complete : moderation_actions csv + audit_logs json + unknown format pour chaque ──
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_moderation_actions_csv() {
+    let p = pool().await;
+    let svc = ExportService::new(p.clone());
+    let g = fresh_id();
+    seed_moderation_action(&p, &g).await;
+    let res = svc.execute(&g, "moderation_actions", "csv", 100).await.unwrap();
+    assert_eq!(res.row_count, 1);
+    assert!(res.data.starts_with("id,moderator_id,"));
+    assert!(res.data.contains("mute"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_audit_logs_json() {
+    let p = pool().await;
+    let svc = ExportService::new(p.clone());
+    let g = fresh_id();
+    seed_audit_log(&p, &g).await;
+    let res = svc.execute(&g, "audit_logs", "json", 100).await.unwrap();
+    assert_eq!(res.row_count, 1);
+    assert!(res.data.contains("\"event_type\":\"message_deleted\""));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_audit_logs_unknown_format_returns_error() {
+    let p = pool().await;
+    let svc = ExportService::new(p.clone());
+    let g = fresh_id();
+    seed_audit_log(&p, &g).await;
+    let err = svc.execute(&g, "audit_logs", "xml", 100).await.unwrap_err();
+    assert!(format!("{err:?}").contains("format"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_moderation_actions_unknown_format_returns_error() {
+    let p = pool().await;
+    let svc = ExportService::new(p.clone());
+    let g = fresh_id();
+    seed_moderation_action(&p, &g).await;
+    let err = svc.execute(&g, "moderation_actions", "xml", 100).await.unwrap_err();
+    assert!(format!("{err:?}").contains("format"));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn execute_max_rows_clamped_to_50k_cap() {
+    // max_rows > 50_000 est clampe a 50_000. Sans donnees, on verifie juste que
+    // l'appel reussit sans depassement numerique.
+    let svc = ExportService::new(pool().await);
+    let res = svc.execute(&fresh_id(), "infractions", "csv", 1_000_000).await.unwrap();
+    assert_eq!(res.row_count, 0);
+}

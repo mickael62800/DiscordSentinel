@@ -124,3 +124,141 @@ fn real_tokenizer_french_insults() {
     let non_zero = ids.iter().filter(|&&v| v != 0).count();
     assert!(non_zero > 3);
 }
+
+// ── Tests avec un tokenizer minimal écrit dans un fichier temporaire ──
+//
+// Ces tests écrivent un tokenizer.json WordLevel minimal en /tmp pour
+// exercer le chemin "tokenizer charge correctement" sans avoir besoin
+// du gros modele HuggingFace.
+
+fn write_minimal_tokenizer_json(pad_token: &str, pad_id: u32) -> std::path::PathBuf {
+    let dir = std::env::temp_dir();
+    let path = dir.join(format!(
+        "sentinel_test_tokenizer_{}_{}.json",
+        pad_token.replace('<', "a").replace('>', "b").replace('[', "c").replace(']', "d"),
+        uuid::Uuid::new_v4().as_u128() % 1_000_000
+    ));
+    // WordLevel minimal qui se decode avec le crate `tokenizers`.
+    let json = serde_json::json!({
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [
+            {"id": pad_id, "content": pad_token, "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true},
+            {"id": 99, "content": "[UNK]", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true}
+        ],
+        "normalizer": null,
+        "pre_tokenizer": {"type": "Whitespace"},
+        "post_processor": null,
+        "decoder": null,
+        "model": {
+            "type": "WordLevel",
+            "vocab": {
+                "[UNK]": 99_i32,
+                pad_token: pad_id as i32,
+                "hello": 2,
+                "world": 3,
+                "bonjour": 4,
+                "monde": 5
+            },
+            "unk_token": "[UNK]"
+        }
+    });
+    std::fs::write(&path, serde_json::to_string(&json).unwrap())
+        .expect("ecriture tokenizer temp");
+    path
+}
+
+#[test]
+fn minimal_tokenizer_loads_with_pad_detection() {
+    let path = write_minimal_tokenizer_json("<pad>", 1);
+    let tok = TextTokenizer::new(Some(path.to_str().unwrap()), 16);
+    assert!(tok.available());
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn minimal_tokenizer_bracket_pad_variant() {
+    // Teste la branche `[PAD]` du detector pad token.
+    let path = write_minimal_tokenizer_json("[PAD]", 0);
+    let tok = TextTokenizer::new(Some(path.to_str().unwrap()), 16);
+    assert!(tok.available());
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn minimal_tokenizer_tokenize_returns_padded_shape() {
+    let path = write_minimal_tokenizer_json("<pad>", 1);
+    let tok = TextTokenizer::new(Some(path.to_str().unwrap()), 16);
+    let (ids, mask) = tok.tokenize("hello world").unwrap();
+    // Padding fixe a 16 → shape (1, 16)
+    assert_eq!(ids.shape(), &[1, 16]);
+    assert_eq!(mask.shape(), &[1, 16]);
+    // Premier token = "hello" = id 2
+    assert_eq!(ids[[0, 0]], 2);
+    assert_eq!(ids[[0, 1]], 3);
+    // Padding apres : ids = pad_id (1), mask = 0
+    assert_eq!(ids[[0, 15]], 1);
+    assert_eq!(mask[[0, 15]], 0);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn minimal_tokenizer_handles_unknown_words() {
+    let path = write_minimal_tokenizer_json("<pad>", 1);
+    let tok = TextTokenizer::new(Some(path.to_str().unwrap()), 16);
+    let (ids, _mask) = tok.tokenize("wibble wobble").unwrap();
+    // Mots inconnus → UNK token (id 99)
+    assert_eq!(ids[[0, 0]], 99);
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn malformed_tokenizer_file_falls_back_to_unavailable() {
+    // Ecrit du JSON invalide pour un tokenizer
+    let dir = std::env::temp_dir();
+    let path = dir.join(format!("sentinel_malformed_{}.json", uuid::Uuid::new_v4().as_u128() % 1_000_000));
+    std::fs::write(&path, "{not: valid: json}").unwrap();
+    let tok = TextTokenizer::new(Some(path.to_str().unwrap()), 16);
+    // Erreur de parsing → tokenizer = None
+    assert!(!tok.available());
+    let _ = std::fs::remove_file(&path);
+}
+
+#[test]
+fn tokenizer_without_pad_token_uses_default_fallback() {
+    // Tokenizer valide mais sans <pad> ni [PAD] → fallback (0, "[PAD]")
+    let dir = std::env::temp_dir();
+    let path = dir.join(format!("sentinel_no_pad_{}.json", uuid::Uuid::new_v4().as_u128() % 1_000_000));
+    let json = serde_json::json!({
+        "version": "1.0",
+        "truncation": null,
+        "padding": null,
+        "added_tokens": [
+            {"id": 99, "content": "[UNK]", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false, "special": true}
+        ],
+        "normalizer": null,
+        "pre_tokenizer": {"type": "Whitespace"},
+        "post_processor": null,
+        "decoder": null,
+        "model": {
+            "type": "WordLevel",
+            "vocab": {
+                "[UNK]": 99_i32,
+                "hello": 2_i32
+            },
+            "unk_token": "[UNK]"
+        }
+    });
+    std::fs::write(&path, serde_json::to_string(&json).unwrap()).unwrap();
+    let tok = TextTokenizer::new(Some(path.to_str().unwrap()), 8);
+    // Pas de pad token trouve → fallback (0, "[PAD]") utilise en interne.
+    assert!(tok.available());
+    // tokenize fonctionne avec padding au defaut
+    let (ids, mask) = tok.tokenize("hello").unwrap();
+    assert_eq!(ids.shape(), &[1, 8]);
+    // Padding ids = 0 (fallback), mask = 0
+    assert_eq!(ids[[0, 7]], 0);
+    assert_eq!(mask[[0, 7]], 0);
+    let _ = std::fs::remove_file(&path);
+}

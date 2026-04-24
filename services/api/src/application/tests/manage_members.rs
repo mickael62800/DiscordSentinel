@@ -218,3 +218,146 @@ async fn update_member_not_found_returns_404() {
     }).await.unwrap_err();
     assert!(matches!(err, DomainError::NotFound(_)));
 }
+
+#[tokio::test]
+async fn update_member_applies_avatar_and_roles() {
+    let r = Arc::new(MockMemberRepo::default());
+    r.members.lock().unwrap().push(sample_member("g", "u", "X"));
+    let svc = make_service(r.clone());
+    svc.update_member(UpdateMemberCommand {
+        guild_id: "g".into(), user_id: "u".into(),
+        username: None, display_name: None,
+        avatar: Some("https://img/av.png".into()),
+        roles: Some(serde_json::json!(["mod"])),
+    }).await.unwrap();
+    let up = &r.upserts.lock().unwrap()[0];
+    assert_eq!(up.avatar.as_deref(), Some("https://img/av.png"));
+    assert_eq!(up.roles, serde_json::json!(["mod"]));
+    // Unchanged:
+    assert_eq!(up.username, "X");
+}
+
+// ── get_member_summary ──
+
+#[tokio::test]
+async fn get_member_summary_returns_default_shape_for_empty_stubs() {
+    let r = Arc::new(MockMemberRepo::default());
+    r.members.lock().unwrap().push(sample_member("g", "u", "Alice"));
+    let svc = make_service(r);
+    let s = svc.get_member_summary("g", "u").await.unwrap();
+    assert_eq!(s.member.username, "Alice");
+    assert_eq!(s.infractions.total, 0);
+    assert!(s.infractions.recent.is_empty());
+    assert_eq!(s.moderation.total_warns, 0);
+    assert_eq!(s.moderation.total_mutes, 0);
+    assert_eq!(s.moderation.total_bans, 0);
+    // ConductConfig.default_for_guild fournit max_points ; StubConductUc.get_points renvoie 100.
+    assert_eq!(s.conduct.points, 100);
+    assert!(s.conduct.max_points > 0);
+    // StatsUc renvoie None → 0/0/None.
+    assert_eq!(s.stats.message_count, 0);
+    assert_eq!(s.stats.voice_seconds, 0);
+    assert!(s.stats.last_active.is_none());
+}
+
+#[tokio::test]
+async fn get_member_summary_not_found_returns_404() {
+    let svc = make_service(Arc::new(MockMemberRepo::default()));
+    let err = svc.get_member_summary("g", "ghost").await.unwrap_err();
+    assert!(matches!(err, DomainError::NotFound(_)));
+}
+
+// ── get_member_summary avec stubs enrichis (infractions + moderation + stats) ──
+
+struct RichInfUc;
+#[async_trait]
+impl ManageInfractionsUseCase for RichInfUc {
+    async fn list_infractions(&self, g: &str, _: InfractionFilters) -> Result<Vec<Infraction>, DomainError> {
+        let now = chrono::Utc::now();
+        Ok((0..3).map(|i| Infraction {
+            id: uuid::Uuid::new_v4(), guild_id: g.into(),
+            channel_id: "c".into(), user_id: "u".into(),
+            username: "u".into(), message_id: "m".into(),
+            content: format!("msg{i}"),
+            flags: crate::domain::value_objects::DetectionFlags {
+                spam: false, insult: false, link: false, phishing: false,
+            },
+            action: crate::domain::value_objects::Action::Warn,
+            score: 1.0 + i as f64, reason: format!("r{i}"),
+            duration: None,
+            created_at: now,
+        }).collect())
+    }
+    async fn list_all_infractions(&self, _: i64, _: i64) -> Result<Vec<Infraction>, DomainError> { Ok(vec![]) }
+    async fn count_today(&self) -> Result<u64, DomainError> { Ok(0) }
+    async fn find_by_id(&self, _: &str) -> Result<Option<Infraction>, DomainError> { Ok(None) }
+    async fn delete_infraction(&self, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { Ok(0) }
+}
+
+struct RichModUc;
+#[async_trait]
+impl ManageModerationUseCase for RichModUc {
+    async fn log_action(&self, _: LogModerationCommand) -> Result<ModerationAction, DomainError> { unimplemented!() }
+    async fn get_history(&self, g: &str, t: &str) -> Result<UserModerationHistory, DomainError> {
+        let now = chrono::Utc::now();
+        let mk = |kind: &str| ModerationAction {
+            id: uuid::Uuid::new_v4(), guild_id: g.into(),
+            channel_id: "c".into(),
+            target_id: t.into(), target_name: "t".into(),
+            moderator_id: "m".into(), moderator_name: "M".into(),
+            action_type: kind.into(), reason: "r".into(),
+            gravity: None,
+            duration: None, created_at: now,
+        };
+        Ok(UserModerationHistory {
+            target_id: t.into(), target_name: "t".into(),
+            total_warns: 2, total_mutes: 1, total_bans: 0,
+            actions: vec![mk("warn"), mk("warn"), mk("mute")],
+        })
+    }
+    async fn list_bans(&self, _: Option<&str>, _: i64, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+    async fn list_actions(&self, _: Option<&str>, _: i64) -> Result<Vec<ModerationAction>, DomainError> { Ok(vec![]) }
+    async fn delete_bans_for_user(&self, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn delete_action(&self, _: uuid::Uuid) -> Result<bool, DomainError> { Ok(false) }
+}
+
+struct RichStatsUc;
+#[async_trait]
+impl ManageStatsUseCase for RichStatsUc {
+    async fn record_messages(&self, _: RecordMessagesCommand) -> Result<(), DomainError> { Ok(()) }
+    async fn record_voice(&self, _: RecordVoiceCommand) -> Result<(), DomainError> { Ok(()) }
+    async fn get_user_stats(&self, g: &str, u: &str) -> Result<Option<UserStats>, DomainError> {
+        let now = chrono::Utc::now();
+        Ok(Some(UserStats {
+            id: uuid::Uuid::new_v4(),
+            guild_id: g.into(), user_id: u.into(), username: u.into(),
+            message_count: 42, voice_seconds: 3600,
+            updated_at: now,
+        }))
+    }
+    async fn get_guild_overview(&self, _: &str) -> Result<GuildStatsOverview, DomainError> { unimplemented!() }
+    async fn get_leaderboard(&self, _: &str, _: u32) -> Result<Vec<UserStats>, DomainError> { Ok(vec![]) }
+    async fn get_dashboard_stats(&self) -> Result<DashboardStats, DomainError> { unimplemented!() }
+    async fn get_guild_voice_stats(&self, _: &str, _: u32, _: u32) -> Result<GuildVoiceStats, DomainError> { unimplemented!() }
+}
+
+#[tokio::test]
+async fn get_member_summary_counts_moderation_actions_by_type() {
+    let r = Arc::new(MockMemberRepo::default());
+    r.members.lock().unwrap().push(sample_member("g", "u", "Alice"));
+    let svc = ManageMembersService::new(
+        r, Arc::new(RichInfUc), Arc::new(RichModUc),
+        Arc::new(StubConductUc), Arc::new(RichStatsUc),
+    );
+    let s = svc.get_member_summary("g", "u").await.unwrap();
+    assert_eq!(s.moderation.total_warns, 2);
+    assert_eq!(s.moderation.total_mutes, 1);
+    assert_eq!(s.moderation.total_bans, 0);
+    assert_eq!(s.moderation.actions.len(), 3);
+    assert_eq!(s.infractions.total, 3);
+    assert_eq!(s.infractions.recent.len(), 3);
+    assert_eq!(s.stats.message_count, 42);
+    assert_eq!(s.stats.voice_seconds, 3600);
+    assert!(s.stats.last_active.is_some());
+}

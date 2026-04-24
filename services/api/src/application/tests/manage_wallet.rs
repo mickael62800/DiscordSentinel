@@ -179,3 +179,148 @@ async fn credit_rejects_non_positive_amount() {
     assert!(svc.credit("g", "u", 0, "t", "d").await.is_err());
     assert!(svc.credit("g", "u", -1, "t", "d").await.is_err());
 }
+
+#[tokio::test]
+async fn debit_rejects_non_positive_amount() {
+    let repo = Arc::new(MockWalletRepo::new(100));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts);
+
+    assert!(svc.debit("g", "u", 0, "t", "d").await.is_err());
+    assert!(svc.debit("g", "u", -5, "t", "d").await.is_err());
+}
+
+#[tokio::test]
+async fn credit_below_jackpot_threshold_does_not_trigger() {
+    let repo = Arc::new(MockWalletRepo::new(100));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts.clone());
+
+    let m = svc.credit("g", "u", 500, "t", "d").await.unwrap();
+    assert!(m.triggered_taunts.is_empty());
+    // Mock is called regardless, but returns None under 10k.
+    assert_eq!(*taunts.jackpot_calls.lock().unwrap(), 1);
+    assert_eq!(*taunts.last_jackpot_amount.lock().unwrap(), Some(500));
+}
+
+#[tokio::test]
+async fn debit_from_zero_does_not_trigger_bankruptcy() {
+    // previous == 0, so strict transition >0 → 0 not met.
+    let repo = Arc::new(MockWalletRepo::new(100));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo.clone(), taunts.clone());
+
+    // Drain first (triggers one bankruptcy).
+    let _ = svc.debit("g", "u", 100, "t", "d").await.unwrap();
+    let before = *taunts.bankruptcy_calls.lock().unwrap();
+    // Now balance is 0 ; debit of 0 is rejected, so do credit then debit partial.
+    let _ = svc.credit("g", "u", 50, "t", "d").await.unwrap();
+    let _ = svc.debit("g", "u", 20, "t", "d").await.unwrap();
+    assert_eq!(*taunts.bankruptcy_calls.lock().unwrap(), before);
+}
+
+#[tokio::test]
+async fn transfer_rejects_non_positive() {
+    let repo = Arc::new(MockWalletRepo::new(500));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts);
+    assert!(svc.transfer("g", "a", "b", 0, "t", "d").await.is_err());
+    assert!(svc.transfer("g", "a", "b", -5, "t", "d").await.is_err());
+}
+
+#[tokio::test]
+async fn transfer_rejects_self_transfer() {
+    let repo = Arc::new(MockWalletRepo::new(500));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts);
+    let err = svc.transfer("g", "alice", "alice", 100, "t", "d").await.unwrap_err();
+    match err {
+        DomainError::ValidationError(m) => assert!(m.contains("soi-meme")),
+        o => panic!("expected ValidationError, got {:?}", o),
+    }
+}
+
+#[tokio::test]
+async fn transfer_full_balance_triggers_bankruptcy_and_jackpot() {
+    // Sender drains to 0 (bankruptcy), receiver gets big amount (jackpot).
+    let repo = Arc::new(MockWalletRepo::new(15_000));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts.clone());
+    let events = svc.transfer("g", "alice", "bob", 15_000, "t", "d").await.unwrap();
+    // Mock uses shared balance: sender before=15000, after=0. Receiver amount >= 10000 → jackpot.
+    assert_eq!(*taunts.bankruptcy_calls.lock().unwrap(), 1);
+    assert_eq!(*taunts.jackpot_calls.lock().unwrap(), 1);
+    assert_eq!(events.len(), 2);
+}
+
+#[tokio::test]
+async fn transfer_insufficient_balance_propagates_error() {
+    let repo = Arc::new(MockWalletRepo::new(50));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts);
+    assert!(svc.transfer("g", "a", "b", 500, "t", "d").await.is_err());
+}
+
+#[tokio::test]
+async fn get_balance_reads_from_repo() {
+    let repo = Arc::new(MockWalletRepo::new(1234));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts);
+    assert_eq!(svc.get_balance("g", "u").await.unwrap(), 1234);
+}
+
+#[tokio::test]
+async fn post_commit_taunts_emits_bankruptcy_and_jackpot() {
+    use crate::ports::inbound::manage_wallet::TxWalletMutation;
+    let repo = Arc::new(MockWalletRepo::new(0));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts.clone());
+
+    let mutation = TxWalletMutation {
+        new_balance: 0,
+        previous_balance: 100,
+        maybe_bankruptcy: true,
+        maybe_jackpot_amount: Some(20_000),
+    };
+    let events = svc.post_commit_taunts("g", "u", &mutation).await;
+    assert_eq!(events.len(), 2);
+    assert_eq!(*taunts.bankruptcy_calls.lock().unwrap(), 1);
+    assert_eq!(*taunts.jackpot_calls.lock().unwrap(), 1);
+}
+
+#[tokio::test]
+async fn post_commit_taunts_skips_when_flags_unset() {
+    use crate::ports::inbound::manage_wallet::TxWalletMutation;
+    let repo = Arc::new(MockWalletRepo::new(0));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts.clone());
+
+    let mutation = TxWalletMutation {
+        new_balance: 0,
+        previous_balance: 100,
+        maybe_bankruptcy: false,
+        maybe_jackpot_amount: None,
+    };
+    let events = svc.post_commit_taunts("g", "u", &mutation).await;
+    assert!(events.is_empty());
+    assert_eq!(*taunts.bankruptcy_calls.lock().unwrap(), 0);
+    assert_eq!(*taunts.jackpot_calls.lock().unwrap(), 0);
+}
+
+#[tokio::test]
+async fn post_commit_taunts_jackpot_below_threshold_emits_nothing() {
+    use crate::ports::inbound::manage_wallet::TxWalletMutation;
+    let repo = Arc::new(MockWalletRepo::new(0));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo, taunts.clone());
+
+    let mutation = TxWalletMutation {
+        new_balance: 500,
+        previous_balance: 0,
+        maybe_bankruptcy: false,
+        maybe_jackpot_amount: Some(500),
+    };
+    let events = svc.post_commit_taunts("g", "u", &mutation).await;
+    assert!(events.is_empty());
+    assert_eq!(*taunts.jackpot_calls.lock().unwrap(), 1);
+}
