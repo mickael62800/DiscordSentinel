@@ -289,6 +289,14 @@ pub(super) async fn execute_action(
 }
 
 /// Analyse les images attachees a un message via le ai-worker (async).
+///
+/// Lit la config automod-bot pour les cles vision_* (fusionnees depuis l ex
+/// image-bot par la migration 156) :
+///   - vision_max_image_size_mb : taille max d une image traitee (defaut 14 Mo)
+///   - vision_scan_embeds       : analyse aussi les images dans les embeds
+///   - vision_queue_max_retries : nombre de retries sur echec de submission
+///   - vision_auto_delete_nsfw  : force delete si la raison contient "nsfw"
+///   - vision_auto_delete_illicit : force delete si la raison contient "illicit"
 pub(super) async fn analyze_message_images(
     ctx: &Context,
     msg: &Message,
@@ -296,7 +304,32 @@ pub(super) async fn analyze_message_images(
     _log_channel_id: u64,
     colors: &EmbedColors,
 ) {
-    let image_urls: Vec<String> = msg
+    let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
+
+    // Lecture de la config automod-bot (ex-image-bot fusionne par la 156).
+    let config = sentinel_shared::discord_helpers::guild_config_or_default(
+        ctx, &guild_id, crate::modules::automod::MODULE_BOT_NAME,
+    ).await;
+
+    let max_image_size_mb = sentinel_shared::api_client::BaseApiClient::config_u64(
+        &config, "vision_max_image_size_mb", 14,
+    );
+    let max_image_bytes = (max_image_size_mb as usize) * 1024 * 1024;
+    let scan_embeds = sentinel_shared::api_client::BaseApiClient::config_bool(
+        &config, "vision_scan_embeds", true,
+    );
+    let queue_max_retries = sentinel_shared::api_client::BaseApiClient::config_u64(
+        &config, "vision_queue_max_retries", 3,
+    ) as usize;
+    let auto_delete_nsfw = sentinel_shared::api_client::BaseApiClient::config_bool(
+        &config, "vision_auto_delete_nsfw", false,
+    );
+    let auto_delete_illicit = sentinel_shared::api_client::BaseApiClient::config_bool(
+        &config, "vision_auto_delete_illicit", true,
+    );
+
+    // Collecte des URLs : pieces jointes + (optionnel) images dans embeds.
+    let mut image_urls: Vec<String> = msg
         .attachments
         .iter()
         .filter(|a| {
@@ -308,6 +341,17 @@ pub(super) async fn analyze_message_images(
         .map(|a| a.url.clone())
         .collect();
 
+    if scan_embeds {
+        for embed in &msg.embeds {
+            if let Some(img) = &embed.image {
+                image_urls.push(img.url.clone());
+            }
+            if let Some(thumb) = &embed.thumbnail {
+                image_urls.push(thumb.url.clone());
+            }
+        }
+    }
+
     if image_urls.is_empty() {
         return;
     }
@@ -317,7 +361,6 @@ pub(super) async fn analyze_message_images(
         return;
     };
 
-    let guild_id = msg.guild_id.map(|g| g.to_string()).unwrap_or_default();
     let http_client = reqwest::Client::new();
     let api_url = base.base_url().to_string();
 
@@ -332,11 +375,13 @@ pub(super) async fn analyze_message_images(
             Err(e) => { warn!(error = %e, url, "Echec download image"); continue; }
         };
 
-        if bytes.len() > 14 * 1024 * 1024 {
+        if bytes.len() > max_image_bytes {
+            debug!(size_bytes = bytes.len(), max_bytes = max_image_bytes, url, "Image > vision_max_image_size_mb, skip");
             continue;
         }
 
         // 2. Soumettre un job AI via l'API (non-bloquant, queue DB).
+        //    Retry jusqu a queue_max_retries fois en cas d echec reseau.
         let payload = serde_json::json!({
             "guild_id": guild_id,
             "channel_id": msg.channel_id.to_string(),
@@ -346,33 +391,40 @@ pub(super) async fn analyze_message_images(
             "image_base64": base64_encode(&bytes),
         });
 
-        let submit_resp = match http_client
-            .post(format!("{api_url}/api/ai/jobs"))
-            .json(&serde_json::json!({
-                "guild_id": guild_id,
-                "job_type": "analyze_image",
-                "input_payload": payload,
-            }))
-            .send()
-            .await
-        {
-            Ok(r) => r,
-            Err(e) => { warn!(error = %e, "Echec soumission job AI image"); continue; }
-        };
+        let mut job_id: Option<String> = None;
+        for attempt in 0..=queue_max_retries {
+            let submit_resp = match http_client
+                .post(format!("{api_url}/api/ai/jobs"))
+                .json(&serde_json::json!({
+                    "guild_id": guild_id,
+                    "job_type": "analyze_image",
+                    "input_payload": payload,
+                }))
+                .send()
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    warn!(error = %e, attempt, "Echec soumission job AI image");
+                    continue;
+                }
+            };
 
-        if !submit_resp.status().is_success() {
-            warn!(status = %submit_resp.status(), "Job AI image refuse par l'API");
-            continue;
+            if submit_resp.status().is_success() {
+                if let Ok(v) = submit_resp.json::<serde_json::Value>().await {
+                    if let Some(id) = v.get("job_id").and_then(|x| x.as_str()) {
+                        job_id = Some(id.to_string());
+                        break;
+                    }
+                }
+            } else {
+                warn!(status = %submit_resp.status(), attempt, "Job AI image refuse par l'API");
+            }
         }
 
-        let job_resp: serde_json::Value = match submit_resp.json().await {
-            Ok(v) => v,
-            Err(e) => { warn!(error = %e, "Echec parse reponse job AI"); continue; }
-        };
-
-        let job_id = match job_resp.get("job_id").and_then(|v| v.as_str()) {
-            Some(id) => id.to_string(),
-            None => { warn!("job_id absent de la reponse"); continue; }
+        let Some(job_id) = job_id else {
+            warn!("Job AI image abandonne apres {queue_max_retries} retries");
+            continue;
         };
 
         // 3. Attendre le resultat via Redis (pub/sub avec timeout 30s).
@@ -388,12 +440,27 @@ pub(super) async fn analyze_message_images(
         let action_str = result_json.get("action").and_then(|v| v.as_str()).unwrap_or("none");
         let reason = result_json.get("reason").and_then(|v| v.as_str()).unwrap_or("Image detectee");
 
-        let action = match action_str {
+        let api_action = match action_str {
             "warn" => Action::Warn,
             "delete" => Action::Delete,
             "mute" => Action::Mute,
             "ban" => Action::Ban,
             _ => Action::None,
+        };
+
+        // Override : si la raison signale NSFW / illicit ET le toggle correspondant
+        // est ON, force la suppression meme si l action API retournee etait moins
+        // severe. Garde les actions plus severes (mute/ban) telles quelles.
+        let reason_lower = reason.to_lowercase();
+        let action = if (auto_delete_nsfw && reason_lower.contains("nsfw"))
+            || (auto_delete_illicit && reason_lower.contains("illicit"))
+        {
+            match api_action {
+                Action::None | Action::Warn => Action::Delete,
+                other => other,
+            }
+        } else {
+            api_action
         };
 
         if action == Action::None {

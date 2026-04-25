@@ -56,7 +56,33 @@ const numberFields = computed(() => configFields.value.filter((f) => f.type === 
 const channelFields = computed(() => configFields.value.filter((f) => f.type === "channel"));
 const roleFields = computed(() => configFields.value.filter((f) => f.type === "role"));
 const enumFields = computed(() => configFields.value.filter((f) => f.type === "enum"));
-const textFields = computed(() => configFields.value.filter((f) => f.type === "text"));
+
+/// Detecte les inputs textarea (multi-ligne) : par convention les cles
+/// finissant par "_message" sont rendues en <textarea> dans ConfigFieldRow.
+/// On les isole pour ne pas creer de decalage visuel avec les single-line.
+function isMultilineKey(k: string): boolean {
+  return k.endsWith("_message");
+}
+const longTextFields = computed(() =>
+  configFields.value.filter((f) => f.type === "text" && isMultilineKey(f.key)),
+);
+const shortTextFields = computed(() =>
+  configFields.value.filter((f) => f.type === "text" && !isMultilineKey(f.key)),
+);
+
+/// Sections affichees (apres filtrage des sections vides). Chaque section
+/// porte un flag `wide` pour les textareas qui prennent toute la largeur.
+const visibleSections = computed(() => {
+  const all = [
+    { title: "Valeurs", fields: numberFields.value, wide: false },
+    { title: "Choix", fields: enumFields.value, wide: false },
+    { title: "Salons", fields: channelFields.value, wide: false },
+    { title: "Roles", fields: roleFields.value, wide: false },
+    { title: "Textes courts", fields: shortTextFields.value, wide: false },
+    { title: "Textes longs", fields: longTextFields.value, wide: true },
+  ];
+  return all.filter((s) => s.fields.length > 0);
+});
 
 
 const allTogglesOn = computed(() =>
@@ -302,7 +328,7 @@ watch(selectedComponent, loadFormValues);
                 :class="{ modified: isFieldModified(field.key) }"
               >
                 <div class="toggle-card-header">
-                  <span class="toggle-card-label">{{ field.label }}</span>
+                  <span class="toggle-card-label" :title="field.label">{{ field.label }}</span>
                   <span v-if="field.description" class="tooltip-wrap">
                     <span class="info-icon">i</span>
                     <span class="tooltip-text">{{ field.description }}</span>
@@ -322,20 +348,25 @@ watch(selectedComponent, loadFormValues);
             </div>
           </div>
 
-          <!-- Sections non-boolean : Valeurs / Choix / Salons / Roles / Texte
-               Chaque section affiche ses champs en grille 2 colonnes
-               (input a gauche + description a droite). -->
-          <template
-            v-for="section in [
-              { title: 'Valeurs', fields: numberFields },
-              { title: 'Choix', fields: enumFields },
-              { title: 'Salons', fields: channelFields },
-              { title: 'Roles', fields: roleFields },
-              { title: 'Texte & Listes', fields: textFields },
-            ]"
-            :key="section.title"
-          >
-            <div v-if="section.fields.length > 0" class="inputs-section">
+          <!-- Sections non-boolean : flex flow horizontal pour eviter les
+               trous quand une section ne contient qu'un seul input.
+               Les textareas (multi-ligne) sont isolees pour ne pas creer
+               de decalage avec les single-line. -->
+          <div class="sections-flow">
+            <div
+              v-for="section in visibleSections"
+              :key="section.title"
+              class="inputs-section"
+              :class="[
+                section.fields.length >= 4 || section.wide ? 'section-full' : 'section-auto',
+                section.wide ? 'section-textareas' : '',
+              ]"
+              :style="
+                !section.wide && section.fields.length < 4
+                  ? { flexGrow: section.fields.length }
+                  : undefined
+              "
+            >
               <h3 class="section-title">{{ section.title }}</h3>
               <div class="fields-grid-2col">
                 <ConfigFieldRow
@@ -351,7 +382,7 @@ watch(selectedComponent, loadFormValues);
                 />
               </div>
             </div>
-          </template>
+          </div>
 
           <div class="form-actions">
             <button
@@ -630,6 +661,50 @@ watch(selectedComponent, loadFormValues);
   .fields-grid-2col {
     grid-template-columns: repeat(6, 1fr);
   }
+}
+
+/* Conteneur flex qui laisse les sections flotter cote a cote quand elles
+   sont petites (1-3 inputs). Evite les trous a droite quand une section
+   ne contient qu'un seul input. */
+.sections-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.inputs-section.section-full {
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.inputs-section.section-auto {
+  /* flex-grow defini inline (egal au nombre de champs) pour que les sections
+     prennent une largeur proportionnelle a leur contenu. Une section avec 2
+     inputs = 2x plus large qu'une section avec 1 input -> les inputs ont
+     tous la meme largeur visuelle. */
+  flex: 1 1 360px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* Section dediee aux textareas : grid plus large par cellule pour que les
+   textareas aient de la place pour respirer (3 max par ligne en 4K). */
+.inputs-section.section-textareas .fields-grid-2col {
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+}
+
+@media (min-width: 1900px) {
+  .inputs-section.section-textareas .fields-grid-2col {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Pour les .section-auto, la grid interne s'auto-adapte selon la largeur
+   du flex item : si la section est large (beaucoup de champs -> grand
+   flex-grow), 2-3 inputs se mettent cote a cote. Si etroite, 1 par ligne. */
+.inputs-section.section-auto .fields-grid-2col {
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
 }
 
 /* Sous-sections (regroupement par prefixe de cle) */
@@ -918,6 +993,19 @@ watch(selectedComponent, loadFormValues);
 .inputs-section {
   margin-top: 24px;
   margin-bottom: 16px;
+  /* Flex column pour que la grille interne puisse fill la hauteur de la
+     section (qui est elle-meme stretch par .sections-flow). Sans ca, une
+     section avec 1 seul input court ne s aligne pas en bas avec ses voisines
+     plus hautes. */
+  display: flex;
+  flex-direction: column;
+}
+
+.inputs-section .fields-grid-2col {
+  /* Prend toute la hauteur restante apres le titre h3 -> les cellules a
+     l interieur (qui ont height: 100%) se stretch et leurs inputs (avec
+     margin-top: auto) collent en bas. */
+  flex: 1;
 }
 
 .inputs-section + .inputs-section {
@@ -944,9 +1032,16 @@ watch(selectedComponent, loadFormValues);
 
 .toggles-grid {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
+  /* Auto-fit en dessous du 4K, force 14 cols en >= 1900px (4K). */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
   margin-top: 8px;
+}
+
+@media (min-width: 1900px) {
+  .toggles-grid {
+    grid-template-columns: repeat(10, 1fr);
+  }
 }
 
 .toggle-card {
@@ -975,6 +1070,13 @@ watch(selectedComponent, loadFormValues);
   font-weight: 600;
   color: var(--text-primary);
   line-height: 1.3;
+  /* Force le label sur 1 ligne max. Si trop long -> ellipsis ; le tooltip
+     natif (attribut title) permet de voir le label complet au survol. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .modified-dot {
