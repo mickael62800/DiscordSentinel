@@ -1,31 +1,169 @@
-//! Handlers des clics sur le panel slot (Tirer / Daily).
+//! Handlers des boutons slot.
+//!
+//! - `handle_open_machine` (panel global) : cree ou retrouve le salon perso
+//!   du user et y poste un message d accueil avec les boutons d action.
+//! - `handle_spin_in_channel` / `handle_daily_in_channel` : dans le salon
+//!   perso, lance un spin (avec animation suspense 6s) et re-poste un nouveau
+//!   message avec les boutons d action.
+//! - `handle_close_channel` : ferme et supprime le salon perso.
 
 use std::sync::Arc;
+use std::time::Duration;
 
 use serenity::all::{
-    ComponentInteraction, Context, CreateInteractionResponse, CreateInteractionResponseMessage,
+    ButtonStyle, ChannelType, ComponentInteraction, Context, CreateActionRow, CreateButton,
+    CreateChannel, CreateInteractionResponse, CreateInteractionResponseMessage, CreateMessage,
+    PermissionOverwrite, PermissionOverwriteType,
 };
-use tracing::warn;
+use serenity::builder::EditMessage;
+use serenity::model::id::{ChannelId, RoleId, UserId};
+use serenity::model::permissions::Permissions;
+use tracing::{error, info, warn};
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use super::api_client::{self, DailyRequest, SpinRequest};
+use super::animation::{frame_symbols, FRAME_DELAY_MS, TOTAL_REVEAL_FRAMES};
+use super::api_client::{self, DailyRequest, SpinRequest, SpinResponse};
 use super::embeds;
+use super::setup;
+use super::SlotChannelManagerKey;
 
-/// Mise par defaut quand le user clique "Tirer" sans choisir de mise.
-/// Lue depuis la config (cle "default_bet"), fallback 50.
 const FALLBACK_DEFAULT_BET: i64 = 50;
 
-pub async fn handle_spin(ctx: &Context, component: &ComponentInteraction) {
+// ══════════════════════════════════════════════════════════
+// 1. Click sur le panel global "Ouvrir ma machine"
+// ══════════════════════════════════════════════════════════
+
+pub async fn handle_open_machine(ctx: &Context, component: &ComponentInteraction) {
     let guild_id = match component.guild_id {
-        Some(id) => id.to_string(),
+        Some(g) => g,
         None => return,
     };
-    let user_id = component.user.id.to_string();
+    let user_id = component.user.id;
+
+    // Verifie si l user a deja un salon ouvert (et qu il existe encore Discord-side).
+    let existing = {
+        let data = ctx.data.read().await;
+        data.get::<SlotChannelManagerKey>()
+            .and_then(|mgr| mgr.get(user_id))
+    };
+    if let Some(active) = existing {
+        let still_exists = active.channel_id.to_channel(&ctx.http).await.is_ok();
+        if still_exists {
+            // Redirige vers le salon existant.
+            let resp = CreateInteractionResponse::Message(
+                CreateInteractionResponseMessage::new()
+                    .content(format!(
+                        "Tu as deja un salon ouvert : <#{}>",
+                        active.channel_id
+                    ))
+                    .ephemeral(true),
+            );
+            let _ = component.create_response(&ctx.http, resp).await;
+            return;
+        }
+        // Salon orphelin : purge.
+        let data = ctx.data.read().await;
+        if let Some(mgr) = data.get::<SlotChannelManagerKey>() {
+            mgr.remove(user_id);
+        }
+    }
+
+    // Reponse immediate ephemerale.
+    let resp = CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .content("\u{1f3b0} Creation de ton salon prive...")
+            .ephemeral(true),
+    );
+    if let Err(e) = component.create_response(&ctx.http, resp).await {
+        warn!(error = %e, "Echec defer panel open");
+        return;
+    }
+
+    let everyone_role = RoleId::new(guild_id.get());
+    let channel_name = format!(
+        "slot-{}",
+        component.user.name.chars().take(15).collect::<String>().to_lowercase()
+    );
+
+    let channel = match guild_id
+        .create_channel(
+            &ctx.http,
+            CreateChannel::new(&channel_name)
+                .kind(ChannelType::Text)
+                .topic(format!("[slot:{}]", user_id))
+                .permissions(vec![
+                    PermissionOverwrite {
+                        allow: Permissions::empty(),
+                        deny: Permissions::VIEW_CHANNEL,
+                        kind: PermissionOverwriteType::Role(everyone_role),
+                    },
+                    PermissionOverwrite {
+                        allow: Permissions::VIEW_CHANNEL
+                            | Permissions::SEND_MESSAGES
+                            | Permissions::READ_MESSAGE_HISTORY,
+                        deny: Permissions::empty(),
+                        kind: PermissionOverwriteType::Member(user_id),
+                    },
+                ]),
+        )
+        .await
+    {
+        Ok(ch) => ch,
+        Err(e) => {
+            error!(error = %e, "Echec creation salon slot");
+            let edit = serenity::builder::EditInteractionResponse::new()
+                .content("Erreur lors de la creation du salon.");
+            let _ = component.edit_response(&ctx.http, edit).await;
+            return;
+        }
+    };
+
+    // Enregistre le salon.
+    {
+        let data = ctx.data.read().await;
+        if let Some(mgr) = data.get::<SlotChannelManagerKey>() {
+            mgr.register(user_id, channel.id, guild_id);
+        }
+    }
+
+    // Message d accueil + boutons d action.
+    let welcome = CreateMessage::new()
+        .embed(
+            serenity::all::CreateEmbed::new()
+                .title(format!("\u{1f3b0} Salut <@{}> !", user_id))
+                .description("Bienvenue dans ta machine a sous personnelle.\n\nClique sur **Tirer** pour lancer un spin, **Daily Bonus** pour ton spin gratuit du jour, ou **Fermer** pour quitter.")
+                .color(0xf1c40f),
+        )
+        .components(action_buttons_row());
+
+    if let Err(e) = channel.id.send_message(&ctx.http, welcome).await {
+        warn!(error = %e, "Echec envoi message accueil slot");
+    }
+
+    // Met a jour la reponse ephemerale.
+    let edit = serenity::builder::EditInteractionResponse::new()
+        .content(format!("Ton salon est pret : <#{}>", channel.id));
+    let _ = component.edit_response(&ctx.http, edit).await;
+
+    info!(channel = %channel.id, user = %user_id, "Salon slot cree");
+}
+
+// ══════════════════════════════════════════════════════════
+// 2. Spin (depuis le salon perso) — avec animation suspense
+// ══════════════════════════════════════════════════════════
+
+pub async fn handle_spin_in_channel(ctx: &Context, component: &ComponentInteraction) {
+    let guild_id = match component.guild_id {
+        Some(g) => g.to_string(),
+        None => return,
+    };
+    let user_id = component.user.id;
     let username = component.user.name.clone();
 
-    // Defer ephemeral pour pouvoir prendre du temps (round-trip API).
+    // Defer ephemeral pour acquitter le clic ; le vrai resultat arrive via
+    // un nouveau message non-ephemeral dans le salon.
     if let Err(e) = component
         .create_response(
             &ctx.http,
@@ -35,41 +173,54 @@ pub async fn handle_spin(ctx: &Context, component: &ComponentInteraction) {
         )
         .await
     {
-        warn!(error = %e, "Echec defer slot_spin");
+        warn!(error = %e, "Echec defer spin in channel");
         return;
     }
 
     let base = match get_api_client(ctx).await {
         Some(c) => c,
-        None => return,
+        None => {
+            edit_ephemeral_error(ctx, component, "API indisponible").await;
+            return;
+        }
     };
 
     let mise = read_default_bet(&base, &guild_id).await;
-
-    let req = SpinRequest { user_id, username: username.clone(), mise };
+    let req = SpinRequest {
+        user_id: user_id.to_string(),
+        username: username.clone(),
+        mise,
+    };
 
     let response = match api_client::spin(&base, &guild_id, &req).await {
         Ok(r) => r,
         Err(e) => {
-            let msg = humanize_api_error(&e);
-            edit_with_error(ctx, component, &msg).await;
+            edit_ephemeral_error(ctx, component, &humanize_api_error(&e)).await;
             return;
         }
     };
 
-    let embed = embeds::build_spin_result_embed(&response, &username);
-    let edit = serenity::builder::EditInteractionResponse::new().embed(embed);
-    if let Err(e) = component.edit_response(&ctx.http, edit).await {
-        warn!(error = %e, "Echec edit reponse spin");
-    }
+    // Touch activity tracker.
+    touch_activity(ctx, user_id).await;
+
+    // Lance l animation dans le salon perso.
+    play_spin_in_channel(ctx, component.channel_id, &response, &username).await;
+
+    // Acquitte le clic ephemeral.
+    let edit = serenity::builder::EditInteractionResponse::new().content("Spin lance !");
+    let _ = component.edit_response(&ctx.http, edit).await;
 }
 
-pub async fn handle_daily(ctx: &Context, component: &ComponentInteraction) {
+// ══════════════════════════════════════════════════════════
+// 3. Daily bonus (depuis le salon perso) — avec animation
+// ══════════════════════════════════════════════════════════
+
+pub async fn handle_daily_in_channel(ctx: &Context, component: &ComponentInteraction) {
     let guild_id = match component.guild_id {
-        Some(id) => id.to_string(),
+        Some(g) => g.to_string(),
         None => return,
     };
-    let user_id = component.user.id.to_string();
+    let user_id = component.user.id;
     let username = component.user.name.clone();
 
     if let Err(e) = component
@@ -81,32 +232,194 @@ pub async fn handle_daily(ctx: &Context, component: &ComponentInteraction) {
         )
         .await
     {
-        warn!(error = %e, "Echec defer slot_daily");
+        warn!(error = %e, "Echec defer daily in channel");
         return;
     }
 
     let base = match get_api_client(ctx).await {
         Some(c) => c,
-        None => return,
-    };
-
-    let req = DailyRequest { user_id, username: username.clone() };
-
-    let response = match api_client::daily(&base, &guild_id, &req).await {
-        Ok(r) => r,
-        Err(e) => {
-            let msg = humanize_api_error(&e);
-            edit_with_error(ctx, component, &msg).await;
+        None => {
+            edit_ephemeral_error(ctx, component, "API indisponible").await;
             return;
         }
     };
 
-    let embed = embeds::build_spin_result_embed(&response, &username);
-    let edit = serenity::builder::EditInteractionResponse::new().embed(embed);
-    if let Err(e) = component.edit_response(&ctx.http, edit).await {
-        warn!(error = %e, "Echec edit reponse daily");
-    }
+    let req = DailyRequest {
+        user_id: user_id.to_string(),
+        username: username.clone(),
+    };
+    let response = match api_client::daily(&base, &guild_id, &req).await {
+        Ok(r) => r,
+        Err(e) => {
+            edit_ephemeral_error(ctx, component, &humanize_api_error(&e)).await;
+            return;
+        }
+    };
+
+    touch_activity(ctx, user_id).await;
+    play_spin_in_channel(ctx, component.channel_id, &response, &username).await;
+
+    let edit = serenity::builder::EditInteractionResponse::new().content("Daily lance !");
+    let _ = component.edit_response(&ctx.http, edit).await;
 }
+
+// ══════════════════════════════════════════════════════════
+// 4. Fermer le salon
+// ══════════════════════════════════════════════════════════
+
+pub async fn handle_close_channel(ctx: &Context, component: &ComponentInteraction) {
+    let user_id = component.user.id;
+    let channel_id = component.channel_id;
+
+    // Verifie que le user qui clique est bien l owner du salon.
+    let owner_id = {
+        let data = ctx.data.read().await;
+        data.get::<SlotChannelManagerKey>()
+            .and_then(|mgr| mgr.find_by_channel(channel_id))
+            .map(|(uid, _)| uid)
+    };
+
+    let is_owner = owner_id == Some(user_id);
+    let is_admin = component
+        .member
+        .as_ref()
+        .and_then(|m| m.permissions)
+        .map(|p| p.contains(Permissions::MANAGE_GUILD) || p.contains(Permissions::ADMINISTRATOR))
+        .unwrap_or(false);
+
+    if !is_owner && !is_admin {
+        let resp = CreateInteractionResponse::Message(
+            CreateInteractionResponseMessage::new()
+                .content("Seul le proprietaire du salon peut le fermer.")
+                .ephemeral(true),
+        );
+        let _ = component.create_response(&ctx.http, resp).await;
+        return;
+    }
+
+    // Defer ephemeral.
+    if let Err(e) = component
+        .create_response(
+            &ctx.http,
+            CreateInteractionResponse::Defer(
+                CreateInteractionResponseMessage::new().ephemeral(true),
+            ),
+        )
+        .await
+    {
+        warn!(error = %e, "Echec defer close");
+        return;
+    }
+
+    // Retire du tracker.
+    if let Some(uid) = owner_id {
+        let data = ctx.data.read().await;
+        if let Some(mgr) = data.get::<SlotChannelManagerKey>() {
+            mgr.remove(uid);
+        }
+    }
+
+    // Supprime le salon Discord.
+    if let Err(e) = channel_id.delete(&ctx.http).await {
+        warn!(error = %e, channel = %channel_id, "Echec suppression salon slot");
+    }
+
+    info!(channel = %channel_id, user = %user_id, "Salon slot ferme");
+}
+
+// ══════════════════════════════════════════════════════════
+// Animation : lance les 4 frames + re-poste les boutons d action
+// ══════════════════════════════════════════════════════════
+
+async fn play_spin_in_channel(
+    ctx: &Context,
+    channel_id: ChannelId,
+    response: &SpinResponse,
+    username: &str,
+) {
+    // Sanity : on s attend a 3 symboles. Si l API en renvoie autre chose,
+    // on affiche direct le resultat sans animation.
+    let final_syms: [String; 3] = match response.symbols.as_slice() {
+        [a, b, c] => [a.clone(), b.clone(), c.clone()],
+        _ => {
+            let _ = channel_id
+                .send_message(&ctx.http, build_result_message(response, username))
+                .await;
+            return;
+        }
+    };
+
+    // Frame 0 : tout spinning.
+    let initial_frame = frame_symbols(&final_syms, 0);
+    let mut sent = match channel_id
+        .send_message(
+            &ctx.http,
+            CreateMessage::new().embed(embeds::build_spinning_embed(&initial_frame)),
+        )
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            warn!(error = %e, "Echec envoi frame 0 slot");
+            return;
+        }
+    };
+
+    // Frames 1..=TOTAL_REVEAL_FRAMES : revele progressif.
+    for i in 1..=TOTAL_REVEAL_FRAMES {
+        tokio::time::sleep(Duration::from_millis(FRAME_DELAY_MS)).await;
+
+        let edit = if i == TOTAL_REVEAL_FRAMES {
+            // Frame finale : remplace par l embed resultat complet.
+            EditMessage::new().embed(embeds::build_spin_result_embed(response, username))
+        } else {
+            let f = frame_symbols(&final_syms, i);
+            EditMessage::new().embed(embeds::build_spinning_embed(&f))
+        };
+
+        if let Err(e) = sent.edit(&ctx.http, edit).await {
+            warn!(error = %e, frame = i, "Echec edit frame slot");
+            return;
+        }
+    }
+
+    // Re-poste les boutons d action en bas.
+    let _ = channel_id
+        .send_message(
+            &ctx.http,
+            CreateMessage::new()
+                .content("\u{1f3b0} Pret pour le prochain spin ?")
+                .components(action_buttons_row()),
+        )
+        .await;
+}
+
+fn build_result_message(response: &SpinResponse, username: &str) -> CreateMessage {
+    CreateMessage::new()
+        .embed(embeds::build_spin_result_embed(response, username))
+        .components(action_buttons_row())
+}
+
+/// Row de 3 boutons : Tirer / Daily / Fermer.
+pub(super) fn action_buttons_row() -> Vec<CreateActionRow> {
+    let spin = CreateButton::new(setup::CHANNEL_SPIN_ID)
+        .label("Tirer")
+        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f3b0}".into()))
+        .style(ButtonStyle::Success);
+    let daily = CreateButton::new(setup::CHANNEL_DAILY_ID)
+        .label("Daily Bonus")
+        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f381}".into()))
+        .style(ButtonStyle::Primary);
+    let close = CreateButton::new(setup::CHANNEL_CLOSE_ID)
+        .label("Fermer")
+        .emoji(serenity::model::channel::ReactionType::Unicode("\u{274c}".into()))
+        .style(ButtonStyle::Danger);
+    vec![CreateActionRow::Buttons(vec![spin, daily, close])]
+}
+
+// ══════════════════════════════════════════════════════════
+// Helpers
+// ══════════════════════════════════════════════════════════
 
 async fn get_api_client(ctx: &Context) -> Option<Arc<BaseApiClient>> {
     let data = ctx.data.read().await;
@@ -121,19 +434,23 @@ async fn read_default_bet(base: &BaseApiClient, guild_id: &str) -> i64 {
         .unwrap_or(FALLBACK_DEFAULT_BET)
 }
 
-async fn edit_with_error(ctx: &Context, component: &ComponentInteraction, message: &str) {
-    let embed = embeds::build_error_embed(message);
-    let edit = serenity::builder::EditInteractionResponse::new().embed(embed);
+async fn touch_activity(ctx: &Context, user_id: UserId) {
+    let data = ctx.data.read().await;
+    if let Some(mgr) = data.get::<SlotChannelManagerKey>() {
+        mgr.touch(user_id);
+    }
+}
+
+async fn edit_ephemeral_error(ctx: &Context, component: &ComponentInteraction, message: &str) {
+    let edit = serenity::builder::EditInteractionResponse::new()
+        .embed(embeds::build_error_embed(message));
     if let Err(e) = component.edit_response(&ctx.http, edit).await {
         warn!(error = %e, "Echec edit error response slot");
     }
 }
 
-/// Convertit une erreur de l API en message lisible pour l utilisateur.
-/// Les ValidationError remontent avec un "ValidationError(...)" qu on nettoie.
+/// Convertit une erreur de l API en message lisible. Tests dans tests/buttons.rs.
 pub(crate) fn humanize_api_error(raw: &str) -> String {
-    // L API serialise DomainError::ValidationError(msg) en HTTP 400 avec body
-    // contenant le msg. BaseApiClient le rebalance dans la chaine d erreur.
     if let Some(start) = raw.find("Cooldown") {
         return raw[start..].split('"').next().unwrap_or(raw).to_string();
     }
@@ -156,51 +473,6 @@ pub(crate) fn humanize_api_error(raw: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
+#[path = "tests/buttons.rs"]
+mod tests;
 
-    #[test]
-    fn humanizes_cooldown_error() {
-        let raw = r#"Erreur API 400 POST /api/slot/g/spin: {"error":"Cooldown actif : encore 3 secondes"}"#;
-        let msg = humanize_api_error(raw);
-        assert!(msg.contains("Cooldown"));
-        assert!(msg.contains("3 secondes"));
-    }
-
-    #[test]
-    fn humanizes_mise_out_of_range() {
-        let raw = r#"Erreur API 400: {"error":"Mise hors borne (autorise : 10 - 1000)"}"#;
-        let msg = humanize_api_error(raw);
-        assert!(msg.contains("Mise hors borne"));
-        assert!(msg.contains("10"));
-        assert!(msg.contains("1000"));
-    }
-
-    #[test]
-    fn humanizes_insufficient_balance() {
-        let raw = r#"Erreur API 400: {"error":"ValidationError(\"Solde insuffisant: tu as 50 coins\")"}"#;
-        let msg = humanize_api_error(raw);
-        assert!(msg.contains("Solde insuffisant"));
-    }
-
-    #[test]
-    fn humanizes_daily_disabled() {
-        let raw = r#"Erreur API 400: {"error":"Daily bonus desactive sur ce serveur"}"#;
-        let msg = humanize_api_error(raw);
-        assert!(msg.contains("Daily bonus") && msg.contains("desactive"));
-    }
-
-    #[test]
-    fn humanizes_daily_already_claimed() {
-        let raw = r#"Erreur API 400: {"error":"Daily bonus deja reclame aujourd hui"}"#;
-        let msg = humanize_api_error(raw);
-        assert!(msg.contains("deja reclame"));
-    }
-
-    #[test]
-    fn humanizes_unknown_error_to_generic() {
-        let raw = "Erreur API 500: timeout";
-        let msg = humanize_api_error(raw);
-        assert!(msg.contains("Erreur") && msg.contains("Reessaie"));
-    }
-}

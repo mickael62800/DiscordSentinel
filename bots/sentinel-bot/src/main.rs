@@ -18,7 +18,7 @@ use sentinel_shared::heartbeat::{ApiClientKey, spawn_heartbeat};
 
 use crate::config::Config;
 use crate::handler::Handler;
-use crate::modules::{audit, automod, blackjack, community, coude, moderation, progression, security, tickets, voice};
+use crate::modules::{audit, automod, blackjack, community, coude, moderation, progression, security, slot, tickets, voice};
 
 #[tokio::main]
 async fn main() {
@@ -64,6 +64,7 @@ async fn main() {
 
         progression::init_typemap(&mut data, &api, &grpc);
         blackjack::init_typemap(&mut data, &api, &grpc);
+        slot::init_typemap(&mut data);
         community::init_typemap(&mut data, &api, &grpc);
         security::init_typemap(&mut data, &api, &grpc);
         automod::init_typemap(&mut data);

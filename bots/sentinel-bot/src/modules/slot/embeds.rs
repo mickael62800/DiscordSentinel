@@ -65,6 +65,17 @@ pub fn build_error_embed(message: &str) -> CreateEmbed {
         .color(0xed4245)
 }
 
+/// Embed des frames intermediaires d animation : symboles partiellement
+/// reveles, fond neutre, footer "Suspense...".
+pub fn build_spinning_embed(symbols: &[String; 3]) -> CreateEmbed {
+    let line = format!("# {}", symbols.join(" \u{2003} "));
+    CreateEmbed::new()
+        .title("\u{1f3b0} La machine tourne...")
+        .description(line)
+        .color(0xf1c40f)
+        .footer(serenity::all::CreateEmbedFooter::new("Suspense..."))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -192,5 +203,30 @@ mod tests {
     fn error_embed_contains_message() {
         let s = embed_to_string(&build_error_embed("Cooldown actif"));
         assert!(s.contains("Cooldown"));
+    }
+
+    #[test]
+    fn spinning_embed_contains_placeholders() {
+        let frame = ["🎰".to_string(), "🎰".to_string(), "🎰".to_string()];
+        let s = embed_to_string(&build_spinning_embed(&frame));
+        // 3 placeholders presents
+        assert!(s.matches("🎰").count() >= 3);
+        assert!(s.contains("tourne"));
+    }
+
+    #[test]
+    fn spinning_embed_with_partial_reveal() {
+        let frame = ["🍒".to_string(), "🎰".to_string(), "🎰".to_string()];
+        let s = embed_to_string(&build_spinning_embed(&frame));
+        assert!(s.contains("🍒"));
+        assert!(s.contains("🎰"));
+    }
+
+    #[test]
+    fn spinning_embed_color_is_gold() {
+        let frame = ["🎰".to_string(), "🎰".to_string(), "🎰".to_string()];
+        let s = embed_to_string(&build_spinning_embed(&frame));
+        // 0xf1c40f = 15844367 en decimal
+        assert!(s.contains("15844367"));
     }
 }

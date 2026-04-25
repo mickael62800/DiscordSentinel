@@ -7,8 +7,13 @@ use serenity::all::{
 };
 use tracing::{info, warn};
 
-pub const PANEL_SPIN_ID: &str = "slot_panel_spin";
-pub const PANEL_DAILY_ID: &str = "slot_panel_daily";
+/// Bouton unique du panel global : ouvre (ou retrouve) le salon perso du user.
+pub const PANEL_OPEN_ID: &str = "slot_panel_open";
+
+/// Boutons dans le salon perso : spin payant, daily, fermer le salon.
+pub const CHANNEL_SPIN_ID: &str = "slot_ch_spin";
+pub const CHANNEL_DAILY_ID: &str = "slot_ch_daily";
+pub const CHANNEL_CLOSE_ID: &str = "slot_ch_close";
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("slot-setup")
@@ -22,26 +27,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let embed = CreateEmbed::new()
         .title("\u{1f3b0} Machine a sous")
         .description(
-            "Tente ta chance ! Clique sur **Tirer** pour faire un spin a la mise par defaut.\n\n\
+            "Tente ta chance ! Clique sur **Ouvrir ma machine** pour creer ton salon prive.\n\n\
+             Tu pourras y faire des spins en suspense, voir tes gains et reclamer\n\
+             ton Daily Bonus quotidien.\n\n\
              3 symboles identiques = jackpot (multiplie ta mise).\n\
              2 identiques = mise remboursee.\n\
-             3x \u{0037}\u{fe0f}\u{20e3} = pool jackpot progressif !\n\n\
-             Tu peux aussi reclamer ton **Daily Bonus** (1 spin gratuit / jour)."
+             3x \u{0037}\u{fe0f}\u{20e3} = pool jackpot progressif !"
         )
         .color(0xf1c40f)
         .footer(CreateEmbedFooter::new("Slot Machine | Sentinel"));
 
-    let spin_btn = CreateButton::new(PANEL_SPIN_ID)
-        .label("Tirer")
+    let open_btn = CreateButton::new(PANEL_OPEN_ID)
+        .label("Ouvrir ma machine")
         .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f3b0}".into()))
         .style(ButtonStyle::Success);
 
-    let daily_btn = CreateButton::new(PANEL_DAILY_ID)
-        .label("Daily Bonus")
-        .emoji(serenity::model::channel::ReactionType::Unicode("\u{1f381}".into()))
-        .style(ButtonStyle::Primary);
-
-    let row = CreateActionRow::Buttons(vec![spin_btn, daily_btn]);
+    let row = CreateActionRow::Buttons(vec![open_btn]);
 
     if let Err(e) = channel_id
         .send_message(&ctx.http, CreateMessage::new().embed(embed).components(vec![row]))
