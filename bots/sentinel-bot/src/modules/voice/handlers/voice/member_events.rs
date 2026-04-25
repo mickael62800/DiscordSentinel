@@ -105,13 +105,18 @@ pub async fn handle_voice_state_update(
         }
     }
 
-    if let Some(old_state) = old {
-        if let Some(old_channel_id) = old_state.channel_id {
-            if old_channel_id != public_creator_id && old_channel_id != private_creator_id {
-                maybe_auto_transfer_ownership(ctx, guild_id, old_channel_id, user_id).await;
-                check_and_delete_empty(ctx, old_channel_id, guild_id).await;
-            }
-        }
+    // Auto-transfert d'ownership + delete-if-empty : UNIQUEMENT quand le user
+    // quitte ou bouge de salon. Sans ce gate, un simple self_mute / self_deaf /
+    // toggle video declenche un voice_state_update avec old_channel == new_channel
+    // et faisait perdre le controle du salon a l'owner (regression).
+    if let Some(old_channel_id) = should_run_leave_handlers(
+        old_channel,
+        new_channel,
+        public_creator_id,
+        private_creator_id,
+    ) {
+        maybe_auto_transfer_ownership(ctx, guild_id, old_channel_id, user_id).await;
+        check_and_delete_empty(ctx, old_channel_id, guild_id).await;
     }
 
     // Tracking AFK
@@ -432,3 +437,35 @@ async fn check_queue_join(
         }
     }
 }
+
+/// Decide si les handlers "le user a quitte le salon" (auto-transfert
+/// d'ownership + delete-if-empty) doivent etre executes.
+///
+/// Regle metier :
+/// 1. Le user doit avoir un old_channel (sinon il vient juste de join).
+/// 2. old_channel != new_channel (sinon ce n est pas un leave/move : c est
+///    juste un self_mute / self_deaf / toggle video / streaming. Sans ce
+///    gate, l owner perdait son ownership en se mutant — regression).
+/// 3. old_channel ne doit PAS etre un creator channel (les creators sont
+///    des "lobbies" qui ne portent pas d ownership).
+///
+/// Retourne `Some(old_channel_id)` si le bloc doit s executer, `None` sinon.
+pub(super) fn should_run_leave_handlers(
+    old_channel: Option<ChannelId>,
+    new_channel: Option<ChannelId>,
+    public_creator_id: ChannelId,
+    private_creator_id: ChannelId,
+) -> Option<ChannelId> {
+    let old = old_channel?;
+    if Some(old) == new_channel {
+        return None;
+    }
+    if old == public_creator_id || old == private_creator_id {
+        return None;
+    }
+    Some(old)
+}
+
+#[cfg(test)]
+#[path = "tests/member_events.rs"]
+mod tests;
