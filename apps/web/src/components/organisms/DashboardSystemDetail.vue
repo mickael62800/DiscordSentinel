@@ -33,50 +33,61 @@ function formatMemory(mb: number): string {
     <div v-if="loading && !info" class="loading">Chargement…</div>
     <div v-else-if="error" class="error-msg">Erreur : {{ error }}</div>
     <div v-else-if="info" class="detail-grid">
-      <!-- Bots Discord -->
-      <div class="card detail-card">
+      <!-- Services (bots + workers combines) -->
+      <div class="card detail-card services-card">
         <div class="card-header">
-          <h3>Bots Discord</h3>
+          <h3>Services</h3>
           <span class="count-pill">
-            {{ info.bots.filter(b => b.online).length }} / {{ info.bots.length }}
+            {{ info.bots.filter(b => b.online).length + info.workers.filter(w => w.online).length }}
+            / {{ info.bots.length + info.workers.length }}
           </span>
         </div>
-        <div v-if="info.bots.length === 0" class="empty-list">
-          Aucun bot enregistre.
-        </div>
-        <div v-else class="service-list">
-          <div
-            v-for="b in info.bots"
-            :key="b.name"
-            :class="['service-row', b.online ? 'online' : 'offline']"
-          >
-            <span class="service-dot" />
-            <span class="service-name">{{ b.name }}</span>
-            <span class="service-status">{{ b.online ? "En ligne" : "Hors ligne" }}</span>
+
+        <!-- Sous-section Bots -->
+        <div class="subsection">
+          <div class="subsection-header">
+            <h4>Bots</h4>
+            <span class="count-pill small">
+              {{ info.bots.filter(b => b.online).length }} / {{ info.bots.length }}
+            </span>
+          </div>
+          <div v-if="info.bots.length === 0" class="empty-list">
+            Aucun bot enregistre.
+          </div>
+          <div v-else class="service-list">
+            <div
+              v-for="b in info.bots"
+              :key="b.name"
+              :class="['service-row', b.online ? 'online' : 'offline']"
+            >
+              <span class="service-dot" />
+              <span class="service-name">{{ b.name }}</span>
+              <span class="service-status">{{ b.online ? "En ligne" : "Hors ligne" }}</span>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Workers -->
-      <div class="card detail-card">
-        <div class="card-header">
-          <h3>Workers</h3>
-          <span class="count-pill">
-            {{ info.workers.filter(w => w.online).length }} / {{ info.workers.length }}
-          </span>
-        </div>
-        <div v-if="info.workers.length === 0" class="empty-list">
-          Aucun worker enregistre.
-        </div>
-        <div v-else class="service-list">
-          <div
-            v-for="w in info.workers"
-            :key="w.name"
-            :class="['service-row', w.online ? 'online' : 'offline']"
-          >
-            <span class="service-dot" />
-            <span class="service-name">{{ w.name }}</span>
-            <span class="service-status">{{ w.online ? "En ligne" : "Hors ligne" }}</span>
+        <!-- Sous-section Workers -->
+        <div class="subsection">
+          <div class="subsection-header">
+            <h4>Workers</h4>
+            <span class="count-pill small">
+              {{ info.workers.filter(w => w.online).length }} / {{ info.workers.length }}
+            </span>
+          </div>
+          <div v-if="info.workers.length === 0" class="empty-list">
+            Aucun worker enregistre.
+          </div>
+          <div v-else class="service-list">
+            <div
+              v-for="w in info.workers"
+              :key="w.name"
+              :class="['service-row', w.online ? 'online' : 'offline']"
+            >
+              <span class="service-dot" />
+              <span class="service-name">{{ w.name }}</span>
+              <span class="service-status">{{ w.online ? "En ligne" : "Hors ligne" }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -172,9 +183,37 @@ function formatMemory(mb: number): string {
 
 .detail-grid {
   display: grid;
-  /* 3 colonnes au-dela de ~1000px, 2 entre 600-1000, 1 en dessous. */
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  /* 2 colonnes au-dela de ~900px, 1 en dessous.
+     Services (bots + workers) a gauche, Ressources a droite. */
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 16px;
+}
+
+.services-card .subsection + .subsection {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+
+.subsection-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.subsection-header h4 {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin: 0;
+}
+
+.count-pill.small {
+  font-size: 10px;
+  padding: 2px 8px;
 }
 
 .detail-card {
