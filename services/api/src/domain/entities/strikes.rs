@@ -53,6 +53,16 @@ pub struct StrikeResult {
     pub escalation_duration: Option<u64>,
 }
 
+impl StrikeResult {
+    /// Indique si cette resolution de strike doit declencher un broadcast
+    /// `strike_added` (seuil d'escalade franchi). Centralise la regle metier
+    /// "broadcast ssi une action d'escalade a ete decidee" pour que les
+    /// handlers n'aient pas a la redefinir via `escalation_action.is_some()`.
+    pub fn should_trigger_escalation_broadcast(&self) -> bool {
+        self.escalation_action.is_some()
+    }
+}
+
 #[cfg(test)]
 #[path = "tests/strikes.rs"]
 mod tests;

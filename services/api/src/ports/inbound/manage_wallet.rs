@@ -19,7 +19,7 @@
 use async_trait::async_trait;
 use sqlx::{Postgres, Transaction};
 
-use crate::domain::entities::TauntEvent;
+use crate::domain::entities::{TauntEvent, Wallet, WalletTransaction};
 use crate::domain::errors::DomainError;
 
 /// Resultat d'une mutation de wallet. Contient le nouveau solde + les taunts
@@ -134,4 +134,69 @@ pub trait ManageWalletUseCase: Send + Sync {
         user_id: &str,
         mutation: &TxWalletMutation,
     ) -> Vec<TauntEvent>;
+
+    // ─────────────────────────────────────────────────────────────────
+    // Lectures + admin — exposent le wallet aux handlers HTTP sans que
+    // ceux-ci touchent directement au WalletRepository. Le service
+    // resoud les valeurs par defaut (starting_coins, reset balance) via
+    // les fonctions domain pures.
+    //
+    // Default `unimplemented!()` pour que les mocks existants qui
+    // n'appellent pas ces methodes continuent a compiler sans edit.
+    // ─────────────────────────────────────────────────────────────────
+
+    /// Lit ou cree le wallet (applique `resolve_starting_coins` +
+    /// `WALLET_STARTING_COINS` env en interne).
+    async fn get_or_create(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<Wallet, DomainError> {
+        unimplemented!("get_or_create not implemented")
+    }
+
+    /// Liste tous les wallets d'une guild (admin).
+    async fn list_by_guild(&self, _guild_id: &str) -> Result<Vec<Wallet>, DomainError> {
+        unimplemented!("list_by_guild not implemented")
+    }
+
+    /// Top N wallets par solde.
+    async fn leaderboard(
+        &self,
+        _guild_id: &str,
+        _limit: i64,
+    ) -> Result<Vec<Wallet>, DomainError> {
+        unimplemented!("leaderboard not implemented")
+    }
+
+    /// Historique des transactions d'un wallet.
+    async fn get_transactions(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _limit: i64,
+    ) -> Result<Vec<WalletTransaction>, DomainError> {
+        unimplemented!("get_transactions not implemented")
+    }
+
+    /// Reset individuel. `new_balance_input` est normalise via
+    /// `resolve_reset_balance` (None -> defaut, negatif -> 0).
+    /// Retourne (wallet, new_balance applique).
+    async fn reset_wallet(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _new_balance_input: Option<i64>,
+    ) -> Result<(Wallet, i64), DomainError> {
+        unimplemented!("reset_wallet not implemented")
+    }
+
+    /// Reset bulk. Retourne (nb de rows affectees, new_balance applique).
+    async fn reset_all_wallets(
+        &self,
+        _guild_id: &str,
+        _new_balance_input: Option<i64>,
+    ) -> Result<(u64, i64), DomainError> {
+        unimplemented!("reset_all_wallets not implemented")
+    }
 }

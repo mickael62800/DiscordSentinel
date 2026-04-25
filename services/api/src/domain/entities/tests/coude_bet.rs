@@ -253,3 +253,66 @@ fn commission_split_is_consistent() {
         assert_eq!(b.loser_bonus, expected_commission - expected_winner);
     }
 }
+
+// ── BetPayout::outcome() ─────────────────────────────────────────────
+
+fn payout(won: bool, payout: i64) -> BetPayout {
+    BetPayout {
+        bet_id: Uuid::nil(),
+        bettor_id: "u".into(),
+        bettor_name: "u".into(),
+        backed_id: "A".into(),
+        amount_bet: 100,
+        payout,
+        won,
+    }
+}
+
+#[test]
+fn outcome_win_when_won_and_payout_positive() {
+    assert_eq!(payout(true, 250).outcome(), BetPayoutOutcome::Win { amount: 250 });
+}
+
+#[test]
+fn outcome_refund_when_not_won_but_payout_positive() {
+    assert_eq!(payout(false, 100).outcome(), BetPayoutOutcome::Refund { amount: 100 });
+}
+
+#[test]
+fn outcome_loss_when_not_won_and_payout_zero() {
+    assert_eq!(payout(false, 0).outcome(), BetPayoutOutcome::Loss);
+}
+
+#[test]
+fn outcome_loss_when_won_but_payout_zero() {
+    // Cas impossible par construction mais defensif : won=true + payout=0 → Loss
+    assert_eq!(payout(true, 0).outcome(), BetPayoutOutcome::Loss);
+}
+
+#[test]
+fn outcome_loss_when_payout_negative() {
+    // Defensif : payout < 0 ne doit jamais crediter.
+    assert_eq!(payout(true, -50).outcome(), BetPayoutOutcome::Loss);
+    assert_eq!(payout(false, -50).outcome(), BetPayoutOutcome::Loss);
+}
+
+#[test]
+fn outcome_draw_scenario_produces_refunds() {
+    // Scenario egalite du domain builder : `won=false, payout=amount_bet`.
+    let bets = vec![bet(1, "u1", "A", 100), bet(2, "u2", "B", 50)];
+    let plan = calculate_bet_resolution(&bets, None, "A", "B");
+    for p in &plan.payouts {
+        assert!(matches!(p.outcome(), BetPayoutOutcome::Refund { .. }));
+    }
+}
+
+#[test]
+fn outcome_winner_scenario_produces_win_for_winner_and_loss_for_losers() {
+    // u1 a backe A (gagnant), u2 a backe B (perdant).
+    let bets = vec![bet(1, "u1", "A", 100), bet(2, "u2", "B", 50)];
+    let plan = calculate_bet_resolution(&bets, Some("A"), "A", "B");
+    let u1 = plan.payouts.iter().find(|p| p.bettor_id == "u1").unwrap();
+    let u2 = plan.payouts.iter().find(|p| p.bettor_id == "u2").unwrap();
+    assert!(matches!(u1.outcome(), BetPayoutOutcome::Win { .. }));
+    assert_eq!(u2.outcome(), BetPayoutOutcome::Loss);
+}

@@ -89,7 +89,7 @@ pub use blackjack::{
 
 mod moderation_review;
 pub use moderation_review::{
-    is_valid_review_status, truncate_review_text, validate_evidence_url,
+    is_valid_review_status, resolve_mute_duration, truncate_review_text, validate_evidence_url,
     DEFAULT_MUTE_DURATION_SECS, MAX_EVIDENCE_URL_LEN, MAX_REVIEW_TEXT_LEN, VALID_REVIEW_STATUSES,
 };
 
@@ -150,7 +150,7 @@ pub use combat_resolution_rules::{
 
 mod coude_bet;
 pub use coude_bet::{
-    calculate_bet_resolution, BetPayout, BetResolutionPlan, CoudeBet,
+    calculate_bet_resolution, BetPayout, BetPayoutOutcome, BetResolutionPlan, CoudeBet,
     FighterBetBonus as CoudeFighterBetBonus, NewCoudeBet, RefundSummary,
 };
 

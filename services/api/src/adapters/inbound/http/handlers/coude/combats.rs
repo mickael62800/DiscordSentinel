@@ -14,7 +14,6 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::errors::DomainError;
 use crate::domain::entities::{CombatResolution, NewCoudeCombat};
 
 // ── Lecture ──
@@ -109,17 +108,10 @@ pub async fn cancel_combat(
     let id = parse_combat_id(&combat_id)?;
 
     // Phase 7 B — Gate RBAC : moderator+ requis pour annuler un combat coude.
-    // Fetch le guild_id du combat via sqlx direct (ressource-id-based).
+    // Resolution du guild_id via l'UC (ressource-id-based). Si le combat
+    // n'existe pas, on laisse `cancel()` remonter le 404 — ne pas masquer.
     if rbac.is_some() {
-        let row: Option<(String,)> = sqlx::query_as(
-            "SELECT guild_id FROM coude_combats WHERE id = $1",
-        )
-        .bind(id)
-        .fetch_optional(&state.pg_pool)
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("fetch combat guild_id: {e}"))))?;
-
-        if let Some((guild_id,)) = row {
+        if let Some(guild_id) = state.coude_combats_uc.get_guild_id(id).await? {
             check_role_for_guild(
                 &state,
                 &rbac,
@@ -201,30 +193,13 @@ pub async fn purge_all(
     )
     .await?;
 
-    let mut tx = state
-        .pg_pool
-        .begin()
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("begin tx: {e}"))))?;
-
-    // Tables + ordre : regle metier dans `domain/entities/coude_purge.rs`.
-    let mut totals = serde_json::Map::new();
-    for table in crate::domain::entities::COUDE_PURGE_TABLES {
-        let sql = format!("DELETE FROM {table} WHERE guild_id = $1");
-        let res = sqlx::query(&sql)
-            .bind(&guild_id)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| ApiError(DomainError::Internal(format!("purge {table}: {e}"))))?;
-        totals.insert(
-            (*table).to_string(),
-            serde_json::Value::from(res.rows_affected()),
-        );
-    }
-
-    tx.commit()
-        .await
-        .map_err(|e| ApiError(DomainError::Internal(format!("commit tx: {e}"))))?;
+    // Le repo possede l'atomicite (tx + ordre des DELETE selon
+    // COUDE_PURGE_TABLES). Handler convertit juste le resultat en JSON.
+    let counts = state.coude_combats_uc.purge_guild_subsystem(&guild_id).await?;
+    let totals: serde_json::Map<String, serde_json::Value> = counts
+        .into_iter()
+        .map(|(table, rows)| (table, serde_json::Value::from(rows)))
+        .collect();
 
     Ok(Json(serde_json::Value::Object(totals)))
 }

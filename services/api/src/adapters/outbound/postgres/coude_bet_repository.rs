@@ -5,13 +5,68 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary, TauntEvent,
+    BetPayoutOutcome, BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary, TauntEvent,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 
 use super::pg_err;
 use crate::ports::outbound::CoudeBetRepository;
+
+/// Refund "neutre" dans une tx en cours : credite les coins sans toucher
+/// `total_earned` (l'argent revient, ce n'est pas un gain) et log la tx wallet.
+/// Partage entre `apply_resolution` (egalite) et `refund_unresolved`.
+async fn refund_wallet_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &str,
+    user_id: &str,
+    amount: i64,
+    source: &str,
+    description: &str,
+) -> Result<(), DomainError> {
+    let balance_after: i64 = sqlx::query_scalar(
+        "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2
+         RETURNING coins",
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(amount)
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(pg_err)?;
+    super::wallet_tx_log::log_wallet_tx(
+        tx,
+        guild_id,
+        user_id,
+        amount,
+        balance_after,
+        source,
+        description,
+    )
+    .await
+}
+
+/// Double-comptabilite legacy : `coude_players.total_earned` suit les gains
+/// wallet issus de paris et bonus combattants.
+async fn bump_player_earned_in_tx(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    guild_id: &str,
+    user_id: &str,
+    amount: i64,
+) -> Result<(), DomainError> {
+    sqlx::query(
+        "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
+         WHERE guild_id = $1 AND user_id = $2",
+    )
+    .bind(guild_id)
+    .bind(user_id)
+    .bind(amount)
+    .execute(&mut **tx)
+    .await
+    .map_err(pg_err)?;
+    Ok(())
+}
 
 pub struct PgCoudeBetRepository {
     pool: PgPool,
@@ -145,64 +200,33 @@ impl CoudeBetRepository for PgCoudeBetRepository {
         )> = Vec::new();
 
         for payout in &plan.payouts {
-            // Crédite le joueur si gagné (inclut total_earned via credit_tx) OU
-            // si remboursement égalité (payout = mise mais won = false : on rembourse
-            // SANS toucher total_earned, semantique legacy preservee via UPDATE direct).
-            if payout.won && payout.payout > 0 {
-                // Credit wallet unifie (credit_tx alimente total_earned + log tx)
-                let desc = format!("Pari gagne combat {}", payout.bet_id);
-                let m = self
-                    .wallet_uc
-                    .credit_tx(
+            // Dispatch sur la semantique metier explicite (cf. BetPayout::outcome).
+            match payout.outcome() {
+                BetPayoutOutcome::Win { amount } => {
+                    let desc = format!("Pari gagne combat {}", payout.bet_id);
+                    let m = self
+                        .wallet_uc
+                        .credit_tx(&mut tx, guild_id, &payout.bettor_id, amount, "coude_bet_win", &desc)
+                        .await?;
+                    pending_taunts.push((payout.bettor_id.clone(), m));
+                    bump_player_earned_in_tx(&mut tx, guild_id, &payout.bettor_id, amount).await?;
+                }
+                BetPayoutOutcome::Refund { amount } => {
+                    // Egalite : credit sans total_earned, pas de taunt.
+                    let desc = format!("Pari egalite - remboursement combat {}", payout.bet_id);
+                    refund_wallet_in_tx(
                         &mut tx,
                         guild_id,
                         &payout.bettor_id,
-                        payout.payout,
-                        "coude_bet_win",
+                        amount,
+                        "coude_bet_refund",
                         &desc,
                     )
                     .await?;
-                pending_taunts.push((payout.bettor_id.clone(), m));
-
-                // Stats coude_players.total_earned (double comptabilite legacy
-                // preservee : wallet + coude_players).
-                sqlx::query(
-                    "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
-                     WHERE guild_id = $1 AND user_id = $2",
-                )
-                .bind(guild_id)
-                .bind(&payout.bettor_id)
-                .bind(payout.payout)
-                .execute(&mut *tx)
-                .await
-                .map_err(pg_err)?;
-            } else if !payout.won && payout.payout > 0 {
-                // Remboursement égalité : juste les coins (wallet), pas total_earned,
-                // pas de taunt jackpot (c'est un remboursement pas un gain).
-                // On reste sur un UPDATE direct + log_wallet_tx parce que credit_tx
-                // incremente forcement total_earned (ce qu'on ne veut pas ici).
-                let balance_after: i64 = sqlx::query_scalar(
-                    "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
-                     WHERE guild_id = $1 AND user_id = $2
-                     RETURNING coins",
-                )
-                .bind(guild_id)
-                .bind(&payout.bettor_id)
-                .bind(payout.payout)
-                .fetch_one(&mut *tx)
-                .await
-                .map_err(pg_err)?;
-                let desc = format!("Pari egalite - remboursement combat {}", payout.bet_id);
-                super::wallet_tx_log::log_wallet_tx(
-                    &mut tx,
-                    guild_id,
-                    &payout.bettor_id,
-                    payout.payout,
-                    balance_after,
-                    "coude_bet_refund",
-                    &desc,
-                )
-                .await?;
+                }
+                BetPayoutOutcome::Loss => {
+                    // Pari perdu : aucune mutation wallet.
+                }
             }
 
             sqlx::query("UPDATE coude_bets SET won = $2, payout = $3 WHERE id = $1")
@@ -228,17 +252,7 @@ impl CoudeBetRepository for PgCoudeBetRepository {
                     )
                     .await?;
                 pending_taunts.push((bonus.winner_id.clone(), m));
-
-                sqlx::query(
-                    "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
-                     WHERE guild_id = $1 AND user_id = $2",
-                )
-                .bind(guild_id)
-                .bind(&bonus.winner_id)
-                .bind(bonus.winner_bonus)
-                .execute(&mut *tx)
-                .await
-                .map_err(pg_err)?;
+                bump_player_earned_in_tx(&mut tx, guild_id, &bonus.winner_id, bonus.winner_bonus).await?;
             }
             if bonus.loser_bonus > 0 {
                 let m = self
@@ -253,17 +267,7 @@ impl CoudeBetRepository for PgCoudeBetRepository {
                     )
                     .await?;
                 pending_taunts.push((bonus.loser_id.clone(), m));
-
-                sqlx::query(
-                    "UPDATE coude_players SET total_earned = total_earned + $3, updated_at = NOW()
-                     WHERE guild_id = $1 AND user_id = $2",
-                )
-                .bind(guild_id)
-                .bind(&bonus.loser_id)
-                .bind(bonus.loser_bonus)
-                .execute(&mut *tx)
-                .await
-                .map_err(pg_err)?;
+                bump_player_earned_in_tx(&mut tx, guild_id, &bonus.loser_id, bonus.loser_bonus).await?;
             }
         }
 
@@ -299,20 +303,18 @@ impl CoudeBetRepository for PgCoudeBetRepository {
 
         let mut refunded_total = 0i64;
         for (bet_id, bettor_id, amount) in &bets {
-            // Refund : pas de total_earned (argent qui revient, pas un gain).
-            // On reste sur UPDATE direct + log (cf. apply_resolution, cas
-            // egalite). Pas de taunt non plus (remboursement = neutre).
-            let balance_after: i64 = sqlx::query_scalar(
-                "UPDATE user_wallets SET coins = coins + $3, updated_at = NOW()
-                 WHERE guild_id = $1 AND user_id = $2
-                 RETURNING coins",
+            // Refund neutre : credite les coins sans toucher total_earned,
+            // pas de taunt. Helper partage avec apply_resolution (cas egalite).
+            let desc = format!("Remboursement pari combat {}", combat_id);
+            refund_wallet_in_tx(
+                &mut tx,
+                guild_id,
+                bettor_id,
+                *amount,
+                "coude_bet_unresolved_refund",
+                &desc,
             )
-            .bind(guild_id)
-            .bind(bettor_id)
-            .bind(*amount)
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(pg_err)?;
+            .await?;
 
             sqlx::query("UPDATE coude_bets SET won = false, payout = $2 WHERE id = $1")
                 .bind(bet_id)
@@ -320,18 +322,6 @@ impl CoudeBetRepository for PgCoudeBetRepository {
                 .execute(&mut *tx)
                 .await
                 .map_err(pg_err)?;
-
-            let desc = format!("Remboursement pari combat {}", combat_id);
-            super::wallet_tx_log::log_wallet_tx(
-                &mut tx,
-                guild_id,
-                bettor_id,
-                *amount,
-                balance_after,
-                "coude_bet_unresolved_refund",
-                &desc,
-            )
-            .await?;
 
             refunded_total += amount;
         }

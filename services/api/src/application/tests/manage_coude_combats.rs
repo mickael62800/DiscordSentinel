@@ -13,6 +13,9 @@ struct MockRepo {
     cancel_returns: StdMutex<bool>,
     resolve_returns: StdMutex<bool>,
     list_limit_received: StdMutex<Option<i64>>,
+    get_returns: StdMutex<Option<CoudeCombat>>,
+    purge_returns: StdMutex<Vec<(String, u64)>>,
+    purge_guild_received: StdMutex<Option<String>>,
 }
 
 impl MockRepo {
@@ -61,7 +64,9 @@ impl CoudeCombatRepository for MockRepo {
         *self.list_limit_received.lock().unwrap() = Some(limit);
         Ok(vec![])
     }
-    async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
+    async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> {
+        Ok(self.get_returns.lock().unwrap().clone())
+    }
     async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
     async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
     async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
@@ -108,6 +113,10 @@ impl CoudeCombatRepository for MockRepo {
     }
     async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    async fn purge_guild_subsystem(&self, g: &str) -> Result<Vec<(String, u64)>, DomainError> {
+        *self.purge_guild_received.lock().unwrap() = Some(g.to_string());
+        Ok(self.purge_returns.lock().unwrap().clone())
+    }
 }
 
 fn new_combat(attacker: &str, defender: &str, mise: i64) -> NewCoudeCombat {
@@ -252,6 +261,44 @@ async fn set_betting_rejects_empty_message_id() {
 async fn set_betting_accepts_non_empty() {
     let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
     assert!(svc.set_betting(Uuid::new_v4(), "msg123").await.is_ok());
+}
+
+// ── get_guild_id (RBAC resource-based) ────────────────────────────────
+
+#[tokio::test]
+async fn get_guild_id_returns_none_when_combat_absent() {
+    let svc = ManageCoudeCombatsService::new(Arc::new(MockRepo::default()));
+    let out = svc.get_guild_id(Uuid::new_v4()).await.unwrap();
+    assert!(out.is_none());
+}
+
+#[tokio::test]
+async fn get_guild_id_returns_guild_from_repo_when_present() {
+    let repo = MockRepo::default();
+    let mut c = sample_combat();
+    c.guild_id = "guild-42".into();
+    *repo.get_returns.lock().unwrap() = Some(c);
+    let svc = ManageCoudeCombatsService::new(Arc::new(repo));
+    assert_eq!(svc.get_guild_id(Uuid::new_v4()).await.unwrap().as_deref(), Some("guild-42"));
+}
+
+// ── purge_guild_subsystem ─────────────────────────────────────────────
+
+#[tokio::test]
+async fn purge_guild_subsystem_delegates_to_repo_with_guild_id() {
+    let repo = MockRepo::default();
+    *repo.purge_returns.lock().unwrap() = vec![
+        ("coude_bets".into(), 3),
+        ("coude_combats".into(), 2),
+        ("coude_players".into(), 5),
+    ];
+    let repo = Arc::new(repo);
+    let svc = ManageCoudeCombatsService::new(repo.clone());
+
+    let out = svc.purge_guild_subsystem("guild-xyz").await.unwrap();
+    assert_eq!(out.len(), 3);
+    assert_eq!(out[0], ("coude_bets".into(), 3));
+    assert_eq!(*repo.purge_guild_received.lock().unwrap(), Some("guild-xyz".into()));
 }
 
 #[tokio::test]

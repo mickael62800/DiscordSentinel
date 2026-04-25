@@ -235,6 +235,17 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         }
         Ok(())
     }
+
+    async fn get_guild_id(&self, id: Uuid) -> Result<Option<String>, DomainError> {
+        Ok(self.repo.get(id).await?.map(|c| c.guild_id))
+    }
+
+    async fn purge_guild_subsystem(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<(String, u64)>, DomainError> {
+        self.repo.purge_guild_subsystem(guild_id).await
+    }
 }
 
 #[cfg(test)]

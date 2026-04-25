@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
+use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat, COUDE_PURGE_TABLES};
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
@@ -436,5 +436,24 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
         .await
         .map_err(pg_err)?;
         Ok(())
+    }
+
+    async fn purge_guild_subsystem(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<(String, u64)>, DomainError> {
+        let mut tx = self.pool.begin().await.map_err(pg_err)?;
+        let mut out = Vec::with_capacity(COUDE_PURGE_TABLES.len());
+        for table in COUDE_PURGE_TABLES {
+            let sql = format!("DELETE FROM {table} WHERE guild_id = $1");
+            let res = sqlx::query(&sql)
+                .bind(guild_id)
+                .execute(&mut *tx)
+                .await
+                .map_err(|e| DomainError::Internal(format!("purge {table}: {e}")))?;
+            out.push(((*table).to_string(), res.rows_affected()));
+        }
+        tx.commit().await.map_err(pg_err)?;
+        Ok(out)
     }
 }

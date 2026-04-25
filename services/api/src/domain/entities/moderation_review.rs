@@ -11,6 +11,13 @@ pub const MAX_REVIEW_TEXT_LEN: usize = 500;
 /// Duree par defaut d'un mute timeout en secondes (1 heure).
 pub const DEFAULT_MUTE_DURATION_SECS: u64 = 3600;
 
+/// Resout la duree de mute a appliquer : defaut 1h si non fournie.
+/// Centralise la regle "absent -> DEFAULT_MUTE_DURATION_SECS" pour eviter
+/// que chaque call site (handler HTTP, bot, worker) la redefinisse.
+pub fn resolve_mute_duration(input: Option<u64>) -> u64 {
+    input.unwrap_or(DEFAULT_MUTE_DURATION_SECS)
+}
+
 /// Valide une URL de preuve : trim non-vide et longueur <= 2000.
 pub fn validate_evidence_url(url: &str) -> Result<(), &'static str> {
     if url.trim().is_empty() || url.len() > MAX_EVIDENCE_URL_LEN {

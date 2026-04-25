@@ -33,7 +33,9 @@ use async_trait::async_trait;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
-use crate::domain::entities::TauntEvent;
+use crate::domain::entities::{
+    resolve_reset_balance, resolve_starting_coins, TauntEvent, Wallet, WalletTransaction,
+};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::{
@@ -347,6 +349,62 @@ impl ManageWalletUseCase for ManageWalletService {
             }
         }
         out
+    }
+
+    // ── Lectures + admin ─────────────────────────────────────────────────
+
+    async fn get_or_create(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Wallet, DomainError> {
+        let env = std::env::var("WALLET_STARTING_COINS").ok();
+        let starting = resolve_starting_coins(env.as_deref());
+        self.repo
+            .get_or_create(guild_id, user_id, user_id, starting)
+            .await
+    }
+
+    async fn list_by_guild(&self, guild_id: &str) -> Result<Vec<Wallet>, DomainError> {
+        self.repo.list_by_guild(guild_id).await
+    }
+
+    async fn leaderboard(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<Wallet>, DomainError> {
+        self.repo.leaderboard(guild_id, limit).await
+    }
+
+    async fn get_transactions(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WalletTransaction>, DomainError> {
+        self.repo.get_transactions(guild_id, user_id, limit).await
+    }
+
+    async fn reset_wallet(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        new_balance_input: Option<i64>,
+    ) -> Result<(Wallet, i64), DomainError> {
+        let new_balance = resolve_reset_balance(new_balance_input);
+        let wallet = self.repo.reset_wallet(guild_id, user_id, new_balance).await?;
+        Ok((wallet, new_balance))
+    }
+
+    async fn reset_all_wallets(
+        &self,
+        guild_id: &str,
+        new_balance_input: Option<i64>,
+    ) -> Result<(u64, i64), DomainError> {
+        let new_balance = resolve_reset_balance(new_balance_input);
+        let affected = self.repo.reset_all_wallets(guild_id, new_balance).await?;
+        Ok((affected, new_balance))
     }
 }
 

@@ -79,7 +79,7 @@ pub async fn log_action(
     );
 
     if let Some(ref sr) = strike_result {
-        if sr.escalation_action.is_some() {
+        if sr.should_trigger_escalation_broadcast() {
             state.broadcaster.broadcast(
                 "strike_added",
                 serde_json::json!({
@@ -241,7 +241,7 @@ pub async fn execute_mute(
     )
     .await?;
 
-    let duration = dto.duration.unwrap_or(crate::domain::entities::DEFAULT_MUTE_DURATION_SECS);
+    let duration = crate::domain::entities::resolve_mute_duration(dto.duration);
     state
         .discord_api
         .apply_timeout(&dto.guild_id, &dto.user_id, duration)

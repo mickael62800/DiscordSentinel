@@ -8,8 +8,7 @@ use crate::adapters::inbound::http::helpers::{normalize_limit, ok_response};
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::entities::{
-    resolve_reset_balance, resolve_starting_coins, validate_positive_amount,
-    validate_transfer_distinct_users, Wallet, WalletTransaction,
+    validate_positive_amount, validate_transfer_distinct_users, Wallet, WalletTransaction,
 };
 use crate::domain::errors::DomainError;
 
@@ -46,10 +45,7 @@ pub async fn get_wallet(
 ) -> Result<Json<Wallet>, ApiError> {
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
-    let env = std::env::var("WALLET_STARTING_COINS").ok();
-    let starting_coins = resolve_starting_coins(env.as_deref());
-
-    let wallet = state.wallet_repo.get_or_create(&guild_id, &user_id, &user_id, starting_coins).await?;
+    let wallet = state.wallet_uc.get_or_create(&guild_id, &user_id).await?;
     Ok(Json(wallet))
 }
 
@@ -63,7 +59,10 @@ pub async fn credit(
     validate_positive_amount(dto.amount)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
-    let wallet = state.wallet_repo.credit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description).await?;
+    let mutation = state
+        .wallet_uc
+        .credit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description)
+        .await?;
 
     state.broadcaster.broadcast(
         "wallet_credit",
@@ -71,11 +70,12 @@ pub async fn credit(
             "guild_id": guild_id,
             "user_id": user_id,
             "amount": dto.amount,
-            "balance": wallet.coins,
+            "balance": mutation.new_balance,
             "source": dto.source,
         }),
     );
 
+    let wallet = state.wallet_uc.get_or_create(&guild_id, &user_id).await?;
     Ok(Json(wallet))
 }
 
@@ -89,7 +89,10 @@ pub async fn debit(
     validate_positive_amount(dto.amount)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
-    let wallet = state.wallet_repo.debit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description).await?;
+    let mutation = state
+        .wallet_uc
+        .debit(&guild_id, &user_id, dto.amount, &dto.source, &dto.description)
+        .await?;
 
     state.broadcaster.broadcast(
         "wallet_debit",
@@ -97,11 +100,12 @@ pub async fn debit(
             "guild_id": guild_id,
             "user_id": user_id,
             "amount": dto.amount,
-            "balance": wallet.coins,
+            "balance": mutation.new_balance,
             "source": dto.source,
         }),
     );
 
+    let wallet = state.wallet_uc.get_or_create(&guild_id, &user_id).await?;
     Ok(Json(wallet))
 }
 
@@ -118,10 +122,17 @@ pub async fn transfer(
     validate_transfer_distinct_users(&dto.from_user_id, &dto.to_user_id)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
-    state.wallet_repo.transfer(
-        &dto.guild_id, &dto.from_user_id, &dto.to_user_id,
-        dto.amount, &dto.source, &dto.description,
-    ).await?;
+    state
+        .wallet_uc
+        .transfer(
+            &dto.guild_id,
+            &dto.from_user_id,
+            &dto.to_user_id,
+            dto.amount,
+            &dto.source,
+            &dto.description,
+        )
+        .await?;
 
     state.broadcaster.broadcast(
         "wallet_transfer",
@@ -154,7 +165,7 @@ pub async fn leaderboard(
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
     let limit = normalize_limit(params.limit, 20, 100);
-    let wallets = state.wallet_repo.leaderboard(&guild_id, limit).await?;
+    let wallets = state.wallet_uc.leaderboard(&guild_id, limit).await?;
     Ok(Json(wallets))
 }
 
@@ -167,7 +178,7 @@ pub async fn transactions(
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
     let limit = normalize_limit(params.limit, 20, 100);
-    let txs = state.wallet_repo.get_transactions(&guild_id, &user_id, limit).await?;
+    let txs = state.wallet_uc.get_transactions(&guild_id, &user_id, limit).await?;
     Ok(Json(txs))
 }
 
@@ -178,7 +189,7 @@ pub async fn list_wallets(
     Path(guild_id): Path<String>,
 ) -> Result<Json<Vec<Wallet>>, ApiError> {
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
-    let wallets = state.wallet_repo.list_by_guild(&guild_id).await?;
+    let wallets = state.wallet_uc.list_by_guild(&guild_id).await?;
     Ok(Json(wallets))
 }
 
@@ -195,9 +206,11 @@ pub async fn reset_wallet(
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<Wallet>, ApiError> {
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
-    let new_balance = resolve_reset_balance(dto.new_balance);
 
-    let wallet = state.wallet_repo.reset_wallet(&guild_id, &user_id, new_balance).await?;
+    let (wallet, new_balance) = state
+        .wallet_uc
+        .reset_wallet(&guild_id, &user_id, dto.new_balance)
+        .await?;
 
     state.broadcaster.broadcast(
         "wallet_reset",
@@ -218,9 +231,11 @@ pub async fn reset_all_wallets(
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
-    let new_balance = resolve_reset_balance(dto.new_balance);
 
-    let affected = state.wallet_repo.reset_all_wallets(&guild_id, new_balance).await?;
+    let (affected, new_balance) = state
+        .wallet_uc
+        .reset_all_wallets(&guild_id, dto.new_balance)
+        .await?;
 
     state.broadcaster.broadcast(
         "wallet_reset_all",

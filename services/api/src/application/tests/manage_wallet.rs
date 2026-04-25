@@ -14,10 +14,26 @@ use crate::ports::outbound::WalletRepository;
 
 struct MockWalletRepo {
     balance: Mutex<i64>,
+    last_starting_coins: Mutex<Option<i64>>,
+    last_reset_balance: Mutex<Option<i64>>,
+    last_reset_all_balance: Mutex<Option<i64>>,
+    reset_all_affected: u64,
+    leaderboard_return: Mutex<Vec<Wallet>>,
+    list_return: Mutex<Vec<Wallet>>,
+    txs_return: Mutex<Vec<WalletTransaction>>,
 }
 impl MockWalletRepo {
     fn new(initial: i64) -> Self {
-        Self { balance: Mutex::new(initial) }
+        Self {
+            balance: Mutex::new(initial),
+            last_starting_coins: Mutex::new(None),
+            last_reset_balance: Mutex::new(None),
+            last_reset_all_balance: Mutex::new(None),
+            reset_all_affected: 0,
+            leaderboard_return: Mutex::new(vec![]),
+            list_return: Mutex::new(vec![]),
+            txs_return: Mutex::new(vec![]),
+        }
     }
     fn wallet(&self, coins: i64) -> Wallet {
         Wallet {
@@ -35,7 +51,8 @@ impl MockWalletRepo {
 }
 #[async_trait]
 impl WalletRepository for MockWalletRepo {
-    async fn get_or_create(&self, _g: &str, _u: &str, _n: &str, _s: i64) -> Result<Wallet, DomainError> {
+    async fn get_or_create(&self, _g: &str, _u: &str, _n: &str, s: i64) -> Result<Wallet, DomainError> {
+        *self.last_starting_coins.lock().unwrap() = Some(s);
         Ok(self.wallet(*self.balance.lock().unwrap()))
     }
     async fn get(&self, _g: &str, _u: &str) -> Result<Option<Wallet>, DomainError> {
@@ -63,14 +80,24 @@ impl WalletRepository for MockWalletRepo {
         Ok(())
     }
     async fn pay_combat_atomic(&self, _: &str, _: &str, _: i64, _: &str, _: i64, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
-    async fn leaderboard(&self, _g: &str, _l: i64) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
-    async fn get_transactions(&self, _g: &str, _u: &str, _l: i64) -> Result<Vec<WalletTransaction>, DomainError> { Ok(vec![]) }
-    async fn list_by_guild(&self, _g: &str) -> Result<Vec<Wallet>, DomainError> { Ok(vec![]) }
+    async fn leaderboard(&self, _g: &str, _l: i64) -> Result<Vec<Wallet>, DomainError> {
+        Ok(self.leaderboard_return.lock().unwrap().clone())
+    }
+    async fn get_transactions(&self, _g: &str, _u: &str, _l: i64) -> Result<Vec<WalletTransaction>, DomainError> {
+        Ok(self.txs_return.lock().unwrap().clone())
+    }
+    async fn list_by_guild(&self, _g: &str) -> Result<Vec<Wallet>, DomainError> {
+        Ok(self.list_return.lock().unwrap().clone())
+    }
     async fn reset_wallet(&self, _g: &str, _u: &str, b: i64) -> Result<Wallet, DomainError> {
+        *self.last_reset_balance.lock().unwrap() = Some(b);
         *self.balance.lock().unwrap() = b;
         Ok(self.wallet(b))
     }
-    async fn reset_all_wallets(&self, _g: &str, _b: i64) -> Result<u64, DomainError> { Ok(0) }
+    async fn reset_all_wallets(&self, _g: &str, b: i64) -> Result<u64, DomainError> {
+        *self.last_reset_all_balance.lock().unwrap() = Some(b);
+        Ok(self.reset_all_affected)
+    }
 }
 
 struct MockTaunts {
@@ -305,6 +332,105 @@ async fn post_commit_taunts_skips_when_flags_unset() {
     assert!(events.is_empty());
     assert_eq!(*taunts.bankruptcy_calls.lock().unwrap(), 0);
     assert_eq!(*taunts.jackpot_calls.lock().unwrap(), 0);
+}
+
+// ── Lectures + admin (handler delegation) ─────────────────────────────
+
+#[tokio::test]
+async fn get_or_create_uses_default_starting_coins_when_env_absent() {
+    std::env::remove_var("WALLET_STARTING_COINS");
+    let repo = Arc::new(MockWalletRepo::new(0));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo.clone(), taunts);
+
+    let _ = svc.get_or_create("g", "u").await.unwrap();
+    assert_eq!(*repo.last_starting_coins.lock().unwrap(), Some(100));
+}
+
+#[tokio::test]
+async fn list_by_guild_delegates_to_repo() {
+    let repo = Arc::new(MockWalletRepo::new(0));
+    let w = repo.wallet(42);
+    *repo.list_return.lock().unwrap() = vec![w];
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo.clone(), taunts);
+
+    let out = svc.list_by_guild("g").await.unwrap();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].coins, 42);
+}
+
+#[tokio::test]
+async fn leaderboard_delegates_to_repo() {
+    let repo = Arc::new(MockWalletRepo::new(0));
+    *repo.leaderboard_return.lock().unwrap() = vec![repo.wallet(10), repo.wallet(5)];
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo.clone(), taunts);
+
+    let out = svc.leaderboard("g", 20).await.unwrap();
+    assert_eq!(out.len(), 2);
+    assert_eq!(out[0].coins, 10);
+}
+
+#[tokio::test]
+async fn get_transactions_delegates_to_repo() {
+    let repo = Arc::new(MockWalletRepo::new(0));
+    *repo.txs_return.lock().unwrap() = vec![WalletTransaction {
+        id: Uuid::new_v4(),
+        guild_id: "g".into(),
+        user_id: "u".into(),
+        amount: 50,
+        balance_after: 150,
+        source: "test".into(),
+        description: "d".into(),
+        created_at: Utc::now(),
+    }];
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo.clone(), taunts);
+
+    let out = svc.get_transactions("g", "u", 10).await.unwrap();
+    assert_eq!(out.len(), 1);
+    assert_eq!(out[0].amount, 50);
+}
+
+#[tokio::test]
+async fn reset_wallet_applies_resolve_reset_balance() {
+    let repo = Arc::new(MockWalletRepo::new(999));
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo.clone(), taunts);
+
+    // None → defaut 100
+    let (_, nb) = svc.reset_wallet("g", "u", None).await.unwrap();
+    assert_eq!(nb, 100);
+    assert_eq!(*repo.last_reset_balance.lock().unwrap(), Some(100));
+
+    // Negatif → clampe a 0
+    let (_, nb) = svc.reset_wallet("g", "u", Some(-500)).await.unwrap();
+    assert_eq!(nb, 0);
+    assert_eq!(*repo.last_reset_balance.lock().unwrap(), Some(0));
+
+    // Valeur positive → passee telle quelle
+    let (w, nb) = svc.reset_wallet("g", "u", Some(777)).await.unwrap();
+    assert_eq!(nb, 777);
+    assert_eq!(w.coins, 777);
+    assert_eq!(*repo.last_reset_balance.lock().unwrap(), Some(777));
+}
+
+#[tokio::test]
+async fn reset_all_wallets_applies_resolve_reset_balance_and_returns_affected() {
+    let mut repo = MockWalletRepo::new(0);
+    repo.reset_all_affected = 42;
+    let repo = Arc::new(repo);
+    let taunts = Arc::new(MockTaunts::new());
+    let svc = ManageWalletService::new(repo.clone(), taunts);
+
+    let (affected, nb) = svc.reset_all_wallets("g", Some(-10)).await.unwrap();
+    assert_eq!(affected, 42);
+    assert_eq!(nb, 0);
+    assert_eq!(*repo.last_reset_all_balance.lock().unwrap(), Some(0));
+
+    let (_, nb) = svc.reset_all_wallets("g", None).await.unwrap();
+    assert_eq!(nb, 100);
 }
 
 #[tokio::test]

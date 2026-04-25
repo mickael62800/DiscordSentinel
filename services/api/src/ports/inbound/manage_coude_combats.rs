@@ -65,4 +65,29 @@ pub trait ManageCoudeCombatsUseCase: Send + Sync {
         id: Uuid,
         item_key: &str,
     ) -> Result<(), DomainError>;
+
+    /// Lecture rapide du `guild_id` rattache a un combat. Renvoie `None` si le
+    /// combat n'existe pas — utile pour les pre-checks RBAC `ressource-based`
+    /// (RBAC ne doit PAS masquer un "combat introuvable", laisser l'erreur
+    /// remonter via `cancel()` / `resolve()`).
+    ///
+    /// Default `unimplemented!()` pour preserver les mocks existants.
+    async fn get_guild_id(&self, _id: Uuid) -> Result<Option<String>, DomainError> {
+        unimplemented!("get_guild_id not implemented")
+    }
+
+    /// Purge destructive : vide toutes les tables du sous-systeme Coup de Coude
+    /// pour une guild (ordre metier dans `COUDE_PURGE_TABLES`). Retourne le
+    /// compte des rows supprimees par table.
+    ///
+    /// Admin-only, irreversible — les handlers doivent gater avec RBAC avant
+    /// d'appeler.
+    ///
+    /// Default `unimplemented!()` pour preserver les mocks existants.
+    async fn purge_guild_subsystem(
+        &self,
+        _guild_id: &str,
+    ) -> Result<Vec<(String, u64)>, DomainError> {
+        unimplemented!("purge_guild_subsystem not implemented")
+    }
 }

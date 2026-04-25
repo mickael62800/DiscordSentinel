@@ -84,6 +84,25 @@ fn default_mute_duration_is_one_hour() {
 }
 
 #[test]
+fn resolve_mute_duration_none_uses_default() {
+    assert_eq!(resolve_mute_duration(None), DEFAULT_MUTE_DURATION_SECS);
+    assert_eq!(resolve_mute_duration(None), 3600);
+}
+
+#[test]
+fn resolve_mute_duration_preserves_some_value() {
+    assert_eq!(resolve_mute_duration(Some(60)), 60);
+    assert_eq!(resolve_mute_duration(Some(86_400)), 86_400);
+}
+
+#[test]
+fn resolve_mute_duration_accepts_zero_as_explicit_no_op() {
+    // Defensif : Some(0) est une valeur explicite, on ne la remplace pas.
+    // Discord clampera cote API si invalide.
+    assert_eq!(resolve_mute_duration(Some(0)), 0);
+}
+
+#[test]
 fn valid_review_statuses_contains_three() {
     assert_eq!(VALID_REVIEW_STATUSES.len(), 3);
 }

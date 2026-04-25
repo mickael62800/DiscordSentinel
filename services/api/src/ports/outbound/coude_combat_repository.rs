@@ -113,4 +113,16 @@ pub trait CoudeCombatRepository: Send + Sync {
     /// dépendance circulaire avec le futur `CoudeBetRepository`. Sera déplacée
     /// quand le slice "Bets" sera extrait.
     async fn mark_unresolved_bets_lost(&self, combat_id: Uuid) -> Result<(), DomainError>;
+
+    /// Purge destructive : vide toutes les tables Coup de Coude listees dans
+    /// `COUDE_PURGE_TABLES` (domain) pour une guild, dans une transaction
+    /// unique. Retourne les comptes par table. Admin-only.
+    ///
+    /// Default `unimplemented!()` pour preserver les mocks existants.
+    async fn purge_guild_subsystem(
+        &self,
+        _guild_id: &str,
+    ) -> Result<Vec<(String, u64)>, DomainError> {
+        unimplemented!("purge_guild_subsystem not implemented")
+    }
 }

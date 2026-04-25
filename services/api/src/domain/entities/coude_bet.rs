@@ -38,6 +38,29 @@ pub struct BetPayout {
     pub won: bool,
 }
 
+/// Semantique metier d'un `BetPayout` derriere le tuple `(won, payout)` :
+/// - `Win` : le parieur a gagne → credit wallet + `total_earned` += payout.
+/// - `Refund` : egalite → credit wallet **sans** toucher `total_earned`
+///    (l'argent revient, ce n'est pas un gain).
+/// - `Loss` : le parieur a perdu → aucune mutation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BetPayoutOutcome {
+    Win { amount: i64 },
+    Refund { amount: i64 },
+    Loss,
+}
+
+impl BetPayout {
+    /// Traduit le tuple `(won, payout)` en semantique metier explicite.
+    pub fn outcome(&self) -> BetPayoutOutcome {
+        match (self.won, self.payout) {
+            (true, p) if p > 0 => BetPayoutOutcome::Win { amount: p },
+            (false, p) if p > 0 => BetPayoutOutcome::Refund { amount: p },
+            _ => BetPayoutOutcome::Loss,
+        }
+    }
+}
+
 /// Bonus versé aux deux combattants sur la commission pari-mutuel.
 ///
 /// Commission totale = 15% du pot :
