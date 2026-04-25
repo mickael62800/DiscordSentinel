@@ -364,6 +364,16 @@ pub async fn build_app_state(
         wallet_uc.clone(),
     ));
 
+    // Slot machine — nouvelle feature (migration 157).
+    let slot_repo = Arc::new(crate::adapters::outbound::postgres::PgSlotRepository::new(pg_pool.clone()));
+    let slot_uc: Arc<dyn crate::ports::inbound::manage_slot::ManageSlotUseCase> =
+        Arc::new(crate::application::ManageSlotService::new(
+            slot_repo,
+            bot_config_repo.clone(),
+            wallet_uc.clone(),
+            pg_pool.clone(),
+        ));
+
     let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(
         coude_economy_repo.clone(),
         wallet_uc.clone(),
@@ -506,6 +516,7 @@ pub async fn build_app_state(
         wallet_repo,
         wallet_uc: wallet_uc.clone(),
         blackjack_svc,
+        slot_uc,
         coude_players_uc,
         coude_combats_uc,
         coude_bets_uc,

@@ -90,3 +90,6 @@ pub use manage_wallet_service::ManageWalletService;
 
 pub mod export_service;
 pub use export_service::{ExportService, ExecuteExportUseCase};
+
+pub mod manage_slot_service;
+pub use manage_slot_service::ManageSlotService;

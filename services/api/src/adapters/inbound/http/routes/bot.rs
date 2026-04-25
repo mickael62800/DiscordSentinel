@@ -45,4 +45,10 @@ pub fn routes() -> Router<AppState> {
         .route("/api/blackjack/tables/{table_id}/games", get(handlers::blackjack::list_table_games))
         .route("/api/blackjack/tables/{table_id}", delete(handlers::blackjack::close_table))
         .route("/api/blackjack/tables/by-channel/{channel_id}", get(handlers::blackjack::get_table_by_channel))
+        // Slot machine (migration 157)
+        .route("/api/slot/{guild_id}/spin", post(handlers::slot::spin))
+        .route("/api/slot/{guild_id}/daily", post(handlers::slot::daily))
+        .route("/api/slot/{guild_id}/jackpot", get(handlers::slot::get_jackpot))
+        .route("/api/slot/{guild_id}/recent", get(handlers::slot::recent_spins))
+        .route("/api/slot/{guild_id}/leaderboard", get(handlers::slot::leaderboard))
 }

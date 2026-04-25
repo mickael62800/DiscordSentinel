@@ -200,3 +200,10 @@ pub use coude_heist::{
     HEIST_GAIN_MIN_PERCENT, HEIST_ITEM_BONUS_PERCENT, HEIST_MAX_SUCCESS_PERCENT,
     HEIST_PRISON_HOURS, HEIST_TOOLS,
 };
+
+mod slot;
+pub use slot::{
+    compute_jackpot_contribution, compute_payout, evaluate_spin, parse_csv_multipliers,
+    parse_csv_symbols, parse_csv_weights, spin_with_rng, validate_slot_config, SlotConfig,
+    SlotConfigError, SlotJackpotPool, SlotSpin, SlotTopWinner, SpinOutcome,
+};

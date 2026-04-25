@@ -93,3 +93,6 @@ pub use manage_voice_channels::{
     ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
     TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
 };
+
+pub mod manage_slot;
+pub use manage_slot::{ManageSlotUseCase, SpinCommand, SpinResult};

@@ -22,8 +22,8 @@ use rand::Rng;
 use tracing::info;
 
 use crate::domain::entities::{
-    compute_success_chance, CoudeBalanceParams, HeistOutcome, HEIST_COOLDOWN_DAYS,
-    HEIST_GAIN_MAX_PERCENT, HEIST_GAIN_MIN_PERCENT, HEIST_PRISON_HOURS, HEIST_TOOLS,
+    compute_success_chance, CoudeBalanceParams, HeistOutcome,
+    HEIST_GAIN_MAX_PERCENT, HEIST_GAIN_MIN_PERCENT, HEIST_TOOLS,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_heist::{

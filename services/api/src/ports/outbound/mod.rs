@@ -115,3 +115,6 @@ pub use pending_action_repository::{PendingAction, PendingActionRepository};
 
 mod blackjack_table_repository;
 pub use blackjack_table_repository::{BlackjackTable, BlackjackTablePlayer, BlackjackTableRepository};
+
+mod slot_repository;
+pub use slot_repository::SlotRepository;

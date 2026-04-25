@@ -159,3 +159,6 @@ pub use pending_action_repository::PgPendingActionRepository;
 
 mod blackjack_table_repository;
 pub use blackjack_table_repository::PgBlackjackTableRepository;
+
+mod slot_repository;
+pub use slot_repository::PgSlotRepository;

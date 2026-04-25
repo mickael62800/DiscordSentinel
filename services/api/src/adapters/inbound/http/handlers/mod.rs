@@ -34,6 +34,7 @@ pub mod purge;
 pub mod rbac;
 pub mod wallet;
 pub mod blackjack;
+pub mod slot;
 pub mod games;
 pub mod welcome;
 pub mod oauth;
