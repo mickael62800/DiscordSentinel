@@ -5,6 +5,7 @@ import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useToast } from "../../composables/useToast";
 import AppToggle from "../atoms/AppToggle.vue";
+import AutomodAnalysisHistory from "../organisms/AutomodAnalysisHistory.vue";
 
 const { success, error: showError } = useToast();
 
@@ -625,6 +626,12 @@ watch(selectedComponent, loadFormValues);
             </button>
             <span v-if="successMessage" class="success-msg">{{ successMessage }}</span>
           </div>
+
+          <!-- Vue debug temporaire : historique des analyses automod (a supprimer apres tuning). -->
+          <AutomodAnalysisHistory
+            v-if="selectedComponent === 'automod-bot'"
+            :guild-id="selectedGuildId"
+          />
         </template>
       </div>
     </template>

@@ -93,6 +93,14 @@ pub struct DashboardInfractionDto {
     /// Duree en secondes (pour mute/timeout/ban temporaire). None sinon.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration: Option<u64>,
+    /// Contenu original du message analyse (None pour les actions de moderation
+    /// manuelles). Utilise par la vue debug "Historique d'analyse" cote web.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    /// Score IA brut combine (regex + IA + tension). None pour les actions
+    /// manuelles. Utilise par la vue debug "Historique d'analyse".
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub score: Option<f64>,
 }
 
 impl From<Infraction> for DashboardInfractionDto {
@@ -108,6 +116,8 @@ impl From<Infraction> for DashboardInfractionDto {
             moderator: "AutoMod".to_string(),
             source: "detection".to_string(),
             duration: inf.duration,
+            content: Some(inf.content),
+            score: Some(inf.score),
         }
     }
 }
@@ -125,6 +135,8 @@ impl From<crate::domain::entities::ModerationAction> for DashboardInfractionDto 
             moderator: action.moderator_name,
             source: "action".to_string(),
             duration: action.duration,
+            content: None,
+            score: None,
         }
     }
 }

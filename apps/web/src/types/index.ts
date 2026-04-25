@@ -88,6 +88,8 @@ export interface Infraction {
   source?: "detection" | "action";
   /** Duree en secondes (mute/timeout/ban temporaire). */
   duration?: number;
+  /** Contenu original du message analyse (uniquement source="detection"). */
+  content?: string;
 }
 
 export interface ConfirmedBan {

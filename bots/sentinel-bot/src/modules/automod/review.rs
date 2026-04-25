@@ -60,7 +60,7 @@ pub(super) async fn send_review_card(
         .color(action_color)
         .field("Utilisateur", format!("<@{}> (`{}`)", user_id, msg.author.name), true)
         .field("Salon", format!("<#{}>", channel_id), true)
-        .field("Score IA", format!("{:.0}%", score * 100.0), true)
+        .field("Score IA", format!("{:.2}", score), true)
         .field("Message original", format!("```{}```", content_preview), false)
         .field("Raison IA", reason, false)
         .field("Flags detectes", &flags_str, true)
