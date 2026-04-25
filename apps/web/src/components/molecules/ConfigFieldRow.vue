@@ -31,91 +31,107 @@ const isMultilineText = computed(
 
 <template>
   <div class="field-row" :class="{ modified }">
-    <!-- Colonne gauche : label + input + hint -->
-    <div class="field-col-input">
+    <!-- 1. Label + hint a droite -->
+    <div class="field-label-row">
       <label :for="field.key" class="field-label">
         {{ field.label }}
         <span v-if="modified" class="modified-dot" />
       </label>
-
-      <NumberInputWithUnit
-        v-if="field.type === 'number'"
-        :id="field.key"
-        :model-value="modelValue"
-        :unit="field.unit"
-        :min="field.min"
-        :max="field.max"
-        :placeholder="field.default !== undefined ? String(field.default) : '0'"
-        @update:model-value="update"
-      />
-
-      <EnumSelect
-        v-else-if="field.type === 'enum' && field.options"
-        :id="field.key"
-        :model-value="modelValue"
-        :options="field.options"
-        :placeholder="field.default !== undefined ? String(field.default) : '—'"
-        @update:model-value="update"
-      />
-
-      <ChannelSelect
-        v-else-if="field.type === 'channel'"
-        :id="field.key"
-        :model-value="modelValue"
-        :guild-id="guildId"
-        @update:model-value="update"
-      />
-
-      <RoleSelect
-        v-else-if="field.type === 'role'"
-        :id="field.key"
-        :model-value="modelValue"
-        :guild-id="guildId"
-        @update:model-value="update"
-      />
-
-      <textarea
-        v-else-if="isMultilineText"
-        :id="field.key"
-        :value="modelValue"
-        class="field-input field-textarea"
-        rows="6"
-        :placeholder="field.default !== undefined ? String(field.default) : ''"
-        @input="update(($event.target as HTMLTextAreaElement).value)"
-      />
-
-      <input
-        v-else
-        :id="field.key"
-        :value="modelValue"
-        type="text"
-        class="field-input"
-        :placeholder="field.default !== undefined ? String(field.default) : ''"
-        @input="update(($event.target as HTMLInputElement).value)"
-      />
-
-      <span v-if="hint" class="field-hint" :class="hintSource ? `hint-${hintSource}` : ''">
+      <span
+        v-if="hint"
+        class="field-hint-inline"
+        :class="hintSource ? `hint-${hintSource}` : ''"
+      >
         {{ hint }}
       </span>
     </div>
 
-    <!-- Colonne droite : description pedagogique -->
-    <div class="field-col-desc">
-      <FieldDescription :text="field.description" />
-    </div>
+    <!-- 2. Description pedagogique juste sous le label -->
+    <FieldDescription v-if="field.description" :text="field.description" />
+
+    <!-- 3. Input -->
+    <NumberInputWithUnit
+      v-if="field.type === 'number'"
+      :id="field.key"
+      :model-value="modelValue"
+      :unit="field.unit"
+      :min="field.min"
+      :max="field.max"
+      :placeholder="field.default !== undefined ? String(field.default) : '0'"
+      @update:model-value="update"
+    />
+
+    <EnumSelect
+      v-else-if="field.type === 'enum' && field.options"
+      :id="field.key"
+      :model-value="modelValue"
+      :options="field.options"
+      :placeholder="field.default !== undefined ? String(field.default) : '—'"
+      @update:model-value="update"
+    />
+
+    <ChannelSelect
+      v-else-if="field.type === 'channel'"
+      :id="field.key"
+      :model-value="modelValue"
+      :guild-id="guildId"
+      @update:model-value="update"
+    />
+
+    <RoleSelect
+      v-else-if="field.type === 'role'"
+      :id="field.key"
+      :model-value="modelValue"
+      :guild-id="guildId"
+      @update:model-value="update"
+    />
+
+    <textarea
+      v-else-if="isMultilineText"
+      :id="field.key"
+      :value="modelValue"
+      class="field-input field-textarea"
+      rows="6"
+      :placeholder="field.default !== undefined ? String(field.default) : ''"
+      @input="update(($event.target as HTMLTextAreaElement).value)"
+    />
+
+    <input
+      v-else
+      :id="field.key"
+      :value="modelValue"
+      type="text"
+      class="field-input"
+      :placeholder="field.default !== undefined ? String(field.default) : ''"
+      @input="update(($event.target as HTMLInputElement).value)"
+    />
   </div>
 </template>
 
 <style scoped>
 .field-row {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 16px;
-  padding: 14px 16px;
+  /* Cellule verticale : label-hint / description / input empiles.
+     L input est toujours colle en bas pour que toutes les cellules d une
+     meme ligne aient leurs inputs alignes (peu importe la longueur de la
+     description). */
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
   background: var(--bg-card, #1a1d24);
   border: 1px solid var(--border);
   border-radius: 8px;
-  align-items: start;
+  min-width: 0;
+  /* h-full implicite : le grid parent stretch les cellules a la hauteur
+     de la plus grande, on doit donc pouvoir pousser l input en bas. */
+  height: 100%;
+}
+
+/* Pousse le dernier enfant (= l input) tout en bas de la cellule.
+   Comme la cellule est en flex column, margin-top: auto sur le dernier
+   absorbe l espace libre. */
+.field-row > *:last-child {
+  margin-top: auto;
 }
 
 .field-row.modified {
@@ -123,16 +139,11 @@ const isMultilineText = computed(
   box-shadow: 0 0 0 1px var(--accent, #5865f2);
 }
 
-.field-col-input {
+.field-label-row {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-.field-col-desc {
-  display: flex;
-  align-items: center;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
   min-width: 0;
 }
 
@@ -144,6 +155,31 @@ const isMultilineText = computed(
   font-weight: 600;
   color: var(--text-primary);
   text-transform: none;
+  flex-shrink: 0;
+}
+
+.field-hint-inline {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: right;
+  min-width: 0;
+}
+
+.field-hint-inline.hint-db {
+  color: var(--success, #57f287);
+}
+
+.field-hint-inline.hint-default {
+  color: var(--text-secondary);
+}
+
+.field-hint-inline.hint-none {
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .modified-dot {
@@ -175,33 +211,4 @@ const isMultilineText = computed(
   font-family: inherit;
 }
 
-.field-hint {
-  font-size: 11px;
-  color: var(--text-secondary);
-  font-family: monospace;
-}
-
-.field-hint.hint-db {
-  color: var(--success, #57f287);
-}
-
-.field-hint.hint-default {
-  color: var(--text-secondary);
-}
-
-.field-hint.hint-none {
-  color: var(--text-secondary);
-  opacity: 0.6;
-}
-
-@media (max-width: 1100px) {
-  .field-row {
-    grid-template-columns: 1fr;
-  }
-
-  .field-col-desc {
-    border-top: 1px dashed var(--border);
-    padding-top: 10px;
-  }
-}
 </style>

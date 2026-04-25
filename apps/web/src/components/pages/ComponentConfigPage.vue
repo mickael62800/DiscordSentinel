@@ -613,20 +613,22 @@ watch(selectedComponent, loadFormValues);
   grid-template-columns: repeat(6, 1fr);
 }
 
-/* Nouvelle grille : 2 colonnes en desktop large (4K-friendly), 1 en dessous.
-   Chaque cellule = ConfigFieldRow qui contient input + description en interne. */
+/* Nouvelle grille : cellules ConfigFieldRow empilees verticalement
+   (label/description/input). Plus on a d espace, plus on met de colonnes :
+   - >= 1900px (4K) : 6 colonnes (densite max)
+   - 1100-1900px    : 3-4 colonnes (auto-fit)
+   - mobile         : 1-2 colonnes */
 .fields-grid-2col {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 12px;
   margin-top: 8px;
   margin-bottom: 12px;
 }
 
-@media (min-width: 1700px) {
-  /* En 4K, on force 2 colonnes max pour eviter d'etaler trop. */
+@media (min-width: 1900px) {
   .fields-grid-2col {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(6, 1fr);
   }
 }
 
