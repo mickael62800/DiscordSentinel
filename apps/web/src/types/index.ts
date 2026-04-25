@@ -12,13 +12,49 @@ export interface BotDefinition {
   config_schema: ConfigField[];
 }
 
+export interface ConfigFieldOption {
+  value: string;
+  label: string;
+}
+
 export interface ConfigField {
   key: string;
   label: string;
+  /**
+   * Type d'input :
+   * - "boolean" : toggle ON/OFF
+   * - "number" : input numerique (peut etre combine avec unit / min / max)
+   * - "channel" : dropdown des salons Discord
+   * - "role"    : dropdown des roles Discord
+   * - "enum"    : <select> base sur le tableau `options`
+   * - "text"    : input texte libre
+   */
   type: string;
   required: boolean;
   default?: string;
+  /**
+   * Description courte (1-2 phrases) affichee a droite de l'input.
+   * Aide pedagogique pour expliquer ce que fait le champ.
+   */
+  description?: string;
+  /**
+   * Unite affichee en suffixe d'un input number (ex: "heures", "minutes",
+   * "secondes", "%"). Cosmetique — n'affecte pas la valeur stockee.
+   */
+  unit?: string;
+  /** Valeur min autorisee pour un input number (clamp dur a la sauvegarde). */
+  min?: number;
+  /** Valeur max autorisee pour un input number (clamp dur a la sauvegarde). */
+  max?: number;
+  /** Options pour type="enum" (dropdown). */
+  options?: ConfigFieldOption[];
   [k: string]: unknown;
+}
+
+export interface DiscordChannelInfo {
+  id: string;
+  name: string;
+  position?: number;
 }
 
 export interface BotGuildConfig {
