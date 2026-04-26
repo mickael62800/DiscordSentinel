@@ -70,6 +70,7 @@ pub struct AppState {
     pub coude_safety_net_uc: Arc<dyn crate::ports::inbound::ManageCoudeSafetyNetUseCase>,
     pub coude_vendetta_uc: Arc<dyn crate::ports::inbound::ManageCoudeVendettaUseCase>,
     pub coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::CoudeToutOuRienRepository>,
+    pub coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

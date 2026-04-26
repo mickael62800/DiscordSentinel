@@ -24,7 +24,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::{
     PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgBotConfigRepository,
     PgConductRepository, PgCoudeBetRepository, PgCoudeCashboxRepository, PgCoudeCombatRepository,
-    PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeVendettaRepository,
+    PgCoudeBountyRepository, PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeVendettaRepository,
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
@@ -486,6 +486,10 @@ pub async fn build_app_state(
     let coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::CoudeToutOuRienRepository> =
         Arc::new(PgCoudeToutOuRienRepository::new(pg_pool.clone()));
 
+    // Primes collectives (cf. COUPE_AMELIORATIONS 5.3).
+    let coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository> =
+        Arc::new(PgCoudeBountyRepository::new(pg_pool.clone()));
+
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::CoudeStealProtectionRepository,
     > = Arc::new(PgCoudeStealProtectionRepository::new(pg_pool.clone()));
@@ -517,7 +521,8 @@ pub async fn build_app_state(
             .with_curses_repo(coude_curses_repo.clone())
             .with_safety_net_repo(coude_safety_net_repo.clone())
             .with_vendetta_repo(coude_vendetta_repo.clone())
-            .with_player_repo(coude_player_repo.clone()),
+            .with_player_repo(coude_player_repo.clone())
+            .with_bounty_repo(coude_bounty_repo.clone()),
         );
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
@@ -595,6 +600,7 @@ pub async fn build_app_state(
         coude_safety_net_uc,
         coude_vendetta_uc,
         coude_tout_ou_rien_repo,
+        coude_bounty_repo: coude_bounty_repo.clone(),
         broadcaster,
         job_client,
         discord_api,

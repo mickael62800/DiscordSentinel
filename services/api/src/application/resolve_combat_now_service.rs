@@ -35,8 +35,8 @@ use crate::ports::inbound::{
     ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
 };
 use crate::ports::outbound::{
-    BotConfigRepository, CoudeCombatRepository, CoudeCursesRepository, CoudePlayerRepository,
-    CoudeSafetyNetRepository, CoudeVendettaRepository, WalletRepository,
+    BotConfigRepository, CoudeBountyRepository, CoudeCombatRepository, CoudeCursesRepository,
+    CoudePlayerRepository, CoudeSafetyNetRepository, CoudeVendettaRepository, WalletRepository,
 };
 
 pub struct ResolveCombatNowService {
@@ -53,6 +53,7 @@ pub struct ResolveCombatNowService {
     safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
     vendetta_repo: Option<Arc<dyn CoudeVendettaRepository>>,
     player_repo: Option<Arc<dyn CoudePlayerRepository>>,
+    bounty_repo: Option<Arc<dyn CoudeBountyRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -81,6 +82,7 @@ impl ResolveCombatNowService {
             safety_net_repo: None,
             vendetta_repo: None,
             player_repo: None,
+            bounty_repo: None,
         }
     }
 
@@ -89,6 +91,13 @@ impl ResolveCombatNowService {
     /// declencher la "Prime collective" (regicide bonus 1000c).
     pub fn with_player_repo(mut self, repo: Arc<dyn CoudePlayerRepository>) -> Self {
         self.player_repo = Some(repo);
+        self
+    }
+
+    /// Branche le repo bounty (cf. COUPE_AMELIORATIONS 5.3) pour gerer
+    /// les primes collectives auto-ouvertes / claimees lors des combats.
+    pub fn with_bounty_repo(mut self, repo: Arc<dyn CoudeBountyRepository>) -> Self {
+        self.bounty_repo = Some(repo);
         self
     }
 
@@ -1148,25 +1157,48 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         let mut taunt_events = Vec::new();
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
-                // Prime collective / Regicide (cf. COUPE_AMELIORATIONS 5.3) :
-                // si le perdant avait une win_streak >= 5 AVANT cette
-                // defaite, le gagnant casse la streak et touche un bonus
-                // de 1000c paye par le neant. Lecture pre-touch.
-                const REGICIDE_STREAK_THRESHOLD: i32 = 5;
-                const REGICIDE_BONUS: i64 = 1000;
+                // Prime collective / Regicide (cf. COUPE_AMELIORATIONS 5.3).
+                //
+                // Etape 1 (pre-touch) : si le perdant avait une streak >= 5
+                // ET une bounty ouverte sur sa tete, on la claim et on
+                // credit le total au gagnant. Si pas de bounty mais
+                // streak >= 5 (cas legacy / pre-bounty), fallback bonus
+                // fixe pour preserver le comportement.
+                use crate::domain::entities::{
+                    BOUNTY_AUTO_OPEN_STREAK_THRESHOLD, BOUNTY_INITIAL_AMOUNT,
+                };
+                let mut loser_pre_streak: Option<i32> = None;
                 if let Some(repo) = &self.player_repo {
                     if let Ok(Some((win_streak, _loss_streak))) = repo
                         .get_combat_streaks(&combat.guild_id, loser_id)
                         .await
                     {
-                        if win_streak >= REGICIDE_STREAK_THRESHOLD {
+                        loser_pre_streak = Some(win_streak);
+                        if win_streak >= BOUNTY_AUTO_OPEN_STREAK_THRESHOLD {
+                            // Cherche une bounty ouverte (theoriquement
+                            // auto-creee a streak=5 dans un combat
+                            // precedent). Sinon fallback BOUNTY_INITIAL.
+                            let bounty_amount: i64 = if let Some(brepo) = &self.bounty_repo {
+                                match brepo.get_open(&combat.guild_id, loser_id).await {
+                                    Ok(Some(b)) => {
+                                        let total = b.total_amount;
+                                        if let Err(e) = brepo.claim(b.id, winner_id).await {
+                                            warn!(error = %e, "Echec claim bounty");
+                                        }
+                                        total
+                                    }
+                                    _ => BOUNTY_INITIAL_AMOUNT,
+                                }
+                            } else {
+                                BOUNTY_INITIAL_AMOUNT
+                            };
                             if let Err(e) = self
                                 .wallet_repo
                                 .credit(
                                     &combat.guild_id,
                                     winner_id,
-                                    REGICIDE_BONUS,
-                                    "regicide_bonus",
+                                    bounty_amount,
+                                    "regicide_bounty",
                                     "Prime collective Regicide",
                                 )
                                 .await
@@ -1175,11 +1207,14 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                             }
                             regicide_msg = Some(format!(
                                 "\u{1f451} **REGICIDE !** <@{}> casse la serie de {} victoires de <@{}> et empoche **+{} coins** de prime collective.",
-                                winner_id, win_streak, loser_id, REGICIDE_BONUS
+                                winner_id, win_streak, loser_id, bounty_amount
                             ));
                         }
                     }
                 }
+                // (Etape 2 — post-touch — vit plus bas, voir
+                // bloc `if let Some(brepo)` apres on_player_won).
+                let _ = loser_pre_streak;
 
                 if let Ok(Some(ev)) = self
                     .taunts_uc
@@ -1194,6 +1229,45 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .await
                 {
                     taunt_events.push(ev);
+                }
+
+                // Etape 2 (post-touch) : si le gagnant vient d atteindre
+                // la 5e victoire consecutive, on auto-ouvre une prime
+                // de 1000c sur sa tete (cf. COUPE_AMELIORATIONS 5.3).
+                if let (Some(prepo), Some(brepo)) = (&self.player_repo, &self.bounty_repo) {
+                    if let Ok(Some((winner_streak, _))) = prepo
+                        .get_combat_streaks(&combat.guild_id, winner_id)
+                        .await
+                    {
+                        if winner_streak == BOUNTY_AUTO_OPEN_STREAK_THRESHOLD {
+                            // open echoue avec Conflict si une bounty est
+                            // deja ouverte — c est OK, no-op silent.
+                            if let Err(e) = brepo
+                                .open(
+                                    &combat.guild_id,
+                                    winner_id,
+                                    BOUNTY_INITIAL_AMOUNT,
+                                )
+                                .await
+                            {
+                                if !matches!(e, DomainError::Conflict(_)) {
+                                    warn!(error = %e, "Echec auto-open bounty");
+                                }
+                            } else {
+                                taunt_events.push(crate::domain::entities::TauntEvent {
+                                    channel_id: combat.guild_id.clone(),
+                                    target_user_id: winner_id.clone(),
+                                    message: format!(
+                                        "\u{1f48e} Une **prime collective de {}c** vient de s ouvrir sur la tete de <@{}> ! Tout le monde peut contribuer via `/contribuer-prime` jusqu a ce qu il soit battu.",
+                                        BOUNTY_INITIAL_AMOUNT, winner_id
+                                    ),
+                                    nickname_suffix: String::new(),
+                                    streak_kind: "win",
+                                    streak_value: winner_streak,
+                                });
+                            }
+                        }
+                    }
                 }
             }
             _ => {

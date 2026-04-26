@@ -529,3 +529,4 @@ mod utility;
 mod curses;
 mod vendetta;
 mod tout_ou_rien;
+mod bounty;

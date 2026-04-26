@@ -177,3 +177,6 @@ pub use coude_vendetta_repository::PgCoudeVendettaRepository;
 
 mod coude_tout_ou_rien_repository;
 pub use coude_tout_ou_rien_repository::PgCoudeToutOuRienRepository;
+
+mod coude_bounty_repository;
+pub use coude_bounty_repository::PgCoudeBountyRepository;

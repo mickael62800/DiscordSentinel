@@ -162,6 +162,15 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/tout-ou-rien/by-user/{user_id}",
             get(handlers::coude::get_user_stats),
         )
+        // Migration 164 : primes collectives (cf. COUPE_AMELIORATIONS 5.3)
+        .route(
+            "/{guild_id}/bounties/by-target/{target_id}",
+            get(handlers::coude::get_bounty_by_target),
+        )
+        .route(
+            "/{guild_id}/bounties/by-target/{target_id}/contribute",
+            post(handlers::coude::contribute_to_target),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

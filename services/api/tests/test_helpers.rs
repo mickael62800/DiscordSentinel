@@ -538,6 +538,14 @@ pub struct StubCoudeToutOuRien;
     async fn user_stats(&self, _: &str, _: &str) -> Result<sentinel_api::domain::entities::ToutOuRienUserStats, DomainError> { Ok(Default::default()) }
 }
 
+pub struct StubCoudeBounty;
+#[async_trait] impl sentinel_api::ports::outbound::CoudeBountyRepository for StubCoudeBounty {
+    async fn open(&self, _: &str, _: &str, _: i64) -> Result<uuid::Uuid, DomainError> { Ok(uuid::Uuid::new_v4()) }
+    async fn get_open(&self, _: &str, _: &str) -> Result<Option<sentinel_api::domain::entities::ActiveBounty>, DomainError> { Ok(None) }
+    async fn contribute(&self, _: uuid::Uuid, _: &str, _: &str, _: i64) -> Result<i64, DomainError> { Ok(0) }
+    async fn claim(&self, _: uuid::Uuid, _: &str) -> Result<i64, DomainError> { Ok(0) }
+}
+
 // ── Stubs pour les nouveaux repos ──
 
 pub struct StubUserActivityRepo;
@@ -693,6 +701,7 @@ fn base_state() -> AppState {
         coude_safety_net_uc: Arc::new(StubCoudeSafetyNet),
         coude_vendetta_uc: Arc::new(StubCoudeVendetta),
         coude_tout_ou_rien_repo: Arc::new(StubCoudeToutOuRien),
+        coude_bounty_repo: Arc::new(StubCoudeBounty),
         resolve_betting_batch_uc: Arc::new(StubResolveBettingBatch),
         expire_combats_batch_uc: Arc::new(StubExpireCombatsBatch),
         resolve_combat_now_uc: Arc::new(StubResolveCombatNow),

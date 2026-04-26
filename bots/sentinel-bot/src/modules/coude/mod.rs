@@ -137,6 +137,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "tout-ou-rien" => commands::tout_ou_rien::handle(ctx, command).await,
         "vendetta" => commands::vendetta::handle(ctx, command).await,
         "memorial" => commands::memorial::handle(ctx, command).await,
+        "contribuer-prime" => commands::contribuer_prime::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -175,6 +176,7 @@ pub fn handles_command(name: &str) -> bool {
             | "tout-ou-rien"
             | "vendetta"
             | "memorial"
+            | "contribuer-prime"
     )
 }
 

@@ -253,6 +253,12 @@ pub use mythic_events::{
     format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
 };
 
+mod bounty;
+pub use bounty::{
+    ActiveBounty, BountyStatus, BOUNTY_AUTO_OPEN_STREAK_THRESHOLD, BOUNTY_INITIAL_AMOUNT,
+    BOUNTY_MIN_CONTRIBUTION,
+};
+
 mod vendetta;
 pub use vendetta::{
     apply_revenge_bonus, ActiveVendetta, VendettaStatus, VENDETTA_BOURREAU_SUFFIX_PREFIX,

@@ -133,3 +133,6 @@ pub use coude_vendetta_repository::CoudeVendettaRepository;
 
 mod coude_tout_ou_rien_repository;
 pub use coude_tout_ou_rien_repository::CoudeToutOuRienRepository;
+
+mod coude_bounty_repository;
+pub use coude_bounty_repository::CoudeBountyRepository;

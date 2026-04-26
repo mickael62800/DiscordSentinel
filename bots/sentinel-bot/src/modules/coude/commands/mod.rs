@@ -6,6 +6,7 @@ pub mod boost_voleur;
 pub mod braquage;
 pub mod cagnotte;
 pub mod classe;
+pub mod contribuer_prime;
 pub mod coude;
 pub mod defend_item;
 pub mod donner;
@@ -67,5 +68,6 @@ pub fn all() -> Vec<CreateCommand> {
         tout_ou_rien::register(),
         vendetta::register(),
         memorial::register(),
+        contribuer_prime::register(),
     ]
 }
