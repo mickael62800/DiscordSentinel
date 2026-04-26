@@ -214,3 +214,26 @@ pub use wheel::{
     is_memorable_case, spin_with_rng as wheel_spin_with_rng, WheelCase, WheelOutcome,
     WheelSpin, WheelTopWinner, WHEEL_CASES,
 };
+
+mod combat_outcome_flags;
+pub use combat_outcome_flags::{
+    detect_outcome_flags, CombatOutcomeFlags, CLUTCH_HP_PCT_MAX, COMEBACK_HP_PCT_MAX,
+    COMEBACK_MIN_ROUNDS_LOW_HP, PERFECT_HP_PCT_MIN,
+};
+
+mod cowardice_relief;
+pub use cowardice_relief::{should_count_as_cowardice, COWARDICE_RELIEF_HP_PCT};
+
+mod lucky_shield;
+pub use lucky_shield::{
+    apply_lucky_shield, should_preserve_win_streak_after_shielded_defeat,
+    LUCKY_SHIELD_LOSS_MULTIPLIER,
+};
+
+mod smart_default_bet;
+pub use smart_default_bet::{quick_bet_buttons, suggest_default_bet, DEFAULT_BET_PCT};
+
+mod branding;
+pub use branding::{
+    coude_bet_footer, coude_combat_footer, COUDE_TAGLINE, COUDE_TAGLINE_SHORT, SENTINEL_TAGLINE,
+};
