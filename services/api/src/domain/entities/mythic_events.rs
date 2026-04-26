@@ -60,7 +60,7 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         probability: 0.003,
         emoji: "💀",
         announce: "💀 **REVANCHE D OUTRE-TOMBE** — {loser} ressuscite, vole 30% des coins de {winner}, repart !",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "invasion_poulets",

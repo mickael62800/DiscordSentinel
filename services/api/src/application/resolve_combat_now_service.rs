@@ -247,6 +247,44 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         }
                     }
                 }
+                // Revanche d outre-tombe : le perdant ressuscite et vole
+                // 30% des coins du gagnant. On force un match nul
+                // (skip le pipeline atomique de paiement combat) et on
+                // execute directement un transfert 30%-balance du
+                // gagnant vers le perdant.
+                "revanche_outre_tombe" => {
+                    let original_winner = result.winner_id.clone();
+                    let original_loser = result.loser_id.clone();
+                    result.winner_id = None;
+                    result.loser_id = None;
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                    if let (Some(w_id), Some(l_id)) = (original_winner, original_loser) {
+                        let w_balance = match self.wallet_repo.get(&combat.guild_id, &w_id).await {
+                            Ok(Some(w)) => w.coins,
+                            _ => 0,
+                        };
+                        let stolen = (w_balance as f64 * 0.30) as i64;
+                        if stolen > 0 {
+                            if let Err(e) = self
+                                .wallet_repo
+                                .transfer(
+                                    &combat.guild_id,
+                                    &w_id,
+                                    &l_id,
+                                    stolen,
+                                    "mythic_revanche_outre_tombe",
+                                    "Revanche d outre-tombe (vol 30%)",
+                                )
+                                .await
+                            {
+                                warn!(error = %e, "Echec transfert Revanche outre-tombe");
+                            }
+                        }
+                    }
+                }
                 // Jackpot divin : le combat est resolu normalement (winner /
                 // loser conserves) mais le winner touche en plus un bonus
                 // de 10 * mise depuis le neant (le serveur paye, pas la

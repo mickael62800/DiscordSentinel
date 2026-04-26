@@ -114,6 +114,7 @@ fn mechanical_flags_count_matches_expectation() {
         "licorne_rose",
         "etoile_filante",
         "jackpot_divin",
+        "revanche_outre_tombe",
         "invasion_poulets",
         "distributeur_pq",
         "trefle_quatre_feuilles",
