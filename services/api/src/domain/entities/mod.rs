@@ -253,6 +253,13 @@ pub use mythic_events::{
     format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
 };
 
+mod tout_ou_rien;
+pub use tout_ou_rien::{
+    coin_delta as tout_ou_rien_delta, resolve_outcome as tout_ou_rien_resolve,
+    ToutOuRienOutcome, TOUT_OU_RIEN_COOLDOWN_KEY, TOUT_OU_RIEN_COOLDOWN_SECS,
+    TOUT_OU_RIEN_LOSS_KEEP_PCT, TOUT_OU_RIEN_WIN_MULTIPLIER, TOUT_OU_RIEN_WIN_PROBABILITY,
+};
+
 mod season_theme;
 pub use season_theme::{
     season_theme_by_key, theme_for_season, SeasonTheme, CURRENT_SEASON_THEME_CONFIG_KEY,

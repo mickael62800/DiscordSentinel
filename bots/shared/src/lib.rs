@@ -11,3 +11,4 @@ pub mod parsers;
 pub mod shard_launcher;
 pub mod branding;
 pub mod season_theme;
+pub mod tout_ou_rien;

@@ -27,6 +27,7 @@ pub mod resume;
 pub mod saison;
 pub mod shop_cmd;
 pub mod taunts_channel;
+pub mod tout_ou_rien;
 pub mod train;
 pub mod voler;
 
@@ -61,5 +62,6 @@ pub fn all() -> Vec<CreateCommand> {
         prank::register(),
         aide::register(),
         saboter::register(),
+        tout_ou_rien::register(),
     ]
 }
