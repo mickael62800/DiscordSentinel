@@ -91,7 +91,7 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         label: "Aliens",
         probability: 0.0005,
         emoji: "🛸",
-        announce: "🛸 **ALIENS** — les deux combattants sont abductes ! Combat marque 'non resolu' pendant 24h, resultat mystere a venir.",
+        announce: "🛸 **ALIENS** survolent l arene puis repartent. Les combattants gardent un souvenir flou. Le combat est resolu normalement (le report 24h promis dans le folklore reste a implementer).",
         mechanical_implemented: false,
     },
     MythicEvent {
@@ -99,7 +99,7 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         label: "Le Magicien",
         probability: 0.001,
         emoji: "🎩",
-        announce: "🎩 **LE MAGICIEN** — les classes des deux combattants sont echangees pour ce combat seulement !",
+        announce: "🎩 **LE MAGICIEN** apparait dans l arene — il prononce un sort, fait disparaitre une licorne, repart. Le combat suit son cours, mais on a tous vu un magicien.",
         mechanical_implemented: false,
     },
     MythicEvent {
