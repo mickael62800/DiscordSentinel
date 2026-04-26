@@ -76,7 +76,7 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         probability: 0.0015,
         emoji: "🧻",
         announce: "🧻 **DISTRIBUTEUR DE PQ** — tout le pot devient du PQ, personne ne gagne rien, on rigole quand meme.",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "trefle_quatre_feuilles",

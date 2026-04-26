@@ -209,6 +209,15 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 result.stolen_bonus = 0;
                 result.vol_coins = 0;
             }
+            // Effet "Distributeur de PQ" : le resultat est conserve (un
+            // gagnant, un perdant) mais le pot devient du PQ — aucun
+            // transfert de coins. Personne ne gagne/perd financierement.
+            if ev.key == "distributeur_pq" {
+                result.coins_won = 0;
+                result.coins_lost_by_loser = 0;
+                result.stolen_bonus = 0;
+                result.vol_coins = 0;
+            }
         }
 
         let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);
