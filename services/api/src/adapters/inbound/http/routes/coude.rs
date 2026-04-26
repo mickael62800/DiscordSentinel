@@ -140,6 +140,15 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/curses/{target_id}/lift",
             post(handlers::coude::lift_curse),
         )
+        // Migration 161 : vendettas (cf. COUPE_AMELIORATIONS 5.3)
+        .route(
+            "/{guild_id}/vendettas",
+            post(handlers::coude::declare_vendetta),
+        )
+        .route(
+            "/{guild_id}/vendettas/by-challenger/{challenger_id}",
+            get(handlers::coude::list_vendettas_by_challenger),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

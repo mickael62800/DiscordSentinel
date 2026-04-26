@@ -105,3 +105,6 @@ pub use manage_coude_curses::{CastedCurse, ManageCoudeCursesUseCase};
 
 pub mod manage_coude_safety_net;
 pub use manage_coude_safety_net::ManageCoudeSafetyNetUseCase;
+
+pub mod manage_coude_vendetta;
+pub use manage_coude_vendetta::ManageCoudeVendettaUseCase;

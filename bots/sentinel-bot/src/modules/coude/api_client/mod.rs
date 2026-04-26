@@ -517,3 +517,4 @@ mod economy;
 mod events;
 mod utility;
 mod curses;
+mod vendetta;

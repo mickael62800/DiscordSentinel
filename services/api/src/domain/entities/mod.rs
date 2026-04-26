@@ -253,6 +253,12 @@ pub use mythic_events::{
     format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
 };
 
+mod vendetta;
+pub use vendetta::{
+    apply_revenge_bonus, ActiveVendetta, VendettaStatus, VENDETTA_BOURREAU_SUFFIX_PREFIX,
+    VENDETTA_WINDOW_HOURS, VENDETTA_WIN_BONUS_MULTIPLIER,
+};
+
 mod safety_net;
 pub use safety_net::{
     boost_bet_gain as safety_net_boost_bet_gain, reduce_loss as safety_net_reduce_loss,

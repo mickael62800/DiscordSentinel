@@ -102,3 +102,6 @@ pub use manage_coude_curses_service::ManageCoudeCursesService;
 
 pub mod manage_coude_safety_net_service;
 pub use manage_coude_safety_net_service::ManageCoudeSafetyNetService;
+
+pub mod manage_coude_vendetta_service;
+pub use manage_coude_vendetta_service::ManageCoudeVendettaService;

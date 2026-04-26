@@ -171,3 +171,6 @@ pub use coude_curses_repository::PgCoudeCursesRepository;
 
 mod coude_safety_net_repository;
 pub use coude_safety_net_repository::PgCoudeSafetyNetRepository;
+
+mod coude_vendetta_repository;
+pub use coude_vendetta_repository::PgCoudeVendettaRepository;

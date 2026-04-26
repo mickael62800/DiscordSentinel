@@ -29,6 +29,7 @@ pub mod shop_cmd;
 pub mod taunts_channel;
 pub mod tout_ou_rien;
 pub mod train;
+pub mod vendetta;
 pub mod voler;
 
 use serenity::builder::CreateCommand;
@@ -63,5 +64,6 @@ pub fn all() -> Vec<CreateCommand> {
         aide::register(),
         saboter::register(),
         tout_ou_rien::register(),
+        vendetta::register(),
     ]
 }

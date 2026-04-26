@@ -24,7 +24,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::{
     PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgBotConfigRepository,
     PgConductRepository, PgCoudeBetRepository, PgCoudeCashboxRepository, PgCoudeCombatRepository,
-    PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeSafetyNetRepository,
+    PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeSafetyNetRepository, PgCoudeVendettaRepository,
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
@@ -40,7 +40,7 @@ use crate::application::{
     AnalyzeImageService, AnalyzeMessageService, BlackjackService, ExpireCombatsBatchService,
     ExportService, ManageAuditLogsService, ManageConductService, ManageCoudeBetsService,
     ManageCoudeCashboxService, ManageCoudeCatalogService, ManageCoudeCombatsService,
-    ManageCoudeCursesService, ManageCoudeEconomyService, ManageCoudeHeistService, ManageCoudeInventoryService, ManageCoudeSafetyNetService,
+    ManageCoudeCursesService, ManageCoudeEconomyService, ManageCoudeHeistService, ManageCoudeInventoryService, ManageCoudeSafetyNetService, ManageCoudeVendettaService,
     ManageCoudePlayersService, ManageCoudeSocialService, ManageCoudeStealBoostsService,
     ManageCoudeStealProtectionsService, ManageCoudeTauntsService, ManageWalletService,
     ManageInfractionsService,
@@ -468,6 +468,12 @@ pub async fn build_app_state(
     let coude_safety_net_uc: Arc<dyn crate::ports::inbound::ManageCoudeSafetyNetUseCase> =
         Arc::new(ManageCoudeSafetyNetService::new(coude_safety_net_repo.clone()));
 
+    // Vendetta (cf. COUPE_AMELIORATIONS 5.3).
+    let coude_vendetta_repo: Arc<dyn crate::ports::outbound::CoudeVendettaRepository> =
+        Arc::new(PgCoudeVendettaRepository::new(pg_pool.clone()));
+    let coude_vendetta_uc: Arc<dyn crate::ports::inbound::ManageCoudeVendettaUseCase> =
+        Arc::new(ManageCoudeVendettaService::new(coude_vendetta_repo));
+
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::CoudeStealProtectionRepository,
     > = Arc::new(PgCoudeStealProtectionRepository::new(pg_pool.clone()));
@@ -573,6 +579,7 @@ pub async fn build_app_state(
         coude_heist_uc,
         coude_curses_uc,
         coude_safety_net_uc,
+        coude_vendetta_uc,
         broadcaster,
         job_client,
         discord_api,

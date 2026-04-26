@@ -21,6 +21,7 @@ pub mod social;
 pub mod taunts;
 pub mod tournaments;
 pub mod curses;
+pub mod vendetta;
 
 pub use bets::*;
 pub use combats::*;
@@ -32,6 +33,7 @@ pub use social::*;
 pub use taunts::*;
 pub use tournaments::*;
 pub use curses::*;
+pub use vendetta::*;
 
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.
 ///
