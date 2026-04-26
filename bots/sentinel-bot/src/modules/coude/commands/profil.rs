@@ -196,6 +196,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         embed = embed.field("\u{1f6e1}\u{fe0f} Assurance", ins_text, false);
     }
 
+    // Succes cosmetiques (cf. COUPE_AMELIORATIONS 3.4) — derives de
+    // l etat actuel du joueur, aucune persistance dediee.
+    let achievements_text =
+        crate::modules::coude::achievements::format_unlocked_compact(&player);
+    embed = embed.field("\u{1f3c5} Succes", achievements_text, false);
+
     // Malediction OU sabotage actif (cf. COUPE_AMELIORATIONS 5.1 / 5.2).
     if let Some(curse) = active_curse {
         let remaining_str = chrono::DateTime::parse_from_rfc3339(&curse.expires_at)
