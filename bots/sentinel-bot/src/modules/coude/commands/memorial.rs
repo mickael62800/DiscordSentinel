@@ -69,9 +69,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .title("\u{1faa6} MEMORIAL DES CLODOS")
         .description(body)
         .color(0x424242)
-        .footer(CreateEmbedFooter::new(
-            "Tout-ou-rien · Au nom du Pere, du Fils et du Saint Wallet",
-        ))
+        .footer(CreateEmbedFooter::new(format!(
+            "Tout-ou-rien · Au nom du Pere, du Fils et du Saint Wallet · {}",
+            sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+        )))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command

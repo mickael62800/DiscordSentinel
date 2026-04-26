@@ -209,9 +209,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             expires_date
         ))
         .color(0x8E44AD)
-        .footer(CreateEmbedFooter::new(
-            "Coup de Coude | Sentinel — Cumulatif avec les autres boosts",
-        ))
+        .footer(CreateEmbedFooter::new(format!(
+            "{} — Cumulatif avec les autres boosts",
+            sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+        )))
         .timestamp(serenity::model::Timestamp::now());
 
     crate::modules::coude::interaction_helper::followup_embed_ephemeral(ctx, command, embed).await;

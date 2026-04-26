@@ -91,7 +91,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             false,
         )
         .color(0xF1C40F)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel — Reset saisonnier tous les 3 mois"))
+        .footer(CreateEmbedFooter::new(format!(
+            "{} — Reset saisonnier tous les 3 mois",
+            sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+        )))
         .timestamp(serenity::model::Timestamp::now());
 
     command

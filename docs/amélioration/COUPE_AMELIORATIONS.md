@@ -544,7 +544,7 @@ Modifie l'équilibre sans toucher au code, juste via config. Les joueurs
 **Bénéfice** : le jeu "respire", chaque 3 mois apporte un twist. Renforce
 l'**identité : un jeu vivant qui bouge**.
 
-### 6.4 🟢 Tagline + ton des embeds ⏳
+### 6.4 🟢 Tagline + ton des embeds ✅
 
 Choisir **une** identité et l'assumer partout dans les textes :
 
@@ -610,10 +610,9 @@ Effet viral : les participants invitent leurs potes.
 - 🟢 **Bouclier malchance du jour** (4.1) — première défaite quotidienne ×0.5
   *(distinct du filet de sécurité 4.4 déjà fait, qui s'active sous 50c)*
 - 🔴 **Mode duel amical** (4.5) — `/coude-amical` sans mise
-- 🟢 **Tagline + ton des embeds** (6.4) — choisir LA phrase signature et l'afficher partout
 
 ### 🎯 Verdict
-~22 des 28 features livrées. Il ne reste que des items quick-win (tagline,
+~23 des 28 features livrées. Il ne reste que des items quick-win (tagline,
 bouclier 1ère défaite, mise par défaut) ou cosmétiques/onboarding
 (tutoriel, duel amical, ultimates shop). Le cœur du jeu — chaos, prestige,
 paliers, sabotage, vendetta, signature roue — est complet.

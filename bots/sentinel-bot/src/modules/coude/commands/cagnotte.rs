@@ -91,9 +91,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         )
         .field("\u{23f0} Derniere redistribution", last_redist_field, false)
         .color(0xF39C12)
-        .footer(CreateEmbedFooter::new(
-            "Coup de Coude | Sentinel — Redistribution hebdomadaire aux joueurs actifs",
-        ))
+        .footer(CreateEmbedFooter::new(format!(
+            "{} — Redistribution hebdomadaire aux joueurs actifs",
+            sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+        )))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command

@@ -162,9 +162,10 @@ fn build_result_embed(user_id: &str, r: &crate::modules::coude::api_client::Heis
                 r.cashbox_total_before
             ))
             .color(0xFFD700)
-            .footer(CreateEmbedFooter::new(
-                "Coup de Coude | Sentinel — Braquage hebdomadaire",
-            ))
+            .footer(CreateEmbedFooter::new(format!(
+                "{} — Braquage hebdomadaire",
+                sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+            )))
             .timestamp(serenity::model::Timestamp::now())
     } else {
         let prison_msg = r
@@ -196,9 +197,10 @@ fn build_result_embed(user_id: &str, r: &crate::modules::coude::api_client::Heis
                 flavor, r.chance_percent, tools_line, prison_msg
             ))
             .color(0xE74C3C)
-            .footer(CreateEmbedFooter::new(
-                "Coup de Coude | Sentinel — Retour dans 1 semaine minimum",
-            ))
+            .footer(CreateEmbedFooter::new(format!(
+                "{} — Retour dans 1 semaine minimum",
+                sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+            )))
             .timestamp(serenity::model::Timestamp::now())
     }
 }
