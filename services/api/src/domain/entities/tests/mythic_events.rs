@@ -102,14 +102,17 @@ fn format_handles_none_winner_loser() {
 }
 
 #[test]
-fn all_mechanical_flags_are_false_for_now() {
-    // Cette assertion devra etre modifiee au fur et a mesure que les
-    // effets mecaniques sont branches commit par commit.
-    for e in MYTHIC_EVENTS {
-        assert!(
-            !e.mechanical_implemented,
-            "{} marque comme branche mecaniquement — mettre a jour ce test",
-            e.key
-        );
-    }
+fn mechanical_flags_count_matches_expectation() {
+    // Au fur et a mesure que les effets mythiques sont branches dans
+    // resolve_combat_now_service, la liste ci-dessous doit etre etendue.
+    let branched: Vec<&str> = MYTHIC_EVENTS
+        .iter()
+        .filter(|e| e.mechanical_implemented)
+        .map(|e| e.key)
+        .collect();
+    let expected = ["invasion_poulets"];
+    assert_eq!(
+        branched, expected,
+        "le set de mythiques branches mecaniquement a change"
+    );
 }

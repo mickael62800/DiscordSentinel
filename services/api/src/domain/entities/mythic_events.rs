@@ -68,7 +68,7 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         probability: 0.002,
         emoji: "🐔",
         announce: "🐔 **INVASION DE POULETS** — 50 poulets sauvages envahissent l arene, le combat est annule, match nul !",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "distributeur_pq",

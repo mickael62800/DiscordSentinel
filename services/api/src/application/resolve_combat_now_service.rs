@@ -174,7 +174,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             attacker_has_banana: self.fetch_banana(&combat.guild_id, &combat.attacker_id).await,
             defender_has_banana: self.fetch_banana(&combat.guild_id, &combat.defender_id).await,
         };
-        let result = engine::combat::resolve_combat_with_curses(
+        let mut result = engine::combat::resolve_combat_with_curses(
             &atk_player,
             &def_player,
             attacker.hp_current,
@@ -186,6 +186,30 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             &balance,
             curses,
         );
+
+        // Mythiques (cf. COUPE_AMELIORATIONS 2.1) — roll au tout debut pour
+        // pouvoir appliquer les effets mecaniques avant les paiements.
+        let mythic_event: Option<crate::domain::entities::MythicEvent> = {
+            use crate::domain::entities::roll_mythic_event;
+            use rand::rngs::StdRng;
+            use rand::SeedableRng;
+            let mut myth_rng = StdRng::from_entropy();
+            roll_mythic_event(&mut myth_rng)
+        };
+
+        // Effet "Invasion de poulets" : combat annule, match nul force, zero
+        // transfert de coins. On clear winner/loser et les montants pour que
+        // tout le pipeline de paiement plus bas se mette en mode "draw".
+        if let Some(ev) = &mythic_event {
+            if ev.key == "invasion_poulets" {
+                result.winner_id = None;
+                result.loser_id = None;
+                result.coins_won = 0;
+                result.coins_lost_by_loser = 0;
+                result.stolen_bonus = 0;
+                result.vol_coins = 0;
+            }
+        }
 
         let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);
         let first_def_roll = result.rounds.first().map(|r| r.defender_roll).unwrap_or(0);
@@ -628,34 +652,28 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // (jackpots parieurs + bonus combattants) avec ceux des streaks.
         taunt_events.extend(bets_draw_taunts);
 
-        // Mythiques (cf. COUPE_AMELIORATIONS 2.1) — events ultra-rares
-        // (somme ~1.6%) annonces en haut de l embed. Effets mecaniques
-        // pas encore branches : c est la premiere passe declarative.
-        let mythic_announce: Option<String> = {
-            use crate::domain::entities::{format_mythic_announce, roll_mythic_event};
-            use rand::rngs::StdRng;
-            use rand::SeedableRng;
-            let mut myth_rng = StdRng::from_entropy();
-            roll_mythic_event(&mut myth_rng).map(|ev| {
-                let winner_name = result.winner_id.as_deref().and_then(|id| {
-                    if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
-                    else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
-                    else { None }
-                });
-                let loser_name = result.loser_id.as_deref().and_then(|id| {
-                    if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
-                    else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
-                    else { None }
-                });
-                format_mythic_announce(
-                    &ev,
-                    &combat.attacker_name,
-                    &combat.defender_name,
-                    winner_name,
-                    loser_name,
-                )
-            })
-        };
+        // Mythiques (cf. COUPE_AMELIORATIONS 2.1) — annonce de l event
+        // deja roll au debut de la resolution (cf. plus haut).
+        let mythic_announce: Option<String> = mythic_event.map(|ev| {
+            use crate::domain::entities::format_mythic_announce;
+            let winner_name = result.winner_id.as_deref().and_then(|id| {
+                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
+                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
+                else { None }
+            });
+            let loser_name = result.loser_id.as_deref().and_then(|id| {
+                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
+                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
+                else { None }
+            });
+            format_mythic_announce(
+                &ev,
+                &combat.attacker_name,
+                &combat.defender_name,
+                winner_name,
+                loser_name,
+            )
+        });
 
         // Spectateurs fictifs (cf. COUPE_AMELIORATIONS 2.5) — 3-5 faux
         // commentaires de "spectateurs" injectes en fin d embed pour
