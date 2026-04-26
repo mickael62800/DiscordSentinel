@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome};
+use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeToutOuRienRepository;
 
@@ -79,6 +79,37 @@ impl CoudeToutOuRienRepository for PgCoudeToutOuRienRepository {
         .await
         .map_err(pg_err)?;
         Ok(())
+    }
+
+    async fn user_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<ToutOuRienUserStats, DomainError> {
+        // Aggregat unique pour eviter 4 round-trips. COALESCE pour les
+        // cas vides (jamais joue / jamais gagne / jamais perdu).
+        let row: (i64, i64, i64, i64, i64) = sqlx::query_as(
+            r#"SELECT
+                   COUNT(*)::BIGINT,
+                   COUNT(*) FILTER (WHERE outcome = 'won')::BIGINT,
+                   COUNT(*) FILTER (WHERE outcome = 'lost')::BIGINT,
+                   COALESCE(MAX(delta) FILTER (WHERE outcome = 'won'), 0)::BIGINT,
+                   COALESCE(ABS(MIN(delta)) FILTER (WHERE outcome = 'lost'), 0)::BIGINT
+               FROM coude_tout_ou_rien_log
+               WHERE guild_id = $1 AND user_id = $2"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(ToutOuRienUserStats {
+            attempts: row.0,
+            wins: row.1,
+            losses: row.2,
+            biggest_win: row.3,
+            biggest_loss: row.4,
+        })
     }
 
     async fn memorial(

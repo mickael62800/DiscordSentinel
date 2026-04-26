@@ -61,4 +61,25 @@ impl ApiClient {
             ))
             .await
     }
+
+    pub async fn get_user_tout_ou_rien_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<ToutOuRienUserStatsResp, String> {
+        self.base
+            .get_json(&format!(
+                "/api/coude/{guild_id}/tout-ou-rien/by-user/{user_id}"
+            ))
+            .await
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct ToutOuRienUserStatsResp {
+    pub attempts: i64,
+    pub wins: i64,
+    pub losses: i64,
+    pub biggest_win: i64,
+    pub biggest_loss: i64,
 }

@@ -39,6 +39,26 @@ pub struct ToutOuRienLogEntry {
     pub created_at: DateTime<Utc>,
 }
 
+/// Stats agregees d un joueur sur ses tentatives /tout-ou-rien.
+/// Utilise dans /profil pour afficher l historique personnel.
+#[derive(Debug, Clone, Default)]
+pub struct ToutOuRienUserStats {
+    pub attempts: i64,
+    pub wins: i64,
+    pub losses: i64,
+    /// Plus gros gain (delta positif max). 0 si jamais gagne.
+    pub biggest_win: i64,
+    /// Plus grosse perte (delta negatif min, en valeur absolue). 0 si
+    /// jamais perdu.
+    pub biggest_loss: i64,
+}
+
+impl ToutOuRienUserStats {
+    pub fn never_played(&self) -> bool {
+        self.attempts == 0
+    }
+}
+
 #[cfg(test)]
 #[path = "tests/tout_ou_rien_log.rs"]
 mod tests;

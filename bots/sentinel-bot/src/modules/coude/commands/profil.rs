@@ -83,6 +83,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .await
         .ok()
         .flatten();
+    let tor_stats = api
+        .get_user_tout_ou_rien_stats(&guild_id, &target.id.to_string())
+        .await
+        .unwrap_or_default();
 
     let class = catalog.get_class(player.class.as_deref().unwrap_or("bourrin"));
     let title = catalog.title_for_level(player.level).to_string();
@@ -201,6 +205,39 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let milestones_text =
         crate::modules::coude::milestones::format_profile_section(player.level);
     embed = embed.field("\u{1f4ca} Paliers", milestones_text, false);
+
+    // Stats /tout-ou-rien (cf. COUPE_AMELIORATIONS 6.1) — affichees
+    // uniquement si le joueur a deja tente au moins une fois.
+    if tor_stats.attempts > 0 {
+        let win_rate = if tor_stats.attempts > 0 {
+            (tor_stats.wins as f64 / tor_stats.attempts as f64 * 100.0) as i64
+        } else {
+            0
+        };
+        let mut lines = vec![format!(
+            "**{}** tentative{} — {} victoire{} / {} defaite{} ({}% de win-rate)",
+            tor_stats.attempts,
+            if tor_stats.attempts > 1 { "s" } else { "" },
+            tor_stats.wins,
+            if tor_stats.wins > 1 { "s" } else { "" },
+            tor_stats.losses,
+            if tor_stats.losses > 1 { "s" } else { "" },
+            win_rate,
+        )];
+        if tor_stats.biggest_win > 0 {
+            lines.push(format!(
+                "\u{1f3c6} Plus gros gain : **+{}** coins",
+                tor_stats.biggest_win
+            ));
+        }
+        if tor_stats.biggest_loss > 0 {
+            lines.push(format!(
+                "\u{1faa6} Plus grosse perte : **-{}** coins (au Memorial)",
+                tor_stats.biggest_loss
+            ));
+        }
+        embed = embed.field("\u{1f3b2} Tout-ou-rien", lines.join("\n"), false);
+    }
 
     // Succes cosmetiques (cf. COUPE_AMELIORATIONS 3.4) — derives de
     // l etat actuel du joueur, aucune persistance dediee.

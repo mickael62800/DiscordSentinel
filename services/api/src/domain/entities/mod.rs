@@ -274,7 +274,7 @@ pub use tout_ou_rien::{
 };
 
 mod tout_ou_rien_log;
-pub use tout_ou_rien_log::{ToutOuRienLogEntry, ToutOuRienLogOutcome};
+pub use tout_ou_rien_log::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
 
 mod season_theme;
 pub use season_theme::{

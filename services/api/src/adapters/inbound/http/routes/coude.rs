@@ -158,6 +158,10 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/tout-ou-rien/memorial",
             get(handlers::coude::get_memorial),
         )
+        .route(
+            "/{guild_id}/tout-ou-rien/by-user/{user_id}",
+            get(handlers::coude::get_user_stats),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

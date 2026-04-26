@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome};
+use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
@@ -94,4 +94,37 @@ pub async fn get_memorial(
         .memorial(&guild_id, q.limit)
         .await?;
     Ok(Json(entries.into_iter().map(Into::into).collect()))
+}
+
+#[derive(Debug, Serialize)]
+pub struct ToutOuRienUserStatsDto {
+    pub attempts: i64,
+    pub wins: i64,
+    pub losses: i64,
+    pub biggest_win: i64,
+    pub biggest_loss: i64,
+}
+
+impl From<ToutOuRienUserStats> for ToutOuRienUserStatsDto {
+    fn from(s: ToutOuRienUserStats) -> Self {
+        Self {
+            attempts: s.attempts,
+            wins: s.wins,
+            losses: s.losses,
+            biggest_win: s.biggest_win,
+            biggest_loss: s.biggest_loss,
+        }
+    }
+}
+
+/// GET /api/coude/{guild_id}/tout-ou-rien/by-user/{user_id}
+pub async fn get_user_stats(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<ToutOuRienUserStatsDto>, ApiError> {
+    let stats = state
+        .coude_tout_ou_rien_repo
+        .user_stats(&guild_id, &user_id)
+        .await?;
+    Ok(Json(stats.into()))
 }

@@ -535,6 +535,7 @@ pub struct StubCoudeToutOuRien;
 #[async_trait] impl sentinel_api::ports::outbound::CoudeToutOuRienRepository for StubCoudeToutOuRien {
     async fn record(&self, _: &str, _: &str, _: &str, _: i64, _: sentinel_api::domain::entities::ToutOuRienLogOutcome, _: i64) -> Result<(), DomainError> { Ok(()) }
     async fn memorial(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::ToutOuRienLogEntry>, DomainError> { Ok(vec![]) }
+    async fn user_stats(&self, _: &str, _: &str) -> Result<sentinel_api::domain::entities::ToutOuRienUserStats, DomainError> { Ok(Default::default()) }
 }
 
 // ── Stubs pour les nouveaux repos ──

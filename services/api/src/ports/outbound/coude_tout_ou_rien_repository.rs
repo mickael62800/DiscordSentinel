@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome};
+use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -24,4 +24,11 @@ pub trait CoudeToutOuRienRepository: Send + Sync {
         guild_id: &str,
         limit: i64,
     ) -> Result<Vec<ToutOuRienLogEntry>, DomainError>;
+
+    /// Stats agregees d un joueur (pour /profil).
+    async fn user_stats(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<ToutOuRienUserStats, DomainError>;
 }
