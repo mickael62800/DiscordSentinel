@@ -353,6 +353,19 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     result.stolen_bonus = 0;
                     result.vol_coins = 0;
                 }
+                // Aliens (light) : abduction brievement, les deux reviennent
+                // sonnes a 1 HP. Match nul force, zero transfert. Le report
+                // 24h promis dans le folklore reste a faire (out of scope).
+                "aliens" => {
+                    result.winner_id = None;
+                    result.loser_id = None;
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                    result.attacker_hp_final = 1;
+                    result.defender_hp_final = 1;
+                }
                 // Distributeur de PQ : un gagnant et un perdant sont bien
                 // declares mais le pot devient du PQ — aucun transfert.
                 "distributeur_pq" => {

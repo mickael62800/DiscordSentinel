@@ -91,8 +91,8 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         label: "Aliens",
         probability: 0.0005,
         emoji: "🛸",
-        announce: "🛸 **ALIENS** survolent l arene puis repartent. Les combattants gardent un souvenir flou. Le combat est resolu normalement (le report 24h promis dans le folklore reste a implementer).",
-        mechanical_implemented: false,
+        announce: "🛸 **ALIENS** abductent les deux combattants quelques minutes ! Ils reviennent sonnes (1 HP), match nul force. Aucun transfert de coins.",
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "magicien",

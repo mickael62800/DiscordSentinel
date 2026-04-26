@@ -118,6 +118,7 @@ fn mechanical_flags_count_matches_expectation() {
         "invasion_poulets",
         "distributeur_pq",
         "trefle_quatre_feuilles",
+        "aliens",
         "magicien",
         "bombe_nucleaire",
     ];
