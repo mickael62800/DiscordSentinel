@@ -103,3 +103,46 @@ fn display_format_includes_emoji_and_label() {
     assert!(s.contains("🍌"));
     assert!(s.contains("banane"));
 }
+
+#[test]
+fn graisser_has_specific_cost_and_duration() {
+    assert_eq!(CurseKind::Graisser.cost_coins(), 200);
+    assert_eq!(CurseKind::Graisser.duration_hours(), 24);
+}
+
+#[test]
+fn pancarte_has_specific_cost_and_duration() {
+    assert_eq!(CurseKind::Pancarte.cost_coins(), 150);
+    assert_eq!(CurseKind::Pancarte.duration_hours(), 24 * 7);
+}
+
+#[test]
+fn classic_curses_use_default_cost_and_duration() {
+    for k in [
+        CurseKind::Chicken,
+        CurseKind::Banana,
+        CurseKind::LeakyWallet,
+        CurseKind::Slowness,
+        CurseKind::Insomnia,
+        CurseKind::Heartbreak,
+    ] {
+        assert_eq!(k.cost_coins(), 300);
+        assert_eq!(k.duration_hours(), 24);
+    }
+}
+
+#[test]
+fn graisser_round_trips_db_string() {
+    assert_eq!(CurseKind::Graisser.as_db_str(), "graisser");
+    assert_eq!(CurseKind::from_db_str("graisser"), Some(CurseKind::Graisser));
+}
+
+#[test]
+fn graisser_excluded_from_random_pool() {
+    // Pancarte et Graisser sont des sabotages explicites — pas de
+    // tirage aleatoire par /maudire.
+    for k in CurseKind::ALL {
+        assert_ne!(k, CurseKind::Pancarte);
+        assert_ne!(k, CurseKind::Graisser);
+    }
+}

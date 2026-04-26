@@ -233,25 +233,38 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             })
             .unwrap_or_else(|| "?".to_string());
 
-        // Pancarte = sabotage (cosmetique pure, format dedie).
-        if curse.kind == "pancarte" {
-            embed = embed.field(
-                format!("{} Rival officiel", curse.kind_emoji),
-                format!(
-                    "Sous le nez de tout le monde : **Rival officiel de <@{}>**\nExpire dans **{}**.",
-                    curse.source_id, remaining_str
-                ),
-                false,
-            );
-        } else {
-            embed = embed.field(
-                format!("{} Malediction", curse.kind_emoji),
-                format!(
-                    "**{}** — pose par <@{}>\nExpire dans **{}** (lever : 600c)",
-                    curse.kind_label, curse.source_id, remaining_str
-                ),
-                false,
-            );
+        // Pancarte / Graisser = sabotages (format dedie).
+        match curse.kind.as_str() {
+            "pancarte" => {
+                embed = embed.field(
+                    format!("{} Rival officiel", curse.kind_emoji),
+                    format!(
+                        "Sous le nez de tout le monde : **Rival officiel de <@{}>**\nExpire dans **{}**.",
+                        curse.source_id, remaining_str
+                    ),
+                    false,
+                );
+            }
+            "graisser" => {
+                embed = embed.field(
+                    format!("{} Armes graissees", curse.kind_emoji),
+                    format!(
+                        "Sabotage de <@{}> : ta prochaine attaque speciale en combat va foirer ! Expire dans **{}**.",
+                        curse.source_id, remaining_str
+                    ),
+                    false,
+                );
+            }
+            _ => {
+                embed = embed.field(
+                    format!("{} Malediction", curse.kind_emoji),
+                    format!(
+                        "**{}** — pose par <@{}>\nExpire dans **{}** (lever : 600c)",
+                        curse.kind_label, curse.source_id, remaining_str
+                    ),
+                    false,
+                );
+            }
         }
     }
 

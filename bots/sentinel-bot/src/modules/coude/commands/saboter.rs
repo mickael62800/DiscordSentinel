@@ -24,7 +24,8 @@ pub fn register() -> CreateCommand {
         .add_option(
             CreateCommandOption::new(CommandOptionType::String, "type", "Type de sabotage")
                 .required(true)
-                .add_string_choice("Coller une pancarte (150c, 7 jours)", "pancarte"),
+                .add_string_choice("Coller une pancarte (150c, 7 jours)", "pancarte")
+                .add_string_choice("Graisser les armes (200c, prochaine attaque speciale)", "graisser"),
         )
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "cible", "Cible du sabotage")
@@ -123,17 +124,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     match result {
         Ok(out) => {
+            let effect_text = match out.kind.as_str() {
+                "pancarte" => format!(
+                    "<@{}> est marque « Rival officiel de <@{}> » pendant 7 jours, visible dans son `/profil`.",
+                    target_id, command.user.id
+                ),
+                "graisser" => format!(
+                    "La **prochaine attaque speciale** de <@{}> en combat foire automatiquement. Effet consume au 1er combat (sinon expire en 24h).",
+                    target_id
+                ),
+                _ => format!("Effet inconnu sur <@{}>.", target_id),
+            };
             let embed = CreateEmbed::new()
                 .title(format!("{} Sabotage execute !", out.kind_emoji))
                 .description(format!(
-                    "<@{}> vient de poser une **{}** sur <@{}> !\n\n\
-                     Effet : <@{}> est marque « Rival officiel de <@{}> » pendant 7 jours, visible dans son `/profil`.\n\
+                    "<@{}> vient de poser **{}** sur <@{}> !\n\n\
+                     Effet : {}\n\
                      Cout : {}c.",
                     command.user.id,
                     out.kind_label,
                     target_id,
-                    target_id,
-                    command.user.id,
+                    effect_text,
                     out.cost_paid,
                 ))
                 .color(0xE67E22)

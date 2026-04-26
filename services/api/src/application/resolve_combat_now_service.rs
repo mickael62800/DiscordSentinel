@@ -127,6 +127,25 @@ impl ResolveCombatNowService {
             Ok(Some(c)) if c.kind == CurseKind::Banana
         )
     }
+
+    /// Consume Graisser si actif sur la cible (cf. COUPE_AMELIORATIONS 5.2).
+    /// Retourne `true` si la malediction a ete trouvee + levee, ce qui doit
+    /// faire foirer la prochaine attaque speciale.
+    async fn consume_graisser_if_active(&self, guild_id: &str, user_id: &str) -> bool {
+        let Some(repo) = &self.curses_repo else { return false; };
+        use crate::domain::entities::CurseKind;
+        match repo.get_active_for_target(guild_id, user_id).await {
+            Ok(Some(c)) if c.kind == CurseKind::Graisser => {
+                // Consume the curse — log et continue meme si lift echoue
+                // (best-effort, le combat doit aboutir).
+                if let Err(e) = repo.lift(c.id, user_id).await {
+                    warn!(error = %e, %user_id, "Echec lift Graisser apres consumption");
+                }
+                true
+            }
+            _ => false,
+        }
+    }
 }
 
 #[async_trait]
@@ -209,18 +228,54 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             attacker_has_banana: self.fetch_banana(&combat.guild_id, &combat.attacker_id).await,
             defender_has_banana: self.fetch_banana(&combat.guild_id, &combat.defender_id).await,
         };
+
+        // Sabotage "Graisser les armes" (cf. COUPE_AMELIORATIONS 5.2) :
+        // si l attaquant ou le defenseur est sous l effet, sa prochaine
+        // attaque speciale foire (override a None) et le sabotage est
+        // consume.
+        let attacker_special_raw = combat.special_attack.as_deref();
+        let defender_special_raw = combat.defender_special.as_deref();
+        let mut graisser_msgs: Vec<String> = Vec::new();
+        let attacker_special_effective = if attacker_special_raw.is_some()
+            && self.consume_graisser_if_active(&combat.guild_id, &combat.attacker_id).await
+        {
+            graisser_msgs.push(format!(
+                "\u{1f6e2}\u{fe0f} **{}** : son arme etait graissee, l attaque speciale foire !",
+                combat.attacker_name
+            ));
+            None
+        } else {
+            attacker_special_raw
+        };
+        let defender_special_effective = if defender_special_raw.is_some()
+            && self.consume_graisser_if_active(&combat.guild_id, &combat.defender_id).await
+        {
+            graisser_msgs.push(format!(
+                "\u{1f6e2}\u{fe0f} **{}** : son arme etait graissee, la riposte foire !",
+                combat.defender_name
+            ));
+            None
+        } else {
+            defender_special_raw
+        };
+
         let mut result = engine::combat::resolve_combat_with_curses(
             &atk_player,
             &def_player,
             attacker.hp_current,
             defender.hp_current,
             combat.mise,
-            combat.special_attack.as_deref(),
-            combat.defender_special.as_deref(),
+            attacker_special_effective,
+            defender_special_effective,
             &engine_events,
             &balance,
             curses,
         );
+
+        // Prefix les messages Graisser dans la description du combat.
+        if !graisser_msgs.is_empty() {
+            result.message = format!("{}\n\n{}", graisser_msgs.join("\n"), result.message);
+        }
 
         // Mythiques (cf. COUPE_AMELIORATIONS 2.1) — roll au tout debut pour
         // pouvoir appliquer les effets mecaniques avant les paiements.

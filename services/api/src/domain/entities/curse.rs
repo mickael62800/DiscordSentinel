@@ -76,6 +76,11 @@ pub enum CurseKind {
     Heartbreak,
     /// Pancarte "Rival officiel de @X" affichee sous le profil 7 jours.
     Pancarte,
+    /// Sabotage "Graisser les armes" (cf. COUPE_AMELIORATIONS 5.2) :
+    /// la prochaine attaque speciale de la cible foire automatiquement
+    /// (override a `None`). Consume on use. Cout : 200c. Expire en 24h
+    /// si jamais declenchee.
+    Graisser,
 }
 
 impl CurseKind {
@@ -89,6 +94,7 @@ impl CurseKind {
             CurseKind::Insomnia => "insomnia",
             CurseKind::Heartbreak => "heartbreak",
             CurseKind::Pancarte => "pancarte",
+            CurseKind::Graisser => "graisser",
         }
     }
 
@@ -101,6 +107,7 @@ impl CurseKind {
             "insomnia" => Some(CurseKind::Insomnia),
             "heartbreak" => Some(CurseKind::Heartbreak),
             "pancarte" => Some(CurseKind::Pancarte),
+            "graisser" => Some(CurseKind::Graisser),
             _ => None,
         }
     }
@@ -115,6 +122,7 @@ impl CurseKind {
             CurseKind::Insomnia => "🧛",
             CurseKind::Heartbreak => "💔",
             CurseKind::Pancarte => "🪧",
+            CurseKind::Graisser => "🛢️",
         }
     }
 
@@ -128,22 +136,25 @@ impl CurseKind {
             CurseKind::Insomnia => "Insomnie",
             CurseKind::Heartbreak => "Malchance amoureuse",
             CurseKind::Pancarte => "Pancarte Rival officiel",
+            CurseKind::Graisser => "Armes graissees",
         }
     }
 
-    /// Cout en coins paye par l auteur. Specifique a Pancarte (sabotage,
-    /// 150c) ; les 6 maledictions classiques coutent 300c.
+    /// Cout en coins paye par l auteur. Specifique aux sabotages /
+    /// curses non-classiques. Defaut = CURSE_COST_COINS (300c).
     pub fn cost_coins(self) -> i64 {
         match self {
             CurseKind::Pancarte => 150,
+            CurseKind::Graisser => 200,
             _ => CURSE_COST_COINS,
         }
     }
 
-    /// Duree de vie en heures. Pancarte = 7 jours, autres = 24h.
+    /// Duree de vie en heures. Defaut = CURSE_DURATION_HOURS (24h).
     pub fn duration_hours(self) -> i64 {
         match self {
             CurseKind::Pancarte => 24 * 7,
+            // Graisser = 24h fallback ; en pratique consume au 1er combat.
             _ => CURSE_DURATION_HOURS,
         }
     }
