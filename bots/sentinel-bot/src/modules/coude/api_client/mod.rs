@@ -533,3 +533,4 @@ mod bounty;
 mod refusal;
 mod coalition;
 mod ultimate;
+mod prestige;

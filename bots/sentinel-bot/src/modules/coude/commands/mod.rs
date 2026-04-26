@@ -20,6 +20,7 @@ pub mod no_taunts;
 pub mod prank;
 pub mod pari;
 pub mod potion;
+pub mod prestige;
 pub mod prime;
 pub mod profil;
 pub mod protection;
@@ -75,5 +76,6 @@ pub fn all() -> Vec<CreateCommand> {
         honneur::register(),
         coalition::register(),
         ultimate::register(),
+        prestige::register(),
     ]
 }

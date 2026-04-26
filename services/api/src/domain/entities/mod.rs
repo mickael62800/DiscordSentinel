@@ -274,6 +274,12 @@ pub use ultimate::{
     ultimate_ready, UltimateKind, UltimateState, ULTIMATE_UNLOCK_LEVEL,
 };
 
+mod prestige;
+pub use prestige::{
+    can_prestige, prestige_gain_multiplier, prestige_stars, PRESTIGE_GAIN_BONUS_PCT,
+    PRESTIGE_MAX_COUNT, PRESTIGE_UNLOCK_LEVEL,
+};
+
 mod vendetta;
 pub use vendetta::{
     apply_revenge_bonus, ActiveVendetta, VendettaStatus, VENDETTA_BOURREAU_SUFFIX_PREFIX,

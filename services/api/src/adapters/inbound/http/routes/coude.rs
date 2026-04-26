@@ -202,6 +202,11 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/ultimates/{user_id}",
             get(handlers::coude::get_ultimate_state),
         )
+        // Migration 168 : prestige (cf. roadmap 3.3)
+        .route(
+            "/{guild_id}/players/{user_id}/prestige",
+            post(handlers::coude::prestige_player),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

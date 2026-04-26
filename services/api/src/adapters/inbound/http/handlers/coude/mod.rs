@@ -27,6 +27,7 @@ pub mod bounty;
 pub mod refusal;
 pub mod coalition;
 pub mod ultimate;
+pub mod prestige;
 
 pub use bets::*;
 pub use combats::*;
@@ -44,6 +45,7 @@ pub use bounty::*;
 pub use refusal::*;
 pub use coalition::*;
 pub use ultimate::*;
+pub use prestige::*;
 
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.
 ///
