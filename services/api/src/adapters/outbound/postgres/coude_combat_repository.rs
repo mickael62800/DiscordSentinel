@@ -456,4 +456,25 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
         tx.commit().await.map_err(pg_err)?;
         Ok(out)
     }
+
+    async fn count_defeats_today(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<i64, DomainError> {
+        let count: Option<i64> = sqlx::query_scalar(
+            "SELECT COUNT(*)::bigint FROM coude_combats
+             WHERE guild_id = $1
+               AND winner_id IS NOT NULL
+               AND winner_id != $2
+               AND (attacker_id = $2 OR defender_id = $2)
+               AND DATE(resolved_at) = CURRENT_DATE",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(count.unwrap_or(0))
+    }
 }

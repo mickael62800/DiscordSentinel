@@ -71,6 +71,7 @@ impl CoudeCombatRepository for MockCombatRepo {
     async fn cancel_pending(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
     async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn mark_unresolved_bets_lost(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
+    async fn count_defeats_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
 }
 
 struct MockCombatsUc {

@@ -20,7 +20,8 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    apply_insurance_to_loss, compute_combat_xp, format_bet_payout_lines, CoudeBalanceParams,
+    apply_insurance_to_loss, apply_lucky_shield, compute_combat_xp, detect_outcome_flags,
+    format_bet_payout_lines, CoudeBalanceParams, CombatOutcomeFlags, COMEBACK_HP_PCT_MAX,
 };
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{
@@ -169,6 +170,10 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             .find_map(|r| r.chaos_event)
             .map(|c| c.key().to_string());
 
+        // Sprint 1 (2.3) — Detection des moments memorables (Clutch /
+        // Comeback / Perfect / Ridicule / Zero pointe).
+        let outcome_flags = compute_outcome_flags_from_result(&result, &combat);
+
         // 5. Persister le combat
         self.combat_repo
             .resolve(
@@ -273,7 +278,27 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     }
                 }
                 insurance_msg = adj.message;
-                let actual_loss = adj.actual_loss;
+
+                // Sprint 1 (4.1) — bouclier malchance : si c est la 1ere
+                // defaite du jour, perte * 0.5. Recommande pour eviter la
+                // spirale "j ai perdu une fois, je quitte".
+                let is_first_defeat_today = self
+                    .combat_repo
+                    .count_defeats_today(&combat.guild_id, loser_id)
+                    .await
+                    .unwrap_or(0)
+                    == 0;
+                let actual_loss = apply_lucky_shield(adj.actual_loss, is_first_defeat_today);
+                if is_first_defeat_today && actual_loss < adj.actual_loss {
+                    let shield_msg = format!(
+                        "\u{1f49a} Bouclier malchance du jour : perte reduite de {} a {}.",
+                        adj.actual_loss, actual_loss
+                    );
+                    insurance_msg = match insurance_msg {
+                        Some(prev) => Some(format!("{prev}\n{shield_msg}")),
+                        None => Some(shield_msg),
+                    };
+                }
 
                 // Payout atomique : credit winner + debit loser dans la meme
                 // tx Postgres. Evite les etats partiels si le processus crash
@@ -578,15 +603,74 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // (jackpots parieurs + bonus combattants) avec ceux des streaks.
         taunt_events.extend(bets_draw_taunts);
 
+        // Pretix les badges memorables au debut de la description si applicable.
+        let description = if outcome_flags.is_any_set() {
+            let labels = outcome_flags.labels().join(" · ");
+            format!("**{}**\n\n{}", labels, result.message)
+        } else {
+            result.message
+        };
+
         Ok(ResolveCombatNowOutput {
             combat_id: combat.id.to_string(),
             title: "\u{2694}\u{fe0f} Resultat du Coup de Coude !".into(),
-            description: result.message,
+            description,
             color: title_color,
             fields,
             taunt_events,
         })
     }
+}
+
+/// Calcule les flags memorables d un combat resolu.
+/// Identifie le gagnant + ses HP finaux + son d20 du 1er round + les rounds
+/// passes en bas HP, puis appelle `detect_outcome_flags`.
+fn compute_outcome_flags_from_result(
+    result: &crate::domain::services::coude_combat_engine::combat::CombatResult,
+    combat: &crate::domain::entities::CoudeCombat,
+) -> CombatOutcomeFlags {
+    let Some(winner_id) = result.winner_id.as_ref() else {
+        // Match nul : pas de "winner" -> seul potentiel flag = zero_pointe
+        return detect_outcome_flags(0, 1, 0, result.total_rounds as usize, None, 0);
+    };
+
+    let winner_is_attacker = *winner_id == combat.attacker_id;
+    let (winner_hp_remaining, winner_hp_max, loser_hp_remaining, winner_first_d20) =
+        if winner_is_attacker {
+            (
+                result.attacker_hp_final,
+                result.attacker_hp_max,
+                result.defender_hp_final,
+                result.rounds.first().map(|r| r.attacker_roll as u8),
+            )
+        } else {
+            (
+                result.defender_hp_final,
+                result.defender_hp_max,
+                result.attacker_hp_final,
+                result.rounds.first().map(|r| r.defender_roll as u8),
+            )
+        };
+
+    // Compte les rounds ou le gagnant est passe sous le seuil COMEBACK_HP_PCT_MAX.
+    let low_hp_threshold = (winner_hp_max as f64 * COMEBACK_HP_PCT_MAX) as i32;
+    let winner_low_hp_rounds: usize = result
+        .rounds
+        .iter()
+        .filter(|r| {
+            let hp = if winner_is_attacker { r.attacker_hp_after } else { r.defender_hp_after };
+            hp <= low_hp_threshold && hp > 0
+        })
+        .count();
+
+    detect_outcome_flags(
+        winner_hp_remaining,
+        winner_hp_max,
+        winner_low_hp_rounds,
+        result.total_rounds as usize,
+        winner_first_d20,
+        loser_hp_remaining,
+    )
 }
 
 /// Charge les parametres de balance du jeu Coup de Coude pour une guild

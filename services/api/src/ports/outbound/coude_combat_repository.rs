@@ -125,4 +125,17 @@ pub trait CoudeCombatRepository: Send + Sync {
     ) -> Result<Vec<(String, u64)>, DomainError> {
         unimplemented!("purge_guild_subsystem not implemented")
     }
+
+    /// Compte le nombre de combats perdus aujourd hui par `user_id` (resolved_at
+    /// CURRENT_DATE, statut resolved, loser_id = user). Utilise par le bouclier
+    /// malchance (lucky_shield) pour detecter la 1ere defaite du jour.
+    ///
+    /// Default `unimplemented!()` pour preserver les mocks existants.
+    async fn count_defeats_today(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<i64, DomainError> {
+        unimplemented!("count_defeats_today not implemented")
+    }
 }

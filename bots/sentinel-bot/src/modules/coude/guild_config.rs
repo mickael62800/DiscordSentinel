@@ -78,6 +78,20 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "default_bet", 10) as i64
     }
 
+    /// Sprint 1 (1.2) — Mise par defaut intelligente : 20% du wallet du
+    /// joueur, clampe [min_bet, max_bet]. Si wallet < min_bet, retourne
+    /// min_bet (le service refusera la mise pour solde insuffisant —
+    /// comportement intentionnel pour expliciter la borne au joueur).
+    pub fn smart_default_bet(&self, wallet_balance: i64) -> i64 {
+        let min = self.min_bet();
+        let max = self.max_bet();
+        let raw = ((wallet_balance.max(0) as f64) * 0.20).round() as i64;
+        if max < min {
+            return min.max(1);
+        }
+        raw.clamp(min, max)
+    }
+
     // ── Chaos ──
 
     pub fn chaos_enabled(&self) -> bool {
@@ -373,5 +387,52 @@ impl CoudeConfig {
     pub fn channel_tournament(&self) -> Option<String> {
         self.channel_opt("tournament_channel_id")
             .or_else(|| self.channel_activites())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn make_config(entries: &[(&str, &str)]) -> CoudeConfig {
+        let raw: HashMap<String, String> = entries
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.to_string()))
+            .collect();
+        CoudeConfig { raw }
+    }
+
+    #[test]
+    fn smart_default_20_pct_within_bounds() {
+        let cfg = make_config(&[("min_bet", "10"), ("max_bet", "1000"), ("default_bet", "50")]);
+        // 1000 * 20% = 200, dans [10, 1000] -> 200
+        assert_eq!(cfg.smart_default_bet(1000), 200);
+    }
+
+    #[test]
+    fn smart_default_clamped_to_min_when_wallet_small() {
+        let cfg = make_config(&[("min_bet", "10"), ("max_bet", "1000")]);
+        // 30 * 20% = 6, < 10 -> 10
+        assert_eq!(cfg.smart_default_bet(30), 10);
+    }
+
+    #[test]
+    fn smart_default_clamped_to_max() {
+        let cfg = make_config(&[("min_bet", "10"), ("max_bet", "1000")]);
+        // 100000 * 20% = 20000, > 1000 -> 1000
+        assert_eq!(cfg.smart_default_bet(100_000), 1000);
+    }
+
+    #[test]
+    fn smart_default_zero_wallet_returns_min() {
+        let cfg = make_config(&[("min_bet", "10"), ("max_bet", "1000")]);
+        assert_eq!(cfg.smart_default_bet(0), 10);
+    }
+
+    #[test]
+    fn smart_default_negative_wallet_safe() {
+        let cfg = make_config(&[("min_bet", "10"), ("max_bet", "1000")]);
+        assert_eq!(cfg.smart_default_bet(-50), 10);
     }
 }

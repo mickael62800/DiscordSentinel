@@ -14,7 +14,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::{cowardice_penalty, CashboxSource};
+use crate::domain::entities::{cowardice_penalty, should_count_as_cowardice, CashboxSource};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::expire_combats_batch::{
     ExpireCombatsBatchUseCase, ExpiredCombatOutput,
@@ -105,12 +105,25 @@ impl ExpireCombatsBatchUseCase for ExpireCombatsBatchService {
                 }
             }
 
-            if let Err(e) = self
+            // Sprint 1 (4.2) — relief : si le defenseur est <= 20% HP, on
+            // n incremente PAS cowardice. Refus legitime quand on est mourant.
+            let should_count = match self
                 .player_repo
-                .increment_cowardice(&combat.guild_id, &combat.defender_id)
+                .get(&combat.guild_id, &combat.defender_id)
                 .await
             {
-                warn!(error = %e, "Echec increment_cowardice defenseur expire");
+                Ok(Some(player)) => should_count_as_cowardice(player.hp_current, player.hp_max),
+                _ => true, // si erreur fetch, fallback sur comportement historique
+            };
+
+            if should_count {
+                if let Err(e) = self
+                    .player_repo
+                    .increment_cowardice(&combat.guild_id, &combat.defender_id)
+                    .await
+                {
+                    warn!(error = %e, "Echec increment_cowardice defenseur expire");
+                }
             }
 
             // Rembourser les paris (refund_all).
