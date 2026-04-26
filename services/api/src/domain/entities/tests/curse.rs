@@ -139,13 +139,31 @@ fn graisser_round_trips_db_string() {
 
 #[test]
 fn graisser_excluded_from_random_pool() {
-    // Pancarte / Graisser / Empoisonner sont des sabotages explicites
-    // — pas de tirage aleatoire par /maudire.
+    // Tous les sabotages sont des effets explicites — pas de tirage
+    // aleatoire par /maudire.
     for k in CurseKind::ALL {
         assert_ne!(k, CurseKind::Pancarte);
         assert_ne!(k, CurseKind::Graisser);
         assert_ne!(k, CurseKind::Empoisonner);
+        assert_ne!(k, CurseKind::FausseAssurance);
     }
+}
+
+#[test]
+fn fausse_assurance_has_specific_cost_uses_duration() {
+    assert_eq!(CurseKind::FausseAssurance.cost_coins(), 500);
+    assert_eq!(CurseKind::FausseAssurance.duration_hours(), 24 * 7);
+    assert_eq!(CurseKind::FausseAssurance.initial_uses(), Some(1));
+    assert_eq!(FAUSSE_ASSURANCE_FEE_COINS, 200);
+}
+
+#[test]
+fn fausse_assurance_round_trips_db_string() {
+    assert_eq!(CurseKind::FausseAssurance.as_db_str(), "fausse_assurance");
+    assert_eq!(
+        CurseKind::from_db_str("fausse_assurance"),
+        Some(CurseKind::FausseAssurance)
+    );
 }
 
 #[test]

@@ -26,7 +26,8 @@ pub fn register() -> CreateCommand {
                 .required(true)
                 .add_string_choice("Coller une pancarte (150c, 7 jours)", "pancarte")
                 .add_string_choice("Graisser les armes (200c, prochaine attaque speciale)", "graisser")
-                .add_string_choice("Empoisonner le wallet (400c, 10% des 3 prochains gains)", "empoisonner"),
+                .add_string_choice("Empoisonner le wallet (400c, 10% des 3 prochains gains)", "empoisonner")
+                .add_string_choice("Fausse assurance (500c, scam quand la cible perd avec une assurance)", "fausse_assurance"),
         )
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "cible", "Cible du sabotage")
@@ -136,6 +137,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 ),
                 "empoisonner" => format!(
                     "Sur les **3 prochains gains de combat** de <@{}>, **10%** sont redirige vers ton wallet. Expire en 7 jours si non epuise.",
+                    target_id
+                ),
+                "fausse_assurance" => format!(
+                    "La prochaine fois que <@{}> perd un combat avec une assurance active, elle est silencieusement annulee + **200c** preleves vers ton wallet. One-shot, expire en 7 jours si non declenche.",
                     target_id
                 ),
                 _ => format!("Effet inconnu sur <@{}>.", target_id),

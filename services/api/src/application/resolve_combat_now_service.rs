@@ -743,12 +743,60 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
 
                 // Assurance : clamp-then-apply dans le domain pour que les
                 // joueurs fauches beneficient effectivement de la protection.
-                let active_insurance = self
+                let mut active_insurance = self
                     .inventory_uc
                     .get_active_insurance(&combat.guild_id, loser_id)
                     .await
                     .ok()
                     .flatten();
+
+                // Sabotage Fausse assurance (cf. COUPE_AMELIORATIONS 5.2) :
+                // si le loser est sous l effet ET avait une assurance
+                // active, l assurance est annulee + 200c additionnels
+                // sont preleves vers le saboteur. La curse est consumee.
+                if let (Some(curses_repo), Some(_ins)) = (&self.curses_repo, &active_insurance) {
+                    use crate::domain::entities::{CurseKind, FAUSSE_ASSURANCE_FEE_COINS};
+                    if let Ok(Some(c)) = curses_repo
+                        .get_active_for_target(&combat.guild_id, loser_id)
+                        .await
+                    {
+                        if c.kind == CurseKind::FausseAssurance {
+                            // Nullifie la protection : le clamp-then-apply
+                            // partira en flux "no insurance".
+                            active_insurance = None;
+                            // Frais additionnels via transfer atomique
+                            // loser -> saboteur. Hors-tx mais ok : si
+                            // echec on a juste pas de tax (loser garde
+                            // ses coins).
+                            if let Err(e) = self
+                                .wallet_repo
+                                .transfer(
+                                    &combat.guild_id,
+                                    loser_id,
+                                    &c.source_id,
+                                    FAUSSE_ASSURANCE_FEE_COINS,
+                                    "fausse_assurance_fee",
+                                    "Sabotage Fausse assurance — frais",
+                                )
+                                .await
+                            {
+                                warn!(error = %e, "Echec transfer fausse assurance");
+                            }
+                            if let Err(e) = curses_repo.consume_one_use(c.id).await {
+                                warn!(error = %e, "Echec consume FausseAssurance");
+                            }
+                            let scam_msg = format!(
+                                "\u{1f3ad} **Fausse assurance** : <@{}> decouvre que son contrat etait un scam de <@{}> ! Aucune reduction + {}c de frais preleves.",
+                                loser_id, c.source_id, FAUSSE_ASSURANCE_FEE_COINS
+                            );
+                            insurance_msg = match insurance_msg {
+                                Some(prev) => Some(format!("{prev}\n{scam_msg}")),
+                                None => Some(scam_msg),
+                            };
+                        }
+                    }
+                }
+
                 let mut adj = apply_insurance_to_loss(
                     result.coins_lost_by_loser,
                     loser_balance,

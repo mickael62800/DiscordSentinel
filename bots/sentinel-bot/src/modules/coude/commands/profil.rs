@@ -308,6 +308,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     false,
                 );
             }
+            "fausse_assurance" => {
+                embed = embed.field(
+                    format!("{} Fausse assurance", curse.kind_emoji),
+                    format!(
+                        "Sabotage de <@{}> : ton prochain combat perdu avec une assurance, la protection ne s applique pas + 200c preleves. Expire dans **{}**.",
+                        curse.source_id, remaining_str
+                    ),
+                    false,
+                );
+            }
             _ => {
                 embed = embed.field(
                     format!("{} Malediction", curse.kind_emoji),

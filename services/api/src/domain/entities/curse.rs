@@ -88,6 +88,12 @@ pub enum CurseKind {
     /// sur les 3 prochains gains de combat de la cible, 10% sont redirige
     /// vers le saboteur. Cout : 400c. Expire en 7 jours ou apres 3 uses.
     Empoisonner,
+    /// Sabotage "Fausse assurance" (cf. COUPE_AMELIORATIONS 5.2) :
+    /// la prochaine fois que la cible perd un combat avec une assurance
+    /// active, l assurance ne s applique PAS et 200c additionnels sont
+    /// preleves a son wallet et redirige vers le saboteur. One-shot.
+    /// Cout : 500c. Expire en 7 jours si non declenche.
+    FausseAssurance,
 }
 
 impl CurseKind {
@@ -103,6 +109,7 @@ impl CurseKind {
             CurseKind::Pancarte => "pancarte",
             CurseKind::Graisser => "graisser",
             CurseKind::Empoisonner => "empoisonner",
+            CurseKind::FausseAssurance => "fausse_assurance",
         }
     }
 
@@ -117,6 +124,7 @@ impl CurseKind {
             "pancarte" => Some(CurseKind::Pancarte),
             "graisser" => Some(CurseKind::Graisser),
             "empoisonner" => Some(CurseKind::Empoisonner),
+            "fausse_assurance" => Some(CurseKind::FausseAssurance),
             _ => None,
         }
     }
@@ -133,6 +141,7 @@ impl CurseKind {
             CurseKind::Pancarte => "🪧",
             CurseKind::Graisser => "🛢️",
             CurseKind::Empoisonner => "☠️",
+            CurseKind::FausseAssurance => "🎭",
         }
     }
 
@@ -148,6 +157,7 @@ impl CurseKind {
             CurseKind::Pancarte => "Pancarte Rival officiel",
             CurseKind::Graisser => "Armes graissees",
             CurseKind::Empoisonner => "Wallet empoisonne",
+            CurseKind::FausseAssurance => "Fausse assurance",
         }
     }
 
@@ -158,6 +168,7 @@ impl CurseKind {
             CurseKind::Pancarte => 150,
             CurseKind::Graisser => 200,
             CurseKind::Empoisonner => 400,
+            CurseKind::FausseAssurance => 500,
             _ => CURSE_COST_COINS,
         }
     }
@@ -167,6 +178,7 @@ impl CurseKind {
         match self {
             CurseKind::Pancarte => 24 * 7,
             CurseKind::Empoisonner => 24 * 7,
+            CurseKind::FausseAssurance => 24 * 7,
             // Graisser = 24h fallback ; en pratique consume au 1er combat.
             _ => CURSE_DURATION_HOURS,
         }
@@ -178,6 +190,7 @@ impl CurseKind {
     pub fn initial_uses(self) -> Option<i32> {
         match self {
             CurseKind::Empoisonner => Some(3),
+            CurseKind::FausseAssurance => Some(1),
             _ => None,
         }
     }
@@ -253,6 +266,10 @@ pub fn apply_insomnia_to_taunt_weight(base_weight: f64, has_insomnia: bool) -> f
 
 /// Pourcentage redirige vers le saboteur sous l effet "Empoisonner".
 pub const POISON_GAIN_REDIRECT_PCT: f64 = 0.10;
+
+/// Frais additionnels (en coins) preleves a la cible et redirige au
+/// saboteur quand "Fausse assurance" est declenchee.
+pub const FAUSSE_ASSURANCE_FEE_COINS: i64 = 200;
 
 /// Calcule le montant a rediriger vers le saboteur sur un gain donne.
 /// Floor a 0 si pas empoisonne ou gain non-positif.
