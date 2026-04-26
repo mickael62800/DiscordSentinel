@@ -628,6 +628,38 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // (jackpots parieurs + bonus combattants) avec ceux des streaks.
         taunt_events.extend(bets_draw_taunts);
 
+        // Spectateurs fictifs (cf. COUPE_AMELIORATIONS 2.5) — 3-5 faux
+        // commentaires de "spectateurs" injectes en fin d embed pour
+        // donner l illusion d une foule. Zero mecanique.
+        {
+            use crate::domain::entities::{format_spectator_chat, pick_spectator_chat};
+            use rand::rngs::StdRng;
+            use rand::SeedableRng;
+            let mut chat_rng = StdRng::from_entropy();
+            let winner_name = result.winner_id.as_deref().and_then(|id| {
+                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
+                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
+                else { None }
+            });
+            let loser_name = result.loser_id.as_deref().and_then(|id| {
+                if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
+                else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
+                else { None }
+            });
+            let chat = pick_spectator_chat(
+                &mut chat_rng,
+                &combat.attacker_name,
+                &combat.defender_name,
+                winner_name,
+                loser_name,
+            );
+            fields.push(ResolvedCombatEmbedField {
+                name: "\u{1f4e3} Tribune".into(),
+                value: format_spectator_chat(&chat),
+                inline: false,
+            });
+        }
+
         // Pretix les badges memorables au debut de la description si applicable.
         let description = if outcome_flags.is_any_set() {
             let labels = outcome_flags.labels().join(" · ");
