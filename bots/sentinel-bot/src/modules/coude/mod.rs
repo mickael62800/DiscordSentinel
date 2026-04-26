@@ -8,6 +8,7 @@ pub const MODULE_BOT_NAME: &str = "coude-bot";
 pub mod achievements;
 pub mod api_client;
 pub mod catalog;
+pub mod milestones;
 pub mod channel_check;
 pub mod commands;
 pub mod daily_chaos_events;

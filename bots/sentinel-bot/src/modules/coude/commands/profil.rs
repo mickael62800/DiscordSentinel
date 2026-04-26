@@ -196,6 +196,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         embed = embed.field("\u{1f6e1}\u{fe0f} Assurance", ins_text, false);
     }
 
+    // Paliers visibles (cf. COUPE_AMELIORATIONS 3.2) — debloques par
+    // niveau, declaratif uniquement pour l instant.
+    let milestones_text =
+        crate::modules::coude::milestones::format_profile_section(player.level);
+    embed = embed.field("\u{1f4ca} Paliers", milestones_text, false);
+
     // Succes cosmetiques (cf. COUPE_AMELIORATIONS 3.4) — derives de
     // l etat actuel du joueur, aucune persistance dediee.
     let achievements_text =
