@@ -478,17 +478,20 @@ pub async fn build_app_state(
                 .with_bot_config_repo(bot_config_repo.clone()),
         );
     let resolve_combat_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase> =
-        Arc::new(ResolveCombatNowService::new(
-            coude_combat_repo.clone(),
-            coude_combats_uc.clone(),
-            coude_players_uc.clone() as Arc<dyn crate::ports::inbound::ManageCoudePlayersUseCase>,
-            wallet_repo.clone(),
-            coude_bets_uc.clone(),
-            coude_inventory_uc.clone(),
-            coude_social_uc.clone(),
-            coude_taunts_uc.clone(),
-            bot_config_repo.clone(),
-        ));
+        Arc::new(
+            ResolveCombatNowService::new(
+                coude_combat_repo.clone(),
+                coude_combats_uc.clone(),
+                coude_players_uc.clone() as Arc<dyn crate::ports::inbound::ManageCoudePlayersUseCase>,
+                wallet_repo.clone(),
+                coude_bets_uc.clone(),
+                coude_inventory_uc.clone(),
+                coude_social_uc.clone(),
+                coude_taunts_uc.clone(),
+                bot_config_repo.clone(),
+            )
+            .with_curses_repo(coude_curses_repo.clone()),
+        );
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),

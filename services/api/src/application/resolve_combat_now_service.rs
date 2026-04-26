@@ -34,7 +34,9 @@ use crate::ports::inbound::{
     ManageCoudeBetsUseCase, ManageCoudeCombatsUseCase, ManageCoudeInventoryUseCase,
     ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
 };
-use crate::ports::outbound::{BotConfigRepository, CoudeCombatRepository, WalletRepository};
+use crate::ports::outbound::{
+    BotConfigRepository, CoudeCombatRepository, CoudeCursesRepository, WalletRepository,
+};
 
 pub struct ResolveCombatNowService {
     combat_repo: Arc<dyn CoudeCombatRepository>,
@@ -46,6 +48,7 @@ pub struct ResolveCombatNowService {
     social_uc: Arc<dyn ManageCoudeSocialUseCase>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
+    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -70,7 +73,24 @@ impl ResolveCombatNowService {
             social_uc,
             taunts_uc,
             bot_config_repo,
+            curses_repo: None,
         }
+    }
+
+    /// Branche le repo des maledictions pour activer Banana
+    /// (cf. COUPE_AMELIORATIONS 5.1) sur les d20 du combat.
+    pub fn with_curses_repo(mut self, repo: Arc<dyn CoudeCursesRepository>) -> Self {
+        self.curses_repo = Some(repo);
+        self
+    }
+
+    async fn fetch_banana(&self, guild_id: &str, user_id: &str) -> bool {
+        let Some(repo) = &self.curses_repo else { return false; };
+        use crate::domain::entities::CurseKind;
+        matches!(
+            repo.get_active_for_target(guild_id, user_id).await,
+            Ok(Some(c)) if c.kind == CurseKind::Banana
+        )
     }
 }
 
@@ -150,7 +170,11 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             }
         }
 
-        let result = engine::combat::resolve_combat(
+        let curses = engine::combat::CombatCurses {
+            attacker_has_banana: self.fetch_banana(&combat.guild_id, &combat.attacker_id).await,
+            defender_has_banana: self.fetch_banana(&combat.guild_id, &combat.defender_id).await,
+        };
+        let result = engine::combat::resolve_combat_with_curses(
             &atk_player,
             &def_player,
             attacker.hp_current,
@@ -160,6 +184,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             combat.defender_special.as_deref(),
             &engine_events,
             &balance,
+            curses,
         );
 
         let first_atk_roll = result.rounds.first().map(|r| r.attacker_roll).unwrap_or(0);

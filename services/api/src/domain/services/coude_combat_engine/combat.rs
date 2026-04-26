@@ -233,6 +233,16 @@ fn max_rounds(combined_hp: i32) -> i32 {
 // ── Main combat function ──
 // ══════════════════════════════════════════════════════════════════════
 
+/// Maledictions actives sur les combattants (cf. COUPE_AMELIORATIONS 5.1).
+/// Default = aucune malediction. Les call-sites historiques continuent
+/// d appeler `resolve_combat` sans curses ; `resolve_combat_with_curses`
+/// expose la version branchee pour les services qui les fetchent.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct CombatCurses {
+    pub attacker_has_banana: bool,
+    pub defender_has_banana: bool,
+}
+
 pub fn resolve_combat(
     attacker: &Player,
     defender: &Player,
@@ -243,6 +253,24 @@ pub fn resolve_combat(
     defender_special: Option<&str>,
     active_events: &[ServerEvent],
     params: &CoudeBalanceParams,
+) -> CombatResult {
+    resolve_combat_with_curses(
+        attacker, defender, attacker_current_hp, defender_current_hp, mise, special,
+        defender_special, active_events, params, CombatCurses::default(),
+    )
+}
+
+pub fn resolve_combat_with_curses(
+    attacker: &Player,
+    defender: &Player,
+    attacker_current_hp: i32,
+    defender_current_hp: i32,
+    mise: i64,
+    special: Option<&str>,
+    defender_special: Option<&str>,
+    active_events: &[ServerEvent],
+    params: &CoudeBalanceParams,
+    curses: CombatCurses,
 ) -> CombatResult {
     // Pre-calcul des coefficients a partir des % config.
     let rage_atk_mult = 1.0 + (params.rage_atk_bonus_pct as f64 / 100.0);
@@ -385,16 +413,29 @@ pub fn resolve_combat(
         let mut atk_passif: Option<String> = None;
         let mut def_passif: Option<String> = None;
 
-        // ── Rolls ──
-        let mut atk_roll: i32 = rng.gen_range(1..=20);
-        let mut def_roll: i32 = rng.gen_range(1..=20);
+        // ── Rolls (avec branchement Banana cf. COUPE_AMELIORATIONS 5.1) ──
+        // Si le combattant est sous Peau de banane, 30% de chance que son
+        // d20 soit ramene a 1 (echec critique). Le tirage de probabilite
+        // est independant du d20 lui-meme.
+        let roll_d20 = |rng: &mut rand::rngs::ThreadRng, banana: bool| -> i32 {
+            let raw: i32 = rng.gen_range(1..=20);
+            if banana {
+                use crate::domain::entities::apply_banana_to_d20;
+                let p: f64 = rng.gen_range(0.0..1.0);
+                apply_banana_to_d20(raw as u8, true, p) as i32
+            } else {
+                raw
+            }
+        };
+        let mut atk_roll: i32 = roll_d20(&mut rng, curses.attacker_has_banana);
+        let mut def_roll: i32 = roll_d20(&mut rng, curses.defender_has_banana);
 
         if atk_double {
-            let second: i32 = rng.gen_range(1..=20);
+            let second: i32 = roll_d20(&mut rng, curses.attacker_has_banana);
             atk_roll = params.double_coup_mode.aggregate(atk_roll, second);
         }
         if def_double {
-            let second: i32 = rng.gen_range(1..=20);
+            let second: i32 = roll_d20(&mut rng, curses.defender_has_banana);
             def_roll = params.double_coup_mode.aggregate(def_roll, second);
         }
 
