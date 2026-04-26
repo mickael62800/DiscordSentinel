@@ -248,6 +248,11 @@ pub use fake_spectators::{
     SPECTATOR_LINES, SPECTATOR_USERNAMES,
 };
 
+mod mythic_events;
+pub use mythic_events::{
+    format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
+};
+
 mod curse;
 pub use curse::{
     apply_banana_to_d20, apply_insomnia_to_taunt_weight, apply_leaky_wallet, lift_cost,

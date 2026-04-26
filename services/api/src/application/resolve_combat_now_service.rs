@@ -628,6 +628,35 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // (jackpots parieurs + bonus combattants) avec ceux des streaks.
         taunt_events.extend(bets_draw_taunts);
 
+        // Mythiques (cf. COUPE_AMELIORATIONS 2.1) — events ultra-rares
+        // (somme ~1.6%) annonces en haut de l embed. Effets mecaniques
+        // pas encore branches : c est la premiere passe declarative.
+        let mythic_announce: Option<String> = {
+            use crate::domain::entities::{format_mythic_announce, roll_mythic_event};
+            use rand::rngs::StdRng;
+            use rand::SeedableRng;
+            let mut myth_rng = StdRng::from_entropy();
+            roll_mythic_event(&mut myth_rng).map(|ev| {
+                let winner_name = result.winner_id.as_deref().and_then(|id| {
+                    if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
+                    else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
+                    else { None }
+                });
+                let loser_name = result.loser_id.as_deref().and_then(|id| {
+                    if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
+                    else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
+                    else { None }
+                });
+                format_mythic_announce(
+                    &ev,
+                    &combat.attacker_name,
+                    &combat.defender_name,
+                    winner_name,
+                    loser_name,
+                )
+            })
+        };
+
         // Spectateurs fictifs (cf. COUPE_AMELIORATIONS 2.5) — 3-5 faux
         // commentaires de "spectateurs" injectes en fin d embed pour
         // donner l illusion d une foule. Zero mecanique.
@@ -666,6 +695,12 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             format!("**{}**\n\n{}", labels, result.message)
         } else {
             result.message
+        };
+        // Prefix mythique en tete de description si tombe.
+        let description = if let Some(annonce) = mythic_announce {
+            format!("{}\n\n{}", annonce, description)
+        } else {
+            description
         };
 
         Ok(ResolveCombatNowOutput {
