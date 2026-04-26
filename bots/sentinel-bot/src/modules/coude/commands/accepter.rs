@@ -229,6 +229,21 @@ pub async fn resolve_combat_internal_ex(
         embed = embed.field(f.name, f.value, f.inline);
     }
 
+    // Malediction "Lenteur" (cf. COUPE_AMELIORATIONS 5.1) : si un des deux
+    // combattants est sous Slowness, on retarde la diffusion du resultat
+    // de 10s. Best-effort : si l API curses casse, on n attend pas.
+    let attacker_slow = matches!(
+        api.get_active_curse(&combat_record.guild_id, &combat_record.attacker_id).await,
+        Ok(Some(c)) if c.kind == "slowness"
+    );
+    let defender_slow = matches!(
+        api.get_active_curse(&combat_record.guild_id, &combat_record.defender_id).await,
+        Ok(Some(c)) if c.kind == "slowness"
+    );
+    if attacker_slow || defender_slow {
+        tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+    }
+
     // Phase 9 Part D : dispatch les taunt events (100% IO, zero logique).
     if !resp.taunt_events.is_empty() {
         if let Ok(guild_id) = combat_record.guild_id.parse::<u64>() {
