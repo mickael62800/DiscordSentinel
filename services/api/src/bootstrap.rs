@@ -407,7 +407,8 @@ pub async fn build_app_state(
             wallet_uc.clone(),
             coude_taunts_uc.clone(),
         )
-        .with_leaky_wallet_support(wallet_repo.clone(), coude_curses_repo.clone()),
+        .with_leaky_wallet_support(wallet_repo.clone(), coude_curses_repo.clone())
+        .with_player_repo(coude_player_repo.clone()),
     );
     let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
     let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));

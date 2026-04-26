@@ -9,7 +9,9 @@ use crate::ports::inbound::manage_coude_economy::{
 };
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::{CoudeCursesRepository, CoudeEconomyRepository, WalletRepository};
+use crate::ports::outbound::{
+    CoudeCursesRepository, CoudeEconomyRepository, CoudePlayerRepository, WalletRepository,
+};
 
 /// Service "economie Coup de Coude".
 ///
@@ -33,6 +35,7 @@ pub struct ManageCoudeEconomyService {
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     wallet_repo: Option<Arc<dyn WalletRepository>>,
     curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
+    player_repo: Option<Arc<dyn CoudePlayerRepository>>,
 }
 
 impl ManageCoudeEconomyService {
@@ -41,7 +44,14 @@ impl ManageCoudeEconomyService {
         wallet_uc: Arc<dyn ManageWalletUseCase>,
         taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     ) -> Self {
-        Self { repo, wallet_uc, taunts_uc, wallet_repo: None, curses_repo: None }
+        Self {
+            repo,
+            wallet_uc,
+            taunts_uc,
+            wallet_repo: None,
+            curses_repo: None,
+            player_repo: None,
+        }
     }
 
     /// Branche les repos necessaires au LeakyWallet (cf. COUPE_AMELIORATIONS
@@ -57,6 +67,14 @@ impl ManageCoudeEconomyService {
         self
     }
 
+    /// Branche le repo player pour appliquer le multiplicateur de
+    /// "Saison du Vol" (cf. COUPE_AMELIORATIONS 6.3) : gains x1.5
+    /// pour le voleur, paye depuis le neant (server-paid bonus).
+    pub fn with_player_repo(mut self, player_repo: Arc<dyn CoudePlayerRepository>) -> Self {
+        self.player_repo = Some(player_repo);
+        self
+    }
+
     async fn has_leaky_wallet(&self, guild_id: &str, user_id: &str) -> bool {
         let Some(repo) = &self.curses_repo else {
             return false;
@@ -65,6 +83,20 @@ impl ManageCoudeEconomyService {
             repo.get_active_for_target(guild_id, user_id).await,
             Ok(Some(c)) if c.kind == CurseKind::LeakyWallet
         )
+    }
+
+    /// Bonus en coins a creer ex-nihilo si la "Saison du Vol" est
+    /// active pour le voleur. Retourne 0 si pas de saison ou pas
+    /// de player_repo branche.
+    async fn season_steal_bonus(&self, guild_id: &str, thief_id: &str, stolen: i64) -> i64 {
+        let Some(repo) = &self.player_repo else { return 0; };
+        let Ok(Some(player)) = repo.get(guild_id, thief_id).await else { return 0; };
+        use crate::domain::entities::theme_for_season;
+        let mult = theme_for_season(player.season).steal_gain_multiplier;
+        if mult <= 1.0 || stolen <= 0 {
+            return 0;
+        }
+        ((stolen as f64) * (mult - 1.0)) as i64
     }
 }
 
@@ -186,8 +218,29 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
             .record_steal_stats(guild_id, thief_id, victim_id, stolen)
             .await?;
 
+        // 4. Saison du Vol (cf. COUPE_AMELIORATIONS 6.3) : si le voleur
+        //    est en saison Vol, on credit un bonus ex-nihilo (la victime
+        //    n est pas davantage videe). Best-effort.
+        let season_bonus = self.season_steal_bonus(guild_id, thief_id, stolen).await;
+        if season_bonus > 0 {
+            if let Some(wallet_repo) = &self.wallet_repo {
+                if let Err(e) = wallet_repo
+                    .credit(
+                        guild_id,
+                        thief_id,
+                        season_bonus,
+                        "season_vol_bonus",
+                        "Bonus Saison du Vol",
+                    )
+                    .await
+                {
+                    tracing::warn!(error = %e, thief_id, "Echec credit bonus saison vol");
+                }
+            }
+        }
+
         Ok(StealOutcome {
-            stolen,
+            stolen: stolen + season_bonus,
             taunt_events: taunts,
         })
     }
