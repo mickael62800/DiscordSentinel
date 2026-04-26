@@ -106,6 +106,27 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
             .await
     }
 
+    async fn buy_insurance_for_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        is_scam: bool,
+        duration_seconds: i64,
+        level: i32,
+    ) -> Result<bool, DomainError> {
+        // Cf. COUPE_AMELIORATIONS 3.2 palier niveau 5.
+        let max_slots = if level >= 5 { 2 } else { 1 };
+        self.repo
+            .buy_insurance_with_max_slots(
+                guild_id,
+                user_id,
+                is_scam,
+                duration_seconds,
+                max_slots,
+            )
+            .await
+    }
+
     async fn get_active_insurance(
         &self,
         guild_id: &str,

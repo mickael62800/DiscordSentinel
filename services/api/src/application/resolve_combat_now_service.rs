@@ -946,6 +946,37 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         None => Some(c_msg),
                     };
                 }
+
+                // Bonus de prestige (cf. COUPE_AMELIORATIONS 3.3) :
+                // +5% par prestige du gagnant sur le payout combat.
+                // Lecture via player_repo si dispo.
+                let coins_transferred = if let Some(prepo) = &self.player_repo {
+                    use crate::domain::entities::prestige_gain_multiplier;
+                    let prestige_count = prepo
+                        .get_prestige_count(&combat.guild_id, winner_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .unwrap_or(0);
+                    let mult = prestige_gain_multiplier(prestige_count);
+                    if mult > 1.0 && coins_transferred > 0 {
+                        let boosted =
+                            ((coins_transferred as f64) * mult).round() as i64;
+                        let prestige_msg = format!(
+                            "\u{2728} Bonus prestige (x{:.2}) : {} -> {} coins.",
+                            mult, coins_transferred, boosted
+                        );
+                        insurance_msg = match insurance_msg {
+                            Some(prev) => Some(format!("{prev}\n{prestige_msg}")),
+                            None => Some(prestige_msg),
+                        };
+                        boosted
+                    } else {
+                        coins_transferred
+                    }
+                } else {
+                    coins_transferred
+                };
                 // Auto-break de la coalition : la cible vient de battre
                 // un de ses conspirateurs.
                 if let (Some(coalition_repo), Some(coalition_id)) =

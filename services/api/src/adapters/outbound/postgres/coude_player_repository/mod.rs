@@ -284,6 +284,24 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         Ok(row)
     }
 
+    async fn get_prestige_count(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        let row: Option<(i32,)> = sqlx::query_as(
+            r#"SELECT prestige_count
+               FROM coude_players
+               WHERE guild_id = $1 AND user_id = $2"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(crate::adapters::outbound::postgres::pg_err)?;
+        Ok(row.map(|(c,)| c))
+    }
+
     async fn touch_steal_victim_streak(
         &self,
         guild_id: &str,

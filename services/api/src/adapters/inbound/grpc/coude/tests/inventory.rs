@@ -288,7 +288,7 @@ async fn buy_insurance_returns_empty_on_success() {
     let g = grpc(uc, Arc::new(MockProtectionsUc::default()), Arc::new(MockBoostsUc::default()));
     let _ = g.buy_insurance(Request::new(proto::BuyInsuranceRequest {
         guild_id: "g".into(), user_id: "u".into(),
-        is_scam: false, duration_seconds: 86400,
+        is_scam: false, duration_seconds: 86400, level: 0,
     })).await.unwrap();
 }
 
@@ -299,7 +299,7 @@ async fn buy_insurance_already_active_returns_already_exists() {
     let g = grpc(uc, Arc::new(MockProtectionsUc::default()), Arc::new(MockBoostsUc::default()));
     let err = g.buy_insurance(Request::new(proto::BuyInsuranceRequest {
         guild_id: "g".into(), user_id: "u".into(),
-        is_scam: false, duration_seconds: 86400,
+        is_scam: false, duration_seconds: 86400, level: 0,
     })).await.unwrap_err();
     assert_eq!(err.code(), tonic::Code::AlreadyExists);
 }

@@ -165,6 +165,18 @@ pub trait CoudePlayerRepository: Send + Sync {
         Ok(None)
     }
 
+    /// Lecture du compteur de prestige (cf. COUPE_AMELIORATIONS 3.3).
+    /// Utilise pour appliquer le bonus +5%/prestige sur les gains. Default
+    /// impl Ok(None) pour preserver les mocks existants — equivaut a
+    /// "pas de bonus" (multiplier 1.0).
+    async fn get_prestige_count(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<Option<i32>, DomainError> {
+        Ok(None)
+    }
+
     /// Incremente `current_steal_victim_streak`. Retourne la nouvelle valeur.
     async fn touch_steal_victim_streak(
         &self,

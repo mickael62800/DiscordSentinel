@@ -277,6 +277,38 @@ impl CoudeInventoryRepository for PgCoudeInventoryRepository {
         Ok(inserted.is_some())
     }
 
+    async fn buy_insurance_with_max_slots(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        is_scam: bool,
+        duration_seconds: i64,
+        max_slots: i32,
+    ) -> Result<bool, DomainError> {
+        let secs = if duration_seconds <= 0 { 3600 } else { duration_seconds };
+        let max = max_slots.max(1);
+        // Insert seulement si le nombre d assurances actives < max_slots.
+        let inserted = sqlx::query_scalar::<_, Uuid>(
+            r#"INSERT INTO coude_insurances (guild_id, user_id, is_scam, expires_at)
+               SELECT $1, $2, $3, NOW() + make_interval(secs => $4)
+               WHERE (
+                   SELECT COUNT(*) FROM coude_insurances
+                    WHERE guild_id = $1 AND user_id = $2
+                      AND active = TRUE AND expires_at > NOW()
+               ) < $5
+               RETURNING id"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .bind(is_scam)
+        .bind(secs as f64)
+        .bind(max)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(inserted.is_some())
+    }
+
     async fn get_active_insurance(
         &self,
         guild_id: &str,

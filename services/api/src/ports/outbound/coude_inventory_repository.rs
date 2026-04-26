@@ -75,6 +75,20 @@ pub trait CoudeInventoryRepository: Send + Sync {
         duration_seconds: i64,
     ) -> Result<bool, DomainError>;
 
+    /// Variante avec nombre max d assurances actives concurrentes (cf.
+    /// COUPE_AMELIORATIONS 3.2, palier niveau 5 : 2 emplacements au lieu
+    /// de 1). Default impl delegue a `buy_insurance` (= max=1).
+    async fn buy_insurance_with_max_slots(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        is_scam: bool,
+        duration_seconds: i64,
+        _max_slots: i32,
+    ) -> Result<bool, DomainError> {
+        self.buy_insurance(guild_id, user_id, is_scam, duration_seconds).await
+    }
+
     async fn get_active_insurance(
         &self,
         guild_id: &str,

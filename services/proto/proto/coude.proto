@@ -614,6 +614,9 @@ message BuyInsuranceRequest {
   // Duree en secondes. 0 ou absent = defaut 3600 (1h) pour
   // retrocompat. Valeurs typiques : 86400 (1j), 604800 (1s), 2592000 (30j).
   int64 duration_seconds = 4;
+  // Niveau du joueur (cf. COUPE_AMELIORATIONS 3.2 palier niveau 5 :
+  // 2 emplacements d'assurance au lieu d'1). 0 = retrocompat (= 1 slot).
+  int32 level = 5;
 }
 
 message ExpireInsuranceRequest {

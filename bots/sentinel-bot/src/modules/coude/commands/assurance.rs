@@ -130,21 +130,24 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Verifier si deja assure
-    match api.get_active_insurance(&guild_id, &user_id).await {
-        Ok(Some(_)) => {
-            reply_ephemeral(
-                ctx,
-                command,
-                "Tu as deja une assurance active ! Attends sa fin avant de souscrire une nouvelle.",
-            )
-            .await;
-            return;
-        }
-        Ok(None) => {}
-        Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
-            return;
+    // Verifier si deja assure (palier niveau 5 : 2 slots autorises).
+    let max_slots: i32 = if player.level >= 5 { 2 } else { 1 };
+    if max_slots < 2 {
+        match api.get_active_insurance(&guild_id, &user_id).await {
+            Ok(Some(_)) => {
+                reply_ephemeral(
+                    ctx,
+                    command,
+                    "Tu as deja une assurance active ! Attends sa fin avant de souscrire une nouvelle.",
+                )
+                .await;
+                return;
+            }
+            Ok(None) => {}
+            Err(e) => {
+                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+                return;
+            }
         }
     }
 
@@ -164,7 +167,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
 
     if let Err(e) = api
-        .buy_insurance(&guild_id, &user_id, is_scam, tier.duration_seconds)
+        .buy_insurance(&guild_id, &user_id, is_scam, tier.duration_seconds, player.level)
         .await
     {
         // Rembourser

@@ -66,6 +66,20 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         duration_seconds: i64,
     ) -> Result<bool, DomainError>;
 
+    /// Variante de `buy_insurance` avec niveau du joueur passe explicitement
+    /// (cf. COUPE_AMELIORATIONS 3.2 palier niveau 5 : 2 slots actives au
+    /// lieu de 1). Default impl delegue a `buy_insurance` (= 1 slot).
+    async fn buy_insurance_for_level(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        is_scam: bool,
+        duration_seconds: i64,
+        _level: i32,
+    ) -> Result<bool, DomainError> {
+        self.buy_insurance(guild_id, user_id, is_scam, duration_seconds).await
+    }
+
     async fn get_active_insurance(
         &self,
         guild_id: &str,

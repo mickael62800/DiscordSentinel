@@ -172,7 +172,13 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
         let inserted = self.uc
-            .buy_insurance(&req.guild_id, &req.user_id, req.is_scam, req.duration_seconds)
+            .buy_insurance_for_level(
+                &req.guild_id,
+                &req.user_id,
+                req.is_scam,
+                req.duration_seconds,
+                req.level,
+            )
             .await
             .map_err(domain_to_status)?;
         if !inserted {
