@@ -63,6 +63,44 @@ async fn post_taunt_message(ctx: &Context, ev: &TauntEvent) {
     }
 }
 
+/// Renomme un membre en ajoutant un suffixe (best-effort, log+ignore en
+/// cas d echec). Utilise par le branchement Chicken (cf. COUPE_AMELIORATIONS
+/// 5.1) pour appliquer " le Poulet" au pseudo de la cible.
+pub async fn apply_suffix_to_user(
+    ctx: &Context,
+    guild_id: GuildId,
+    user_id: UserId,
+    suffix: &str,
+) {
+    if suffix.is_empty() {
+        return;
+    }
+    let member = match guild_id.member(&ctx.http, user_id).await {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!(error = %e, %user_id, "Echec fetch member pour rename curse");
+            return;
+        }
+    };
+    let current = member
+        .nick
+        .clone()
+        .unwrap_or_else(|| member.user.name.clone());
+    if current.ends_with(suffix) {
+        return;
+    }
+    let suffix_len = suffix.chars().count();
+    let max_base = DISCORD_NICKNAME_MAX.saturating_sub(suffix_len);
+    let base: String = current.chars().take(max_base).collect();
+    let new_nick = format!("{}{}", base, suffix);
+    if let Err(e) = guild_id
+        .edit_member(&ctx.http, user_id, EditMember::new().nickname(&new_nick))
+        .await
+    {
+        tracing::warn!(error = %e, %user_id, new_nick, "Echec rename member (curse)");
+    }
+}
+
 async fn apply_nickname_suffix(ctx: &Context, guild_id: GuildId, ev: &TauntEvent) {
     // Si le suffixe est vide, rename_enabled=false cote API : aucun rename.
     if ev.nickname_suffix.is_empty() {

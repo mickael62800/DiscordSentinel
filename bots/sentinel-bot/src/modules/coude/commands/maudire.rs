@@ -128,6 +128,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     match result {
         Ok(out) => {
+            // Branchement Chicken : rename immediat de la cible en
+            // "<pseudo> le Poulet". Reversion manuelle (le user peut
+            // rename apres /lift). Best-effort.
+            if out.kind == "chicken" {
+                if let Some(gid) = command.guild_id {
+                    crate::modules::coude::taunts_dispatch::apply_suffix_to_user(
+                        ctx,
+                        gid,
+                        target_id,
+                        " le Poulet",
+                    )
+                    .await;
+                }
+            }
+
             let embed = CreateEmbed::new()
                 .title(format!("{} Malediction posee !", out.kind_emoji))
                 .description(format!(
