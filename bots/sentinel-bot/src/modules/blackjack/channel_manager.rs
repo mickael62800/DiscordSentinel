@@ -165,9 +165,13 @@ mod tests {
         let user = UserId::new(1);
         mgr.register(user, ChannelId::new(100), GuildId::new(200));
 
-        // Forcer le timestamp dans le passe
+        // Forcer le timestamp dans le passe (skip si uptime trop bas)
+        let past = match Instant::now().checked_sub(std::time::Duration::from_secs(3600)) {
+            Some(p) => p,
+            None => return,
+        };
         if let Some(mut entry) = mgr.active.get_mut(&user) {
-            entry.last_activity = Instant::now() - std::time::Duration::from_secs(3600);
+            entry.last_activity = past;
         }
 
         let afk = mgr.afk_channels(1800);
@@ -181,9 +185,13 @@ mod tests {
         let user = UserId::new(1);
         mgr.register(user, ChannelId::new(100), GuildId::new(200));
 
-        // Forcer vieux
+        // Forcer vieux (skip si uptime trop bas)
+        let past = match Instant::now().checked_sub(std::time::Duration::from_secs(3600)) {
+            Some(p) => p,
+            None => return,
+        };
         if let Some(mut entry) = mgr.active.get_mut(&user) {
-            entry.last_activity = Instant::now() - std::time::Duration::from_secs(3600);
+            entry.last_activity = past;
         }
 
         mgr.touch(user);

@@ -135,7 +135,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .title("\u{1f414} Defi refuse !")
         .description(description)
         .color(0xED4245)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     // Remplacer la card de defi par la card de refus (supprime les boutons)

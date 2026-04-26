@@ -93,7 +93,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
             attacker.coins - penalty,
         ))
         .color(0x95A5A6)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = component

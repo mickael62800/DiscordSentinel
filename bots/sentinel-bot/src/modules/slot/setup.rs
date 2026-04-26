@@ -35,7 +35,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
              3x \u{0037}\u{fe0f}\u{20e3} = pool jackpot progressif !"
         )
         .color(0xf1c40f)
-        .footer(CreateEmbedFooter::new("Slot Machine | Sentinel"));
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::SLOT_TAGLINE));
 
     let open_btn = CreateButton::new(PANEL_OPEN_ID)
         .label("Ouvrir ma machine")

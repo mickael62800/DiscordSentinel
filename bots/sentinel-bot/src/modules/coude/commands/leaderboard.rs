@@ -84,7 +84,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             format_leaderboard(&chaos, "events"),
             false,
         )
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command

@@ -141,7 +141,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             hp_current, hp_max, hp_pct, bar_full, bar_empty, status, regen_msg
         ))
         .color(color)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Err(e) = command

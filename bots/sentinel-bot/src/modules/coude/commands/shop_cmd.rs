@@ -232,7 +232,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     command.user.id, item.emoji, item.name, price, item.description
                 ))
                 .color(category_color(category))
-                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+                .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
                 .timestamp(serenity::model::Timestamp::now());
 
             crate::modules::coude::channel_check::post_activity(
@@ -308,7 +308,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .title(title)
                 .description(desc)
                 .color(category_color(category))
-                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+                .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
                 .timestamp(serenity::model::Timestamp::now());
 
             if let Err(e) = command

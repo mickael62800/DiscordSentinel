@@ -184,7 +184,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             true,
         )
         .field("\u{1f3d2} Inventaire", inventory_field, false)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     if let Some(ins_text) = insurance_field {

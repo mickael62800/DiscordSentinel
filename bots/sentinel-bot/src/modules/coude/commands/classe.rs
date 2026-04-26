@@ -111,7 +111,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
     let embed = embed
         .color(0x3498DB)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"));
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT));
 
     let buttons = vec![
         CreateButton::new(format!("{CLASS_SELECT_PREFIX}bourrin"))
@@ -258,7 +258,7 @@ pub async fn handle_select(ctx: &Context, component: &ComponentInteraction) {
             class_info.emoji, class_info.name, cost_msg, class_info.passif_description, class_info.description
         ))
         .color(0x57F287)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"));
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT));
 
     // Apres Acknowledge (DEFERRED_UPDATE_MESSAGE), on edite le message d'origine.
     component

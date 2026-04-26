@@ -98,7 +98,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             class.emoji, class.name, class.base_atk, class.base_def
         ))
         .color(0x3498DB)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     command

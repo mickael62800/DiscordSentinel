@@ -157,7 +157,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             format!("{} coins", total),
             false,
         )
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     crate::modules::coude::channel_check::post_activity_followup(ctx, command, config.channel_activites(), embed).await;

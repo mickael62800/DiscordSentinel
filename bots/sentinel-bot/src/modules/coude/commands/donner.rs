@@ -278,7 +278,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 command.user.id, amount, target_id, amount, tax, received
             ))
             .color(0x57F287)
-            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
             .timestamp(serenity::model::Timestamp::now());
 
         crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;
@@ -378,7 +378,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 command.user.id, qty_label, item.name, item.emoji, target_id
             ))
             .color(0x3498DB)
-            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
             .timestamp(serenity::model::Timestamp::now());
 
         crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;

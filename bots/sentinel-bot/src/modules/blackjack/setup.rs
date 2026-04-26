@@ -28,7 +28,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
              *Bonne chance !*"
         )
         .color(0xF1C40F)
-        .footer(CreateEmbedFooter::new("Blackjack | Sentinel"));
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::BLACKJACK_TAGLINE));
 
     let button = CreateButton::new(PANEL_BUTTON_ID)
         .label("Jouer au Blackjack")

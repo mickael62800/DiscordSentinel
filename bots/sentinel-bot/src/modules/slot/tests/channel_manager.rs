@@ -64,9 +64,17 @@ fn touch_updates_timestamp() {
     let user = UserId::new(1);
     mgr.register(user, ChannelId::new(100), GuildId::new(200));
 
-    // Force timestamp dans le passe
+    // Force timestamp dans le passe.
+    // Sur Windows fresh boot, Instant::now() peut etre < 3600s -> overflow.
+    // On skip le test si on ne peut pas reculer (rarissime mais robuste).
+    let past = match std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(3600))
+    {
+        Some(p) => p,
+        None => return, // skip silencieux : uptime systeme trop bas
+    };
     if let Some(mut entry) = mgr.active.get_mut(&user) {
-        entry.last_activity = std::time::Instant::now() - std::time::Duration::from_secs(3600);
+        entry.last_activity = past;
     }
 
     mgr.touch(user);
@@ -89,8 +97,14 @@ fn afk_channels_returns_old_entries() {
     let user = UserId::new(1);
     mgr.register(user, ChannelId::new(100), GuildId::new(200));
 
+    let past = match std::time::Instant::now()
+        .checked_sub(std::time::Duration::from_secs(3600))
+    {
+        Some(p) => p,
+        None => return, // skip si uptime trop bas (Windows fresh boot)
+    };
     if let Some(mut entry) = mgr.active.get_mut(&user) {
-        entry.last_activity = std::time::Instant::now() - std::time::Duration::from_secs(3600);
+        entry.last_activity = past;
     }
 
     let afk = mgr.afk_channels(1800);

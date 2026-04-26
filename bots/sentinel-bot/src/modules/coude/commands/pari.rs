@@ -178,7 +178,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             command.user.id, mise, target_id, combat.attacker_id, combat.defender_id
         ))
         .color(0xF1C40F)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     crate::modules::coude::interaction_helper::followup_embed(ctx, command, embed).await;

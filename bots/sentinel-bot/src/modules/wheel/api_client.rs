@@ -23,6 +23,9 @@ pub struct TauntEventDto {
 pub struct WheelSpinResponse {
     #[allow(dead_code)]
     pub spin_id: String,
+    /// Cle stable de la case tiree (jackpot/licorne/blanche/...). Utilise
+    /// par les tests + futur affichage stats par case.
+    #[allow(dead_code)]
     pub case_key: String,
     pub case_label: String,
     pub payout: i64,

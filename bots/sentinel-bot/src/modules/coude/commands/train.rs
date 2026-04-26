@@ -120,7 +120,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             updated.stat_points
         ))
         .color(0x3498DB)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;

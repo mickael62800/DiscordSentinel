@@ -12,7 +12,7 @@ use serenity::all::{
 };
 use serenity::model::id::UserId;
 
-const FOOTER: &str = "Coup de Coude | Sentinel";
+const FOOTER: &str = sentinel_shared::branding::COUDE_TAGLINE_SHORT;
 
 /// Embed du défi normal avec tous les boutons d'action.
 pub fn build_challenge_embed(

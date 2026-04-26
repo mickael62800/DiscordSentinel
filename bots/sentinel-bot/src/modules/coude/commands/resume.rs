@@ -90,7 +90,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 "Aucun mouvement enregistre pour l'instant.\n\n\u{1fa99} Solde actuel : **{}** coins",
                 current_balance.unwrap_or(0)
             ))
-            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
             .timestamp(serenity::model::Timestamp::now());
 
         if let Err(e) = command

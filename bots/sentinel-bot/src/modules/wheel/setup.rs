@@ -27,7 +27,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
              *Le resultat est annonce publiquement. Tout le serveur en parle.*"
         )
         .color(0xf1c40f)
-        .footer(CreateEmbedFooter::new("Roue du Destin | Sentinel"));
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::WHEEL_TAGLINE));
 
     let btn = CreateButton::new(PANEL_SPIN_ID)
         .label("Tirer la Roue")

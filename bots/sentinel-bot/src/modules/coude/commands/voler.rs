@@ -530,7 +530,7 @@ async fn resolve_steal_attempt(
                 .title("\u{1f6e1}\u{fe0f} Vol bloque !")
                 .description(format!("{}{}{}", block_msg, roll_detail, xp_line))
                 .color(0x3498DB)
-                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+                .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
                 .timestamp(serenity::model::Timestamp::now());
             return (embed, taunt_events);
         }
@@ -601,7 +601,7 @@ async fn resolve_steal_attempt(
             .title("\u{1f4b0} Vol reussi !")
             .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
             .color(0x57F287)
-            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
             .timestamp(serenity::model::Timestamp::now());
         (embed, taunt_events)
     } else {
@@ -656,7 +656,7 @@ async fn resolve_steal_attempt(
             .title("\u{1f6a8} Vol rate !")
             .description(format!("{}{}{}", msg_text, roll_detail, xp_line))
             .color(0xED4245)
-            .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+            .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
             .timestamp(serenity::model::Timestamp::now());
         (embed, taunt_events)
     }

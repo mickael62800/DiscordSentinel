@@ -168,7 +168,7 @@ pub fn build_game_embed(game: &BlackjackGameDto, wallet_balance: i64) -> CreateE
             false,
         )
         .color(color)
-        .footer(CreateEmbedFooter::new("Blackjack | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::BLACKJACK_TAGLINE))
         .timestamp(serenity::model::Timestamp::now());
 
     if game.doubled {

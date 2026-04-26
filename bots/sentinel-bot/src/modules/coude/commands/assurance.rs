@@ -214,7 +214,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .field("Cout", format!("{} coins", total_cost), true)
         .field("Duree", tier.label, true)
         .field("Protection", "50% des pertes de combat", true)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     crate::modules::coude::channel_check::post_activity(ctx, command, config.channel_activites(), embed).await;

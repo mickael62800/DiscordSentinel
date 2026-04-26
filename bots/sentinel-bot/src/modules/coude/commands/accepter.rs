@@ -121,7 +121,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         ))
         .field("Mise", format!("{} coins", combat_record.mise), true)
         .color(0x3498DB)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     // Edit du message original : on enleve les boutons et on met le nouveau
@@ -152,7 +152,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
                     combat_record.mise, delay_min, combat_channel,
                 ))
                 .color(0x57F287)
-                .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+                .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
                 .timestamp(serenity::model::Timestamp::now());
 
             if let Err(e) = serenity::model::id::ChannelId::new(ch_id)
@@ -222,7 +222,7 @@ pub async fn resolve_combat_internal_ex(
         .title(&resp.title)
         .description(&resp.description)
         .color(resp.color)
-        .footer(CreateEmbedFooter::new("Coup de Coude | Sentinel"))
+        .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
         .timestamp(serenity::model::Timestamp::now());
 
     for f in resp.fields {
