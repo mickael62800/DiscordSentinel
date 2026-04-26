@@ -129,6 +129,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "taunts-channel" => commands::taunts_channel::handle(ctx, command).await,
         "braquage" => commands::braquage::handle(ctx, command).await,
         "maudire" => commands::maudire::handle(ctx, command).await,
+        "prank" => commands::prank::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -161,6 +162,7 @@ pub fn handles_command(name: &str) -> bool {
             | "taunts-channel"
             | "braquage"
             | "maudire"
+            | "prank"
     )
 }
 
