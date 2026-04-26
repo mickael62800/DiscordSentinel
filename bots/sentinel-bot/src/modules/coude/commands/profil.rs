@@ -78,6 +78,11 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .await
         .ok()
         .flatten();
+    let active_curse = api
+        .get_active_curse(&guild_id, &target.id.to_string())
+        .await
+        .ok()
+        .flatten();
 
     let class = catalog.get_class(player.class.as_deref().unwrap_or("bourrin"));
     let title = catalog.title_for_level(player.level).to_string();
@@ -189,6 +194,33 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     if let Some(ins_text) = insurance_field {
         embed = embed.field("\u{1f6e1}\u{fe0f} Assurance", ins_text, false);
+    }
+
+    // Malediction active (cf. COUPE_AMELIORATIONS 5.1).
+    if let Some(curse) = active_curse {
+        let remaining_str = chrono::DateTime::parse_from_rfc3339(&curse.expires_at)
+            .ok()
+            .map(|expires| {
+                let remaining = expires
+                    .with_timezone(&chrono::Utc)
+                    .signed_duration_since(chrono::Utc::now());
+                if remaining.num_hours() >= 1 {
+                    format!("{}h {}m", remaining.num_hours(), remaining.num_minutes() % 60)
+                } else if remaining.num_minutes() >= 1 {
+                    format!("{}m", remaining.num_minutes())
+                } else {
+                    "<1m".to_string()
+                }
+            })
+            .unwrap_or_else(|| "?".to_string());
+        embed = embed.field(
+            format!("{} Malediction", curse.kind_emoji),
+            format!(
+                "**{}** — pose par <@{}>\nExpire dans **{}** (lever : 600c)",
+                curse.kind_label, curse.source_id, remaining_str
+            ),
+            false,
+        );
     }
 
     if let Err(e) = command

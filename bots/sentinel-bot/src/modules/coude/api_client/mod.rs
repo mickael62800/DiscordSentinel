@@ -516,3 +516,4 @@ mod players;
 mod economy;
 mod events;
 mod utility;
+mod curses;

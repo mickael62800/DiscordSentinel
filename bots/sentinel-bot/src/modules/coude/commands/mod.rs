@@ -10,6 +10,7 @@ pub mod defend_item;
 pub mod donner;
 pub mod hp;
 pub mod leaderboard;
+pub mod maudire;
 pub mod no_taunts;
 pub mod pari;
 pub mod potion;
@@ -53,5 +54,6 @@ pub fn all() -> Vec<CreateCommand> {
         no_taunts::register(),
         taunts_channel::register(),
         braquage::register(),
+        maudire::register(),
     ]
 }
