@@ -9,6 +9,7 @@ pub mod classe;
 pub mod coalition;
 pub mod contribuer_prime;
 pub mod coude;
+pub mod coude_amical;
 pub mod defend_item;
 pub mod donner;
 pub mod honneur;
@@ -44,6 +45,7 @@ use serenity::builder::CreateCommand;
 pub fn all() -> Vec<CreateCommand> {
     vec![
         coude::register(),
+        coude_amical::register(),
         profil::register(),
         shop_cmd::register(),
         prime::register(),

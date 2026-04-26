@@ -66,6 +66,7 @@ fn coude_inner() -> Router<AppState> {
         .route("/{guild_id}/primes/{target_id}/active", get(handlers::coude::get_active_primes))
         .route("/{guild_id}/primes/claim", post(handlers::coude::claim_primes))
         // Insurance
+        .route("/{guild_id}/friendly-duels", post(handlers::coude::resolve_friendly_duel))
         .route("/{guild_id}/insurance/buy", post(handlers::coude::buy_insurance))
         .route("/{guild_id}/insurance/{user_id}", get(handlers::coude::get_active_insurance))
         .route("/insurance/{insurance_id}/expire", post(handlers::coude::expire_insurance))

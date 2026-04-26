@@ -59,6 +59,7 @@ pub struct AppState {
     pub resolve_betting_batch_uc: Arc<dyn crate::ports::inbound::ResolveBettingBatchUseCase>,
     pub expire_combats_batch_uc: Arc<dyn crate::ports::inbound::ExpireCombatsBatchUseCase>,
     pub resolve_combat_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase>,
+    pub resolve_friendly_duel_uc: Arc<dyn crate::ports::inbound::ResolveFriendlyDuelUseCase>,
     pub coude_catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
     pub coude_cashbox_uc: Arc<dyn crate::ports::inbound::ManageCoudeCashboxUseCase>,
     pub coude_steal_protections_uc:

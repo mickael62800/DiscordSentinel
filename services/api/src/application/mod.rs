@@ -67,6 +67,9 @@ pub use expire_combats_batch_service::ExpireCombatsBatchService;
 mod resolve_combat_now_service;
 pub use resolve_combat_now_service::ResolveCombatNowService;
 
+mod resolve_friendly_duel_service;
+pub use resolve_friendly_duel_service::ResolveFriendlyDuelService;
+
 mod manage_coude_catalog_service;
 pub use manage_coude_catalog_service::ManageCoudeCatalogService;
 

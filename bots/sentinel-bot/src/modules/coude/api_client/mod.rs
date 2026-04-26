@@ -534,3 +534,5 @@ mod refusal;
 mod coalition;
 mod ultimate;
 mod prestige;
+mod friendly_duel;
+pub use friendly_duel::FriendlyDuelResp;

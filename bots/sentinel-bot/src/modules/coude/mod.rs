@@ -109,6 +109,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     }
     match command.data.name.as_str() {
         "coude" => commands::coude::handle(ctx, command).await,
+        "coude-amical" => commands::coude_amical::handle(ctx, command).await,
         "profil" => commands::profil::handle(ctx, command).await,
         "shop" => commands::shop_cmd::handle(ctx, command).await,
         "prime" => commands::prime::handle(ctx, command).await,
@@ -153,6 +154,7 @@ pub fn handles_command(name: &str) -> bool {
     matches!(
         name,
         "coude"
+            | "coude-amical"
             | "profil"
             | "shop"
             | "prime"

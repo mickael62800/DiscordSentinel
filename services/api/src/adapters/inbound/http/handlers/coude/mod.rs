@@ -28,6 +28,7 @@ pub mod refusal;
 pub mod coalition;
 pub mod ultimate;
 pub mod prestige;
+pub mod friendly_duel;
 
 pub use bets::*;
 pub use combats::*;
@@ -46,6 +47,7 @@ pub use refusal::*;
 pub use coalition::*;
 pub use ultimate::*;
 pub use prestige::*;
+pub use friendly_duel::*;
 
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.
 ///

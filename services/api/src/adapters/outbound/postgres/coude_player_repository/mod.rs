@@ -284,6 +284,27 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         Ok(row)
     }
 
+    async fn increment_friendly_stat(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        won: bool,
+    ) -> Result<(), DomainError> {
+        let col = if won { "friendly_wins" } else { "friendly_losses" };
+        let q = format!(
+            r#"UPDATE coude_players
+               SET {col} = {col} + 1, updated_at = NOW()
+               WHERE guild_id = $1 AND user_id = $2"#
+        );
+        sqlx::query(&q)
+            .bind(guild_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+            .map_err(crate::adapters::outbound::postgres::pg_err)?;
+        Ok(())
+    }
+
     async fn get_prestige_count(
         &self,
         guild_id: &str,

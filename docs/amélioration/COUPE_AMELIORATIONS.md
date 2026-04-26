@@ -320,7 +320,7 @@ bonus de survie pendant 3 jours :
 
 Logique : éviter qu'un joueur pauvre reste pauvre à cause du RNG.
 
-### 4.5 🔴 Mode « duel amical » ⏳
+### 4.5 🔴 Mode « duel amical » ✅ *(MVP — leaderboard separe a venir)*
 
 Nouvelle variante : `/coude-amical @cible` — combat **sans mise** ni
 conséquence coins. Le gagnant gagne juste **+20 XP** (au lieu de 15) et
@@ -606,10 +606,10 @@ Effet viral : les participants invitent leurs potes.
 ### ⏳ Reste à faire
 - 🟢 **Tutoriel interactif 5 étapes** (1.1) — onboarding nouveaux joueurs
 - 🟡 **Ultimates communes au shop** (3.1bis) — Dé chargé, Clown mode, Rembobine, Déclaration de guerre, Cadeau empoisonné
-- 🔴 **Mode duel amical** (4.5) — `/coude-amical` sans mise
+- 🔵 **Leaderboard duel amical** (extension 4.5) — exposer `friendly_wins` / `friendly_losses` dans `/leaderboard`
 
 ### 🎯 Verdict
-~26 des 28 features livrées. Il ne reste que des items quick-win (tagline,
+~27 des 28 features livrées (4.5 livre en MVP, leaderboard a venir). Il ne reste que des items quick-win (tagline,
 bouclier 1ère défaite, mise par défaut) ou cosmétiques/onboarding
 (tutoriel, duel amical, ultimates shop). Le cœur du jeu — chaos, prestige,
 paliers, sabotage, vendetta, signature roue — est complet.

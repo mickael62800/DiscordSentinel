@@ -1,0 +1,129 @@
+//! Implementation du duel amical (cf. COUPE_AMELIORATIONS 4.5).
+//!
+//! On reutilise le moteur de combat pur (`coude_combat_engine`) avec
+//! mise=0, sans event ni curse, avec les params par defaut. Le resultat
+//! cote economie (coins_won, coins_lost_by_loser) est ignore — c est le
+//! point precis de "duel amical sans risque".
+
+use std::sync::Arc;
+
+use async_trait::async_trait;
+
+use crate::domain::entities::CoudeBalanceParams;
+use crate::domain::errors::DomainError;
+use crate::domain::services::coude_combat_engine::{resolve_combat, PlayerLite};
+use crate::ports::inbound::{
+    FriendlyDuelInput, FriendlyDuelOutput, ManageCoudePlayersUseCase,
+    ResolveFriendlyDuelUseCase,
+};
+use crate::ports::outbound::CoudePlayerRepository;
+
+const FRIENDLY_WINNER_XP: i64 = 20;
+const FRIENDLY_LOSER_XP: i64 = 5;
+
+pub struct ResolveFriendlyDuelService {
+    pub player_repo: Arc<dyn CoudePlayerRepository>,
+    pub players_uc: Arc<dyn ManageCoudePlayersUseCase>,
+}
+
+impl ResolveFriendlyDuelService {
+    pub fn new(
+        player_repo: Arc<dyn CoudePlayerRepository>,
+        players_uc: Arc<dyn ManageCoudePlayersUseCase>,
+    ) -> Self {
+        Self { player_repo, players_uc }
+    }
+}
+
+#[async_trait]
+impl ResolveFriendlyDuelUseCase for ResolveFriendlyDuelService {
+    async fn resolve(&self, input: FriendlyDuelInput) -> Result<FriendlyDuelOutput, DomainError> {
+        if input.attacker_id == input.defender_id {
+            return Err(DomainError::ValidationError(
+                "Tu ne peux pas te defier toi-meme.".into(),
+            ));
+        }
+
+        let attacker = self
+            .player_repo
+            .get_or_create(&input.guild_id, &input.attacker_id, &input.attacker_name)
+            .await?;
+        let defender = self
+            .player_repo
+            .get_or_create(&input.guild_id, &input.defender_id, &input.defender_name)
+            .await?;
+
+        let attacker_lite = PlayerLite {
+            user_id: attacker.user_id.clone(),
+            class: attacker.class.as_ref().map(|c| c.as_str().to_string()),
+            level: attacker.level,
+            atk: attacker.atk,
+            def: attacker.def,
+            cowardice_count: attacker.cowardice_count,
+            hp_current: Some(attacker.hp_current),
+        };
+        let defender_lite = PlayerLite {
+            user_id: defender.user_id.clone(),
+            class: defender.class.as_ref().map(|c| c.as_str().to_string()),
+            level: defender.level,
+            atk: defender.atk,
+            def: defender.def,
+            cowardice_count: defender.cowardice_count,
+            hp_current: Some(defender.hp_current),
+        };
+
+        let params = CoudeBalanceParams::default();
+        let result = resolve_combat(
+            &attacker_lite,
+            &defender_lite,
+            attacker.hp_current,
+            defender.hp_current,
+            0, // mise nulle : moteur tourne sans payout
+            None,
+            None,
+            &[],
+            &params,
+        );
+
+        let draw = result.winner_id.is_none() && result.loser_id.is_none();
+        let (winner_xp, loser_xp) = if draw {
+            (FRIENDLY_LOSER_XP, FRIENDLY_LOSER_XP)
+        } else {
+            (FRIENDLY_WINNER_XP, FRIENDLY_LOSER_XP)
+        };
+
+        if let Some(winner_id) = &result.winner_id {
+            let _ = self
+                .player_repo
+                .increment_friendly_stat(&input.guild_id, winner_id, true)
+                .await;
+            let _ = self
+                .players_uc
+                .add_xp(&input.guild_id, winner_id, winner_xp)
+                .await;
+        }
+        if let Some(loser_id) = &result.loser_id {
+            let _ = self
+                .player_repo
+                .increment_friendly_stat(&input.guild_id, loser_id, false)
+                .await;
+            let _ = self
+                .players_uc
+                .add_xp(&input.guild_id, loser_id, loser_xp)
+                .await;
+        }
+
+        Ok(FriendlyDuelOutput {
+            winner_id: result.winner_id,
+            loser_id: result.loser_id,
+            draw,
+            total_rounds: result.total_rounds,
+            attacker_hp_final: result.attacker_hp_final,
+            attacker_hp_max: result.attacker_hp_max,
+            defender_hp_final: result.defender_hp_final,
+            defender_hp_max: result.defender_hp_max,
+            winner_xp,
+            loser_xp,
+        })
+    }
+}

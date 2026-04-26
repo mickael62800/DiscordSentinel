@@ -165,6 +165,18 @@ pub trait CoudePlayerRepository: Send + Sync {
         Ok(None)
     }
 
+    /// Incremente `friendly_wins` ou `friendly_losses` (cf.
+    /// COUPE_AMELIORATIONS 4.5 — duel amical). Default impl no-op pour
+    /// preserver les mocks existants.
+    async fn increment_friendly_stat(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _won: bool,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
     /// Lecture du compteur de prestige (cf. COUPE_AMELIORATIONS 3.3).
     /// Utilise pour appliquer le bonus +5%/prestige sur les gains. Default
     /// impl Ok(None) pour preserver les mocks existants — equivaut a

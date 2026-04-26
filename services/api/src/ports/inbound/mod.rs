@@ -40,6 +40,10 @@ pub use resolve_combat_now::{
     ResolveCombatNowOutput, ResolveCombatNowUseCase, ResolvedCombatEmbedField,
     VendettaHumiliation,
 };
+pub mod resolve_friendly_duel;
+pub use resolve_friendly_duel::{
+    FriendlyDuelInput, FriendlyDuelOutput, ResolveFriendlyDuelUseCase,
+};
 pub mod manage_coude_catalog;
 pub use manage_coude_catalog::{
     AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, ManageCoudeCatalogUseCase,

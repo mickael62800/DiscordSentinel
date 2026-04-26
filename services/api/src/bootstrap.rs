@@ -538,6 +538,11 @@ pub async fn build_app_state(
             .with_coalition_repo(coude_coalition_repo.clone())
             .with_ultimate_repo(coude_ultimate_repo.clone()),
         );
+    let resolve_friendly_duel_uc: Arc<dyn crate::ports::inbound::ResolveFriendlyDuelUseCase> =
+        Arc::new(crate::application::ResolveFriendlyDuelService::new(
+            coude_player_repo.clone(),
+            coude_players_uc.clone() as Arc<dyn crate::ports::inbound::ManageCoudePlayersUseCase>,
+        ));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
         infractions_uc.clone(),
@@ -604,6 +609,7 @@ pub async fn build_app_state(
         resolve_betting_batch_uc,
         expire_combats_batch_uc,
         resolve_combat_now_uc,
+        resolve_friendly_duel_uc,
         coude_catalog_uc,
         coude_cashbox_uc,
         coude_steal_protections_uc,
