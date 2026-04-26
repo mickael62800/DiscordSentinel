@@ -266,6 +266,24 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         streaks::reset_combat_streaks(self, guild_id, user_id).await
     }
 
+    async fn get_combat_streaks(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<Option<(i32, i32)>, DomainError> {
+        let row: Option<(i32, i32)> = sqlx::query_as(
+            r#"SELECT current_win_streak, current_loss_streak
+               FROM coude_players
+               WHERE guild_id = $1 AND user_id = $2"#,
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(crate::adapters::outbound::postgres::pg_err)?;
+        Ok(row)
+    }
+
     async fn touch_steal_victim_streak(
         &self,
         guild_id: &str,

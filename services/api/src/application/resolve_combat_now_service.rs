@@ -35,8 +35,8 @@ use crate::ports::inbound::{
     ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
 };
 use crate::ports::outbound::{
-    BotConfigRepository, CoudeCombatRepository, CoudeCursesRepository, CoudeSafetyNetRepository,
-    CoudeVendettaRepository, WalletRepository,
+    BotConfigRepository, CoudeCombatRepository, CoudeCursesRepository, CoudePlayerRepository,
+    CoudeSafetyNetRepository, CoudeVendettaRepository, WalletRepository,
 };
 
 pub struct ResolveCombatNowService {
@@ -52,6 +52,7 @@ pub struct ResolveCombatNowService {
     curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
     safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
     vendetta_repo: Option<Arc<dyn CoudeVendettaRepository>>,
+    player_repo: Option<Arc<dyn CoudePlayerRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -79,7 +80,16 @@ impl ResolveCombatNowService {
             curses_repo: None,
             safety_net_repo: None,
             vendetta_repo: None,
+            player_repo: None,
         }
+    }
+
+    /// Branche le repo player (cf. COUPE_AMELIORATIONS 5.3) pour
+    /// detecter quand un winner casse une streak >= 5 du loser et
+    /// declencher la "Prime collective" (regicide bonus 1000c).
+    pub fn with_player_repo(mut self, repo: Arc<dyn CoudePlayerRepository>) -> Self {
+        self.player_repo = Some(repo);
+        self
     }
 
     /// Branche le repo des maledictions pour activer Banana
@@ -626,6 +636,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
 
         let mut vendetta_msg: Option<String> = None;
         let mut vendetta_humiliation: Option<crate::ports::inbound::VendettaHumiliation> = None;
+        let mut regicide_msg: Option<String> = None;
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
                 // Cap sur solde reel du perdant (pre-requis pour l'assurance
@@ -1033,11 +1044,51 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 inline: false,
             });
         }
+        if let Some(r_msg) = regicide_msg {
+            fields.push(ResolvedCombatEmbedField {
+                name: "\u{1f451} Regicide".into(),
+                value: r_msg,
+                inline: false,
+            });
+        }
 
         // Phase 9 Part D : track streaks + collecte taunt events.
         let mut taunt_events = Vec::new();
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
+                // Prime collective / Regicide (cf. COUPE_AMELIORATIONS 5.3) :
+                // si le perdant avait une win_streak >= 5 AVANT cette
+                // defaite, le gagnant casse la streak et touche un bonus
+                // de 1000c paye par le neant. Lecture pre-touch.
+                const REGICIDE_STREAK_THRESHOLD: i32 = 5;
+                const REGICIDE_BONUS: i64 = 1000;
+                if let Some(repo) = &self.player_repo {
+                    if let Ok(Some((win_streak, _loss_streak))) = repo
+                        .get_combat_streaks(&combat.guild_id, loser_id)
+                        .await
+                    {
+                        if win_streak >= REGICIDE_STREAK_THRESHOLD {
+                            if let Err(e) = self
+                                .wallet_repo
+                                .credit(
+                                    &combat.guild_id,
+                                    winner_id,
+                                    REGICIDE_BONUS,
+                                    "regicide_bonus",
+                                    "Prime collective Regicide",
+                                )
+                                .await
+                            {
+                                warn!(error = %e, "Echec credit regicide");
+                            }
+                            regicide_msg = Some(format!(
+                                "\u{1f451} **REGICIDE !** <@{}> casse la serie de {} victoires de <@{}> et empoche **+{} coins** de prime collective.",
+                                winner_id, win_streak, loser_id, REGICIDE_BONUS
+                            ));
+                        }
+                    }
+                }
+
                 if let Ok(Some(ev)) = self
                     .taunts_uc
                     .on_player_won(&combat.guild_id, winner_id)

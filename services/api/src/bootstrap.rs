@@ -516,7 +516,8 @@ pub async fn build_app_state(
             )
             .with_curses_repo(coude_curses_repo.clone())
             .with_safety_net_repo(coude_safety_net_repo.clone())
-            .with_vendetta_repo(coude_vendetta_repo.clone()),
+            .with_vendetta_repo(coude_vendetta_repo.clone())
+            .with_player_repo(coude_player_repo.clone()),
         );
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,

@@ -152,6 +152,19 @@ pub trait CoudePlayerRepository: Send + Sync {
         user_id: &str,
     ) -> Result<(), DomainError>;
 
+    /// Lecture des streaks combat courantes (win, loss) sans mutation.
+    /// Utilise par la detection Régicide (cf. COUPE_AMELIORATIONS 5.3) :
+    /// avant d incrementer la loss du perdant, on lit son win_streak
+    /// pour savoir si le winner casse une streak >= 5.
+    /// Default impl returns Ok(None) pour preserver les mocks existants.
+    async fn get_combat_streaks(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<Option<(i32, i32)>, DomainError> {
+        Ok(None)
+    }
+
     /// Incremente `current_steal_victim_streak`. Retourne la nouvelle valeur.
     async fn touch_steal_victim_streak(
         &self,
