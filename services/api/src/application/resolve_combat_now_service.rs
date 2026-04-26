@@ -189,10 +189,38 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             .map(|e| ServerEventLite { event_type: e.event_type })
             .collect();
 
-        // 4. Moteur de combat (pur domain)
+        // 4. Moteur de combat (pur domain).
+        //
+        // Roll des mythiques (cf. COUPE_AMELIORATIONS 2.1) en amont pour
+        // pouvoir appliquer les effets qui modifient les inputs du moteur
+        // (ex: Magicien -> swap classes).
+        let mythic_event: Option<crate::domain::entities::MythicEvent> = {
+            use crate::domain::entities::roll_mythic_event;
+            use rand::rngs::StdRng;
+            use rand::SeedableRng;
+            let mut myth_rng = StdRng::from_entropy();
+            roll_mythic_event(&mut myth_rng)
+        };
+
+        // Mythique "Le Magicien" : echange les classes des deux combattants
+        // pour ce combat seulement. Les autres stats (level, atk, def,
+        // hp) restent celles du joueur d origine — seul le passif de
+        // classe (Berserker/Blindage/Esquive/Vampirisme/...) est swap.
+        let magician_active = matches!(&mythic_event, Some(ev) if ev.key == "magicien");
+        let (atk_class_for_engine, def_class_for_engine) = if magician_active {
+            (
+                defender.class.as_ref().map(|c| c.as_str().to_string()),
+                attacker.class.as_ref().map(|c| c.as_str().to_string()),
+            )
+        } else {
+            (
+                attacker.class.as_ref().map(|c| c.as_str().to_string()),
+                defender.class.as_ref().map(|c| c.as_str().to_string()),
+            )
+        };
         let atk_player = PlayerLite {
             user_id: attacker.user_id.clone(),
-            class: attacker.class.as_ref().map(|c| c.as_str().to_string()),
+            class: atk_class_for_engine,
             level: attacker.level,
             atk: attacker.atk,
             def: attacker.def,
@@ -201,7 +229,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         };
         let def_player = PlayerLite {
             user_id: defender.user_id.clone(),
-            class: defender.class.as_ref().map(|c| c.as_str().to_string()),
+            class: def_class_for_engine,
             level: defender.level,
             atk: defender.atk,
             def: defender.def,
@@ -309,17 +337,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             result.message = format!("{}\n\n{}", graisser_msgs.join("\n"), result.message);
         }
 
-        // Mythiques (cf. COUPE_AMELIORATIONS 2.1) — roll au tout debut pour
-        // pouvoir appliquer les effets mecaniques avant les paiements.
-        let mythic_event: Option<crate::domain::entities::MythicEvent> = {
-            use crate::domain::entities::roll_mythic_event;
-            use rand::rngs::StdRng;
-            use rand::SeedableRng;
-            let mut myth_rng = StdRng::from_entropy();
-            roll_mythic_event(&mut myth_rng)
-        };
-
         // Effets mecaniques des mythiques (cf. COUPE_AMELIORATIONS 2.1).
+        // Le roll a deja eu lieu plus haut pour permettre Magicien
+        // (swap classes pre-engine).
         if let Some(ev) = &mythic_event {
             match ev.key {
                 // Invasion de poulets : combat annule, match nul force,

@@ -99,8 +99,8 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         label: "Le Magicien",
         probability: 0.001,
         emoji: "🎩",
-        announce: "🎩 **LE MAGICIEN** apparait dans l arene — il prononce un sort, fait disparaitre une licorne, repart. Le combat suit son cours, mais on a tous vu un magicien.",
-        mechanical_implemented: false,
+        announce: "🎩 **LE MAGICIEN** apparait dans l arene — il echange les classes des deux combattants pour ce combat seulement !",
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "bombe_nucleaire",
