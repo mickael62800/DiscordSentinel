@@ -131,6 +131,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "maudire" => commands::maudire::handle(ctx, command).await,
         "prank" => commands::prank::handle(ctx, command).await,
         "aide" => commands::aide::handle(ctx, command).await,
+        "saboter" => commands::saboter::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -165,6 +166,7 @@ pub fn handles_command(name: &str) -> bool {
             | "maudire"
             | "prank"
             | "aide"
+            | "saboter"
     )
 }
 

@@ -56,7 +56,10 @@ pub const INSOMNIA_TAUNT_MULTIPLIER: f64 = 1.5;
 /// Retard d affichage (secondes) pour les messages de combat sous "Lenteur".
 pub const SLOWNESS_DELAY_SECS: u64 = 10;
 
-/// Les six maledictions ridicules disponibles.
+/// Les sept "maledictions" / "sabotages" disponibles. Les 6 premiers sont
+/// les vraies maledictions de /maudire (24h, 300c, tirage aleatoire).
+/// Pancarte est un sabotage de /saboter (7 jours, 150c, pure cosmetique
+/// — affichage du saboteur sous le profil de la cible).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CurseKind {
     /// Pseudo renomme "@X le Poulet" pendant 24h.
@@ -71,6 +74,8 @@ pub enum CurseKind {
     Insomnia,
     /// Au prochain combat, la licorne ne peut PAS tomber.
     Heartbreak,
+    /// Pancarte "Rival officiel de @X" affichee sous le profil 7 jours.
+    Pancarte,
 }
 
 impl CurseKind {
@@ -83,6 +88,7 @@ impl CurseKind {
             CurseKind::Slowness => "slowness",
             CurseKind::Insomnia => "insomnia",
             CurseKind::Heartbreak => "heartbreak",
+            CurseKind::Pancarte => "pancarte",
         }
     }
 
@@ -94,6 +100,7 @@ impl CurseKind {
             "slowness" => Some(CurseKind::Slowness),
             "insomnia" => Some(CurseKind::Insomnia),
             "heartbreak" => Some(CurseKind::Heartbreak),
+            "pancarte" => Some(CurseKind::Pancarte),
             _ => None,
         }
     }
@@ -107,6 +114,7 @@ impl CurseKind {
             CurseKind::Slowness => "🐌",
             CurseKind::Insomnia => "🧛",
             CurseKind::Heartbreak => "💔",
+            CurseKind::Pancarte => "🪧",
         }
     }
 
@@ -119,9 +127,29 @@ impl CurseKind {
             CurseKind::Slowness => "Lenteur",
             CurseKind::Insomnia => "Insomnie",
             CurseKind::Heartbreak => "Malchance amoureuse",
+            CurseKind::Pancarte => "Pancarte Rival officiel",
         }
     }
 
+    /// Cout en coins paye par l auteur. Specifique a Pancarte (sabotage,
+    /// 150c) ; les 6 maledictions classiques coutent 300c.
+    pub fn cost_coins(self) -> i64 {
+        match self {
+            CurseKind::Pancarte => 150,
+            _ => CURSE_COST_COINS,
+        }
+    }
+
+    /// Duree de vie en heures. Pancarte = 7 jours, autres = 24h.
+    pub fn duration_hours(self) -> i64 {
+        match self {
+            CurseKind::Pancarte => 24 * 7,
+            _ => CURSE_DURATION_HOURS,
+        }
+    }
+
+    /// Catalogue des maledictions tirables au sort par /maudire.
+    /// Pancarte EXCLUE : c est un sabotage explicite via /saboter.
     pub const ALL: [CurseKind; 6] = [
         CurseKind::Chicken,
         CurseKind::Banana,

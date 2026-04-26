@@ -21,6 +21,7 @@ pub mod profil;
 pub mod protection;
 pub mod refuser;
 pub mod repos;
+pub mod saboter;
 pub mod reset_stats;
 pub mod resume;
 pub mod saison;
@@ -59,5 +60,6 @@ pub fn all() -> Vec<CreateCommand> {
         maudire::register(),
         prank::register(),
         aide::register(),
+        saboter::register(),
     ]
 }

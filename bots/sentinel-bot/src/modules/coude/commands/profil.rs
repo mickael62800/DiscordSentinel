@@ -196,7 +196,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         embed = embed.field("\u{1f6e1}\u{fe0f} Assurance", ins_text, false);
     }
 
-    // Malediction active (cf. COUPE_AMELIORATIONS 5.1).
+    // Malediction OU sabotage actif (cf. COUPE_AMELIORATIONS 5.1 / 5.2).
     if let Some(curse) = active_curse {
         let remaining_str = chrono::DateTime::parse_from_rfc3339(&curse.expires_at)
             .ok()
@@ -204,7 +204,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 let remaining = expires
                     .with_timezone(&chrono::Utc)
                     .signed_duration_since(chrono::Utc::now());
-                if remaining.num_hours() >= 1 {
+                if remaining.num_days() >= 1 {
+                    format!("{}j {}h", remaining.num_days(), remaining.num_hours() % 24)
+                } else if remaining.num_hours() >= 1 {
                     format!("{}h {}m", remaining.num_hours(), remaining.num_minutes() % 60)
                 } else if remaining.num_minutes() >= 1 {
                     format!("{}m", remaining.num_minutes())
@@ -213,14 +215,27 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 }
             })
             .unwrap_or_else(|| "?".to_string());
-        embed = embed.field(
-            format!("{} Malediction", curse.kind_emoji),
-            format!(
-                "**{}** — pose par <@{}>\nExpire dans **{}** (lever : 600c)",
-                curse.kind_label, curse.source_id, remaining_str
-            ),
-            false,
-        );
+
+        // Pancarte = sabotage (cosmetique pure, format dedie).
+        if curse.kind == "pancarte" {
+            embed = embed.field(
+                format!("{} Rival officiel", curse.kind_emoji),
+                format!(
+                    "Sous le nez de tout le monde : **Rival officiel de <@{}>**\nExpire dans **{}**.",
+                    curse.source_id, remaining_str
+                ),
+                false,
+            );
+        } else {
+            embed = embed.field(
+                format!("{} Malediction", curse.kind_emoji),
+                format!(
+                    "**{}** — pose par <@{}>\nExpire dans **{}** (lever : 600c)",
+                    curse.kind_label, curse.source_id, remaining_str
+                ),
+                false,
+            );
+        }
     }
 
     if let Err(e) = command

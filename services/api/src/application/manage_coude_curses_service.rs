@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use rand::Rng;
 
 use crate::domain::entities::{
-    lift_cost, pick_curse_by_index, ActiveCurse, CurseKind, CURSE_COST_COINS, CURSE_DURATION_HOURS,
+    lift_cost, pick_curse_by_index, ActiveCurse, CurseKind,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_curses::{CastedCurse, ManageCoudeCursesUseCase};
@@ -68,14 +68,17 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
             }
         };
 
+        let cost = chosen.cost_coins();
+        let duration = chosen.duration_hours();
+
         // Debit du wallet de l auteur — leve l erreur si solde insuffisant.
         self.wallet_repo
             .debit(
                 guild_id,
                 source_id,
-                CURSE_COST_COINS,
+                cost,
                 CAST_SOURCE,
-                &format!("Malediction {} sur {}", chosen.label(), target_id),
+                &format!("{} sur {}", chosen.label(), target_id),
             )
             .await?;
 
@@ -88,7 +91,7 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
                 target_id,
                 source_id,
                 chosen,
-                CURSE_DURATION_HOURS,
+                duration,
             )
             .await
             .map_err(|e| {
@@ -101,7 +104,7 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
         Ok(CastedCurse {
             id,
             kind: chosen,
-            cost_paid: CURSE_COST_COINS,
+            cost_paid: cost,
         })
     }
 
