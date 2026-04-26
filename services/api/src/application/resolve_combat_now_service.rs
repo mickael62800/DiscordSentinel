@@ -697,6 +697,50 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     coins_transferred_nominal
                 };
 
+                // Sabotage Empoisonner (cf. COUPE_AMELIORATIONS 5.2) :
+                // si le winner est sous l effet, 10% de son gain est
+                // redirige vers le saboteur. Consume une utilisation.
+                let mut poison_msg: Option<String> = None;
+                if let Some(curses_repo) = &self.curses_repo {
+                    use crate::domain::entities::{poison_redirect_amount, CurseKind};
+                    if let Ok(Some(c)) = curses_repo
+                        .get_active_for_target(&combat.guild_id, winner_id)
+                        .await
+                    {
+                        if c.kind == CurseKind::Empoisonner {
+                            let redirect = poison_redirect_amount(coins_transferred, true);
+                            if redirect > 0 {
+                                if let Err(e) = self
+                                    .wallet_repo
+                                    .credit(
+                                        &combat.guild_id,
+                                        &c.source_id,
+                                        redirect,
+                                        "poison_wallet_redirect",
+                                        "Sabotage Empoisonner — gain redirige",
+                                    )
+                                    .await
+                                {
+                                    warn!(error = %e, "Echec credit Empoisonner");
+                                }
+                                if let Err(e) = curses_repo.consume_one_use(c.id).await {
+                                    warn!(error = %e, "Echec consume Empoisonner");
+                                }
+                                poison_msg = Some(format!(
+                                    "\u{2620}\u{fe0f} **Wallet empoisonne** : {}c (10%) du gain de <@{}> redirige vers <@{}>.",
+                                    redirect, winner_id, c.source_id
+                                ));
+                            }
+                        }
+                    }
+                }
+                if let Some(p_msg) = poison_msg {
+                    insurance_msg = match insurance_msg {
+                        Some(prev) => Some(format!("{prev}\n{p_msg}")),
+                        None => Some(p_msg),
+                    };
+                }
+
                 // Assurance : clamp-then-apply dans le domain pour que les
                 // joueurs fauches beneficient effectivement de la protection.
                 let active_insurance = self

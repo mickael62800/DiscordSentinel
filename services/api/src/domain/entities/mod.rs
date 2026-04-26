@@ -285,7 +285,7 @@ pub use season_theme::{
 mod curse;
 pub use curse::{
     apply_banana_to_d20, apply_insomnia_to_taunt_weight, apply_leaky_wallet, lift_cost,
-    pick_curse_by_index, ActiveCurse, CurseKind, BANANA_FAIL_PROBABILITY, CURSE_COST_COINS,
-    CURSE_DURATION_HOURS, CURSE_LIFT_MULTIPLIER, INSOMNIA_TAUNT_MULTIPLIER, LEAKY_WALLET_FEE_COINS,
-    SLOWNESS_DELAY_SECS,
+    pick_curse_by_index, poison_redirect_amount, ActiveCurse, CurseKind, BANANA_FAIL_PROBABILITY,
+    CURSE_COST_COINS, CURSE_DURATION_HOURS, CURSE_LIFT_MULTIPLIER, INSOMNIA_TAUNT_MULTIPLIER,
+    LEAKY_WALLET_FEE_COINS, POISON_GAIN_REDIRECT_PCT, SLOWNESS_DELAY_SECS,
 };

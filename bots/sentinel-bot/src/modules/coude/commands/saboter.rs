@@ -25,7 +25,8 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(CommandOptionType::String, "type", "Type de sabotage")
                 .required(true)
                 .add_string_choice("Coller une pancarte (150c, 7 jours)", "pancarte")
-                .add_string_choice("Graisser les armes (200c, prochaine attaque speciale)", "graisser"),
+                .add_string_choice("Graisser les armes (200c, prochaine attaque speciale)", "graisser")
+                .add_string_choice("Empoisonner le wallet (400c, 10% des 3 prochains gains)", "empoisonner"),
         )
         .add_option(
             CreateCommandOption::new(CommandOptionType::User, "cible", "Cible du sabotage")
@@ -131,6 +132,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 ),
                 "graisser" => format!(
                     "La **prochaine attaque speciale** de <@{}> en combat foire automatiquement. Effet consume au 1er combat (sinon expire en 24h).",
+                    target_id
+                ),
+                "empoisonner" => format!(
+                    "Sur les **3 prochains gains de combat** de <@{}>, **10%** sont redirige vers ton wallet. Expire en 7 jours si non epuise.",
                     target_id
                 ),
                 _ => format!("Effet inconnu sur <@{}>.", target_id),

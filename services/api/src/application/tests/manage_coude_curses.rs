@@ -40,6 +40,7 @@ impl CoudeCursesRepository for MockCursesRepo {
             expires_at: Utc::now() + ChronoDuration::hours(duration_hours),
             lifted_at: None,
             lifted_by: None,
+            uses_remaining: None,
         });
         Ok(id)
     }

@@ -26,6 +26,9 @@ pub struct ActiveCurse {
     pub expires_at: DateTime<Utc>,
     pub lifted_at: Option<DateTime<Utc>>,
     pub lifted_by: Option<String>,
+    /// Some(n) si la curse a un compteur d utilisations (cf. Empoisonner).
+    /// None pour les curses purement temporelles.
+    pub uses_remaining: Option<i32>,
 }
 
 impl ActiveCurse {
@@ -81,6 +84,10 @@ pub enum CurseKind {
     /// (override a `None`). Consume on use. Cout : 200c. Expire en 24h
     /// si jamais declenchee.
     Graisser,
+    /// Sabotage "Empoisonner le wallet" (cf. COUPE_AMELIORATIONS 5.2) :
+    /// sur les 3 prochains gains de combat de la cible, 10% sont redirige
+    /// vers le saboteur. Cout : 400c. Expire en 7 jours ou apres 3 uses.
+    Empoisonner,
 }
 
 impl CurseKind {
@@ -95,6 +102,7 @@ impl CurseKind {
             CurseKind::Heartbreak => "heartbreak",
             CurseKind::Pancarte => "pancarte",
             CurseKind::Graisser => "graisser",
+            CurseKind::Empoisonner => "empoisonner",
         }
     }
 
@@ -108,6 +116,7 @@ impl CurseKind {
             "heartbreak" => Some(CurseKind::Heartbreak),
             "pancarte" => Some(CurseKind::Pancarte),
             "graisser" => Some(CurseKind::Graisser),
+            "empoisonner" => Some(CurseKind::Empoisonner),
             _ => None,
         }
     }
@@ -123,6 +132,7 @@ impl CurseKind {
             CurseKind::Heartbreak => "💔",
             CurseKind::Pancarte => "🪧",
             CurseKind::Graisser => "🛢️",
+            CurseKind::Empoisonner => "☠️",
         }
     }
 
@@ -137,6 +147,7 @@ impl CurseKind {
             CurseKind::Heartbreak => "Malchance amoureuse",
             CurseKind::Pancarte => "Pancarte Rival officiel",
             CurseKind::Graisser => "Armes graissees",
+            CurseKind::Empoisonner => "Wallet empoisonne",
         }
     }
 
@@ -146,6 +157,7 @@ impl CurseKind {
         match self {
             CurseKind::Pancarte => 150,
             CurseKind::Graisser => 200,
+            CurseKind::Empoisonner => 400,
             _ => CURSE_COST_COINS,
         }
     }
@@ -154,8 +166,19 @@ impl CurseKind {
     pub fn duration_hours(self) -> i64 {
         match self {
             CurseKind::Pancarte => 24 * 7,
+            CurseKind::Empoisonner => 24 * 7,
             // Graisser = 24h fallback ; en pratique consume au 1er combat.
             _ => CURSE_DURATION_HOURS,
+        }
+    }
+
+    /// Nombre d utilisations initiales pour les curses "consume on use".
+    /// None = curse purement temporelle (la duree gere son extinction).
+    /// Some(n) = la curse expire automatiquement apres n declenchements.
+    pub fn initial_uses(self) -> Option<i32> {
+        match self {
+            CurseKind::Empoisonner => Some(3),
+            _ => None,
         }
     }
 
@@ -226,6 +249,18 @@ pub fn apply_insomnia_to_taunt_weight(base_weight: f64, has_insomnia: bool) -> f
     } else {
         base_weight
     }
+}
+
+/// Pourcentage redirige vers le saboteur sous l effet "Empoisonner".
+pub const POISON_GAIN_REDIRECT_PCT: f64 = 0.10;
+
+/// Calcule le montant a rediriger vers le saboteur sur un gain donne.
+/// Floor a 0 si pas empoisonne ou gain non-positif.
+pub fn poison_redirect_amount(gain: i64, has_poison: bool) -> i64 {
+    if !has_poison || gain <= 0 {
+        return 0;
+    }
+    ((gain as f64) * POISON_GAIN_REDIRECT_PCT) as i64
 }
 
 #[cfg(test)]

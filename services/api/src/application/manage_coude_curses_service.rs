@@ -83,15 +83,18 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
             .await?;
 
         // Insertion. La contrainte unique partial sert de garde-fou en cas
-        // de race entre le check + l insert.
+        // de race entre le check + l insert. Si la kind a un compteur
+        // d utilisations (cf. Empoisonner), on passe par cast_with_uses.
+        let initial_uses = chosen.initial_uses();
         let id = self
             .curses_repo
-            .cast(
+            .cast_with_uses(
                 guild_id,
                 target_id,
                 source_id,
                 chosen,
                 duration,
+                initial_uses,
             )
             .await
             .map_err(|e| {

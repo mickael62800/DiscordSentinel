@@ -298,6 +298,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                     false,
                 );
             }
+            "empoisonner" => {
+                embed = embed.field(
+                    format!("{} Wallet empoisonne", curse.kind_emoji),
+                    format!(
+                        "Sabotage de <@{}> : 10% de tes prochains gains de combat sont redirige vers lui. Expire dans **{}**.",
+                        curse.source_id, remaining_str
+                    ),
+                    false,
+                );
+            }
             _ => {
                 embed = embed.field(
                     format!("{} Malediction", curse.kind_emoji),

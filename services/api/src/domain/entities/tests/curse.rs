@@ -139,10 +139,59 @@ fn graisser_round_trips_db_string() {
 
 #[test]
 fn graisser_excluded_from_random_pool() {
-    // Pancarte et Graisser sont des sabotages explicites — pas de
-    // tirage aleatoire par /maudire.
+    // Pancarte / Graisser / Empoisonner sont des sabotages explicites
+    // — pas de tirage aleatoire par /maudire.
     for k in CurseKind::ALL {
         assert_ne!(k, CurseKind::Pancarte);
         assert_ne!(k, CurseKind::Graisser);
+        assert_ne!(k, CurseKind::Empoisonner);
     }
+}
+
+#[test]
+fn empoisonner_has_specific_cost_uses_duration() {
+    assert_eq!(CurseKind::Empoisonner.cost_coins(), 400);
+    assert_eq!(CurseKind::Empoisonner.duration_hours(), 24 * 7);
+    assert_eq!(CurseKind::Empoisonner.initial_uses(), Some(3));
+}
+
+#[test]
+fn classic_curses_have_no_initial_uses() {
+    for k in [
+        CurseKind::Chicken,
+        CurseKind::Banana,
+        CurseKind::LeakyWallet,
+        CurseKind::Slowness,
+        CurseKind::Insomnia,
+        CurseKind::Heartbreak,
+        CurseKind::Pancarte,
+        CurseKind::Graisser,
+    ] {
+        assert_eq!(k.initial_uses(), None, "{:?} ne doit pas avoir d uses", k);
+    }
+}
+
+#[test]
+fn poison_redirect_zero_when_inactive() {
+    assert_eq!(poison_redirect_amount(1000, false), 0);
+}
+
+#[test]
+fn poison_redirect_10_percent_when_active() {
+    assert_eq!(poison_redirect_amount(1000, true), 100);
+    assert_eq!(poison_redirect_amount(50, true), 5);
+}
+
+#[test]
+fn poison_redirect_zero_for_non_positive_gain() {
+    assert_eq!(poison_redirect_amount(0, true), 0);
+    assert_eq!(poison_redirect_amount(-100, true), 0);
+}
+
+#[test]
+fn poison_redirect_floor() {
+    // 9 * 0.10 = 0.9 -> floor to 0
+    assert_eq!(poison_redirect_amount(9, true), 0);
+    // 10 * 0.10 = 1.0
+    assert_eq!(poison_redirect_amount(10, true), 1);
 }
