@@ -332,6 +332,14 @@ pub async fn build_app_state(
     let coude_curses_repo: Arc<dyn crate::ports::outbound::CoudeCursesRepository> =
         Arc::new(PgCoudeCursesRepository::new(pg_pool.clone()));
 
+    // Filet de securite et vendetta — repos crees tot pour pouvoir les
+    // brancher dans bets (boost x1.5 paris gagnants) et combat
+    // (bonus +100% revanche). Re-utilises plus bas pour creer les UC.
+    let coude_safety_net_repo: Arc<dyn crate::ports::outbound::CoudeSafetyNetRepository> =
+        Arc::new(PgCoudeSafetyNetRepository::new(pg_pool.clone()));
+    let coude_vendetta_repo: Arc<dyn crate::ports::outbound::CoudeVendettaRepository> =
+        Arc::new(PgCoudeVendettaRepository::new(pg_pool.clone()));
+
     let coude_taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase> = Arc::new(
         ManageCoudeTauntsService::new(
             coude_taunts_repo,
@@ -356,10 +364,10 @@ pub async fn build_app_state(
         pg_pool.clone(),
         wallet_uc.clone(),
     ));
-    let coude_bets_uc = Arc::new(ManageCoudeBetsService::new(
-        coude_bet_repo,
-        coude_combats_uc.clone(),
-    ));
+    let coude_bets_uc = Arc::new(
+        ManageCoudeBetsService::new(coude_bet_repo, coude_combats_uc.clone())
+            .with_safety_net_repo(coude_safety_net_repo.clone()),
+    );
 
     // Migration #4 : `blackjack_svc` passe ses mutations wallet (mise, cashout,
     // double down) par `wallet_uc` pour centralisation + detection auto des
@@ -462,15 +470,12 @@ pub async fn build_app_state(
         ManageCoudeCursesService::new(coude_curses_repo.clone(), wallet_repo.clone()),
     );
 
-    // Filet de securite (cf. COUPE_AMELIORATIONS 4.4).
-    let coude_safety_net_repo: Arc<dyn crate::ports::outbound::CoudeSafetyNetRepository> =
-        Arc::new(PgCoudeSafetyNetRepository::new(pg_pool.clone()));
+    // Filet de securite (cf. COUPE_AMELIORATIONS 4.4) — repo deja cree
+    // plus haut pour permettre le branchement dans bets et combat.
     let coude_safety_net_uc: Arc<dyn crate::ports::inbound::ManageCoudeSafetyNetUseCase> =
         Arc::new(ManageCoudeSafetyNetService::new(coude_safety_net_repo.clone()));
 
-    // Vendetta (cf. COUPE_AMELIORATIONS 5.3).
-    let coude_vendetta_repo: Arc<dyn crate::ports::outbound::CoudeVendettaRepository> =
-        Arc::new(PgCoudeVendettaRepository::new(pg_pool.clone()));
+    // Vendetta (cf. COUPE_AMELIORATIONS 5.3) — repo deja cree plus haut.
     let coude_vendetta_uc: Arc<dyn crate::ports::inbound::ManageCoudeVendettaUseCase> =
         Arc::new(ManageCoudeVendettaService::new(coude_vendetta_repo.clone()));
 

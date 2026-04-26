@@ -4,18 +4,19 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    calculate_bet_resolution, CoudeBet, NewCoudeBet, RefundSummary,
+    calculate_bet_resolution, safety_net_boost_bet_gain, CoudeBet, NewCoudeBet, RefundSummary,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_bets::{
     ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
 };
 use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
-use crate::ports::outbound::CoudeBetRepository;
+use crate::ports::outbound::{CoudeBetRepository, CoudeSafetyNetRepository};
 
 pub struct ManageCoudeBetsService {
     bet_repo: Arc<dyn CoudeBetRepository>,
     combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
+    safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
 }
 
 impl ManageCoudeBetsService {
@@ -23,7 +24,20 @@ impl ManageCoudeBetsService {
         bet_repo: Arc<dyn CoudeBetRepository>,
         combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
     ) -> Self {
-        Self { bet_repo, combats_uc }
+        Self { bet_repo, combats_uc, safety_net_repo: None }
+    }
+
+    /// Branche le repo du filet de securite (cf. COUPE_AMELIORATIONS 4.4)
+    /// pour booster les paris gagnants des joueurs en phase de
+    /// recuperation (multiplicateur x1.5 applique au payout brut).
+    pub fn with_safety_net_repo(mut self, repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
+        self.safety_net_repo = Some(repo);
+        self
+    }
+
+    async fn bettor_has_safety_net(&self, guild_id: &str, user_id: &str) -> bool {
+        let Some(repo) = &self.safety_net_repo else { return false; };
+        matches!(repo.get_active(guild_id, user_id).await, Ok(Some(_)))
     }
 }
 
@@ -70,12 +84,27 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
         let combat = self.combats_uc.get(combat_id).await?;
         let bets = self.bet_repo.list_for_combat(combat_id).await?;
 
-        let plan = calculate_bet_resolution(
+        let mut plan = calculate_bet_resolution(
             &bets,
             winner_id.as_deref(),
             &combat.attacker_id,
             &combat.defender_id,
         );
+
+        // Filet de securite (cf. COUPE_AMELIORATIONS 4.4) : pour chaque
+        // parieur gagnant qui a un filet actif, on boost son payout x1.5.
+        // Pre-fetch les filets actifs en bulk via list_active pour eviter
+        // N requetes (ok pour 5-50 paris par combat).
+        if self.safety_net_repo.is_some() {
+            for p in plan.payouts.iter_mut() {
+                if !p.won || p.payout <= 0 {
+                    continue;
+                }
+                if self.bettor_has_safety_net(&combat.guild_id, &p.bettor_id).await {
+                    p.payout = safety_net_boost_bet_gain(p.payout, true);
+                }
+            }
+        }
 
         if plan.payouts.is_empty() {
             // Rien à faire côté DB : pas de paris sur ce combat.
