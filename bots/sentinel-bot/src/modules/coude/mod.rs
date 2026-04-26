@@ -130,6 +130,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "braquage" => commands::braquage::handle(ctx, command).await,
         "maudire" => commands::maudire::handle(ctx, command).await,
         "prank" => commands::prank::handle(ctx, command).await,
+        "aide" => commands::aide::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -163,6 +164,7 @@ pub fn handles_command(name: &str) -> bool {
             | "braquage"
             | "maudire"
             | "prank"
+            | "aide"
     )
 }
 

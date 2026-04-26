@@ -1,4 +1,5 @@
 pub mod accepter;
+pub mod aide;
 pub mod annuler;
 pub mod assurance;
 pub mod boost_voleur;
@@ -57,5 +58,6 @@ pub fn all() -> Vec<CreateCommand> {
         braquage::register(),
         maudire::register(),
         prank::register(),
+        aide::register(),
     ]
 }
