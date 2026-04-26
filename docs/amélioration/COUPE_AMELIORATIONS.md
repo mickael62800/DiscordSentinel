@@ -278,7 +278,7 @@ impacter l'équilibre.
 Le jeu punit : coins perdus, prison 24 h, cowardice, scam d'assurance.
 Combiné au RNG, certains joueurs quittent après une grosse défaite.
 
-### 4.1 🟢 Bouclier « malchance du jour » ⏳
+### 4.1 🟢 Bouclier « malchance du jour » ✅
 
 La **première défaite de la journée** est adoucie automatiquement :
 - Perte de coins × 0.5 (au lieu du calcul normal).
@@ -607,12 +607,10 @@ Effet viral : les participants invitent leurs potes.
 - 🟢 **Tutoriel interactif 5 étapes** (1.1) — onboarding nouveaux joueurs
 - 🟢 **Mise par défaut intelligente** (1.2) — boutons rapides 50c/100c/all-in
 - 🟡 **Ultimates communes au shop** (3.1bis) — Dé chargé, Clown mode, Rembobine, Déclaration de guerre, Cadeau empoisonné
-- 🟢 **Bouclier malchance du jour** (4.1) — première défaite quotidienne ×0.5
-  *(distinct du filet de sécurité 4.4 déjà fait, qui s'active sous 50c)*
 - 🔴 **Mode duel amical** (4.5) — `/coude-amical` sans mise
 
 ### 🎯 Verdict
-~23 des 28 features livrées. Il ne reste que des items quick-win (tagline,
+~25 des 28 features livrées. Il ne reste que des items quick-win (tagline,
 bouclier 1ère défaite, mise par défaut) ou cosmétiques/onboarding
 (tutoriel, duel amical, ultimates shop). Le cœur du jeu — chaos, prestige,
 paliers, sabotage, vendetta, signature roue — est complet.

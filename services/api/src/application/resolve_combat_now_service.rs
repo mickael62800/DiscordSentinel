@@ -840,6 +840,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         let mut vendetta_msg: Option<String> = None;
         let mut vendetta_humiliation: Option<crate::ports::inbound::VendettaHumiliation> = None;
         let mut regicide_msg: Option<String> = None;
+        // Bouclier malchance (4.1) : true si la 1ere defaite du jour a
+        // ete adoucie. Visible aux deux match blocks (payout + streaks).
+        let mut shield_active = false;
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
                 // Cap sur solde reel du perdant (pre-requis pour l'assurance
@@ -1125,9 +1128,10 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .unwrap_or(0)
                     == 0;
                 let actual_loss = apply_lucky_shield(adj.actual_loss, is_first_defeat_today);
-                if is_first_defeat_today && actual_loss < adj.actual_loss {
+                shield_active = is_first_defeat_today && actual_loss < adj.actual_loss;
+                if shield_active {
                     let shield_msg = format!(
-                        "\u{1f49a} Bouclier malchance du jour : perte reduite de {} a {}.",
+                        "\u{1f49a} Bouclier malchance du jour : perte reduite de {} a {} (win streak preservee).",
                         adj.actual_loss, actual_loss
                     );
                     insurance_msg = match insurance_msg {
@@ -1513,12 +1517,18 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 {
                     taunt_events.push(ev);
                 }
-                if let Ok(Some(ev)) = self
-                    .taunts_uc
-                    .on_player_lost(&combat.guild_id, loser_id)
-                    .await
-                {
-                    taunt_events.push(ev);
+                // Bouclier malchance (4.1) : sous shield, on saute le
+                // touch_loss_streak qui resetterait la win streak. Pas
+                // d incrementation de loss_streak non plus — c est le prix
+                // de la "1ere defaite adoucie".
+                if !shield_active {
+                    if let Ok(Some(ev)) = self
+                        .taunts_uc
+                        .on_player_lost(&combat.guild_id, loser_id)
+                        .await
+                    {
+                        taunt_events.push(ev);
+                    }
                 }
 
                 // Etape 2 (post-touch) : si le gagnant vient d atteindre
