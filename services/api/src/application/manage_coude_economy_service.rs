@@ -2,14 +2,14 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::TauntEvent;
+use crate::domain::entities::{CurseKind, TauntEvent, LEAKY_WALLET_FEE_COINS};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_economy::{
     ManageCoudeEconomyUseCase, StealOutcome,
 };
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::CoudeEconomyRepository;
+use crate::ports::outbound::{CoudeCursesRepository, CoudeEconomyRepository, WalletRepository};
 
 /// Service "economie Coup de Coude".
 ///
@@ -31,6 +31,8 @@ pub struct ManageCoudeEconomyService {
     repo: Arc<dyn CoudeEconomyRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
+    wallet_repo: Option<Arc<dyn WalletRepository>>,
+    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
 }
 
 impl ManageCoudeEconomyService {
@@ -39,7 +41,30 @@ impl ManageCoudeEconomyService {
         wallet_uc: Arc<dyn ManageWalletUseCase>,
         taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     ) -> Self {
-        Self { repo, wallet_uc, taunts_uc }
+        Self { repo, wallet_uc, taunts_uc, wallet_repo: None, curses_repo: None }
+    }
+
+    /// Branche les repos necessaires au LeakyWallet (cf. COUPE_AMELIORATIONS
+    /// 5.1). Si l emetteur d un /donner est sous l effet, 10c sont preleves
+    /// en plus en frais (le destinataire recoit `amount` complet).
+    pub fn with_leaky_wallet_support(
+        mut self,
+        wallet_repo: Arc<dyn WalletRepository>,
+        curses_repo: Arc<dyn CoudeCursesRepository>,
+    ) -> Self {
+        self.wallet_repo = Some(wallet_repo);
+        self.curses_repo = Some(curses_repo);
+        self
+    }
+
+    async fn has_leaky_wallet(&self, guild_id: &str, user_id: &str) -> bool {
+        let Some(repo) = &self.curses_repo else {
+            return false;
+        };
+        matches!(
+            repo.get_active_for_target(guild_id, user_id).await,
+            Ok(Some(c)) if c.kind == CurseKind::LeakyWallet
+        )
     }
 }
 
@@ -78,6 +103,30 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
             .wallet_uc
             .transfer(guild_id, from_id, to_id, amount, "coude_donner", &description)
             .await?;
+
+        // 1.bis Branchement Leaky Wallet (cf. COUPE_AMELIORATIONS 5.1) :
+        //       si l emetteur est maudit, 10c supplementaires sont preleves
+        //       en frais (best-effort hors-tx — si le debit echoue, le don
+        //       est deja passe : on log et on continue).
+        if self.has_leaky_wallet(guild_id, from_id).await {
+            if let Some(wallet_repo) = &self.wallet_repo {
+                if let Err(e) = wallet_repo
+                    .debit(
+                        guild_id,
+                        from_id,
+                        LEAKY_WALLET_FEE_COINS,
+                        "curse_leaky_wallet",
+                        "Frais Portefeuille troue",
+                    )
+                    .await
+                {
+                    tracing::warn!(
+                        error = %e, guild_id, from_id,
+                        "leaky wallet : echec prelevement frais (don deja passe)"
+                    );
+                }
+            }
+        }
 
         // 2. Don genereux : taunt specifique cote emetteur si amount >=
         //    threshold configure (logique interne au service taunts). Ne

@@ -393,11 +393,14 @@ pub async fn build_app_state(
             .with_curses_repo(coude_curses_repo.clone()),
         );
 
-    let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(
-        coude_economy_repo.clone(),
-        wallet_uc.clone(),
-        coude_taunts_uc.clone(),
-    ));
+    let coude_economy_uc = Arc::new(
+        ManageCoudeEconomyService::new(
+            coude_economy_repo.clone(),
+            wallet_uc.clone(),
+            coude_taunts_uc.clone(),
+        )
+        .with_leaky_wallet_support(wallet_repo.clone(), coude_curses_repo.clone()),
+    );
     let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
     let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));
     let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
