@@ -33,6 +33,16 @@ const COMBAT_START: &[&str] = &[
     "\u{1f984} {attaquant} invoque la magie du coup de coude contre {defenseur} !",
     "\u{1f477} {attaquant} sort la boite a outils. {defenseur} va etre demonte piece par piece !",
     "\u{1f431}\u{200d}\u{1f464} {attaquant} apparait dans l'ombre... {defenseur} n'a rien vu venir !",
+    "\u{1f9d9} {attaquant} murmure un sortilege ; {defenseur} n'a meme pas appris a se defendre !",
+    "\u{1f3ad} {attaquant} salue le public, {defenseur} l'ignore — grossiere erreur.",
+    "\u{1f4ac} {attaquant} balance une derniere insulte a {defenseur} avant le premier coup !",
+    "\u{1f4f0} BREAKING NEWS : {attaquant} arrive sur {defenseur} en direct du salon !",
+    "\u{1f9ee} {attaquant} fait ses calculs sur les chances de {defenseur}... resultat : zero.",
+    "\u{1f4dc} Le greffier ouvre le registre : combat n* 1042, {attaquant} vs {defenseur}.",
+    "\u{1f3a8} {attaquant} signe l'arene de son blaze, {defenseur} y est juste de passage.",
+    "\u{1f309} L'arc-en-ciel s'eteint : {attaquant} a decide de detruire {defenseur} aujourd'hui.",
+    "\u{1f987} Comme une chauve-souris, {attaquant} surgit ! {defenseur} n'a pas le radar !",
+    "\u{1f4cd} Cible verrouillee : {defenseur}. Tireur : {attaquant}. Issue : douloureuse.",
 ];
 
 const ROUND_ATTACK: &[&str] = &[
@@ -60,6 +70,18 @@ const ROUND_ATTACK: &[&str] = &[
     "\u{1f4aa} {attaquant} invoque la force de ses ancetres ! {degats} degats !",
     "\u{1f3af} Bullseye ! {attaquant} touche pile au bon endroit ! {degats} degats !",
     "\u{1f98d} KING KONG COUDE ! {attaquant} ecrase tout ! {degats} degats !",
+    "\u{1f4a5} {attaquant} brise le mur du son ! {degats} degats supersoniques !",
+    "\u{1f30b} Eruption ! {attaquant} libere sa lave interieure ! {degats} degats brulants !",
+    "\u{1f30a} Vague de choc ! {attaquant} balaie tout sur son passage ! {degats} degats liquides !",
+    "\u{2744}\u{fe0f} {attaquant} congele puis brise son adversaire ! {degats} degats glaces !",
+    "\u{1f320} Pluie d'etoiles ! {attaquant} fait pleuvoir les coups ! {degats} degats stellaires !",
+    "\u{1f680} {attaquant} decolle vers la lune et atterrit en plein dessus ! {degats} degats orbital !",
+    "\u{1f3af} HEADSHOT ! {attaquant} touche le centre de gravite ! {degats} degats cibles !",
+    "\u{1f9ec} {attaquant} reecrit l'ADN de son adversaire ! {degats} degats genetiques !",
+    "\u{1f44a} {attaquant} sort le coup secret de papi ! {degats} degats inter-generationnels !",
+    "\u{1f3ad} {attaquant} fait croire qu'il rate, puis touche pour {degats} degats ! Quel troll !",
+    "\u{1f5e1}\u{fe0f} {attaquant} dechaine sa lame imaginaire ! {degats} degats mystiques !",
+    "\u{1f4dd} Le coup est tellement bien que c'est ecrit dans les manuels ! {degats} degats academiques !",
 ];
 
 const ROUND_WEAK: &[&str] = &[
@@ -82,6 +104,17 @@ const ROUND_WEAK: &[&str] = &[
     "\u{1f411} {defenseur} prend {degats} degats de laine. Ca pique a peine.",
     "\u{1f32b}\u{fe0f} {attaquant} rate dans le brouillard ! {degats} degats accidentels.",
     "\u{1f3b2} Roll de degats catastrophique : {degats} pour {attaquant}...",
+    "\u{1f47b} {attaquant} attaque dans le vide... un fantome encaisse a sa place. {degats} degats.",
+    "\u{1f422} {attaquant} est aussi rapide qu'une tortue. {defenseur} prend {degats} degats en baillant.",
+    "\u{1f4ac} {attaquant} bavarde au lieu de frapper. {degats} degats par accident.",
+    "\u{1f9d3}\u{200d}\u{2640}\u{fe0f} Niveau papi : {attaquant} colle {degats} degats avec sa canne.",
+    "\u{1f6cf}\u{fe0f} {attaquant} pousse une couette sur {defenseur}. {degats} degats moelleux.",
+    "\u{1f344} {attaquant} jette un champignon... ca aurait pu etre pire. {degats} degats.",
+    "\u{1f9c1} Coup sucre ! {attaquant} balance un cupcake ! {degats} degats sucres.",
+    "\u{1f43b} {attaquant} fait un calin a {defenseur}, c'est embarrassant. {degats} degats sociaux.",
+    "\u{1f486} Massage offensif ! {attaquant} relaxe douloureusement {defenseur}. {degats} degats.",
+    "\u{1f5d2}\u{fe0f} Lance-papier ! {attaquant} balance des post-its ! {degats} degats administratifs.",
+    "\u{1f3a8} {attaquant} bombarde {defenseur} de peinture aquarelle. {degats} degats artistiques.",
 ];
 
 const COMBAT_KO: &[&str] = &[
@@ -104,6 +137,16 @@ const COMBAT_KO: &[&str] = &[
     "\u{1f4de} Allo ambulance ? C'est pour {perdant}. {gagnant} vous salue bien !",
     "\u{1f947} {gagnant} monte sur le podium, {perdant} descend aux urgences !",
     "\u{1f3a4} {gagnant} lache le mic ! {perdant} est au tapis, KO technique !",
+    "\u{1f3ad} Rideau ! Le spectacle de {perdant} se termine en larmes. {gagnant} salue !",
+    "\u{1f5fd} {gagnant} plante son drapeau dans le crane de {perdant}. Domination totale !",
+    "\u{1faa6} {perdant} part rejoindre les anciens combattants. {gagnant} reste seul au sommet.",
+    "\u{1f396}\u{fe0f} Medaille d'or pour {gagnant} ! {perdant} repart avec une compresse.",
+    "\u{1fa78} Hemoglobine partout ! {perdant} dort dans une mare. {gagnant} marche vers la lumiere !",
+    "\u{1f5dd}\u{fe0f} Game over, insert coin... ah non, {perdant} n'a plus de credit. {gagnant} continue !",
+    "\u{1f3aa} The show is over ! {gagnant} gagne le grand prix, {perdant} remballe le clown.",
+    "\u{2728} {gagnant} brille de mille feux. {perdant} ne brille plus du tout, sniff.",
+    "\u{1f4ff} Final fatality ! {gagnant} EXTERMINE {perdant} pour de bon !",
+    "\u{1f9ff} {gagnant} place une amulette sur {perdant} pour eviter qu'il revienne hanter !",
 ];
 
 const COMBAT_TIMEOUT: &[&str] = &[
@@ -121,6 +164,15 @@ const COMBAT_TIMEOUT: &[&str] = &[
     "\u{26f3} {gagnant} gagne aux points avec {hp_g}% HP (adversaire : {hp_p}%) !",
     "\u{1f5fd} {gagnant} tient la barre ! Victoire aux points, {hp_g}% vs {hp_p}% !",
     "\u{1f3af} Cible atteinte ! {gagnant} sort gagnant ({hp_g}% HP contre {hp_p}%) !",
+    "\u{2696}\u{fe0f} La balance penche pour {gagnant} : {hp_g}% HP face a {hp_p}% pour l'autre.",
+    "\u{1f4dc} Le verdict du parchemin sacre : {gagnant} l'emporte avec {hp_g}% HP !",
+    "\u{1f5e3}\u{fe0f} {gagnant} tient debout, l'autre boite. Score final : {hp_g}% vs {hp_p}% !",
+    "\u{1f4f6} Couverture reseau plus stable que {hp_p}%. {gagnant} l'emporte avec {hp_g}% HP !",
+    "\u{1f3aa} La foule clame : {gagnant} ! Il termine a {hp_g}% HP, {hp_p}% pour l'autre.",
+    "\u{1f4f8} Photo selfie post-victoire : {gagnant} a {hp_g}% HP encore en stock.",
+    "\u{1f9d1}\u{200d}\u{2696}\u{fe0f} Les juges chuchotent, puis tranchent : {gagnant} gagne, {hp_g}% vs {hp_p}%.",
+    "\u{1f9ed} La boussole pointe vers {gagnant} (HP {hp_g}% restants, {hp_p}% pour le perdant).",
+    "\u{1f527} {gagnant} repare l'arene avec ses {hp_g}% HP restants. L'autre n'en a plus que {hp_p}%.",
 ];
 
 const COMBAT_DRAW: &[&str] = &[
@@ -134,6 +186,16 @@ const COMBAT_DRAW: &[&str] = &[
     "\u{1fa84} La magie du combat a fait une egalite ! Personne ne gagne !",
     "\u{1f914} Meme les juges sont confus... match nul !",
     "\u{1f937} Bon bah... c'est nul des deux cotes ! Aucun vainqueur !",
+    "\u{1f3ad} Rideau gele : les deux comediens oublient leur texte. Match nul !",
+    "\u{1f9ff} Les esprits du combat boudent, refusent de trancher. Egalite !",
+    "\u{1f6f8} Atterrissage des aliens : ils interrompent. Combat indecidable !",
+    "\u{1f4ad} Les deux pensent a leur maman en meme temps. Trop attendrissant pour finir.",
+    "\u{1f955} Les deux mangent une carotte cosmique et oublient pourquoi ils se tapaient. Egalite !",
+    "\u{1f3a8} Les deux dessinent un coeur dans le sable. Match nul artistique !",
+    "\u{1f6cf}\u{fe0f} Tout le monde au lit, demain on recommence. Match nul fatigue !",
+    "\u{1f3b6} Une symphonie surgit, les deux dansent ensemble. Personne ne se bat, fin !",
+    "\u{1f5ff} Les deux se transforment en statues. Ca va etre dur de finir le combat...",
+    "\u{1f37e} Bouchon de champagne ! Les deux trinquent. Match nul, on s'en fout !",
 ];
 
 // ══════════════════════════════════════════════════════════════════════
