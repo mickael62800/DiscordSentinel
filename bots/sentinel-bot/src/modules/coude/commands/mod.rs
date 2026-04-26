@@ -34,6 +34,7 @@ pub mod shop_cmd;
 pub mod taunts_channel;
 pub mod tout_ou_rien;
 pub mod train;
+pub mod travaux;
 pub mod ultimate;
 pub mod vendetta;
 pub mod voler;
@@ -77,5 +78,6 @@ pub fn all() -> Vec<CreateCommand> {
         coalition::register(),
         ultimate::register(),
         prestige::register(),
+        travaux::register(),
     ]
 }

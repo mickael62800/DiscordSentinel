@@ -143,6 +143,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "coalition" => commands::coalition::handle(ctx, command).await,
         "ultimate" => commands::ultimate::handle(ctx, command).await,
         "prestige" => commands::prestige::handle(ctx, command).await,
+        "travaux" => commands::travaux::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -186,6 +187,7 @@ pub fn handles_command(name: &str) -> bool {
             | "coalition"
             | "ultimate"
             | "prestige"
+            | "travaux"
     )
 }
 
