@@ -8,11 +8,13 @@ use tracing::{debug, warn};
 
 use crate::domain::entities::{
     build_taunt_event, build_taunt_event_single, crossed_threshold, parse_bool_config,
-    parse_i64_config, CoudeTauntsConfig, StreakKind, TauntEvent,
+    parse_i64_config, CoudeTauntsConfig, CurseKind, StreakKind, TauntEvent,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::outbound::{BotConfigRepository, CoudePlayerRepository, CoudeTauntsRepository};
+use crate::ports::outbound::{
+    BotConfigRepository, CoudeCursesRepository, CoudePlayerRepository, CoudeTauntsRepository,
+};
 
 const ECO_BOT_NAME: &str = "coude-bot";
 const CFG_BANKRUPTCY_ENABLED: &str = "bankruptcy_taunt_enabled";
@@ -25,6 +27,7 @@ pub struct ManageCoudeTauntsService {
     taunts_repo: Arc<dyn CoudeTauntsRepository>,
     player_repo: Arc<dyn CoudePlayerRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
+    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
 }
 
 impl ManageCoudeTauntsService {
@@ -37,7 +40,27 @@ impl ManageCoudeTauntsService {
             taunts_repo,
             player_repo,
             bot_config_repo,
+            curses_repo: None,
         }
+    }
+
+    /// Branche le repo des maledictions pour activer Insomnia
+    /// (cf. COUPE_AMELIORATIONS 5.1) : la cible voit ses paliers de
+    /// taunts de defaite atteints +50% plus vite (streak effectif x1.5).
+    pub fn with_curses_repo(mut self, repo: Arc<dyn CoudeCursesRepository>) -> Self {
+        self.curses_repo = Some(repo);
+        self
+    }
+
+    /// Retourne true si le joueur est sous l effet Insomnia.
+    async fn has_insomnia(&self, guild_id: &str, user_id: &str) -> bool {
+        let Some(repo) = &self.curses_repo else {
+            return false;
+        };
+        matches!(
+            repo.get_active_for_target(guild_id, user_id).await,
+            Ok(Some(c)) if c.kind == CurseKind::Insomnia
+        )
     }
 
     /// Helper commun threshold-based : met a jour la streak, charge la
@@ -56,9 +79,21 @@ impl ManageCoudeTauntsService {
 
         debug!(guild_id, user_id, kind = kind.as_str(), new_streak, "taunt: streak updated");
 
-        if crossed_threshold(new_streak).is_none() {
+        // Insomnia (cf. COUPE_AMELIORATIONS 5.1) — multiplie les streaks
+        // de defaite par 1.5 avant de checker les paliers, pour que les
+        // taunts tombent +50% plus vite sur la cible maudite.
+        let effective_streak = if matches!(kind, StreakKind::Loss)
+            && self.has_insomnia(guild_id, user_id).await
+        {
+            ((new_streak as f64) * 1.5).floor() as i32
+        } else {
+            new_streak
+        };
+
+        if crossed_threshold(effective_streak).is_none() {
             return Ok(None);
         }
+        let new_streak = effective_streak;
 
         let (config, opted_out) = self.load_gate(guild_id, user_id).await?;
         let Some(config) = config else {

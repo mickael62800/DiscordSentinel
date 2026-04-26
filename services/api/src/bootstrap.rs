@@ -326,12 +326,19 @@ pub async fn build_app_state(
     // les taunts "don genereux").
     let coude_taunts_repo: Arc<dyn crate::ports::outbound::CoudeTauntsRepository> =
         Arc::new(PgCoudeTauntsRepository::new(pg_pool.clone()));
+
+    // Maledictions — repo cree tot pour pouvoir le brancher dans taunts
+    // (effet Insomnia) et wheel (effet Heartbreak).
+    let coude_curses_repo: Arc<dyn crate::ports::outbound::CoudeCursesRepository> =
+        Arc::new(PgCoudeCursesRepository::new(pg_pool.clone()));
+
     let coude_taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase> = Arc::new(
         ManageCoudeTauntsService::new(
             coude_taunts_repo,
             coude_player_repo.clone(),
             bot_config_repo.clone(),
-        ),
+        )
+        .with_curses_repo(coude_curses_repo.clone()),
     );
 
     // Migration wallet unifie : use case qui centralise les mutations
@@ -373,11 +380,6 @@ pub async fn build_app_state(
             wallet_uc.clone(),
             pg_pool.clone(),
         ));
-
-    // Maledictions — repo cree tot pour pouvoir le brancher dans wheel
-    // (effet Heartbreak) en plus du UC dedie cree plus bas.
-    let coude_curses_repo: Arc<dyn crate::ports::outbound::CoudeCursesRepository> =
-        Arc::new(PgCoudeCursesRepository::new(pg_pool.clone()));
 
     // Roue du Destin — Sprint 2 sign'ature (migration 158).
     let wheel_repo = Arc::new(crate::adapters::outbound::postgres::PgWheelRepository::new(pg_pool.clone()));
