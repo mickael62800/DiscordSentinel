@@ -84,7 +84,7 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         probability: 0.005,
         emoji: "🍀",
         announce: "🍀 **TREFLE A 4 FEUILLES** — {loser} recupere 150% de sa mise au lieu d en perdre. {winner} reste loggue gagnant.",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "aliens",

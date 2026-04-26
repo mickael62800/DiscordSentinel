@@ -114,6 +114,7 @@ fn mechanical_flags_count_matches_expectation() {
         "licorne_rose",
         "invasion_poulets",
         "distributeur_pq",
+        "trefle_quatre_feuilles",
         "bombe_nucleaire",
     ];
     assert_eq!(

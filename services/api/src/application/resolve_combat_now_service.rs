@@ -247,6 +247,37 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         }
                     }
                 }
+                // Trefle a 4 feuilles : le combat est resolu normalement
+                // (winner_id / loser_id conserves, win streak incremente),
+                // mais le perdant recupere 150% de sa mise au lieu d en
+                // perdre. Le gagnant ne touche rien (la cagnotte cosmique
+                // sponsorise). Operationnellement : zero transfert atomique
+                // (coins_won / coins_lost forces a 0), puis credit du loser
+                // 1.5 * mise depuis le neant.
+                "trefle_quatre_feuilles" => {
+                    let bonus = (combat.mise as f64 * 1.5) as i64;
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                    if let Some(loser_id) = result.loser_id.clone() {
+                        if bonus > 0 {
+                            if let Err(e) = self
+                                .wallet_repo
+                                .credit(
+                                    &combat.guild_id,
+                                    &loser_id,
+                                    bonus,
+                                    "mythic_trefle",
+                                    "Trefle a 4 feuilles",
+                                )
+                                .await
+                            {
+                                warn!(error = %e, user_id = %loser_id, "Echec credit Trefle");
+                            }
+                        }
+                    }
+                }
                 // Bombe nucleaire : annihilation totale, les deux perdent
                 // 50% de leur wallet, le combat est marque match nul. Read
                 // le solde courant pour calculer 50% precis. Best-effort.
