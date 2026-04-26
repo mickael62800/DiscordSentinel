@@ -111,7 +111,7 @@ fn mechanical_flags_match_branched_set() {
         .filter(|m| m.mechanical_implemented)
         .map(|m| m.key)
         .collect();
-    assert_eq!(branched, vec!["repos_short_cooldown"]);
+    assert_eq!(branched, vec!["repos_short_cooldown", "riposte_first"]);
 }
 
 #[test]

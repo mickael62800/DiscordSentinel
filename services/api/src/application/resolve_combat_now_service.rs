@@ -318,11 +318,17 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             };
             (chaos, tank)
         };
+        // Palier "Riposte fulgurante" (cf. COUPE_AMELIORATIONS 3.2) :
+        // un defenseur de niveau 20+ qui se fait attaquer par un joueur
+        // de niveau strictement inferieur frappe en premier au round 1.
+        let defender_riposte_first_round = defender.level >= 20 && defender.level > attacker.level;
+
         let curses = engine::combat::CombatCurses {
             attacker_has_banana: self.fetch_banana(&combat.guild_id, &combat.attacker_id).await,
             defender_has_banana: self.fetch_banana(&combat.guild_id, &combat.defender_id).await,
             chaos_multiplier: season_chaos_multiplier,
             tank_def_bonus_pct: season_tank_def_bonus,
+            defender_riposte_first_round,
         };
 
         // Sabotage "Graisser les armes" (cf. COUPE_AMELIORATIONS 5.2) :

@@ -65,8 +65,8 @@ pub const MILESTONES: &[Milestone] = &[
         key: "riposte_first",
         label: "Riposte fulgurante",
         emoji: "\u{26a1}",
-        description: "Priorite de riposte sur les joueurs de niveau inferieur au tien.",
-        mechanical_implemented: false,
+        description: "Priorite de riposte au round 1 quand tu te fais attaquer par un joueur de niveau inferieur.",
+        mechanical_implemented: true,
     },
     Milestone {
         level: 25,

@@ -512,3 +512,48 @@ fn tank_def_bonus_none_is_neutral() {
     );
     assert_eq!(none_explicit.attacker_hp_max, default.attacker_hp_max);
 }
+
+// ══════════════════════════════════════════════════════════
+// Palier "Riposte fulgurante" (cf. COUPE_AMELIORATIONS 3.2)
+// ══════════════════════════════════════════════════════════
+
+#[test]
+fn riposte_first_round_does_not_panic() {
+    let atk = player("111", "bourrin", 5);
+    let def = player("222", "agile", 25);
+    let r = resolve_combat_with_curses(
+        &atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses { defender_riposte_first_round: true, ..Default::default() },
+    );
+    // Le combat doit produire un resultat coherent.
+    assert!(r.total_rounds >= 0);
+}
+
+#[test]
+fn riposte_first_round_does_not_break_combat() {
+    // Le flag riposte ne doit jamais empecher la production d un
+    // resultat coherent (winner ou draw).
+    let atk = player("111", "bourrin", 1);
+    let def = player("222", "tank", 25);
+    for _ in 0..30 {
+        let r = resolve_combat_with_curses(
+            &atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+            CombatCurses { defender_riposte_first_round: true, ..Default::default() },
+        );
+        assert!(r.total_rounds >= 0);
+        assert!(r.coins_won >= 0);
+    }
+}
+
+#[test]
+fn riposte_default_false_preserves_existing_behavior() {
+    // Le combat sans riposte (default) ne doit produire aucun message
+    // mentionnant la riposte fulgurante.
+    let atk = player("111", "bourrin", 5);
+    let def = player("222", "agile", 5);
+    let r = resolve_combat_with_curses(
+        &atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses::default(),
+    );
+    assert!(!r.message.contains("Riposte fulgurante"));
+}

@@ -308,6 +308,11 @@ pub struct CombatCurses {
     /// Bonus DEF (en %) applique aux Tanks uniquement, avant items
     /// (cf. COUPE_AMELIORATIONS 6.3 Saison du Tank). None = neutre.
     pub tank_def_bonus_pct: Option<f64>,
+    /// Cf. COUPE_AMELIORATIONS 3.2 palier "Riposte fulgurante" (niveau 20+
+    /// vs joueur < lv). Si `true`, au round 1 les degats du defenseur
+    /// sont appliques AVANT ceux de l attaquant ; si l attaquant meurt
+    /// avant d avoir pu frapper, ses degats sont annules.
+    pub defender_riposte_first_round: bool,
 }
 
 pub fn resolve_combat(
@@ -684,9 +689,25 @@ pub fn resolve_combat_with_curses(
             ));
         }
 
-        // ── Apply damage simultaneously ──
-        def_hp -= atk_dmg;
-        atk_hp -= def_dmg;
+        // ── Apply damage ──
+        // En regle generale c est simultane. Exception : palier "Riposte
+        // fulgurante" (cf. COUPE_AMELIORATIONS 3.2) — au round 1, le
+        // defenseur frappe en premier et si l attaquant meurt avant
+        // d avoir pu placer son coup, ses degats sont annules.
+        if curses.defender_riposte_first_round && round_num == 1 {
+            atk_hp -= def_dmg;
+            if atk_hp <= 0 {
+                round_msg.push_str(&format!(
+                    "\u{26a1} **Riposte fulgurante** : {} frappe en premier et abat {} avant qu il ne puisse riposter !\n",
+                    def_name, atk_name
+                ));
+                atk_dmg = 0;
+            }
+            def_hp -= atk_dmg;
+        } else {
+            def_hp -= atk_dmg;
+            atk_hp -= def_dmg;
+        }
 
         // ── Fourbe: Vampirisme — heal 10% of damage dealt ──
         if atk_class.name == "fourbe" && atk_dmg > 0 {
