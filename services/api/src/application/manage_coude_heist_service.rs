@@ -31,7 +31,8 @@ use crate::ports::inbound::manage_coude_heist::{
 };
 use crate::ports::inbound::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::{
-    BotConfigRepository, CoudeCashboxRepository, CoudeHeistRepository, WalletRepository,
+    BotConfigRepository, CoudeCashboxRepository, CoudeHeistRepository, CoudePlayerRepository,
+    WalletRepository,
 };
 
 pub struct ManageCoudeHeistService {
@@ -40,6 +41,7 @@ pub struct ManageCoudeHeistService {
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     wallet_repo: Arc<dyn WalletRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
+    player_repo: Option<Arc<dyn CoudePlayerRepository>>,
 }
 
 impl ManageCoudeHeistService {
@@ -56,7 +58,35 @@ impl ManageCoudeHeistService {
             inventory_uc,
             wallet_repo,
             bot_config_repo,
+            player_repo: None,
         }
+    }
+
+    /// Branche le repo player (cf. COUPE_AMELIORATIONS 6.3) pour
+    /// appliquer le multiplicateur de cooldown de la "Saison du
+    /// Braquage".
+    pub fn with_player_repo(mut self, repo: Arc<dyn CoudePlayerRepository>) -> Self {
+        self.player_repo = Some(repo);
+        self
+    }
+
+    /// Calcule le cooldown effectif (en jours) en appliquant le
+    /// multiplicateur de saison thematique si dispo.
+    async fn effective_cooldown_days(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        base_cooldown_days: i64,
+    ) -> i64 {
+        let Some(repo) = &self.player_repo else { return base_cooldown_days; };
+        let Ok(Some(player)) = repo.get(guild_id, user_id).await else { return base_cooldown_days; };
+        use crate::domain::entities::theme_for_season;
+        let theme = theme_for_season(player.season);
+        if theme.braquage_cooldown_multiplier == 1.0 {
+            return base_cooldown_days;
+        }
+        let scaled = (base_cooldown_days as f64) * theme.braquage_cooldown_multiplier;
+        (scaled as i64).max(1)
     }
 
     async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
@@ -89,7 +119,10 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             });
         };
         let params = self.load_balance(guild_id).await;
-        let cooldown_days = params.heist_cooldown_days.max(1) as i64;
+        let base_cooldown_days = params.heist_cooldown_days.max(1) as i64;
+        let cooldown_days = self
+            .effective_cooldown_days(guild_id, user_id, base_cooldown_days)
+            .await;
         let next = last.attempted_at + ChronoDuration::days(cooldown_days);
         let ready = Utc::now() >= next;
         Ok(HeistCooldownStatus {
@@ -133,13 +166,22 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             ));
         }
 
-        // 2. Check cooldown configurable (default 7 jours, cf. CoudeBalanceParams)
+        // 2. Check cooldown configurable (default 7 jours, cf. CoudeBalanceParams).
+        //    Le multiplicateur de "Saison du Braquage" est applique dans
+        //    get_cooldown_status (cf. COUPE_AMELIORATIONS 6.3).
         let params_early = self.load_balance(guild_id).await;
         let cooldown = self.get_cooldown_status(guild_id, user_id).await?;
         if !cooldown.ready {
+            let effective_days = self
+                .effective_cooldown_days(
+                    guild_id,
+                    user_id,
+                    params_early.heist_cooldown_days as i64,
+                )
+                .await;
             return Err(DomainError::Forbidden(format!(
                 "Cooldown {} jours non ecoule.",
-                params_early.heist_cooldown_days
+                effective_days
             )));
         }
 

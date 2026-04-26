@@ -455,14 +455,16 @@ pub async fn build_app_state(
     );
 
     // Phase 10 — heist UC (depend de cashbox_repo + inventory_uc + wallet_repo).
-    let coude_heist_uc: Arc<dyn crate::ports::inbound::ManageCoudeHeistUseCase> =
-        Arc::new(ManageCoudeHeistService::new(
+    let coude_heist_uc: Arc<dyn crate::ports::inbound::ManageCoudeHeistUseCase> = Arc::new(
+        ManageCoudeHeistService::new(
             coude_heist_repo.clone(),
             coude_cashbox_repo.clone(),
             coude_inventory_uc.clone(),
             wallet_repo.clone(),
             bot_config_repo.clone(),
-        ));
+        )
+        .with_player_repo(coude_player_repo.clone()),
+    );
 
     // Maledictions (cf. COUPE_AMELIORATIONS 5.1) — repo deja cree plus haut
     // pour permettre le branchement Heartbreak dans wheel.
