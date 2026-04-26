@@ -197,6 +197,8 @@ pub fn handles_command(name: &str) -> bool {
 pub fn handles_component(cid: &str) -> bool {
     cid.starts_with(commands::coude::PRECONFIRM_OK_PREFIX)
         || cid.starts_with(commands::coude::PRECONFIRM_NO_PREFIX)
+        || cid.starts_with(commands::coude::MISE_PICK_PREFIX)
+        || cid.starts_with(commands::coude::MISE_PICK_CANCEL_PREFIX)
         || cid.starts_with(commands::accepter::ACCEPT_PREFIX)
         || cid.starts_with(commands::defend_item::DEFEND_SELECT_PREFIX)
         || cid.starts_with(commands::defend_item::DEFEND_PREFIX)
@@ -216,6 +218,10 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
         commands::coude::handle_preconfirm_ok(ctx, component).await;
     } else if custom_id.starts_with(commands::coude::PRECONFIRM_NO_PREFIX) {
         commands::coude::handle_preconfirm_no(ctx, component).await;
+    } else if custom_id.starts_with(commands::coude::MISE_PICK_PREFIX) {
+        commands::coude::handle_pick_mise(ctx, component).await;
+    } else if custom_id.starts_with(commands::coude::MISE_PICK_CANCEL_PREFIX) {
+        commands::coude::handle_pick_cancel(ctx, component).await;
     } else if custom_id.starts_with(commands::accepter::ACCEPT_PREFIX) {
         commands::accepter::handle(ctx, component).await;
     } else if custom_id.starts_with(commands::defend_item::DEFEND_SELECT_PREFIX) {

@@ -35,7 +35,7 @@ n'est pas encore vrai.
 **Bénéfice** : onboarding naturel, zéro doc à lire, le joueur "sent" les
 mécaniques avant de risquer quoi que ce soit.
 
-### 1.2 🟢 Mise par défaut intelligente ⏳
+### 1.2 🟢 Mise par défaut intelligente ✅
 
 - Si le joueur tape `/coude @cible` sans mise, le bot suggère automatiquement
   20 % de ses coins (dans la fourchette min/max serveur).
@@ -605,12 +605,11 @@ Effet viral : les participants invitent leurs potes.
 
 ### ⏳ Reste à faire
 - 🟢 **Tutoriel interactif 5 étapes** (1.1) — onboarding nouveaux joueurs
-- 🟢 **Mise par défaut intelligente** (1.2) — boutons rapides 50c/100c/all-in
 - 🟡 **Ultimates communes au shop** (3.1bis) — Dé chargé, Clown mode, Rembobine, Déclaration de guerre, Cadeau empoisonné
 - 🔴 **Mode duel amical** (4.5) — `/coude-amical` sans mise
 
 ### 🎯 Verdict
-~25 des 28 features livrées. Il ne reste que des items quick-win (tagline,
+~26 des 28 features livrées. Il ne reste que des items quick-win (tagline,
 bouclier 1ère défaite, mise par défaut) ou cosmétiques/onboarding
 (tutoriel, duel amical, ultimates shop). Le cœur du jeu — chaos, prestige,
 paliers, sabotage, vendetta, signature roue — est complet.

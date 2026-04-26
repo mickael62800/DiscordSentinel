@@ -30,6 +30,13 @@ pub const PRECONFIRM_OK_PREFIX: &str = "coude_prec_ok|";
 /// Prefixe du bouton "Annuler" du meme flow.
 pub const PRECONFIRM_NO_PREFIX: &str = "coude_prec_no|";
 
+/// Prefixe des boutons "mise rapide" (cf. COUPE_AMELIORATIONS 1.2 — quand
+/// /coude est lance sans mise, on propose 20% / 50c / 100c / all-in).
+/// Format custom_id : `coude_mise_pick|<target_id>|<mise>|<special>`
+pub const MISE_PICK_PREFIX: &str = "coude_mise_pick|";
+/// Bouton Annuler du flow mise rapide.
+pub const MISE_PICK_CANCEL_PREFIX: &str = "coude_mise_cancel|";
+
 pub fn register() -> CreateCommand {
     CreateCommand::new("coude")
         .description("Defie un joueur en Coup de Coude !")
@@ -41,7 +48,7 @@ pub fn register() -> CreateCommand {
             CreateCommandOption::new(
                 CommandOptionType::Integer,
                 "mise",
-                "Montant de la mise (defaut: 10)",
+                "Montant de la mise (laisse vide pour proposer 20% / 50c / 100c / all-in)",
             )
             .required(false)
             .min_int_value(1),
@@ -95,7 +102,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    let mise = command
+    let mise_opt: Option<i64> = command
         .data
         .options
         .iter()
@@ -103,8 +110,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value {
             CommandDataOptionValue::Integer(v) => Some(*v),
             _ => None,
-        })
-        .unwrap_or(config.default_bet());
+        });
 
     let special = command
         .data
@@ -182,6 +188,37 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
+    // Cf. COUPE_AMELIORATIONS 1.2 : si la mise est omise, on propose un
+    // mini-menu de boutons (20% / 50c / 100c / all-in / Annuler) au lieu
+    // de retomber silencieusement sur default_bet(). L attaquant choisit,
+    // puis on enchaine le preconfirm habituel via handle_pick_mise.
+    let mise = match mise_opt {
+        Some(v) => v,
+        None => {
+            let (embed, row) = build_mise_pick_ui(
+                target.id,
+                attacker.coins,
+                special.as_deref(),
+                config.min_bet(),
+                config.max_bet(),
+                config.default_bet(),
+            );
+            if let Err(e) = command
+                .create_followup(
+                    &ctx.http,
+                    serenity::all::CreateInteractionResponseFollowup::new()
+                        .embed(embed)
+                        .components(vec![row])
+                        .ephemeral(true),
+                )
+                .await
+            {
+                tracing::warn!(error = %e, "Echec followup pick mise");
+            }
+            return;
+        }
+    };
+
     // Matchmaking check (handicap sera recalcule apres la confirmation)
     let level_gap = (attacker.level - defender_player.level).abs();
     let (_handicap, blocked) =
@@ -201,77 +238,89 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         return;
     }
 
-    // Verifier la mise (limites depuis la config)
+    drop(data);
+    match build_preconfirm_payload(
+        ctx,
+        &guild_id,
+        &command.user,
+        &target,
+        mise,
+        special.as_deref(),
+        &config,
+    )
+    .await
+    {
+        Ok((embed, row)) => {
+            if let Err(e) = command
+                .create_followup(
+                    &ctx.http,
+                    serenity::all::CreateInteractionResponseFollowup::new()
+                        .embed(embed)
+                        .components(vec![row])
+                        .ephemeral(true),
+                )
+                .await
+            {
+                tracing::warn!(error = %e, "Echec followup Discord preconfirm");
+            }
+        }
+        Err(msg) => {
+            crate::modules::coude::interaction_helper::followup_text(ctx, command, &msg).await;
+        }
+    }
+}
+
+/// Construit l embed + row preconfirm pour une mise donnee. Centralise les
+/// validations (limites, coins, pending, item) pour etre appelable depuis
+/// `/coude` direct ET depuis le clic d un bouton de mise rapide (1.2).
+async fn build_preconfirm_payload(
+    ctx: &Context,
+    guild_id: &str,
+    attacker_user: &serenity::model::user::User,
+    target: &serenity::model::user::User,
+    mise: i64,
+    special: Option<&str>,
+    config: &crate::modules::coude::guild_config::CoudeConfig,
+) -> Result<(CreateEmbed, CreateActionRow), String> {
+    let data = ctx.data.read().await;
+    let api = data.get::<GameApiKey>().unwrap();
+
     if mise < config.min_bet() {
-        crate::modules::coude::interaction_helper::followup_text(
-            ctx,
-            command,
-            &format!("La mise minimum est de {} coins.", config.min_bet()),
-        )
-        .await;
-        return;
+        return Err(format!("La mise minimum est de {} coins.", config.min_bet()));
     }
     if mise > config.max_bet() {
-        crate::modules::coude::interaction_helper::followup_text(
-            ctx,
-            command,
-            &format!("La mise maximum est de {} coins.", config.max_bet()),
-        )
-        .await;
-        return;
-    }
-    if attacker.coins < mise {
-        crate::modules::coude::interaction_helper::followup_text(
-            ctx,
-            command,
-            &format!(
-                "Tu n'as pas assez de coins ! (tu as {} coins, mise demandee : {})",
-                attacker.coins, mise
-            ),
-        )
-        .await;
-        return;
+        return Err(format!("La mise maximum est de {} coins.", config.max_bet()));
     }
 
-    // Verifier pas de combat en cours
+    let attacker = api
+        .get_or_create_player(guild_id, &attacker_user.id.to_string(), &attacker_user.name)
+        .await
+        .map_err(|e| format!("Erreur API : {e}"))?;
+
+    if attacker.coins < mise {
+        return Err(format!(
+            "Tu n'as pas assez de coins ! (tu as {} coins, mise demandee : {})",
+            attacker.coins, mise
+        ));
+    }
+
     if let Ok(Some(_)) = api
-        .get_pending_combat_for_attacker(&guild_id, &command.user.id.to_string())
+        .get_pending_combat_for_attacker(guild_id, &attacker_user.id.to_string())
         .await
     {
-        crate::modules::coude::interaction_helper::followup_text(ctx, command, "Tu as deja un defi en attente !").await;
-        return;
+        return Err("Tu as deja un defi en attente !".to_string());
     }
 
-    // Verifier l'item special (has_item seulement — la consommation est
-    // differee apres la confirmation pour ne pas gaspiller l'item si
-    // l'attaquant annule le preconfirm).
-    if let Some(ref item_key) = special {
-        let has = match api
-            .has_item(&guild_id, &command.user.id.to_string(), item_key)
+    if let Some(item_key) = special {
+        let has = api
+            .has_item(guild_id, &attacker_user.id.to_string(), item_key)
             .await
-        {
-            Ok(h) => h,
-            Err(e) => {
-                crate::modules::coude::interaction_helper::followup_text(ctx, command, &format!("Erreur API : {e}")).await;
-                return;
-            }
-        };
+            .map_err(|e| format!("Erreur API : {e}"))?;
         if !has {
-            crate::modules::coude::interaction_helper::followup_text(
-                ctx,
-                command,
-                &format!("Tu n'as pas l'objet **{}** dans ton inventaire !", item_key),
-            )
-            .await;
-            return;
+            return Err(format!("Tu n'as pas l'objet **{}** dans ton inventaire !", item_key));
         }
     }
 
-    // Preconfirmation : on montre les PV de l'attaquant + boutons oui/non.
-    // Le combat n'est PAS encore cree a ce stade ; ca evite :
-    // - de consommer l'item si l'attaquant change d'avis ;
-    // - de laisser une row pending en DB si l'attaquant abandonne ;
-    // - de surprendre quelqu'un qui ne savait pas qu'il etait low HP.
     let hp_current = attacker.hp_current.unwrap_or(100);
     let hp_max = attacker.hp_max.unwrap_or(100);
     let hp_pct = if hp_max > 0 { (hp_current * 100) / hp_max } else { 0 };
@@ -283,29 +332,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         ""
     };
 
-    // Blocage : impossible de defier un joueur a 0 coin (il n'a rien a perdre,
-    // et l'attaquant ne peut rien gagner — duel deséquilibré).
-    // Avertissement : si le defenseur a moins que la mise, on previent que le
-    // gain sera cap sur son solde reel.
-    // Refetch defender pour avoir ses coins a jour (il a pu changer
-    // entre le premier fetch et maintenant). On reutilise defender_player
-    // pour les checks plus simples si besoin de perf, mais ici la row
-    // coins peut avoir bouge.
     let defender_coins_warn = match api
-        .get_or_create_player(&guild_id, &target.id.to_string(), &target.name)
+        .get_or_create_player(guild_id, &target.id.to_string(), &target.name)
         .await
     {
         Ok(def) if def.coins <= 0 => {
-            crate::modules::coude::interaction_helper::followup_text(
-                ctx,
-                command,
-                &format!(
-                    "Impossible de defier <@{}> : ce joueur n'a aucun coin. Pas de duel sans enjeu !",
-                    target.id
-                ),
-            )
-            .await;
-            return;
+            return Err(format!(
+                "Impossible de defier <@{}> : ce joueur n'a aucun coin. Pas de duel sans enjeu !",
+                target.id
+            ));
         }
         Ok(def) if def.coins < mise => format!(
             "\n\n\u{26a0}\u{fe0f} **<@{}> n'a que {} coins !** Si tu gagnes, tu ne recupereras que **{} coins** (pas {}). Si tu perds, tu perdras bien les {} coins mises.",
@@ -316,10 +351,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let hp_warn = format!("{}{}", hp_warn, defender_coins_warn);
 
     let special_suffix = special
-        .as_deref()
         .map(|s| format!(" | Special : **{}**", s))
         .unwrap_or_default();
-    let special_for_id = special.as_deref().unwrap_or("-");
+    let special_for_id = special.unwrap_or("-");
 
     let custom_ok = format!(
         "{}{}|{}|{}",
@@ -339,9 +373,10 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             target.id, mise, special_suffix, hp_current, hp_max, hp_warn
         ))
         .color(if hp_pct <= 25 { 0xE74C3C } else { 0xF1C40F })
-        .footer(CreateEmbedFooter::new(
-            "Coup de Coude | Sentinel — cette confirmation t'est reservee",
-        ))
+        .footer(CreateEmbedFooter::new(format!(
+            "{} — cette confirmation t'est reservee",
+            sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+        )))
         .timestamp(serenity::model::Timestamp::now());
 
     let row = CreateActionRow::Buttons(vec![
@@ -359,19 +394,176 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             )),
     ]);
 
-    // Followup ephemeral avec embed + components (on a defer plus haut).
-    if let Err(e) = command
-        .create_followup(
-            &ctx.http,
-            serenity::all::CreateInteractionResponseFollowup::new()
-                .embed(confirm_embed)
-                .components(vec![row])
-                .ephemeral(true),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec followup Discord preconfirm");
+    Ok((confirm_embed, row))
+}
+
+/// Construit l UI de selection rapide de mise (1.2) : 20% / 50c / 100c /
+/// all-in / Annuler. Filtre les boutons inaccessibles (mise < min, > max,
+/// > coins). Si aucune option viable, fallback un seul bouton "default_bet".
+fn build_mise_pick_ui(
+    target_id: serenity::all::UserId,
+    attacker_coins: i64,
+    special: Option<&str>,
+    min_bet: i64,
+    max_bet: i64,
+    default_bet: i64,
+) -> (CreateEmbed, CreateActionRow) {
+    let special_for_id = special.unwrap_or("-");
+    let special_suffix = special
+        .map(|s| format!(" | Special : **{}**", s))
+        .unwrap_or_default();
+
+    // Suggestion 20% du wallet, clampe dans [min_bet, max_bet].
+    let suggested = (attacker_coins / 5).clamp(min_bet, max_bet);
+    // All-in : tout le wallet, clampe dans [min, max].
+    let all_in = attacker_coins.clamp(min_bet, max_bet);
+
+    let mut buttons: Vec<CreateButton> = Vec::new();
+    let mut seen_amounts: Vec<i64> = Vec::new();
+
+    let add_btn = |amount: i64, label: String, style: ButtonStyle, seen: &mut Vec<i64>, btns: &mut Vec<CreateButton>| {
+        if amount < min_bet || amount > max_bet || amount > attacker_coins {
+            return;
+        }
+        if seen.contains(&amount) {
+            return;
+        }
+        seen.push(amount);
+        let cid = format!("{}{}|{}|{}", MISE_PICK_PREFIX, target_id, amount, special_for_id);
+        btns.push(CreateButton::new(cid).label(label).style(style));
+    };
+
+    add_btn(
+        suggested,
+        format!("Suggere {}c (20%)", suggested),
+        ButtonStyle::Primary,
+        &mut seen_amounts,
+        &mut buttons,
+    );
+    add_btn(50, "50c".into(), ButtonStyle::Secondary, &mut seen_amounts, &mut buttons);
+    add_btn(100, "100c".into(), ButtonStyle::Secondary, &mut seen_amounts, &mut buttons);
+    if all_in > 0 && all_in != suggested {
+        add_btn(
+            all_in,
+            format!("All-in ({}c)", all_in),
+            ButtonStyle::Danger,
+            &mut seen_amounts,
+            &mut buttons,
+        );
     }
+    // Fallback : si tous les boutons sont filtres (ex. coins < min_bet),
+    // on tente quand meme default_bet pour ne pas presenter une UI vide.
+    if buttons.is_empty() {
+        add_btn(
+            default_bet,
+            format!("Defaut {}c", default_bet),
+            ButtonStyle::Primary,
+            &mut seen_amounts,
+            &mut buttons,
+        );
+    }
+
+    let cancel_cid = format!("{}{}|0|{}", MISE_PICK_CANCEL_PREFIX, target_id, special_for_id);
+    buttons.push(
+        CreateButton::new(cancel_cid)
+            .label("Annuler")
+            .style(ButtonStyle::Secondary)
+            .emoji(serenity::model::channel::ReactionType::Unicode(
+                "\u{274c}".to_string(),
+            )),
+    );
+
+    let embed = CreateEmbed::new()
+        .title("\u{1f4b0} Choisis ta mise")
+        .description(format!(
+            "Tu vas defier <@{}>{}.\n\
+             Tu as actuellement **{} coins**.\n\n\
+             Choisis une mise rapide ci-dessous, ou relance `/coude @cible mise:<montant>` pour un montant precis.",
+            target_id, special_suffix, attacker_coins
+        ))
+        .color(0x3498DB)
+        .footer(CreateEmbedFooter::new(format!(
+            "{} — selection de mise",
+            sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+        )))
+        .timestamp(serenity::model::Timestamp::now());
+
+    (embed, CreateActionRow::Buttons(buttons))
+}
+
+/// Handler du clic sur un bouton de mise rapide (1.2). Re-fait toutes les
+/// validations puis emet le preconfirm habituel en remplacement de l UI pick.
+pub async fn handle_pick_mise(ctx: &Context, component: &ComponentInteraction) {
+    let (target_id_str, mise, special) = match parse_preconfirm_id(&component.data.custom_id, MISE_PICK_PREFIX) {
+        Some(x) => x,
+        None => {
+            edit_component_message(ctx, component, "Custom id invalide.").await;
+            return;
+        }
+    };
+
+    let guild_id = match component.guild_id {
+        Some(id) => id.to_string(),
+        None => {
+            edit_component_message(ctx, component, "Commande serveur uniquement.").await;
+            return;
+        }
+    };
+
+    let target_id = match target_id_str.parse::<u64>() {
+        Ok(v) => UserId::new(v),
+        Err(_) => {
+            edit_component_message(ctx, component, "Cible invalide.").await;
+            return;
+        }
+    };
+    let target = match target_id.to_user(&ctx.http).await {
+        Ok(u) => u,
+        Err(_) => {
+            edit_component_message(ctx, component, "Cible introuvable.").await;
+            return;
+        }
+    };
+
+    let config = load_guild_config(ctx, &guild_id).await;
+    let special_opt = if special == "-" { None } else { Some(special.as_str()) };
+
+    match build_preconfirm_payload(
+        ctx,
+        &guild_id,
+        &component.user,
+        &target,
+        mise,
+        special_opt,
+        &config,
+    )
+    .await
+    {
+        Ok((embed, row)) => {
+            if let Err(e) = component
+                .create_response(
+                    &ctx.http,
+                    CreateInteractionResponse::UpdateMessage(
+                        CreateInteractionResponseMessage::new()
+                            .content("")
+                            .embed(embed)
+                            .components(vec![row]),
+                    ),
+                )
+                .await
+            {
+                tracing::warn!(error = %e, "Echec update preconfirm apres pick mise");
+            }
+        }
+        Err(msg) => {
+            edit_component_message(ctx, component, &msg).await;
+        }
+    }
+}
+
+/// Handler du bouton Annuler du flow mise rapide.
+pub async fn handle_pick_cancel(ctx: &Context, component: &ComponentInteraction) {
+    edit_component_message(ctx, component, "\u{274c} Selection de mise annulee.").await;
 }
 
 /// Handler du bouton "Confirmer" affiche par `/coude` avant la creation du
