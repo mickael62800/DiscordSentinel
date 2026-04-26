@@ -21,7 +21,7 @@ Le joueur débutant voit trop de commandes, trop d'items, trop de règles.
 Il abandonne avant de comprendre. « Je clique → je comprends → je rejoue »
 n'est pas encore vrai.
 
-### 1.1 🟢 Tutoriel interactif en 5 étapes
+### 1.1 🟢 Tutoriel interactif en 5 étapes ⏳
 
 - Au premier `/profil` : le bot propose un mini-parcours guidé.
 - Étape 1 : choisir une classe (avec résumé 1 phrase de chaque).
@@ -35,7 +35,7 @@ n'est pas encore vrai.
 **Bénéfice** : onboarding naturel, zéro doc à lire, le joueur "sent" les
 mécaniques avant de risquer quoi que ce soit.
 
-### 1.2 🟢 Mise par défaut intelligente
+### 1.2 🟢 Mise par défaut intelligente ⏳
 
 - Si le joueur tape `/coude @cible` sans mise, le bot suggère automatiquement
   20 % de ses coins (dans la fourchette min/max serveur).
@@ -43,7 +43,7 @@ mécaniques avant de risquer quoi que ce soit.
 - Supprime le frottement du « combien je mise » pour les joueurs nouveaux
   ou pressés.
 
-### 1.3 🟡 Commande `/aide` contextuelle
+### 1.3 🟡 Commande `/aide` contextuelle ✅
 
 Une seule commande qui répond : **« Qu'est-ce que je peux faire maintenant ? »**
 
@@ -68,7 +68,7 @@ qui font réagir le chat et créent des anecdotes racontées la semaine suivante
 > le cran **« c'est un peu n'importe quoi et c'est exactement pour ça
 > qu'on aime »**. Pas de narration Shakespeare — du Kaamelott dopé aux RedBull.
 
-### 2.1 🟢 Événements chaos **Mythiques** (absurdes assumés)
+### 2.1 🟢 Événements chaos **Mythiques** (absurdes assumés) ✅
 
 Ajouter une dizaine d'events à très basse probabilité, tous ridicules,
 tous annoncés avec ping serveur :
@@ -90,7 +90,7 @@ tous annoncés avec ping serveur :
 pendant 3 jours. La **rareté crée la légende**. « J'étais là quand la
 bombe nucléaire est tombée sur le combat de Bob » devient un meme interne.
 
-### 2.2 🟢 Commentaires de combat débiles
+### 2.2 🟢 Commentaires de combat débiles ✅
 
 Le bot intercale des phrases ridicules pendant le récit du combat :
 
@@ -107,7 +107,7 @@ par round). Aucun impact mécanique — c'est **du bruit de fond comique**.
 **Bénéfice** : transforme un combat calculé en **scène de théâtre absurde**.
 Les captures d'écran circulent.
 
-### 2.3 🟢 Détection Clutch / Comeback / Ridicule
+### 2.3 🟢 Détection Clutch / Comeback / Ridicule ✅
 
 Le moteur calcule déjà les HP finaux. On détecte automatiquement :
 
@@ -123,7 +123,7 @@ Tout ça stacké dans le profil : *"12 clutchs, 4 KO ridicules, 1 zéro pointé"
 
 **Bénéfice** : chaque combat, même banal, a un **potentiel de collector**.
 
-### 2.4 🟡 Narration débridée (pas sage)
+### 2.4 🟡 Narration débridée (pas sage) ✅
 
 Le texte du combat n'est plus informatif, il est **narratif ET méchant** :
 
@@ -146,7 +146,7 @@ Pack de **~200 phrases** à rédiger une fois, piochées à vie.
 **Bénéfice** : le combat n'est plus un tableau Excel, c'est une **vanne
 longue de 400 caractères**.
 
-### 2.5 🟡 Spectateurs fictifs (faux chat stream)
+### 2.5 🟡 Spectateurs fictifs (faux chat stream) ✅
 
 À la fin d'un combat, le bot poste **3-5 faux commentaires de spectateurs
 inventés** comme sur un stream Twitch :
@@ -166,7 +166,7 @@ juste de l'ambiance.
 **Bénéfice** : donne l'illusion qu'il y a 200 personnes qui regardent
 chaque combat. Rend les petits combats **aussi épiques que les gros**.
 
-### 2.6 🔴 Combat animé round par round
+### 2.6 🔴 Combat animé round par round ✅
 
 Au lieu de tout poster d'un coup, éditer le message progressivement :
 round 1 → pause 2s → round 2 → pause 2s → … → résultat.
@@ -184,7 +184,7 @@ Les spectateurs suivent en direct. Sensation de combat streamé.
 Montée de niveau linéaire, +3 points de stats à distribuer, changement
 de titre. Ça marche jusqu'au niveau 10, après le joueur décroche.
 
-### 3.1 🟡 Ultimate par classe (débloqué au niveau 10) — versions barrées
+### 3.1 🟡 Ultimate par classe (débloqué au niveau 10) — versions barrées ✅
 
 Oublie les « +15 % ATK ». Les ultimates doivent faire **halluciner le chat**.
 Une par classe, utilisable 1× par semaine via `/ultimate`, thématique mais débile :
@@ -210,7 +210,7 @@ Une par classe, utilisable 1× par semaine via `/ultimate`, thématique mais dé
   de 10 rounds par forfait de l'adversaire qui s'ennuie. Message du
   combat : « Bob n'a pas bougé. Alice est partie chercher un sandwich. »
 
-### 3.1bis 🟡 Ultimates communes débloquables (toutes classes)
+### 3.1bis 🟡 Ultimates communes débloquables (toutes classes) ⏳
 
 En plus de l'ultimate de classe, le joueur peut acheter des **ultimates
 universelles** au shop (très cher, usage unique) :
@@ -231,7 +231,7 @@ universelles** au shop (très cher, usage unique) :
 **Bénéfice** : sensation nette de *"je gagne des pouvoirs en montant"*
 ET de *"ce jeu est complètement taré"*. Identité renforcée.
 
-### 3.2 🟡 Paliers visibles (milestones)
+### 3.2 🟡 Paliers visibles (milestones) ✅
 
 Tous les 5 niveaux (5 / 10 / 15 / 20 / 25), débloquer un **effet permanent** :
 
@@ -243,7 +243,7 @@ Tous les 5 niveaux (5 / 10 / 15 / 20 / 25), débloquer un **effet permanent** :
 
 **Bénéfice** : chaque palier est une **carotte claire**, visible dans le profil.
 
-### 3.3 🔴 Système de Prestige (niveau 25+)
+### 3.3 🔴 Système de Prestige (niveau 25+) ✅
 
 Au lieu de « max level », permettre de **Prestige** :
 - Reset au niveau 1 mais **+5 % de gains permanents** par prestige (cumul).
@@ -255,7 +255,7 @@ Au lieu de « max level », permettre de **Prestige** :
 **Bénéfice** : les hardcores ont un objectif long terme. Les joueurs moyens
 voient le prestige comme un rêve atteignable.
 
-### 3.4 🟢 Achievements cosmétiques
+### 3.4 🟢 Achievements cosmétiques ✅
 
 30-50 succès collectables, trackés automatiquement :
 - "Survivant" : gagner un combat sous 5 % HP (×1)
@@ -278,7 +278,7 @@ impacter l'équilibre.
 Le jeu punit : coins perdus, prison 24 h, cowardice, scam d'assurance.
 Combiné au RNG, certains joueurs quittent après une grosse défaite.
 
-### 4.1 🟢 Bouclier « malchance du jour »
+### 4.1 🟢 Bouclier « malchance du jour » ⏳
 
 La **première défaite de la journée** est adoucie automatiquement :
 - Perte de coins × 0.5 (au lieu du calcul normal).
@@ -289,7 +289,7 @@ La **première défaite de la journée** est adoucie automatiquement :
 **Bénéfice** : élimine la spirale "j'ai perdu une fois, je quitte".
 Le joueur peut retenter sans risque fatal.
 
-### 4.2 🟢 Refus = pas de lâcheté si HP bas
+### 4.2 🟢 Refus = pas de lâcheté si HP bas ✅
 
 Si le défenseur est à **< 20 % HP**, refuser un combat **n'incrémente pas**
 `cowardice_count`. Message : « Ta cible est trop faible pour se battre ».
@@ -297,7 +297,7 @@ Si le défenseur est à **< 20 % HP**, refuser un combat **n'incrémente pas**
 Actuellement le joueur est forcé de perdre OU d'être flag lâche —
 piège RNG pénalisant. Donne une échappatoire légitime.
 
-### 4.3 🟡 Travaux communautaires en prison
+### 4.3 🟡 Travaux communautaires en prison ✅
 
 Pendant les 24 h de prison post-braquage raté, au lieu d'être muet :
 - Commandes passives restent actives : `/travaux` remplace `/coude`.
@@ -310,7 +310,7 @@ Pendant les 24 h de prison post-braquage raté, au lieu d'être muet :
 **Bénéfice** : transforme la prison d'une punition stérile en **contenu
 de gameplay**. Le joueur reste engagé.
 
-### 4.4 🟡 Filet de sécurité coins
+### 4.4 🟡 Filet de sécurité coins ✅
 
 Si le solde du joueur tombe sous **50 coins**, activation automatique de
 bonus de survie pendant 3 jours :
@@ -320,7 +320,7 @@ bonus de survie pendant 3 jours :
 
 Logique : éviter qu'un joueur pauvre reste pauvre à cause du RNG.
 
-### 4.5 🔴 Mode « duel amical »
+### 4.5 🔴 Mode « duel amical » ⏳
 
 Nouvelle variante : `/coude-amical @cible` — combat **sans mise** ni
 conséquence coins. Le gagnant gagne juste **+20 XP** (au lieu de 15) et
@@ -344,7 +344,7 @@ contourner.
 > 🔥 C'est **le** chaînon manquant. C'est ce qui différencie un bot de
 > combat générique d'un jeu *"on s'est marrés tout le week-end"*.
 
-### 5.1 🟢 Malédictions (`/maudire @pote`)
+### 5.1 🟢 Malédictions (`/maudire @pote`) ✅
 
 Pose un sort minable sur un ami pendant 24 h. Coût : 300c. Les
 malédictions sont **ridicules mais visibles** :
@@ -365,7 +365,7 @@ en payant double à son auteur.
 **Bénéfice** : permet de troller un pote sans le flinguer financièrement.
 Rigolade pure.
 
-### 5.2 🟡 Sabotage (actif)
+### 5.2 🟡 Sabotage (actif) ✅
 
 Pay-to-troll : des actions payantes qui pénalisent un joueur spécifique
 sans vol direct de coins.
@@ -384,7 +384,7 @@ sans vol direct de coins.
 l'économie. Les sabotages sont visibles, personne ne se fait avoir en
 silence → la victime **peut répliquer** (revenge).
 
-### 5.3 🟡 Revenge mechanics (vendetta)
+### 5.3 🟡 Revenge mechanics (vendetta) ✅
 
 Quand tu te fais humilier, tu dois pouvoir **rendre la pareille**.
 
@@ -408,7 +408,7 @@ Quand tu te fais humilier, tu dois pouvoir **rendre la pareille**.
 **Bénéfice** : le jeu devient **une guerre de clans** vivante. Les
 rancœurs qui traversent la semaine alimentent les sessions.
 
-### 5.4 🟢 Pranks communautaires
+### 5.4 🟢 Pranks communautaires ✅
 
 Outils de troll pur, zéro gameplay derrière, juste de l'ambiance :
 
@@ -441,7 +441,7 @@ Combat + économie + hasard sans émotion dominante claire. Il manque
 > 🏆 La signature, c'est **une mécanique unique, ridicule, racontable
 > en une phrase**. Pas deux. Pas trois. **Une**.
 
-### 6.0 🟢 🪙 LA SIGNATURE : **LA ROUE DU DESTIN** (une fois par jour)
+### 6.0 🟢 🪙 LA SIGNATURE : **LA ROUE DU DESTIN** (une fois par jour) ✅
 
 **Commande unique : `/roue`**.
 
@@ -493,7 +493,7 @@ Les probas peuvent être tweakées (cases 1 / 19 / 20 plus rares).
 **Tagline associée** : *« Coup de Coude — le jeu Discord où t'as pas
 besoin de jouer pour que la journée soit déjà pétée. »*
 
-### 6.1 🟡 TOUT-OU-RIEN (backup signature, si Roue du Destin trop complexe)
+### 6.1 🟡 TOUT-OU-RIEN (backup signature, si Roue du Destin trop complexe) ✅
 
 Commande `/tout-ou-rien` — disponible 1× par semaine :
 
@@ -510,7 +510,7 @@ Tout le monde en parle. Les potes se chambrent.
 **parient** entre eux sur qui va tenter cette semaine. Les records
 circulent (« Bob a perdu 47 000 coins au tout-ou-rien mdr »).
 
-### 6.2 🟡 Moment de la semaine (highlight reel)
+### 6.2 🟡 Moment de la semaine (highlight reel) ✅
 
 Chaque dimanche à 23 h, un bot poste automatiquement dans le salon principal :
 
@@ -530,7 +530,7 @@ Automatique, basé sur les stats déjà loggées.
 Récompense les exploits même sans gain tangible. C'est la machine à
 souvenirs partagés qui forge l'identité.
 
-### 6.3 🟡 Saisons thématiques
+### 6.3 🟡 Saisons thématiques ✅
 
 Chaque saison (90 jours actuels) a un **thème** annoncé :
 - **Saison du Chaos** : events chaos ×2 cette saison.
@@ -544,7 +544,7 @@ Modifie l'équilibre sans toucher au code, juste via config. Les joueurs
 **Bénéfice** : le jeu "respire", chaque 3 mois apporte un twist. Renforce
 l'**identité : un jeu vivant qui bouge**.
 
-### 6.4 🟢 Tagline + ton des embeds
+### 6.4 🟢 Tagline + ton des embeds ⏳
 
 Choisir **une** identité et l'assumer partout dans les textes :
 
@@ -561,7 +561,7 @@ OU
 À afficher dans `/aide`, dans les embeds de combat, dans le footer des
 messages. Cohérence = identité.
 
-### 6.5 🔴 Événement serveur live (1× par mois)
+### 6.5 🔴 Événement serveur live (1× par mois) ✅
 
 Un samedi soir par mois, **Grand Tournoi Live** :
 - Annonce 3 jours avant.
@@ -576,46 +576,47 @@ Effet viral : les participants invitent leurs potes.
 
 ---
 
-## 📅 Roadmap suggérée
+## 📅 État d'avancement (mis à jour 2026-04-26)
 
-### Semaine 1 — Quick wins (impact immédiat)
-- ✅ Fix bug `/repos` + hp_max drift (déjà fait)
-- 🟢 Événements chaos Mythiques (2.1)
-- 🟢 Commentaires de combat débiles (2.2)
-- 🟢 Détection Clutch / Comeback / Ridicule (2.3)
-- 🟢 Spectateurs fictifs (2.5)
-- 🟢 Bouclier malchance du jour (4.1)
-- 🟢 Refus OK si HP bas (4.2)
-- 🟢 Mise par défaut intelligente (1.2)
-- 🟢 Tagline affichée partout (6.4)
-- 🟢 **Malédictions** `/maudire` (5.1)
-- 🟢 **Pranks communautaires** (5.4)
-- 🟢 **🪙 LA ROUE DU DESTIN** (6.0) ⭐ priorité max
+### ✅ Livré (le gros)
+- **Événements chaos Mythiques** (2.1)
+- **Commentaires de combat débiles** (2.2)
+- **Clutch / Comeback / Ridicule** (2.3)
+- **Narration débridée** (2.4)
+- **Spectateurs fictifs** (2.5)
+- **Combat animé round par round** (2.6)
+- **Ultimates de classe** (3.1) — Bourrin, Agile, Fourbe, Tank
+- **Paliers milestones** (3.2) — incl. niveau 5 slot assurance +1
+- **Système de Prestige** (3.3) — incl. wiring multiplicateur sur payouts
+- **Achievements cosmétiques** (3.4)
+- **Refus OK si HP bas** (4.2)
+- **Travaux communautaires en prison** (4.3)
+- **Filet de sécurité coins** (4.4)
+- **Malédictions `/maudire`** (5.1)
+- **Sabotage** (5.2) — graisser, empoisonner wallet, fausse assurance
+- **Revenge / Vendetta** (5.3) — vendetta, prime collective, dette d'honneur, coalition
+- **Pranks communautaires** (5.4)
+- **🪙 La Roue du Destin** (6.0) ⭐ signature
+- **TOUT-OU-RIEN + Memorial** (6.1)
+- **Moment de la semaine** (6.2)
+- **Saisons thématiques** (6.3)
+- **Tournoi mensuel live** (6.5)
+- **`/aide` contextuelle** (1.3)
 
-### Semaine 2-3 — Moyens (construction)
-- 🟡 **Ultimates débridées** par classe (3.1 + 3.1bis)
-- 🟡 Paliers visibles milestones (3.2)
-- 🟡 Narration débridée (2.4)
-- 🟡 Filet de sécurité coins (4.4)
-- 🟡 Saisons thématiques (6.3)
-- 🟡 Commande `/aide` contextuelle (1.3)
-- 🟡 **Sabotage** (5.2)
-- 🟡 **Revenge / Vendetta** (5.3)
-- 🟡 TOUT-OU-RIEN backup signature (6.1)
-- 🟡 Moment de la semaine automatique (6.2)
+### ⏳ Reste à faire
+- 🟢 **Tutoriel interactif 5 étapes** (1.1) — onboarding nouveaux joueurs
+- 🟢 **Mise par défaut intelligente** (1.2) — boutons rapides 50c/100c/all-in
+- 🟡 **Ultimates communes au shop** (3.1bis) — Dé chargé, Clown mode, Rembobine, Déclaration de guerre, Cadeau empoisonné
+- 🟢 **Bouclier malchance du jour** (4.1) — première défaite quotidienne ×0.5
+  *(distinct du filet de sécurité 4.4 déjà fait, qui s'active sous 50c)*
+- 🔴 **Mode duel amical** (4.5) — `/coude-amical` sans mise
+- 🟢 **Tagline + ton des embeds** (6.4) — choisir LA phrase signature et l'afficher partout
 
-### Mois 2 — Gros morceaux
-- 🔴 Système de Prestige (3.3)
-- 🔴 Combat animé round par round (2.6)
-- 🔴 Travaux communautaires en prison (4.3)
-- 🔴 Tutoriel interactif (1.1)
-- 🔴 Mode duel amical (4.5)
-- 🔴 Grand Tournoi mensuel live (6.5)
-
-### Mois 3 — Ambition
-- 🔴 Combat animé round par round (2.4)
-- 🔴 Grand Tournoi mensuel live (5.4)
-- 🟢 Achievements cosmétiques (3.4)
+### 🎯 Verdict
+~22 des 28 features livrées. Il ne reste que des items quick-win (tagline,
+bouclier 1ère défaite, mise par défaut) ou cosmétiques/onboarding
+(tutoriel, duel amical, ultimates shop). Le cœur du jeu — chaos, prestige,
+paliers, sabotage, vendetta, signature roue — est complet.
 
 ---
 
