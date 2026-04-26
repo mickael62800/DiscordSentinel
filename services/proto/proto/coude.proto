@@ -162,6 +162,17 @@ message ResolvedCombatNowResponse {
   // Phase 9 Part D : events de raillerie si un palier de streak a ete
   // franchi. Le bot les poste tels quels dans le channel fourni.
   repeated TauntEvent taunt_events = 6;
+  // Cf. COUPE_AMELIORATIONS 5.3 : si non null, le bot doit renommer
+  // `target_user_id` en "<pseudo> le Bourreau de @<challenger>" pour
+  // 7 jours suite a une vendetta perdue.
+  optional VendettaHumiliation vendetta_humiliation = 7;
+}
+
+message VendettaHumiliation {
+  // Le user_id a renommer (= le gagnant du combat).
+  string target_user_id = 1;
+  // Le user_id du challenger qui vient de perdre sa vendetta.
+  string challenger_user_id = 2;
 }
 
 message ExpiredCombat {

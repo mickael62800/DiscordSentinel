@@ -33,6 +33,22 @@ pub struct ResolveCombatNowOutput {
     /// Phase 9 Part D : events de raillerie si un joueur a franchi un
     /// palier de streak sur ce combat. Le bot les poste tels quels.
     pub taunt_events: Vec<TauntEvent>,
+    /// Cf. COUPE_AMELIORATIONS 5.3 — humiliation suite a une vendetta
+    /// perdue. `Some` si le perdant avait declare une vendetta contre
+    /// le gagnant (qui vient de l ecraser). Le bot doit alors renommer
+    /// le gagnant "@gagnant le Bourreau de @perdant" pendant 7 jours.
+    pub vendetta_humiliation: Option<VendettaHumiliation>,
+}
+
+/// Donnees pour appliquer le rename "Bourreau" cote bot apres une
+/// vendetta perdue (cf. COUPE_AMELIORATIONS 5.3).
+#[derive(Debug, Clone)]
+pub struct VendettaHumiliation {
+    /// Le joueur a renommer (= le gagnant du combat).
+    pub target_user_id: String,
+    /// Le challenger qui vient de perdre sa vendetta. Le bot resout son
+    /// pseudo Discord pour construire le suffixe " le Bourreau de @X".
+    pub challenger_user_id: String,
 }
 
 #[async_trait]

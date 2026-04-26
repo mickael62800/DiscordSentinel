@@ -612,6 +612,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         }
 
         let mut vendetta_msg: Option<String> = None;
+        let mut vendetta_humiliation: Option<crate::ports::inbound::VendettaHumiliation> = None;
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
                 // Cap sur solde reel du perdant (pre-requis pour l'assurance
@@ -657,6 +658,14 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                                 "\u{1faa6} Vendetta de <@{}> ECHOUEE — il est de nouveau ecrase par <@{}>.",
                                 loser_id, winner_id
                             ));
+                            // Le bot va renommer le winner "le Bourreau
+                            // de @loser" pendant 7 jours (cf. roadmap 5.3).
+                            vendetta_humiliation = Some(
+                                crate::ports::inbound::VendettaHumiliation {
+                                    target_user_id: winner_id.clone(),
+                                    challenger_user_id: loser_id.clone(),
+                                },
+                            );
                         }
                         coins_transferred_nominal
                     }
@@ -1124,6 +1133,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             color: title_color,
             fields,
             taunt_events,
+            vendetta_humiliation,
         })
     }
 }

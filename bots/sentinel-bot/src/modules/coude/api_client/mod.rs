@@ -102,6 +102,16 @@ pub struct ResolvedCombatEmbed {
     pub fields: Vec<ResolvedCombatEmbedField>,
     /// Phase 9 Part D : railleries a poster apres l'embed.
     pub taunt_events: Vec<TauntEvent>,
+    /// Cf. COUPE_AMELIORATIONS 5.3 : si presente, le bot doit renommer
+    /// `target_user_id` en "<pseudo> le Bourreau de @<challenger>" pour
+    /// 7 jours suite a une vendetta perdue.
+    pub vendetta_humiliation: Option<VendettaHumiliation>,
+}
+
+#[derive(Debug, Clone)]
+pub struct VendettaHumiliation {
+    pub target_user_id: String,
+    pub challenger_user_id: String,
 }
 
 #[derive(Debug, Clone)]

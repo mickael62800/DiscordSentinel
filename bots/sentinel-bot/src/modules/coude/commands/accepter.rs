@@ -252,6 +252,30 @@ pub async fn resolve_combat_internal_ex(
         }
     }
 
+    // Vendetta echouee (cf. COUPE_AMELIORATIONS 5.3) : rename le gagnant
+    // "le Bourreau de @<challenger>" pendant 7 jours. Best-effort.
+    if let Some(humil) = &resp.vendetta_humiliation {
+        if let (Ok(guild_id), Ok(target_id), Ok(challenger_id)) = (
+            combat_record.guild_id.parse::<u64>(),
+            humil.target_user_id.parse::<u64>(),
+            humil.challenger_user_id.parse::<u64>(),
+        ) {
+            let gid = serenity::all::GuildId::new(guild_id);
+            let target = serenity::all::UserId::new(target_id);
+            // Resout le pseudo du challenger pour le suffixe.
+            let challenger_name = serenity::all::UserId::new(challenger_id)
+                .to_user(&ctx.http)
+                .await
+                .map(|u| u.name)
+                .unwrap_or_else(|_| "challenger".into());
+            let suffix = format!(" le Bourreau de {}", challenger_name);
+            crate::modules::coude::taunts_dispatch::apply_suffix_to_user(
+                ctx, gid, target, &suffix,
+            )
+            .await;
+        }
+    }
+
     ResolveOutcome::Resolved(embed)
 }
 

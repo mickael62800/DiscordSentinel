@@ -314,6 +314,12 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
                 .into_iter()
                 .map(taunt_event_to_proto)
                 .collect(),
+            vendetta_humiliation: out.vendetta_humiliation.map(|h| {
+                proto::VendettaHumiliation {
+                    target_user_id: h.target_user_id,
+                    challenger_user_id: h.challenger_user_id,
+                }
+            }),
         }))
     }
 }

@@ -145,6 +145,7 @@ impl ResolveCombatNowUseCase for MockResolveNow {
                 inline: false,
             }],
             taunt_events: vec![],
+            vendetta_humiliation: None,
         }))
     }
 }
@@ -554,6 +555,7 @@ async fn resolve_combat_now_returns_embed_fields_and_taunts() {
             inline: false,
         }],
         taunt_events: vec![],
+        vendetta_humiliation: None,
     });
     let g = grpc_full(uc, rb, eb, rn.clone());
     let resp = g.resolve_combat_now(Request::new(proto::ResolveCombatNowRequest {

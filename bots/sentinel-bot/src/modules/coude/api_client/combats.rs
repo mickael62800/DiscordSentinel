@@ -244,6 +244,12 @@ impl ApiClient {
                 })
                 .collect(),
             taunt_events: resp.taunt_events.into_iter().map(taunt_event_from_proto).collect(),
+            vendetta_humiliation: resp.vendetta_humiliation.map(|h| {
+                super::VendettaHumiliation {
+                    target_user_id: h.target_user_id,
+                    challenger_user_id: h.challenger_user_id,
+                }
+            }),
         })
     }
 

@@ -37,7 +37,8 @@ pub mod expire_combats_batch;
 pub use expire_combats_batch::{ExpireCombatsBatchUseCase, ExpiredCombatOutput};
 pub mod resolve_combat_now;
 pub use resolve_combat_now::{
-    ResolveCombatNowUseCase, ResolveCombatNowOutput, ResolvedCombatEmbedField,
+    ResolveCombatNowOutput, ResolveCombatNowUseCase, ResolvedCombatEmbedField,
+    VendettaHumiliation,
 };
 pub mod manage_coude_catalog;
 pub use manage_coude_catalog::{
