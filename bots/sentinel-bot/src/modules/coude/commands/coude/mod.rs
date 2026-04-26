@@ -559,13 +559,13 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                             .embed(build_surprise_embed(attacker_user.id, target.id)),
                     )
                     .await;
-                if let Err(e) = component
-                    .channel_id
-                    .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                    .await
-                {
-                    tracing::warn!(error = %e, "Echec post embed resultat combat surprise");
-                }
+                super::accepter::post_combat_embed_animated(
+                    ctx,
+                    component.channel_id,
+                    embed,
+                    combat.mise,
+                )
+                .await;
                 edit_component_message(ctx, component, "\u{2705} Defi surprise resolu !").await;
                 return;
             }
@@ -613,13 +613,13 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
             .await;
         match super::accepter::resolve_combat_internal(ctx, &combat, component.channel_id).await {
             Some(embed) => {
-                if let Err(e) = component
-                    .channel_id
-                    .send_message(&ctx.http, CreateMessage::new().embed(embed))
-                    .await
-                {
-                    tracing::warn!(error = %e, "Echec post embed resultat combat bloodbath");
-                }
+                super::accepter::post_combat_embed_animated(
+                    ctx,
+                    component.channel_id,
+                    embed,
+                    combat.mise,
+                )
+                .await;
                 edit_component_message(ctx, component, "\u{2705} Defi Bloodbath resolu !").await;
             }
             None => {

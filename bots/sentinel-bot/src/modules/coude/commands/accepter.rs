@@ -1,6 +1,6 @@
 use serenity::all::{
     ComponentInteraction, Context, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
-    CreateInteractionResponseFollowup, CreateMessage,
+    CreateInteractionResponseFollowup, CreateMessage, EditMessage,
 };
 use serenity::model::id::ChannelId;
 
@@ -277,6 +277,79 @@ pub async fn resolve_combat_internal_ex(
     }
 
     ResolveOutcome::Resolved(embed)
+}
+
+/// Seuil de mise au-dessus duquel on anime le combat round par round
+/// (cf. COUPE_AMELIORATIONS 2.6). En dessous, on poste le resultat
+/// directement pour ne pas ralentir les petits combats.
+pub const ANIMATED_COMBAT_MISE_THRESHOLD: i64 = 500;
+
+/// Poste un embed de combat avec ou sans animation selon la mise.
+/// Pour les grosses mises (>= seuil), affiche d abord 3 phases
+/// "buildup" avec 2s de pause chacune avant le resultat final.
+///
+/// Best-effort : si une etape d edit foire, on log et on continue. Le
+/// resultat final est toujours poste si possible.
+pub async fn post_combat_embed_animated(
+    ctx: &Context,
+    channel: ChannelId,
+    final_embed: CreateEmbed,
+    mise: i64,
+) {
+    if mise < ANIMATED_COMBAT_MISE_THRESHOLD {
+        if let Err(e) = channel
+            .send_message(&ctx.http, CreateMessage::new().embed(final_embed))
+            .await
+        {
+            tracing::warn!(error = %e, "Echec post embed combat (direct)");
+        }
+        return;
+    }
+
+    // Phase 1 : placeholder "le combat commence".
+    let phase1 = CreateEmbed::new()
+        .title("\u{1f941} Le combat commence...")
+        .description("Les deux combattants entrent dans l arene. Les paris sont fermes. Le silence se fait.")
+        .color(0xF1C40F);
+    let msg = match channel
+        .send_message(&ctx.http, CreateMessage::new().embed(phase1))
+        .await
+    {
+        Ok(m) => m,
+        Err(e) => {
+            tracing::warn!(error = %e, "Echec post embed combat (animation)");
+            return;
+        }
+    };
+
+    // Phase 2.
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    let phase2 = CreateEmbed::new()
+        .title("\u{2694}\u{fe0f} Round 1 — les coups pleuvent...")
+        .description("Premiers echanges. Les d20 roulent dans le bruit.")
+        .color(0xE67E22);
+    let _ = channel
+        .edit_message(&ctx.http, msg.id, EditMessage::new().embed(phase2))
+        .await;
+
+    // Phase 3.
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    let phase3 = CreateEmbed::new()
+        .title("\u{1f525} Round suivant — ca chauffe...")
+        .description("Le tempo s emballe. La foule retient son souffle.")
+        .color(0xE74C3C);
+    let _ = channel
+        .edit_message(&ctx.http, msg.id, EditMessage::new().embed(phase3))
+        .await;
+
+    // Phase 4 : verdict final.
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    if let Err(e) = channel
+        .edit_message(&ctx.http, msg.id, EditMessage::new().embed(final_embed))
+        .await
+    {
+        tracing::warn!(error = %e, "Echec edit final combat anime");
+    }
 }
 
 /// Followup ephemeral apres un Acknowledge (on a defer au debut).
