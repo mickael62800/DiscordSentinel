@@ -239,6 +239,9 @@ pub use branding::{
     coude_bet_footer, coude_combat_footer, COUDE_TAGLINE, COUDE_TAGLINE_SHORT, SENTINEL_TAGLINE,
 };
 
+mod combat_flavor;
+pub use combat_flavor::{pick_flavor_line, FLAVOR_LINES, FLAVOR_LINE_PROBABILITY};
+
 mod curse;
 pub use curse::{
     apply_banana_to_d20, apply_insomnia_to_taunt_weight, apply_leaky_wallet, lift_cost,

@@ -667,6 +667,16 @@ pub fn resolve_combat_with_curses(
             round_msg.push('\n');
         }
 
+        // Commentaires de combat debiles (cf. COUPE_AMELIORATIONS 2.2) —
+        // ~20% par round, aucune incidence mecanique, juste de l ambiance.
+        {
+            use crate::domain::entities::pick_flavor_line;
+            let proba: f64 = rng.gen_range(0.0..1.0);
+            if let Some(line) = pick_flavor_line(&mut rng, proba, &atk_name, &def_name) {
+                round_msg.push_str(&format!("\n_\u{1f3ad} {}_\n", line));
+            }
+        }
+
         round_msg.push_str(&format!(
             "\u{2764}\u{fe0f} {} : {}/{} HP | {} : {}/{} HP",
             atk_name, atk_hp, atk_hp_max, def_name, def_hp, def_hp_max
