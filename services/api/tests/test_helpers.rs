@@ -516,6 +516,13 @@ pub struct StubCoudeCurses;
     async fn lift_own(&self, _: &str, _: &str, _: &str) -> Result<sentinel_api::domain::entities::ActiveCurse, DomainError> { unimplemented!() }
 }
 
+pub struct StubCoudeSafetyNet;
+#[async_trait] impl sentinel_api::ports::inbound::ManageCoudeSafetyNetUseCase for StubCoudeSafetyNet {
+    async fn try_activate(&self, _: &str, _: &str, _: i64) -> Result<Option<sentinel_api::domain::entities::ActiveSafetyNet>, DomainError> { Ok(None) }
+    async fn get_active(&self, _: &str, _: &str) -> Result<Option<sentinel_api::domain::entities::ActiveSafetyNet>, DomainError> { Ok(None) }
+    async fn list_active(&self, _: &str) -> Result<Vec<sentinel_api::domain::entities::ActiveSafetyNet>, DomainError> { Ok(vec![]) }
+}
+
 // ── Stubs pour les nouveaux repos ──
 
 pub struct StubUserActivityRepo;
@@ -668,6 +675,7 @@ fn base_state() -> AppState {
         coude_taunts_uc: Arc::new(StubCoudeTaunts),
         coude_heist_uc: Arc::new(StubCoudeHeist),
         coude_curses_uc: Arc::new(StubCoudeCurses),
+        coude_safety_net_uc: Arc::new(StubCoudeSafetyNet),
         resolve_betting_batch_uc: Arc::new(StubResolveBettingBatch),
         expire_combats_batch_uc: Arc::new(StubExpireCombatsBatch),
         resolve_combat_now_uc: Arc::new(StubResolveCombatNow),

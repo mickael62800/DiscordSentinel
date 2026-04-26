@@ -35,7 +35,8 @@ use crate::ports::inbound::{
     ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
 };
 use crate::ports::outbound::{
-    BotConfigRepository, CoudeCombatRepository, CoudeCursesRepository, WalletRepository,
+    BotConfigRepository, CoudeCombatRepository, CoudeCursesRepository, CoudeSafetyNetRepository,
+    WalletRepository,
 };
 
 pub struct ResolveCombatNowService {
@@ -49,6 +50,7 @@ pub struct ResolveCombatNowService {
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
     curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
+    safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -74,6 +76,7 @@ impl ResolveCombatNowService {
             taunts_uc,
             bot_config_repo,
             curses_repo: None,
+            safety_net_repo: None,
         }
     }
 
@@ -82,6 +85,38 @@ impl ResolveCombatNowService {
     pub fn with_curses_repo(mut self, repo: Arc<dyn CoudeCursesRepository>) -> Self {
         self.curses_repo = Some(repo);
         self
+    }
+
+    /// Branche le repo du filet de securite (cf. COUPE_AMELIORATIONS 4.4)
+    /// pour reduire les pertes du perdant et activer le filet quand son
+    /// solde tombe sous le seuil.
+    pub fn with_safety_net_repo(mut self, repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
+        self.safety_net_repo = Some(repo);
+        self
+    }
+
+    async fn loser_has_safety_net(&self, guild_id: &str, user_id: &str) -> bool {
+        let Some(repo) = &self.safety_net_repo else { return false; };
+        matches!(repo.get_active(guild_id, user_id).await, Ok(Some(_)))
+    }
+
+    async fn try_activate_safety_net_after(&self, guild_id: &str, user_id: &str) {
+        let Some(repo) = &self.safety_net_repo else { return; };
+        let balance = match self.wallet_repo.get(guild_id, user_id).await {
+            Ok(Some(w)) => w.coins,
+            _ => return,
+        };
+        use crate::domain::entities::{safety_net_should_trigger, SAFETY_NET_DURATION_HOURS};
+        if !safety_net_should_trigger(balance) {
+            return;
+        }
+        // Skip si deja un filet actif (evite cumul).
+        if matches!(repo.get_active(guild_id, user_id).await, Ok(Some(_))) {
+            return;
+        }
+        if let Err(e) = repo.activate(guild_id, user_id, SAFETY_NET_DURATION_HOURS).await {
+            warn!(error = %e, %user_id, "Echec activation safety_net");
+        }
     }
 
     async fn fetch_banana(&self, guild_id: &str, user_id: &str) -> bool {
@@ -530,6 +565,27 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     };
                 }
 
+                // Filet de securite (cf. COUPE_AMELIORATIONS 4.4) : si le
+                // perdant a un filet actif, sa perte est divisee par 2.
+                let has_safety_net = self.loser_has_safety_net(&combat.guild_id, loser_id).await;
+                let actual_loss = if has_safety_net {
+                    use crate::domain::entities::safety_net_reduce_loss;
+                    let reduced = safety_net_reduce_loss(actual_loss, true);
+                    if reduced < actual_loss {
+                        let net_msg = format!(
+                            "\u{1f49a} Filet de securite : perte reduite de {} a {}.",
+                            actual_loss, reduced
+                        );
+                        insurance_msg = match insurance_msg {
+                            Some(prev) => Some(format!("{prev}\n{net_msg}")),
+                            None => Some(net_msg),
+                        };
+                    }
+                    reduced
+                } else {
+                    actual_loss
+                };
+
                 // Payout atomique : credit winner + debit loser dans la meme
                 // tx Postgres. Evite les etats partiels si le processus crash
                 // entre les deux operations (bug #1 de l audit).
@@ -551,6 +607,11 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         warn!(error = %e, "Echec payout combat atomique");
                     }
                 }
+
+                // Filet de securite (cf. COUPE_AMELIORATIONS 4.4) : apres
+                // le payout, si le solde du perdant tombe sous 50c et qu il
+                // n a pas deja un filet actif, on l active. Best-effort.
+                self.try_activate_safety_net_after(&combat.guild_id, loser_id).await;
 
                 // Stats
                 let _ = self

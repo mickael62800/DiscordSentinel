@@ -124,3 +124,6 @@ pub use wheel_repository::WheelRepository;
 
 mod coude_curses_repository;
 pub use coude_curses_repository::CoudeCursesRepository;
+
+mod coude_safety_net_repository;
+pub use coude_safety_net_repository::CoudeSafetyNetRepository;

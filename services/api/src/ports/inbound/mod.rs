@@ -102,3 +102,6 @@ pub use manage_wheel::{ManageWheelUseCase, WheelSpinCommand, WheelSpinResult};
 
 pub mod manage_coude_curses;
 pub use manage_coude_curses::{CastedCurse, ManageCoudeCursesUseCase};
+
+pub mod manage_coude_safety_net;
+pub use manage_coude_safety_net::ManageCoudeSafetyNetUseCase;

@@ -253,6 +253,13 @@ pub use mythic_events::{
     format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
 };
 
+mod safety_net;
+pub use safety_net::{
+    boost_bet_gain as safety_net_boost_bet_gain, reduce_loss as safety_net_reduce_loss,
+    should_trigger as safety_net_should_trigger, ActiveSafetyNet, SAFETY_NET_BET_GAIN_MULTIPLIER,
+    SAFETY_NET_DURATION_HOURS, SAFETY_NET_LOSS_MULTIPLIER, SAFETY_NET_TRIGGER_COINS,
+};
+
 mod tout_ou_rien;
 pub use tout_ou_rien::{
     coin_delta as tout_ou_rien_delta, resolve_outcome as tout_ou_rien_resolve,

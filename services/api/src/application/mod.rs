@@ -99,3 +99,6 @@ pub use manage_wheel_service::ManageWheelService;
 
 pub mod manage_coude_curses_service;
 pub use manage_coude_curses_service::ManageCoudeCursesService;
+
+pub mod manage_coude_safety_net_service;
+pub use manage_coude_safety_net_service::ManageCoudeSafetyNetService;
