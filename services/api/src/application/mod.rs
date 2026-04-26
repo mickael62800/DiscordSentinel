@@ -96,3 +96,6 @@ pub use manage_slot_service::ManageSlotService;
 
 pub mod manage_wheel_service;
 pub use manage_wheel_service::ManageWheelService;
+
+pub mod manage_coude_curses_service;
+pub use manage_coude_curses_service::ManageCoudeCursesService;

@@ -121,3 +121,6 @@ pub use slot_repository::SlotRepository;
 
 mod wheel_repository;
 pub use wheel_repository::WheelRepository;
+
+mod coude_curses_repository;
+pub use coude_curses_repository::CoudeCursesRepository;

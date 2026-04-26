@@ -99,3 +99,6 @@ pub use manage_slot::{ManageSlotUseCase, SpinCommand, SpinResult};
 
 pub mod manage_wheel;
 pub use manage_wheel::{ManageWheelUseCase, WheelSpinCommand, WheelSpinResult};
+
+pub mod manage_coude_curses;
+pub use manage_coude_curses::{CastedCurse, ManageCoudeCursesUseCase};

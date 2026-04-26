@@ -66,6 +66,7 @@ pub struct AppState {
     pub coude_steal_boosts_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealBoostsUseCase>,
     pub coude_taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase>,
     pub coude_heist_uc: Arc<dyn crate::ports::inbound::ManageCoudeHeistUseCase>,
+    pub coude_curses_uc: Arc<dyn crate::ports::inbound::ManageCoudeCursesUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

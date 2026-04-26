@@ -24,7 +24,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::{
     PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgBotConfigRepository,
     PgConductRepository, PgCoudeBetRepository, PgCoudeCashboxRepository, PgCoudeCombatRepository,
-    PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository,
+    PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository,
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
@@ -40,7 +40,7 @@ use crate::application::{
     AnalyzeImageService, AnalyzeMessageService, BlackjackService, ExpireCombatsBatchService,
     ExportService, ManageAuditLogsService, ManageConductService, ManageCoudeBetsService,
     ManageCoudeCashboxService, ManageCoudeCatalogService, ManageCoudeCombatsService,
-    ManageCoudeEconomyService, ManageCoudeHeistService, ManageCoudeInventoryService,
+    ManageCoudeCursesService, ManageCoudeEconomyService, ManageCoudeHeistService, ManageCoudeInventoryService,
     ManageCoudePlayersService, ManageCoudeSocialService, ManageCoudeStealBoostsService,
     ManageCoudeStealProtectionsService, ManageCoudeTauntsService, ManageWalletService,
     ManageInfractionsService,
@@ -443,6 +443,13 @@ pub async fn build_app_state(
             bot_config_repo.clone(),
         ));
 
+    // Maledictions (cf. COUPE_AMELIORATIONS 5.1).
+    let coude_curses_repo: Arc<dyn crate::ports::outbound::CoudeCursesRepository> =
+        Arc::new(PgCoudeCursesRepository::new(pg_pool.clone()));
+    let coude_curses_uc: Arc<dyn crate::ports::inbound::ManageCoudeCursesUseCase> = Arc::new(
+        ManageCoudeCursesService::new(coude_curses_repo, wallet_repo.clone()),
+    );
+
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::CoudeStealProtectionRepository,
     > = Arc::new(PgCoudeStealProtectionRepository::new(pg_pool.clone()));
@@ -542,6 +549,7 @@ pub async fn build_app_state(
         coude_steal_boosts_uc,
         coude_taunts_uc,
         coude_heist_uc,
+        coude_curses_uc,
         broadcaster,
         job_client,
         discord_api,

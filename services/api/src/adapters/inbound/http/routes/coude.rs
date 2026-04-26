@@ -127,6 +127,19 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/tournaments/history",
             get(handlers::coude::get_tournament_history),
         )
+        // Migration 159 : maledictions (cf. COUPE_AMELIORATIONS 5.1)
+        .route(
+            "/{guild_id}/curses",
+            post(handlers::coude::cast_curse),
+        )
+        .route(
+            "/{guild_id}/curses/{target_id}",
+            get(handlers::coude::get_active_curse),
+        )
+        .route(
+            "/{guild_id}/curses/{target_id}/lift",
+            post(handlers::coude::lift_curse),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

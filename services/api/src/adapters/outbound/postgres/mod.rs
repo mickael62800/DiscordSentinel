@@ -165,3 +165,6 @@ pub use slot_repository::PgSlotRepository;
 
 mod wheel_repository;
 pub use wheel_repository::PgWheelRepository;
+
+mod coude_curses_repository;
+pub use coude_curses_repository::PgCoudeCursesRepository;
