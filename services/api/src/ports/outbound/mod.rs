@@ -118,3 +118,6 @@ pub use blackjack_table_repository::{BlackjackTable, BlackjackTablePlayer, Black
 
 mod slot_repository;
 pub use slot_repository::SlotRepository;
+
+mod wheel_repository;
+pub use wheel_repository::WheelRepository;

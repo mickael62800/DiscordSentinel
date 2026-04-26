@@ -14,3 +14,4 @@ pub mod slot;
 pub mod tickets;
 pub mod voice;
 pub mod welcome;
+pub mod wheel;

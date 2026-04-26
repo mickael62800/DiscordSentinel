@@ -1,0 +1,143 @@
+use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+use sqlx::{PgPool, Postgres, Transaction};
+
+use crate::domain::entities::{WheelSpin, WheelTopWinner};
+use crate::domain::errors::DomainError;
+use crate::ports::outbound::WheelRepository;
+
+use super::pg_err;
+
+pub struct PgWheelRepository {
+    pool: PgPool,
+}
+
+impl PgWheelRepository {
+    pub fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+}
+
+#[async_trait]
+impl WheelRepository for PgWheelRepository {
+    async fn has_claimed_today(&self, guild_id: &str, user_id: &str) -> Result<bool, DomainError> {
+        let exists: Option<i32> = sqlx::query_scalar(
+            "SELECT 1 FROM wheel_daily_claims
+             WHERE guild_id = $1 AND user_id = $2 AND day = CURRENT_DATE
+             LIMIT 1",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(exists.is_some())
+    }
+
+    async fn log_spin_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        spin: &WheelSpin,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "INSERT INTO wheel_spin_log
+             (id, guild_id, user_id, username, case_key, case_label, payout, created_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+        )
+        .bind(spin.id)
+        .bind(&spin.guild_id)
+        .bind(&spin.user_id)
+        .bind(&spin.username)
+        .bind(&spin.case_key)
+        .bind(&spin.case_label)
+        .bind(spin.payout)
+        .bind(spin.created_at)
+        .execute(&mut **tx)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn mark_claimed_in_tx(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), DomainError> {
+        sqlx::query(
+            "INSERT INTO wheel_daily_claims (guild_id, user_id, day)
+             VALUES ($1, $2, CURRENT_DATE)
+             ON CONFLICT (guild_id, user_id, day) DO NOTHING",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&mut **tx)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
+    async fn recent_spins(
+        &self,
+        guild_id: &str,
+        limit: i64,
+    ) -> Result<Vec<WheelSpin>, DomainError> {
+        let rows: Vec<(uuid::Uuid, String, String, String, String, String, i64, DateTime<Utc>)> =
+            sqlx::query_as(
+                "SELECT id, guild_id, user_id, username, case_key, case_label, payout, created_at
+                 FROM wheel_spin_log
+                 WHERE guild_id = $1
+                 ORDER BY created_at DESC
+                 LIMIT $2",
+            )
+            .bind(guild_id)
+            .bind(limit)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(pg_err)?;
+
+        Ok(rows.into_iter().map(|r| WheelSpin {
+            id: r.0,
+            guild_id: r.1,
+            user_id: r.2,
+            username: r.3,
+            case_key: r.4,
+            case_label: r.5,
+            payout: r.6,
+            created_at: r.7,
+        }).collect())
+    }
+
+    async fn top_winners(
+        &self,
+        guild_id: &str,
+        days: i64,
+        limit: i64,
+    ) -> Result<Vec<WheelTopWinner>, DomainError> {
+        let rows: Vec<(String, String, i64, i64)> = sqlx::query_as(
+            "SELECT user_id,
+                    COALESCE(MAX(username), user_id) AS username,
+                    COALESCE(SUM(payout), 0)::bigint AS total_payout,
+                    COUNT(*)::bigint AS spin_count
+             FROM wheel_spin_log
+             WHERE guild_id = $1
+               AND created_at >= NOW() - ($2 || ' days')::interval
+             GROUP BY user_id
+             ORDER BY total_payout DESC
+             LIMIT $3",
+        )
+        .bind(guild_id)
+        .bind(days.to_string())
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+
+        Ok(rows.into_iter().map(|(uid, name, total, count)| WheelTopWinner {
+            user_id: uid,
+            username: name,
+            total_payout: total,
+            spin_count: count as u32,
+        }).collect())
+    }
+}

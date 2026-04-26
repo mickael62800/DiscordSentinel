@@ -204,6 +204,13 @@ pub use coude_heist::{
 mod slot;
 pub use slot::{
     compute_jackpot_contribution, compute_payout, evaluate_spin, parse_csv_multipliers,
-    parse_csv_symbols, parse_csv_weights, spin_with_rng, validate_slot_config, SlotConfig,
-    SlotConfigError, SlotJackpotPool, SlotSpin, SlotTopWinner, SpinOutcome,
+    parse_csv_symbols, parse_csv_weights, spin_with_rng as slot_spin_with_rng,
+    validate_slot_config, SlotConfig, SlotConfigError, SlotJackpotPool, SlotSpin,
+    SlotTopWinner, SpinOutcome,
+};
+
+mod wheel;
+pub use wheel::{
+    is_memorable_case, spin_with_rng as wheel_spin_with_rng, WheelCase, WheelOutcome,
+    WheelSpin, WheelTopWinner, WHEEL_CASES,
 };

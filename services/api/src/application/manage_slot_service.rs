@@ -19,8 +19,8 @@ use uuid::Uuid;
 
 use crate::domain::entities::{
     compute_jackpot_contribution, compute_payout, evaluate_spin, parse_csv_multipliers,
-    parse_csv_symbols, parse_csv_weights, spin_with_rng, validate_slot_config, SlotConfig,
-    SlotSpin, SlotTopWinner, SpinOutcome, TauntEvent,
+    parse_csv_symbols, parse_csv_weights, slot_spin_with_rng, validate_slot_config,
+    SlotConfig, SlotSpin, SlotTopWinner, SpinOutcome, TauntEvent,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_slot::{ManageSlotUseCase, SpinCommand, SpinResult};
@@ -99,7 +99,7 @@ impl ManageSlotService {
 
         // RNG OS-driven (non-deterministe).
         let mut rng = rand::rngs::StdRng::from_entropy();
-        let symbol_indices = spin_with_rng(&mut rng, cfg);
+        let symbol_indices = slot_spin_with_rng(&mut rng, cfg);
         let outcome = evaluate_spin(&symbol_indices, cfg);
         let symbol_strings: Vec<String> = symbol_indices
             .iter()

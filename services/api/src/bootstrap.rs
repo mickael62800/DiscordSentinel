@@ -374,6 +374,15 @@ pub async fn build_app_state(
             pg_pool.clone(),
         ));
 
+    // Roue du Destin — Sprint 2 sign'ature (migration 158).
+    let wheel_repo = Arc::new(crate::adapters::outbound::postgres::PgWheelRepository::new(pg_pool.clone()));
+    let wheel_uc: Arc<dyn crate::ports::inbound::manage_wheel::ManageWheelUseCase> =
+        Arc::new(crate::application::ManageWheelService::new(
+            wheel_repo,
+            wallet_uc.clone(),
+            pg_pool.clone(),
+        ));
+
     let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(
         coude_economy_repo.clone(),
         wallet_uc.clone(),
@@ -517,6 +526,7 @@ pub async fn build_app_state(
         wallet_uc: wallet_uc.clone(),
         blackjack_svc,
         slot_uc,
+        wheel_uc,
         coude_players_uc,
         coude_combats_uc,
         coude_bets_uc,

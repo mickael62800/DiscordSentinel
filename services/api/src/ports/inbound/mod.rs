@@ -96,3 +96,6 @@ pub use manage_voice_channels::{
 
 pub mod manage_slot;
 pub use manage_slot::{ManageSlotUseCase, SpinCommand, SpinResult};
+
+pub mod manage_wheel;
+pub use manage_wheel::{ManageWheelUseCase, WheelSpinCommand, WheelSpinResult};

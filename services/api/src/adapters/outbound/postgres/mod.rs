@@ -162,3 +162,6 @@ pub use blackjack_table_repository::PgBlackjackTableRepository;
 
 mod slot_repository;
 pub use slot_repository::PgSlotRepository;
+
+mod wheel_repository;
+pub use wheel_repository::PgWheelRepository;

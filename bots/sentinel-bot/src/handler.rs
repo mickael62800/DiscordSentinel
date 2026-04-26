@@ -38,6 +38,7 @@ impl EventHandler for Handler {
         commands.extend(modules::progression::register_commands());
         commands.extend(modules::blackjack::register_commands());
         commands.extend(modules::slot::register_commands());
+        commands.extend(modules::wheel::register_commands());
         commands.extend(modules::security::register_commands());
         commands.extend(modules::automod::register_commands());
         commands.extend(modules::moderation::register_commands());
@@ -290,6 +291,7 @@ impl EventHandler for Handler {
                     "level" | "stats" => modules::progression::handle_command(&ctx, &command).await,
                     "blackjack-setup" => modules::blackjack::handle_command(&ctx, &command).await,
                     "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
+                    "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,
                     "security" => modules::security::handle_command(&ctx, &command).await,
                     "automod" => modules::automod::handle_command(&ctx, &command).await,
                     "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
@@ -317,6 +319,8 @@ impl EventHandler for Handler {
                     modules::blackjack::on_component(&ctx, &component).await;
                 } else if modules::slot::handles_component(cid) {
                     modules::slot::on_component(&ctx, &component).await;
+                } else if modules::wheel::handles_component(cid) {
+                    modules::wheel::on_component(&ctx, &component).await;
                 } else if modules::security::handles_component(cid) {
                     modules::security::on_component(&ctx, &component).await;
                 } else if modules::automod::handles_component(cid) {

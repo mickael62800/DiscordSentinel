@@ -49,6 +49,7 @@ pub struct AppState {
     pub wallet_uc: Arc<dyn ManageWalletUseCase>,
     pub blackjack_svc: Arc<BlackjackService>,
     pub slot_uc: Arc<dyn crate::ports::inbound::manage_slot::ManageSlotUseCase>,
+    pub wheel_uc: Arc<dyn crate::ports::inbound::manage_wheel::ManageWheelUseCase>,
     pub coude_players_uc: Arc<dyn ManageCoudePlayersUseCase>,
     pub coude_combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
     pub coude_bets_uc: Arc<dyn ManageCoudeBetsUseCase>,

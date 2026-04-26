@@ -39,3 +39,5 @@ pub mod games;
 pub mod welcome;
 pub mod oauth;
 pub mod system;
+
+pub mod wheel;

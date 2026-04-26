@@ -51,4 +51,8 @@ pub fn routes() -> Router<AppState> {
         .route("/api/slot/{guild_id}/jackpot", get(handlers::slot::get_jackpot))
         .route("/api/slot/{guild_id}/recent", get(handlers::slot::recent_spins))
         .route("/api/slot/{guild_id}/leaderboard", get(handlers::slot::leaderboard))
+        // Roue du Destin (migration 158)
+        .route("/api/wheel/{guild_id}/spin", post(handlers::wheel::spin))
+        .route("/api/wheel/{guild_id}/recent", get(handlers::wheel::recent))
+        .route("/api/wheel/{guild_id}/leaderboard", get(handlers::wheel::leaderboard))
 }
