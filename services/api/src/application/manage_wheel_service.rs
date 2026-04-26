@@ -17,18 +17,20 @@ use rand::SeedableRng;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    is_memorable_case, wheel_spin_with_rng, TauntEvent, WheelSpin, WheelTopWinner,
+    is_memorable_case, wheel_spin_with_rng_curses, CurseKind, TauntEvent, WheelSpin,
+    WheelTopWinner,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::manage_wheel::{
     ManageWheelUseCase, WheelSpinCommand, WheelSpinResult,
 };
-use crate::ports::outbound::WheelRepository;
+use crate::ports::outbound::{CoudeCursesRepository, WheelRepository};
 
 pub struct ManageWheelService {
     repo: Arc<dyn WheelRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
+    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
     pg_pool: sqlx::PgPool,
 }
 
@@ -38,7 +40,16 @@ impl ManageWheelService {
         wallet_uc: Arc<dyn ManageWalletUseCase>,
         pg_pool: sqlx::PgPool,
     ) -> Self {
-        Self { repo, wallet_uc, pg_pool }
+        Self { repo, wallet_uc, curses_repo: None, pg_pool }
+    }
+
+    /// Branche le repo des maledictions pour activer "Heartbreak"
+    /// (cf. COUPE_AMELIORATIONS 5.1) : le spinner maudit ne peut pas
+    /// tomber sur la licorne. Optionnel pour preserver les call-sites
+    /// de test et eviter une regression silencieuse.
+    pub fn with_curses_repo(mut self, repo: Arc<dyn CoudeCursesRepository>) -> Self {
+        self.curses_repo = Some(repo);
+        self
     }
 }
 
@@ -52,9 +63,24 @@ impl ManageWheelUseCase for ManageWheelService {
             ));
         }
 
-        // 2. Spin RNG (entropie OS).
+        // 2. Detection malediction "Heartbreak" — bloque la licorne pour
+        //    cette tirage. Echec silencieux : si le repo casse, on spin
+        //    quand meme normalement (le user ne perdra rien de plus).
+        let block_licorne = if let Some(curses_repo) = &self.curses_repo {
+            match curses_repo
+                .get_active_for_target(&cmd.guild_id, &cmd.user_id)
+                .await
+            {
+                Ok(Some(c)) if c.kind == CurseKind::Heartbreak => true,
+                _ => false,
+            }
+        } else {
+            false
+        };
+
+        // 3. Spin RNG (entropie OS).
         let mut rng = rand::rngs::StdRng::from_entropy();
-        let outcome = wheel_spin_with_rng(&mut rng);
+        let outcome = wheel_spin_with_rng_curses(&mut rng, block_licorne);
         let payout = outcome.case.payout;
 
         // 3. Tx atomique.

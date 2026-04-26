@@ -49,7 +49,23 @@ pub struct WheelOutcome {
 /// Spin de la roue. RNG injectee -> seedable pour les tests.
 /// Ne peut pas paniquer car WHEEL_CASES n est pas vide et au moins un poids > 0.
 pub fn spin_with_rng(rng: &mut impl RngCore) -> WheelOutcome {
-    let weights: Vec<u32> = WHEEL_CASES.iter().map(|c| c.weight).collect();
+    spin_with_rng_curses(rng, false)
+}
+
+/// Variante avec malediction "Heartbreak" (cf. COUPE_AMELIORATIONS 5.1) :
+/// si `block_licorne` est `true`, la case licorne (poids 1) est exclue du
+/// tirage. Utilise quand le spinner est sous l effet "Malchance amoureuse".
+pub fn spin_with_rng_curses(rng: &mut impl RngCore, block_licorne: bool) -> WheelOutcome {
+    let weights: Vec<u32> = WHEEL_CASES
+        .iter()
+        .map(|c| {
+            if block_licorne && c.key == "licorne" {
+                0
+            } else {
+                c.weight
+            }
+        })
+        .collect();
     let dist = WeightedIndex::new(&weights).expect("WHEEL_CASES doit avoir des poids valides");
     let idx = dist.sample(rng);
     WheelOutcome {

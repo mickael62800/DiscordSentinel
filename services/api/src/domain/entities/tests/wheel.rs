@@ -166,3 +166,47 @@ fn all_weights_positive() {
         assert!(c.weight > 0, "case {} a un poids 0 -> ne sortira jamais", c.key);
     }
 }
+
+// ══════════════════════════════════════════════════════════
+// Heartbreak (cf. COUPE_AMELIORATIONS 5.1)
+// ══════════════════════════════════════════════════════════
+
+#[test]
+fn heartbreak_blocks_licorne_in_10000_spins() {
+    let mut rng = StdRng::seed_from_u64(42);
+    for _ in 0..10_000 {
+        let outcome = spin_with_rng_curses(&mut rng, true);
+        assert_ne!(outcome.case.key, "licorne", "Heartbreak doit bloquer la licorne");
+    }
+}
+
+#[test]
+fn no_heartbreak_can_yield_licorne() {
+    let mut rng = StdRng::seed_from_u64(7);
+    let mut saw_licorne = false;
+    for _ in 0..50_000 {
+        let outcome = spin_with_rng_curses(&mut rng, false);
+        if outcome.case.key == "licorne" {
+            saw_licorne = true;
+            break;
+        }
+    }
+    assert!(saw_licorne, "sans Heartbreak la licorne doit pouvoir tomber sur 50k spins");
+}
+
+#[test]
+fn heartbreak_keeps_other_cases_distribution() {
+    let mut rng = StdRng::seed_from_u64(123);
+    let mut blanche = 0;
+    let mut bombe = 0;
+    for _ in 0..10_000 {
+        let outcome = spin_with_rng_curses(&mut rng, true);
+        match outcome.case.key {
+            "blanche" => blanche += 1,
+            "bombe" => bombe += 1,
+            _ => {}
+        }
+    }
+    assert!(blanche > 2_000, "blanche (poids 25/99) doit sortir frequemment");
+    assert!(bombe > 100, "bombe (poids 2/99) doit sortir parfois");
+}

@@ -211,8 +211,9 @@ pub use slot::{
 
 mod wheel;
 pub use wheel::{
-    is_memorable_case, spin_with_rng as wheel_spin_with_rng, WheelCase, WheelOutcome,
-    WheelSpin, WheelTopWinner, WHEEL_CASES,
+    is_memorable_case, spin_with_rng as wheel_spin_with_rng,
+    spin_with_rng_curses as wheel_spin_with_rng_curses, WheelCase, WheelOutcome, WheelSpin,
+    WheelTopWinner, WHEEL_CASES,
 };
 
 mod combat_outcome_flags;

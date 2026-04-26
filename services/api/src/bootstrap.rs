@@ -374,14 +374,22 @@ pub async fn build_app_state(
             pg_pool.clone(),
         ));
 
+    // Maledictions — repo cree tot pour pouvoir le brancher dans wheel
+    // (effet Heartbreak) en plus du UC dedie cree plus bas.
+    let coude_curses_repo: Arc<dyn crate::ports::outbound::CoudeCursesRepository> =
+        Arc::new(PgCoudeCursesRepository::new(pg_pool.clone()));
+
     // Roue du Destin — Sprint 2 sign'ature (migration 158).
     let wheel_repo = Arc::new(crate::adapters::outbound::postgres::PgWheelRepository::new(pg_pool.clone()));
     let wheel_uc: Arc<dyn crate::ports::inbound::manage_wheel::ManageWheelUseCase> =
-        Arc::new(crate::application::ManageWheelService::new(
-            wheel_repo,
-            wallet_uc.clone(),
-            pg_pool.clone(),
-        ));
+        Arc::new(
+            crate::application::ManageWheelService::new(
+                wheel_repo,
+                wallet_uc.clone(),
+                pg_pool.clone(),
+            )
+            .with_curses_repo(coude_curses_repo.clone()),
+        );
 
     let coude_economy_uc = Arc::new(ManageCoudeEconomyService::new(
         coude_economy_repo.clone(),
@@ -443,11 +451,10 @@ pub async fn build_app_state(
             bot_config_repo.clone(),
         ));
 
-    // Maledictions (cf. COUPE_AMELIORATIONS 5.1).
-    let coude_curses_repo: Arc<dyn crate::ports::outbound::CoudeCursesRepository> =
-        Arc::new(PgCoudeCursesRepository::new(pg_pool.clone()));
+    // Maledictions (cf. COUPE_AMELIORATIONS 5.1) — repo deja cree plus haut
+    // pour permettre le branchement Heartbreak dans wheel.
     let coude_curses_uc: Arc<dyn crate::ports::inbound::ManageCoudeCursesUseCase> = Arc::new(
-        ManageCoudeCursesService::new(coude_curses_repo, wallet_repo.clone()),
+        ManageCoudeCursesService::new(coude_curses_repo.clone(), wallet_repo.clone()),
     );
 
     let coude_steal_protection_repo: Arc<
