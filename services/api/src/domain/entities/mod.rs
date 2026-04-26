@@ -253,6 +253,12 @@ pub use mythic_events::{
     format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
 };
 
+mod season_theme;
+pub use season_theme::{
+    season_theme_by_key, theme_for_season, SeasonTheme, CURRENT_SEASON_THEME_CONFIG_KEY,
+    SEASON_THEMES,
+};
+
 mod curse;
 pub use curse::{
     apply_banana_to_d20, apply_insomnia_to_taunt_weight, apply_leaky_wallet, lift_cost,

@@ -113,6 +113,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         "`/profil` affiche tout : HP, stats, classe, malediction, assurance, inventaire.".into(),
     ));
 
+    // 9. Theme de saison (cf. COUPE_AMELIORATIONS 6.3).
+    let theme = sentinel_shared::season_theme::theme_for_season(
+        player.season.unwrap_or(1),
+    );
+    tips.push((
+        "\u{1f3ad} Saison en cours",
+        format!("{} **{}** — {}", theme.emoji, theme.label, theme.tagline),
+    ));
+
     // On limite a 6 suggestions max pour rester lisible.
     let mut embed = CreateEmbed::new()
         .title("\u{1f4a1} Aide contextuelle")

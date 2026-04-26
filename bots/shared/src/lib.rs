@@ -10,3 +10,4 @@ pub mod heartbeat;
 pub mod parsers;
 pub mod shard_launcher;
 pub mod branding;
+pub mod season_theme;

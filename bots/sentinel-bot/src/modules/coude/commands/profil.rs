@@ -202,6 +202,17 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         crate::modules::coude::achievements::format_unlocked_compact(&player);
     embed = embed.field("\u{1f3c5} Succes", achievements_text, false);
 
+    // Theme de la saison courante (cf. COUPE_AMELIORATIONS 6.3) —
+    // calcule deterministe depuis le numero de saison du joueur.
+    let theme = sentinel_shared::season_theme::theme_for_season(
+        player.season.unwrap_or(1),
+    );
+    embed = embed.field(
+        format!("{} {}", theme.emoji, theme.label),
+        theme.tagline.to_string(),
+        false,
+    );
+
     // Malediction OU sabotage actif (cf. COUPE_AMELIORATIONS 5.1 / 5.2).
     if let Some(curse) = active_curse {
         let remaining_str = chrono::DateTime::parse_from_rfc3339(&curse.expires_at)
