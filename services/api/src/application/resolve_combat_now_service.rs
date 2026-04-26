@@ -1192,6 +1192,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // tx Postgres. Evite les etats partiels si le processus crash
                 // entre les deux operations (bug #1 de l audit).
                 let desc = format!("Combat {} vs {}", winner_id, loser_id);
+                let mut payout_ok = true;
                 if coins_transferred > 0 || actual_loss > 0 {
                     if let Err(e) = self
                         .wallet_repo
@@ -1206,7 +1207,16 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         )
                         .await
                     {
-                        warn!(error = %e, "Echec payout combat atomique");
+                        // error! (et non warn!) : c est une desync wallet
+                        // critique. Le combat est pose mais l argent n a pas
+                        // bouge. On evite d enregistrer les stats pour ne pas
+                        // creer un total_won/total_lost incoherent vs wallet.
+                        tracing::error!(
+                            error = %e,
+                            combat_id = %combat.id,
+                            "Echec payout combat atomique — stats non enregistrees pour preserver la coherence"
+                        );
+                        payout_ok = false;
                     }
                 }
 
@@ -1215,15 +1225,23 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // n a pas deja un filet actif, on l active. Best-effort.
                 self.try_activate_safety_net_after(&combat.guild_id, loser_id).await;
 
-                // Stats
-                let _ = self
-                    .players_uc
-                    .record_win(&combat.guild_id, winner_id, coins_transferred, result.stolen_bonus)
-                    .await;
-                let _ = self
-                    .players_uc
-                    .record_loss(&combat.guild_id, loser_id, actual_loss)
-                    .await;
+                // Stats : seulement si le payout a reussi (eviter desync).
+                if payout_ok {
+                    if let Err(e) = self
+                        .players_uc
+                        .record_win(&combat.guild_id, winner_id, coins_transferred, result.stolen_bonus)
+                        .await
+                    {
+                        tracing::error!(error = %e, "Echec record_win");
+                    }
+                    if let Err(e) = self
+                        .players_uc
+                        .record_loss(&combat.guild_id, loser_id, actual_loss)
+                        .await
+                    {
+                        tracing::error!(error = %e, "Echec record_loss");
+                    }
+                }
 
                 // Primes : si le perdant en a, le gagnant les recupere
                 let winner_name = if *winner_id == combat.attacker_id {
@@ -1361,22 +1379,34 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     // les deux perdent X coins" ne correspondait a rien en BDD.
                     let desc = format!("Explosion combat {}", combat.id);
                     let loss = result.coins_lost_by_loser;
-                    let _ = self
+                    if let Err(e) = self
                         .wallet_repo
                         .debit(&combat.guild_id, &combat.attacker_id, loss, "coude_combat_explosion", &desc)
-                        .await;
-                    let _ = self
+                        .await
+                    {
+                        tracing::error!(error = %e, attacker = %combat.attacker_id, %loss, "Echec debit explosion attaquant — desync embed/wallet");
+                    }
+                    if let Err(e) = self
                         .wallet_repo
                         .debit(&combat.guild_id, &combat.defender_id, loss, "coude_combat_explosion", &desc)
-                        .await;
-                    let _ = self
+                        .await
+                    {
+                        tracing::error!(error = %e, defender = %combat.defender_id, %loss, "Echec debit explosion defenseur — desync embed/wallet");
+                    }
+                    if let Err(e) = self
                         .players_uc
                         .record_draw(&combat.guild_id, &combat.attacker_id, loss)
-                        .await;
-                    let _ = self
+                        .await
+                    {
+                        tracing::error!(error = %e, "Echec record_draw explosion attaquant");
+                    }
+                    if let Err(e) = self
                         .players_uc
                         .record_draw(&combat.guild_id, &combat.defender_id, loss)
-                        .await;
+                        .await
+                    {
+                        tracing::error!(error = %e, "Echec record_draw explosion defenseur");
+                    }
                 }
 
                 if had_accident {
@@ -1386,14 +1416,20 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     // depuis la migration #3 wallet).
                     let desc = format!("Accident debile combat {}", combat.id);
                     if combat.mise > 0 {
-                        let _ = self
+                        if let Err(e) = self
                             .wallet_repo
                             .debit(&combat.guild_id, &combat.attacker_id, combat.mise, "coude_combat_draw", &desc)
-                            .await;
-                        let _ = self
+                            .await
+                        {
+                            tracing::error!(error = %e, "Echec debit accident attaquant — desync embed/wallet");
+                        }
+                        if let Err(e) = self
                             .wallet_repo
                             .debit(&combat.guild_id, &combat.defender_id, combat.mise, "coude_combat_draw", &desc)
-                            .await;
+                            .await
+                        {
+                            tracing::error!(error = %e, "Echec debit accident defenseur — desync embed/wallet");
+                        }
                     }
                     let _ = self
                         .players_uc
@@ -1499,14 +1535,25 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                             // Cherche une bounty ouverte (theoriquement
                             // auto-creee a streak=5 dans un combat
                             // precedent). Sinon fallback BOUNTY_INITIAL.
+                            // Si claim() echoue, on retombe sur le fallback
+                            // BOUNTY_INITIAL_AMOUNT (montant fixe) plutot que
+                            // de crediter `total` : sinon la bounty reste
+                            // ouverte en DB et un autre joueur pourrait la
+                            // re-claim plus tard -> double-paiement.
                             let bounty_amount: i64 = if let Some(brepo) = &self.bounty_repo {
                                 match brepo.get_open(&combat.guild_id, loser_id).await {
                                     Ok(Some(b)) => {
-                                        let total = b.total_amount;
-                                        if let Err(e) = brepo.claim(b.id, winner_id).await {
-                                            warn!(error = %e, "Echec claim bounty");
+                                        match brepo.claim(b.id, winner_id).await {
+                                            Ok(_) => b.total_amount,
+                                            Err(e) => {
+                                                tracing::error!(
+                                                    error = %e,
+                                                    bounty_id = %b.id,
+                                                    "Echec claim bounty — fallback initial pour eviter double-paiement"
+                                                );
+                                                BOUNTY_INITIAL_AMOUNT
+                                            }
                                         }
-                                        total
                                     }
                                     _ => BOUNTY_INITIAL_AMOUNT,
                                 }
@@ -1566,7 +1613,11 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         .get_combat_streaks(&combat.guild_id, winner_id)
                         .await
                     {
-                        if winner_streak == BOUNTY_AUTO_OPEN_STREAK_THRESHOLD {
+                        // >= et non == : sous shield ou autre edge case, la
+                        // streak peut sauter le seuil exact (ex. 4 -> 6) sans
+                        // qu on ait jamais ouvert la bounty. open() est
+                        // idempotente (Conflict ignore si deja ouverte).
+                        if winner_streak >= BOUNTY_AUTO_OPEN_STREAK_THRESHOLD {
                             // open echoue avec Conflict si une bounty est
                             // deja ouverte — c est OK, no-op silent.
                             if let Err(e) = brepo

@@ -290,18 +290,31 @@ impl CoudePlayerRepository for PgCoudePlayerRepository {
         user_id: &str,
         won: bool,
     ) -> Result<(), DomainError> {
-        let col = if won { "friendly_wins" } else { "friendly_losses" };
-        let q = format!(
-            r#"UPDATE coude_players
-               SET {col} = {col} + 1, updated_at = NOW()
-               WHERE guild_id = $1 AND user_id = $2"#
-        );
-        sqlx::query(&q)
+        // Deux requetes statiques plutot qu un format!() avec interpolation
+        // de nom de colonne — eviter tout risque d injection si la fonction
+        // est refactoree ulterieurement avec un input non controle.
+        let result = if won {
+            sqlx::query(
+                r#"UPDATE coude_players
+                   SET friendly_wins = friendly_wins + 1, updated_at = NOW()
+                   WHERE guild_id = $1 AND user_id = $2"#,
+            )
             .bind(guild_id)
             .bind(user_id)
             .execute(&self.pool)
             .await
-            .map_err(crate::adapters::outbound::postgres::pg_err)?;
+        } else {
+            sqlx::query(
+                r#"UPDATE coude_players
+                   SET friendly_losses = friendly_losses + 1, updated_at = NOW()
+                   WHERE guild_id = $1 AND user_id = $2"#,
+            )
+            .bind(guild_id)
+            .bind(user_id)
+            .execute(&self.pool)
+            .await
+        };
+        result.map_err(crate::adapters::outbound::postgres::pg_err)?;
         Ok(())
     }
 

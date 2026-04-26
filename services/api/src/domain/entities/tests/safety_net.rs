@@ -24,7 +24,24 @@ fn reduce_loss_no_net_returns_nominal() {
 fn reduce_loss_with_net_halves() {
     assert_eq!(reduce_loss(1000, true), 500);
     assert_eq!(reduce_loss(2, true), 1);
-    assert_eq!(reduce_loss(1, true), 0); // arrondi vers 0
+    // 1 * 0.5 = 0.5 -> round() = 1 (round-half-away-from-zero en Rust).
+    // On reste sur cette convention pour eviter les pertes nulles abusives
+    // sur micro-pertes : si tu perds 1c, tu en perds bien 1, pas 0.
+    assert_eq!(reduce_loss(1, true), 1);
+    // 3 * 0.5 = 1.5 -> 2 (avant fix : truncate = 1).
+    assert_eq!(reduce_loss(3, true), 2);
+    // 7 * 0.5 = 3.5 -> 4 (avant fix : truncate = 3).
+    assert_eq!(reduce_loss(7, true), 4);
+}
+
+#[test]
+fn reduce_loss_with_custom_multiplier_uses_round() {
+    // Verifie le comportement parametrable utilise par CoudeGuildSettings
+    // (cf. migration 170 — safety_net_loss_percent).
+    assert_eq!(reduce_loss_with_multiplier(10, true, 0.7), 7);
+    assert_eq!(reduce_loss_with_multiplier(10, true, 0.75), 8); // 7.5 -> 8
+    assert_eq!(reduce_loss_with_multiplier(10, true, 0.0), 0);
+    assert_eq!(reduce_loss_with_multiplier(10, true, 1.0), 10);
 }
 
 #[test]
@@ -42,6 +59,17 @@ fn boost_bet_gain_no_net_returns_nominal() {
 fn boost_bet_gain_with_net_adds_50_percent() {
     assert_eq!(boost_bet_gain(1000, true), 1500);
     assert_eq!(boost_bet_gain(100, true), 150);
+    // 5 * 1.5 = 7.5 -> 8 (avant fix : truncate = 7, le joueur perdait 1c).
+    assert_eq!(boost_bet_gain(5, true), 8);
+    assert_eq!(boost_bet_gain(3, true), 5); // 4.5 -> 5
+}
+
+#[test]
+fn boost_bet_gain_with_custom_multiplier_uses_round() {
+    // safety_net_bet_gain_percent configurable (default 150 = x1.5).
+    assert_eq!(boost_bet_gain_with_multiplier(10, true, 1.25), 13); // 12.5 -> 13
+    assert_eq!(boost_bet_gain_with_multiplier(10, true, 2.0), 20);
+    assert_eq!(boost_bet_gain_with_multiplier(10, true, 1.0), 10);
 }
 
 #[test]

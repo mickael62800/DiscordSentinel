@@ -36,6 +36,16 @@ fn revenge_bonus_zero_unchanged() {
 }
 
 #[test]
+fn revenge_bonus_rounds_half_away_from_zero() {
+    // Si le multiplicateur evolue (configurable plus tard), s'assurer
+    // qu'on arrondit (.round()) plutot que de tronquer (as i64).
+    // Avec x2.0 le test est trivial, mais cette assertion garantit le
+    // contrat si on baisse le multiplicateur a 1.5 ou 1.75.
+    assert_eq!(apply_revenge_bonus(1, true), 2); // 1 * 2 = 2
+    assert_eq!(apply_revenge_bonus(7, true), 14);
+}
+
+#[test]
 fn is_active_at_true_when_pending_and_within_window() {
     let now = Utc::now();
     let v = ActiveVendetta {

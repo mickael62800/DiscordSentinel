@@ -72,7 +72,9 @@ pub fn apply_revenge_bonus(nominal_gain: i64, has_active_vendetta: bool) -> i64 
     if !has_active_vendetta || nominal_gain <= 0 {
         return nominal_gain;
     }
-    ((nominal_gain as f64) * VENDETTA_WIN_BONUS_MULTIPLIER) as i64
+    // round() (et non as i64) pour eviter de spolier le joueur de 0.5c
+    // sur les multiplicateurs non-entiers configurables.
+    ((nominal_gain as f64) * VENDETTA_WIN_BONUS_MULTIPLIER).round() as i64
 }
 
 /// Suffixe applique au pseudo du gagnant initial s il bat a nouveau le

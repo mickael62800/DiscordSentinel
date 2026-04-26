@@ -62,7 +62,9 @@ pub fn reduce_loss_with_multiplier(
     if !has_active_net || nominal_loss <= 0 {
         return nominal_loss;
     }
-    ((nominal_loss as f64) * multiplier) as i64
+    // round() (et non as i64) pour rester coherent avec lucky_shield et
+    // eviter +/- 1c systematique selon la parite (3 * 0.5 = 1.5 -> 2, pas 1).
+    ((nominal_loss as f64) * multiplier).round() as i64
 }
 
 /// Boost d un gain de pari sous filet actif.
@@ -78,7 +80,9 @@ pub fn boost_bet_gain_with_multiplier(
     if !has_active_net || nominal_gain <= 0 {
         return nominal_gain;
     }
-    ((nominal_gain as f64) * multiplier) as i64
+    // round() pour rester coherent avec lucky_shield et eviter de spolier
+    // le joueur de 0.5c systematique (5 * 1.5 = 7.5 -> 8, pas 7).
+    ((nominal_gain as f64) * multiplier).round() as i64
 }
 
 #[cfg(test)]
