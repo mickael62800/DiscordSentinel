@@ -247,6 +247,21 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         }
                     }
                 }
+                // Etoile filante : les deux combattants ressuscitent a 100%
+                // HP — interpretation simplifiee, pas de sudden death
+                // re-execute (necessiterait de rerun le moteur). On force
+                // un match nul, on retablit les HP finaux a hp_max et zero
+                // transfert. Le narratif annonce explique la "magie".
+                "etoile_filante" => {
+                    result.winner_id = None;
+                    result.loser_id = None;
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                    result.attacker_hp_final = result.attacker_hp_max;
+                    result.defender_hp_final = result.defender_hp_max;
+                }
                 // Trefle a 4 feuilles : le combat est resolu normalement
                 // (winner_id / loser_id conserves, win streak incremente),
                 // mais le perdant recupere 150% de sa mise au lieu d en

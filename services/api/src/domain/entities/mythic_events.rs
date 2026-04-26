@@ -43,8 +43,8 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         label: "Etoile filante",
         probability: 0.002,
         emoji: "🌠",
-        announce: "🌠 **ETOILE FILANTE** — les deux combattants ressuscitent a 100%, sudden death !",
-        mechanical_implemented: false,
+        announce: "🌠 **ETOILE FILANTE** — les deux combattants ressuscitent a 100% HP, magie cosmique, le combat se solde en match nul.",
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "jackpot_divin",
