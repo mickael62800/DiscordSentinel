@@ -472,7 +472,7 @@ pub async fn build_app_state(
     let coude_vendetta_repo: Arc<dyn crate::ports::outbound::CoudeVendettaRepository> =
         Arc::new(PgCoudeVendettaRepository::new(pg_pool.clone()));
     let coude_vendetta_uc: Arc<dyn crate::ports::inbound::ManageCoudeVendettaUseCase> =
-        Arc::new(ManageCoudeVendettaService::new(coude_vendetta_repo));
+        Arc::new(ManageCoudeVendettaService::new(coude_vendetta_repo.clone()));
 
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::CoudeStealProtectionRepository,
@@ -503,7 +503,8 @@ pub async fn build_app_state(
                 bot_config_repo.clone(),
             )
             .with_curses_repo(coude_curses_repo.clone())
-            .with_safety_net_repo(coude_safety_net_repo.clone()),
+            .with_safety_net_repo(coude_safety_net_repo.clone())
+            .with_vendetta_repo(coude_vendetta_repo.clone()),
         );
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,

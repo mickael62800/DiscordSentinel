@@ -36,7 +36,7 @@ use crate::ports::inbound::{
 };
 use crate::ports::outbound::{
     BotConfigRepository, CoudeCombatRepository, CoudeCursesRepository, CoudeSafetyNetRepository,
-    WalletRepository,
+    CoudeVendettaRepository, WalletRepository,
 };
 
 pub struct ResolveCombatNowService {
@@ -51,6 +51,7 @@ pub struct ResolveCombatNowService {
     bot_config_repo: Arc<dyn BotConfigRepository>,
     curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
     safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
+    vendetta_repo: Option<Arc<dyn CoudeVendettaRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -77,6 +78,7 @@ impl ResolveCombatNowService {
             bot_config_repo,
             curses_repo: None,
             safety_net_repo: None,
+            vendetta_repo: None,
         }
     }
 
@@ -92,6 +94,15 @@ impl ResolveCombatNowService {
     /// solde tombe sous le seuil.
     pub fn with_safety_net_repo(mut self, repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
         self.safety_net_repo = Some(repo);
+        self
+    }
+
+    /// Branche le repo des vendettas (cf. COUPE_AMELIORATIONS 5.3) pour
+    /// detecter les revanches en cours et appliquer le bonus +100% au
+    /// gain du challenger qui gagne sa revanche, ou marquer la vendetta
+    /// comme perdue dans le cas inverse.
+    pub fn with_vendetta_repo(mut self, repo: Arc<dyn CoudeVendettaRepository>) -> Self {
+        self.vendetta_repo = Some(repo);
         self
     }
 
@@ -559,6 +570,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             title_color = 0x9B59B6;
         }
 
+        let mut vendetta_msg: Option<String> = None;
         match (&result.winner_id, &result.loser_id) {
             (Some(winner_id), Some(loser_id)) => {
                 // Cap sur solde reel du perdant (pre-requis pour l'assurance
@@ -570,7 +582,46 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .ok()
                     .flatten();
                 let loser_balance = loser_wallet.map(|w| w.coins).unwrap_or(0);
-                let coins_transferred = result.coins_won.min(loser_balance);
+                let coins_transferred_nominal = result.coins_won.min(loser_balance);
+
+                // Vendetta (cf. COUPE_AMELIORATIONS 5.3) : si le winner a
+                // une vendetta active contre le loser, c est sa revanche
+                // — gain double. Inversement si le loser avait declare une
+                // vendetta contre le winner, on la resout comme perdue.
+                use crate::domain::entities::apply_revenge_bonus;
+                let coins_transferred = if let Some(repo) = &self.vendetta_repo {
+                    if let Ok(Some(v)) = repo.get_active(&combat.guild_id, winner_id, loser_id).await {
+                        let boosted = apply_revenge_bonus(coins_transferred_nominal, true);
+                        if let Err(e) = repo.resolve(v.id, true).await {
+                            warn!(error = %e, "Echec resolve vendetta won");
+                        }
+                        if boosted > coins_transferred_nominal {
+                            vendetta_msg = Some(format!(
+                                "\u{2694}\u{fe0f} **VENDETTA ACCOMPLIE !** Gain double : {} -> {} coins.",
+                                coins_transferred_nominal, boosted
+                            ));
+                        }
+                        boosted
+                    } else {
+                        // Verifie si le perdant avait une vendetta contre
+                        // le gagnant : il vient de la perdre.
+                        if let Ok(Some(v)) = repo
+                            .get_active(&combat.guild_id, loser_id, winner_id)
+                            .await
+                        {
+                            if let Err(e) = repo.resolve(v.id, false).await {
+                                warn!(error = %e, "Echec resolve vendetta lost");
+                            }
+                            vendetta_msg = Some(format!(
+                                "\u{1faa6} Vendetta de <@{}> ECHOUEE — il est de nouveau ecrase par <@{}>.",
+                                loser_id, winner_id
+                            ));
+                        }
+                        coins_transferred_nominal
+                    }
+                } else {
+                    coins_transferred_nominal
+                };
 
                 // Assurance : clamp-then-apply dans le domain pour que les
                 // joueurs fauches beneficient effectivement de la protection.
@@ -909,6 +960,13 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             fields.push(ResolvedCombatEmbedField {
                 name: "\u{1f6e1}\u{fe0f} Assurance".into(),
                 value: ins_msg,
+                inline: false,
+            });
+        }
+        if let Some(v_msg) = vendetta_msg {
+            fields.push(ResolvedCombatEmbedField {
+                name: "\u{2694}\u{fe0f} Vendetta".into(),
+                value: v_msg,
                 inline: false,
             });
         }
