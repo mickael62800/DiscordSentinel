@@ -193,6 +193,15 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/coalitions/by-target/{target_id}",
             get(handlers::coude::get_coalition_by_target),
         )
+        // Migration 167 : ultimates par classe (cf. roadmap 3.1)
+        .route(
+            "/{guild_id}/ultimates/{user_id}/activate",
+            post(handlers::coude::activate_ultimate),
+        )
+        .route(
+            "/{guild_id}/ultimates/{user_id}",
+            get(handlers::coude::get_ultimate_state),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

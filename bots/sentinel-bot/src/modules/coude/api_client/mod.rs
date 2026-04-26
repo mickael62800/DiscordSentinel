@@ -532,3 +532,4 @@ mod tout_ou_rien;
 mod bounty;
 mod refusal;
 mod coalition;
+mod ultimate;

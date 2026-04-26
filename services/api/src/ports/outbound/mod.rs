@@ -142,3 +142,6 @@ pub use coude_refusal_count_repository::CoudeRefusalCountRepository;
 
 mod coude_coalition_repository;
 pub use coude_coalition_repository::CoudeCoalitionRepository;
+
+mod coude_ultimate_repository;
+pub use coude_ultimate_repository::CoudeUltimateRepository;

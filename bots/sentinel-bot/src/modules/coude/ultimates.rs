@@ -29,7 +29,7 @@ pub const CLASS_ULTIMATES: &[ClassUltimate] = &[
         emoji: "\u{1f504}",
         label: "Echange de carcasses",
         description: "Swap ton HP courant avec celui de l adversaire AVANT le combat. Mourant a 5 HP ? Il herite de tes 5 HP et tu recuperes ses 180.",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
         cooldown_days: 7,
     },
     ClassUltimate {

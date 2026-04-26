@@ -269,6 +269,11 @@ pub use coalition::{
     COALITION_MIN_MEMBERS,
 };
 
+mod ultimate;
+pub use ultimate::{
+    ultimate_ready, UltimateKind, UltimateState, ULTIMATE_UNLOCK_LEVEL,
+};
+
 mod vendetta;
 pub use vendetta::{
     apply_revenge_bonus, ActiveVendetta, VendettaStatus, VENDETTA_BOURREAU_SUFFIX_PREFIX,

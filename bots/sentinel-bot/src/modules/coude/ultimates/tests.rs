@@ -64,12 +64,11 @@ fn all_ultimates_have_emoji_label_description() {
 }
 
 #[test]
-fn all_mechanical_flags_false_for_now() {
-    for u in CLASS_ULTIMATES {
-        assert!(
-            !u.mechanical_implemented,
-            "{} marque comme branche — actualiser",
-            u.class_key
-        );
-    }
+fn mechanical_flags_match_branched_set() {
+    let branched: Vec<&str> = CLASS_ULTIMATES
+        .iter()
+        .filter(|u| u.mechanical_implemented)
+        .map(|u| u.class_key)
+        .collect();
+    assert_eq!(branched, vec!["bourrin"]);
 }

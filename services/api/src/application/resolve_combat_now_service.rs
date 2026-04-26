@@ -37,7 +37,7 @@ use crate::ports::inbound::{
 use crate::ports::outbound::{
     BotConfigRepository, CoudeBountyRepository, CoudeCoalitionRepository, CoudeCombatRepository,
     CoudeCursesRepository, CoudePlayerRepository, CoudeSafetyNetRepository,
-    CoudeVendettaRepository, WalletRepository,
+    CoudeUltimateRepository, CoudeVendettaRepository, WalletRepository,
 };
 
 pub struct ResolveCombatNowService {
@@ -56,6 +56,7 @@ pub struct ResolveCombatNowService {
     player_repo: Option<Arc<dyn CoudePlayerRepository>>,
     bounty_repo: Option<Arc<dyn CoudeBountyRepository>>,
     coalition_repo: Option<Arc<dyn CoudeCoalitionRepository>>,
+    ultimate_repo: Option<Arc<dyn CoudeUltimateRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -86,12 +87,19 @@ impl ResolveCombatNowService {
             player_repo: None,
             bounty_repo: None,
             coalition_repo: None,
+            ultimate_repo: None,
         }
     }
 
     /// Branche le repo coalition (cf. COUPE_AMELIORATIONS 5.3).
     pub fn with_coalition_repo(mut self, repo: Arc<dyn CoudeCoalitionRepository>) -> Self {
         self.coalition_repo = Some(repo);
+        self
+    }
+
+    /// Branche le repo ultimate (cf. COUPE_AMELIORATIONS 3.1).
+    pub fn with_ultimate_repo(mut self, repo: Arc<dyn CoudeUltimateRepository>) -> Self {
+        self.ultimate_repo = Some(repo);
         self
     }
 
@@ -347,11 +355,41 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             defender_special_raw
         };
 
+        // Ultimate "Echange de carcasses" (Bourrin) cf. COUPE_AMELIORATIONS
+        // 3.1 : si l attaquant est Bourrin et a une ultimate pendante,
+        // on swap son hp_current avec celui du defenseur AVANT l engine.
+        // Consume la pendante.
+        let mut ultimate_msg: Option<String> = None;
+        let (atk_hp_for_engine, def_hp_for_engine) = {
+            let mut a = attacker.hp_current;
+            let mut d = defender.hp_current;
+            if let Some(ult_repo) = &self.ultimate_repo {
+                use crate::domain::entities::UltimateKind;
+                if let Ok(state) = ult_repo.get(&combat.guild_id, &combat.attacker_id).await {
+                    if state.pending_kind == Some(UltimateKind::Bourrin) {
+                        std::mem::swap(&mut a, &mut d);
+                        ultimate_msg = Some(format!(
+                            "\u{1f504} **Echange de carcasses** : <@{}> swap son HP ({} -> {}) avec <@{}> ({} -> {}) !",
+                            combat.attacker_id, attacker.hp_current, d,
+                            combat.defender_id, defender.hp_current, a
+                        ));
+                        if let Err(e) = ult_repo
+                            .consume_pending(&combat.guild_id, &combat.attacker_id)
+                            .await
+                        {
+                            warn!(error = %e, "Echec consume ultimate Bourrin");
+                        }
+                    }
+                }
+            }
+            (a, d)
+        };
+
         let mut result = engine::combat::resolve_combat_with_curses(
             &atk_player,
             &def_player,
-            attacker.hp_current,
-            defender.hp_current,
+            atk_hp_for_engine,
+            def_hp_for_engine,
             combat.mise,
             attacker_special_effective,
             defender_special_effective,
@@ -360,9 +398,12 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             curses,
         );
 
-        // Prefix les messages Graisser dans la description du combat.
+        // Prefix les messages Graisser + ultimate dans la description.
         if !graisser_msgs.is_empty() {
             result.message = format!("{}\n\n{}", graisser_msgs.join("\n"), result.message);
+        }
+        if let Some(u_msg) = &ultimate_msg {
+            result.message = format!("{}\n\n{}", u_msg, result.message);
         }
 
         // Effets mecaniques des mythiques (cf. COUPE_AMELIORATIONS 2.1).

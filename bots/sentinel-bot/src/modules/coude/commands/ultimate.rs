@@ -6,8 +6,9 @@
 //! sera branchee dans des commits suivants.
 
 use serenity::all::{
-    CommandInteraction, Context, CreateCommand, CreateEmbed, CreateEmbedFooter,
-    CreateInteractionResponse, CreateInteractionResponseMessage,
+    CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
+    CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateInteractionResponse,
+    CreateInteractionResponseMessage,
 };
 
 use sentinel_shared::discord_helpers::reply_ephemeral;
@@ -19,7 +20,15 @@ use crate::modules::coude::GameApiKey;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("ultimate")
-        .description("Affiche ton ultimate de classe (debloque au niveau 10)")
+        .description("Affiche ou active ton ultimate (debloque au niveau 10)")
+        .add_option(
+            CreateCommandOption::new(
+                CommandOptionType::Boolean,
+                "activer",
+                "true = active sur ton prochain combat (sinon affichage seul)",
+            )
+            .required(false),
+        )
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
@@ -46,6 +55,74 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let class_key = player.class.as_deref().unwrap_or("bourrin");
     let ult = ultimate_for_class(class_key);
+
+    let activate = command
+        .data
+        .options
+        .iter()
+        .find(|o| o.name == "activer")
+        .and_then(|o| match &o.value {
+            CommandDataOptionValue::Boolean(b) => Some(*b),
+            _ => None,
+        })
+        .unwrap_or(false);
+
+    if activate {
+        let Some(u) = ult else {
+            reply_ephemeral(ctx, command, "Aucun ultimate pour ta classe.").await;
+            return;
+        };
+        if !u.mechanical_implemented && u.class_key != "bourrin" {
+            reply_ephemeral(
+                ctx,
+                command,
+                "Cet ultimate n a pas encore d effet mecanique branche — l activation arrive bientot.",
+            )
+            .await;
+            return;
+        }
+        match api
+            .activate_ultimate(&guild_id, &user_id, u.class_key)
+            .await
+        {
+            Ok(_) => {
+                let embed = CreateEmbed::new()
+                    .title(format!("{} {} — ACTIVE !", u.emoji, u.label))
+                    .description(format!(
+                        "<@{}> a active **{}** ! Ton prochain combat declenche l effet.\n\n_{}_",
+                        command.user.id, u.label, u.description
+                    ))
+                    .color(0x9B59B6)
+                    .footer(CreateEmbedFooter::new(
+                        sentinel_shared::branding::COUDE_TAGLINE_SHORT,
+                    ))
+                    .timestamp(serenity::model::Timestamp::now());
+                if let Err(e) = command
+                    .create_response(
+                        &ctx.http,
+                        CreateInteractionResponse::Message(
+                            CreateInteractionResponseMessage::new().embed(embed),
+                        ),
+                    )
+                    .await
+                {
+                    tracing::warn!(error = %e, "Echec response /ultimate activate");
+                }
+                return;
+            }
+            Err(e) => {
+                let msg = if e.contains("Cooldown") || e.contains("non disponible") {
+                    "Cooldown encore en cours ou level insuffisant.".to_string()
+                } else if e.contains("reserve a la classe") {
+                    "Cet ultimate ne correspond pas a ta classe.".to_string()
+                } else {
+                    format!("Erreur API : {e}")
+                };
+                reply_ephemeral(ctx, command, &msg).await;
+                return;
+            }
+        }
+    }
 
     let embed = if let Some(u) = ult {
         let unlock_status = if player.level >= ULTIMATE_UNLOCK_LEVEL {

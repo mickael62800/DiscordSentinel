@@ -73,6 +73,7 @@ pub struct AppState {
     pub coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository>,
     pub coude_refusal_count_repo: Arc<dyn crate::ports::outbound::CoudeRefusalCountRepository>,
     pub coude_coalition_repo: Arc<dyn crate::ports::outbound::CoudeCoalitionRepository>,
+    pub coude_ultimate_repo: Arc<dyn crate::ports::outbound::CoudeUltimateRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,

@@ -24,7 +24,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::{
     PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgBotConfigRepository,
     PgConductRepository, PgCoudeBetRepository, PgCoudeCashboxRepository, PgCoudeCombatRepository,
-    PgCoudeBountyRepository, PgCoudeCoalitionRepository, PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeRefusalCountRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeVendettaRepository,
+    PgCoudeBountyRepository, PgCoudeCoalitionRepository, PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeRefusalCountRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeUltimateRepository, PgCoudeVendettaRepository,
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
@@ -498,6 +498,10 @@ pub async fn build_app_state(
     let coude_coalition_repo: Arc<dyn crate::ports::outbound::CoudeCoalitionRepository> =
         Arc::new(PgCoudeCoalitionRepository::new(pg_pool.clone()));
 
+    // Ultimates par classe (cf. COUPE_AMELIORATIONS 3.1).
+    let coude_ultimate_repo: Arc<dyn crate::ports::outbound::CoudeUltimateRepository> =
+        Arc::new(PgCoudeUltimateRepository::new(pg_pool.clone()));
+
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::CoudeStealProtectionRepository,
     > = Arc::new(PgCoudeStealProtectionRepository::new(pg_pool.clone()));
@@ -531,7 +535,8 @@ pub async fn build_app_state(
             .with_vendetta_repo(coude_vendetta_repo.clone())
             .with_player_repo(coude_player_repo.clone())
             .with_bounty_repo(coude_bounty_repo.clone())
-            .with_coalition_repo(coude_coalition_repo.clone()),
+            .with_coalition_repo(coude_coalition_repo.clone())
+            .with_ultimate_repo(coude_ultimate_repo.clone()),
         );
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
@@ -612,6 +617,7 @@ pub async fn build_app_state(
         coude_bounty_repo: coude_bounty_repo.clone(),
         coude_refusal_count_repo,
         coude_coalition_repo: coude_coalition_repo.clone(),
+        coude_ultimate_repo: coude_ultimate_repo.clone(),
         broadcaster,
         job_client,
         discord_api,

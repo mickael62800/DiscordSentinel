@@ -186,3 +186,6 @@ pub use coude_refusal_count_repository::PgCoudeRefusalCountRepository;
 
 mod coude_coalition_repository;
 pub use coude_coalition_repository::PgCoudeCoalitionRepository;
+
+mod coude_ultimate_repository;
+pub use coude_ultimate_repository::PgCoudeUltimateRepository;

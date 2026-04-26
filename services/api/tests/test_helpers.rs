@@ -553,6 +553,21 @@ pub struct StubCoudeRefusalCount;
     async fn reset(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
 }
 
+pub struct StubCoudeUltimate;
+#[async_trait] impl sentinel_api::ports::outbound::CoudeUltimateRepository for StubCoudeUltimate {
+    async fn activate(&self, _: &str, _: &str, _: sentinel_api::domain::entities::UltimateKind) -> Result<(), DomainError> { Ok(()) }
+    async fn get(&self, g: &str, u: &str) -> Result<sentinel_api::domain::entities::UltimateState, DomainError> {
+        Ok(sentinel_api::domain::entities::UltimateState {
+            guild_id: g.into(),
+            user_id: u.into(),
+            pending_kind: None,
+            last_used_at: None,
+            activated_at: None,
+        })
+    }
+    async fn consume_pending(&self, _: &str, _: &str) -> Result<Option<sentinel_api::domain::entities::UltimateKind>, DomainError> { Ok(None) }
+}
+
 pub struct StubCoudeCoalition;
 #[async_trait] impl sentinel_api::ports::outbound::CoudeCoalitionRepository for StubCoudeCoalition {
     async fn create_with_first_member(&self, _: &str, _: &str, _: &str, _: &str, _: i64) -> Result<uuid::Uuid, DomainError> { Ok(uuid::Uuid::new_v4()) }
@@ -733,6 +748,7 @@ fn base_state() -> AppState {
         coude_bounty_repo: Arc::new(StubCoudeBounty),
         coude_refusal_count_repo: Arc::new(StubCoudeRefusalCount),
         coude_coalition_repo: Arc::new(StubCoudeCoalition),
+        coude_ultimate_repo: Arc::new(StubCoudeUltimate),
         resolve_betting_batch_uc: Arc::new(StubResolveBettingBatch),
         expire_combats_batch_uc: Arc::new(StubExpireCombatsBatch),
         resolve_combat_now_uc: Arc::new(StubResolveCombatNow),
