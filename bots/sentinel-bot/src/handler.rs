@@ -288,7 +288,7 @@ impl EventHandler for Handler {
                     "game" | "game-admin" => modules::games::handle_command(&ctx, &command).await,
                     "roles-panel" | "parrain" => modules::community::handle_command(&ctx, &command).await,
                     "audit" => modules::audit::handle_command(&ctx, &command).await,
-                    "level" | "stats" => modules::progression::handle_command(&ctx, &command).await,
+                    "level" | "stats" | "progression-resync" => modules::progression::handle_command(&ctx, &command).await,
                     "blackjack-setup" => modules::blackjack::handle_command(&ctx, &command).await,
                     "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
                     "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,

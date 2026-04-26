@@ -579,6 +579,8 @@ Effet viral : les participants invitent leurs potes.
 ## 📅 État d'avancement (mis à jour 2026-04-26)
 
 ### ✅ Livré (le gros)
+- **`/aide` contextuelle** (1.3)
+- **Mise par défaut intelligente** (1.2) — pick UI 20%/50c/100c/all-in si mise omise
 - **Événements chaos Mythiques** (2.1)
 - **Commentaires de combat débiles** (2.2)
 - **Clutch / Comeback / Ridicule** (2.3)
@@ -589,9 +591,11 @@ Effet viral : les participants invitent leurs potes.
 - **Paliers milestones** (3.2) — incl. niveau 5 slot assurance +1
 - **Système de Prestige** (3.3) — incl. wiring multiplicateur sur payouts
 - **Achievements cosmétiques** (3.4)
+- **Bouclier malchance du jour** (4.1) — 1ʳᵉ défeat ×0.5 + win streak preservée
 - **Refus OK si HP bas** (4.2)
 - **Travaux communautaires en prison** (4.3)
 - **Filet de sécurité coins** (4.4)
+- **Mode duel amical** (4.5) — `/coude-amical` MVP (leaderboard séparé en suivi)
 - **Malédictions `/maudire`** (5.1)
 - **Sabotage** (5.2) — graisser, empoisonner wallet, fausse assurance
 - **Revenge / Vendetta** (5.3) — vendetta, prime collective, dette d'honneur, coalition
@@ -600,8 +604,19 @@ Effet viral : les participants invitent leurs potes.
 - **TOUT-OU-RIEN + Memorial** (6.1)
 - **Moment de la semaine** (6.2)
 - **Saisons thématiques** (6.3)
+- **Tagline officielle propagée aux footers** (6.4) — `COUDE_TAGLINE_SHORT`
 - **Tournoi mensuel live** (6.5)
-- **`/aide` contextuelle** (1.3)
+
+### ⚙️ Infra — Configuration par-guild (migration 170)
+13 paramètres exposés au schema de `coude-bot` (modifiables depuis la web admin `/components/config`) :
+- `mise_pick_suggested_percent` (1.2)
+- `lucky_shield_enabled`, `lucky_shield_loss_percent` (4.1)
+- `assurance_extra_slot_level` (3.2)
+- `prestige_unlock_level`, `prestige_max_count`, `prestige_gain_bonus_percent` (3.3)
+- `friendly_winner_xp`, `friendly_loser_xp` (4.5)
+- `safety_net_trigger_coins`, `safety_net_duration_hours`, `safety_net_loss_percent`, `safety_net_bet_gain_percent` (4.4)
+
+Helper `CoudeGuildSettings` (`services/api/src/application/coude_guild_settings.rs`) centralise la lecture. Variantes `_with_multiplier` / `_with_params` ajoutées aux fonctions domaine pour préserver les tests existants.
 
 ### ⏳ Reste à faire
 - 🟢 **Tutoriel interactif 5 étapes** (1.1) — onboarding nouveaux joueurs
@@ -609,10 +624,7 @@ Effet viral : les participants invitent leurs potes.
 - 🔵 **Leaderboard duel amical** (extension 4.5) — exposer `friendly_wins` / `friendly_losses` dans `/leaderboard`
 
 ### 🎯 Verdict
-~27 des 28 features livrées (4.5 livre en MVP, leaderboard a venir). Il ne reste que des items quick-win (tagline,
-bouclier 1ère défaite, mise par défaut) ou cosmétiques/onboarding
-(tutoriel, duel amical, ultimates shop). Le cœur du jeu — chaos, prestige,
-paliers, sabotage, vendetta, signature roue — est complet.
+27/28 features livrées + 13 paramètres exposés au panneau admin. Le cœur du jeu — chaos, prestige, paliers, sabotage, vendetta, signature roue, duel amical — est complet et **paramétrable par-guild**. Reste de l'onboarding (tutoriel) et 2 extensions cosmétiques.
 
 ---
 

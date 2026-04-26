@@ -6,6 +6,7 @@ pub mod api_client;
 pub mod level_channel;
 pub mod level_cmd;
 pub mod multipliers;
+pub mod resync_cmd;
 pub mod stats_cmd;
 pub mod streaks;
 pub mod tracker;
@@ -211,7 +212,7 @@ async fn credit_voice_tick(ctx: &Context) -> Result<(), String> {
 // ── Slash commands ──
 
 pub fn register_commands() -> Vec<CreateCommand> {
-    vec![level_cmd::register(), stats_cmd::register()]
+    vec![level_cmd::register(), stats_cmd::register(), resync_cmd::register()]
 }
 
 pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
@@ -221,6 +222,7 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
     match command.data.name.as_str() {
         "level" => level_cmd::handle(ctx, command).await,
         "stats" => stats_cmd::handle(ctx, command).await,
+        "progression-resync" => resync_cmd::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -585,6 +587,17 @@ pub async fn assign_default_role(ctx: &Context, new_member: &Member) {
 
 // ── Helper interne ──
 
+/// Bilan d une synchronisation de roles pour un membre. Utilise par la
+/// commande `/progression-resync` pour reporter ce qui a change.
+#[derive(Debug, Default, Clone)]
+pub struct RoleSyncReport {
+    pub added_roles: Vec<u64>,
+    pub removed_roles: Vec<u64>,
+    pub errors: Vec<String>,
+    /// `true` si on n a pas pu charger member/rewards (skip silencieux).
+    pub skipped: bool,
+}
+
 /// Verifie TOUS les rewards (texte, vocal, jours) et attribue les roles manquants.
 async fn check_and_assign_all_roles(
     ctx: &Context,
@@ -594,9 +607,28 @@ async fn check_and_assign_all_roles(
     level_voice: i32,
     level_global: i32,
 ) {
+    let _ = sync_member_roles(ctx, guild_id, user_id, level_text, level_voice, level_global).await;
+}
+
+/// Variante publique avec rapport — meme logique que
+/// `check_and_assign_all_roles` mais retourne ce qui a ete ajoute / retire
+/// pour permettre a la commande de resync d afficher un bilan.
+pub async fn sync_member_roles(
+    ctx: &Context,
+    guild_id: GuildId,
+    user_id: UserId,
+    level_text: i32,
+    level_voice: i32,
+    level_global: i32,
+) -> RoleSyncReport {
+    let mut report = RoleSyncReport::default();
     let member = match guild_id.member(&ctx.http, user_id).await {
         Ok(m) => m,
-        Err(_) => return,
+        Err(e) => {
+            report.skipped = true;
+            report.errors.push(format!("member fetch: {e}"));
+            return report;
+        }
     };
 
     let member_roles: Vec<u64> = member.roles.iter().map(|r| r.get()).collect();
@@ -640,22 +672,32 @@ async fn check_and_assign_all_roles(
         } else if let Some(api) = data.get::<StatsApiKey>() {
             match api.get_all_rewards(&guild_str).await {
                 Ok(r) => { cache.set(&guild_str, r.clone()); r }
-                Err(_) => return,
+                Err(e) => {
+                    report.skipped = true;
+                    report.errors.push(format!("get_all_rewards: {e}"));
+                    return report;
+                }
             }
         } else {
-            return;
+            report.skipped = true;
+            return report;
         }
     } else if let Some(api) = data.get::<StatsApiKey>() {
         match api.get_all_rewards(&guild_str).await {
             Ok(r) => r,
-            Err(_) => return,
+            Err(e) => {
+                report.skipped = true;
+                report.errors.push(format!("get_all_rewards: {e}"));
+                return report;
+            }
         }
     } else {
-        return;
+        report.skipped = true;
+        return report;
     };
 
     if rewards.is_empty() {
-        return;
+        return report;
     }
 
     let sources = ["text", "voice", "days"];
@@ -686,16 +728,28 @@ async fn check_and_assign_all_roles(
                 if let Ok(best_role_id) = reward.role_id.parse::<u64>() {
                     if !member_roles.contains(&best_role_id) {
                         match member.add_role(&ctx.http, RoleId::new(best_role_id)).await {
-                            Ok(_) => info!(guild=%guild_id, user=%user_id, role=%best_role_id, source=%source, "Role attribue"),
-                            Err(e) => warn!(guild=%guild_id, user=%user_id, role=%best_role_id, error=%e, "Echec attribution role"),
+                            Ok(_) => {
+                                info!(guild=%guild_id, user=%user_id, role=%best_role_id, source=%source, "Role attribue");
+                                report.added_roles.push(best_role_id);
+                            }
+                            Err(e) => {
+                                warn!(guild=%guild_id, user=%user_id, role=%best_role_id, error=%e, "Echec attribution role");
+                                report.errors.push(format!("add_role {best_role_id} ({source}): {e}"));
+                            }
                         }
                     }
 
                     for role_id in &all_source_role_ids {
                         if *role_id != best_role_id && member_roles.contains(role_id) {
                             match member.remove_role(&ctx.http, RoleId::new(*role_id)).await {
-                                Ok(_) => info!(guild=%guild_id, user=%user_id, role=%role_id, source=%source, "Ancien role retire"),
-                                Err(e) => warn!(guild=%guild_id, user=%user_id, role=%role_id, error=%e, "Echec retrait ancien role"),
+                                Ok(_) => {
+                                    info!(guild=%guild_id, user=%user_id, role=%role_id, source=%source, "Ancien role retire");
+                                    report.removed_roles.push(*role_id);
+                                }
+                                Err(e) => {
+                                    warn!(guild=%guild_id, user=%user_id, role=%role_id, error=%e, "Echec retrait ancien role");
+                                    report.errors.push(format!("remove_role {role_id} ({source}): {e}"));
+                                }
                             }
                         }
                     }
@@ -704,12 +758,18 @@ async fn check_and_assign_all_roles(
             None => {
                 for role_id in &all_source_role_ids {
                     if member_roles.contains(role_id) {
-                        if let Err(e) = member.remove_role(&ctx.http, RoleId::new(*role_id)).await {
-                            warn!(error = %e, "Failed to remove unqualified role");
+                        match member.remove_role(&ctx.http, RoleId::new(*role_id)).await {
+                            Ok(_) => report.removed_roles.push(*role_id),
+                            Err(e) => {
+                                warn!(error = %e, "Failed to remove unqualified role");
+                                report.errors.push(format!("remove_role {role_id} (under-qualified, {source}): {e}"));
+                            }
                         }
                     }
                 }
             }
         }
     }
+
+    report
 }
