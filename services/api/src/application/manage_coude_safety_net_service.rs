@@ -4,20 +4,25 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{
-    safety_net_should_trigger, ActiveSafetyNet, SAFETY_NET_DURATION_HOURS,
-};
+use crate::application::CoudeGuildSettings;
+use crate::domain::entities::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_safety_net::ManageCoudeSafetyNetUseCase;
-use crate::ports::outbound::CoudeSafetyNetRepository;
+use crate::ports::outbound::{BotConfigRepository, CoudeSafetyNetRepository};
 
 pub struct ManageCoudeSafetyNetService {
     repo: Arc<dyn CoudeSafetyNetRepository>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeSafetyNetService {
     pub fn new(repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
-        Self { repo }
+        Self { repo, bot_config_repo: None }
+    }
+
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
+        self
     }
 }
 
@@ -29,17 +34,24 @@ impl ManageCoudeSafetyNetUseCase for ManageCoudeSafetyNetService {
         user_id: &str,
         current_balance: i64,
     ) -> Result<Option<ActiveSafetyNet>, DomainError> {
-        if !safety_net_should_trigger(current_balance) {
+        let (trigger, duration) = match &self.bot_config_repo {
+            Some(repo) => {
+                let s = CoudeGuildSettings::load(&**repo, guild_id).await;
+                (
+                    s.get_i64("safety_net_trigger_coins", 50),
+                    s.get_i64("safety_net_duration_hours", 72),
+                )
+            }
+            None => (50, 72),
+        };
+        if current_balance >= trigger {
             return Ok(None);
         }
         // Skip si filet deja actif (pas de cumul).
         if self.repo.get_active(guild_id, user_id).await?.is_some() {
             return Ok(None);
         }
-        let _id = self
-            .repo
-            .activate(guild_id, user_id, SAFETY_NET_DURATION_HOURS)
-            .await?;
+        let _id = self.repo.activate(guild_id, user_id, duration).await?;
         // Re-read pour avoir les timestamps definitifs.
         self.repo.get_active(guild_id, user_id).await
     }

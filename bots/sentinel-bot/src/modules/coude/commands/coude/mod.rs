@@ -201,7 +201,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 special.as_deref(),
                 config.min_bet(),
                 config.max_bet(),
-                config.default_bet(),
+                config.smart_default_bet(attacker.coins),
             );
             if let Err(e) = command
                 .create_followup(
@@ -413,8 +413,9 @@ fn build_mise_pick_ui(
         .map(|s| format!(" | Special : **{}**", s))
         .unwrap_or_default();
 
-    // Suggestion 20% du wallet, clampe dans [min_bet, max_bet].
-    let suggested = (attacker_coins / 5).clamp(min_bet, max_bet);
+    // Suggestion = X% du wallet (config mise_pick_suggested_percent),
+    // clampe dans [min_bet, max_bet].
+    let suggested = default_bet.clamp(min_bet, max_bet);
     // All-in : tout le wallet, clampe dans [min, max].
     let all_in = attacker_coins.clamp(min_bet, max_bet);
 

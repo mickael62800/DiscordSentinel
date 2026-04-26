@@ -78,14 +78,19 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "default_bet", 10) as i64
     }
 
-    /// Sprint 1 (1.2) — Mise par defaut intelligente : 20% du wallet du
-    /// joueur, clampe [min_bet, max_bet]. Si wallet < min_bet, retourne
-    /// min_bet (le service refusera la mise pour solde insuffisant —
-    /// comportement intentionnel pour expliciter la borne au joueur).
+    /// Cf. 1.2 — pourcentage du wallet utilise comme mise rapide suggeree.
+    /// Default 20%. Plage 1-100.
+    pub fn mise_pick_suggested_percent(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "mise_pick_suggested_percent", 20) as i64
+    }
+
+    /// Mise par defaut intelligente : `mise_pick_suggested_percent`% du wallet,
+    /// clampe [min_bet, max_bet]. Si wallet < min_bet, retourne min_bet.
     pub fn smart_default_bet(&self, wallet_balance: i64) -> i64 {
         let min = self.min_bet();
         let max = self.max_bet();
-        let raw = ((wallet_balance.max(0) as f64) * 0.20).round() as i64;
+        let pct = self.mise_pick_suggested_percent().clamp(1, 100) as f64 / 100.0;
+        let raw = ((wallet_balance.max(0) as f64) * pct).round() as i64;
         if max < min {
             return min.max(1);
         }

@@ -70,6 +70,9 @@ pub use resolve_combat_now_service::ResolveCombatNowService;
 mod resolve_friendly_duel_service;
 pub use resolve_friendly_duel_service::ResolveFriendlyDuelService;
 
+pub mod coude_guild_settings;
+pub use coude_guild_settings::CoudeGuildSettings;
+
 mod manage_coude_catalog_service;
 pub use manage_coude_catalog_service::ManageCoudeCatalogService;
 

@@ -24,6 +24,17 @@ pub async fn prestige_player(
     State(state): State<AppState>,
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<PrestigeOutcomeDto>, ApiError> {
+    // Cf. migration 170 : seuils configurables par-guild.
+    let settings = crate::application::CoudeGuildSettings::load(
+        state.bot_config_repo.as_ref(),
+        &guild_id,
+    )
+    .await;
+    let unlock_level = settings.get_i32(
+        "prestige_unlock_level",
+        crate::domain::entities::PRESTIGE_UNLOCK_LEVEL,
+    );
+    let max_count = settings.get_i32("prestige_max_count", PRESTIGE_MAX_COUNT);
     // Atomic : UPDATE conditionnel (WHERE level >= 25 AND prestige_count
     // < MAX) pour eviter une race + valider eligibilite en 1 query. Si
     // le RETURNING est vide, le joueur n est pas eligible.
@@ -43,8 +54,8 @@ pub async fn prestige_player(
     )
     .bind(&guild_id)
     .bind(&user_id)
-    .bind(crate::domain::entities::PRESTIGE_UNLOCK_LEVEL)
-    .bind(PRESTIGE_MAX_COUNT)
+    .bind(unlock_level)
+    .bind(max_count)
     .fetch_optional(&state.pg_pool)
     .await
     .map_err(|e| {
@@ -56,8 +67,7 @@ pub async fn prestige_player(
     let new_count = row.map(|r| r.0).ok_or_else(|| {
         ApiError::from(DomainError::Conflict(format!(
             "Prestige indisponible : il faut etre niveau {}+ et avoir moins de {} prestiges.",
-            crate::domain::entities::PRESTIGE_UNLOCK_LEVEL,
-            PRESTIGE_MAX_COUNT
+            unlock_level, max_count
         )))
     })?;
     Ok(Json(PrestigeOutcomeDto {

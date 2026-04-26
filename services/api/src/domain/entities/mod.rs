@@ -227,8 +227,8 @@ pub use cowardice_relief::{should_count_as_cowardice, COWARDICE_RELIEF_HP_PCT};
 
 mod lucky_shield;
 pub use lucky_shield::{
-    apply_lucky_shield, should_preserve_win_streak_after_shielded_defeat,
-    LUCKY_SHIELD_LOSS_MULTIPLIER,
+    apply_lucky_shield, apply_lucky_shield_with_multiplier,
+    should_preserve_win_streak_after_shielded_defeat, LUCKY_SHIELD_LOSS_MULTIPLIER,
 };
 
 mod smart_default_bet;
@@ -276,7 +276,8 @@ pub use ultimate::{
 
 mod prestige;
 pub use prestige::{
-    can_prestige, prestige_gain_multiplier, prestige_stars, PRESTIGE_GAIN_BONUS_PCT,
+    can_prestige, prestige_gain_multiplier, prestige_gain_multiplier_with_params,
+    prestige_stars, PRESTIGE_GAIN_BONUS_PCT,
     PRESTIGE_MAX_COUNT, PRESTIGE_UNLOCK_LEVEL,
 };
 
@@ -288,7 +289,10 @@ pub use vendetta::{
 
 mod safety_net;
 pub use safety_net::{
-    boost_bet_gain as safety_net_boost_bet_gain, reduce_loss as safety_net_reduce_loss,
+    boost_bet_gain as safety_net_boost_bet_gain,
+    boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier,
+    reduce_loss as safety_net_reduce_loss,
+    reduce_loss_with_multiplier as safety_net_reduce_loss_with_multiplier,
     should_trigger as safety_net_should_trigger, ActiveSafetyNet, SAFETY_NET_BET_GAIN_MULTIPLIER,
     SAFETY_NET_DURATION_HOURS, SAFETY_NET_LOSS_MULTIPLIER, SAFETY_NET_TRIGGER_COINS,
 };

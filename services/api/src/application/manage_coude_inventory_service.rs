@@ -3,20 +3,27 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::application::CoudeGuildSettings;
 use crate::domain::entities::{
     CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::outbound::CoudeInventoryRepository;
+use crate::ports::outbound::{BotConfigRepository, CoudeInventoryRepository};
 
 pub struct ManageCoudeInventoryService {
     repo: Arc<dyn CoudeInventoryRepository>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeInventoryService {
     pub fn new(repo: Arc<dyn CoudeInventoryRepository>) -> Self {
-        Self { repo }
+        Self { repo, bot_config_repo: None }
+    }
+
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
+        self
     }
 }
 
@@ -114,8 +121,15 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         duration_seconds: i64,
         level: i32,
     ) -> Result<bool, DomainError> {
-        // Cf. COUPE_AMELIORATIONS 3.2 palier niveau 5.
-        let max_slots = if level >= 5 { 2 } else { 1 };
+        // Cf. COUPE_AMELIORATIONS 3.2 palier niveau 5 (configurable via
+        // `assurance_extra_slot_level`, default 5).
+        let unlock_level = match &self.bot_config_repo {
+            Some(repo) => CoudeGuildSettings::load(&**repo, guild_id)
+                .await
+                .get_i32("assurance_extra_slot_level", 5),
+            None => 5,
+        };
+        let max_slots = if level >= unlock_level { 2 } else { 1 };
         self.repo
             .buy_insurance_with_max_slots(
                 guild_id,

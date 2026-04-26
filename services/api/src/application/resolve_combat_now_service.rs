@@ -153,15 +153,21 @@ impl ResolveCombatNowService {
             Ok(Some(w)) => w.coins,
             _ => return,
         };
-        use crate::domain::entities::{safety_net_should_trigger, SAFETY_NET_DURATION_HOURS};
-        if !safety_net_should_trigger(balance) {
+        let settings = crate::application::CoudeGuildSettings::load(
+            self.bot_config_repo.as_ref(),
+            guild_id,
+        )
+        .await;
+        let trigger = settings.get_i64("safety_net_trigger_coins", 50);
+        let duration = settings.get_i64("safety_net_duration_hours", 72);
+        if balance >= trigger {
             return;
         }
         // Skip si deja un filet actif (evite cumul).
         if matches!(repo.get_active(guild_id, user_id).await, Ok(Some(_))) {
             return;
         }
-        if let Err(e) = repo.activate(guild_id, user_id, SAFETY_NET_DURATION_HOURS).await {
+        if let Err(e) = repo.activate(guild_id, user_id, duration).await {
             warn!(error = %e, %user_id, "Echec activation safety_net");
         }
     }
@@ -276,6 +282,13 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // Charge les parametres de balance de la guild (fallback default
         // si bot_guild_config indispo ou vide).
         let balance = load_balance_params(self.bot_config_repo.as_ref(), &combat.guild_id).await;
+        // Settings pour les features 4.1 / 3.3 / 4.4 (config par-guild,
+        // cf. migration 170).
+        let settings = crate::application::CoudeGuildSettings::load(
+            self.bot_config_repo.as_ref(),
+            &combat.guild_id,
+        )
+        .await;
 
         // Gate : si l'attaquant a lance une surprise ET que le defenseur
         // possede Explosion dans son inventaire ET que le flag
@@ -954,14 +967,18 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // +5% par prestige du gagnant sur le payout combat.
                 // Lecture via player_repo si dispo.
                 let coins_transferred = if let Some(prepo) = &self.player_repo {
-                    use crate::domain::entities::prestige_gain_multiplier;
+                    use crate::domain::entities::prestige_gain_multiplier_with_params;
                     let prestige_count = prepo
                         .get_prestige_count(&combat.guild_id, winner_id)
                         .await
                         .ok()
                         .flatten()
                         .unwrap_or(0);
-                    let mult = prestige_gain_multiplier(prestige_count);
+                    let bonus_pct = settings.get_percent_ratio("prestige_gain_bonus_percent", 5);
+                    let max_count = settings.get_i32("prestige_max_count", 5);
+                    let mult = prestige_gain_multiplier_with_params(
+                        prestige_count, bonus_pct, max_count,
+                    );
                     if mult > 1.0 && coins_transferred > 0 {
                         let boosted =
                             ((coins_transferred as f64) * mult).round() as i64;
@@ -1127,7 +1144,16 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                     .await
                     .unwrap_or(0)
                     == 0;
-                let actual_loss = apply_lucky_shield(adj.actual_loss, is_first_defeat_today);
+                // Bouclier malchance : enabled + multiplicateur configurables.
+                let shield_enabled = settings.get_bool("lucky_shield_enabled", true);
+                let shield_mult = settings.get_percent_ratio("lucky_shield_loss_percent", 50);
+                let actual_loss = if shield_enabled {
+                    crate::domain::entities::apply_lucky_shield_with_multiplier(
+                        adj.actual_loss, is_first_defeat_today, shield_mult,
+                    )
+                } else {
+                    adj.actual_loss
+                };
                 shield_active = is_first_defeat_today && actual_loss < adj.actual_loss;
                 if shield_active {
                     let shield_msg = format!(
@@ -1144,8 +1170,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // perdant a un filet actif, sa perte est divisee par 2.
                 let has_safety_net = self.loser_has_safety_net(&combat.guild_id, loser_id).await;
                 let actual_loss = if has_safety_net {
-                    use crate::domain::entities::safety_net_reduce_loss;
-                    let reduced = safety_net_reduce_loss(actual_loss, true);
+                    use crate::domain::entities::safety_net_reduce_loss_with_multiplier;
+                    let net_mult = settings.get_percent_ratio("safety_net_loss_percent", 50);
+                    let reduced = safety_net_reduce_loss_with_multiplier(actual_loss, true, net_mult);
                     if reduced < actual_loss {
                         let net_msg = format!(
                             "\u{1f49a} Filet de securite : perte reduite de {} a {}.",

@@ -21,8 +21,18 @@ pub fn can_prestige(level: i32, current_prestige_count: i32) -> bool {
 /// Multiplicateur de gain applique aux gains du joueur en fonction de
 /// son nombre de prestiges. 1.0 = neutre, 1.25 = 5 prestiges max.
 pub fn prestige_gain_multiplier(prestige_count: i32) -> f64 {
-    let count = prestige_count.clamp(0, PRESTIGE_MAX_COUNT);
-    1.0 + (count as f64 * PRESTIGE_GAIN_BONUS_PCT)
+    prestige_gain_multiplier_with_params(prestige_count, PRESTIGE_GAIN_BONUS_PCT, PRESTIGE_MAX_COUNT)
+}
+
+/// Variante parametrable (config par-guild via `prestige_gain_bonus_percent`
+/// et `prestige_max_count`).
+pub fn prestige_gain_multiplier_with_params(
+    prestige_count: i32,
+    bonus_pct: f64,
+    max_count: i32,
+) -> f64 {
+    let count = prestige_count.clamp(0, max_count);
+    1.0 + (count as f64 * bonus_pct)
 }
 
 /// Format etoiles pour affichage (1 prestige = ⭐, 5 = ⭐⭐⭐⭐⭐).

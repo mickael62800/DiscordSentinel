@@ -12,22 +12,32 @@
 /// Multiplicateur applique a la perte si c est la premiere defaite du jour.
 pub const LUCKY_SHIELD_LOSS_MULTIPLIER: f64 = 0.5;
 
-/// Calcule la perte effective apres application eventuelle du bouclier.
-///
-/// # Arguments
-/// * `nominal_loss` — perte nominale calculee par le moteur (positive)
-/// * `is_first_defeat_today` — true si c est la 1ere defeat du jour
-///
-/// # Retour
-/// Perte adoucie si bouclier actif, sinon perte nominale.
-pub fn apply_lucky_shield(nominal_loss: i64, is_first_defeat_today: bool) -> i64 {
+/// Calcule la perte effective apres application eventuelle du bouclier
+/// avec un multiplicateur explicite (0.5 par defaut, configurable via
+/// `lucky_shield_loss_percent`).
+pub fn apply_lucky_shield_with_multiplier(
+    nominal_loss: i64,
+    is_first_defeat_today: bool,
+    multiplier: f64,
+) -> i64 {
     if !is_first_defeat_today {
         return nominal_loss;
     }
     if nominal_loss <= 0 {
         return nominal_loss;
     }
-    ((nominal_loss as f64) * LUCKY_SHIELD_LOSS_MULTIPLIER).round() as i64
+    ((nominal_loss as f64) * multiplier).round() as i64
+}
+
+/// Variante avec le multiplicateur par defaut (0.5). Conservee pour la
+/// retrocompatibilite des tests + des appels existants ; les nouveaux
+/// call sites passent par `apply_lucky_shield_with_multiplier`.
+pub fn apply_lucky_shield(nominal_loss: i64, is_first_defeat_today: bool) -> i64 {
+    apply_lucky_shield_with_multiplier(
+        nominal_loss,
+        is_first_defeat_today,
+        LUCKY_SHIELD_LOSS_MULTIPLIER,
+    )
 }
 
 /// Doit-on preserver le win streak du perdant si le bouclier s applique ?

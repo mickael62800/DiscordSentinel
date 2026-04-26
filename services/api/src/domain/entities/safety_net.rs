@@ -51,18 +51,34 @@ pub fn should_trigger(current_balance: i64) -> bool {
 /// Reduction d une perte sous filet actif. Floor a 0 pour eviter les
 /// pertes negatives sur des arrondis.
 pub fn reduce_loss(nominal_loss: i64, has_active_net: bool) -> i64 {
+    reduce_loss_with_multiplier(nominal_loss, has_active_net, SAFETY_NET_LOSS_MULTIPLIER)
+}
+
+pub fn reduce_loss_with_multiplier(
+    nominal_loss: i64,
+    has_active_net: bool,
+    multiplier: f64,
+) -> i64 {
     if !has_active_net || nominal_loss <= 0 {
         return nominal_loss;
     }
-    ((nominal_loss as f64) * SAFETY_NET_LOSS_MULTIPLIER) as i64
+    ((nominal_loss as f64) * multiplier) as i64
 }
 
 /// Boost d un gain de pari sous filet actif.
 pub fn boost_bet_gain(nominal_gain: i64, has_active_net: bool) -> i64 {
+    boost_bet_gain_with_multiplier(nominal_gain, has_active_net, SAFETY_NET_BET_GAIN_MULTIPLIER)
+}
+
+pub fn boost_bet_gain_with_multiplier(
+    nominal_gain: i64,
+    has_active_net: bool,
+    multiplier: f64,
+) -> i64 {
     if !has_active_net || nominal_gain <= 0 {
         return nominal_gain;
     }
-    ((nominal_gain as f64) * SAFETY_NET_BET_GAIN_MULTIPLIER) as i64
+    ((nominal_gain as f64) * multiplier) as i64
 }
 
 #[cfg(test)]

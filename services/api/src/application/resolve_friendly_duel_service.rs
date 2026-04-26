@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
+use crate::application::CoudeGuildSettings;
 use crate::domain::entities::CoudeBalanceParams;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{resolve_combat, PlayerLite};
@@ -16,22 +17,24 @@ use crate::ports::inbound::{
     FriendlyDuelInput, FriendlyDuelOutput, ManageCoudePlayersUseCase,
     ResolveFriendlyDuelUseCase,
 };
-use crate::ports::outbound::CoudePlayerRepository;
+use crate::ports::outbound::{BotConfigRepository, CoudePlayerRepository};
 
-const FRIENDLY_WINNER_XP: i64 = 20;
-const FRIENDLY_LOSER_XP: i64 = 5;
+const DEFAULT_FRIENDLY_WINNER_XP: i64 = 20;
+const DEFAULT_FRIENDLY_LOSER_XP: i64 = 5;
 
 pub struct ResolveFriendlyDuelService {
     pub player_repo: Arc<dyn CoudePlayerRepository>,
     pub players_uc: Arc<dyn ManageCoudePlayersUseCase>,
+    pub bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ResolveFriendlyDuelService {
     pub fn new(
         player_repo: Arc<dyn CoudePlayerRepository>,
         players_uc: Arc<dyn ManageCoudePlayersUseCase>,
+        bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
-        Self { player_repo, players_uc }
+        Self { player_repo, players_uc, bot_config_repo }
     }
 }
 
@@ -85,11 +88,15 @@ impl ResolveFriendlyDuelUseCase for ResolveFriendlyDuelService {
             &params,
         );
 
+        let settings = CoudeGuildSettings::load(&*self.bot_config_repo, &input.guild_id).await;
+        let cfg_winner_xp = settings.get_i64("friendly_winner_xp", DEFAULT_FRIENDLY_WINNER_XP);
+        let cfg_loser_xp = settings.get_i64("friendly_loser_xp", DEFAULT_FRIENDLY_LOSER_XP);
+
         let draw = result.winner_id.is_none() && result.loser_id.is_none();
         let (winner_xp, loser_xp) = if draw {
-            (FRIENDLY_LOSER_XP, FRIENDLY_LOSER_XP)
+            (cfg_loser_xp, cfg_loser_xp)
         } else {
-            (FRIENDLY_WINNER_XP, FRIENDLY_LOSER_XP)
+            (cfg_winner_xp, cfg_loser_xp)
         };
 
         if let Some(winner_id) = &result.winner_id {

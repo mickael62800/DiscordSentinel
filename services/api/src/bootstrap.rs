@@ -366,7 +366,8 @@ pub async fn build_app_state(
     ));
     let coude_bets_uc = Arc::new(
         ManageCoudeBetsService::new(coude_bet_repo, coude_combats_uc.clone())
-            .with_safety_net_repo(coude_safety_net_repo.clone()),
+            .with_safety_net_repo(coude_safety_net_repo.clone())
+            .with_bot_config_repo(bot_config_repo.clone()),
     );
 
     // Migration #4 : `blackjack_svc` passe ses mutations wallet (mise, cashout,
@@ -411,7 +412,10 @@ pub async fn build_app_state(
         .with_player_repo(coude_player_repo.clone()),
     );
     let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
-    let coude_inventory_uc = Arc::new(ManageCoudeInventoryService::new(coude_inventory_repo));
+    let coude_inventory_uc = Arc::new(
+        ManageCoudeInventoryService::new(coude_inventory_repo)
+            .with_bot_config_repo(bot_config_repo.clone()),
+    );
     let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
     let coude_social_uc = Arc::new(ManageCoudeSocialService::new(
         coude_social_repo,
@@ -476,7 +480,10 @@ pub async fn build_app_state(
     // Filet de securite (cf. COUPE_AMELIORATIONS 4.4) — repo deja cree
     // plus haut pour permettre le branchement dans bets et combat.
     let coude_safety_net_uc: Arc<dyn crate::ports::inbound::ManageCoudeSafetyNetUseCase> =
-        Arc::new(ManageCoudeSafetyNetService::new(coude_safety_net_repo.clone()));
+        Arc::new(
+            ManageCoudeSafetyNetService::new(coude_safety_net_repo.clone())
+                .with_bot_config_repo(bot_config_repo.clone()),
+        );
 
     // Vendetta (cf. COUPE_AMELIORATIONS 5.3) — repo deja cree plus haut.
     let coude_vendetta_uc: Arc<dyn crate::ports::inbound::ManageCoudeVendettaUseCase> =
@@ -542,6 +549,7 @@ pub async fn build_app_state(
         Arc::new(crate::application::ResolveFriendlyDuelService::new(
             coude_player_repo.clone(),
             coude_players_uc.clone() as Arc<dyn crate::ports::inbound::ManageCoudePlayersUseCase>,
+            bot_config_repo.clone(),
         ));
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,

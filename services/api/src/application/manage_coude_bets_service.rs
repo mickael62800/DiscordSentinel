@@ -3,20 +3,23 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
+use crate::application::CoudeGuildSettings;
 use crate::domain::entities::{
-    calculate_bet_resolution, safety_net_boost_bet_gain, CoudeBet, NewCoudeBet, RefundSummary,
+    calculate_bet_resolution, safety_net_boost_bet_gain_with_multiplier, CoudeBet, NewCoudeBet,
+    RefundSummary,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_bets::{
     ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
 };
 use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
-use crate::ports::outbound::{CoudeBetRepository, CoudeSafetyNetRepository};
+use crate::ports::outbound::{BotConfigRepository, CoudeBetRepository, CoudeSafetyNetRepository};
 
 pub struct ManageCoudeBetsService {
     bet_repo: Arc<dyn CoudeBetRepository>,
     combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
     safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
+    bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeBetsService {
@@ -24,14 +27,19 @@ impl ManageCoudeBetsService {
         bet_repo: Arc<dyn CoudeBetRepository>,
         combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
     ) -> Self {
-        Self { bet_repo, combats_uc, safety_net_repo: None }
+        Self { bet_repo, combats_uc, safety_net_repo: None, bot_config_repo: None }
     }
 
     /// Branche le repo du filet de securite (cf. COUPE_AMELIORATIONS 4.4)
     /// pour booster les paris gagnants des joueurs en phase de
-    /// recuperation (multiplicateur x1.5 applique au payout brut).
+    /// recuperation (multiplicateur configurable, default x1.5).
     pub fn with_safety_net_repo(mut self, repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
         self.safety_net_repo = Some(repo);
+        self
+    }
+
+    pub fn with_bot_config_repo(mut self, repo: Arc<dyn BotConfigRepository>) -> Self {
+        self.bot_config_repo = Some(repo);
         self
     }
 
@@ -96,12 +104,18 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
         // Pre-fetch les filets actifs en bulk via list_active pour eviter
         // N requetes (ok pour 5-50 paris par combat).
         if self.safety_net_repo.is_some() {
+            let mult = match &self.bot_config_repo {
+                Some(repo) => CoudeGuildSettings::load(&**repo, &combat.guild_id)
+                    .await
+                    .get_percent_ratio("safety_net_bet_gain_percent", 150),
+                None => 1.5,
+            };
             for p in plan.payouts.iter_mut() {
                 if !p.won || p.payout <= 0 {
                     continue;
                 }
                 if self.bettor_has_safety_net(&combat.guild_id, &p.bettor_id).await {
-                    p.payout = safety_net_boost_bet_gain(p.payout, true);
+                    p.payout = safety_net_boost_bet_gain_with_multiplier(p.payout, true, mult);
                 }
             }
         }
