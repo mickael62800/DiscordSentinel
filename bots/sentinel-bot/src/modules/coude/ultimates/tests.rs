@@ -70,5 +70,6 @@ fn mechanical_flags_match_branched_set() {
         .filter(|u| u.mechanical_implemented)
         .map(|u| u.class_key)
         .collect();
-    assert_eq!(branched, vec!["bourrin"]);
+    // Bourrin / Agile / Tank branches ; Fourbe restant declaratif.
+    assert_eq!(branched, vec!["bourrin", "agile", "tank"]);
 }

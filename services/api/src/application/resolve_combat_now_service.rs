@@ -355,48 +355,126 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             defender_special_raw
         };
 
-        // Ultimate "Echange de carcasses" (Bourrin) cf. COUPE_AMELIORATIONS
-        // 3.1 : si l attaquant est Bourrin et a une ultimate pendante,
-        // on swap son hp_current avec celui du defenseur AVANT l engine.
-        // Consume la pendante.
+        // Ultimates pre-combat (cf. COUPE_AMELIORATIONS 3.1) :
+        // - Bourrin : swap HP avant l engine
+        // - Tank : court-circuit, victoire forfait
+        // - Agile : court-circuit, 50/50 pur
         let mut ultimate_msg: Option<String> = None;
+        let mut shortcut_result: Option<engine::combat::CombatResult> = None;
         let (atk_hp_for_engine, def_hp_for_engine) = {
             let mut a = attacker.hp_current;
             let mut d = defender.hp_current;
             if let Some(ult_repo) = &self.ultimate_repo {
                 use crate::domain::entities::UltimateKind;
                 if let Ok(state) = ult_repo.get(&combat.guild_id, &combat.attacker_id).await {
-                    if state.pending_kind == Some(UltimateKind::Bourrin) {
-                        std::mem::swap(&mut a, &mut d);
-                        ultimate_msg = Some(format!(
-                            "\u{1f504} **Echange de carcasses** : <@{}> swap son HP ({} -> {}) avec <@{}> ({} -> {}) !",
-                            combat.attacker_id, attacker.hp_current, d,
-                            combat.defender_id, defender.hp_current, a
-                        ));
-                        if let Err(e) = ult_repo
-                            .consume_pending(&combat.guild_id, &combat.attacker_id)
-                            .await
-                        {
-                            warn!(error = %e, "Echec consume ultimate Bourrin");
+                    match state.pending_kind {
+                        Some(UltimateKind::Bourrin) => {
+                            std::mem::swap(&mut a, &mut d);
+                            ultimate_msg = Some(format!(
+                                "\u{1f504} **Echange de carcasses** : <@{}> swap son HP ({} -> {}) avec <@{}> ({} -> {}) !",
+                                combat.attacker_id, attacker.hp_current, d,
+                                combat.defender_id, defender.hp_current, a
+                            ));
+                            if let Err(e) = ult_repo
+                                .consume_pending(&combat.guild_id, &combat.attacker_id)
+                                .await
+                            {
+                                warn!(error = %e, "Echec consume ultimate Bourrin");
+                            }
                         }
+                        Some(UltimateKind::Tank) => {
+                            shortcut_result = Some(engine::combat::CombatResult {
+                                winner_id: Some(combat.attacker_id.clone()),
+                                loser_id: Some(combat.defender_id.clone()),
+                                rounds: vec![],
+                                total_rounds: 10,
+                                attacker_hp_final: attacker.hp_current,
+                                defender_hp_final: defender.hp_current,
+                                attacker_hp_max: attacker.hp_max,
+                                defender_hp_max: defender.hp_max,
+                                chaos_events_count: 0,
+                                coins_won: combat.mise,
+                                coins_lost_by_loser: combat.mise,
+                                stolen_bonus: 0,
+                                vol_coins: 0,
+                                message: format!(
+                                    "\u{1f9f1} **STATUE** : <@{}> ne bouge pas. <@{}> attend... attend... finit par partir chercher un sandwich. Forfait au bout de 10 rounds.",
+                                    combat.attacker_id, combat.defender_id
+                                ),
+                                is_giant_killer: false,
+                                attacker_class_revealed: Some("tank".into()),
+                                defender_class_revealed: None,
+                            });
+                            if let Err(e) = ult_repo
+                                .consume_pending(&combat.guild_id, &combat.attacker_id)
+                                .await
+                            {
+                                warn!(error = %e, "Echec consume ultimate Tank");
+                            }
+                        }
+                        Some(UltimateKind::Agile) => {
+                            use rand::Rng;
+                            let heads = {
+                                let mut rng = rand::thread_rng();
+                                rng.gen_bool(0.5)
+                            };
+                            let (winner_id, loser_id) = if heads {
+                                (combat.attacker_id.clone(), combat.defender_id.clone())
+                            } else {
+                                (combat.defender_id.clone(), combat.attacker_id.clone())
+                            };
+                            shortcut_result = Some(engine::combat::CombatResult {
+                                winner_id: Some(winner_id.clone()),
+                                loser_id: Some(loser_id.clone()),
+                                rounds: vec![],
+                                total_rounds: 1,
+                                attacker_hp_final: if heads { attacker.hp_current } else { 0 },
+                                defender_hp_final: if heads { 0 } else { defender.hp_current },
+                                attacker_hp_max: attacker.hp_max,
+                                defender_hp_max: defender.hp_max,
+                                chaos_events_count: 0,
+                                coins_won: combat.mise,
+                                coins_lost_by_loser: combat.mise,
+                                stolen_bonus: 0,
+                                vol_coins: 0,
+                                message: format!(
+                                    "\u{1fa99} **PILE OU FACE** : la piece tombe. <@{}> gagne. <@{}> a juste regarde la piece tomber. Pas de combat, pas d explication.",
+                                    winner_id, loser_id
+                                ),
+                                is_giant_killer: false,
+                                attacker_class_revealed: Some("agile".into()),
+                                defender_class_revealed: None,
+                            });
+                            if let Err(e) = ult_repo
+                                .consume_pending(&combat.guild_id, &combat.attacker_id)
+                                .await
+                            {
+                                warn!(error = %e, "Echec consume ultimate Agile");
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
             (a, d)
         };
 
-        let mut result = engine::combat::resolve_combat_with_curses(
-            &atk_player,
-            &def_player,
-            atk_hp_for_engine,
-            def_hp_for_engine,
-            combat.mise,
-            attacker_special_effective,
-            defender_special_effective,
-            &engine_events,
-            &balance,
-            curses,
-        );
+        let mut result = if let Some(short) = shortcut_result {
+            short
+        } else {
+            engine::combat::resolve_combat_with_curses(
+                &atk_player,
+                &def_player,
+                atk_hp_for_engine,
+                def_hp_for_engine,
+                combat.mise,
+                attacker_special_effective,
+                defender_special_effective,
+                &engine_events,
+                &balance,
+                curses,
+            )
+        };
 
         // Prefix les messages Graisser + ultimate dans la description.
         if !graisser_msgs.is_empty() {

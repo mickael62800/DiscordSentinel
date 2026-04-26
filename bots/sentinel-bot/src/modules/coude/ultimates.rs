@@ -38,7 +38,7 @@ pub const CLASS_ULTIMATES: &[ClassUltimate] = &[
         emoji: "\u{1fa99}",
         label: "Pile ou face",
         description: "Combat instantanement resolu sur un 50/50 pur. Ignore classes, niveaux, items, HP, tout. Juste un coin flip.",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
         cooldown_days: 7,
     },
     ClassUltimate {
@@ -56,7 +56,7 @@ pub const CLASS_ULTIMATES: &[ClassUltimate] = &[
         emoji: "\u{1f9f1}",
         label: "Statue",
         description: "Aucun degat fait, aucun degat pris. Victoire automatique au bout de 10 rounds par forfait d ennui de l adversaire.",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
         cooldown_days: 7,
     },
 ];
