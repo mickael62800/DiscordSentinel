@@ -107,8 +107,8 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         label: "Bombe nucleaire",
         probability: 0.0002,
         emoji: "💣",
-        announce: "💣 **BOMBE NUCLEAIRE** 💣 — annihilation totale, les deux perdent 50% de leur wallet dans la cagnotte serveur. La legende racontera ce combat.",
-        mechanical_implemented: false,
+        announce: "💣 **BOMBE NUCLEAIRE** 💣 — annihilation totale, les deux perdent 50% de leur wallet. La legende racontera ce combat.",
+        mechanical_implemented: true,
     },
 ];
 

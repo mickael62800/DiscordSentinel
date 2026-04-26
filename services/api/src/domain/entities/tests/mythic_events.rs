@@ -110,7 +110,12 @@ fn mechanical_flags_count_matches_expectation() {
         .filter(|e| e.mechanical_implemented)
         .map(|e| e.key)
         .collect();
-    let expected = ["licorne_rose", "invasion_poulets", "distributeur_pq"];
+    let expected = [
+        "licorne_rose",
+        "invasion_poulets",
+        "distributeur_pq",
+        "bombe_nucleaire",
+    ];
     assert_eq!(
         branched, expected,
         "le set de mythiques branches mecaniquement a change"

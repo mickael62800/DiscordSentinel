@@ -247,6 +247,39 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         }
                     }
                 }
+                // Bombe nucleaire : annihilation totale, les deux perdent
+                // 50% de leur wallet, le combat est marque match nul. Read
+                // le solde courant pour calculer 50% precis. Best-effort.
+                "bombe_nucleaire" => {
+                    result.winner_id = None;
+                    result.loser_id = None;
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                    for uid in [&combat.attacker_id, &combat.defender_id] {
+                        let balance = match self.wallet_repo.get(&combat.guild_id, uid).await {
+                            Ok(Some(w)) => w.coins,
+                            _ => 0,
+                        };
+                        let to_debit = balance / 2;
+                        if to_debit > 0 {
+                            if let Err(e) = self
+                                .wallet_repo
+                                .debit(
+                                    &combat.guild_id,
+                                    uid,
+                                    to_debit,
+                                    "mythic_bombe_nucleaire",
+                                    "Bombe nucleaire mythique",
+                                )
+                                .await
+                            {
+                                warn!(error = %e, user_id = %uid, "Echec debit Bombe nucleaire");
+                            }
+                        }
+                    }
+                }
                 _ => {}
             }
         }
