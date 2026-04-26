@@ -452,6 +452,66 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                                 warn!(error = %e, "Echec consume ultimate Agile");
                             }
                         }
+                        Some(UltimateKind::Fourbe) => {
+                            // Le Fuyard : vol la mise du defenseur AVANT le
+                            // combat et te barre. Transfer atomique
+                            // defender -> attacker pour le montant de la
+                            // mise. Combat marque resolu sans HP perdu.
+                            let stolen = combat.mise;
+                            let transfer_ok = self
+                                .wallet_repo
+                                .transfer(
+                                    &combat.guild_id,
+                                    &combat.defender_id,
+                                    &combat.attacker_id,
+                                    stolen,
+                                    "ultimate_fourbe_fuyard",
+                                    "Ultimate Le Fuyard — vol pre-combat",
+                                )
+                                .await
+                                .is_ok();
+                            // Si le transfer echoue (solde insuffisant
+                            // defendeur), on annule l ultimate et on
+                            // laisse le combat se derouler normalement.
+                            if transfer_ok {
+                                shortcut_result = Some(engine::combat::CombatResult {
+                                    winner_id: Some(combat.attacker_id.clone()),
+                                    loser_id: Some(combat.defender_id.clone()),
+                                    rounds: vec![],
+                                    total_rounds: 0,
+                                    attacker_hp_final: attacker.hp_current,
+                                    defender_hp_final: defender.hp_current,
+                                    attacker_hp_max: attacker.hp_max,
+                                    defender_hp_max: defender.hp_max,
+                                    chaos_events_count: 0,
+                                    // Le transfer a deja eu lieu hors-engine.
+                                    // On force a 0 pour eviter un double payout
+                                    // dans le pipeline post-engine.
+                                    coins_won: 0,
+                                    coins_lost_by_loser: 0,
+                                    stolen_bonus: 0,
+                                    vol_coins: 0,
+                                    message: format!(
+                                        "\u{1f3c3} **LE FUYARD** : <@{}> rafle la mise ({}c) AVANT le combat et se barre. <@{}> recoit un message « ton adversaire a fui avec la caisse ».",
+                                        combat.attacker_id, stolen, combat.defender_id
+                                    ),
+                                    is_giant_killer: false,
+                                    attacker_class_revealed: Some("fourbe".into()),
+                                    defender_class_revealed: None,
+                                });
+                                if let Err(e) = ult_repo
+                                    .consume_pending(&combat.guild_id, &combat.attacker_id)
+                                    .await
+                                {
+                                    warn!(error = %e, "Echec consume ultimate Fourbe");
+                                }
+                            } else {
+                                // Transfer echoue : log et on n active PAS
+                                // l ultimate (le combat continue normalement,
+                                // pendant_kind reste posee pour reessai).
+                                warn!("Echec transfer Fourbe : solde defenseur insuffisant ?");
+                            }
+                        }
                         _ => {}
                     }
                 }

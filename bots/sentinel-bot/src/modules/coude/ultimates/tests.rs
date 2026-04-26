@@ -70,6 +70,6 @@ fn mechanical_flags_match_branched_set() {
         .filter(|u| u.mechanical_implemented)
         .map(|u| u.class_key)
         .collect();
-    // Bourrin / Agile / Tank branches ; Fourbe restant declaratif.
-    assert_eq!(branched, vec!["bourrin", "agile", "tank"]);
+    // 4/4 ultimates branches mecaniquement (ordre = ordre du catalogue).
+    assert_eq!(branched, vec!["bourrin", "agile", "fourbe", "tank"]);
 }

@@ -47,7 +47,7 @@ pub const CLASS_ULTIMATES: &[ClassUltimate] = &[
         emoji: "\u{1f3c3}",
         label: "Le Fuyard",
         description: "Vol la mise AVANT le combat et te barre. Le defenseur recoit « ton adversaire a fui avec la caisse ». Cooldown 14 jours.",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
         cooldown_days: 14,
     },
     ClassUltimate {
