@@ -149,6 +149,15 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/vendettas/by-challenger/{challenger_id}",
             get(handlers::coude::list_vendettas_by_challenger),
         )
+        // Migration 162 : Memorial des clodos (cf. COUPE_AMELIORATIONS 6.1)
+        .route(
+            "/{guild_id}/tout-ou-rien/record",
+            post(handlers::coude::record_tout_ou_rien),
+        )
+        .route(
+            "/{guild_id}/tout-ou-rien/memorial",
+            get(handlers::coude::get_memorial),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

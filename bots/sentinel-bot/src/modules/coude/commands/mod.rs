@@ -12,6 +12,7 @@ pub mod donner;
 pub mod hp;
 pub mod leaderboard;
 pub mod maudire;
+pub mod memorial;
 pub mod no_taunts;
 pub mod prank;
 pub mod pari;
@@ -65,5 +66,6 @@ pub fn all() -> Vec<CreateCommand> {
         saboter::register(),
         tout_ou_rien::register(),
         vendetta::register(),
+        memorial::register(),
     ]
 }

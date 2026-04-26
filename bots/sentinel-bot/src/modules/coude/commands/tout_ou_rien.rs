@@ -159,6 +159,22 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         tracing::warn!(error = %e, "Echec set_cooldown tout-ou-rien");
     }
 
+    // 7.bis Memorial des clodos : log la tentative cote API
+    //       (fire-and-forget — n empeche pas l affichage du resultat).
+    let outcome_str = match outcome {
+        ToutOuRienOutcome::Win => "won",
+        ToutOuRienOutcome::Lose => "lost",
+    };
+    api.record_tout_ou_rien(
+        &guild_id,
+        &user_id,
+        &command.user.name,
+        player.coins,
+        outcome_str,
+        delta,
+    )
+    .await;
+
     // 8. Edit message final.
     let final_embed = match outcome {
         ToutOuRienOutcome::Win => CreateEmbed::new()

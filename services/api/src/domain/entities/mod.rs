@@ -273,6 +273,9 @@ pub use tout_ou_rien::{
     TOUT_OU_RIEN_LOSS_KEEP_PCT, TOUT_OU_RIEN_WIN_MULTIPLIER, TOUT_OU_RIEN_WIN_PROBABILITY,
 };
 
+mod tout_ou_rien_log;
+pub use tout_ou_rien_log::{ToutOuRienLogEntry, ToutOuRienLogOutcome};
+
 mod season_theme;
 pub use season_theme::{
     season_theme_by_key, theme_for_season, SeasonTheme, CURRENT_SEASON_THEME_CONFIG_KEY,

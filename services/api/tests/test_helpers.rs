@@ -531,6 +531,12 @@ pub struct StubCoudeVendetta;
     async fn list_by_challenger(&self, _: &str, _: &str) -> Result<Vec<sentinel_api::domain::entities::ActiveVendetta>, DomainError> { Ok(vec![]) }
 }
 
+pub struct StubCoudeToutOuRien;
+#[async_trait] impl sentinel_api::ports::outbound::CoudeToutOuRienRepository for StubCoudeToutOuRien {
+    async fn record(&self, _: &str, _: &str, _: &str, _: i64, _: sentinel_api::domain::entities::ToutOuRienLogOutcome, _: i64) -> Result<(), DomainError> { Ok(()) }
+    async fn memorial(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::ToutOuRienLogEntry>, DomainError> { Ok(vec![]) }
+}
+
 // ── Stubs pour les nouveaux repos ──
 
 pub struct StubUserActivityRepo;
@@ -685,6 +691,7 @@ fn base_state() -> AppState {
         coude_curses_uc: Arc::new(StubCoudeCurses),
         coude_safety_net_uc: Arc::new(StubCoudeSafetyNet),
         coude_vendetta_uc: Arc::new(StubCoudeVendetta),
+        coude_tout_ou_rien_repo: Arc::new(StubCoudeToutOuRien),
         resolve_betting_batch_uc: Arc::new(StubResolveBettingBatch),
         expire_combats_batch_uc: Arc::new(StubExpireCombatsBatch),
         resolve_combat_now_uc: Arc::new(StubResolveCombatNow),

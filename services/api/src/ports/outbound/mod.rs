@@ -130,3 +130,6 @@ pub use coude_safety_net_repository::CoudeSafetyNetRepository;
 
 mod coude_vendetta_repository;
 pub use coude_vendetta_repository::CoudeVendettaRepository;
+
+mod coude_tout_ou_rien_repository;
+pub use coude_tout_ou_rien_repository::CoudeToutOuRienRepository;

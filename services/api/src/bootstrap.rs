@@ -24,7 +24,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::{
     PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgBotConfigRepository,
     PgConductRepository, PgCoudeBetRepository, PgCoudeCashboxRepository, PgCoudeCombatRepository,
-    PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeSafetyNetRepository, PgCoudeVendettaRepository,
+    PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeVendettaRepository,
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
@@ -482,6 +482,10 @@ pub async fn build_app_state(
     let coude_vendetta_uc: Arc<dyn crate::ports::inbound::ManageCoudeVendettaUseCase> =
         Arc::new(ManageCoudeVendettaService::new(coude_vendetta_repo.clone()));
 
+    // Memorial des clodos / tout-ou-rien log (cf. COUPE_AMELIORATIONS 6.1).
+    let coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::CoudeToutOuRienRepository> =
+        Arc::new(PgCoudeToutOuRienRepository::new(pg_pool.clone()));
+
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::CoudeStealProtectionRepository,
     > = Arc::new(PgCoudeStealProtectionRepository::new(pg_pool.clone()));
@@ -589,6 +593,7 @@ pub async fn build_app_state(
         coude_curses_uc,
         coude_safety_net_uc,
         coude_vendetta_uc,
+        coude_tout_ou_rien_repo,
         broadcaster,
         job_client,
         discord_api,

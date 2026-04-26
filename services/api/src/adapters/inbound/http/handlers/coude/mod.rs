@@ -22,6 +22,7 @@ pub mod taunts;
 pub mod tournaments;
 pub mod curses;
 pub mod vendetta;
+pub mod tout_ou_rien;
 
 pub use bets::*;
 pub use combats::*;
@@ -34,6 +35,7 @@ pub use taunts::*;
 pub use tournaments::*;
 pub use curses::*;
 pub use vendetta::*;
+pub use tout_ou_rien::*;
 
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.
 ///
