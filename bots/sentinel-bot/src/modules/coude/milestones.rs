@@ -18,6 +18,23 @@ pub struct Milestone {
     pub mechanical_implemented: bool,
 }
 
+/// Niveau a partir duquel le cooldown /repos est reduit a
+/// `REPOS_COOLDOWN_REDUCED_HOURS` heures (cf. milestone niveau 15).
+pub const REPOS_COOLDOWN_MILESTONE_LEVEL: i32 = 15;
+pub const REPOS_COOLDOWN_REDUCED_HOURS: i64 = 8;
+
+/// Retourne le cooldown effectif de /repos pour un joueur de niveau
+/// `level` etant donne le cooldown configure par le serveur (`base_hours`).
+/// Floor a `REPOS_COOLDOWN_REDUCED_HOURS` si le joueur a debloque le
+/// palier "Convalescence" (niveau 15+).
+pub fn effective_repos_cooldown_hours(base_hours: i64, level: i32) -> i64 {
+    if level >= REPOS_COOLDOWN_MILESTONE_LEVEL && base_hours > REPOS_COOLDOWN_REDUCED_HOURS {
+        REPOS_COOLDOWN_REDUCED_HOURS
+    } else {
+        base_hours
+    }
+}
+
 pub const MILESTONES: &[Milestone] = &[
     Milestone {
         level: 5,
@@ -41,7 +58,7 @@ pub const MILESTONES: &[Milestone] = &[
         label: "Convalescence",
         emoji: "\u{1f6cf}\u{fe0f}",
         description: "Cooldown /repos reduit a 8h (au lieu de 12h).",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
     },
     Milestone {
         level: 20,

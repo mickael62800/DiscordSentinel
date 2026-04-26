@@ -103,14 +103,33 @@ fn all_milestones_have_emoji_and_label() {
 }
 
 #[test]
-fn all_mechanical_flags_false_for_now() {
+fn mechanical_flags_match_branched_set() {
     // A mettre a jour au fur et a mesure que les effets mecaniques
-    // sont branches.
-    for m in MILESTONES {
-        assert!(
-            !m.mechanical_implemented,
-            "{} marque comme branche — actualiser ce test",
-            m.key
-        );
-    }
+    // sont branches dans les services.
+    let branched: Vec<&str> = MILESTONES
+        .iter()
+        .filter(|m| m.mechanical_implemented)
+        .map(|m| m.key)
+        .collect();
+    assert_eq!(branched, vec!["repos_short_cooldown"]);
+}
+
+#[test]
+fn effective_repos_cooldown_low_level_returns_base() {
+    assert_eq!(effective_repos_cooldown_hours(12, 1), 12);
+    assert_eq!(effective_repos_cooldown_hours(12, 14), 12);
+}
+
+#[test]
+fn effective_repos_cooldown_at_milestone_caps_to_8() {
+    assert_eq!(effective_repos_cooldown_hours(12, 15), 8);
+    assert_eq!(effective_repos_cooldown_hours(12, 25), 8);
+    assert_eq!(effective_repos_cooldown_hours(24, 15), 8);
+}
+
+#[test]
+fn effective_repos_cooldown_already_short_unchanged() {
+    // Si le serveur configure deja un cooldown <= 8h, on ne le rallonge pas.
+    assert_eq!(effective_repos_cooldown_hours(6, 15), 6);
+    assert_eq!(effective_repos_cooldown_hours(8, 15), 8);
 }
