@@ -36,7 +36,7 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         probability: 0.0005,
         emoji: "🦄",
         announce: "🦄 **LICORNE ROSE** 🦄 — match nul force, +500c bonus pour les deux !",
-        mechanical_implemented: false,
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "etoile_filante",

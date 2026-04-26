@@ -197,26 +197,57 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             roll_mythic_event(&mut myth_rng)
         };
 
-        // Effet "Invasion de poulets" : combat annule, match nul force, zero
-        // transfert de coins. On clear winner/loser et les montants pour que
-        // tout le pipeline de paiement plus bas se mette en mode "draw".
+        // Effets mecaniques des mythiques (cf. COUPE_AMELIORATIONS 2.1).
         if let Some(ev) = &mythic_event {
-            if ev.key == "invasion_poulets" {
-                result.winner_id = None;
-                result.loser_id = None;
-                result.coins_won = 0;
-                result.coins_lost_by_loser = 0;
-                result.stolen_bonus = 0;
-                result.vol_coins = 0;
-            }
-            // Effet "Distributeur de PQ" : le resultat est conserve (un
-            // gagnant, un perdant) mais le pot devient du PQ — aucun
-            // transfert de coins. Personne ne gagne/perd financierement.
-            if ev.key == "distributeur_pq" {
-                result.coins_won = 0;
-                result.coins_lost_by_loser = 0;
-                result.stolen_bonus = 0;
-                result.vol_coins = 0;
+            match ev.key {
+                // Invasion de poulets : combat annule, match nul force,
+                // zero transfert de coins. Le pipeline plus bas gere deja
+                // le cas (None, None) comme un draw.
+                "invasion_poulets" => {
+                    result.winner_id = None;
+                    result.loser_id = None;
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                }
+                // Distributeur de PQ : un gagnant et un perdant sont bien
+                // declares mais le pot devient du PQ — aucun transfert.
+                "distributeur_pq" => {
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                }
+                // Licorne rose : match nul force + 500c bonus pour chaque
+                // combattant (cree de la masse monetaire — le serveur paye).
+                // Le credit wallet est applique en best-effort, hors-tx :
+                // si l API casse, on n a pas perdu d argent (les wallets
+                // d origine sont intacts).
+                "licorne_rose" => {
+                    result.winner_id = None;
+                    result.loser_id = None;
+                    result.coins_won = 0;
+                    result.coins_lost_by_loser = 0;
+                    result.stolen_bonus = 0;
+                    result.vol_coins = 0;
+                    for uid in [&combat.attacker_id, &combat.defender_id] {
+                        if let Err(e) = self
+                            .wallet_repo
+                            .credit(
+                                &combat.guild_id,
+                                uid,
+                                500,
+                                "mythic_licorne_rose",
+                                "Bonus Licorne rose",
+                            )
+                            .await
+                        {
+                            warn!(error = %e, user_id = %uid, "Echec credit Licorne rose");
+                        }
+                    }
+                }
+                _ => {}
             }
         }
 
