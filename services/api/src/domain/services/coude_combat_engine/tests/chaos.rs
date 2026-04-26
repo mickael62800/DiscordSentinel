@@ -154,3 +154,51 @@ fn chaos_event_equality_and_copy() {
     assert_eq!(a, b);
     assert_ne!(a, ChaosEvent::Glissade);
 }
+
+// ══════════════════════════════════════════════════════════
+// Multiplicateur saison du Chaos (cf. COUPE_AMELIORATIONS 6.3)
+// ══════════════════════════════════════════════════════════
+
+#[test]
+fn roll_chaos_multiplier_1_matches_default_distribution() {
+    let iterations = 5_000;
+    let mut hits = 0usize;
+    for _ in 0..iterations {
+        if roll_chaos_with_multiplier(1.0).is_some() {
+            hits += 1;
+        }
+    }
+    let expected = (iterations as f64 * 0.08) as usize;
+    let low = (expected as f64 * 0.75) as usize;
+    let high = (expected as f64 * 1.25) as usize;
+    assert!(
+        (low..=high).contains(&hits),
+        "hits {hits} hors tolerance [{low}, {high}] avec multiplier 1.0"
+    );
+}
+
+#[test]
+fn roll_chaos_multiplier_2_doubles_event_rate() {
+    let iterations = 5_000;
+    let mut hits = 0usize;
+    for _ in 0..iterations {
+        if roll_chaos_with_multiplier(2.0).is_some() {
+            hits += 1;
+        }
+    }
+    // Avec x2 on attend ~16% (8% * 2). Tolerance ±25%.
+    let expected = (iterations as f64 * 0.16) as usize;
+    let low = (expected as f64 * 0.75) as usize;
+    let high = (expected as f64 * 1.25) as usize;
+    assert!(
+        (low..=high).contains(&hits),
+        "hits {hits} hors tolerance [{low}, {high}] avec multiplier 2.0"
+    );
+}
+
+#[test]
+fn roll_chaos_multiplier_0_disables_events() {
+    for _ in 0..1000 {
+        assert!(roll_chaos_with_multiplier(0.0).is_none());
+    }
+}

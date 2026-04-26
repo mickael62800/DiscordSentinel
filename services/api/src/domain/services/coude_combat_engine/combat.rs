@@ -295,14 +295,16 @@ fn max_rounds(combined_hp: i32) -> i32 {
 // ── Main combat function ──
 // ══════════════════════════════════════════════════════════════════════
 
-/// Maledictions actives sur les combattants (cf. COUPE_AMELIORATIONS 5.1).
-/// Default = aucune malediction. Les call-sites historiques continuent
-/// d appeler `resolve_combat` sans curses ; `resolve_combat_with_curses`
-/// expose la version branchee pour les services qui les fetchent.
+/// Maledictions actives sur les combattants (cf. COUPE_AMELIORATIONS 5.1)
+/// + modificateurs de saison thematique (cf. 6.3). Default = aucune
+/// malediction et pas de modulation de saison.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct CombatCurses {
     pub attacker_has_banana: bool,
     pub defender_has_banana: bool,
+    /// Multiplicateur de probabilite des chaos events. None = neutre
+    /// (1.0). Some(2.0) sous "Saison du Chaos".
+    pub chaos_multiplier: Option<f64>,
 }
 
 pub fn resolve_combat(
@@ -587,7 +589,7 @@ pub fn resolve_combat_with_curses(
         }
 
         // ── Chaos event (8% per round) ──
-        let chaos_event = chaos::roll_chaos();
+        let chaos_event = chaos::roll_chaos_with_multiplier(curses.chaos_multiplier.unwrap_or(1.0));
         // We use roll_chaos which has 18% total; for now we treat it as-is
         // (will be adjusted to 8% per-round in chaos.rs separately)
 

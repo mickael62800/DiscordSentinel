@@ -235,9 +235,22 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             }
         }
 
+        // Saisons thematiques (cf. COUPE_AMELIORATIONS 6.3) : on derive le
+        // theme du numero de saison de l attaquant (rotation deterministe).
+        // "Saison du Chaos" -> chaos events x2.
+        let season_chaos_multiplier = {
+            use crate::domain::entities::theme_for_season;
+            let theme = theme_for_season(attacker.season);
+            if theme.chaos_multiplier != 1.0 {
+                Some(theme.chaos_multiplier)
+            } else {
+                None
+            }
+        };
         let curses = engine::combat::CombatCurses {
             attacker_has_banana: self.fetch_banana(&combat.guild_id, &combat.attacker_id).await,
             defender_has_banana: self.fetch_banana(&combat.guild_id, &combat.defender_id).await,
+            chaos_multiplier: season_chaos_multiplier,
         };
 
         // Sabotage "Graisser les armes" (cf. COUPE_AMELIORATIONS 5.2) :

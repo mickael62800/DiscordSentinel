@@ -61,16 +61,41 @@ impl ChaosEvent {
 /// Tire un evenement chaos pour un round (8% de chance total par round).
 /// Sur un combat de 5 rounds, probabilite d'au moins un event : ~34%.
 pub fn roll_chaos() -> Option<ChaosEvent> {
+    roll_chaos_with_multiplier(1.0)
+}
+
+/// Variante avec multiplicateur applique aux probabilites — utilise par
+/// les saisons thematiques (cf. COUPE_AMELIORATIONS 6.3) :
+/// - "Saison du Chaos" -> multiplier=2.0 (events x2)
+/// - autres saisons -> multiplier=1.0 (neutre)
+///
+/// Le multiplicateur est applique aux seuils 1..=80 ; le reste reste
+/// "no event". Clamp implicite : si le multiplicateur depasse 1000/80
+/// (~12.5), on satureait — improbable en pratique (multiplicateur max
+/// prevu = 2.0).
+pub fn roll_chaos_with_multiplier(multiplier: f64) -> Option<ChaosEvent> {
     let mut rng = rand::thread_rng();
     let roll: u32 = rng.gen_range(1..=1000);
 
-    match roll {
-        1..=20 => Some(ChaosEvent::CritiqueSauvage),   // 2%
-        21..=40 => Some(ChaosEvent::EsquiveDivine),     // 2%
-        41..=55 => Some(ChaosEvent::AccidentDebile),     // 1.5%
-        56..=65 => Some(ChaosEvent::Glissade),           // 1%
-        66..=80 => Some(ChaosEvent::Vol),                // 1.5%
-        _ => None,                                        // 92%
+    let scaled = |upper: u32| -> u32 { ((upper as f64) * multiplier) as u32 };
+    let t1 = scaled(20);
+    let t2 = scaled(40);
+    let t3 = scaled(55);
+    let t4 = scaled(65);
+    let t5 = scaled(80);
+
+    if roll <= t1 {
+        Some(ChaosEvent::CritiqueSauvage)
+    } else if roll <= t2 {
+        Some(ChaosEvent::EsquiveDivine)
+    } else if roll <= t3 {
+        Some(ChaosEvent::AccidentDebile)
+    } else if roll <= t4 {
+        Some(ChaosEvent::Glissade)
+    } else if roll <= t5 {
+        Some(ChaosEvent::Vol)
+    } else {
+        None
     }
 }
 
