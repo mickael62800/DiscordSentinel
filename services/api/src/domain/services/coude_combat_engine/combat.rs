@@ -305,6 +305,9 @@ pub struct CombatCurses {
     /// Multiplicateur de probabilite des chaos events. None = neutre
     /// (1.0). Some(2.0) sous "Saison du Chaos".
     pub chaos_multiplier: Option<f64>,
+    /// Bonus DEF (en %) applique aux Tanks uniquement, avant items
+    /// (cf. COUPE_AMELIORATIONS 6.3 Saison du Tank). None = neutre.
+    pub tank_def_bonus_pct: Option<f64>,
 }
 
 pub fn resolve_combat(
@@ -354,6 +357,20 @@ pub fn resolve_combat_with_curses(
     // hp_max reduit (bug : « /repos pas pris en compte »).
     let (mut atk_atk, mut atk_def) = effective_stats(attacker);
     let (mut def_atk, mut def_def) = effective_stats(defender);
+
+    // Saison du Tank (cf. COUPE_AMELIORATIONS 6.3) : +X% DEF pour les
+    // Tanks uniquement, applique AVANT le snapshot hp_max pour que le
+    // bonus se reflete aussi dans le HP pool.
+    if let Some(pct) = curses.tank_def_bonus_pct {
+        let mult = 1.0 + (pct / 100.0);
+        if atk_class.name == "tank" {
+            atk_def = (atk_def as f64 * mult) as i32;
+        }
+        if def_class.name == "tank" {
+            def_def = (def_def as f64 * mult) as i32;
+        }
+    }
+
     let base_atk_def = atk_def;
     let base_def_def = def_def;
 

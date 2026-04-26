@@ -456,3 +456,59 @@ fn large_combat_max_7_rounds() {
     let r = resolve_combat(&atk, &def, 200, 200, 50, None, None, &[], &CoudeBalanceParams::default());
     assert!(r.total_rounds <= 7);
 }
+
+// ══════════════════════════════════════════════════════════
+// Saison du Tank (cf. COUPE_AMELIORATIONS 6.3)
+// ══════════════════════════════════════════════════════════
+
+#[test]
+fn tank_def_bonus_increases_tank_hp_max() {
+    let atk_tank = player("111", "tank", 5);
+    let def = player("222", "bourrin", 5);
+    let neutral = resolve_combat_with_curses(
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses::default(),
+    );
+    let boosted = resolve_combat_with_curses(
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses { tank_def_bonus_pct: Some(20.0), ..Default::default() },
+    );
+    assert!(
+        boosted.attacker_hp_max > neutral.attacker_hp_max,
+        "tank doit avoir un hp_max plus eleve avec saison Tank (neutre={}, boost={})",
+        neutral.attacker_hp_max, boosted.attacker_hp_max
+    );
+}
+
+#[test]
+fn tank_def_bonus_does_not_affect_non_tank() {
+    let atk_bourrin = player("111", "bourrin", 5);
+    let def = player("222", "bourrin", 5);
+    let neutral = resolve_combat_with_curses(
+        &atk_bourrin, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses::default(),
+    );
+    let with_tank_season = resolve_combat_with_curses(
+        &atk_bourrin, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses { tank_def_bonus_pct: Some(20.0), ..Default::default() },
+    );
+    assert_eq!(
+        neutral.attacker_hp_max, with_tank_season.attacker_hp_max,
+        "non-Tank ne doit pas etre affecte par la saison du Tank"
+    );
+}
+
+#[test]
+fn tank_def_bonus_none_is_neutral() {
+    let atk_tank = player("111", "tank", 5);
+    let def = player("222", "bourrin", 5);
+    let none_explicit = resolve_combat_with_curses(
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses { tank_def_bonus_pct: None, ..Default::default() },
+    );
+    let default = resolve_combat_with_curses(
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        CombatCurses::default(),
+    );
+    assert_eq!(none_explicit.attacker_hp_max, default.attacker_hp_max);
+}
