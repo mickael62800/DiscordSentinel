@@ -546,6 +546,35 @@ pub struct StubCoudeBounty;
     async fn claim(&self, _: uuid::Uuid, _: &str) -> Result<i64, DomainError> { Ok(0) }
 }
 
+pub struct StubCoudeRefusalCount;
+#[async_trait] impl sentinel_api::ports::outbound::CoudeRefusalCountRepository for StubCoudeRefusalCount {
+    async fn increment(&self, _: &str, _: &str, _: &str) -> Result<i32, DomainError> { Ok(0) }
+    async fn get(&self, _: &str, _: &str, _: &str) -> Result<Option<sentinel_api::domain::entities::RefusalCount>, DomainError> { Ok(None) }
+    async fn reset(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
+}
+
+pub struct StubCoudeCoalition;
+#[async_trait] impl sentinel_api::ports::outbound::CoudeCoalitionRepository for StubCoudeCoalition {
+    async fn create_with_first_member(&self, _: &str, _: &str, _: &str, _: &str, _: i64) -> Result<uuid::Uuid, DomainError> { Ok(uuid::Uuid::new_v4()) }
+    async fn add_member(&self, _: uuid::Uuid, _: &str, _: &str) -> Result<sentinel_api::domain::entities::ActiveCoalition, DomainError> {
+        use chrono::Utc;
+        Ok(sentinel_api::domain::entities::ActiveCoalition {
+            id: uuid::Uuid::new_v4(),
+            guild_id: String::new(),
+            target_id: String::new(),
+            opened_at: Utc::now(),
+            expires_at: Utc::now(),
+            status: sentinel_api::domain::entities::CoalitionStatus::Forming,
+            broken_by: None,
+            broken_at: None,
+            members: vec![],
+        })
+    }
+    async fn get_active(&self, _: &str, _: &str) -> Result<Option<sentinel_api::domain::entities::ActiveCoalition>, DomainError> { Ok(None) }
+    async fn mark_broken(&self, _: uuid::Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn is_member_of_active_coalition_against(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
+}
+
 // ── Stubs pour les nouveaux repos ──
 
 pub struct StubUserActivityRepo;
@@ -702,6 +731,8 @@ fn base_state() -> AppState {
         coude_vendetta_uc: Arc::new(StubCoudeVendetta),
         coude_tout_ou_rien_repo: Arc::new(StubCoudeToutOuRien),
         coude_bounty_repo: Arc::new(StubCoudeBounty),
+        coude_refusal_count_repo: Arc::new(StubCoudeRefusalCount),
+        coude_coalition_repo: Arc::new(StubCoudeCoalition),
         resolve_betting_batch_uc: Arc::new(StubResolveBettingBatch),
         expire_combats_batch_uc: Arc::new(StubExpireCombatsBatch),
         resolve_combat_now_uc: Arc::new(StubResolveCombatNow),

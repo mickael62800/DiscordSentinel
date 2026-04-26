@@ -259,6 +259,16 @@ pub use bounty::{
     BOUNTY_MIN_CONTRIBUTION,
 };
 
+mod refusal_count;
+pub use refusal_count::{RefusalCount, HONOR_DEBT_THRESHOLD};
+
+mod coalition;
+pub use coalition::{
+    apply_coalition_penalty, ActiveCoalition, CoalitionMember, CoalitionStatus,
+    COALITION_COST_PER_MEMBER, COALITION_DURATION_HOURS, COALITION_GAIN_MULTIPLIER,
+    COALITION_MIN_MEMBERS,
+};
+
 mod vendetta;
 pub use vendetta::{
     apply_revenge_bonus, ActiveVendetta, VendettaStatus, VENDETTA_BOURREAU_SUFFIX_PREFIX,

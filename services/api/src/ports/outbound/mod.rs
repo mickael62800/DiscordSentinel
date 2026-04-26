@@ -136,3 +136,9 @@ pub use coude_tout_ou_rien_repository::CoudeToutOuRienRepository;
 
 mod coude_bounty_repository;
 pub use coude_bounty_repository::CoudeBountyRepository;
+
+mod coude_refusal_count_repository;
+pub use coude_refusal_count_repository::CoudeRefusalCountRepository;
+
+mod coude_coalition_repository;
+pub use coude_coalition_repository::CoudeCoalitionRepository;

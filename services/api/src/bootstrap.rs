@@ -24,7 +24,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::{
     PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgBotConfigRepository,
     PgConductRepository, PgCoudeBetRepository, PgCoudeCashboxRepository, PgCoudeCombatRepository,
-    PgCoudeBountyRepository, PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeVendettaRepository,
+    PgCoudeBountyRepository, PgCoudeCoalitionRepository, PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeRefusalCountRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeVendettaRepository,
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
@@ -490,6 +490,14 @@ pub async fn build_app_state(
     let coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository> =
         Arc::new(PgCoudeBountyRepository::new(pg_pool.clone()));
 
+    // Compteurs de refus / dette d honneur (cf. COUPE_AMELIORATIONS 5.3).
+    let coude_refusal_count_repo: Arc<dyn crate::ports::outbound::CoudeRefusalCountRepository> =
+        Arc::new(PgCoudeRefusalCountRepository::new(pg_pool.clone()));
+
+    // Coalitions (cf. COUPE_AMELIORATIONS 5.3).
+    let coude_coalition_repo: Arc<dyn crate::ports::outbound::CoudeCoalitionRepository> =
+        Arc::new(PgCoudeCoalitionRepository::new(pg_pool.clone()));
+
     let coude_steal_protection_repo: Arc<
         dyn crate::ports::outbound::CoudeStealProtectionRepository,
     > = Arc::new(PgCoudeStealProtectionRepository::new(pg_pool.clone()));
@@ -522,7 +530,8 @@ pub async fn build_app_state(
             .with_safety_net_repo(coude_safety_net_repo.clone())
             .with_vendetta_repo(coude_vendetta_repo.clone())
             .with_player_repo(coude_player_repo.clone())
-            .with_bounty_repo(coude_bounty_repo.clone()),
+            .with_bounty_repo(coude_bounty_repo.clone())
+            .with_coalition_repo(coude_coalition_repo.clone()),
         );
     let watched_users_uc = Arc::new(ManageWatchedUsersService::new(
         watched_user_repo,
@@ -601,6 +610,8 @@ pub async fn build_app_state(
         coude_vendetta_uc,
         coude_tout_ou_rien_repo,
         coude_bounty_repo: coude_bounty_repo.clone(),
+        coude_refusal_count_repo,
+        coude_coalition_repo: coude_coalition_repo.clone(),
         broadcaster,
         job_client,
         discord_api,

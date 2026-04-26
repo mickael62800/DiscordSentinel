@@ -9,6 +9,7 @@ pub mod achievements;
 pub mod api_client;
 pub mod catalog;
 pub mod milestones;
+pub mod ultimates;
 pub mod channel_check;
 pub mod commands;
 pub mod daily_chaos_events;
@@ -138,6 +139,9 @@ pub async fn handle_command(ctx: &Context, command: &CommandInteraction) {
         "vendetta" => commands::vendetta::handle(ctx, command).await,
         "memorial" => commands::memorial::handle(ctx, command).await,
         "contribuer-prime" => commands::contribuer_prime::handle(ctx, command).await,
+        "honneur" => commands::honneur::handle(ctx, command).await,
+        "coalition" => commands::coalition::handle(ctx, command).await,
+        "ultimate" => commands::ultimate::handle(ctx, command).await,
         _ => {}
     }
 }
@@ -177,6 +181,9 @@ pub fn handles_command(name: &str) -> bool {
             | "vendetta"
             | "memorial"
             | "contribuer-prime"
+            | "honneur"
+            | "coalition"
+            | "ultimate"
     )
 }
 

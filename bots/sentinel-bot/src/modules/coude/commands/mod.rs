@@ -6,10 +6,12 @@ pub mod boost_voleur;
 pub mod braquage;
 pub mod cagnotte;
 pub mod classe;
+pub mod coalition;
 pub mod contribuer_prime;
 pub mod coude;
 pub mod defend_item;
 pub mod donner;
+pub mod honneur;
 pub mod hp;
 pub mod leaderboard;
 pub mod maudire;
@@ -31,6 +33,7 @@ pub mod shop_cmd;
 pub mod taunts_channel;
 pub mod tout_ou_rien;
 pub mod train;
+pub mod ultimate;
 pub mod vendetta;
 pub mod voler;
 
@@ -69,5 +72,8 @@ pub fn all() -> Vec<CreateCommand> {
         vendetta::register(),
         memorial::register(),
         contribuer_prime::register(),
+        honneur::register(),
+        coalition::register(),
+        ultimate::register(),
     ]
 }

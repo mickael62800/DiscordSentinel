@@ -180,3 +180,9 @@ pub use coude_tout_ou_rien_repository::PgCoudeToutOuRienRepository;
 
 mod coude_bounty_repository;
 pub use coude_bounty_repository::PgCoudeBountyRepository;
+
+mod coude_refusal_count_repository;
+pub use coude_refusal_count_repository::PgCoudeRefusalCountRepository;
+
+mod coude_coalition_repository;
+pub use coude_coalition_repository::PgCoudeCoalitionRepository;

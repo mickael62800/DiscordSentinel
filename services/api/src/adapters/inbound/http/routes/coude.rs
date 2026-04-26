@@ -171,6 +171,28 @@ fn coude_inner() -> Router<AppState> {
             "/{guild_id}/bounties/by-target/{target_id}/contribute",
             post(handlers::coude::contribute_to_target),
         )
+        // Migration 165 : refusals / dette d honneur (cf. roadmap 5.3)
+        .route(
+            "/{guild_id}/refusals/{requester_id}/{refuser_id}/increment",
+            post(handlers::coude::increment_refusal),
+        )
+        .route(
+            "/{guild_id}/refusals/{requester_id}/{refuser_id}",
+            get(handlers::coude::get_refusal),
+        )
+        .route(
+            "/{guild_id}/refusals/{requester_id}/{refuser_id}/reset",
+            post(handlers::coude::reset_refusal),
+        )
+        // Migration 166 : coalitions (cf. roadmap 5.3)
+        .route(
+            "/{guild_id}/coalitions/join",
+            post(handlers::coude::join_coalition),
+        )
+        .route(
+            "/{guild_id}/coalitions/by-target/{target_id}",
+            get(handlers::coude::get_coalition_by_target),
+        )
 }
 
 pub fn routes() -> Router<AppState> {

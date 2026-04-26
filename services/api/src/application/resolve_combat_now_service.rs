@@ -35,8 +35,9 @@ use crate::ports::inbound::{
     ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
 };
 use crate::ports::outbound::{
-    BotConfigRepository, CoudeBountyRepository, CoudeCombatRepository, CoudeCursesRepository,
-    CoudePlayerRepository, CoudeSafetyNetRepository, CoudeVendettaRepository, WalletRepository,
+    BotConfigRepository, CoudeBountyRepository, CoudeCoalitionRepository, CoudeCombatRepository,
+    CoudeCursesRepository, CoudePlayerRepository, CoudeSafetyNetRepository,
+    CoudeVendettaRepository, WalletRepository,
 };
 
 pub struct ResolveCombatNowService {
@@ -54,6 +55,7 @@ pub struct ResolveCombatNowService {
     vendetta_repo: Option<Arc<dyn CoudeVendettaRepository>>,
     player_repo: Option<Arc<dyn CoudePlayerRepository>>,
     bounty_repo: Option<Arc<dyn CoudeBountyRepository>>,
+    coalition_repo: Option<Arc<dyn CoudeCoalitionRepository>>,
 }
 
 impl ResolveCombatNowService {
@@ -83,7 +85,14 @@ impl ResolveCombatNowService {
             vendetta_repo: None,
             player_repo: None,
             bounty_repo: None,
+            coalition_repo: None,
         }
+    }
+
+    /// Branche le repo coalition (cf. COUPE_AMELIORATIONS 5.3).
+    pub fn with_coalition_repo(mut self, repo: Arc<dyn CoudeCoalitionRepository>) -> Self {
+        self.coalition_repo = Some(repo);
+        self
     }
 
     /// Branche le repo player (cf. COUPE_AMELIORATIONS 5.3) pour
@@ -705,6 +714,71 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 } else {
                     coins_transferred_nominal
                 };
+
+                // Coalition active contre le winner (cf. COUPE_AMELIORATIONS
+                // 5.3) : ses gains de combat sont reduits a 80% (perte
+                // de 20% absorbee par le neant). Si le loser est membre
+                // d une coalition contre le winner, on flag aussi pour
+                // potentiel auto-break ci-dessous.
+                let mut coalition_msg: Option<String> = None;
+                let mut break_coalition_id: Option<uuid::Uuid> = None;
+                let coins_transferred = if let Some(coalition_repo) = &self.coalition_repo {
+                    use crate::domain::entities::{
+                        apply_coalition_penalty, COALITION_GAIN_MULTIPLIER,
+                    };
+                    // Penalite si winner est cible d une coalition active.
+                    let winner_in_coalition = coalition_repo
+                        .get_active(&combat.guild_id, winner_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .filter(|c| c.is_active_at(chrono::Utc::now()));
+                    let after_coalition = if let Some(c) = &winner_in_coalition {
+                        // Le winner est cible. Loser membre ? -> auto-break.
+                        if c.members.iter().any(|m| m.member_id == *loser_id) {
+                            break_coalition_id = Some(c.id);
+                        }
+                        let reduced = apply_coalition_penalty(coins_transferred, true);
+                        if reduced < coins_transferred {
+                            coalition_msg = Some(format!(
+                                "\u{1f5e1}\u{fe0f} Coalition active : gain reduit a {}% ({} -> {} coins).",
+                                (COALITION_GAIN_MULTIPLIER * 100.0) as i32,
+                                coins_transferred,
+                                reduced
+                            ));
+                        }
+                        reduced
+                    } else {
+                        coins_transferred
+                    };
+                    after_coalition
+                } else {
+                    coins_transferred
+                };
+                if let Some(c_msg) = coalition_msg {
+                    insurance_msg = match insurance_msg {
+                        Some(prev) => Some(format!("{prev}\n{c_msg}")),
+                        None => Some(c_msg),
+                    };
+                }
+                // Auto-break de la coalition : la cible vient de battre
+                // un de ses conspirateurs.
+                if let (Some(coalition_repo), Some(coalition_id)) =
+                    (&self.coalition_repo, break_coalition_id)
+                {
+                    if let Err(e) = coalition_repo.mark_broken(coalition_id, winner_id).await {
+                        warn!(error = %e, "Echec mark_broken coalition");
+                    } else {
+                        let break_msg = format!(
+                            "\u{1f4a5} **Coalition brisee !** <@{}> a battu <@{}> et leve la coalition contre lui. Les gains reprennent a 100%.",
+                            winner_id, loser_id
+                        );
+                        insurance_msg = match insurance_msg {
+                            Some(prev) => Some(format!("{prev}\n{break_msg}")),
+                            None => Some(break_msg),
+                        };
+                    }
+                }
 
                 // Sabotage Empoisonner (cf. COUPE_AMELIORATIONS 5.2) :
                 // si le winner est sous l effet, 10% de son gain est

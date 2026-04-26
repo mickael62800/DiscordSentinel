@@ -121,6 +121,16 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
         .await
         .unwrap_or(0);
 
+    // Dette d honneur (cf. COUPE_AMELIORATIONS 5.3) : incremente le
+    // compteur par paire (requester=attaquant, refuser=defenseur).
+    // Quand il atteint 3, l attaquant pourra invoquer /honneur.
+    api.increment_refusal(
+        &combat_record.guild_id,
+        &combat_record.attacker_id,
+        &combat_record.defender_id,
+    )
+    .await;
+
     let mut description = refuse_msg;
 
     if cowardice >= config.cowardice_threshold() {
