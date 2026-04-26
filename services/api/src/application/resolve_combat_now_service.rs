@@ -247,6 +247,30 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         }
                     }
                 }
+                // Jackpot divin : le combat est resolu normalement (winner /
+                // loser conserves) mais le winner touche en plus un bonus
+                // de 10 * mise depuis le neant (le serveur paye, pas la
+                // cagnotte — interpretation simplifiee). Best-effort credit.
+                "jackpot_divin" => {
+                    if let Some(winner_id) = result.winner_id.clone() {
+                        let bonus = combat.mise.saturating_mul(10);
+                        if bonus > 0 {
+                            if let Err(e) = self
+                                .wallet_repo
+                                .credit(
+                                    &combat.guild_id,
+                                    &winner_id,
+                                    bonus,
+                                    "mythic_jackpot_divin",
+                                    "Jackpot divin x10 mise",
+                                )
+                                .await
+                            {
+                                warn!(error = %e, user_id = %winner_id, "Echec credit Jackpot divin");
+                            }
+                        }
+                    }
+                }
                 // Etoile filante : les deux combattants ressuscitent a 100%
                 // HP — interpretation simplifiee, pas de sudden death
                 // re-execute (necessiterait de rerun le moteur). On force

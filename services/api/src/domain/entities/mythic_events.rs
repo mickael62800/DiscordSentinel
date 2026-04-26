@@ -51,8 +51,8 @@ pub const MYTHIC_EVENTS: &[MythicEvent] = &[
         label: "Jackpot divin",
         probability: 0.001,
         emoji: "🎰",
-        announce: "🎰 **JACKPOT DIVIN** — {winner} touche x10 la mise sortie de la cagnotte serveur !",
-        mechanical_implemented: false,
+        announce: "🎰 **JACKPOT DIVIN** — {winner} touche x10 la mise en bonus !",
+        mechanical_implemented: true,
     },
     MythicEvent {
         key: "revanche_outre_tombe",
