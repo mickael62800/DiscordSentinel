@@ -40,6 +40,7 @@ import TempRolesPage from "../components/pages/TempRolesPage.vue";
 import SystemOpsPage from "../components/pages/SystemOpsPage.vue";
 import SlotPage from "../components/pages/SlotPage.vue";
 import WheelPage from "../components/pages/WheelPage.vue";
+import NameHistoryPage from "../components/pages/NameHistoryPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -86,5 +87,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/system/operations", name: "system-ops", component: SystemOpsPage },
   { path: "/slot", name: "slot", component: SlotPage },
   { path: "/wheel", name: "wheel", component: WheelPage },
+  { path: "/name-history", name: "name-history", component: NameHistoryPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

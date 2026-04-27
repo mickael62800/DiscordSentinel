@@ -58,6 +58,7 @@ const moderationItems = [
   { path: "/evidence", label: "Preuves", icon: "paperclip" },
   { path: "/review", label: "Reviews", icon: "check-circle" },
   { path: "/modstats", label: "Modstats", icon: "bar-chart-2" },
+  { path: "/name-history", label: "Historique pseudos", icon: "user-x" },
 ];
 
 const communityItems = [

@@ -10,6 +10,10 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         // Bot persistence (fire-and-forget endpoints for bot data)
         .route("/api/name-history", post(handlers::bot_persistence::create_name_history))
+        .route(
+            "/api/name-history/{guild_id}/{user_id}",
+            get(handlers::bot_persistence::list_name_history),
+        )
         .route("/api/levels/{guild_id}/{user_id}/streak", patch(handlers::bot_persistence::update_streak))
         .route("/api/tickets/{id}/sla", patch(handlers::bot_persistence::update_ticket_sla))
         .route("/api/sponsorships", post(handlers::bot_persistence::create_sponsorship))

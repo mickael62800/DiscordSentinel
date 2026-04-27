@@ -30,6 +30,69 @@ pub struct CreateNameHistoryDto {
     pub new_name: String,
 }
 
+#[derive(Debug, serde::Serialize)]
+pub struct NameHistoryEntryDto {
+    pub id: String,
+    pub guild_id: String,
+    pub user_id: String,
+    pub old_name: String,
+    pub new_name: String,
+    pub created_at: String,
+}
+
+/// GET /api/name-history/{guild_id}/{user_id}
+///
+/// Liste l'historique de pseudos d'un utilisateur, deduit des audit_logs
+/// `member_nickname_history`. Trie par created_at desc, max 50 entrees.
+/// Respect de l'archi hexagonale : passe par `audit_logs_uc.list()`.
+pub async fn list_name_history(
+    State(state): State<AppState>,
+    Path((guild_id, user_id)): Path<(String, String)>,
+) -> Result<Json<Vec<NameHistoryEntryDto>>, ApiError> {
+    validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
+
+    use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
+    let logs = state
+        .audit_logs_uc
+        .list(
+            Some(&guild_id),
+            AuditLogFilters {
+                event_type: Some(
+                    crate::domain::entities::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.to_string(),
+                ),
+                actor_id: None,
+                target_id: Some(user_id.clone()),
+                limit: 50,
+                offset: 0,
+            },
+        )
+        .await?;
+
+    let entries = logs
+        .into_iter()
+        .map(|l| NameHistoryEntryDto {
+            id: l.id.to_string(),
+            guild_id: l.guild_id,
+            user_id: l.target_id.clone().unwrap_or_default(),
+            old_name: l
+                .details
+                .get("old_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            new_name: l
+                .details
+                .get("new_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string(),
+            created_at: l.created_at.to_rfc3339(),
+        })
+        .collect();
+
+    Ok(Json(entries))
+}
+
 /// POST /api/name-history
 pub async fn create_name_history(
     State(state): State<AppState>,
