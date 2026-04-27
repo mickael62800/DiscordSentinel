@@ -90,7 +90,7 @@ pub struct AppState {
     #[allow(dead_code)]
     pub discord_bot_token: String,
     pub user_activity_repo: Arc<dyn crate::ports::outbound::UserActivityRepository>,
-    pub welcome_config_repo: Arc<dyn crate::ports::outbound::WelcomeConfigRepository>,
+    pub welcome_config_uc: Arc<dyn crate::ports::inbound::ManageWelcomeConfigUseCase>,
     pub export_uc: Arc<dyn crate::application::ExecuteExportUseCase>,
     pub evidence_repo: Arc<dyn crate::ports::outbound::EvidenceRepository>,
     pub review_repo: Arc<dyn crate::ports::outbound::ReviewRepository>,

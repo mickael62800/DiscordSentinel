@@ -1,5 +1,7 @@
-//! gRPC Welcome config — delegue au WelcomeConfigRepository.
-//! Plus de SQL direct : le repo centralise la query + defaults.
+//! gRPC Welcome config — delegue au use case `ManageWelcomeConfigUseCase`.
+//! Respect de l'archi hexagonale : un adapter inbound (gRPC) doit
+//! toujours passer par un port inbound, jamais par un repo outbound
+//! directement.
 
 use std::sync::Arc;
 
@@ -8,10 +10,10 @@ use tonic::{Request, Response, Status};
 use sentinel_proto::welcome::v1 as proto;
 use sentinel_proto::welcome::v1::welcome_service_server::WelcomeService;
 
-use crate::ports::outbound::WelcomeConfigRepository;
+use crate::ports::inbound::ManageWelcomeConfigUseCase;
 
 pub struct WelcomeGrpc {
-    pub repo: Arc<dyn WelcomeConfigRepository>,
+    pub uc: Arc<dyn ManageWelcomeConfigUseCase>,
 }
 
 #[tonic::async_trait]
@@ -20,7 +22,7 @@ impl WelcomeService for WelcomeGrpc {
         &self,
         request: Request<proto::GetConfigRequest>,
     ) -> Result<Response<proto::WelcomeConfig>, Status> {
-        let cfg = self.repo.get_config(&request.into_inner().guild_id).await
+        let cfg = self.uc.get(&request.into_inner().guild_id).await
             .map_err(|e| Status::internal(format!("get welcome config: {e}")))?;
 
         Ok(Response::new(proto::WelcomeConfig {

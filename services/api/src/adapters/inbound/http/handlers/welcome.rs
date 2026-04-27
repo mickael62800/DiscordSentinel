@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
+use crate::ports::inbound::WelcomeConfigPatch;
 use crate::ports::outbound::WelcomeConfigData;
 
 #[derive(Debug, Serialize)]
@@ -100,7 +101,7 @@ pub async fn get_config(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
-    let config = state.welcome_config_repo.get_config(&guild_id).await?;
+    let config = state.welcome_config_uc.get(&guild_id).await?;
     Ok(Json(config.into()))
 }
 
@@ -110,32 +111,49 @@ pub async fn save_config(
     Path(guild_id): Path<String>,
     Json(dto): Json<SaveWelcomeConfigDto>,
 ) -> Result<Json<WelcomeConfigDto>, ApiError> {
-    // Merge : lire la config actuelle puis appliquer les champs presents.
-    let mut current = state.welcome_config_repo.get_config(&guild_id).await?;
-    if let Some(v) = dto.welcome_enabled { current.welcome_enabled = v; }
-    if let Some(v) = dto.welcome_channel_id { current.welcome_channel_id = Some(v); }
-    if let Some(v) = dto.welcome_message { current.welcome_message = v; }
-    if let Some(v) = dto.welcome_embed_color { current.welcome_embed_color = v; }
-    if let Some(v) = dto.welcome_dm_enabled { current.welcome_dm_enabled = v; }
-    if let Some(v) = dto.welcome_dm_message { current.welcome_dm_message = v; }
-    if let Some(v) = dto.leave_enabled { current.leave_enabled = v; }
-    if let Some(v) = dto.leave_channel_id { current.leave_channel_id = Some(v); }
-    if let Some(v) = dto.leave_message { current.leave_message = v; }
-    if let Some(v) = dto.rules_enabled { current.rules_enabled = v; }
-    if let Some(v) = dto.rules_channel_id { current.rules_channel_id = Some(v); }
-    if let Some(v) = dto.rules_message { current.rules_message = v; }
-    if let Some(v) = dto.rules_role_id { current.rules_role_id = Some(v); }
-    if let Some(v) = dto.rules_button_label { current.rules_button_label = v; }
-    if let Some(v) = dto.counter_enabled { current.counter_enabled = v; }
-    if let Some(v) = dto.counter_channel_id { current.counter_channel_id = Some(v); }
-    if let Some(v) = dto.counter_format { current.counter_format = v; }
-    if let Some(v) = dto.anniversary_enabled { current.anniversary_enabled = v; }
-    if let Some(v) = dto.anniversary_channel_id { current.anniversary_channel_id = Some(v); }
-    if let Some(v) = dto.anniversary_message { current.anniversary_message = v; }
-    if let Some(v) = dto.rejoin_message { current.rejoin_message = v; }
-
-    let saved = state.welcome_config_repo.save_config(&guild_id, &current).await?;
+    let saved = state
+        .welcome_config_uc
+        .save_patch(&guild_id, dto_to_patch(dto))
+        .await?;
     Ok(Json(saved.into()))
+}
+
+fn dto_to_patch(dto: SaveWelcomeConfigDto) -> WelcomeConfigPatch {
+    WelcomeConfigPatch {
+        welcome_enabled: dto.welcome_enabled,
+        welcome_channel_id: dto.welcome_channel_id,
+        welcome_message: dto.welcome_message,
+        welcome_embed_color: dto.welcome_embed_color,
+        welcome_dm_enabled: dto.welcome_dm_enabled,
+        welcome_dm_message: dto.welcome_dm_message,
+        welcome_title: None,
+        welcome_image_url: None,
+        welcome_footer_text: None,
+        leave_enabled: dto.leave_enabled,
+        leave_channel_id: dto.leave_channel_id,
+        leave_message: dto.leave_message,
+        leave_title: None,
+        leave_image_url: None,
+        leave_footer_text: None,
+        rules_enabled: dto.rules_enabled,
+        rules_channel_id: dto.rules_channel_id,
+        rules_message: dto.rules_message,
+        rules_role_id: dto.rules_role_id,
+        rules_button_label: dto.rules_button_label,
+        counter_enabled: dto.counter_enabled,
+        counter_channel_id: dto.counter_channel_id,
+        counter_format: dto.counter_format,
+        anniversary_enabled: dto.anniversary_enabled,
+        anniversary_channel_id: dto.anniversary_channel_id,
+        anniversary_message: dto.anniversary_message,
+        anniversary_title: None,
+        anniversary_image_url: None,
+        anniversary_footer_text: None,
+        rejoin_message: dto.rejoin_message,
+        rejoin_title: None,
+        rejoin_image_url: None,
+        rejoin_footer_text: None,
+    }
 }
 
 #[cfg(test)]

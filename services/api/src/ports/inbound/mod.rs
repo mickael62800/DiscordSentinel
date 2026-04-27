@@ -127,3 +127,6 @@ pub use roll_steal::{RollStealCommand, RollStealUseCase, StealRoll};
 
 pub mod manage_discord_action_messages;
 pub use manage_discord_action_messages::ManageDiscordActionMessagesUseCase;
+
+pub mod manage_welcome_config;
+pub use manage_welcome_config::{ManageWelcomeConfigUseCase, WelcomeConfigPatch};

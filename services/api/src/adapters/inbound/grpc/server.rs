@@ -121,7 +121,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         discord_role_repo: state.discord_role_repo.clone(),
     };
     let welcome = WelcomeGrpc {
-        repo: state.welcome_config_repo.clone(),
+        uc: state.welcome_config_uc.clone(),
     };
     let export = ExportGrpc {
         uc: state.export_uc.clone(),

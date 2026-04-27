@@ -76,6 +76,9 @@ pub use coude_guild_settings::CoudeGuildSettings;
 mod manage_discord_action_messages_service;
 pub use manage_discord_action_messages_service::ManageDiscordActionMessagesService;
 
+mod manage_welcome_config_service;
+pub use manage_welcome_config_service::ManageWelcomeConfigService;
+
 mod manage_coude_catalog_service;
 pub use manage_coude_catalog_service::ManageCoudeCatalogService;
 
