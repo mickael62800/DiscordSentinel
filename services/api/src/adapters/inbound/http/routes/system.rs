@@ -1,6 +1,6 @@
 //! Routes systeme (user activity, models status, cache, system info, welcome, jobs async, RBAC).
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 
 use super::super::handlers;
@@ -35,4 +35,17 @@ pub fn routes() -> Router<AppState> {
                 .delete(handlers::rbac::revoke_role),
         )
         .route("/api/rbac/me/{guild_id}", get(handlers::rbac::get_my_role))
+        // Phase 1 sync Discord <-> Web : mapping action_id <-> Discord message
+        .route(
+            "/api/discord-messages/register",
+            post(handlers::discord_action_messages::register),
+        )
+        .route(
+            "/api/discord-messages/{action_id}",
+            get(handlers::discord_action_messages::list_for_action),
+        )
+        .route(
+            "/api/discord-messages/{action_id}/{kind}",
+            delete(handlers::discord_action_messages::delete_mapping),
+        )
 }

@@ -26,6 +26,8 @@ mod coude_purge;
 mod rbac;
 mod config_parsers;
 mod coude_expire;
+mod discord_action_message;
+pub use discord_action_message::{DiscordActionMessage, NewDiscordActionMessage, kinds as discord_action_kinds};
 pub mod analytics;
 
 pub use coude_expire::cowardice_penalty;

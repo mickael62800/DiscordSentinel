@@ -528,6 +528,15 @@ pub async fn build_app_state(
         dyn crate::ports::outbound::CoudeFlavorTemplatesRepository,
     > = Arc::new(PgCoudeFlavorTemplatesRepository::new(pg_pool.clone()));
 
+    // Sync Discord <-> Web (Phase 1 — cf. SYNC_DISCORD_WEB_DESIGN.md).
+    let discord_action_message_repo: Arc<
+        dyn crate::ports::outbound::DiscordActionMessageRepository,
+    > = Arc::new(
+        crate::adapters::outbound::postgres::PgDiscordActionMessageRepository::new(
+            pg_pool.clone(),
+        ),
+    );
+
     // Primes collectives (cf. COUPE_AMELIORATIONS 5.3).
     let coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository> =
         Arc::new(PgCoudeBountyRepository::new(pg_pool.clone()));
@@ -667,6 +676,7 @@ pub async fn build_app_state(
         play_travaux_uc,
         roll_steal_uc,
         coude_flavor_templates_repo,
+        discord_action_message_repo,
         coude_bounty_repo: coude_bounty_repo.clone(),
         coude_refusal_count_repo,
         coude_coalition_repo: coude_coalition_repo.clone(),

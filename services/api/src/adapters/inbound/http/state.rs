@@ -75,6 +75,8 @@ pub struct AppState {
     pub play_travaux_uc: Arc<dyn crate::ports::inbound::play_travaux::PlayTravauxUseCase>,
     pub roll_steal_uc: Arc<dyn crate::ports::inbound::roll_steal::RollStealUseCase>,
     pub coude_flavor_templates_repo: Arc<dyn crate::ports::outbound::CoudeFlavorTemplatesRepository>,
+    pub discord_action_message_repo:
+        Arc<dyn crate::ports::outbound::DiscordActionMessageRepository>,
     pub coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository>,
     pub coude_refusal_count_repo: Arc<dyn crate::ports::outbound::CoudeRefusalCountRepository>,
     pub coude_coalition_repo: Arc<dyn crate::ports::outbound::CoudeCoalitionRepository>,
