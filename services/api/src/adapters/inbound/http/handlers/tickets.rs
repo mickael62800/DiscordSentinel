@@ -95,9 +95,17 @@ pub async fn close_ticket(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.tickets_uc.close_ticket(&id).await?;
 
+    // Phase 2 sync : enrichi avec `action_id` (= ticket_id parse en UUID)
+    // pour que le bot puisse retrouver le mapping discord_action_messages
+    // et lock le channel Discord. Format aligne sur SYNC_DISCORD_WEB_DESIGN.md.
+    let action_id = uuid::Uuid::parse_str(&id).ok();
     state.broadcaster.broadcast(
         "ticket_closed",
-        serde_json::json!({ "ticket_id": &id }),
+        serde_json::json!({
+            "ticket_id": &id,
+            "action_id": action_id,
+            "actor": { "source": "web" },
+        }),
     );
 
     Ok(ok_response())

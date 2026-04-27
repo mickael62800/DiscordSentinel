@@ -538,6 +538,121 @@ async fn check_escalations(ctx: &Context) {
     }
 }
 
+/// Phase 2 sync : un ticket a ete ferme depuis la web admin. On va
+/// verrouiller le channel Discord (deny SendMessages au @everyone) et
+/// editer le message de bienvenue pour signaler la fermeture.
+async fn handle_ticket_closed_from_web(ctx: &Context, action_id: &str) {
+    use serenity::all::{ChannelId, EditChannel, GetMessages, MessageId, PermissionOverwrite,
+                        PermissionOverwriteType, Permissions, RoleId};
+
+    // 1. Recupere le mapping discord_action_messages pour cet action_id.
+    let data = ctx.data.read().await;
+    let api = match data.get::<ApiClientKey>() {
+        Some(a) => a.clone(),
+        None => return,
+    };
+    drop(data);
+
+    #[derive(serde::Deserialize)]
+    struct Mapping {
+        kind: String,
+        guild_id: String,
+        channel_id: String,
+        message_id: String,
+    }
+    let mappings: Vec<Mapping> = match api
+        .get_json(&format!("/api/discord-messages/{action_id}"))
+        .await
+    {
+        Ok(list) => list,
+        Err(e) => {
+            warn!(error = %e, action_id, "Echec fetch mapping discord_action_messages");
+            return;
+        }
+    };
+
+    let ticket_mapping = match mappings.into_iter().find(|m| m.kind == "ticket") {
+        Some(m) => m,
+        None => {
+            // Pas de mapping enregistre — ticket cree avant la phase 2 sync.
+            return;
+        }
+    };
+
+    let channel_id = match ticket_mapping.channel_id.parse::<u64>() {
+        Ok(v) => ChannelId::new(v),
+        Err(_) => return,
+    };
+    let guild_id = match ticket_mapping.guild_id.parse::<u64>() {
+        Ok(v) => serenity::all::GuildId::new(v),
+        Err(_) => return,
+    };
+
+    // 2. Edit le message de bienvenue (action_id) pour signaler la fermeture.
+    if let Ok(msg_id_u64) = ticket_mapping.message_id.parse::<u64>() {
+        let msg_id = MessageId::new(msg_id_u64);
+        // Recupere l embed existant pour ne pas perdre l info, on ajoute
+        // juste un footer "Ferme via web".
+        if let Ok(messages) = channel_id
+            .messages(&ctx.http, GetMessages::new().limit(1).around(msg_id))
+            .await
+        {
+            if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
+                if let Some(existing_embed) = original.embeds.first() {
+                    let new_embed = serenity::builder::CreateEmbed::from(existing_embed.clone())
+                        .color(0x95A5A6) // gris
+                        .footer(serenity::builder::CreateEmbedFooter::new(
+                            "\u{1f512} Ticket ferme depuis la web admin",
+                        ));
+                    if let Err(e) = channel_id
+                        .edit_message(
+                            &ctx.http,
+                            msg_id,
+                            serenity::builder::EditMessage::new().embed(new_embed),
+                        )
+                        .await
+                    {
+                        warn!(error = %e, %channel_id, %msg_id, "Echec edit welcome ticket");
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Lock le channel : deny SendMessages au @everyone (role = guild_id).
+    let everyone_role = RoleId::new(guild_id.get());
+    let overwrite = PermissionOverwrite {
+        allow: Permissions::empty(),
+        deny: Permissions::SEND_MESSAGES,
+        kind: PermissionOverwriteType::Role(everyone_role),
+    };
+    if let Err(e) = channel_id
+        .create_permission(&ctx.http, overwrite)
+        .await
+    {
+        warn!(error = %e, %channel_id, "Echec lock channel ticket apres close web");
+    }
+
+    // 4. Optionnel : rename le channel pour signaler la fermeture
+    // (closed-ticket-XXX). Best-effort.
+    if let Ok(channel_obj) = channel_id.to_channel(&ctx.http).await {
+        if let Some(guild_channel) = channel_obj.guild() {
+            if !guild_channel.name.starts_with("closed-") {
+                let new_name = format!("closed-{}", guild_channel.name);
+                let _ = channel_id
+                    .edit(&ctx.http, EditChannel::new().name(&new_name))
+                    .await;
+            }
+        }
+    }
+
+    info!(
+        action_id,
+        channel = %channel_id,
+        "Ticket ferme depuis la web : channel Discord locke + welcome edite"
+    );
+}
+
 async fn handle_redis_event(ctx: &Context, payload: &str) {
     let event: serde_json::Value = match serde_json::from_str(payload) {
         Ok(v) => v,
@@ -549,6 +664,26 @@ async fn handle_redis_event(ctx: &Context, payload: &str) {
         Some(d) => d,
         None => return,
     };
+
+    // Phase 2 sync : ticket ferme depuis le web -> on lock le channel
+    // Discord pour eviter les nouveaux messages. Si actor.source != "web",
+    // c est notre propre fermeture (boucle), on skip.
+    if event_type == "ticket_closed" {
+        let source = data
+            .get("actor")
+            .and_then(|a| a.get("source"))
+            .and_then(|s| s.as_str())
+            .unwrap_or("");
+        if source != "web" {
+            return;
+        }
+        let action_id = data.get("action_id").and_then(|v| v.as_str()).unwrap_or("");
+        if action_id.is_empty() {
+            return;
+        }
+        handle_ticket_closed_from_web(ctx, action_id).await;
+        return;
+    }
 
     if event_type != "ticket_message" {
         return;

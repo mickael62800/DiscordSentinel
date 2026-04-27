@@ -1,7 +1,8 @@
-import { ref, computed, onMounted } from "vue";
+import { ref, computed, onMounted, onUnmounted } from "vue";
 import type { Ticket, TicketDetail } from "../types";
 import { useToast } from "./useToast";
 import { ticketsService, type BulkDeleteParams } from "@/services/ticketsService";
+import { on as onWsEvent } from "@/api/events";
 
 export function useTickets() {
   const { error: showError } = useToast();
@@ -85,6 +86,32 @@ export function useTickets() {
   }
 
   onMounted(fetchTickets);
+
+  // Phase 2 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : refresh automatique
+  // sur les events tickets emis par l API ou par d autres sources (bot
+  // Discord, autre admin). Le bus WS local republie via @/api/events.
+  type TicketEvent = {
+    payload: {
+      data?: {
+        ticket_id?: string;
+        action_id?: string;
+        status?: string;
+      };
+    };
+  };
+  const refreshOnEvent = (_e: TicketEvent) => {
+    fetchTickets();
+  };
+  const offClosed = onWsEvent("ws:ticket_closed", refreshOnEvent);
+  const offCreated = onWsEvent("ws:ticket_created", refreshOnEvent);
+  const offAssigned = onWsEvent("ws:ticket_assigned", refreshOnEvent);
+  const offStatus = onWsEvent("ws:ticket_status_updated", refreshOnEvent);
+  onUnmounted(() => {
+    offClosed();
+    offCreated();
+    offAssigned();
+    offStatus();
+  });
 
   return {
     tickets,

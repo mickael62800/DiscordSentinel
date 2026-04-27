@@ -35,6 +35,22 @@
 
 **Au-delà** : Q3 — gestion Discord native (channels, webhooks, server settings). Gros chantier à part.
 
+### 🔄 Bonus livré : sync bilatérale **tickets**
+
+En complément du pilote ban (qui n'avait pas de message Discord à éditer), un cas
+d'usage **vraiment** bilatéral a été livré sur les **tickets** — c'est la
+démonstration end-to-end du pattern :
+
+- **Bot** (`panel.rs`) : enregistre le mapping `(ticket_uuid, "ticket", channel_id, welcome_msg_id)` après création.
+- **API** : événement `ticket_closed` enrichi avec `action_id` (UUID) + `actor.source`.
+- **Bot listener** (`handle_ticket_closed_from_web`) : si fermeture depuis web,
+  - fetch le mapping via `GET /api/discord-messages/{action_id}`,
+  - édite le welcome message (gris + footer 🔒 « Fermé via web »),
+  - lock le channel (deny `SEND_MESSAGES` au `@everyone`),
+  - rename `closed-<nom>`.
+- **Web** (`useTickets`) : subscribe aux 4 events `ws:ticket_{created,closed,assigned,status_updated}` → refresh sans F5.
+- **Idempotence** : si `actor.source != "web"`, le bot skip (pas de boucle).
+
 ---
 
 ## 🚀 Phase 1 — Sync infra + pilote ban (semaines 1-2)

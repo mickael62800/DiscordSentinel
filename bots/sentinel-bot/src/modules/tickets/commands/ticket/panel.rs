@@ -445,8 +445,37 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
         .color(embed_color);
 
     let welcome = CreateMessage::new().embed(welcome_embed);
-    if let Err(e) = channel.send_message(&ctx.http, welcome).await {
-        error!(error = %e, channel = %channel.id, "Erreur envoi message de bienvenue");
+    let welcome_posted = match channel.send_message(&ctx.http, welcome).await {
+        Ok(msg) => Some(msg),
+        Err(e) => {
+            error!(error = %e, channel = %channel.id, "Erreur envoi message de bienvenue");
+            None
+        }
+    };
+
+    // Phase 2 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : enregistre le
+    // mapping ticket_uuid <-> message Discord pour permettre les sync
+    // bilaterales (close depuis web -> lock channel ; close depuis
+    // Discord -> retire de la liste web).
+    if let Some(ref welcome_msg) = welcome_posted {
+        if let Ok(action_uuid) = uuid::Uuid::parse_str(&ticket_id) {
+            let data = ctx.data.read().await;
+            if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+                let api_clone = std::sync::Arc::clone(api);
+                let guild_str = guild_id.to_string();
+                let ch_str = channel.id.to_string();
+                let msg_str = welcome_msg.id.to_string();
+                drop(data);
+                crate::sync::register_action_message(
+                    &api_clone,
+                    action_uuid,
+                    crate::sync::kinds::TICKET,
+                    &guild_str,
+                    &ch_str,
+                    &msg_str,
+                ).await;
+            }
+        }
     }
 
     let staff_close_btn = CreateButton::new(CLOSE_BUTTON_ID)
