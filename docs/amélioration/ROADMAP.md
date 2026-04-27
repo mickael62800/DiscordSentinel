@@ -152,8 +152,9 @@ démonstration end-to-end du pattern :
 
 ---
 
-## 🛡️ Phase 3 — Modération avancée (semaines 4-5) — partielle ✅
-> Strikes + Notes livrés (pages dédiées). Reste : Evidence, Review, Reminders, Templates, Modstats dashboard.
+## 🛡️ Phase 3 — Modération avancée (semaines 4-5) ✅
+> Strikes, Notes, Reminders, Evidence, Reviews, Modstats — toutes les pages livrées.
+> Templates (CRUD) reporté (rare usage admin, dispo via commande Discord `/template`).
 
 > **Objectif** : le workflow modération complet (evidence, review, strikes, notes, reminders) est dans la web — fini les commandes Discord-only pour les modos.
 
