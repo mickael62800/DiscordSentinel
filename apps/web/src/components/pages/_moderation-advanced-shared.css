@@ -1,0 +1,146 @@
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.page-header {
+  margin-bottom: 24px;
+}
+.page-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 1.6rem;
+}
+.lede {
+  color: var(--text-muted, #888);
+  margin: 0;
+}
+.lede code {
+  background: var(--bg-muted, #2a2a2a);
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+.card {
+  background: var(--bg-card, #1f1f1f);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.card h2 {
+  margin: 0 0 12px 0;
+  font-size: 1.1rem;
+}
+.lookup {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.lookup input,
+.add-form input,
+.add-form textarea,
+.add-form select {
+  background: var(--bg-input, #2a2a2a);
+  border: 1px solid var(--border-color, #444);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: inherit;
+  font-family: inherit;
+}
+.lookup input {
+  flex: 1;
+  max-width: 320px;
+}
+.add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.add-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9rem;
+}
+.add-form textarea {
+  width: 100%;
+  resize: vertical;
+}
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.btn-secondary,
+.btn-primary,
+.btn-success,
+.btn-danger,
+.btn-warn {
+  border: none;
+  border-radius: 4px;
+  padding: 8px 18px;
+  cursor: pointer;
+  font-weight: 600;
+  color: white;
+}
+.btn-secondary {
+  background: var(--bg-input, #2a2a2a);
+  color: inherit;
+}
+.btn-primary {
+  background: #5865F2;
+}
+.btn-success {
+  background: #2ECC71;
+}
+.btn-danger {
+  background: #E74C3C;
+}
+.btn-warn {
+  background: #E67E22;
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color, #333);
+  vertical-align: top;
+}
+.table th {
+  font-size: 0.85rem;
+  color: var(--text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.table small.muted {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-muted, #888);
+  margin-top: 2px;
+}
+.muted {
+  color: var(--text-muted, #888);
+  font-size: 0.85rem;
+}
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.loading,
+.empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--text-muted, #888);
+}

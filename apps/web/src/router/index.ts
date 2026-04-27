@@ -27,6 +27,10 @@ import WelcomePage from "../components/pages/WelcomePage.vue";
 import AutomodPage from "../components/pages/AutomodPage.vue";
 import StrikesPage from "../components/pages/StrikesPage.vue";
 import NotesPage from "../components/pages/NotesPage.vue";
+import RemindersPage from "../components/pages/RemindersPage.vue";
+import EvidencePage from "../components/pages/EvidencePage.vue";
+import ReviewPage from "../components/pages/ReviewPage.vue";
+import ModstatsPage from "../components/pages/ModstatsPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -60,5 +64,9 @@ export const routes: RouteRecordRaw[] = [
   { path: "/automod", name: "automod", component: AutomodPage },
   { path: "/strikes", name: "strikes", component: StrikesPage },
   { path: "/notes", name: "notes", component: NotesPage },
+  { path: "/reminders", name: "reminders", component: RemindersPage },
+  { path: "/evidence", name: "evidence", component: EvidencePage },
+  { path: "/review", name: "review", component: ReviewPage },
+  { path: "/modstats", name: "modstats", component: ModstatsPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

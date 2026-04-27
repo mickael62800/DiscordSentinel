@@ -26,6 +26,10 @@ const moderationItems = [
   { path: "/rules", label: "Regles", icon: "shield" },
   { path: "/strikes", label: "Strikes", icon: "alert-triangle" },
   { path: "/notes", label: "Notes", icon: "edit-3" },
+  { path: "/reminders", label: "Reminders", icon: "clock" },
+  { path: "/evidence", label: "Preuves", icon: "paperclip" },
+  { path: "/review", label: "Reviews", icon: "check-circle" },
+  { path: "/modstats", label: "Modstats", icon: "bar-chart-2" },
 ];
 
 const communityItems = [
