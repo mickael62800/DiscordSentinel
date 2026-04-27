@@ -24,6 +24,8 @@ const moderationItems = [
   { path: "/moderation", label: "Moderation", icon: "gavel" },
   { path: "/members", label: "Membres", icon: "users" },
   { path: "/rules", label: "Regles", icon: "shield" },
+  { path: "/strikes", label: "Strikes", icon: "alert-triangle" },
+  { path: "/notes", label: "Notes", icon: "edit-3" },
 ];
 
 const communityItems = [

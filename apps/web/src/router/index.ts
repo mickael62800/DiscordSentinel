@@ -25,6 +25,8 @@ import SettingsPage from "../components/pages/SettingsPage.vue";
 import AuthCallbackPage from "../components/pages/AuthCallbackPage.vue";
 import WelcomePage from "../components/pages/WelcomePage.vue";
 import AutomodPage from "../components/pages/AutomodPage.vue";
+import StrikesPage from "../components/pages/StrikesPage.vue";
+import NotesPage from "../components/pages/NotesPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -56,5 +58,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/rbac", name: "rbac", component: RbacPage },
   { path: "/welcome", name: "welcome", component: WelcomePage },
   { path: "/automod", name: "automod", component: AutomodPage },
+  { path: "/strikes", name: "strikes", component: StrikesPage },
+  { path: "/notes", name: "notes", component: NotesPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];
