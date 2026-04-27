@@ -34,6 +34,7 @@ import ModstatsPage from "../components/pages/ModstatsPage.vue";
 import VoiceThemesPage from "../components/pages/VoiceThemesPage.vue";
 import RolePanelEditPage from "../components/pages/RolePanelEditPage.vue";
 import CoudeSocialPage from "../components/pages/CoudeSocialPage.vue";
+import LevelsConfigPage from "../components/pages/LevelsConfigPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -74,5 +75,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/voice-themes", name: "voice-themes", component: VoiceThemesPage },
   { path: "/role-panels/new", name: "role-panel-new", component: RolePanelEditPage },
   { path: "/coude/social", name: "coude-social", component: CoudeSocialPage },
+  { path: "/levels-config", name: "levels-config", component: LevelsConfigPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

@@ -39,6 +39,7 @@ const communityItems = [
   { path: "/voice-themes", label: "Themes vocaux", icon: "layers" },
   { path: "/role-panels", label: "Roles", icon: "users" },
   { path: "/levels", label: "Niveaux", icon: "trending-up" },
+  { path: "/levels-config", label: "Niveaux config", icon: "sliders" },
 ];
 
 const securityItems = [

@@ -307,7 +307,7 @@ Chaque onglet a son `useXxx` composable + appelle les endpoints API existants.
 
 ---
 
-## 📈 Phase 8 — Levels & Conduct config (semaine 11)
+## 📈 Phase 8 — Levels & Conduct config (semaine 11) ✅
 
 > **Objectif** : sauvegarder la config et exposer les actions admin manquantes.
 
