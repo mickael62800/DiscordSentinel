@@ -38,6 +38,8 @@ import LevelsConfigPage from "../components/pages/LevelsConfigPage.vue";
 import SponsorshipsPage from "../components/pages/SponsorshipsPage.vue";
 import TempRolesPage from "../components/pages/TempRolesPage.vue";
 import SystemOpsPage from "../components/pages/SystemOpsPage.vue";
+import SlotPage from "../components/pages/SlotPage.vue";
+import WheelPage from "../components/pages/WheelPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -82,5 +84,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/sponsorships", name: "sponsorships", component: SponsorshipsPage },
   { path: "/temp-roles", name: "temp-roles", component: TempRolesPage },
   { path: "/system/operations", name: "system-ops", component: SystemOpsPage },
+  { path: "/slot", name: "slot", component: SlotPage },
+  { path: "/wheel", name: "wheel", component: WheelPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

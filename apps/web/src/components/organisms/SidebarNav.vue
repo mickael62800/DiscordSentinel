@@ -59,6 +59,8 @@ const gameItems = [
   { path: "/coude", label: "Coup de Coude", icon: "zap" },
   { path: "/coude/social", label: "Coude social", icon: "users" },
   { path: "/blackjack", label: "Blackjack", icon: "layers" },
+  { path: "/slot", label: "Slot machine", icon: "dollar-sign" },
+  { path: "/wheel", label: "Roue du Destin", icon: "refresh-cw" },
   { path: "/wallet", label: "Wallet", icon: "dollar-sign" },
   { path: "/tournaments", label: "Tournoi hebdo", icon: "zap" },
   { path: "/taunts", label: "Railleries", icon: "zap" },
