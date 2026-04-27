@@ -1,9 +1,10 @@
-import { ref, computed, onMounted, watch } from "vue";
+import { ref, computed, onMounted, onUnmounted, watch } from "vue";
 import type { Infraction, ConfirmedBan } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
 import { useToast } from "./useToast";
 import { infractionsService } from "@/services/infractionsService";
 import { moderationService } from "@/services/moderationService";
+import { on as onWsEvent } from "@/api/events";
 
 export function useBans() {
   const { guildIdFilter } = useGuildSelector();
@@ -64,10 +65,19 @@ export function useBans() {
 
   const banning = ref(false);
 
+  /**
+   * Phase 1 sync : on cherche le proposal en cours (s il existe) pour
+   * passer son `action_id` a executeBan. L API publie alors un event
+   * `moderation.ban.executed` que le bot consomme pour editer le message
+   * Discord correspondant (cf. SYNC_DISCORD_WEB_DESIGN.md).
+   */
   async function executeBan(guildId: string, userId: string, reason: string) {
     banning.value = true;
     try {
-      await moderationService.executeBan(guildId, userId, reason);
+      const proposal = banProposals.value.find(
+        (b) => b.server === guildId && b.user_id === userId,
+      );
+      await moderationService.executeBan(guildId, userId, reason, proposal?.id);
       await fetchBans();
       success("Utilisateur banni avec succes.");
     } catch (e) {
@@ -96,6 +106,35 @@ export function useBans() {
 
   onMounted(fetchBans);
   watch(guildIdFilter, fetchBans);
+
+  // Phase 1 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : refresh automatique
+  // de la liste sur les events bans emis par l API (executed, cancelled,
+  // proposed). Le WebSocket gateway republie via emit("ws:<event>", ...).
+  // Filtrage optimiste : on retire la ligne sans refetch full.
+  type BanEvent = {
+    payload: { data?: { action_id?: string; guild_id?: string; target_id?: string } };
+  };
+  const removeProposal = (e: BanEvent) => {
+    const d = e.payload?.data;
+    if (!d?.action_id) {
+      // Fallback : si pas d action_id, on refetch.
+      fetchBans();
+      return;
+    }
+    banProposals.value = banProposals.value.filter((b) => b.id !== d.action_id);
+  };
+  const offExecuted = onWsEvent("ws:moderation.ban.executed", removeProposal);
+  const offCancelled = onWsEvent("ws:moderation.ban.cancelled", removeProposal);
+  const offProposed = onWsEvent("ws:moderation.ban.proposed", () => {
+    // Nouvelle proposition cote bot : refetch full pour recuperer
+    // l infraction complete (id, reason, etc.).
+    fetchBans();
+  });
+  onUnmounted(() => {
+    offExecuted();
+    offCancelled();
+    offProposed();
+  });
 
   return {
     filteredProposals, filteredConfirmed, totalProposals, totalConfirmed,

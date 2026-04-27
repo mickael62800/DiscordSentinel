@@ -150,6 +150,11 @@ pub struct ExecuteBanDto {
     pub guild_id: String,
     pub user_id: String,
     pub reason: String,
+    /// Phase 1 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : si fourni, l API
+    /// publie un event `moderation.ban.executed` avec cet `action_id`,
+    /// permettant au bot d editer le message Discord correspondant.
+    #[serde(default)]
+    pub action_id: Option<uuid::Uuid>,
 }
 
 /// POST /api/moderation/execute-ban — execute un ban Discord + log l'action
@@ -205,6 +210,21 @@ pub async fn execute_ban(
             "reason": &reason,
         }),
     );
+
+    // Phase 1 sync : event dedie pour le bot et le web (refresh + edit
+    // message Discord). Format aligne sur SYNC_DISCORD_WEB_DESIGN.md.
+    if let Some(action_id) = dto.action_id {
+        state.broadcaster.broadcast(
+            "moderation.ban.executed",
+            serde_json::json!({
+                "action_id": action_id,
+                "guild_id": &dto.guild_id,
+                "target_id": &dto.user_id,
+                "actor": { "user_id": "desktop", "source": "web" },
+                "reason": &reason,
+            }),
+        );
+    }
 
     Ok(ok_response())
 }

@@ -57,6 +57,24 @@ pub async fn delete_infraction(
 
     // Envoyer un DM a l'utilisateur pour l'informer de la grace
     if let Some(inf) = infraction {
+        // Phase 1 sync : si c etait un proposal de ban, on previent le
+        // bot pour qu il edite le message Discord (cf.
+        // SYNC_DISCORD_WEB_DESIGN.md). L `action_id` = id de
+        // l infraction supprimee.
+        if inf.action.as_str() == "ban" {
+            if let Ok(action_uuid) = uuid::Uuid::parse_str(&id) {
+                state.broadcaster.broadcast(
+                    "moderation.ban.cancelled",
+                    serde_json::json!({
+                        "action_id": action_uuid,
+                        "guild_id": &inf.guild_id,
+                        "target_id": &inf.user_id,
+                        "actor": { "user_id": "desktop", "source": "web" },
+                    }),
+                );
+            }
+        }
+
         let message = format!(
             "Bonne nouvelle ! Votre avertissement a ete annule.\n\
             **Raison initiale** : {}\n\

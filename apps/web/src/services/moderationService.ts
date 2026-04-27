@@ -16,8 +16,24 @@ export interface LogActionParams {
 }
 
 export const moderationService = {
-  executeBan(guildId: string, userId: string, reason: string): Promise<unknown> {
-    return httpPost("/api/moderation/execute-ban", { guild_id: guildId, user_id: userId, reason });
+  /**
+   * Phase 1 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : si l'on connait
+   * l'`actionId` (= id de l'infraction proposal), on le passe pour que
+   * l'API publie un event `moderation.ban.executed` que le bot consomme
+   * pour editer le message Discord correspondant.
+   */
+  executeBan(
+    guildId: string,
+    userId: string,
+    reason: string,
+    actionId?: string | null,
+  ): Promise<unknown> {
+    return httpPost("/api/moderation/execute-ban", {
+      guild_id: guildId,
+      user_id: userId,
+      reason,
+      action_id: actionId ?? undefined,
+    });
   },
   executeUnban(guildId: string, userId: string): Promise<unknown> {
     return httpPost("/api/moderation/execute-unban", { guild_id: guildId, user_id: userId });

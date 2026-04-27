@@ -66,33 +66,36 @@
 
 #### Semaine 2 — Pilote ban
 
-- [ ] **Bot — enregistrement message_id** :
-  - Patcher `bots/sentinel-bot/src/modules/moderation/commands/ban.rs`
-  - Appel `api.register_discord_message(action_id, "ban_proposal", ...)` après chaque post
-  - Encoder `action_id` dans `custom_id` des boutons : `ban_proposal:cancel:{uuid}`
-- [ ] **Bot — listener events** :
-  - Nouveau worker `event-listener-worker` ou intégré dans le bot principal
-  - Subscribe gRPC aux events `moderation.ban.*`
-  - Sur `ban.executed` → edit message Discord (retire boutons, change couleur, ajoute "Banni par X")
-  - Sur `ban.cancelled` → edit message Discord (retire boutons, ajoute "Annulé par X")
-- [ ] **API — émission events** :
-  - `POST /api/moderation/execute-ban` → publie `moderation.ban.executed`
-  - `POST /api/moderation/{id}/cancel` → publie `moderation.ban.cancelled`
-  - `POST /api/conduct/sync-ban-proposals` → publie `moderation.ban.proposed`
-- [ ] **Web — composable SSE** :
-  - `apps/web/src/composables/useEventStream.ts`
-  - Intégrer dans `useBans.ts` — refresh ligne au lieu de F5
-  - Toast notifications globales
-- [ ] **Idempotence** :
-  - UPDATE conditionnel `WHERE status = 'pending'` côté API
-  - Click bouton dupliqué → 409 Conflict → "déjà résolu"
+- [x] **Bot — module `sync.rs`** ✅
+  - `register_action_message()` (fire-and-forget vers `/api/discord-messages/register`)
+  - `build_action_custom_id()` / `parse_action_custom_id()` (format `{namespace}:{verb}:{uuid}`)
+  - Module `kinds` synchronisé avec le domain API
+  - 4 tests unitaires (round-trip, namespace mismatch, bad UUID)
+- [x] **API — émission events** ✅
+  - `POST /api/moderation/execute-ban` accepte un `action_id` optionnel
+    et publie `moderation.ban.executed { action_id, guild_id, target_id, actor }`
+  - `DELETE /api/infractions/{id}` publie `moderation.ban.cancelled` si l'infraction est de type ban
+- [x] **Web — subscribe events** ✅
+  - `useBans.ts` consomme les events `ws:moderation.ban.{executed|cancelled|proposed}` via le bus local `@/api/events`
+  - Filtre optimiste (retrait ligne sans refetch) + fallback refetch sur `proposed`
+  - `executeBan(...)` passe l'`action_id` du proposal courant
+- ⚠️ **Bot listener edit Discord** — **non applicable au cas ban** :
+  les ban_proposals auto-créés par le worker `sync_ban_proposals` n'ont
+  **pas de message Discord posté** (aucun handler bot ne les affiche).
+  La table `discord_action_messages` reste vide pour le `kind=ban_proposal`
+  tant qu'aucune commande Discord ne pose un embed. Le pattern listener
+  sera testé sur la 1ʳᵉ feature qui a une vraie représentation Discord
+  (tickets, roles panels, combats coude…).
+- [ ] **Idempotence** : UPDATE conditionnel `WHERE status = 'pending'` —
+  reporté en phase suivante (le `delete_infraction` actuel n'a pas de
+  notion de statut, l'infraction est simplement supprimée).
 
 ### 🎯 Critères d'acceptation
 
-- ✅ Cliquer "Annuler" sur Discord → le ban disparaît de la liste web en < 1s sans F5
-- ✅ Exécuter un ban depuis le web → le message Discord est édité (boutons retirés, "Banni") en < 1s
-- ✅ 2 utilisateurs cliquent simultanément → un gagne, l'autre voit "déjà résolu"
-- ✅ Bot redémarre → events des dernières 72h sont rejoués au boot
+- ✅ Exécuter un ban depuis le web → liste mise à jour en < 1s sans F5 (via WS)
+- ✅ Annuler une proposition de ban depuis le web → ligne retirée live de la liste
+- ✅ Pattern de sync utilisable pour la phase 2 (tickets) où les messages Discord existent vraiment
+- ⏳ Edit message Discord à valider en phase suivante (cas où une commande Discord poste un embed)
 
 ### ⚠️ Risques
 
