@@ -79,6 +79,9 @@ pub use manage_discord_action_messages_service::ManageDiscordActionMessagesServi
 mod manage_welcome_config_service;
 pub use manage_welcome_config_service::ManageWelcomeConfigService;
 
+mod manage_automod_reviews_service;
+pub use manage_automod_reviews_service::ManageAutomodReviewsService;
+
 mod manage_coude_catalog_service;
 pub use manage_coude_catalog_service::ManageCoudeCatalogService;
 

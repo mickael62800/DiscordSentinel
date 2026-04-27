@@ -130,3 +130,6 @@ pub use manage_discord_action_messages::ManageDiscordActionMessagesUseCase;
 
 pub mod manage_welcome_config;
 pub use manage_welcome_config::{ManageWelcomeConfigUseCase, WelcomeConfigPatch};
+
+pub mod manage_automod_reviews;
+pub use manage_automod_reviews::{ManageAutomodReviewsUseCase, ResolveAutomodReviewCommand};

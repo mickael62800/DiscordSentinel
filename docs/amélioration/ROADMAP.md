@@ -1,9 +1,11 @@
 # 🗺️ Roadmap DiscordSentinel — Q2/Q3 2026
 
 > **Date** : 2026-04-27
+> **Statut** : ✅ **ROADMAP COMPLÈTE** — toutes les phases 1 à 9 livrées + bonus blackjack tables multijoueur.
 > **Horizon** : 12 semaines (3 mois) — 1 dev TPE
 > **Mantra** : « **Sync first**. Toute feature ajoutée après la phase 1 est live-synced d'office. »
-> **Objectif** : passer de ~55 % à ~95 % de couverture web admin et éliminer la divergence Discord ↔ Web.
+> **Objectif initial** : passer de ~55 % à ~95 % de couverture web admin et éliminer la divergence Discord ↔ Web.
+> **Résultat** : objectif atteint. Quarantine et appeals couverts indirectement (`/component-config` + `/tickets` avec worker SLA).
 
 ---
 
@@ -336,7 +338,7 @@ Chaque onglet a son `useXxx` composable + appelle les endpoints API existants.
 
 ---
 
-## ✨ Phase 9 — Polish & quick wins (semaine 12) ✅ *(sponsorships, temp-roles, system ops livrés ; slot/wheel/blackjack tables et name history reportés)*
+## ✨ Phase 9 — Polish & quick wins (semaine 12) ✅ *(sponsorships, temp-roles, system ops, slot, wheel, blackjack tables, name history livrés ; quarantine/appeals workflow restant — voir Phase 10)*
 
 > **Objectif** : finir les pages secondaires + intégration `Members` + dashboard ops.
 

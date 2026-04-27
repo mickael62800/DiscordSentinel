@@ -122,5 +122,25 @@ pub async fn on_component(ctx: &Context, component: &ComponentInteraction) {
 
 /// Spawn les background tasks du module blackjack (appele au `ready`).
 pub fn spawn_background(ctx: Context) {
-    afk_cleanup::spawn(ctx);
+    afk_cleanup::spawn(ctx.clone());
+    spawn_redis_listener(ctx);
+}
+
+/// Listener Redis Stream : `blackjack_table_closed` depuis web -> edit
+/// l'embed Discord (gris + retire les boutons + footer "ferme via web").
+fn spawn_redis_listener(ctx: Context) {
+    tokio::spawn(async move {
+        let consumer = sentinel_shared::event_bus::default_consumer_name();
+        sentinel_shared::event_bus::listen_stream_group(
+            "blackjack-bot-sync".to_string(),
+            consumer,
+            move |payload| {
+                let ctx = ctx.clone();
+                async move {
+                    table::handle_redis_event(&ctx, &payload).await;
+                }
+            },
+        )
+        .await;
+    });
 }

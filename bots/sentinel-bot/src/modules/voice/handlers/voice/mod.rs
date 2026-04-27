@@ -9,3 +9,4 @@ pub mod channel_lifecycle;
 pub mod member_events;
 
 pub use member_events::handle_voice_state_update;
+pub use channel_lifecycle::handle_voice_redis_event;

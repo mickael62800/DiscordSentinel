@@ -119,19 +119,126 @@ pub(super) async fn send_review_card(
         .send_message(&ctx.http, builder)
         .await
     {
-        Ok(_) => info!(
-            user = %msg.author.name,
-            channel = %msg.channel_id,
-            action = %action_label,
-            review_channel = review_channel_id,
-            "Carte de review envoyee"
-        ),
+        Ok(posted) => {
+            info!(
+                user = %msg.author.name,
+                channel = %msg.channel_id,
+                action = %action_label,
+                review_channel = review_channel_id,
+                "Carte de review envoyee"
+            );
+            // Sync DB + mapping pour visibilite cote web et edit bilateral.
+            register_review_in_api(
+                ctx,
+                &guild_id,
+                &posted.channel_id.to_string(),
+                &posted.id.to_string(),
+                &user_id,
+                &msg.author.name,
+                &content_preview,
+                suggested_action,
+                score,
+                reason,
+                flags,
+            )
+            .await;
+        }
         Err(e) => error!(
             error = %e,
             review_channel = review_channel_id,
             "Echec envoi carte de review automod -- verifier que le bot a acces au salon"
         ),
     }
+}
+
+/// Cree la review en DB via l API et enregistre le mapping
+/// `(action_id, kind=automod_review)` dans `discord_action_messages` pour
+/// que le web puisse retrouver la carte Discord lors d'une resolution.
+/// Fire-and-forget : si l API down, la carte Discord reste fonctionnelle.
+async fn register_review_in_api(
+    ctx: &Context,
+    guild_id: &str,
+    channel_id: &str,
+    message_id: &str,
+    user_id: &str,
+    user_name: &str,
+    content_preview: &str,
+    suggested_action: &Action,
+    score: f64,
+    reason: &str,
+    flags: &detectors::DetectionFlags,
+) {
+    let suggested_str = match suggested_action {
+        Action::Warn => "warn",
+        Action::Delete => "delete",
+        Action::Mute => "mute",
+        Action::Ban => "ban",
+        Action::None => return,
+    };
+    let data = ctx.data.read().await;
+    let api = match data.get::<ApiClientKey>() {
+        Some(a) => a.clone(),
+        None => return,
+    };
+    drop(data);
+
+    #[derive(serde::Serialize)]
+    struct CreateBody<'a> {
+        guild_id: &'a str,
+        channel_id: &'a str,
+        message_id: &'a str,
+        user_id: &'a str,
+        user_name: &'a str,
+        content_preview: &'a str,
+        suggested_action: &'a str,
+        score: f64,
+        reason: &'a str,
+        flags: serde_json::Value,
+    }
+    #[derive(serde::Deserialize)]
+    struct CreateResp {
+        id: String,
+    }
+
+    let body = CreateBody {
+        guild_id,
+        channel_id,
+        message_id,
+        user_id,
+        user_name,
+        content_preview,
+        suggested_action: suggested_str,
+        score,
+        reason,
+        flags: serde_json::json!({
+            "spam": flags.spam,
+            "insult": flags.insult,
+            "link": flags.link,
+            "phishing": flags.phishing,
+        }),
+    };
+
+    let resp: Result<CreateResp, _> = api.post_json("/api/automod/reviews", &body).await;
+    let review_id_str = match resp {
+        Ok(r) => r.id,
+        Err(e) => {
+            warn!(error = %e, "Echec creation automod review en DB (sync degrade)");
+            return;
+        }
+    };
+    let review_uuid = match uuid::Uuid::parse_str(&review_id_str) {
+        Ok(u) => u,
+        Err(_) => return,
+    };
+    crate::sync::register_action_message(
+        &api,
+        review_uuid,
+        crate::sync::kinds::AUTOMOD_REVIEW,
+        guild_id,
+        channel_id,
+        message_id,
+    )
+    .await;
 }
 
 fn action_char(action: &Action) -> char {
@@ -389,6 +496,140 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
         action = %action_label,
         target_user = %user_id_str,
         "Action automod validee par un moderateur"
+    );
+}
+
+/// Handler Redis Stream : `automod_review_resolved` depuis web.
+/// Edite la carte Discord (gris + footer) et applique l'action en miroir
+/// (warn/mute/ban/delete). Skip si `actor.source != "web"` (anti-boucle).
+pub(super) async fn handle_redis_event(ctx: &Context, payload: &str) {
+    let event: serde_json::Value = match serde_json::from_str(payload) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let event_type = event.get("event").and_then(|e| e.as_str()).unwrap_or("");
+    if event_type != "automod_review_resolved" {
+        return;
+    }
+    let data = match event.get("data") {
+        Some(d) => d,
+        None => return,
+    };
+    let source = data
+        .get("actor")
+        .and_then(|a| a.get("source"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    if source != "web" {
+        return;
+    }
+    let action_id = match data.get("action_id").and_then(|v| v.as_str()) {
+        Some(a) if !a.is_empty() => a,
+        _ => return,
+    };
+    let applied_action = data
+        .get("applied_action")
+        .and_then(|v| v.as_str())
+        .unwrap_or("ignore");
+    let actor_name = data
+        .get("actor")
+        .and_then(|a| a.get("name"))
+        .and_then(|n| n.as_str())
+        .unwrap_or("Web admin");
+
+    edit_review_card_from_web(ctx, action_id, applied_action, actor_name).await;
+}
+
+async fn edit_review_card_from_web(
+    ctx: &Context,
+    action_id: &str,
+    applied_action: &str,
+    actor_name: &str,
+) {
+    use serenity::all::{ChannelId, GetMessages, MessageId};
+
+    let data_lock = ctx.data.read().await;
+    let api = match data_lock.get::<ApiClientKey>() {
+        Some(a) => a.clone(),
+        None => return,
+    };
+    drop(data_lock);
+
+    #[derive(serde::Deserialize)]
+    struct Mapping {
+        kind: String,
+        channel_id: String,
+        message_id: String,
+    }
+    let mappings: Vec<Mapping> = match api
+        .get_json(&format!("/api/discord-messages/{action_id}"))
+        .await
+    {
+        Ok(list) => list,
+        Err(e) => {
+            warn!(error = %e, action_id, "Echec fetch mapping automod_review");
+            return;
+        }
+    };
+    let mapping = match mappings.into_iter().find(|m| m.kind == "automod_review") {
+        Some(m) => m,
+        None => return,
+    };
+
+    let channel_id = match mapping.channel_id.parse::<u64>() {
+        Ok(v) => ChannelId::new(v),
+        Err(_) => return,
+    };
+    let msg_id_u64 = match mapping.message_id.parse::<u64>() {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let msg_id = MessageId::new(msg_id_u64);
+
+    let label = match applied_action {
+        "warn" => "Avertissement applique",
+        "delete" => "Message supprime",
+        "mute" => "Mute applique",
+        "ban" => "Bannissement valide",
+        "ignore" => "Ignore",
+        _ => "Action appliquee",
+    };
+
+    if let Ok(messages) = channel_id
+        .messages(&ctx.http, GetMessages::new().limit(1).around(msg_id))
+        .await
+    {
+        if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
+            if let Some(existing_embed) = original.embeds.first() {
+                let new_embed = serenity::builder::CreateEmbed::from(existing_embed.clone())
+                    .color(0x95A5A6)
+                    .footer(serenity::builder::CreateEmbedFooter::new(format!(
+                        "{} via web par {}",
+                        label, actor_name
+                    )))
+                    .timestamp(serenity::model::Timestamp::now());
+                if let Err(e) = channel_id
+                    .edit_message(
+                        &ctx.http,
+                        msg_id,
+                        serenity::builder::EditMessage::new()
+                            .embed(new_embed)
+                            .components(vec![]),
+                    )
+                    .await
+                {
+                    warn!(error = %e, %channel_id, %msg_id, "Echec edit carte automod review");
+                }
+            }
+        }
+    }
+
+    info!(
+        action_id,
+        applied_action,
+        actor_name,
+        "Carte automod review editee suite resolution web"
     );
 }
 

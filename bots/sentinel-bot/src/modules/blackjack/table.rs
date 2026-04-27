@@ -16,6 +16,99 @@ use tracing::{error, info, warn};
 
 use super::{ChannelManagerKey, GameApiKey, BET_PREFIX, CLOSE_TABLE_ID, INVITE_BUTTON_ID, JOIN_BUTTON_ID};
 
+/// Handler Redis : `blackjack_table_closed` depuis web -> edit l'embed
+/// Discord pour signaler la fermeture (gris + retire boutons).
+pub async fn handle_redis_event(ctx: &Context, payload: &str) {
+    use serenity::all::{ChannelId, GetMessages, MessageId};
+
+    let event: serde_json::Value = match serde_json::from_str(payload) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    if event.get("event").and_then(|v| v.as_str()) != Some("blackjack_table_closed") {
+        return;
+    }
+    let data = match event.get("data") {
+        Some(d) => d,
+        None => return,
+    };
+    if data.get("actor").and_then(|a| a.get("source")).and_then(|s| s.as_str())
+        != Some("web")
+    {
+        return;
+    }
+    let action_id = match data.get("action_id").and_then(|v| v.as_str()) {
+        Some(a) if !a.is_empty() => a,
+        _ => return,
+    };
+
+    let api = {
+        let lock = ctx.data.read().await;
+        match lock.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct Mapping {
+        kind: String,
+        channel_id: String,
+        message_id: String,
+    }
+    let mappings: Vec<Mapping> = match api
+        .get_json(&format!("/api/discord-messages/{action_id}"))
+        .await
+    {
+        Ok(list) => list,
+        Err(e) => {
+            warn!(error = %e, action_id, "Echec fetch mapping blackjack_table");
+            return;
+        }
+    };
+    let m = match mappings.into_iter().find(|m| m.kind == "blackjack_table") {
+        Some(m) => m,
+        None => return,
+    };
+
+    let channel_id = match m.channel_id.parse::<u64>() {
+        Ok(v) => ChannelId::new(v),
+        Err(_) => return,
+    };
+    let msg_id = match m.message_id.parse::<u64>() {
+        Ok(v) => MessageId::new(v),
+        Err(_) => return,
+    };
+
+    if let Ok(messages) = channel_id
+        .messages(&ctx.http, GetMessages::new().limit(1).around(msg_id))
+        .await
+    {
+        if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
+            if let Some(existing) = original.embeds.first() {
+                let new_embed = CreateEmbed::from(existing.clone())
+                    .color(0x95A5A6)
+                    .footer(CreateEmbedFooter::new(
+                        "\u{1f512} Table fermee depuis la web admin",
+                    ));
+                if let Err(e) = channel_id
+                    .edit_message(
+                        &ctx.http,
+                        msg_id,
+                        serenity::builder::EditMessage::new()
+                            .embed(new_embed)
+                            .components(vec![]),
+                    )
+                    .await
+                {
+                    warn!(error = %e, %channel_id, %msg_id, "Echec edit embed blackjack table apres close web");
+                }
+            }
+        }
+    }
+    info!(action_id, "Embed blackjack table grise (close via web)");
+}
+
 /// Clic sur "Jouer au Blackjack" du panel -> cree un channel prive.
 pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInteraction) {
     let guild_id = match component.guild_id {
@@ -124,11 +217,13 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
         }
     }
 
-    // Creer la table en DB via l'API
-    {
+    // Creer la table en DB via l'API. Capture l'id (UUID) pour pouvoir
+    // ensuite enregistrer le mapping `discord_action_messages` (sync
+    // bilateral : close depuis web -> edit l'embed Discord).
+    let table_uuid: Option<uuid::Uuid> = {
         let data = ctx.data.read().await;
         if let Some(api) = data.get::<GameApiKey>() {
-            if let Err(e) = api
+            match api
                 .create_table(
                     &guild_id.to_string(),
                     &channel.id.to_string(),
@@ -137,10 +232,16 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
                 )
                 .await
             {
-                warn!(error = %e, "Echec creation table API (continue quand meme)");
+                Ok(t) => uuid::Uuid::parse_str(&t.id).ok(),
+                Err(e) => {
+                    warn!(error = %e, "Echec creation table API (continue quand meme)");
+                    None
+                }
             }
+        } else {
+            None
         }
-    }
+    };
 
     // Accueil : mise + invite
     let embed = CreateEmbed::new()
@@ -194,13 +295,42 @@ pub(super) async fn handle_panel_click(ctx: &Context, component: &ComponentInter
             .style(ButtonStyle::Danger),
     ]);
 
-    let _ = channel
+    let posted_msg_id = match channel
         .id
         .send_message(
             &ctx.http,
             CreateMessage::new().embed(embed).components(vec![row1, row2]),
         )
-        .await;
+        .await
+    {
+        Ok(m) => Some(m.id),
+        Err(e) => {
+            warn!(error = %e, "Echec envoi embed table blackjack");
+            None
+        }
+    };
+
+    // Sync bilateral : enregistre le mapping pour permettre l'edit Discord
+    // si l'admin ferme la table depuis la web admin.
+    if let (Some(uuid), Some(msg_id)) = (table_uuid, posted_msg_id) {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+            let api = std::sync::Arc::clone(api);
+            let g = guild_id.to_string();
+            let c = channel.id.to_string();
+            let m = msg_id.to_string();
+            drop(data);
+            crate::sync::register_action_message(
+                &api,
+                uuid,
+                crate::sync::kinds::BLACKJACK_TABLE,
+                &g,
+                &c,
+                &m,
+            )
+            .await;
+        }
+    }
 
     info!(
         user = %component.user.name,

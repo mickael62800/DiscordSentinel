@@ -145,6 +145,28 @@ pub async fn on_voice_state_update(ctx: &Context, old: &Option<VoiceState>, new:
 pub async fn on_ready(ctx: &Context, ready: &Ready) {
     reconcile_voice_channels(ctx, ready).await;
     tasks::spawn_afk_sweep(ctx.clone());
+    spawn_redis_listener(ctx.clone());
+}
+
+/// Listener Redis Stream : `voice_channel_updated` depuis web.
+/// Re-rend le panneau de controle Discord (edit embed) pour refleter le
+/// nouvel etat (locked/visibility/queue/owner) quand un admin change
+/// quelque chose depuis la web.
+fn spawn_redis_listener(ctx: Context) {
+    tokio::spawn(async move {
+        let consumer = sentinel_shared::event_bus::default_consumer_name();
+        sentinel_shared::event_bus::listen_stream_group(
+            "voice-bot-sync".to_string(),
+            consumer,
+            move |payload| {
+                let ctx = ctx.clone();
+                async move {
+                    handlers::voice::handle_voice_redis_event(&ctx, &payload).await;
+                }
+            },
+        )
+        .await;
+    });
 }
 
 /// Charge les salons vocaux ouverts depuis l'API et verifie leur existence Discord.

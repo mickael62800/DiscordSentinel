@@ -116,6 +116,25 @@ pub fn spawn_background_tasks(ctx: &Context) {
         }
     });
 
+    // Redis listener : `automod_review_resolved` depuis web -> edit la carte
+    // Discord (greyed-out + footer "via web") + applique l'action (warn/mute/
+    // ban/delete). Idempotent : skip si actor.source != "web".
+    let ctx_redis = ctx.clone();
+    tokio::spawn(async move {
+        let consumer = sentinel_shared::event_bus::default_consumer_name();
+        sentinel_shared::event_bus::listen_stream_group(
+            "automod-bot".to_string(),
+            consumer,
+            move |payload| {
+                let ctx = ctx_redis.clone();
+                async move {
+                    review::handle_redis_event(&ctx, &payload).await;
+                }
+            },
+        )
+        .await;
+    });
+
     // Background cleanup : purge des caches processed + flood
     // tracker toutes les 5 minutes.
     let ctx_clean = ctx.clone();

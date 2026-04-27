@@ -259,6 +259,15 @@ pub async fn build_app_state(
         Arc::new(crate::application::ManageWelcomeConfigService::new(
             welcome_config_repo.clone(),
         ));
+    // Automod reviews (sync Discord <-> web).
+    let automod_review_repo: Arc<dyn crate::ports::outbound::AutomodReviewRepository> = Arc::new(
+        crate::adapters::outbound::postgres::PgAutomodReviewRepository::new(pg_pool.clone()),
+    );
+    let automod_reviews_uc: Arc<dyn crate::ports::inbound::ManageAutomodReviewsUseCase> =
+        Arc::new(crate::application::ManageAutomodReviewsService::new(
+            automod_review_repo.clone(),
+        ));
+
     let watched_user_repo = Arc::new(PgWatchedUserRepository::new(pg_pool.clone()));
     let security_uc = Arc::new(
         ManageSecurityService::new(
@@ -703,6 +712,7 @@ pub async fn build_app_state(
         discord_bot_token: config.discord_bot_token.clone(),
         user_activity_repo: user_activity_repo.clone(),
         welcome_config_uc,
+        automod_reviews_uc,
         export_uc: Arc::new(ExportService::new(pg_pool.clone())),
         evidence_repo: Arc::new(PgEvidenceRepository::new(pg_pool.clone())),
         review_repo: Arc::new(PgReviewRepository::new(pg_pool.clone())),

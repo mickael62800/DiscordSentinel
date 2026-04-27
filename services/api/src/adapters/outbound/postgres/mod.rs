@@ -202,3 +202,6 @@ pub use coude_flavor_templates_repository::PgCoudeFlavorTemplatesRepository;
 
 mod discord_action_message_repository;
 pub use discord_action_message_repository::PgDiscordActionMessageRepository;
+
+mod automod_review_repository;
+pub use automod_review_repository::PgAutomodReviewRepository;

@@ -41,6 +41,7 @@ pub(super) async fn send_to_backend(
     colors: &EmbedColors,
     context_max_messages: u8,
     context_max_chars: usize,
+    review_min_score: f64,
 ) {
     // Recuperer les N derniers messages du canal pour le contexte conversationnel
     let context_messages = if context_max_messages == 0 {
@@ -139,11 +140,15 @@ pub(super) async fn send_to_backend(
                 );
             }
 
-            if ai_review_mode && log_channel_id != 0 {
+            // Sync : si score < seuil configure, on saute la review et
+            // on applique directement (filtre le bruit faible sur la pile).
+            let score = response.score.unwrap_or(0.0);
+            let above_threshold = score >= review_min_score;
+            if ai_review_mode && log_channel_id != 0 && above_threshold {
                 send_review_card(
                     ctx, msg, &response.action,
                     &effective_reason,
-                    response.score.unwrap_or(0.0),
+                    score,
                     &request.flags,
                     log_channel_id, colors,
                 ).await;

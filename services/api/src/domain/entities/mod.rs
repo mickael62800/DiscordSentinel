@@ -28,6 +28,8 @@ mod config_parsers;
 mod coude_expire;
 mod discord_action_message;
 pub use discord_action_message::{DiscordActionMessage, NewDiscordActionMessage, kinds as discord_action_kinds};
+mod automod_review;
+pub use automod_review::{AppliedAction, AutomodReview, NewAutomodReview, SuggestedAction};
 pub mod analytics;
 
 pub use coude_expire::cowardice_penalty;

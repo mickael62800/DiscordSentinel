@@ -301,7 +301,7 @@ pub async fn close_channel(
     let before = state.voice_channels_uc.get_channel_detail(&channel_id).await.ok();
     state.voice_channels_uc.close_channel(&channel_id).await?;
 
-    if let Some(d) = before {
+    let payload = if let Some(d) = &before {
         log_voice_event(
             &state,
             d.channel.guild_id.clone(),
@@ -313,12 +313,16 @@ pub async fn close_channel(
             serde_json::json!({}),
         )
         .await;
-    }
-
-    state.broadcaster.broadcast(
-        "voice_channel_closed",
-        serde_json::json!({ "channel_id": &channel_id }),
-    );
+        serde_json::json!({
+            "id": d.channel.id,
+            "channel_id": &channel_id,
+            "guild_id": &d.channel.guild_id,
+            "actor": { "source": "web" },
+        })
+    } else {
+        serde_json::json!({ "channel_id": &channel_id, "actor": { "source": "web" } })
+    };
+    state.broadcaster.broadcast("voice_channel_closed", payload);
 
     Ok(ok_response())
 }
@@ -374,7 +378,8 @@ pub async fn update_channel(
         })
         .await?;
 
-    if let Ok(detail) = state.voice_channels_uc.get_channel_detail(&channel_id).await {
+    let detail_opt = state.voice_channels_uc.get_channel_detail(&channel_id).await.ok();
+    if let Some(detail) = &detail_opt {
         log_voice_event(
             &state,
             detail.channel.guild_id.clone(),
@@ -388,10 +393,23 @@ pub async fn update_channel(
         .await;
     }
 
-    state.broadcaster.broadcast(
-        "voice_channel_updated",
-        serde_json::json!({ "channel_id": &channel_id }),
-    );
+    // Sync bilateral : enrichi avec id (UUID DB), etat complet, et
+    // actor.source = "web" pour que le bot listener re-render le panel.
+    let payload = if let Some(detail) = &detail_opt {
+        serde_json::json!({
+            "id": detail.channel.id,
+            "channel_id": &channel_id,
+            "guild_id": &detail.channel.guild_id,
+            "owner_id": &detail.channel.owner_id,
+            "visibility": &detail.channel.visibility,
+            "locked": detail.channel.locked,
+            "queue_enabled": detail.channel.queue_enabled,
+            "actor": { "source": "web" },
+        })
+    } else {
+        serde_json::json!({ "channel_id": &channel_id, "actor": { "source": "web" } })
+    };
+    state.broadcaster.broadcast("voice_channel_updated", payload);
 
     Ok(ok_response())
 }

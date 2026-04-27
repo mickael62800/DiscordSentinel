@@ -124,6 +124,17 @@ pub async fn cancel_combat(
     }
 
     state.coude_combats_uc.cancel(id).await?;
+
+    // Sync bilateral : edit l'embed du defi Discord (gris + retire boutons).
+    state.broadcaster.broadcast(
+        "coude_combat_cancelled",
+        serde_json::json!({
+            "combat_id": &combat_id,
+            "action_id": &combat_id,
+            "actor": { "source": "web" },
+        }),
+    );
+
     Ok(ok_response())
 }
 

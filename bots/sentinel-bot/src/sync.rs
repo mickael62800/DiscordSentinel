@@ -21,6 +21,8 @@ pub mod kinds {
     pub const ROLES_PANEL: &str = "roles_panel";
     pub const COMBAT_CHALLENGE: &str = "combat_challenge";
     pub const REVIEW_REQUEST: &str = "review_request";
+    pub const AUTOMOD_REVIEW: &str = "automod_review";
+    pub const BLACKJACK_TABLE: &str = "blackjack_table";
 }
 
 #[derive(serde::Serialize)]

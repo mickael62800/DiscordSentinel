@@ -154,3 +154,6 @@ pub use coude_flavor_templates_repository::CoudeFlavorTemplatesRepository;
 
 mod discord_action_message_repository;
 pub use discord_action_message_repository::DiscordActionMessageRepository;
+
+mod automod_review_repository;
+pub use automod_review_repository::AutomodReviewRepository;

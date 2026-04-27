@@ -175,14 +175,30 @@ pub(super) async fn create_temp_channel(
 
     // Envoyer le panneau de controle dans le chat integre du vocal
     // (prive + game uniquement ; les publics n'ont pas de panneau).
-    if kind == "private" || kind == "game" {
+    // Le toggle `panel_post_enabled` (voice-bot config) permet de desactiver
+    // entierement la pose du panneau (la sync bilaterale devient sans objet).
+    let panel_post_enabled = {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+            let cfg = api.get_guild_config_for(&guild_id.to_string(), "voice-bot").await
+                .unwrap_or_default();
+            cfg.get("panel_post_enabled")
+                .map(|v| v == "true" || v == "1")
+                .unwrap_or(true)
+        } else {
+            true
+        }
+    };
+    let panel_msg_id = if panel_post_enabled && (kind == "private" || kind == "game") {
         let queue_enabled_init = queue_channel_id.is_some();
-        send_control_panel(ctx, voice_channel_id, false, queue_enabled_init, false, user_id.get()).await;
-    }
+        send_control_panel(ctx, voice_channel_id, false, queue_enabled_init, false, user_id.get()).await
+    } else {
+        None
+    };
 
-    // Enregistrer via l'API (les champs texte/membres/categorie sont None
-    // dans cette architecture simplifiee).
-    {
+    // Enregistrer via l'API. Capture l'`id` (UUID) retourne pour pouvoir
+    // enregistrer le mapping `discord_action_messages` (sync bilateral).
+    let voice_record_uuid: Option<uuid::Uuid> = {
         let data = ctx.data.read().await;
         if let Some(api) = ApiClient::from_data(&data) {
             let request = CreateVoiceChannelRequest {
@@ -200,9 +216,37 @@ pub(super) async fn create_temp_channel(
                 queue_enabled: queue_channel_id.is_some(),
             };
 
-            if let Err(e) = api.create_channel(&request).await {
-                warn!(error = %e, "Erreur API create_channel");
+            match api.create_channel(&request).await {
+                Ok(resp) => uuid::Uuid::parse_str(&resp.id).ok(),
+                Err(e) => {
+                    warn!(error = %e, "Erreur API create_channel");
+                    None
+                }
             }
+        } else {
+            None
+        }
+    };
+
+    // Sync bilateral : enregistre le panneau pour permettre au web de
+    // declencher un re-render quand un admin change l etat du salon.
+    if let (Some(record_uuid), Some(msg_id)) = (voice_record_uuid, panel_msg_id) {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+            let api = std::sync::Arc::clone(api);
+            let guild_str = guild_id.to_string();
+            let ch_str = voice_channel_id.to_string();
+            let msg_str = msg_id.to_string();
+            drop(data);
+            crate::sync::register_action_message(
+                &api,
+                record_uuid,
+                "voice_panel",
+                &guild_str,
+                &ch_str,
+                &msg_str,
+            )
+            .await;
         }
     }
 
@@ -412,6 +456,187 @@ pub async fn place_queue_above_voice(
 
 // ── Builders UI pour le panneau admin ──
 
+/// Handler Redis Stream : `voice_channel_updated` (ou closed) depuis web.
+/// Edite le panel embed pour refleter le nouvel etat. Skip si le payload
+/// vient deja du bot (anti-boucle : actor.source != "web" => ignore).
+pub async fn handle_voice_redis_event(ctx: &Context, payload: &str) {
+    use serenity::all::{ChannelId, GetMessages, MessageId};
+
+    let event: serde_json::Value = match serde_json::from_str(payload) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let event_type = event.get("event").and_then(|v| v.as_str()).unwrap_or("");
+    if !matches!(event_type, "voice_channel_updated" | "voice_channel_closed") {
+        return;
+    }
+    let data = match event.get("data") {
+        Some(d) => d,
+        None => return,
+    };
+    let source = data
+        .get("actor")
+        .and_then(|a| a.get("source"))
+        .and_then(|s| s.as_str())
+        .unwrap_or("");
+    if source != "web" {
+        return;
+    }
+    // L'API peut publier `id` (UUID DB) ou `voice_id`/`channel_id`. On
+    // accepte plusieurs cles pour rester souple.
+    let action_id = data
+        .get("id")
+        .or_else(|| data.get("voice_id"))
+        .or_else(|| data.get("voice_channel_id"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+    if action_id.is_empty() {
+        return;
+    }
+
+    let api = {
+        let data_lock = ctx.data.read().await;
+        match data_lock.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct Mapping {
+        kind: String,
+        channel_id: String,
+        message_id: String,
+    }
+    let mappings: Vec<Mapping> = match api
+        .get_json(&format!("/api/discord-messages/{action_id}"))
+        .await
+    {
+        Ok(list) => list,
+        Err(e) => {
+            warn!(error = %e, action_id, "Echec fetch mapping voice_panel");
+            return;
+        }
+    };
+    let panel = match mappings.into_iter().find(|m| m.kind == "voice_panel") {
+        Some(m) => m,
+        None => return,
+    };
+
+    let channel_id = match panel.channel_id.parse::<u64>() {
+        Ok(v) => ChannelId::new(v),
+        Err(_) => return,
+    };
+    let msg_id_u64 = match panel.message_id.parse::<u64>() {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let msg_id = MessageId::new(msg_id_u64);
+
+    if event_type == "voice_channel_closed" {
+        // Le salon est ferme — grise le panel et vire les boutons.
+        if let Ok(messages) = channel_id
+            .messages(&ctx.http, GetMessages::new().limit(1).around(msg_id))
+            .await
+        {
+            if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
+                if let Some(existing_embed) = original.embeds.first() {
+                    let new_embed = serenity::builder::CreateEmbed::from(existing_embed.clone())
+                        .color(0x95A5A6)
+                        .footer(serenity::builder::CreateEmbedFooter::new(
+                            "Salon ferme depuis la web",
+                        ));
+                    let _ = channel_id
+                        .edit_message(
+                            &ctx.http,
+                            msg_id,
+                            serenity::builder::EditMessage::new()
+                                .embed(new_embed)
+                                .components(vec![]),
+                        )
+                        .await;
+                }
+            }
+        }
+        info!(action_id, "Voice panel grise (close depuis web)");
+        return;
+    }
+
+    // event = voice_channel_updated. Re-render le panel.
+    let locked = data.get("locked").and_then(|v| v.as_bool()).unwrap_or(false);
+    let queue_enabled = data
+        .get("queue_enabled")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let visibility = data
+        .get("visibility")
+        .and_then(|v| v.as_str())
+        .unwrap_or("visible");
+    let is_hidden = visibility == "hidden";
+    let owner_id = data
+        .get("owner_id")
+        .and_then(|v| v.as_str())
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(0);
+
+    rerender_control_panel(
+        ctx,
+        channel_id,
+        msg_id,
+        is_hidden,
+        queue_enabled,
+        locked,
+        owner_id,
+    )
+    .await;
+    info!(action_id, "Voice panel re-rendu suite update web");
+}
+
+async fn rerender_control_panel(
+    ctx: &Context,
+    text_channel_id: ChannelId,
+    panel_msg_id: serenity::model::id::MessageId,
+    is_hidden: bool,
+    queue_enabled: bool,
+    locked: bool,
+    owner_id: u64,
+) {
+    let visibility = if is_hidden { "Cache" } else { "Visible" };
+    let queue_status = if queue_enabled { "Activee" } else { "Desactivee" };
+    let lock_status = if locked { "Verrouille" } else { "Ouvert" };
+
+    let embed = CreateEmbed::new()
+        .title("Panneau de controle")
+        .description(format!(
+            "Salon prive de <@{owner_id}>\n\n\
+            **Statut du salon :**\n\
+            Visibilite : **{visibility}**\n\
+            File d'attente : **{queue_status}**\n\
+            Acces : **{lock_status}**\n\n\
+            Etat synchronise avec la web admin."
+        ))
+        .color(if locked {
+            0xe67e22
+        } else if is_hidden {
+            0xe74c3c
+        } else {
+            0x2ecc71
+        });
+
+    if let Err(e) = text_channel_id
+        .edit_message(
+            &ctx.http,
+            panel_msg_id,
+            serenity::builder::EditMessage::new().embed(embed),
+        )
+        .await
+    {
+        warn!(error = %e, %text_channel_id, "Echec re-render voice panel");
+    }
+}
+
+/// Retourne l'`MessageId` du panel poste pour permettre l'enregistrement
+/// du mapping `discord_action_messages` (sync Discord <-> web).
 async fn send_control_panel(
     ctx: &Context,
     text_channel_id: ChannelId,
@@ -419,7 +644,7 @@ async fn send_control_panel(
     queue_enabled: bool,
     locked: bool,
     owner_id: u64,
-) {
+) -> Option<serenity::model::id::MessageId> {
     let visibility = if is_hidden { "Cache" } else { "Visible" };
     let queue_status = if queue_enabled { "Activee" } else { "Desactivee" };
     let lock_status = if locked { "Verrouille" } else { "Ouvert" };
@@ -522,7 +747,11 @@ async fn send_control_panel(
         CreateActionRow::SelectMenu(user_select),
     ]);
 
-    if let Err(why) = text_channel_id.send_message(&ctx.http, message).await {
-        error!(error = %why, "Erreur envoi panneau de controle");
+    match text_channel_id.send_message(&ctx.http, message).await {
+        Ok(posted) => Some(posted.id),
+        Err(why) => {
+            error!(error = %why, "Erreur envoi panneau de controle");
+            None
+        }
     }
 }

@@ -87,13 +87,36 @@ pub async fn close_table(
     rbac: Option<Extension<RoleContext>>,
     Path(table_id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    if rbac.is_some() {
-        if let Some(guild_id) = state.blackjack_table_repo.get_guild_id(&table_id).await? {
-            check_role_for_guild(&state, &rbac, &guild_id, Role::Moderator, "moderator+ requis pour fermer une table").await?;
+    let guild_id = state.blackjack_table_repo.get_guild_id(&table_id).await?;
+    if let Some(ref gid) = guild_id {
+        if rbac.is_some() {
+            check_role_for_guild(&state, &rbac, gid, Role::Moderator, "moderator+ requis pour fermer une table").await?;
         }
     }
     state.blackjack_table_repo.close(&table_id).await?;
+
+    // Sync bilateral : event Redis + WS pour que le bot edite l'embed
+    // Discord (gris + footer) et que le web rafraichisse la liste.
+    state.broadcaster.broadcast(
+        "blackjack_table_closed",
+        serde_json::json!({
+            "table_id": &table_id,
+            "action_id": &table_id,
+            "guild_id": guild_id,
+            "actor": { "source": "web" },
+        }),
+    );
+
     Ok(StatusCode::NO_CONTENT)
+}
+
+/// GET /api/blackjack/admin/{guild_id}/tables
+pub async fn list_tables_by_guild(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+) -> Result<Json<Vec<BlackjackTable>>, ApiError> {
+    let tables = state.blackjack_table_repo.list_open_by_guild(&guild_id).await?;
+    Ok(Json(tables))
 }
 
 /// GET /api/blackjack/tables/{table_id}/games

@@ -91,6 +91,7 @@ pub struct AppState {
     pub discord_bot_token: String,
     pub user_activity_repo: Arc<dyn crate::ports::outbound::UserActivityRepository>,
     pub welcome_config_uc: Arc<dyn crate::ports::inbound::ManageWelcomeConfigUseCase>,
+    pub automod_reviews_uc: Arc<dyn crate::ports::inbound::ManageAutomodReviewsUseCase>,
     pub export_uc: Arc<dyn crate::application::ExecuteExportUseCase>,
     pub evidence_repo: Arc<dyn crate::ports::outbound::EvidenceRepository>,
     pub review_repo: Arc<dyn crate::ports::outbound::ReviewRepository>,

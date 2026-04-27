@@ -256,5 +256,109 @@ pub async fn on_ready(ctx: &Context, guild_ids: Vec<GuildId>) {
 ///   via `taunts_dispatch` — meme pipeline que les taunts combat.
 pub fn spawn_background(ctx: Context) {
     tournament_events::spawn(ctx.clone());
-    daily_chaos_events::spawn(ctx);
+    daily_chaos_events::spawn(ctx.clone());
+    spawn_combat_sync_listener(ctx);
+}
+
+/// Listener Redis : `coude_combat_cancelled` depuis web -> grise l'embed
+/// du defi Discord (retire boutons + footer "annule via web").
+fn spawn_combat_sync_listener(ctx: Context) {
+    tokio::spawn(async move {
+        let consumer = sentinel_shared::event_bus::default_consumer_name();
+        sentinel_shared::event_bus::listen_stream_group(
+            "coude-bot-combat-sync".to_string(),
+            consumer,
+            move |payload| {
+                let ctx = ctx.clone();
+                async move {
+                    handle_combat_redis_event(&ctx, &payload).await;
+                }
+            },
+        )
+        .await;
+    });
+}
+
+async fn handle_combat_redis_event(ctx: &Context, payload: &str) {
+    use serenity::all::{ChannelId, GetMessages, MessageId};
+    use serenity::builder::{CreateEmbed, CreateEmbedFooter, EditMessage};
+
+    let event: serde_json::Value = match serde_json::from_str(payload) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    if event.get("event").and_then(|v| v.as_str()) != Some("coude_combat_cancelled") {
+        return;
+    }
+    let data = match event.get("data") {
+        Some(d) => d,
+        None => return,
+    };
+    if data.get("actor").and_then(|a| a.get("source")).and_then(|s| s.as_str()) != Some("web") {
+        return;
+    }
+    let action_id = match data.get("action_id").and_then(|v| v.as_str()) {
+        Some(a) if !a.is_empty() => a,
+        _ => return,
+    };
+
+    let api = {
+        let lock = ctx.data.read().await;
+        match lock.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+            Some(a) => a.clone(),
+            None => return,
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct Mapping {
+        kind: String,
+        channel_id: String,
+        message_id: String,
+    }
+    let mappings: Vec<Mapping> = match api
+        .get_json(&format!("/api/discord-messages/{action_id}"))
+        .await
+    {
+        Ok(list) => list,
+        Err(e) => {
+            tracing::warn!(error = %e, action_id, "Echec fetch mapping combat_challenge");
+            return;
+        }
+    };
+    let m = match mappings.into_iter().find(|m| m.kind == "combat_challenge") {
+        Some(m) => m,
+        None => return,
+    };
+    let channel_id = match m.channel_id.parse::<u64>() {
+        Ok(v) => ChannelId::new(v),
+        Err(_) => return,
+    };
+    let msg_id = match m.message_id.parse::<u64>() {
+        Ok(v) => MessageId::new(v),
+        Err(_) => return,
+    };
+
+    if let Ok(messages) = channel_id
+        .messages(&ctx.http, GetMessages::new().limit(1).around(msg_id))
+        .await
+    {
+        if let Some(original) = messages.into_iter().find(|m| m.id == msg_id) {
+            if let Some(existing) = original.embeds.first() {
+                let new_embed = CreateEmbed::from(existing.clone())
+                    .color(0x95A5A6)
+                    .footer(CreateEmbedFooter::new(
+                        "\u{1f512} Combat annule depuis la web admin",
+                    ));
+                let _ = channel_id
+                    .edit_message(
+                        &ctx.http,
+                        msg_id,
+                        EditMessage::new().embed(new_embed).components(vec![]),
+                    )
+                    .await;
+            }
+        }
+    }
+    tracing::info!(action_id, "Embed combat coude grise (cancel via web)");
 }

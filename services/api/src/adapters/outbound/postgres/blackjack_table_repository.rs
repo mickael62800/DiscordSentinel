@@ -111,4 +111,21 @@ impl BlackjackTableRepository for PgBlackjackTableRepository {
             serde_json::json!({"id": id, "user_id": uid, "username": name, "status": status, "bet": bet, "payout": payout})
         }).collect())
     }
+
+    async fn list_open_by_guild(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<BlackjackTable>, crate::domain::errors::DomainError> {
+        let tables: Vec<BlackjackTable> = sqlx::query_as(
+            "SELECT id::text, guild_id, channel_id, owner_id, owner_name, status, created_at::text \
+             FROM blackjack_tables \
+             WHERE guild_id = $1 AND status = 'open' \
+             ORDER BY created_at DESC",
+        )
+        .bind(guild_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(tables)
+    }
 }

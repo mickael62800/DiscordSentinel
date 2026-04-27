@@ -193,11 +193,15 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
                 let flags = detectors::DetectionFlags { spam: true, insult: false, link: false, phishing: false };
                 let ctx_max_msgs = BaseApiClient::config_u64(&config, "context_max_messages", 3) as u8;
                 let ctx_max_chars = BaseApiClient::config_u64(&config, "context_max_chars", 200) as usize;
+                let flood_review_min_score: f64 = config
+                    .get("review_min_score")
+                    .and_then(|s| s.parse().ok())
+                    .unwrap_or(0.0);
                 let ctx_clone = ctx.clone();
                 let msg_clone = msg.clone();
                 tokio::spawn(async move {
                     let ai_review = true; // flood passe par le backend IA en review
-                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars).await;
+                    send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, ctx_max_msgs, ctx_max_chars, flood_review_min_score).await;
                 });
             }
             return;
@@ -278,11 +282,15 @@ pub(super) async fn process(ctx: &Context, msg: &Message) {
     let ctx_clone = ctx.clone();
     let msg_clone = msg.clone();
     let vision_enabled = BaseApiClient::config_bool(&config, "vision_enabled", true);
+    let review_min_score: f64 = config
+        .get("review_min_score")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(0.0);
     tokio::spawn(async move {
         let ai_review = BaseApiClient::config_bool(&config, "ai_review_mode", true);
 
         // Analyse texte
-        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars).await;
+        send_to_backend(&ctx_clone, &msg_clone, flags, mute_duration_secs, log_channel_id, ai_review, &colors, context_max_messages, context_max_chars, review_min_score).await;
 
         // Analyse image : si le message contient des images, les analyser via l'API.
         if vision_enabled {

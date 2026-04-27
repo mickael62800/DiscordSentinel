@@ -845,7 +845,7 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
     );
     let challenge_row = build_challenge_buttons(&combat.id);
 
-    if let Err(e) = component
+    let posted_msg = component
         .channel_id
         .send_message(
             &ctx.http,
@@ -853,9 +853,31 @@ pub async fn handle_preconfirm_ok(ctx: &Context, component: &ComponentInteractio
                 .embed(challenge_embed)
                 .components(vec![challenge_row]),
         )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec send_message defi");
+        .await;
+    match posted_msg {
+        Ok(msg) => {
+            // Sync bilateral : enregistre le mapping combat_challenge.
+            if let Ok(uuid) = uuid::Uuid::parse_str(&combat.id) {
+                let data = ctx.data.read().await;
+                if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+                    let api = std::sync::Arc::clone(api);
+                    let g = component.guild_id.map(|g| g.to_string()).unwrap_or_default();
+                    let c = component.channel_id.to_string();
+                    let m = msg.id.to_string();
+                    drop(data);
+                    crate::sync::register_action_message(
+                        &api,
+                        uuid,
+                        crate::sync::kinds::COMBAT_CHALLENGE,
+                        &g,
+                        &c,
+                        &m,
+                    )
+                    .await;
+                }
+            }
+        }
+        Err(e) => tracing::warn!(error = %e, "Echec send_message defi"),
     }
 
     // Notifier dans le salon notifications
