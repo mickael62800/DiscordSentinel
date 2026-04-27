@@ -45,20 +45,24 @@
 
 #### Semaine 1 — Infrastructure
 
-- [ ] **Migration SQL** `175_discord_action_messages.sql` :
-  - Table `discord_action_messages` (action_id, kind, guild_id, channel_id, message_id)
-  - Table `event_log` (rétention 72h pour replay SSE)
-- [ ] **Endpoints API** :
+- [x] **Migration SQL** `175_discord_action_messages.sql` ✅
+  - Table `discord_action_messages` (action_id, kind, guild_id, channel_id, message_id, posted_at, last_edited_at)
+  - PK composite `(action_id, kind)`, unique `(guild_id, channel_id, message_id)`
+- [x] **Domain entity + ports** ✅
+  - `DiscordActionMessage`, `NewDiscordActionMessage`, module `kinds`
+  - Port outbound `DiscordActionMessageRepository`
+  - Port inbound `ManageDiscordActionMessagesUseCase`
+  - Service application `ManageDiscordActionMessagesService`
+- [x] **Adapter Postgres** ✅ — `PgDiscordActionMessageRepository` (UPSERT idempotent)
+- [x] **Endpoints HTTP** ✅
   - `POST /api/discord-messages/register`
-  - `DELETE /api/discord-messages/{action_id}/{kind}`
   - `GET /api/discord-messages/{action_id}`
-  - `GET /api/events?guild_id=...&types=...` (SSE)
-- [ ] **Event bus** :
-  - Étendre `EventBroadcaster` pour persister chaque event dans `event_log`
-  - Format `DomainEvent { event_type, guild_id, action_id, emitted_at, actor, payload }`
-  - gRPC `EventBus.Subscribe(filters)` server streaming
-- [ ] **Auth SSE** : cookie session existant → réutiliser
-- [ ] **Tests** : event_log replay sur déconnexion, SSE reconnect
+  - `DELETE /api/discord-messages/{action_id}/{kind}`
+- [x] **AppState + bootstrap wiring** ✅
+- ⚠️ ~~Event log + SSE~~ — **non nécessaire** : l'infra event bus existe déjà
+  (Redis Stream `sentinel:events` + `EventBroadcaster` + `listen_stream_group`
+  côté bot + WebSocket relay côté web via la gateway).
+  → Phase 1 simplifiée : il suffit de **brancher** ce qui existe.
 
 #### Semaine 2 — Pilote ban
 

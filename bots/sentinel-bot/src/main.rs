@@ -6,6 +6,7 @@ static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 mod config;
 mod handler;
 mod modules;
+mod sync;
 
 use std::sync::Arc;
 
