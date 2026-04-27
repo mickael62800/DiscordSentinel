@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import NavItem from "../molecules/NavItem.vue";
 import StatusDot from "../atoms/StatusDot.vue";
@@ -15,6 +15,34 @@ const { user, logout, avatarUrl } = useAuth();
 const { unreadCount, panelOpen, togglePanel } = useNotifications();
 const { connected: wsConnected } = useRealtime();
 const { guilds, selectedGuildId, fetchGuilds, selectGuild } = useGuildSelector();
+
+// ── Sidebar groups (collapsable) ─────────────────────────
+// L état (collapsed / expanded) est persiste en localStorage. Le groupe
+// contenant la route active est auto-expanded.
+const STORAGE_KEY = "sidebar.collapsed.v1";
+const collapsed = ref<Record<string, boolean>>(loadCollapsed());
+
+function loadCollapsed(): Record<string, boolean> {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+function saveCollapsed() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(collapsed.value));
+  } catch {
+    /* ignore */
+  }
+}
+function toggleGroup(key: string) {
+  collapsed.value[key] = !collapsed.value[key];
+  saveCollapsed();
+}
+
+watch(collapsed, saveCollapsed, { deep: true });
 
 const generalItems = [
   { path: "/", label: "Tableau de bord", icon: "grid" },
@@ -73,6 +101,31 @@ const configItems = [
   { path: "/settings", label: "Parametres", icon: "settings" },
 ];
 
+// Définition des groupes collapsables (clé persistée en localStorage).
+const groups = [
+  { key: "moderation", label: "Moderation", items: moderationItems },
+  { key: "community", label: "Communaute", items: communityItems },
+  { key: "security", label: "Securite", items: securityItems },
+  { key: "logs", label: "Logs", items: logItems },
+  { key: "games", label: "Jeu", items: gameItems },
+  { key: "config", label: "Configuration", items: configItems },
+];
+
+// Détecte le groupe contenant la route courante → toujours expanded.
+const activeGroupKey = computed(() => {
+  for (const g of groups) {
+    if (g.items.some((i) => route.path === i.path)) return g.key;
+  }
+  return null;
+});
+
+function isExpanded(key: string): boolean {
+  // Le groupe actif force l affichage, peu importe collapsed.
+  if (activeGroupKey.value === key) return true;
+  // Defaut : expanded sauf si l user a explicitement collapsed.
+  return collapsed.value[key] !== true;
+}
+
 function onGuildChange(event: Event) {
   const value = (event.target as HTMLSelectElement).value;
   selectGuild(value === "" ? null : value);
@@ -126,65 +179,30 @@ onMounted(() => {
         :active="route.path === item.path"
       />
 
-      <div class="nav-separator"><span>Moderation</span></div>
-      <NavItem
-        v-for="item in moderationItems"
-        :key="item.path"
-        :path="item.path"
-        :label="item.label"
-        :icon="item.icon"
-        :active="route.path === item.path"
-      />
-
-      <div class="nav-separator"><span>Communaute</span></div>
-      <NavItem
-        v-for="item in communityItems"
-        :key="item.path"
-        :path="item.path"
-        :label="item.label"
-        :icon="item.icon"
-        :active="route.path === item.path"
-      />
-
-      <div class="nav-separator"><span>Securite</span></div>
-      <NavItem
-        v-for="item in securityItems"
-        :key="item.path"
-        :path="item.path"
-        :label="item.label"
-        :icon="item.icon"
-        :active="route.path === item.path"
-      />
-
-      <div class="nav-separator"><span>Logs</span></div>
-      <NavItem
-        v-for="item in logItems"
-        :key="item.path"
-        :path="item.path"
-        :label="item.label"
-        :icon="item.icon"
-        :active="route.path === item.path"
-      />
-
-      <div class="nav-separator"><span>Jeu</span></div>
-      <NavItem
-        v-for="item in gameItems"
-        :key="item.path"
-        :path="item.path"
-        :label="item.label"
-        :icon="item.icon"
-        :active="route.path === item.path"
-      />
-
-      <div class="nav-separator"><span>Configuration</span></div>
-      <NavItem
-        v-for="item in configItems"
-        :key="item.path"
-        :path="item.path"
-        :label="item.label"
-        :icon="item.icon"
-        :active="route.path === item.path"
-      />
+      <template v-for="group in groups" :key="group.key">
+        <button
+          class="nav-group-header"
+          :class="{ collapsed: !isExpanded(group.key) }"
+          type="button"
+          @click="toggleGroup(group.key)"
+        >
+          <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+          <span>{{ group.label }}</span>
+          <span class="group-count">{{ group.items.length }}</span>
+        </button>
+        <div v-if="isExpanded(group.key)" class="nav-group-items">
+          <NavItem
+            v-for="item in group.items"
+            :key="item.path"
+            :path="item.path"
+            :label="item.label"
+            :icon="item.icon"
+            :active="route.path === item.path"
+          />
+        </div>
+      </template>
     </nav>
 
     <!-- Info utilisateur -->
@@ -337,6 +355,56 @@ onMounted(() => {
   flex: 1;
   height: 1px;
   background-color: var(--border);
+}
+
+/* Groupe collapsable (header cliquable) */
+.nav-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 16px);
+  margin: 12px 8px 4px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  text-align: left;
+  transition: background-color var(--transition-fast, 0.15s);
+}
+.nav-group-header:hover {
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
+}
+.nav-group-header .chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.nav-group-header.collapsed .chevron {
+  transform: rotate(-90deg);
+}
+.nav-group-header span:not(.group-count) {
+  flex: 1;
+}
+.nav-group-header .group-count {
+  font-size: 9px;
+  background: var(--bg-primary);
+  padding: 1px 6px;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+.nav-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 /* Section utilisateur */
