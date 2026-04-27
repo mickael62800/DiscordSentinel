@@ -118,6 +118,26 @@ impl ApiClient {
         Self { base, grpc }
     }
 
+    // ── Catalogue flavor (Phase 3 #9 audit) ────────────────────────────
+    /// Tirage d'un template aleatoire pour `(key, locale)`. `Ok(None)` si
+    /// aucun template (404), `Err` sur autre erreur reseau/serveur.
+    pub async fn random_flavor(
+        &self,
+        key: &str,
+        locale: &str,
+    ) -> Result<Option<String>, String> {
+        #[derive(Deserialize)]
+        struct Resp {
+            content: String,
+        }
+        let path = format!("/api/coude/flavor/{}/random?locale={}", key, locale);
+        match self.base.get_json::<Resp>(&path).await {
+            Ok(r) => Ok(Some(r.content)),
+            Err(e) if e.contains("404") || e.to_lowercase().contains("not found") => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
     // ── Blackjack solo (gRPC) ──
 
     pub async fn start_game(

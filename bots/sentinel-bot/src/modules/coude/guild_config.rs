@@ -380,6 +380,77 @@ impl CoudeConfig {
         BaseApiClient::config_u64(&self.raw, "poison_damage_per_round", 5)
     }
 
+    // ── Phase 1 leftovers : magic constants migrees du bot vers config ─
+
+    /// Niveau requis pour /prestige (default 25).
+    pub fn prestige_unlock_level(&self) -> i32 {
+        BaseApiClient::config_u64(&self.raw, "prestige_unlock_level", 25) as i32
+    }
+
+    /// Niveau requis pour debloquer l'ultimate de classe (default 10).
+    pub fn ultimate_unlock_level(&self) -> i32 {
+        BaseApiClient::config_u64(&self.raw, "ultimate_unlock_level", 10) as i32
+    }
+
+    /// Cout d'un prank "fausse alerte braquage" (default 100).
+    pub fn prank_braquage_cost(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "prank_braquage_cost", 100) as i64
+    }
+
+    /// Cout d'un prank "faux scoop" (default 200).
+    pub fn prank_scoop_cost(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "prank_scoop_cost", 200) as i64
+    }
+
+    /// Cout d'un prank "faux appel DM" (default 50).
+    pub fn prank_appel_cost(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "prank_appel_cost", 50) as i64
+    }
+
+    /// Cout par membre pour creer une coalition (default 500).
+    pub fn coalition_cost_per_member(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "coalition_cost_per_member", 500) as i64
+    }
+
+    /// Contribution minimum a une prime collective (default 50).
+    pub fn contribute_prime_min(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "contribute_prime_min", 50) as i64
+    }
+
+    /// Coins minimum sur la cible pour /voler (default 10).
+    pub fn voler_min_target_coins(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "voler_min_target_coins", 10) as i64
+    }
+
+    /// Duree de l'animation /tout-ou-rien cote bot, en secondes (default 10).
+    pub fn tout_ou_rien_animation_secs(&self) -> u64 {
+        BaseApiClient::config_u64(&self.raw, "tout_ou_rien_animation_secs", 10)
+    }
+
+    // ── Assurance : tiers (Phase 1 leftovers) ─────────────────────────
+    //
+    // 3 paliers (jour / semaine / mois). Les durees sont en secondes,
+    // les multipliers s'appliquent au `insurance_cost` de base.
+
+    pub fn assurance_tier_day_secs(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "assurance_tier_day_secs", 86_400) as i64
+    }
+    pub fn assurance_tier_week_secs(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "assurance_tier_week_secs", 604_800) as i64
+    }
+    pub fn assurance_tier_month_secs(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "assurance_tier_month_secs", 2_592_000) as i64
+    }
+    pub fn assurance_tier_day_mult(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "assurance_tier_day_mult", 1) as i64
+    }
+    pub fn assurance_tier_week_mult(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "assurance_tier_week_mult", 6) as i64
+    }
+    pub fn assurance_tier_month_mult(&self) -> i64 {
+        BaseApiClient::config_u64(&self.raw, "assurance_tier_month_mult", 22) as i64
+    }
+
     pub fn channel_combats(&self) -> Option<String> { self.channel_opt("channel_combats") }
     pub fn channel_leaderboard(&self) -> Option<String> { self.channel_opt("channel_leaderboard") }
     pub fn channel_profil(&self) -> Option<String> { self.channel_opt("channel_profil") }

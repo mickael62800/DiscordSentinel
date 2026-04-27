@@ -1,9 +1,13 @@
 //! Infrastructure partagee entre les workers DiscordSentinel.
 //!
 //! Elimine la duplication de : shutdown signal, lifecycle logging,
-//! heartbeat, scheduler, pool creation, observabilité Prometheus.
+//! heartbeat, scheduler, pool creation, observabilité Prometheus,
+//! appels HTTP/gRPC vers l'API, init Redis client.
 
+pub mod api;
+pub mod grpc;
 pub mod metrics;
+pub mod redis_helpers;
 
 use std::time::Duration;
 

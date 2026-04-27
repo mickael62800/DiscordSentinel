@@ -1,7 +1,6 @@
 //! Tests unitaires du ManageStrikesService.
 //! Teste la logique metier : add_strike (escalation), get_active_strikes, reset, config.
 
-use super::*;
 
 use std::collections::HashMap;
 use std::sync::Arc;

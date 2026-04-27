@@ -6,7 +6,21 @@
 //! - `messages` : phrases fun piochees aleatoirement en fin de partie
 
 pub use super::buttons::build_buttons;
-pub use super::embeds::{build_game_message, is_game_over};
+pub use super::embeds::{build_game_message, flavor_key_for_status, is_game_over};
+
+/// Helper async pour pre-fetch le template flavor cote API selon le statut
+/// final d'une partie. Retourne `None` si :
+///   - la partie n'est pas en etat final (ex: en cours, push)
+///   - l'API ne connait pas la cle
+///   - l'API est indisponible (best-effort, l'embed retombe sur un texte
+///     neutre — pas de fallback local de template).
+pub async fn fetch_flavor_for_status(
+    api: &super::api_client::ApiClient,
+    status: &str,
+) -> Option<String> {
+    let key = flavor_key_for_status(status)?;
+    api.random_flavor(key, "fr").await.ok().flatten()
+}
 
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, ComponentInteraction, Context,
@@ -15,7 +29,7 @@ use serenity::all::{
 };
 
 use sentinel_shared::discord_helpers::{
-    component_reply_ephemeral as reply_component_ephemeral, reply_ephemeral,
+    component_reply_ephemeral as reply_component_ephemeral, reply_ephemeral, require_guild_id,
 };
 
 use super::GameApiKey;
@@ -144,13 +158,7 @@ pub fn register() -> CreateCommand {
 
 #[allow(dead_code)]
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let user_id = command.user.id.to_string();
     let username = command.user.name.clone();
@@ -185,7 +193,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 .await
                 .map(|w| w.coins)
                 .unwrap_or(0);
-            let (embed, attachment) = build_game_message(&game, wallet_balance);
+            // En cours -> pas de flavor (None, l'embed n'en utilise pas).
+            let (embed, attachment) = build_game_message(&game, wallet_balance, None);
             let components = build_buttons(&game);
             let mut msg = CreateInteractionResponseMessage::new()
                 .embed(embed)
@@ -211,7 +220,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    let (embed, attachment) = build_game_message(&game, wallet_balance);
+    let flavor = fetch_flavor_for_status(api, &game.status).await;
+    let (embed, attachment) = build_game_message(&game, wallet_balance, flavor.as_deref());
     let game_over = is_game_over(&game.status);
     let components = if game_over { vec![] } else { build_buttons(&game) };
 
@@ -331,7 +341,8 @@ pub async fn handle_component(ctx: &Context, component: &ComponentInteraction) {
         }
     };
 
-    let (embed, attachment) = build_game_message(&game, wallet_balance);
+    let flavor = fetch_flavor_for_status(api, &game.status).await;
+    let (embed, attachment) = build_game_message(&game, wallet_balance, flavor.as_deref());
     let game_over = is_game_over(&game.status);
     let components = if game_over { vec![] } else { build_buttons(&game) };
 

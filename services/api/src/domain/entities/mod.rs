@@ -120,6 +120,25 @@ pub use coude_limits::{
     DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT,
 };
 
+mod coude_economy;
+pub use coude_economy::{clamp_steal_amount, clamp_steal_fail_penalty, ClampedSteal};
+
+mod coude_combat_validation;
+pub use coude_combat_validation::{check_min_hp_pct, check_surprise_hp_pct, validate_new_combat};
+
+mod coude_travaux;
+pub use coude_travaux::{
+    fail_flavor_at, success_flavor_at, task_at, TravauxTask, TRAVAUX_COINS_MAX, TRAVAUX_COINS_MIN,
+    TRAVAUX_COOLDOWN_KEY, TRAVAUX_COOLDOWN_SECS, TRAVAUX_FAIL_FLAVORS, TRAVAUX_SUCCESS_FLAVORS,
+    TRAVAUX_SUCCESS_PCT, TRAVAUX_TASKS, TRAVAUX_XP_PER_TASK,
+};
+
+mod coude_steal_roll;
+pub use coude_steal_roll::{
+    steal_pct_range_bp, STEAL_D20_MAX, STEAL_D20_MIN, STEAL_PCT_ACTIVE_MAX_BP,
+    STEAL_PCT_ACTIVE_MIN_BP, STEAL_PCT_AFK_MAX_BP, STEAL_PCT_AFK_MIN_BP,
+};
+
 mod game;
 pub use game::{
     format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, normalize_optional_tag,
@@ -309,8 +328,9 @@ pub use tout_ou_rien_log::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienU
 
 mod season_theme;
 pub use season_theme::{
-    season_theme_by_key, theme_for_season, SeasonTheme, CURRENT_SEASON_THEME_CONFIG_KEY,
-    SEASON_THEMES,
+    apply_season_braquage_cooldown, compute_season_steal_bonus, season_chaos_multiplier,
+    season_tank_def_bonus_pct, season_theme_by_key, theme_for_season, SeasonTheme,
+    CURRENT_SEASON_THEME_CONFIG_KEY, SEASON_THEMES,
 };
 
 mod curse;

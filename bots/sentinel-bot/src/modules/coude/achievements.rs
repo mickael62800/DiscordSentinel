@@ -9,7 +9,12 @@
 use crate::modules::coude::api_client::Player;
 
 /// Un succes : identite stable + libelle + emoji + critere de deblocage.
+///
+/// `label` et `description` ne sont pas consommes par le runtime du bot
+/// (les embeds construisent leur texte depuis des templates dedies) mais
+/// restent exposes pour l'introspection (dashboard / `/aide` futur).
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct Achievement {
     pub key: &'static str,
     pub label: &'static str,

@@ -31,8 +31,8 @@ use sentinel_api::adapters::inbound::grpc::coude::{
     CoudeSocialGrpc,
 };
 use sentinel_api::domain::entities::{
-    BetResolutionPlan, CombatResolution, CombatStat, CoudeBet, CoudeCombat, CoudeCurrentSeason,
-    CoudeEvent, CoudeInsurance, CoudeInventoryItem, CoudeLeaderboardEntry, CoudePlayer, CoudePrime,
+    CombatResolution, CombatStat, CoudeBet, CoudeCombat, CoudeCurrentSeason, CoudeEvent,
+    CoudeInsurance, CoudeInventoryItem, CoudeLeaderboardEntry, CoudePlayer, CoudePrime,
     LeaderboardCategory, NewCoudeBet, NewCoudeCombat, NewCoudePrime, NewDailyChaos, RefundSummary,
     XpProgress,
 };

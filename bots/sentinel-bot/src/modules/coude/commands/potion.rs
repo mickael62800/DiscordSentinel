@@ -11,6 +11,8 @@ use serenity::all::{
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage,
 };
 
+use sentinel_shared::discord_helpers::require_guild_id;
+
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
@@ -31,13 +33,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral_pre_defer(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let config = load_guild_config(ctx, &guild_id).await;
     if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_profil()).await {
@@ -223,21 +219,7 @@ async fn followup_info(ctx: &Context, command: &CommandInteraction, content: &st
     }
 }
 
-/// Reply ephemeral AVANT le defer (utilise pour les cas "commande invalide"
-/// ou le channel check qui faillit avant d'arriver au defer).
-async fn reply_ephemeral_pre_defer(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec response Discord potion (pre-defer)");
-    }
-}
+// `reply_ephemeral_pre_defer` supprime : `require_guild_id` (shared)
+// utilise `reply_ephemeral` standard, suffisant ici (l'unique caller etait
+// le guard guild_id qui s'execute avant tout defer).
 

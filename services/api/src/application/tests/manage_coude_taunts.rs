@@ -1,4 +1,3 @@
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -8,7 +7,6 @@ use crate::domain::entities::CombatStat;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::{BotConfigRepository, CoudePlayerRepository, CoudeTauntsRepository};
-use chrono::Utc;
 
 // ══════════════════════════════════════════════════════════
 // Mocks
@@ -47,7 +45,7 @@ impl MockTauntsRepo {
             opt_outs_list: Mutex::new(vec![]),
         }
     }
-    fn with_config(mut self, f: impl FnOnce(&mut CoudeTauntsConfig)) -> Self {
+    fn with_config(self, f: impl FnOnce(&mut CoudeTauntsConfig)) -> Self {
         f(&mut *self.config.lock().unwrap());
         self
     }

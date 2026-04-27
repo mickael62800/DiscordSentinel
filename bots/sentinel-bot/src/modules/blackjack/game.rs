@@ -67,9 +67,14 @@ pub(super) async fn handle_bet_select(ctx: &Context, component: &ComponentIntera
     if let Some(mgr) = data.get::<ChannelManagerKey>() {
         mgr.set_game_id(component.user.id, game.id.clone());
     }
+
+    // Pre-fetch du template flavor cote API si la partie est terminee
+    // (cf. embeds::flavor_key_for_status). `None` si en cours ou push.
+    let flavor = game_logic::fetch_flavor_for_status(api, &game.status).await;
     drop(data);
 
-    let (embed, attachment) = game_logic::build_game_message(&game, wallet_balance);
+    let (embed, attachment) =
+        game_logic::build_game_message(&game, wallet_balance, flavor.as_deref());
     let components = if game_logic::is_game_over(&game.status) {
         vec![]
     } else {

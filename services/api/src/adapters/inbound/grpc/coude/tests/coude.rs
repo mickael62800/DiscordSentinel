@@ -1,6 +1,5 @@
 use super::*;
 
-    use super::*;
     use chrono::{TimeZone, Utc};
     use uuid::Uuid;
 

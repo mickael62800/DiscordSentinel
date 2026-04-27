@@ -84,6 +84,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         svc: state.blackjack_svc.clone(),
         wallet_repo: state.wallet_repo.clone(),
         bot_config_repo: state.bot_config_repo.clone(),
+        table_repo: state.blackjack_table_repo.clone(),
         broadcaster: state.broadcaster.clone(),
     };
     let coude = CoudePlayerGrpc {

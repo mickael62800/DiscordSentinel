@@ -6,9 +6,16 @@
 //!   combat de 50 % (ou les double si c'est une arnaque, configure
 //!   par guild).
 
+use serde::Deserialize;
 use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{grpc_err_to_string, proto_prime_to_dto, ApiClient, Insurance, Prime};
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct BuyInsuranceResolved {
+    pub created: bool,
+    pub is_scam: bool,
+}
 
 impl ApiClient {
     pub async fn create_prime(
@@ -103,6 +110,32 @@ impl ApiClient {
             .guarded(|| async move { client.buy_insurance(req).await.map(|_| ()) })
             .await
             .map_err(grpc_err_to_string)
+    }
+
+    /// Phase 2 #3 audit : RNG scam decide cote API. Le bot envoie le taux
+    /// + duree + level, l'API roule + persiste + retourne `is_scam`.
+    pub async fn buy_insurance_with_roll(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        scam_rate_pct: u32,
+        duration_seconds: i64,
+        level: i32,
+    ) -> Result<BuyInsuranceResolved, String> {
+        #[derive(serde::Serialize)]
+        struct Body<'a> {
+            user_id: &'a str,
+            scam_rate_pct: u32,
+            duration_seconds: i64,
+            level: i32,
+        }
+        let body = Body { user_id, scam_rate_pct, duration_seconds, level };
+        self.base
+            .post_json(
+                &format!("/api/coude/{guild_id}/insurance/buy-with-roll"),
+                &body,
+            )
+            .await
     }
 
     pub async fn get_active_insurance(

@@ -4,7 +4,6 @@
 //! Les règles métier (insurance, XP, formatage) sont testées en pur
 //! dans combat_resolution_rules.
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -13,8 +12,8 @@ use uuid::Uuid;
 
 use crate::application::ResolveBettingBatchService;
 use crate::domain::entities::{
-    BotDefinition, BotGuildConfig, CashboxRedistribution, CashboxRedistributionEntry, CashboxSource,
-    CombatResolution, CombatStat, CoudeBet, CoudeCashbox, CoudeCombat, CoudeCurrentSeason,
+    BotDefinition, BotGuildConfig,
+    CombatResolution, CombatStat, CoudeBet, CoudeCombat, CoudeCurrentSeason,
     CoudeEvent, CoudeInsurance, CoudeInventoryItem, CoudeLeaderboardEntry, CoudePlayer, CoudePrime,
     CoudeTauntsConfig, DailyChaosOutcome, LeaderboardCategory, NewCoudeBet, NewCoudeCombat,
     NewCoudePrime, NewDailyChaos, RefundSummary, TauntEvent, Wallet, WalletTransaction, XpProgress,

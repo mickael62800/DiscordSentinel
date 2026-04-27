@@ -41,16 +41,7 @@ impl ManageCoudeStealBoostsService {
         let Some(repo) = self.bot_config_repo.as_ref() else {
             return CoudeBalanceParams::default();
         };
-        match repo.get_config(guild_id, "coude-bot").await {
-            Ok(entries) => {
-                let map: std::collections::HashMap<String, String> = entries
-                    .into_iter()
-                    .map(|e| (e.config_key, e.config_value))
-                    .collect();
-                CoudeBalanceParams::from_config(&map)
-            }
-            Err(_) => CoudeBalanceParams::default(),
-        }
+        crate::application::coude_guild_settings::load_balance_params(&**repo, guild_id).await
     }
 }
 

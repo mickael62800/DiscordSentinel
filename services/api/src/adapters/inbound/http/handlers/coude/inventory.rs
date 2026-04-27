@@ -133,6 +133,48 @@ pub async fn buy_insurance(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Debug, serde::Deserialize)]
+pub struct BuyInsuranceWithRollDto {
+    pub user_id: String,
+    pub scam_rate_pct: u32,
+    pub duration_seconds: i64,
+    pub level: i32,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct BuyInsuranceResolvedDto {
+    pub created: bool,
+    pub is_scam: bool,
+}
+
+/// POST /api/coude/{guild_id}/insurance/buy-with-roll
+///
+/// Phase 2 #3 audit : RNG `scam` migre cote API. Le bot envoie le taux
+/// de scam (config guild) et le niveau, l'API roule + persiste + retourne
+/// le verdict.
+pub async fn buy_insurance_with_roll(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<BuyInsuranceWithRollDto>,
+) -> Result<Json<BuyInsuranceResolvedDto>, ApiError> {
+    let (created, is_scam) = state
+        .coude_inventory_uc
+        .buy_insurance_with_scam_roll(
+            &guild_id,
+            &dto.user_id,
+            dto.scam_rate_pct,
+            dto.duration_seconds,
+            dto.level,
+        )
+        .await?;
+    if !created {
+        return Err(ApiError(crate::domain::errors::DomainError::Conflict(
+            "Une assurance active existe deja pour ce joueur".into(),
+        )));
+    }
+    Ok(Json(BuyInsuranceResolvedDto { created, is_scam }))
+}
+
 /// GET /api/coude/{guild_id}/insurance/{user_id}
 pub async fn get_active_insurance(
     State(state): State<AppState>,

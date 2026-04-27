@@ -2,7 +2,6 @@
 //! penalty debit → cashbox deposit → stats record → refund bets, avec les
 //! chemins degrades (debit echoue → pas de deposit, pas de stats).
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;

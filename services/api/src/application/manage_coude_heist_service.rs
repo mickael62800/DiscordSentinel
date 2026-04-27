@@ -80,26 +80,15 @@ impl ManageCoudeHeistService {
     ) -> i64 {
         let Some(repo) = &self.player_repo else { return base_cooldown_days; };
         let Ok(Some(player)) = repo.get(guild_id, user_id).await else { return base_cooldown_days; };
-        use crate::domain::entities::theme_for_season;
-        let theme = theme_for_season(player.season);
-        if theme.braquage_cooldown_multiplier == 1.0 {
-            return base_cooldown_days;
-        }
-        let scaled = (base_cooldown_days as f64) * theme.braquage_cooldown_multiplier;
-        (scaled as i64).max(1)
+        crate::domain::entities::apply_season_braquage_cooldown(player.season, base_cooldown_days)
     }
 
     async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
-        match self.bot_config_repo.get_config(guild_id, "coude-bot").await {
-            Ok(entries) => {
-                let map: std::collections::HashMap<String, String> = entries
-                    .into_iter()
-                    .map(|e| (e.config_key, e.config_value))
-                    .collect();
-                CoudeBalanceParams::from_config(&map)
-            }
-            Err(_) => CoudeBalanceParams::default(),
-        }
+        crate::application::coude_guild_settings::load_balance_params(
+            &*self.bot_config_repo,
+            guild_id,
+        )
+        .await
     }
 }
 

@@ -2,7 +2,6 @@
 //! (404 path + success). get_member_summary est couvert par les tests HTTP
 //! integration (members_http) qui testent le flow complet avec stubs.
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;

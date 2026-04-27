@@ -44,4 +44,10 @@ pub enum DomainError {
     // 500
     #[error("Erreur interne : {0}")]
     Internal(String),
+
+    // 501 — methode de port non implementee par cet adapter (mock partiel,
+    // implementation a venir). Remplace les anciens `unimplemented!()` qui
+    // paniquaient en runtime.
+    #[error("Non implemente : {0}")]
+    NotImplemented(String),
 }

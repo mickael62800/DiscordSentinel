@@ -323,4 +323,41 @@ impl ManageConductUseCase for ManageConductService {
 
         Ok(total)
     }
+
+    async fn sync_ban_proposals(&self) -> Result<u64, DomainError> {
+        // Reason prefix utilise pour deduplication (matching `LIKE 'Points de conduite%'`)
+        const REASON_PREFIX: &str = "Points de conduite";
+        const REASON_FULL: &str = "Points de conduite tombes a 0";
+
+        let users = self
+            .repo
+            .find_zero_points_users_without_ban_proposal(REASON_PREFIX)
+            .await?;
+
+        let mut count = 0u64;
+        for user in users {
+            let infraction = Infraction {
+                id: Uuid::new_v4(),
+                guild_id: user.guild_id.clone(),
+                channel_id: String::new(),
+                user_id: user.user_id.clone(),
+                username: user.username.clone(),
+                message_id: String::new(),
+                content: String::new(),
+                flags: DetectionFlags { spam: false, insult: false, link: false, phishing: false },
+                score: 0.0,
+                action: Action::Ban,
+                reason: REASON_FULL.into(),
+                duration: None,
+                created_at: Utc::now(),
+            };
+            if let Err(e) = self.infraction_repo.save(&infraction).await {
+                tracing::warn!(error = %e, guild_id = %user.guild_id, user_id = %user.user_id, "sync_ban_proposals: save infraction echoue");
+                continue;
+            }
+            count += 1;
+        }
+
+        Ok(count)
+    }
 }

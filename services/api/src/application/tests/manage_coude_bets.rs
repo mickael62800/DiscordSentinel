@@ -1,8 +1,7 @@
 use super::*;
 use crate::domain::entities::{BetResolutionPlan, CoudeBet, CoudeCombat, NewCoudeBet, RefundSummary, TauntEvent};
 use crate::ports::inbound::manage_coude_bets::ManageCoudeBetsUseCase;
-use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
-use crate::ports::outbound::CoudeBetRepository;
+use crate::ports::outbound::{CombatQueryRepository, CoudeBetRepository};
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 use uuid::Uuid;
@@ -45,14 +44,14 @@ impl CoudeBetRepository for MockBetRepo {
     }
 }
 
-struct MockCombatsUc {
+struct MockCombatQuery {
     status: String,
     attacker_id: String,
     defender_id: String,
     should_fail: bool,
 }
 
-impl MockCombatsUc {
+impl MockCombatQuery {
     fn new(status: &str) -> Self {
         Self { status: status.into(), attacker_id: "att".into(), defender_id: "def".into(), should_fail: false }
     }
@@ -62,8 +61,7 @@ impl MockCombatsUc {
 }
 
 #[async_trait]
-impl ManageCoudeCombatsUseCase for MockCombatsUc {
-    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
+impl CombatQueryRepository for MockCombatQuery {
     async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError> {
         if self.should_fail {
             return Err(DomainError::NotFound("combat introuvable".into()));
@@ -92,16 +90,6 @@ impl ManageCoudeCombatsUseCase for MockCombatsUc {
             resolved_at: None,
         })
     }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn create(&self, _: crate::domain::entities::NewCoudeCombat) -> Result<CoudeCombat, DomainError> { unimplemented!() }
-    async fn cancel(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-    async fn resolve(&self, _: Uuid, _: crate::domain::entities::CombatResolution) -> Result<(), DomainError> { Ok(()) }
-    async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn expire(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
-    async fn set_defender_special(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
 }
 
 fn new_bet(bettor: &str, amount: i64) -> NewCoudeBet {
@@ -117,7 +105,7 @@ fn new_bet(bettor: &str, amount: i64) -> NewCoudeBet {
 
 fn make_svc(status: &str) -> (ManageCoudeBetsService, Arc<MockBetRepo>) {
     let repo = Arc::new(MockBetRepo::new());
-    let combats = Arc::new(MockCombatsUc::new(status));
+    let combats = Arc::new(MockCombatQuery::new(status));
     let svc = ManageCoudeBetsService::new(repo.clone(), combats);
     (svc, repo)
 }
@@ -178,7 +166,7 @@ async fn place_accepts_valid_bet() {
 #[tokio::test]
 async fn place_maps_combat_not_found_to_not_found() {
     let repo = Arc::new(MockBetRepo::new());
-    let combats = Arc::new(MockCombatsUc::failing());
+    let combats = Arc::new(MockCombatQuery::failing());
     let svc = ManageCoudeBetsService::new(repo, combats);
     let err = svc.place(new_bet("u1", 100)).await.unwrap_err();
     assert!(matches!(err, DomainError::NotFound(_)));
@@ -242,7 +230,7 @@ async fn resolve_with_bets_invokes_apply_resolution() {
 #[tokio::test]
 async fn refund_propagates_combat_not_found() {
     let repo = Arc::new(MockBetRepo::new());
-    let combats = Arc::new(MockCombatsUc::failing());
+    let combats = Arc::new(MockCombatQuery::failing());
     let svc = ManageCoudeBetsService::new(repo, combats);
     assert!(matches!(svc.refund(Uuid::new_v4()).await, Err(DomainError::NotFound(_))));
 }

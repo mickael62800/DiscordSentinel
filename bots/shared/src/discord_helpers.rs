@@ -8,6 +8,41 @@ use serenity::all::{
 };
 use tracing::warn;
 
+/// Extrait le `guild_id` d'une slash command. Si la commande est utilisee
+/// en DM (pas de guild), repond ephemerement et retourne `None`.
+///
+/// Pattern type au call site :
+/// ```ignore
+/// let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
+/// ```
+///
+/// Elimine le bloc `match command.guild_id { Some(id) => id.to_string(),
+/// None => { reply_ephemeral(...); return; } }` duplique dans ~40 commandes.
+pub async fn require_guild_id(
+    ctx: &Context,
+    command: &CommandInteraction,
+) -> Option<String> {
+    match command.guild_id {
+        Some(id) => Some(id.to_string()),
+        None => {
+            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
+            None
+        }
+    }
+}
+
+/// Repond ephemerement avec le message d'erreur API standard.
+///
+/// Remplace le pattern `reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await`
+/// duplique ~42 fois dans les commandes du bot.
+pub async fn reply_api_err<E: std::fmt::Display>(
+    ctx: &Context,
+    command: &CommandInteraction,
+    e: E,
+) {
+    reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+}
+
 /// Defer une slash command en mode ephemere.
 /// A appeler en tout debut de handler si le traitement peut depasser 3s.
 /// Apres un defer, utiliser `followup_ephemeral_embed` au lieu de `reply_*`.

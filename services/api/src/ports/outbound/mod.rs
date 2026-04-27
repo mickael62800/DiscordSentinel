@@ -59,6 +59,9 @@ pub use coude_player_repository::CoudePlayerRepository;
 mod coude_combat_repository;
 pub use coude_combat_repository::CoudeCombatRepository;
 
+mod combat_query_repository;
+pub use combat_query_repository::CombatQueryRepository;
+
 mod coude_bet_repository;
 pub use coude_bet_repository::CoudeBetRepository;
 
@@ -145,3 +148,6 @@ pub use coude_coalition_repository::CoudeCoalitionRepository;
 
 mod coude_ultimate_repository;
 pub use coude_ultimate_repository::CoudeUltimateRepository;
+
+mod coude_flavor_templates_repository;
+pub use coude_flavor_templates_repository::CoudeFlavorTemplatesRepository;

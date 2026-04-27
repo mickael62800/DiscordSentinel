@@ -24,4 +24,16 @@ pub trait ConductRepository: Send + Sync {
     // Log
     async fn save_log(&self, log: &ConductPointsLog) -> Result<(), DomainError>;
     async fn get_log(&self, guild_id: &str, user_id: &str, limit: i64) -> Result<Vec<ConductPointsLog>, DomainError>;
+
+    /// Liste les users dont `points <= 0` qui n'ont pas deja une infraction
+    /// `action='ban'` avec une `reason` LIKE `reason_prefix%`. Utilise par
+    /// `ManageConductUseCase::sync_ban_proposals` pour creer une proposition
+    /// de ban quand les points tombent a zero. Default impl `Ok(vec![])`
+    /// pour preserver les mocks existants.
+    async fn find_zero_points_users_without_ban_proposal(
+        &self,
+        _reason_prefix: &str,
+    ) -> Result<Vec<UserConductPoints>, DomainError> {
+        Ok(Vec::new())
+    }
 }

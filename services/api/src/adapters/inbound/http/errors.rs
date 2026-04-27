@@ -41,6 +41,11 @@ impl IntoResponse for ApiError {
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "Erreur interne".to_string(),
             ),
+
+            // 501
+            DomainError::NotImplemented(_) => {
+                (StatusCode::NOT_IMPLEMENTED, self.0.to_string())
+            }
         };
 
         tracing::error!(status = %status, error = %self.0, "Erreur API");

@@ -9,7 +9,7 @@ use serenity::all::{
     CreateInteractionResponse, CreateInteractionResponseMessage,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_api_err, require_guild_id};
 
 use crate::modules::coude::GameApiKey;
 
@@ -19,13 +19,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let user_id = command.user.id.to_string();
     let data = ctx.data.read().await;
@@ -37,7 +31,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            reply_api_err(ctx, command, e).await;
             return;
         }
     };

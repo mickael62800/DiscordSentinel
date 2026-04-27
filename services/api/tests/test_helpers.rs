@@ -437,6 +437,49 @@ pub struct StubResolveCombatNow;
     async fn resolve_now(&self, _: Uuid) -> Result<resolve_combat_now::ResolveCombatNowOutput, DomainError> { unimplemented!() }
 }
 
+pub struct StubSlotUc;
+#[async_trait] impl manage_slot::ManageSlotUseCase for StubSlotUc {
+    async fn spin(&self, _: manage_slot::SpinCommand) -> Result<manage_slot::SpinResult, DomainError> { unimplemented!() }
+    async fn claim_daily_bonus(&self, _: manage_slot::SpinCommand) -> Result<manage_slot::SpinResult, DomainError> { unimplemented!() }
+    async fn get_jackpot_pool(&self, _: &str) -> Result<i64, DomainError> { Ok(0) }
+    async fn recent_spins(&self, _: &str, _: i64) -> Result<Vec<SlotSpin>, DomainError> { Ok(vec![]) }
+    async fn top_winners(&self, _: &str, _: i64, _: i64) -> Result<Vec<SlotTopWinner>, DomainError> { Ok(vec![]) }
+}
+
+pub struct StubWheelUc;
+#[async_trait] impl manage_wheel::ManageWheelUseCase for StubWheelUc {
+    async fn spin(&self, _: manage_wheel::WheelSpinCommand) -> Result<manage_wheel::WheelSpinResult, DomainError> { unimplemented!() }
+    async fn recent_spins(&self, _: &str, _: i64) -> Result<Vec<WheelSpin>, DomainError> { Ok(vec![]) }
+    async fn top_winners(&self, _: &str, _: i64, _: i64) -> Result<Vec<WheelTopWinner>, DomainError> { Ok(vec![]) }
+}
+
+pub struct StubResolveFriendlyDuel;
+#[async_trait] impl ResolveFriendlyDuelUseCase for StubResolveFriendlyDuel {
+    async fn resolve(&self, _: FriendlyDuelInput) -> Result<FriendlyDuelOutput, DomainError> { unimplemented!() }
+}
+
+pub struct StubPlayToutOuRien;
+#[async_trait] impl play_tout_ou_rien::PlayToutOuRienUseCase for StubPlayToutOuRien {
+    async fn play(&self, _: play_tout_ou_rien::PlayToutOuRienCommand) -> Result<play_tout_ou_rien::ToutOuRienResolution, DomainError> { unimplemented!() }
+}
+
+pub struct StubPlayTravaux;
+#[async_trait] impl play_travaux::PlayTravauxUseCase for StubPlayTravaux {
+    async fn play(&self, _: play_travaux::PlayTravauxCommand) -> Result<play_travaux::TravauxResolution, DomainError> { unimplemented!() }
+}
+
+pub struct StubRollSteal;
+#[async_trait] impl roll_steal::RollStealUseCase for StubRollSteal {
+    async fn roll(&self, _: roll_steal::RollStealCommand) -> Result<roll_steal::StealRoll, DomainError> {
+        Ok(roll_steal::StealRoll { thief_d20: 10, victim_d20: 5, steal_pct_bp: 1200 })
+    }
+}
+
+pub struct StubCoudeFlavorTemplates;
+#[async_trait] impl CoudeFlavorTemplatesRepository for StubCoudeFlavorTemplates {
+    async fn random_by_key(&self, _: &str, _: &str) -> Result<Option<String>, DomainError> { Ok(None) }
+}
+
 pub struct StubCoudeCatalog;
 #[async_trait] impl manage_coude_catalog::ManageCoudeCatalogUseCase for StubCoudeCatalog {
     async fn get_catalog(&self) -> Result<manage_coude_catalog::CoudeCatalog, DomainError> { unimplemented!() }
@@ -752,6 +795,13 @@ fn base_state() -> AppState {
         resolve_betting_batch_uc: Arc::new(StubResolveBettingBatch),
         expire_combats_batch_uc: Arc::new(StubExpireCombatsBatch),
         resolve_combat_now_uc: Arc::new(StubResolveCombatNow),
+        slot_uc: Arc::new(StubSlotUc),
+        wheel_uc: Arc::new(StubWheelUc),
+        resolve_friendly_duel_uc: Arc::new(StubResolveFriendlyDuel),
+        play_tout_ou_rien_uc: Arc::new(StubPlayToutOuRien),
+        play_travaux_uc: Arc::new(StubPlayTravaux),
+        roll_steal_uc: Arc::new(StubRollSteal),
+        coude_flavor_templates_repo: Arc::new(StubCoudeFlavorTemplates),
         user_activity_repo: Arc::new(StubUserActivityRepo),
         welcome_config_repo: Arc::new(StubWelcomeConfigRepo),
         export_uc: Arc::new(StubExportUC),

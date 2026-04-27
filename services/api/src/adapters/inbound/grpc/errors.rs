@@ -19,6 +19,7 @@ pub fn domain_to_status(err: DomainError) -> Status {
         DomainError::RateLimited(_) => (Code::ResourceExhausted, err.to_string()),
         DomainError::Timeout(_) => (Code::DeadlineExceeded, err.to_string()),
         DomainError::Internal(_) => (Code::Internal, err.to_string()),
+        DomainError::NotImplemented(_) => (Code::Unimplemented, err.to_string()),
     };
     Status::new(code, msg)
 }

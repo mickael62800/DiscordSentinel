@@ -3,7 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{CombatResolution, CoudeBalanceParams, CoudeCombat, NewCoudeCombat};
+use crate::domain::entities::{
+    check_min_hp_pct, check_surprise_hp_pct, validate_new_combat, CombatResolution,
+    CoudeBalanceParams, CoudeCombat, NewCoudeCombat,
+};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
 use crate::ports::inbound::ManageCoudePlayersUseCase;
@@ -43,16 +46,7 @@ impl ManageCoudeCombatsService {
         let Some(repo) = self.bot_config_repo.as_ref() else {
             return CoudeBalanceParams::default();
         };
-        match repo.get_config(guild_id, "coude-bot").await {
-            Ok(entries) => {
-                let map: std::collections::HashMap<String, String> = entries
-                    .into_iter()
-                    .map(|e| (e.config_key, e.config_value))
-                    .collect();
-                CoudeBalanceParams::from_config(&map)
-            }
-            Err(_) => CoudeBalanceParams::default(),
-        }
+        crate::application::coude_guild_settings::load_balance_params(&**repo, guild_id).await
     }
 }
 
@@ -108,59 +102,44 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
     }
 
     async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
-        if new.mise <= 0 {
-            return Err(DomainError::ValidationError(
-                "La mise doit etre strictement positive".into(),
-            ));
-        }
-        if new.attacker_id == new.defender_id {
-            return Err(DomainError::ValidationError(
-                "Un joueur ne peut pas se defier lui-meme".into(),
-            ));
-        }
+        // 1. Validations pures (mise positive, pas de self-duel) — domain.
+        validate_new_combat(&new)?;
 
-        // Gate 1 : verifier que les DEUX combattants ont au moins
-        // `combat_min_hp_pct` % de HP. Empeche un joueur a 0 HP d etre
-        // defie ou de defier (combat ferait 0 round et bug la resolution).
+        // 2. Gates HP (necessitent une lecture players + config). Inactifs si
+        //    les deps optionnelles ne sont pas branchees.
         if let (Some(players_uc), Some(_)) =
             (self.players_uc.as_ref(), self.bot_config_repo.as_ref())
         {
             let params = self.load_balance(&new.guild_id).await;
-            let min_pct = params.combat_min_hp_pct;
-            if min_pct > 0 {
+
+            // Gate 1 : les DEUX combattants doivent avoir >= combat_min_hp_pct%.
+            if params.combat_min_hp_pct > 0 {
                 let attacker = players_uc.get(&new.guild_id, &new.attacker_id).await?;
                 let defender = players_uc.get(&new.guild_id, &new.defender_id).await?;
-
-                let check = |who: &str, hp_cur: i32, hp_max: i32| -> Result<(), DomainError> {
-                    let hp_max_u = (hp_max.max(1)) as u64;
-                    let hp_cur_u = (hp_cur.max(0)) as u64;
-                    let cur_pct = hp_cur_u.saturating_mul(100) / hp_max_u;
-                    if cur_pct < min_pct {
-                        return Err(DomainError::ValidationError(format!(
-                            "{who} n'a pas assez de PV pour combattre : {hp_cur_u}/{hp_max_u} ({cur_pct}%), minimum requis {min_pct}%. Utilise /repos pour te soigner."
-                        )));
-                    }
-                    Ok(())
-                };
-                check("L'attaquant", attacker.hp_current, attacker.hp_max)?;
-                check("Le defenseur", defender.hp_current, defender.hp_max)?;
+                check_min_hp_pct(
+                    "L'attaquant",
+                    attacker.hp_current,
+                    attacker.hp_max,
+                    params.combat_min_hp_pct,
+                )?;
+                check_min_hp_pct(
+                    "Le defenseur",
+                    defender.hp_current,
+                    defender.hp_max,
+                    params.combat_min_hp_pct,
+                )?;
             }
 
-            // Gate 2 : pour l'attaque surprise, verification supplementaire
-            // que l'attaquant a au moins `surprise_min_hp_percent` % de ses HP.
-            if new.special_attack.as_deref() == Some("surprise") {
-                let min_pct = params.surprise_min_hp_pct;
-                if min_pct > 0 {
-                    let attacker = players_uc.get(&new.guild_id, &new.attacker_id).await?;
-                    let hp_max = attacker.hp_max.max(1) as u64;
-                    let hp_cur = attacker.hp_current.max(0) as u64;
-                    let cur_pct = hp_cur.saturating_mul(100) / hp_max;
-                    if cur_pct < min_pct {
-                        return Err(DomainError::ValidationError(format!(
-                            "HP insuffisants pour une attaque surprise : {hp_cur}/{hp_max} ({cur_pct}%), minimum requis {min_pct}%."
-                        )));
-                    }
-                }
+            // Gate 2 : attaque surprise -> seuil HP attaquant specifique.
+            if new.special_attack.as_deref() == Some("surprise")
+                && params.surprise_min_hp_pct > 0
+            {
+                let attacker = players_uc.get(&new.guild_id, &new.attacker_id).await?;
+                check_surprise_hp_pct(
+                    attacker.hp_current,
+                    attacker.hp_max,
+                    params.surprise_min_hp_pct,
+                )?;
             }
         }
 

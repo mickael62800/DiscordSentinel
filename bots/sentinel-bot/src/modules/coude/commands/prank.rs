@@ -8,41 +8,26 @@
 //! `costume` (300c) pas implemente : trop intrusif (hooker chaque
 //! message d un user).
 
-use rand::seq::SliceRandom;
 use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateEmbed, CreateEmbedFooter, CreateMessage,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
 
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
-const PRANK_BRAQUAGE_COST: i64 = 100;
-const PRANK_SCOOP_COST: i64 = 200;
-const PRANK_APPEL_COST: i64 = 50;
-
-const SCOOP_TEMPLATES: &[&str] = &[
-    "{cible} vient de perdre 50 000 coins en voulant tout miser sur lui-meme",
-    "Une source proche de {cible} confie qu il vendrait son ame contre une potion",
-    "{cible} a ete vu en train de pleurer dans la cagnotte du serveur",
-    "{cible} aurait depense toutes ses economies dans un boost voleur defectueux",
-    "{cible} viserait une carriere de comptable selon des proches",
-    "Le caissier confirme : {cible} a tente d acheter du PQ avec une carte vide",
-    "{cible} aurait avoue en off vouloir abandonner Coup de Coude",
-    "Selon nos sources, {cible} dort avec un poster de la cagnotte serveur",
-    "{cible} aurait revele avoir 0 ami avant de jouer ici",
-    "Une rumeur indique que {cible} mise tous ses coins parce qu il s ennuie",
-];
-
-const FAUX_APPEL_MESSAGES: &[&str] = &[
-    "Tu as gagne 10 000 coins ! Reclame avec /claim — vite, ca expire dans 5 min !",
-    "FELICITATIONS ! Tu as ete tire au sort gagnant du Tournoi Officiel ! /claim pour empocher 25 000 coins.",
-    "URGENT : ton compte a ete creditee de 5 000 coins par erreur. Confirme avec /claim.",
-    "Le bot t a desigene Joueur Du Mois ! Recupere ta prime de 7 500 coins via /claim.",
-    "Ton boost voleur a degenere en jackpot. /claim pour debloquer 12 000 coins maintenant !",
-];
+// Couts migres dans `CoudeConfig` (Phase 1 leftovers audit) :
+//   prank_braquage_cost / prank_scoop_cost / prank_appel_cost.
+// Defaults preserves : 100c / 200c / 50c.
+//
+// Templates (SCOOP / FAUX_APPEL) migres dans `coude_flavor_templates`
+// (Phase 3 #9). Le bot consomme via `api.random_flavor`. Pas de fallback
+// local — si l'API est indispo on affiche un message d'erreur.
+//
+// Faux montant /braquage migre dans l'endpoint
+// `POST /prank/braquage/roll` (Phase 3 finalisation).
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("prank")
@@ -65,13 +50,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let config = load_guild_config(ctx, &guild_id).await;
     if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_activites()).await {
@@ -101,9 +80,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let source_id = command.user.id.to_string();
     let cost = match prank_type.as_str() {
-        "braquage" => PRANK_BRAQUAGE_COST,
-        "scoop" => PRANK_SCOOP_COST,
-        "appel" => PRANK_APPEL_COST,
+        "braquage" => config.prank_braquage_cost(),
+        "scoop" => config.prank_scoop_cost(),
+        "appel" => config.prank_appel_cost(),
         _ => {
             reply_ephemeral(ctx, command, "Type de prank inconnu.").await;
             return;
@@ -140,7 +119,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            reply_api_err(ctx, command, e).await;
             return;
         }
     };
@@ -155,7 +134,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     if let Err(e) = api.update_player_coins(&guild_id, &source_id, -cost).await {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        reply_api_err(ctx, command, e).await;
         return;
     }
 
@@ -172,11 +151,26 @@ async fn execute_braquage(
     command: &CommandInteraction,
     config: &crate::modules::coude::guild_config::CoudeConfig,
 ) {
-    // Faux montant aleatoire convaincant entre 5k et 50k. RNG scope
-    // ferme avant le premier await pour eviter le `Send` futur.
-    let fake_amount: i64 = {
-        let mut rng = rand::thread_rng();
-        (rng.gen_range(5..=50)) * 1000
+    let guild_id = command
+        .guild_id
+        .map(|g| g.to_string())
+        .unwrap_or_default();
+    // Faux montant tire cote API (catalogue editable, decision auditable).
+    let fake_amount = {
+        let data = ctx.data.read().await;
+        let api = data.get::<GameApiKey>().unwrap();
+        match api.roll_prank_braquage_amount(&guild_id).await {
+            Ok(r) => r.amount,
+            Err(_) => {
+                reply_ephemeral(
+                    ctx,
+                    command,
+                    "API indispo, veuillez reessayer plus tard.",
+                )
+                .await;
+                return;
+            }
+        }
     };
 
     let embed = CreateEmbed::new()
@@ -209,9 +203,22 @@ async fn execute_scoop(
     config: &crate::modules::coude::guild_config::CoudeConfig,
     target: &serenity::model::user::User,
 ) {
-    let tmpl: &str = {
-        let mut rng = rand::thread_rng();
-        SCOOP_TEMPLATES.choose(&mut rng).copied().unwrap_or("")
+    // Tirage cote API (catalogue `prank_scoop`).
+    let tmpl: String = {
+        let data = ctx.data.read().await;
+        let api = data.get::<GameApiKey>().unwrap();
+        match api.random_flavor("prank_scoop", "fr").await {
+            Ok(Some(s)) => s,
+            Ok(None) | Err(_) => {
+                reply_ephemeral(
+                    ctx,
+                    command,
+                    "API indispo, veuillez reessayer plus tard.",
+                )
+                .await;
+                return;
+            }
+        }
     };
     let body = tmpl.replace("{cible}", &format!("<@{}>", target.id));
 
@@ -239,12 +246,22 @@ async fn execute_appel(
     command: &CommandInteraction,
     target: &serenity::model::user::User,
 ) {
-    let tmpl: &str = {
-        let mut rng = rand::thread_rng();
-        FAUX_APPEL_MESSAGES
-            .choose(&mut rng)
-            .copied()
-            .unwrap_or("Tu as gagne quelque chose !")
+    // Tirage cote API (catalogue `prank_appel`).
+    let tmpl: String = {
+        let data = ctx.data.read().await;
+        let api = data.get::<GameApiKey>().unwrap();
+        match api.random_flavor("prank_appel", "fr").await {
+            Ok(Some(s)) => s,
+            Ok(None) | Err(_) => {
+                reply_ephemeral(
+                    ctx,
+                    command,
+                    "API indispo, veuillez reessayer plus tard.",
+                )
+                .await;
+                return;
+            }
+        }
     };
 
     let embed = CreateEmbed::new()
@@ -281,6 +298,3 @@ async fn execute_appel(
     };
     reply_ephemeral(ctx, command, &confirmation).await;
 }
-
-// re-exports rand pour le scope du fichier
-use rand::Rng;

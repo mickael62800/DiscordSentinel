@@ -9,9 +9,9 @@ use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRi
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeToutOuRienRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("coude_tout_ou_rien_log pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "coude_tout_ou_rien_log";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeToutOuRienRepository {
     pool: PgPool,

@@ -12,7 +12,6 @@
 //! - Draw path accident_debile : débits des 2 joueurs + record_draw x2
 //! - Prime path : si claim_primes > 0, credit extra + record_coins_earned
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -175,6 +174,7 @@ struct MockWalletRepo {
 }
 
 impl MockWalletRepo {
+    #[allow(dead_code)]
     fn set_balance(&self, guild: &str, user: &str, coins: i64) {
         self.wallets.lock().unwrap().insert(format!("{guild}:{user}"), coins);
     }

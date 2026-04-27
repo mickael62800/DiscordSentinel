@@ -8,7 +8,7 @@ use serenity::all::{
     CreateCommand, CreateCommandOption, Permissions,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
 
 use crate::modules::coude::GameApiKey;
 
@@ -28,13 +28,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let channel_id = command
         .data
@@ -56,7 +50,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .set_taunts_channel(&guild_id, channel_id.as_deref())
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        reply_api_err(ctx, command, e).await;
         return;
     }
 

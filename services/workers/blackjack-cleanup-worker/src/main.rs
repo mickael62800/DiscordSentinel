@@ -31,10 +31,7 @@ async fn main() {
         config.apply_db_config(&db_config);
     }
 
-    let redis_client = redis::Client::open(config.redis_url.as_str()).unwrap_or_else(|e| {
-        tracing::error!(error = %e, "Impossible de creer le client Redis");
-        std::process::exit(1);
-    });
+    let redis_client = common::redis_helpers::open_or_exit(&config.redis_url);
 
     let (shutdown_tx, shutdown_rx) = watch::channel(false);
 

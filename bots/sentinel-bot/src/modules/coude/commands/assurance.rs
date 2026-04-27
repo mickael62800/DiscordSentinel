@@ -1,22 +1,18 @@
-use rand::Rng;
 use serenity::all::{
     CommandInteraction, CommandOptionType, Context, CreateCommand, CreateCommandOption,
     CreateEmbed, CreateEmbedFooter,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
 
 use crate::modules::coude::GameApiKey;
 use crate::modules::coude::load_guild_config;
 
 /// Tiers d'abonnement d'assurance.
 ///
-/// Le prix est calcule comme `base_cost * multiplier`. Les multiplicateurs
-/// offrent une petite remise sur les durees longues pour inciter aux
-/// abonnements plus longs :
-///   - 1 jour   : 1x  (prix de base, pas de remise)
-///   - 1 semaine: 6x  (remise d'un jour par rapport a 7x quotidien)
-///   - 1 mois   : 22x (remise de 8 jours par rapport a 30x quotidien)
+/// Phase 1 leftovers audit : durees + multipliers migres dans
+/// `CoudeConfig` (`assurance_tier_{day,week,month}_{secs,mult}`). Les
+/// labels et la liste des cles restent statiques (UI Discord).
 struct InsuranceTier {
     key: &'static str,
     label: &'static str,
@@ -24,29 +20,27 @@ struct InsuranceTier {
     multiplier: i64,
 }
 
-const TIERS: &[InsuranceTier] = &[
-    InsuranceTier {
-        key: "day",
-        label: "1 jour",
-        duration_seconds: 86_400,
-        multiplier: 1,
-    },
-    InsuranceTier {
-        key: "week",
-        label: "1 semaine",
-        duration_seconds: 604_800,
-        multiplier: 6,
-    },
-    InsuranceTier {
-        key: "month",
-        label: "1 mois",
-        duration_seconds: 2_592_000,
-        multiplier: 22,
-    },
-];
-
-fn find_tier(key: &str) -> Option<&'static InsuranceTier> {
-    TIERS.iter().find(|t| t.key == key)
+fn build_tiers(cfg: &crate::modules::coude::guild_config::CoudeConfig) -> [InsuranceTier; 3] {
+    [
+        InsuranceTier {
+            key: "day",
+            label: "1 jour",
+            duration_seconds: cfg.assurance_tier_day_secs(),
+            multiplier: cfg.assurance_tier_day_mult(),
+        },
+        InsuranceTier {
+            key: "week",
+            label: "1 semaine",
+            duration_seconds: cfg.assurance_tier_week_secs(),
+            multiplier: cfg.assurance_tier_week_mult(),
+        },
+        InsuranceTier {
+            key: "month",
+            label: "1 mois",
+            duration_seconds: cfg.assurance_tier_month_secs(),
+            multiplier: cfg.assurance_tier_month_mult(),
+        },
+    ]
 }
 
 pub fn register() -> CreateCommand {
@@ -66,13 +60,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let user_id = command.user.id.to_string();
 
@@ -93,7 +81,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             _ => None,
         });
 
-    let tier = match tier_key.as_deref().and_then(find_tier) {
+    let tiers = build_tiers(&config);
+    let tier = match tier_key.as_deref().and_then(|k| tiers.iter().find(|t| t.key == k)) {
         Some(t) => t,
         None => {
             reply_ephemeral(ctx, command, "Duree d'abonnement invalide.").await;
@@ -112,7 +101,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            reply_api_err(ctx, command, e).await;
             return;
         }
     };
@@ -145,7 +134,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             }
             Ok(None) => {}
             Err(e) => {
-                reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+                reply_api_err(ctx, command, e).await;
                 return;
             }
         }
@@ -156,30 +145,36 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .update_player_coins(&guild_id, &user_id, -total_cost)
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        reply_api_err(ctx, command, e).await;
         return;
     }
 
-    // Chance d'arnaque depuis la config
-    let is_scam = {
-        let mut rng = rand::thread_rng();
-        rng.gen_range(1..=100) <= config.insurance_scam_rate()
-    };
-
-    if let Err(e) = api
-        .buy_insurance(&guild_id, &user_id, is_scam, tier.duration_seconds, player.level)
+    // Phase 2 #3 audit : le RNG `is_scam` est cote API. Le bot envoie le
+    // taux de scam (config guild) + duree + level, l'API roule et persiste.
+    let resolved = match api
+        .buy_insurance_with_roll(
+            &guild_id,
+            &user_id,
+            config.insurance_scam_rate() as u32,
+            tier.duration_seconds,
+            player.level,
+        )
         .await
     {
-        // Rembourser
-        if let Err(e2) = api
-            .update_player_coins(&guild_id, &user_id, total_cost)
-            .await
-        {
-            tracing::warn!(error = %e2, "Echec DB update_player_coins remboursement");
+        Ok(r) => r,
+        Err(e) => {
+            // Rembourser
+            if let Err(e2) = api
+                .update_player_coins(&guild_id, &user_id, total_cost)
+                .await
+            {
+                tracing::warn!(error = %e2, "Echec DB update_player_coins remboursement");
+            }
+            reply_api_err(ctx, command, e).await;
+            return;
         }
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
-        return;
-    }
+    };
+    let is_scam = resolved.is_scam;
 
     // Phase 9 : le cout de l'assurance alimente la caisse communautaire.
     // Best-effort : si le deposit echoue, on garde l'assurance (le joueur

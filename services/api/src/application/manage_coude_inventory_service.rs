@@ -141,6 +141,40 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
             .await
     }
 
+    async fn buy_insurance_with_scam_roll(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        scam_rate_pct: u32,
+        duration_seconds: i64,
+        level: i32,
+    ) -> Result<(bool, bool), DomainError> {
+        // Roll RNG cote serveur. Phase 2 #3 audit : le bot ne decide plus.
+        let is_scam = {
+            use rand::Rng;
+            let mut rng = rand::thread_rng();
+            rng.gen_range(1..=100) <= scam_rate_pct.min(100)
+        };
+        let unlock_level = match &self.bot_config_repo {
+            Some(repo) => CoudeGuildSettings::load(&**repo, guild_id)
+                .await
+                .get_i32("assurance_extra_slot_level", 5),
+            None => 5,
+        };
+        let max_slots = if level >= unlock_level { 2 } else { 1 };
+        let created = self
+            .repo
+            .buy_insurance_with_max_slots(
+                guild_id,
+                user_id,
+                is_scam,
+                duration_seconds,
+                max_slots,
+            )
+            .await?;
+        Ok((created, is_scam))
+    }
+
     async fn get_active_insurance(
         &self,
         guild_id: &str,

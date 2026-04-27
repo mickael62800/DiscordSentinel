@@ -3,7 +3,6 @@
 //! wallet_uc.transfer sont testes via l'integration wallet et ne sont pas
 //! duplique ici.
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -85,7 +84,7 @@ impl CoudeSocialRepository for MockSocialRepo {
     }
     async fn get_or_bootstrap_current_season(
         &self,
-        guild_id: &str,
+        _guild_id: &str,
     ) -> Result<CoudeCurrentSeason, DomainError> {
         Ok(self.season.lock().unwrap().clone().unwrap_or(CoudeCurrentSeason {
             season_number: 1,

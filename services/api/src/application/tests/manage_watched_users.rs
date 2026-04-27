@@ -1,7 +1,6 @@
 //! Tests ManageWatchedUsersService : pass-throughs + 404 dossier.
 //! get_user_dossier est couvert par integration HTTP watched_users_http.
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
@@ -16,7 +15,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::{
     AddPointsCommand, AnalyzeNewMemberCommand, DeductPointsCommand, InfractionFilters,
     LogModerationCommand, ManageConductUseCase, ManageInfractionsUseCase,
-    ManageModerationUseCase, ManageSecurityUseCase, ManageStatsUseCase,
+    ManageModerationUseCase, ManageSecurityUseCase,
     ReportSecurityEventCommand, SaveConductConfigCommand, SecurityDecision,
 };
 use crate::ports::inbound::manage_notes::{AddNoteCommand, ManageNotesUseCase};

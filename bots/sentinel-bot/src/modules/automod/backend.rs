@@ -361,11 +361,15 @@ pub(super) async fn analyze_message_images(
         return;
     };
 
-    let http_client = reqwest::Client::new();
+    // Pas de `reqwest::Client::new()` ici : on reutilise le client partage
+    // de `BaseApiClient` (connection pooling + timeouts coherents). L'URL
+    // de Discord CDN est externe — c'est une lecture HTTP brute legitime,
+    // pas un appel API interne.
+    let http_client = base.client();
     let api_url = base.base_url().to_string();
 
     for url in &image_urls {
-        // 1. Telecharger l'image depuis Discord.
+        // 1. Telecharger l'image depuis Discord (CDN externe).
         let bytes = match http_client.get(url).send().await {
             Ok(resp) if resp.status().is_success() => match resp.bytes().await {
                 Ok(b) => b.to_vec(),
@@ -393,16 +397,16 @@ pub(super) async fn analyze_message_images(
 
         let mut job_id: Option<String> = None;
         for attempt in 0..=queue_max_retries {
-            let submit_resp = match http_client
+            // Appel API interne -> on passe par `base.auth(...)` pour
+            // ajouter le Bearer token (homogene avec le reste du bot).
+            let req = http_client
                 .post(format!("{api_url}/api/ai/jobs"))
                 .json(&serde_json::json!({
                     "guild_id": guild_id,
                     "job_type": "analyze_image",
                     "input_payload": payload,
-                }))
-                .send()
-                .await
-            {
+                }));
+            let submit_resp = match base.auth(req).send().await {
                 Ok(r) => r,
                 Err(e) => {
                     warn!(error = %e, attempt, "Echec soumission job AI image");

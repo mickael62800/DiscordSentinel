@@ -83,3 +83,42 @@ pub struct ToutOuRienUserStatsResp {
     pub biggest_win: i64,
     pub biggest_loss: i64,
 }
+
+// ── Phase 2 #1 audit : RNG migre cote API. Le bot appelle un seul
+//    endpoint `play` qui fait cooldown + verif solde + RNG + mutation
+//    wallet + cooldown + memorial. ────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct PlayToutOuRienBody<'a> {
+    pub user_id: &'a str,
+    pub username: &'a str,
+}
+
+#[derive(Debug, Deserialize, Clone)]
+pub struct PlayToutOuRienResp {
+    pub initial_coins: i64,
+    /// "won" | "lost"
+    pub outcome: String,
+    pub delta: i64,
+    pub final_balance: i64,
+}
+
+impl ApiClient {
+    /// Joue un tout-ou-rien : pipeline complet cote API.
+    /// Renvoie une erreur (RateLimited / ValidationError / Internal) que
+    /// le bot affiche tel quel a l'utilisateur.
+    pub async fn play_tout_ou_rien(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        username: &str,
+    ) -> Result<PlayToutOuRienResp, String> {
+        let body = PlayToutOuRienBody { user_id, username };
+        self.base
+            .post_json(
+                &format!("/api/coude/{guild_id}/tout-ou-rien/play"),
+                &body,
+            )
+            .await
+    }
+}

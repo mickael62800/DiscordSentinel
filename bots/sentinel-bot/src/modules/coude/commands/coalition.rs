@@ -6,12 +6,13 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateEmbedFooter,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
 
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
-const COST_PER_MEMBER: i64 = 500;
+// `cost_per_member` migre dans `CoudeConfig::coalition_cost_per_member`
+// (Phase 1 leftovers audit). Default preserve : 500c.
 const MIN_MEMBERS: usize = 3;
 
 pub fn register() -> CreateCommand {
@@ -24,13 +25,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
     let config = load_guild_config(ctx, &guild_id).await;
     if !crate::modules::coude::channel_check::check_channel(ctx, command, config.channel_activites()).await {
         return;
@@ -53,6 +48,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     };
     let user_id = command.user.id.to_string();
     let target_id_str = target_id.to_string();
+    let cost_per_member = config.coalition_cost_per_member();
 
     if user_id == target_id_str {
         reply_ephemeral(ctx, command, "Tu ne peux pas te coaliser contre toi-meme !").await;
@@ -80,15 +76,15 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            reply_api_err(ctx, command, e).await;
             return;
         }
     };
-    if player.coins < COST_PER_MEMBER {
+    if player.coins < cost_per_member {
         reply_ephemeral(
             ctx,
             command,
-            &format!("Solde insuffisant ({}c). Cout : {}c.", player.coins, COST_PER_MEMBER),
+            &format!("Solde insuffisant ({}c). Cout : {}c.", player.coins, cost_per_member),
         )
         .await;
         return;
@@ -97,16 +93,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .get_or_create_player(&guild_id, &target_id_str, &target_user.name)
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        reply_api_err(ctx, command, e).await;
         return;
     }
 
     // Debit + join. Rollback si echec.
     if let Err(e) = api
-        .update_player_coins(&guild_id, &user_id, -COST_PER_MEMBER)
+        .update_player_coins(&guild_id, &user_id, -cost_per_member)
         .await
     {
-        reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+        reply_api_err(ctx, command, e).await;
         return;
     }
 
@@ -155,9 +151,9 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Err(e) => {
             // Rollback : on rend les coins.
             let _ = api
-                .update_player_coins(&guild_id, &user_id, COST_PER_MEMBER)
+                .update_player_coins(&guild_id, &user_id, cost_per_member)
                 .await;
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            reply_api_err(ctx, command, e).await;
         }
     }
 }

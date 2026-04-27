@@ -1,6 +1,5 @@
 //! Tests unitaires du ManageNotesService.
 
-use super::*;
 
 use std::sync::Arc;
 

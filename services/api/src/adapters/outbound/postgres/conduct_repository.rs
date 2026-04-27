@@ -308,4 +308,28 @@ impl ConductRepository for PgConductRepository {
 
         Ok(rows.into_iter().map(ConductPointsLog::from).collect())
     }
+
+    async fn find_zero_points_users_without_ban_proposal(
+        &self,
+        reason_prefix: &str,
+    ) -> Result<Vec<UserConductPoints>, DomainError> {
+        let pattern = format!("{reason_prefix}%");
+        let rows = sqlx::query_as::<_, PointsRow>(
+            "SELECT ucp.* FROM user_conduct_points ucp \
+             WHERE ucp.points <= 0 \
+               AND NOT EXISTS ( \
+                   SELECT 1 FROM infractions i \
+                   WHERE i.guild_id = ucp.guild_id \
+                     AND i.user_id = ucp.user_id \
+                     AND i.action = 'ban' \
+                     AND i.reason LIKE $1 \
+               )",
+        )
+        .bind(&pattern)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+
+        Ok(rows.into_iter().map(UserConductPoints::from).collect())
+    }
 }

@@ -9,9 +9,9 @@ use crate::domain::entities::CoudeStealBoost;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeStealBoostRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("steal_boost pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "steal_boost";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeStealBoostRepository {
     pool: PgPool,

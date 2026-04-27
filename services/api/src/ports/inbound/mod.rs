@@ -113,3 +113,14 @@ pub use manage_coude_safety_net::ManageCoudeSafetyNetUseCase;
 
 pub mod manage_coude_vendetta;
 pub use manage_coude_vendetta::ManageCoudeVendettaUseCase;
+
+pub mod play_tout_ou_rien;
+pub use play_tout_ou_rien::{
+    PlayToutOuRienCommand, PlayToutOuRienUseCase, ToutOuRienResolution, MIN_BALANCE_FOR_PLAY,
+};
+
+pub mod play_travaux;
+pub use play_travaux::{PlayTravauxCommand, PlayTravauxUseCase, TravauxResolution};
+
+pub mod roll_steal;
+pub use roll_steal::{RollStealCommand, RollStealUseCase, StealRoll};

@@ -61,6 +61,14 @@ pub async fn start_game(
         .await?;
     let game = result.game;
 
+    // Anti-AFK : si le joueur est dans une table multi, bumpe son
+    // `last_activity` pour eviter une fermeture par le cleanup worker.
+    state
+        .blackjack_table_repo
+        .touch_activity_by_player(&game.guild_id, &game.user_id)
+        .await
+        .ok();
+
     if game_is_over(&game.status) {
         broadcast_result(&state, &game, false);
     }
@@ -79,6 +87,13 @@ pub async fn hit(
     let id = parse_uuid(&game_id)?;
     let game = state.blackjack_svc.hit(id).await?.game;
 
+    // Anti-AFK : bumpe last_activity de la table multi du joueur (si toute).
+    state
+        .blackjack_table_repo
+        .touch_activity_by_player(&game.guild_id, &game.user_id)
+        .await
+        .ok();
+
     if game_is_over(&game.status) {
         broadcast_result(&state, &game, false);
     }
@@ -94,6 +109,13 @@ pub async fn stand(
     let id = parse_uuid(&game_id)?;
     let game = state.blackjack_svc.stand(id).await?.game;
 
+    // Anti-AFK.
+    state
+        .blackjack_table_repo
+        .touch_activity_by_player(&game.guild_id, &game.user_id)
+        .await
+        .ok();
+
     // stand termine toujours la partie → on broadcast systématiquement.
     broadcast_result(&state, &game, false);
 
@@ -107,6 +129,13 @@ pub async fn double_down(
 ) -> Result<Json<BlackjackGameDto>, ApiError> {
     let id = parse_uuid(&game_id)?;
     let game = state.blackjack_svc.double_down(id).await?.game;
+
+    // Anti-AFK.
+    state
+        .blackjack_table_repo
+        .touch_activity_by_player(&game.guild_id, &game.user_id)
+        .await
+        .ok();
 
     if game_is_over(&game.status) {
         broadcast_result(&state, &game, true);
