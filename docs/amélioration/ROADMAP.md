@@ -281,7 +281,7 @@ démonstration end-to-end du pattern :
 
 ---
 
-## 🎮 Phase 7 — Coude avancé (semaines 9-10)
+## 🎮 Phase 7 — Coude avancé (semaines 9-10) ✅ *(MVP — page lookup par user)*
 
 > **Objectif** : exposer côté web tous les sous-systèmes Coude qui n'ont pas d'admin UI.
 
