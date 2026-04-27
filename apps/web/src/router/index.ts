@@ -33,6 +33,7 @@ import ReviewPage from "../components/pages/ReviewPage.vue";
 import ModstatsPage from "../components/pages/ModstatsPage.vue";
 import VoiceThemesPage from "../components/pages/VoiceThemesPage.vue";
 import RolePanelEditPage from "../components/pages/RolePanelEditPage.vue";
+import CoudeSocialPage from "../components/pages/CoudeSocialPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -72,5 +73,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/modstats", name: "modstats", component: ModstatsPage },
   { path: "/voice-themes", name: "voice-themes", component: VoiceThemesPage },
   { path: "/role-panels/new", name: "role-panel-new", component: RolePanelEditPage },
+  { path: "/coude/social", name: "coude-social", component: CoudeSocialPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

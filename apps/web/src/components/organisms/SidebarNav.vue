@@ -54,6 +54,7 @@ const logItems = [
 const gameItems = [
   { path: "/games", label: "Jeux", icon: "layers" },
   { path: "/coude", label: "Coup de Coude", icon: "zap" },
+  { path: "/coude/social", label: "Coude social", icon: "users" },
   { path: "/blackjack", label: "Blackjack", icon: "layers" },
   { path: "/wallet", label: "Wallet", icon: "dollar-sign" },
   { path: "/tournaments", label: "Tournoi hebdo", icon: "zap" },
