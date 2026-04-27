@@ -4,7 +4,20 @@ import { useGuildSelector } from "../../composables/useGuildSelector";
 import AppBadge from "../atoms/AppBadge.vue";
 
 const { selectedGuildId } = useGuildSelector();
-const { panels, autoRoles, selectedPanel, loading, selectPanel } = useRolePanels();
+const { panels, autoRoles, selectedPanel, loading, selectPanel, deletePanel, removeAutoRole } =
+  useRolePanels();
+
+async function onDelete(panelId: string, title: string, ev: Event) {
+  ev.stopPropagation();
+  if (!confirm(`Supprimer le panel "${title}" ?`)) return;
+  await deletePanel(panelId);
+}
+
+async function onRemoveAutoRole(roleId: string, name: string) {
+  if (!confirm(`Retirer l'auto-role "${name}" ?`)) return;
+  if (!selectedGuildId.value) return;
+  await removeAutoRole(selectedGuildId.value, roleId);
+}
 
 function styleColor(style: string): string {
   switch (style) {
@@ -21,7 +34,14 @@ function styleColor(style: string): string {
   <div class="role-panels">
     <div class="page-header-row">
       <h1>Roles & Auto-Roles</h1>
-      <router-link to="/discord-roles" class="cross-link">Voir tous les roles Discord &rarr;</router-link>
+      <div class="header-actions">
+        <router-link
+          v-if="selectedGuildId"
+          to="/role-panels/new"
+          class="btn-primary"
+        >+ Nouveau panel</router-link>
+        <router-link to="/discord-roles" class="cross-link">Voir tous les roles Discord &rarr;</router-link>
+      </div>
     </div>
 
     <div v-if="!selectedGuildId && !loading" class="empty">
@@ -42,6 +62,11 @@ function styleColor(style: string): string {
             </div>
             <span v-if="ar.delay_secs > 0" class="ar-delay">Delai : {{ ar.delay_secs }}s</span>
             <span v-else class="ar-delay">Immediat</span>
+            <button
+              class="btn-icon-danger"
+              title="Retirer cet auto-role"
+              @click="onRemoveAutoRole(ar.role_id, ar.role_name || ar.role_id)"
+            >🗑️</button>
           </div>
         </div>
       </section>
@@ -67,6 +92,11 @@ function styleColor(style: string): string {
                 :label="panel.message_id ? 'Deploye' : 'Non deploye'"
                 :variant="panel.message_id ? 'success' : 'warning'"
               />
+              <button
+                class="btn-icon-danger"
+                title="Supprimer le panel"
+                @click="onDelete(panel.id, panel.title, $event)"
+              >🗑️</button>
             </div>
             <p v-if="panel.description" class="panel-desc">{{ panel.description }}</p>
             <div class="panel-meta">
@@ -178,4 +208,9 @@ function styleColor(style: string): string {
 .page-header-row h1 { margin-bottom: 0; }
 .cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all var(--transition-fast); }
 .cross-link:hover { background: var(--accent); color: white; }
+.header-actions { display: flex; gap: 12px; align-items: center; }
+.btn-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent, #5865F2); color: white; cursor: pointer; text-decoration: none; }
+.btn-primary:hover { opacity: 0.9; }
+.btn-icon-danger { background: none; border: none; color: var(--danger, #E74C3C); cursor: pointer; font-size: 1rem; padding: 4px; opacity: 0.6; }
+.btn-icon-danger:hover { opacity: 1; }
 </style>

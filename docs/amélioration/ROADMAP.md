@@ -254,7 +254,7 @@ démonstration end-to-end du pattern :
 
 ---
 
-## 🎨 Phase 6 — Role panels CRUD (semaine 8)
+## 🎨 Phase 6 — Role panels CRUD (semaine 8) ✅
 
 > **Objectif** : créer/éditer/déployer les panels de rôles **depuis la web**, sans la commande Discord.
 
