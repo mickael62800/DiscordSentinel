@@ -336,7 +336,7 @@ Chaque onglet a son `useXxx` composable + appelle les endpoints API existants.
 
 ---
 
-## ✨ Phase 9 — Polish & quick wins (semaine 12)
+## ✨ Phase 9 — Polish & quick wins (semaine 12) ✅ *(sponsorships, temp-roles, system ops livrés ; slot/wheel/blackjack tables et name history reportés)*
 
 > **Objectif** : finir les pages secondaires + intégration `Members` + dashboard ops.
 

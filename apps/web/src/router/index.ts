@@ -35,6 +35,9 @@ import VoiceThemesPage from "../components/pages/VoiceThemesPage.vue";
 import RolePanelEditPage from "../components/pages/RolePanelEditPage.vue";
 import CoudeSocialPage from "../components/pages/CoudeSocialPage.vue";
 import LevelsConfigPage from "../components/pages/LevelsConfigPage.vue";
+import SponsorshipsPage from "../components/pages/SponsorshipsPage.vue";
+import TempRolesPage from "../components/pages/TempRolesPage.vue";
+import SystemOpsPage from "../components/pages/SystemOpsPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -76,5 +79,8 @@ export const routes: RouteRecordRaw[] = [
   { path: "/role-panels/new", name: "role-panel-new", component: RolePanelEditPage },
   { path: "/coude/social", name: "coude-social", component: CoudeSocialPage },
   { path: "/levels-config", name: "levels-config", component: LevelsConfigPage },
+  { path: "/sponsorships", name: "sponsorships", component: SponsorshipsPage },
+  { path: "/temp-roles", name: "temp-roles", component: TempRolesPage },
+  { path: "/system/operations", name: "system-ops", component: SystemOpsPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

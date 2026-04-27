@@ -40,6 +40,8 @@ const communityItems = [
   { path: "/role-panels", label: "Roles", icon: "users" },
   { path: "/levels", label: "Niveaux", icon: "trending-up" },
   { path: "/levels-config", label: "Niveaux config", icon: "sliders" },
+  { path: "/sponsorships", label: "Parrainages", icon: "user-check" },
+  { path: "/temp-roles", label: "Roles temp.", icon: "clock" },
 ];
 
 const securityItems = [
@@ -65,6 +67,7 @@ const gameItems = [
 const configItems = [
   { path: "/component-config", label: "Composants", icon: "cpu" },
   { path: "/rbac", label: "Acces RBAC", icon: "shield" },
+  { path: "/system/operations", label: "System ops", icon: "activity" },
   { path: "/settings", label: "Parametres", icon: "settings" },
 ];
 
