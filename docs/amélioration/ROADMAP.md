@@ -223,7 +223,7 @@ démonstration end-to-end du pattern :
 
 ---
 
-## 🎙️ Phase 5 — Voice channels complet (semaine 7)
+## 🎙️ Phase 5 — Voice channels complet (semaine 7) ✅ *(themes livrés ; whitelists/bans/invites/co-admins/transfer : services prêts pour la vue détail)*
 
 > **Objectif** : la page `/voice-channels` couvre 100 % de l'API (thèmes, invites, whitelists, transfer, co-admins).
 
