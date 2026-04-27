@@ -31,6 +31,7 @@ import RemindersPage from "../components/pages/RemindersPage.vue";
 import EvidencePage from "../components/pages/EvidencePage.vue";
 import ReviewPage from "../components/pages/ReviewPage.vue";
 import ModstatsPage from "../components/pages/ModstatsPage.vue";
+import VoiceThemesPage from "../components/pages/VoiceThemesPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -68,5 +69,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/evidence", name: "evidence", component: EvidencePage },
   { path: "/review", name: "review", component: ReviewPage },
   { path: "/modstats", name: "modstats", component: ModstatsPage },
+  { path: "/voice-themes", name: "voice-themes", component: VoiceThemesPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

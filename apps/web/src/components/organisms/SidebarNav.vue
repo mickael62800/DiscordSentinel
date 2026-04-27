@@ -36,6 +36,7 @@ const communityItems = [
   { path: "/welcome", label: "Bienvenue", icon: "user-plus" },
   { path: "/tickets", label: "Tickets", icon: "ticket" },
   { path: "/voice-channels", label: "Vocaux", icon: "mic" },
+  { path: "/voice-themes", label: "Themes vocaux", icon: "layers" },
   { path: "/role-panels", label: "Roles", icon: "users" },
   { path: "/levels", label: "Niveaux", icon: "trending-up" },
 ];
