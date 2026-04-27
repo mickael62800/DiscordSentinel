@@ -36,6 +36,7 @@ const communityItems = [
 
 const securityItems = [
   { path: "/security", label: "Securite", icon: "zap" },
+  { path: "/automod", label: "Automod", icon: "shield" },
   { path: "/audit", label: "Audit", icon: "clipboard" },
 ];
 

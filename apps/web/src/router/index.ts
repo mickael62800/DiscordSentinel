@@ -24,6 +24,7 @@ import TournamentPage from "../components/pages/TournamentPage.vue";
 import SettingsPage from "../components/pages/SettingsPage.vue";
 import AuthCallbackPage from "../components/pages/AuthCallbackPage.vue";
 import WelcomePage from "../components/pages/WelcomePage.vue";
+import AutomodPage from "../components/pages/AutomodPage.vue";
 
 export const routes: RouteRecordRaw[] = [
   { path: "/setup", name: "setup", component: SetupPage, meta: { public: true } },
@@ -54,5 +55,6 @@ export const routes: RouteRecordRaw[] = [
   { path: "/tournaments", name: "tournaments", component: TournamentPage },
   { path: "/rbac", name: "rbac", component: RbacPage },
   { path: "/welcome", name: "welcome", component: WelcomePage },
+  { path: "/automod", name: "automod", component: AutomodPage },
   { path: "/settings", name: "settings", component: SettingsPage },
 ];

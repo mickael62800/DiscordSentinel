@@ -42,3 +42,4 @@ pub mod system;
 
 pub mod wheel;
 pub mod discord_action_messages;
+pub mod automod;

@@ -197,7 +197,7 @@ démonstration end-to-end du pattern :
 
 ---
 
-## 🤖 Phase 4 — Automod page (semaine 6)
+## 🤖 Phase 4 — Automod page (semaine 6) ✅
 
 > **Objectif** : un admin configure et monitore l'automod **depuis la web**, sans CLI ou commande Discord obscure.
 

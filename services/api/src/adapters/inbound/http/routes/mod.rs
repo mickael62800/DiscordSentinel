@@ -5,6 +5,7 @@
 
 pub mod analytics;
 pub mod audit;
+pub mod automod;
 pub mod bot;
 pub mod bot_persistence;
 pub mod coude;
