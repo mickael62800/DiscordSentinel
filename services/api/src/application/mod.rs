@@ -73,6 +73,9 @@ pub use resolve_friendly_duel_service::ResolveFriendlyDuelService;
 pub mod coude_guild_settings;
 pub use coude_guild_settings::CoudeGuildSettings;
 
+mod manage_discord_action_messages_service;
+pub use manage_discord_action_messages_service::ManageDiscordActionMessagesService;
+
 mod manage_coude_catalog_service;
 pub use manage_coude_catalog_service::ManageCoudeCatalogService;
 

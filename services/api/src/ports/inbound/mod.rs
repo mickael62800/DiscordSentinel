@@ -124,3 +124,6 @@ pub use play_travaux::{PlayTravauxCommand, PlayTravauxUseCase, TravauxResolution
 
 pub mod roll_steal;
 pub use roll_steal::{RollStealCommand, RollStealUseCase, StealRoll};
+
+pub mod manage_discord_action_messages;
+pub use manage_discord_action_messages::ManageDiscordActionMessagesUseCase;

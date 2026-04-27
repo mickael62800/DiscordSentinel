@@ -52,7 +52,7 @@ pub async fn register(
     Json(dto): Json<RegisterDto>,
 ) -> Result<StatusCode, ApiError> {
     state
-        .discord_action_message_repo
+        .discord_action_messages_uc
         .register(NewDiscordActionMessage {
             action_id: dto.action_id,
             kind: dto.kind,
@@ -70,7 +70,7 @@ pub async fn list_for_action(
     Path(action_id): Path<Uuid>,
 ) -> Result<Json<Vec<DiscordActionMessageDto>>, ApiError> {
     let list = state
-        .discord_action_message_repo
+        .discord_action_messages_uc
         .list_for_action(action_id)
         .await?;
     Ok(Json(list.into_iter().map(DiscordActionMessageDto::from).collect()))
@@ -82,7 +82,7 @@ pub async fn delete_mapping(
     Path((action_id, kind)): Path<(Uuid, String)>,
 ) -> Result<StatusCode, ApiError> {
     let removed = state
-        .discord_action_message_repo
+        .discord_action_messages_uc
         .delete(action_id, &kind)
         .await?;
     Ok(if removed { StatusCode::NO_CONTENT } else { StatusCode::NOT_FOUND })

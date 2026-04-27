@@ -529,6 +529,9 @@ pub async fn build_app_state(
     > = Arc::new(PgCoudeFlavorTemplatesRepository::new(pg_pool.clone()));
 
     // Sync Discord <-> Web (Phase 1 — cf. SYNC_DISCORD_WEB_DESIGN.md).
+    // Repo outbound + use case inbound : on injecte uniquement le use
+    // case dans AppState pour respecter l'archi hexagonale (handlers
+    // HTTP/gRPC ne touchent jamais les repos directement).
     let discord_action_message_repo: Arc<
         dyn crate::ports::outbound::DiscordActionMessageRepository,
     > = Arc::new(
@@ -536,6 +539,11 @@ pub async fn build_app_state(
             pg_pool.clone(),
         ),
     );
+    let discord_action_messages_uc: Arc<
+        dyn crate::ports::inbound::ManageDiscordActionMessagesUseCase,
+    > = Arc::new(crate::application::ManageDiscordActionMessagesService::new(
+        discord_action_message_repo,
+    ));
 
     // Primes collectives (cf. COUPE_AMELIORATIONS 5.3).
     let coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository> =
@@ -676,7 +684,7 @@ pub async fn build_app_state(
         play_travaux_uc,
         roll_steal_uc,
         coude_flavor_templates_repo,
-        discord_action_message_repo,
+        discord_action_messages_uc,
         coude_bounty_repo: coude_bounty_repo.clone(),
         coude_refusal_count_repo,
         coude_coalition_repo: coude_coalition_repo.clone(),
