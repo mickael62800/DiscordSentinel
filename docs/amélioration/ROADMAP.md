@@ -121,7 +121,7 @@ démonstration end-to-end du pattern :
 
 ---
 
-## 🏠 Phase 2 — Welcome / Onboarding (semaine 3)
+## 🏠 Phase 2 — Welcome / Onboarding (semaine 3) ✅
 
 > **Objectif** : un admin configure le message de bienvenue, les rôles par défaut et le verification gate **depuis la web**, sans toucher Discord.
 

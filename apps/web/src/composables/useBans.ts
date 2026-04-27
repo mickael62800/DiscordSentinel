@@ -111,17 +111,16 @@ export function useBans() {
   // de la liste sur les events bans emis par l API (executed, cancelled,
   // proposed). Le WebSocket gateway republie via emit("ws:<event>", ...).
   // Filtrage optimiste : on retire la ligne sans refetch full.
-  type BanEvent = {
-    payload: { data?: { action_id?: string; guild_id?: string; target_id?: string } };
-  };
-  const removeProposal = (e: BanEvent) => {
-    const d = e.payload?.data;
-    if (!d?.action_id) {
+  type BanEventData = { action_id?: string; guild_id?: string; target_id?: string };
+  const removeProposal = (e: { payload: unknown }) => {
+    const data = (e.payload as { data?: BanEventData } | null)?.data;
+    if (!data?.action_id) {
       // Fallback : si pas d action_id, on refetch.
       fetchBans();
       return;
     }
-    banProposals.value = banProposals.value.filter((b) => b.id !== d.action_id);
+    const aid = data.action_id;
+    banProposals.value = banProposals.value.filter((b) => b.id !== aid);
   };
   const offExecuted = onWsEvent("ws:moderation.ban.executed", removeProposal);
   const offCancelled = onWsEvent("ws:moderation.ban.cancelled", removeProposal);

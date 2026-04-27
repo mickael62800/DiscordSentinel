@@ -90,16 +90,7 @@ export function useTickets() {
   // Phase 2 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : refresh automatique
   // sur les events tickets emis par l API ou par d autres sources (bot
   // Discord, autre admin). Le bus WS local republie via @/api/events.
-  type TicketEvent = {
-    payload: {
-      data?: {
-        ticket_id?: string;
-        action_id?: string;
-        status?: string;
-      };
-    };
-  };
-  const refreshOnEvent = (_e: TicketEvent) => {
+  const refreshOnEvent = () => {
     fetchTickets();
   };
   const offClosed = onWsEvent("ws:ticket_closed", refreshOnEvent);

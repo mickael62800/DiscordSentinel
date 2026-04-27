@@ -27,6 +27,7 @@ const moderationItems = [
 ];
 
 const communityItems = [
+  { path: "/welcome", label: "Bienvenue", icon: "user-plus" },
   { path: "/tickets", label: "Tickets", icon: "ticket" },
   { path: "/voice-channels", label: "Vocaux", icon: "mic" },
   { path: "/role-panels", label: "Roles", icon: "users" },
