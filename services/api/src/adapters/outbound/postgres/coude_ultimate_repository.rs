@@ -8,9 +8,9 @@ use crate::domain::entities::{UltimateKind, UltimateState};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeUltimateRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("coude_ultimate_states pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "coude_ultimate_states";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeUltimateRepository {
     pool: PgPool,

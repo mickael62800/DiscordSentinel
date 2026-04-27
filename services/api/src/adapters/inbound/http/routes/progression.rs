@@ -14,6 +14,11 @@ fn conduct_inner() -> Router<AppState> {
         .route("/{guild_id}/leaderboard", get(handlers::conduct::get_leaderboard))
         .route("/{guild_id}/{user_id}/log", get(handlers::conduct::get_points_log))
         .route("/{guild_id}/{user_id}/add", post(handlers::conduct::add_points))
+        // Endpoints appeles par moderation-worker : regen periodique +
+        // creation des propositions de ban pour les users a 0 points
+        // (cf. WORKERS_ARCHITECTURE_STATE.md P0 #1 + #2).
+        .route("/regen-tick", post(handlers::conduct::run_regen_tick))
+        .route("/sync-ban-proposals", post(handlers::conduct::sync_ban_proposals))
 }
 
 fn level_inner() -> Router<AppState> {

@@ -94,6 +94,58 @@ pub fn theme_for_season(season_number: i32) -> &'static SeasonTheme {
     &SEASON_THEMES[idx]
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// Helpers purs centralisant les calculs de bonus de saison.
+// Extrait depuis manage_coude_economy_service / manage_coude_heist_service
+// / resolve_combat_now_service (P4 #3 audit).
+// ─────────────────────────────────────────────────────────────────────
+
+/// Bonus de coins ex-nihilo a creer si la saison du voleur applique un
+/// `steal_gain_multiplier > 1.0`. Retourne 0 si pas d'effet ou montant
+/// vole non positif. Independant du wallet : c'est juste l'arithmetique.
+pub fn compute_season_steal_bonus(season: i32, stolen: i64) -> i64 {
+    if stolen <= 0 {
+        return 0;
+    }
+    let mult = theme_for_season(season).steal_gain_multiplier;
+    if mult <= 1.0 {
+        return 0;
+    }
+    ((stolen as f64) * (mult - 1.0)) as i64
+}
+
+/// Applique le multiplicateur saison sur le cooldown braquage en jours.
+/// Garde au minimum 1 jour. Retourne `base_days` si pas d'effet.
+pub fn apply_season_braquage_cooldown(season: i32, base_days: i64) -> i64 {
+    let mult = theme_for_season(season).braquage_cooldown_multiplier;
+    if (mult - 1.0).abs() < f64::EPSILON {
+        return base_days;
+    }
+    let scaled = ((base_days as f64) * mult).round() as i64;
+    scaled.max(1)
+}
+
+/// Multiplicateur de chaos events de la saison, ou `None` si pas d'effet
+/// (mult == 1.0). Le caller decide si `None` = utiliser default.
+pub fn season_chaos_multiplier(season: i32) -> Option<f64> {
+    let mult = theme_for_season(season).chaos_multiplier;
+    if (mult - 1.0).abs() < f64::EPSILON {
+        None
+    } else {
+        Some(mult)
+    }
+}
+
+/// Bonus DEF tank (en %) accorde par la saison, ou `None` si neutre.
+pub fn season_tank_def_bonus_pct(season: i32) -> Option<f64> {
+    let bonus = theme_for_season(season).tank_def_bonus_pct;
+    if bonus == 0.0 {
+        None
+    } else {
+        Some(bonus)
+    }
+}
+
 #[cfg(test)]
 #[path = "tests/season_theme.rs"]
 mod tests;

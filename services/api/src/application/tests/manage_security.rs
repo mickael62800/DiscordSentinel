@@ -10,7 +10,6 @@
 //! Les chemins complexes (raid detection, alt detection) delegueraient
 //! au domain::security_analyzer qui est deja teste en isolation.
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;

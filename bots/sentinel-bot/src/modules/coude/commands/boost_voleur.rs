@@ -9,7 +9,7 @@ use serenity::all::{
     CreateCommandOption, CreateEmbed, CreateEmbedFooter,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::api_client::{CashboxDepositSource, StealProtectionDuration};
 use crate::modules::coude::load_guild_config;
@@ -67,13 +67,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let config = load_guild_config(ctx, &guild_id).await;
     if !config.enabled() {

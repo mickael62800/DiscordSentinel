@@ -8,9 +8,9 @@ use crate::domain::entities::RefusalCount;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeRefusalCountRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("coude_refusal_counts pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "coude_refusal_counts";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeRefusalCountRepository {
     pool: PgPool,

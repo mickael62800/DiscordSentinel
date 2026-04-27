@@ -7,7 +7,7 @@ use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat, COU
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
-use crate::ports::outbound::CoudeCombatRepository;
+use crate::ports::outbound::{CombatQueryRepository, CoudeCombatRepository};
 
 pub struct PgCoudeCombatRepository {
     pool: PgPool,
@@ -476,5 +476,15 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
         .await
         .map_err(pg_err)?;
         Ok(count.unwrap_or(0))
+    }
+}
+
+#[async_trait]
+impl CombatQueryRepository for PgCoudeCombatRepository {
+    async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError> {
+        match CoudeCombatRepository::get(self, id).await? {
+            Some(c) => Ok(c),
+            None => Err(DomainError::NotFound("Combat introuvable".into())),
+        }
     }
 }

@@ -45,3 +45,9 @@ desktop.ini
 # Claude Code local files
 .claude/
 coverage-html/
+
+# Cargo llvm-cov artefacts
+**/cov*.txt
+**/coverage*.json
+**/coverage*.txt
+**/coverage_report.txt

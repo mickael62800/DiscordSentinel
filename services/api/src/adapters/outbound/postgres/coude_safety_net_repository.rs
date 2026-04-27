@@ -9,9 +9,9 @@ use crate::domain::entities::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeSafetyNetRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("coude_safety_nets pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "coude_safety_nets";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeSafetyNetRepository {
     pool: PgPool,

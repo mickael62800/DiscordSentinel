@@ -11,8 +11,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
+use crate::domain::entities::{
+    ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienOutcome, ToutOuRienUserStats,
+};
 use crate::domain::errors::DomainError;
+use crate::ports::inbound::play_tout_ou_rien::{
+    PlayToutOuRienCommand, ToutOuRienResolution,
+};
 
 #[derive(Debug, Deserialize)]
 pub struct RecordToutOuRienDto {
@@ -115,6 +120,59 @@ impl From<ToutOuRienUserStats> for ToutOuRienUserStatsDto {
             biggest_loss: s.biggest_loss,
         }
     }
+}
+
+// ── Play (Phase 2 #1 audit) ──────────────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct PlayToutOuRienDto {
+    pub user_id: String,
+    pub username: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ToutOuRienResolutionDto {
+    pub initial_coins: i64,
+    /// "won" | "lost"
+    pub outcome: &'static str,
+    pub delta: i64,
+    pub final_balance: i64,
+}
+
+impl From<ToutOuRienResolution> for ToutOuRienResolutionDto {
+    fn from(r: ToutOuRienResolution) -> Self {
+        Self {
+            initial_coins: r.initial_coins,
+            outcome: match r.outcome {
+                ToutOuRienOutcome::Win => "won",
+                ToutOuRienOutcome::Lose => "lost",
+            },
+            delta: r.delta,
+            final_balance: r.final_balance,
+        }
+    }
+}
+
+/// POST /api/coude/{guild_id}/tout-ou-rien/play
+///
+/// Endpoint atomique : verifie cooldown + solde, tire le RNG cote serveur,
+/// applique la mutation wallet, pose le cooldown, log Memorial, retourne
+/// le verdict. Remplace le pipeline cote bot
+/// (cooldown + get_player + RNG local + update_coins + set_cooldown + record).
+pub async fn play_tout_ou_rien(
+    State(state): State<AppState>,
+    Path(guild_id): Path<String>,
+    Json(dto): Json<PlayToutOuRienDto>,
+) -> Result<Json<ToutOuRienResolutionDto>, ApiError> {
+    let res = state
+        .play_tout_ou_rien_uc
+        .play(PlayToutOuRienCommand {
+            guild_id,
+            user_id: dto.user_id,
+            username: dto.username,
+        })
+        .await?;
+    Ok(Json(res.into()))
 }
 
 /// GET /api/coude/{guild_id}/tout-ou-rien/by-user/{user_id}

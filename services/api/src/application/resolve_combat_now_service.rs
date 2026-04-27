@@ -20,8 +20,8 @@ use tracing::warn;
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    apply_insurance_to_loss, apply_lucky_shield, compute_combat_xp, detect_outcome_flags,
-    format_bet_payout_lines, CoudeBalanceParams, CombatOutcomeFlags, COMEBACK_HP_PCT_MAX,
+    apply_insurance_to_loss, compute_combat_xp, detect_outcome_flags, format_bet_payout_lines,
+    CombatOutcomeFlags, COMEBACK_HP_PCT_MAX,
 };
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{
@@ -317,19 +317,11 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // - "Saison du Chaos" -> chaos events x2
         // - "Saison du Tank"  -> +20% DEF pour les Tanks
         let (season_chaos_multiplier, season_tank_def_bonus) = {
-            use crate::domain::entities::theme_for_season;
-            let theme = theme_for_season(attacker.season);
-            let chaos = if theme.chaos_multiplier != 1.0 {
-                Some(theme.chaos_multiplier)
-            } else {
-                None
+            use crate::domain::entities::{
+                season_chaos_multiplier as season_chaos,
+                season_tank_def_bonus_pct as season_tank,
             };
-            let tank = if theme.tank_def_bonus_pct != 0.0 {
-                Some(theme.tank_def_bonus_pct)
-            } else {
-                None
-            };
-            (chaos, tank)
+            (season_chaos(attacker.season), season_tank(attacker.season))
         };
         // Palier "Riposte fulgurante" (cf. COUPE_AMELIORATIONS 3.2) :
         // un defenseur de niveau 20+ qui se fait attaquer par un joueur
@@ -852,7 +844,6 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
 
         let mut vendetta_msg: Option<String> = None;
         let mut vendetta_humiliation: Option<crate::ports::inbound::VendettaHumiliation> = None;
-        let mut regicide_msg: Option<String> = None;
         // Bouclier malchance (4.1) : true si la 1ere defaite du jour a
         // ete adoucie. Visible aux deux match blocks (payout + streaks).
         let mut shield_active = false;
@@ -1133,7 +1124,15 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                         );
                     }
                 }
-                insurance_msg = adj.message;
+                // Bug fix : concatener le message scam FausseAssurance (mis
+                // plus haut quand le malus est actif) avec le message de
+                // reduction d'assurance. L'ecrasement precedent perdait le
+                // scam alert quand les deux survenaient sur le meme combat.
+                insurance_msg = match (insurance_msg.take(), adj.message) {
+                    (Some(prev), Some(adj_msg)) => Some(format!("{prev}\n{adj_msg}")),
+                    (Some(prev), None) => Some(prev),
+                    (None, adj_msg) => adj_msg,
+                };
 
                 // Sprint 1 (4.1) — bouclier malchance : si c est la 1ere
                 // defaite du jour, perte * 0.5. Recommande pour eviter la
@@ -1502,13 +1501,9 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 inline: false,
             });
         }
-        if let Some(r_msg) = regicide_msg {
-            fields.push(ResolvedCombatEmbedField {
-                name: "\u{1f451} Regicide".into(),
-                value: r_msg,
-                inline: false,
-            });
-        }
+        // Bug fix : le field Regicide etait pousse AVANT que `regicide_msg`
+        // soit calcule (Phase 9 Part D, plus bas), donc jamais affiche. On
+        // pousse maintenant directement apres le calcul, voir plus bas.
 
         // Phase 9 Part D : track streaks + collecte taunt events.
         let mut taunt_events = Vec::new();
@@ -1573,10 +1568,14 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                             {
                                 warn!(error = %e, "Echec credit regicide");
                             }
-                            regicide_msg = Some(format!(
-                                "\u{1f451} **REGICIDE !** <@{}> casse la serie de {} victoires de <@{}> et empoche **+{} coins** de prime collective.",
-                                winner_id, win_streak, loser_id, bounty_amount
-                            ));
+                            fields.push(ResolvedCombatEmbedField {
+                                name: "\u{1f451} Regicide".into(),
+                                value: format!(
+                                    "\u{1f451} **REGICIDE !** <@{}> casse la serie de {} victoires de <@{}> et empoche **+{} coins** de prime collective.",
+                                    winner_id, win_streak, loser_id, bounty_amount
+                                ),
+                                inline: false,
+                            });
                         }
                     }
                 }
@@ -1797,27 +1796,8 @@ fn compute_outcome_flags_from_result(
     )
 }
 
-/// Charge les parametres de balance du jeu Coup de Coude pour une guild
-/// depuis `bot_guild_config` (`bot_name = 'coude-bot'`). Retombe sur le
-/// default si l'appel echoue — on prefere ne pas bloquer un combat pour
-/// une erreur de lecture de config.
-async fn load_balance_params(
-    repo: &dyn crate::ports::outbound::BotConfigRepository,
-    guild_id: &str,
-) -> CoudeBalanceParams {
-    match repo.get_config(guild_id, "coude-bot").await {
-        Ok(entries) => {
-            let map: std::collections::HashMap<String, String> = entries
-                .into_iter()
-                .map(|e| (e.config_key, e.config_value))
-                .collect();
-            CoudeBalanceParams::from_config(&map)
-        }
-        Err(e) => {
-            warn!(error = %e, guild_id, "Echec chargement coude balance params — default");
-            CoudeBalanceParams::default()
-        }
-    }
-}
+// `load_balance_params` deplace dans `application::coude_guild_settings`
+// (cf. API P0 #3 audit). Le wrapper local conserve l'usage existant.
+use crate::application::coude_guild_settings::load_balance_params;
 
 use crate::domain::entities::coude_title_for_level as title_for_level;

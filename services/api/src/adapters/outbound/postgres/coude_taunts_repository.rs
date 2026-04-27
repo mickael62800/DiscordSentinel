@@ -7,9 +7,9 @@ use crate::domain::entities::CoudeTauntsConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeTauntsRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("taunts pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "taunts";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeTauntsRepository {
     pool: PgPool,

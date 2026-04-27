@@ -6,38 +6,17 @@
 //! `CoudeCombatsService.ExpireCombatsBatch`.
 
 use sqlx::PgPool;
-use tonic::transport::{Channel, Endpoint};
-use tonic::metadata::MetadataValue;
 use tonic::Request;
 use tracing::{error, info, warn};
 
 use sentinel_proto::coude::v1::coude_combats_service_client::CoudeCombatsServiceClient;
 use sentinel_proto::coude::v1::Empty as ProtoEmpty;
+use sentinel_worker_common::grpc;
 
 pub async fn run(_pool: &PgPool) -> Result<(), String> {
-    let url = std::env::var("GRPC_API_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
-    let api_key = std::env::var("API_KEY").unwrap_or_default();
-
-    let channel: Channel = Endpoint::from_shared(url.clone())
-        .map_err(|e| format!("invalid GRPC_API_URL {url}: {e}"))?
-        .connect_timeout(std::time::Duration::from_secs(5))
-        .timeout(std::time::Duration::from_secs(30))
-        .connect()
-        .await
-        .map_err(|e| format!("connect gRPC {url}: {e}"))?;
-
-    let auth: MetadataValue<_> = format!("Bearer {api_key}")
-        .parse()
-        .map_err(|e| format!("invalid api_key: {e}"))?;
-
-    let mut client = CoudeCombatsServiceClient::with_interceptor(
-        channel,
-        move |mut req: Request<()>| {
-            req.metadata_mut().insert("authorization", auth.clone());
-            Ok(req)
-        },
-    );
+    let channel = grpc::connect().await?;
+    let interceptor = grpc::bearer_interceptor()?;
+    let mut client = CoudeCombatsServiceClient::with_interceptor(channel, interceptor);
 
     match client.expire_combats_batch(Request::new(ProtoEmpty {})).await {
         Ok(resp) => {

@@ -2,9 +2,21 @@
 
 use serenity::all::{CreateAttachment, CreateEmbed, CreateEmbedFooter};
 
-use super::messages::{pick_random, BJ_BUST, BJ_LOSE, BJ_NATURAL, BJ_WIN};
 use super::api_client::{BlackjackGameDto, CardDto};
 use super::card_image;
+
+/// Cle de template flavor a utiliser selon le statut final d'une partie.
+/// Retourne `None` si la partie n'est pas dans un etat final qui necessite
+/// une raillerie (ex: en cours, push).
+pub fn flavor_key_for_status(status: &str) -> Option<&'static str> {
+    match status {
+        "player_blackjack" => Some("bj_natural"),
+        "player_win" | "dealer_bust" => Some("bj_win"),
+        "player_bust" => Some("bj_bust"),
+        "dealer_win" => Some("bj_lose"),
+        _ => None,
+    }
+}
 
 /// Nom du fichier attachment pour l'image composee player+dealer.
 pub const TABLE_IMAGE_NAME: &str = "table.png";
@@ -56,8 +68,9 @@ fn hand_to_string(hand: &[CardDto]) -> String {
 pub fn build_game_message(
     game: &BlackjackGameDto,
     wallet_balance: i64,
+    flavor: Option<&str>,
 ) -> (CreateEmbed, Option<CreateAttachment>) {
-    let embed = build_game_embed(game, wallet_balance);
+    let embed = build_game_embed(game, wallet_balance, flavor);
     match card_image::render_table(&game.player_hand, &game.dealer_hand) {
         Some(bytes) => {
             let embed_with_image = embed.image(format!("attachment://{}", TABLE_IMAGE_NAME));
@@ -69,7 +82,15 @@ pub fn build_game_message(
 }
 
 /// Embed principal d'une partie — en cours ou terminee (victoire / bust / push / ...).
-pub fn build_game_embed(game: &BlackjackGameDto, wallet_balance: i64) -> CreateEmbed {
+///
+/// `flavor` : template tire cote API (`api.random_flavor`) selon le statut.
+/// `None` si la partie n'est pas en etat final, OU si l'API n'a pas pu
+/// repondre — dans ce cas on affiche un texte neutre.
+pub fn build_game_embed(
+    game: &BlackjackGameDto,
+    wallet_balance: i64,
+    flavor: Option<&str>,
+) -> CreateEmbed {
     let over = is_game_over(&game.status);
 
     let player_hand_str = hand_to_string(&game.player_hand);
@@ -88,9 +109,22 @@ pub fn build_game_embed(game: &BlackjackGameDto, wallet_balance: i64) -> CreateE
             0xF1C40F, // or
         )
     } else {
+        // `flavor` est pre-fetch via `api.random_flavor` selon `flavor_key_for_status`.
+        // S'il est None (API down ou cle non seedee), on affiche un texte neutre
+        // — pas de fallback local (templates migres en DB, cf. migration 174).
+        let format_flavor = |tmpl: Option<&str>| -> Option<String> {
+            tmpl.map(|t| {
+                t.replace("{joueur}", &game.username)
+                    .replace("{total}", &game.player_score.to_string())
+                    .replace("{croupier}", &game.dealer_score.to_string())
+                    .replace("{gain}", &game.payout.to_string())
+                    .replace("{mise}", &game.bet.to_string())
+            })
+        };
         match game.status.as_str() {
             "player_blackjack" => {
-                let msg = pick_random(BJ_NATURAL).replace("{joueur}", &game.username);
+                let msg = format_flavor(flavor)
+                    .unwrap_or_else(|| format!("{} sort un blackjack !", game.username));
                 (
                     "\u{1f31f} BLACKJACK NATUREL !".to_string(),
                     format!("{}\n\n**+{} coins !**", msg, game.payout),
@@ -98,11 +132,8 @@ pub fn build_game_embed(game: &BlackjackGameDto, wallet_balance: i64) -> CreateE
                 )
             }
             "player_win" | "dealer_bust" => {
-                let msg = pick_random(BJ_WIN)
-                    .replace("{joueur}", &game.username)
-                    .replace("{total}", &game.player_score.to_string())
-                    .replace("{croupier}", &game.dealer_score.to_string())
-                    .replace("{gain}", &game.payout.to_string());
+                let msg = format_flavor(flavor)
+                    .unwrap_or_else(|| format!("{} gagne {} contre {} !", game.username, game.player_score, game.dealer_score));
                 (
                     "\u{1f389} VICTOIRE !".to_string(),
                     format!("{}\n\n**+{} coins !**", msg, game.payout),
@@ -110,9 +141,8 @@ pub fn build_game_embed(game: &BlackjackGameDto, wallet_balance: i64) -> CreateE
                 )
             }
             "player_bust" => {
-                let msg = pick_random(BJ_BUST)
-                    .replace("{joueur}", &game.username)
-                    .replace("{total}", &game.player_score.to_string());
+                let msg = format_flavor(flavor)
+                    .unwrap_or_else(|| format!("{} bust a {} !", game.username, game.player_score));
                 let lost = if game.doubled { game.bet * 2 } else { game.bet };
                 (
                     "\u{1f4a5} BUST !".to_string(),
@@ -121,11 +151,8 @@ pub fn build_game_embed(game: &BlackjackGameDto, wallet_balance: i64) -> CreateE
                 )
             }
             "dealer_win" => {
-                let msg = pick_random(BJ_LOSE)
-                    .replace("{joueur}", &game.username)
-                    .replace("{total}", &game.player_score.to_string())
-                    .replace("{croupier}", &game.dealer_score.to_string())
-                    .replace("{mise}", &game.bet.to_string());
+                let msg = format_flavor(flavor)
+                    .unwrap_or_else(|| format!("Le croupier gagne {} contre {} de {}.", game.dealer_score, game.player_score, game.username));
                 let lost = if game.doubled { game.bet * 2 } else { game.bet };
                 (
                     "\u{1f624} DEFAITE".to_string(),

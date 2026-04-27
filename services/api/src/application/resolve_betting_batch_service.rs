@@ -79,19 +79,11 @@ impl ResolveBettingBatchService {
 
     /// Charge les parametres de balance de la guild ou default.
     async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
-        match self.bot_config_repo.get_config(guild_id, "coude-bot").await {
-            Ok(entries) => {
-                let map: std::collections::HashMap<String, String> = entries
-                    .into_iter()
-                    .map(|e| (e.config_key, e.config_value))
-                    .collect();
-                CoudeBalanceParams::from_config(&map)
-            }
-            Err(e) => {
-                warn!(error = %e, guild_id, "Echec chargement coude balance params — default");
-                CoudeBalanceParams::default()
-            }
-        }
+        crate::application::coude_guild_settings::load_balance_params(
+            &*self.bot_config_repo,
+            guild_id,
+        )
+        .await
     }
 
     /// Charge un joueur et le convertit en `PlayerLite` pour le moteur.

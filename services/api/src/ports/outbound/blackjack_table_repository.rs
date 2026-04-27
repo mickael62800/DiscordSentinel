@@ -27,6 +27,17 @@ pub trait BlackjackTableRepository: Send + Sync {
     async fn count_players(&self, table_id: &str) -> Result<i64, DomainError>;
     async fn add_player(&self, table_id: &str, user_id: &str, user_name: &str) -> Result<(), DomainError>;
     async fn touch_activity(&self, table_id: &str) -> Result<(), DomainError>;
+    /// Met a jour `last_activity` de la table ouverte ou `user_id` est joueur,
+    /// pour empecher le worker AFK de fermer une table en pleine partie.
+    /// No-op si l'utilisateur n'est dans aucune table ouverte. Default impl
+    /// no-op pour preserver les mocks existants.
+    async fn touch_activity_by_player(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
     async fn list_players(&self, table_id: &str) -> Result<Vec<BlackjackTablePlayer>, DomainError>;
     async fn find_open_by_channel(&self, channel_id: &str) -> Result<Option<BlackjackTable>, DomainError>;
     async fn get_guild_id(&self, table_id: &str) -> Result<Option<String>, DomainError>;

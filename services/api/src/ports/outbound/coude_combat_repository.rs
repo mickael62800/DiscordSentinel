@@ -118,24 +118,30 @@ pub trait CoudeCombatRepository: Send + Sync {
     /// `COUDE_PURGE_TABLES` (domain) pour une guild, dans une transaction
     /// unique. Retourne les comptes par table. Admin-only.
     ///
-    /// Default `unimplemented!()` pour preserver les mocks existants.
+    /// Default renvoie `DomainError::NotImplemented` pour preserver les mocks
+    /// existants sans paniquer en runtime (mappe sur 501 / Unimplemented).
     async fn purge_guild_subsystem(
         &self,
         _guild_id: &str,
     ) -> Result<Vec<(String, u64)>, DomainError> {
-        unimplemented!("purge_guild_subsystem not implemented")
+        Err(DomainError::NotImplemented(
+            "CoudeCombatRepository::purge_guild_subsystem".into(),
+        ))
     }
 
     /// Compte le nombre de combats perdus aujourd hui par `user_id` (resolved_at
     /// CURRENT_DATE, statut resolved, loser_id = user). Utilise par le bouclier
     /// malchance (lucky_shield) pour detecter la 1ere defaite du jour.
     ///
-    /// Default `unimplemented!()` pour preserver les mocks existants.
+    /// Default renvoie `DomainError::NotImplemented` pour preserver les mocks
+    /// existants sans paniquer en runtime (mappe sur 501 / Unimplemented).
     async fn count_defeats_today(
         &self,
         _guild_id: &str,
         _user_id: &str,
     ) -> Result<i64, DomainError> {
-        unimplemented!("count_defeats_today not implemented")
+        Err(DomainError::NotImplemented(
+            "CoudeCombatRepository::count_defeats_today".into(),
+        ))
     }
 }

@@ -71,9 +71,12 @@ pub trait ManageCoudeCombatsUseCase: Send + Sync {
     /// (RBAC ne doit PAS masquer un "combat introuvable", laisser l'erreur
     /// remonter via `cancel()` / `resolve()`).
     ///
-    /// Default `unimplemented!()` pour preserver les mocks existants.
+    /// Default renvoie `NotImplemented` (mappe sur 501) pour preserver les
+    /// mocks existants sans paniquer en runtime.
     async fn get_guild_id(&self, _id: Uuid) -> Result<Option<String>, DomainError> {
-        unimplemented!("get_guild_id not implemented")
+        Err(DomainError::NotImplemented(
+            "ManageCoudeCombatsUseCase::get_guild_id".into(),
+        ))
     }
 
     /// Purge destructive : vide toutes les tables du sous-systeme Coup de Coude
@@ -83,11 +86,14 @@ pub trait ManageCoudeCombatsUseCase: Send + Sync {
     /// Admin-only, irreversible — les handlers doivent gater avec RBAC avant
     /// d'appeler.
     ///
-    /// Default `unimplemented!()` pour preserver les mocks existants.
+    /// Default renvoie `NotImplemented` (mappe sur 501) pour preserver les
+    /// mocks existants sans paniquer en runtime.
     async fn purge_guild_subsystem(
         &self,
         _guild_id: &str,
     ) -> Result<Vec<(String, u64)>, DomainError> {
-        unimplemented!("purge_guild_subsystem not implemented")
+        Err(DomainError::NotImplemented(
+            "ManageCoudeCombatsUseCase::purge_guild_subsystem".into(),
+        ))
     }
 }

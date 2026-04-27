@@ -10,9 +10,34 @@
 
 use std::collections::HashMap;
 
+use crate::domain::entities::CoudeBalanceParams;
 use crate::ports::outbound::BotConfigRepository;
 
 const BOT_NAME: &str = "coude-bot";
+
+/// Charge les `CoudeBalanceParams` d'une guild depuis le `BotConfigRepository`.
+///
+/// API P0 #3 audit : centralise la duplication qui existait dans
+/// `manage_coude_combats_service`, `manage_coude_heist_service`,
+/// `manage_coude_steal_boosts_service`, `resolve_betting_batch_service`,
+/// `resolve_combat_now_service`. Fallback silencieux sur `default()` si
+/// le repo est down — les services qui ont besoin d'un comportement
+/// strict doivent gerer les erreurs avant d'appeler.
+pub async fn load_balance_params(
+    repo: &dyn BotConfigRepository,
+    guild_id: &str,
+) -> CoudeBalanceParams {
+    match repo.get_config(guild_id, BOT_NAME).await {
+        Ok(entries) => {
+            let map: HashMap<String, String> = entries
+                .into_iter()
+                .map(|e| (e.config_key, e.config_value))
+                .collect();
+            CoudeBalanceParams::from_config(&map)
+        }
+        Err(_) => CoudeBalanceParams::default(),
+    }
+}
 
 #[derive(Debug, Default, Clone)]
 pub struct CoudeGuildSettings {

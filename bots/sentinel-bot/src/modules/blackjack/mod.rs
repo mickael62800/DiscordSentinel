@@ -12,7 +12,8 @@ pub mod channel_manager;
 mod embeds;
 pub mod game;
 pub mod game_logic;
-mod messages;
+// `messages` (templates BJ_*) migre dans `coude_flavor_templates`
+// (migration 174) — bot consomme via `api.random_flavor`.
 pub mod setup;
 pub mod table;
 

@@ -2,12 +2,11 @@
 //!
 //! Exposes comme fonctions libres (plus de `impl Handler`).
 //!
-//! Phase 6A : le refresh periodique est delegue a `audit-cache-worker` qui
-//! push vers Redis + publie sur `sentinel:events`. Ce module expose les
-//! helpers `bootstrap_watched_users` (startup) et `handle_watched_refresh_event`
-//! (consumer stream) utilises par le module audit.
+//! Phase 6A : le refresh periodique est declenche par `audit-cache-worker`
+//! qui publie sur `sentinel:events` un event `watched_users_refreshed`.
+//! Le bot consomme cet event et refresh son cache local en pulling l'API
+//! (`get_all_watched_user_ids`). Plus d'acces Redis direct cote bot.
 
-use redis::AsyncCommands;
 use serenity::prelude::*;
 use tracing::{info, warn};
 
@@ -15,8 +14,6 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::api_client::ApiClient;
 use super::WatchedUserIdsKey;
-
-const REDIS_KEY: &str = "audit:watched_users";
 
 /// Verifie si un utilisateur est dans le set des utilisateurs surveilles.
 ///
@@ -66,11 +63,11 @@ pub async fn track_activity(
     }
 }
 
-/// Phase 6A — Bootstrap du cache `WatchedUserIdsKey` au demarrage du bot.
+/// Bootstrap du cache `WatchedUserIdsKey` au demarrage du bot.
 ///
-/// Essaie de lire le snapshot depuis Redis (alimente par `audit-cache-worker`).
-/// Si Redis est vide (worker pas encore demarre, premier deploiement), retombe
-/// sur un appel API direct comme fallback une seule fois.
+/// Le bot lit la liste cote API (qui sert depuis sa propre source de
+/// verite). Plus d'acces Redis direct — l'audit-cache-worker continue a
+/// pousser un cache mais c'est l'API qui le sert (transparence pour le bot).
 pub async fn bootstrap_watched_users(ctx: &Context) {
     let data = ctx.data.read().await;
     let Some(watched_set) = data.get::<WatchedUserIdsKey>().cloned() else {
@@ -80,29 +77,6 @@ pub async fn bootstrap_watched_users(ctx: &Context) {
     let api_client = data.get::<ApiClientKey>().cloned();
     drop(data);
 
-    // 1. Tentative Redis
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_default();
-    if !redis_url.is_empty() {
-        if let Ok(client) = redis::Client::open(redis_url) {
-            if let Ok(mut conn) = client.get_multiplexed_async_connection().await {
-                if let Ok(Some(json)) = conn.get::<_, Option<String>>(REDIS_KEY).await {
-                    if let Ok(ids) = serde_json::from_str::<Vec<String>>(&json) {
-                        watched_set.clear();
-                        for id in ids {
-                            watched_set.insert(id);
-                        }
-                        info!(
-                            count = watched_set.len(),
-                            "watched_users bootstrap depuis Redis"
-                        );
-                        return;
-                    }
-                }
-            }
-        }
-    }
-
-    // 2. Fallback API (une seule fois, le worker prendra le relais au prochain tick)
     let Some(base) = api_client else {
         warn!("bootstrap_watched_users: ApiClientKey manquant, cache vide");
         return;
@@ -114,20 +88,19 @@ pub async fn bootstrap_watched_users(ctx: &Context) {
             for id in ids {
                 watched_set.insert(id);
             }
-            info!(
-                count = watched_set.len(),
-                "watched_users bootstrap via fallback API (Redis vide)"
-            );
+            info!(count = watched_set.len(), "watched_users bootstrap via API");
         }
         Err(e) => {
-            warn!(error = %e, "bootstrap_watched_users: fallback API failed, cache reste vide");
+            warn!(error = %e, "bootstrap_watched_users: API call failed, cache reste vide");
         }
     }
 }
 
-/// Phase 6A — Consumer stream : recoit `watched_users_refreshed` et refresh
-/// le cache depuis Redis. Appele par le flow `listen_stream_group` dans
-/// le module audit.
+/// Consumer stream : recoit `watched_users_refreshed` (publie par
+/// `audit-cache-worker`) et refresh le cache local en pulling l'API.
+///
+/// Avant : lisait directement Redis. Maintenant : delegue a l'API via
+/// `get_all_watched_user_ids` — l'event est juste un trigger.
 pub async fn handle_watched_refresh_event(ctx: &Context, payload_json: &str) {
     // Parse pour verifier le type d'event — on ignore les autres events qui
     // passent sur la meme stream (moderation_action, etc.)
@@ -140,54 +113,31 @@ pub async fn handle_watched_refresh_event(ctx: &Context, payload_json: &str) {
         return;
     }
 
-    // Re-read depuis Redis (le worker a deja pousse le snapshot avant d'emit
-    // l'event, donc le SET est a jour)
     let data = ctx.data.read().await;
     let Some(watched_set) = data.get::<WatchedUserIdsKey>().cloned() else {
         return;
     };
+    let api_client = data.get::<ApiClientKey>().cloned();
     drop(data);
 
-    let redis_url = std::env::var("REDIS_URL").unwrap_or_default();
-    if redis_url.is_empty() {
-        return;
-    }
-    let client = match redis::Client::open(redis_url) {
-        Ok(c) => c,
-        Err(e) => {
-            warn!(error = %e, "handle_watched_refresh_event: redis client failed");
-            return;
-        }
-    };
-    let mut conn = match client.get_multiplexed_async_connection().await {
-        Ok(c) => c,
-        Err(e) => {
-            warn!(error = %e, "handle_watched_refresh_event: redis connect failed");
-            return;
-        }
-    };
-    let json: Option<String> = match conn.get(REDIS_KEY).await {
-        Ok(v) => v,
-        Err(e) => {
-            warn!(error = %e, "handle_watched_refresh_event: redis get failed");
-            return;
-        }
-    };
-    let Some(json) = json else {
-        warn!("handle_watched_refresh_event: Redis key vide (worker deconnecte ?)");
+    let Some(base) = api_client else {
+        warn!("handle_watched_refresh_event: ApiClientKey manquant");
         return;
     };
-    let ids: Vec<String> = match serde_json::from_str(&json) {
-        Ok(v) => v,
-        Err(e) => {
-            warn!(error = %e, "handle_watched_refresh_event: parse json failed");
-            return;
+    let api = ApiClient::new(base);
+    match api.get_all_watched_user_ids().await {
+        Ok(ids) => {
+            watched_set.clear();
+            for id in ids {
+                watched_set.insert(id);
+            }
+            info!(
+                count = watched_set.len(),
+                "watched_users cache refresh depuis event (via API)"
+            );
         }
-    };
-
-    watched_set.clear();
-    for id in ids {
-        watched_set.insert(id);
+        Err(e) => {
+            warn!(error = %e, "handle_watched_refresh_event: API call failed");
+        }
     }
-    info!(count = watched_set.len(), "watched_users cache refresh depuis event");
 }

@@ -9,9 +9,9 @@ use crate::domain::entities::{CoudeHeistAttempt, CoudePrisonState};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeHeistRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("heist pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "heist";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeHeistRepository {
     pool: PgPool,

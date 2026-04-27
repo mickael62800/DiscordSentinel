@@ -9,9 +9,9 @@ use crate::domain::entities::CoudeStealProtection;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeStealProtectionRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("steal_protection pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "steal_protection";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeStealProtectionRepository {
     pool: PgPool,

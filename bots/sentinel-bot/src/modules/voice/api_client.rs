@@ -393,7 +393,6 @@ impl ApiClient {
             flood_time_window_secs: cfg.flood_time_window_secs,
             empty_cleanup_delay_secs: cfg.empty_cleanup_delay_secs,
             flood_mute_duration_secs: cfg.flood_mute_duration_secs,
-            vote_kick_timeout_secs: cfg.vote_kick_timeout_secs,
         })
     }
 
@@ -430,7 +429,6 @@ pub struct VoiceConfigResponse {
     pub flood_time_window_secs: u64,
     pub empty_cleanup_delay_secs: u64,
     pub flood_mute_duration_secs: u64,
-    pub vote_kick_timeout_secs: u64,
 }
 
 #[derive(Debug, Clone)]

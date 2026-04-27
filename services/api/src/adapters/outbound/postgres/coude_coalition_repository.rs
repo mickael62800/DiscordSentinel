@@ -11,9 +11,9 @@ use crate::domain::entities::{
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeCoalitionRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("coude_coalitions pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "coude_coalitions";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeCoalitionRepository {
     pool: PgPool,

@@ -1,7 +1,5 @@
 use super::*;
 
-    use super::*;
-
     fn req_with_auth(value: Option<&str>) -> Request<()> {
         let mut req = Request::new(());
         if let Some(v) = value {

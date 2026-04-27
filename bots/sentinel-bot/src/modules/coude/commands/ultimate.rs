@@ -11,12 +11,10 @@ use serenity::all::{
     CreateInteractionResponseMessage,
 };
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_api_err};
 
-use crate::modules::coude::ultimates::{
-    format_ultimate_for_class, ultimate_for_class, ULTIMATE_UNLOCK_LEVEL,
-};
-use crate::modules::coude::GameApiKey;
+use crate::modules::coude::ultimates::{format_ultimate_for_class, ultimate_for_class};
+use crate::modules::coude::{load_guild_config, GameApiKey};
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("ultimate")
@@ -32,14 +30,10 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
     let user_id = command.user.id.to_string();
+    let config = load_guild_config(ctx, &guild_id).await;
+    let unlock_level = config.ultimate_unlock_level();
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();
     let player = match api
@@ -48,7 +42,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     {
         Ok(p) => p,
         Err(e) => {
-            reply_ephemeral(ctx, command, &format!("Erreur API : {e}")).await;
+            reply_api_err(ctx, command, e).await;
             return;
         }
     };
@@ -125,12 +119,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     }
 
     let embed = if let Some(u) = ult {
-        let unlock_status = if player.level >= ULTIMATE_UNLOCK_LEVEL {
+        let unlock_status = if player.level >= unlock_level {
             format!("\u{2705} **Debloque** (niveau {})", player.level)
         } else {
             format!(
                 "\u{1f512} Verrouille — debloque au niveau {} (tu es niveau {})",
-                ULTIMATE_UNLOCK_LEVEL, player.level
+                unlock_level, player.level
             )
         };
         let mech_note = if u.mechanical_implemented {
@@ -146,7 +140,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
                 unlock_status,
                 u.cooldown_days,
                 mech_note,
-                format_ultimate_for_class(class_key, player.level)
+                format_ultimate_for_class(class_key, player.level, unlock_level)
             ))
             .color(0x9B59B6)
             .footer(CreateEmbedFooter::new(

@@ -2,7 +2,9 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{CurseKind, TauntEvent, LEAKY_WALLET_FEE_COINS};
+use crate::domain::entities::{
+    clamp_steal_amount, clamp_steal_fail_penalty, CurseKind, TauntEvent, LEAKY_WALLET_FEE_COINS,
+};
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_economy::{
     ManageCoudeEconomyUseCase, StealOutcome,
@@ -91,12 +93,7 @@ impl ManageCoudeEconomyService {
     async fn season_steal_bonus(&self, guild_id: &str, thief_id: &str, stolen: i64) -> i64 {
         let Some(repo) = &self.player_repo else { return 0; };
         let Ok(Some(player)) = repo.get(guild_id, thief_id).await else { return 0; };
-        use crate::domain::entities::theme_for_season;
-        let mult = theme_for_season(player.season).steal_gain_multiplier;
-        if mult <= 1.0 || stolen <= 0 {
-            return 0;
-        }
-        ((stolen as f64) * (mult - 1.0)) as i64
+        crate::domain::entities::compute_season_steal_bonus(player.season, stolen)
     }
 }
 
@@ -178,6 +175,8 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         victim_id: &str,
         amount: i64,
     ) -> Result<StealOutcome, DomainError> {
+        // 1. Validations pre-I/O : on echoue avant get_coins pour eviter
+        //    qu'un wallet absent ne masque une self-steal ou un montant <= 0.
         require_positive(amount)?;
         if thief_id == victim_id {
             return Err(DomainError::ValidationError(
@@ -185,18 +184,11 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
             ));
         }
 
-        // 1. Lire le solde victime + clamp : on ne peut pas voler plus
-        //    que ce qu'elle possede (pas de creation de coins). On lit
-        //    hors-tx : si un autre evenement modifie le solde entre le
-        //    read et le transfer, wallet_uc.transfer echouera
-        //    proprement (ValidationError "Solde insuffisant").
+        // 2. Lecture solde + clamp pur (domain). On lit hors-tx : si un autre
+        //    evenement modifie le solde entre le read et le transfer,
+        //    wallet_uc.transfer echouera proprement ("Solde insuffisant").
         let victim_coins = self.repo.get_coins(guild_id, victim_id).await?;
-        let stolen = amount.min(victim_coins);
-        if stolen <= 0 {
-            return Err(DomainError::ValidationError(
-                "La victime n'a pas de coins a voler".into(),
-            ));
-        }
+        let stolen = clamp_steal_amount(thief_id, victim_id, amount, victim_coins)?.stolen;
 
         // 2. Mutation wallet atomique via le service unifie (faillite
         //    cote victime + jackpot cote voleur auto-detectes).
@@ -258,7 +250,7 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
         // Clamp au solde reel (comportement legacy record_coins_lost :
         // GREATEST(0, coins - amount), pas d'erreur si penalite > solde).
         let thief_coins = self.repo.get_coins(guild_id, thief_id).await?;
-        let lost = amount.min(thief_coins);
+        let lost = clamp_steal_fail_penalty(amount, thief_coins);
         if lost <= 0 {
             // Pas de debit a faire ; taunts stats deja a jour. Le
             // caller affiche quand meme la penalite "faciale".

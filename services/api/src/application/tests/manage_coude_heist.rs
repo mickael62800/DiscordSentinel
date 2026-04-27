@@ -5,7 +5,6 @@
 //! - attempt_heist success path (withdraw + credit + record)
 //! - attempt_heist failure path (prison 24h)
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;

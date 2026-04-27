@@ -39,4 +39,13 @@ pub trait ManageConductUseCase: Send + Sync {
     async fn get_points_log(&self, guild_id: &str, user_id: &str, limit: i64) -> Result<Vec<ConductPointsLog>, DomainError>;
     #[allow(dead_code)]
     async fn run_regen(&self) -> Result<u64, DomainError>;
+
+    /// Cree des propositions de ban (`infractions` action='ban') pour les
+    /// users dont les points de conduite sont a 0 et qui n'ont pas encore
+    /// de proposition de ban liee a la conduite. Idempotent (skip ceux
+    /// deja proposes). Retourne le nombre de propositions creees.
+    /// Default impl `Ok(0)` pour preserver les mocks existants.
+    async fn sync_ban_proposals(&self) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }

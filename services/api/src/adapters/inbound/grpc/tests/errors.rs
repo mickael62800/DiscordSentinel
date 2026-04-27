@@ -1,6 +1,6 @@
 use super::*;
 
-    use super::*;
+    
     use uuid::Uuid;
 
     #[test]

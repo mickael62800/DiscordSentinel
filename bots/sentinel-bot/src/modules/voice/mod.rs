@@ -304,6 +304,5 @@ fn default_voice_config() -> VoiceConfigResponse {
         flood_time_window_secs: 5,
         empty_cleanup_delay_secs: 2,
         flood_mute_duration_secs: 30,
-        vote_kick_timeout_secs: 60,
     }
 }

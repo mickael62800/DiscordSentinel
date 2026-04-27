@@ -12,12 +12,13 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_bets::{
     ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
 };
-use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
-use crate::ports::outbound::{BotConfigRepository, CoudeBetRepository, CoudeSafetyNetRepository};
+use crate::ports::outbound::{
+    BotConfigRepository, CombatQueryRepository, CoudeBetRepository, CoudeSafetyNetRepository,
+};
 
 pub struct ManageCoudeBetsService {
     bet_repo: Arc<dyn CoudeBetRepository>,
-    combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
+    combat_query: Arc<dyn CombatQueryRepository>,
     safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
@@ -25,9 +26,9 @@ pub struct ManageCoudeBetsService {
 impl ManageCoudeBetsService {
     pub fn new(
         bet_repo: Arc<dyn CoudeBetRepository>,
-        combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
+        combat_query: Arc<dyn CombatQueryRepository>,
     ) -> Self {
-        Self { bet_repo, combats_uc, safety_net_repo: None, bot_config_repo: None }
+        Self { bet_repo, combat_query, safety_net_repo: None, bot_config_repo: None }
     }
 
     /// Branche le repo du filet de securite (cf. COUPE_AMELIORATIONS 4.4)
@@ -58,11 +59,7 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
             ));
         }
 
-        let combat = self
-            .combats_uc
-            .get(new.combat_id)
-            .await
-            .map_err(|_| DomainError::NotFound("Combat introuvable".into()))?;
+        let combat = self.combat_query.get(new.combat_id).await?;
 
         if combat.status != "betting" {
             return Err(DomainError::ValidationError(
@@ -89,7 +86,7 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
         combat_id: Uuid,
         winner_id: Option<String>,
     ) -> Result<ResolveBetsOutcome, DomainError> {
-        let combat = self.combats_uc.get(combat_id).await?;
+        let combat = self.combat_query.get(combat_id).await?;
         let bets = self.bet_repo.list_for_combat(combat_id).await?;
 
         let mut plan = calculate_bet_resolution(
@@ -136,7 +133,7 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
     }
 
     async fn refund(&self, combat_id: Uuid) -> Result<RefundSummary, DomainError> {
-        let combat = self.combats_uc.get(combat_id).await?;
+        let combat = self.combat_query.get(combat_id).await?;
         self.bet_repo
             .refund_unresolved(&combat.guild_id, combat_id)
             .await

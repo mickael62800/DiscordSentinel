@@ -1,6 +1,5 @@
 //! Tests unitaires du ManageRemindersService.
 
-use super::*;
 
 use std::sync::Arc;
 

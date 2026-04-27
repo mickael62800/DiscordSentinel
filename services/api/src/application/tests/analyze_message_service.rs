@@ -78,7 +78,7 @@ impl ManageConductUseCase for MockConduct {
 }
 
 
-    use super::*;
+    
     use chrono::Utc;
     use uuid::Uuid;
     use crate::domain::entities::Rule;

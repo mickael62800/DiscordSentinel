@@ -1,7 +1,6 @@
 //! Tests de ManageConductService. Les flows sans HTTP Discord (config + CRUD points)
 //! sont couverts ici. Le mute_user (HTTP Discord PATCH) n'est pas testable sans mock.
 
-use super::*;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;

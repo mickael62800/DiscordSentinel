@@ -9,9 +9,9 @@ use crate::domain::entities::{ActiveCurse, CurseKind};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::CoudeCursesRepository;
 
-fn pg_err(e: sqlx::Error) -> DomainError {
-    DomainError::Internal(format!("coude_curses pg: {e}"))
-}
+use super::pg_err_ctx;
+const TBL: &str = "coude_curses";
+fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
 pub struct PgCoudeCursesRepository {
     pool: PgPool,

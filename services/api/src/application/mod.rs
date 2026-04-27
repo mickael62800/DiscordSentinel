@@ -111,3 +111,12 @@ pub use manage_coude_safety_net_service::ManageCoudeSafetyNetService;
 
 pub mod manage_coude_vendetta_service;
 pub use manage_coude_vendetta_service::ManageCoudeVendettaService;
+
+pub mod play_tout_ou_rien_service;
+pub use play_tout_ou_rien_service::PlayToutOuRienService;
+
+pub mod play_travaux_service;
+pub use play_travaux_service::PlayTravauxService;
+
+pub mod roll_steal_service;
+pub use roll_steal_service::RollStealService;

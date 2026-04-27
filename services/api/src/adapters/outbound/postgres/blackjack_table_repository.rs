@@ -51,6 +51,31 @@ impl BlackjackTableRepository for PgBlackjackTableRepository {
         Ok(())
     }
 
+    async fn touch_activity_by_player(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+    ) -> Result<(), crate::domain::errors::DomainError> {
+        // Bug fix : avant, seul `JoinTable` mettait a jour `last_activity`.
+        // Une partie >30min faisait fermer la table par le cleanup-worker
+        // alors qu'elle etait active. On touche desormais a chaque action
+        // de jeu (start/hit/stand/double) via cette methode qui retrouve
+        // la table ouverte du joueur. No-op si pas de table.
+        sqlx::query(
+            "UPDATE blackjack_tables \
+             SET last_activity = NOW() \
+             WHERE guild_id = $1 \
+               AND status = 'open' \
+               AND id IN (SELECT table_id FROM blackjack_table_players WHERE user_id = $2)",
+        )
+        .bind(guild_id)
+        .bind(user_id)
+        .execute(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(())
+    }
+
     async fn list_players(&self, table_id: &str) -> Result<Vec<BlackjackTablePlayer>, crate::domain::errors::DomainError> {
         let rows: Vec<BlackjackTablePlayer> = sqlx::query_as(
             "SELECT user_id, user_name, joined_at::text FROM blackjack_table_players WHERE table_id = $1::uuid ORDER BY joined_at",

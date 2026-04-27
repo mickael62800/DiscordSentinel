@@ -17,12 +17,13 @@ use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::application::BlackjackService as BlackjackApp;
 use crate::domain::entities::{BlackjackGame, Card, TauntEvent, Wallet};
-use crate::ports::outbound::{BotConfigRepository, WalletRepository};
+use crate::ports::outbound::{BlackjackTableRepository, BotConfigRepository, WalletRepository};
 
 pub struct BlackjackGrpc {
     pub svc: Arc<BlackjackApp>,
     pub wallet_repo: Arc<dyn WalletRepository>,
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
+    pub table_repo: Arc<dyn BlackjackTableRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
 }
 
@@ -94,6 +95,12 @@ impl BlackjackGrpcTrait for BlackjackGrpc {
             )
             .await
             .map_err(domain_to_status)?;
+        // Anti-AFK : empeche le cleanup-worker de fermer la table pendant
+        // que le joueur joue. No-op si solo (pas de table).
+        let _ = self
+            .table_repo
+            .touch_activity_by_player(&result.game.guild_id, &result.game.user_id)
+            .await;
         if game_is_over(&result.game.status) {
             self.broadcast_result(&result.game, false);
         }
@@ -106,6 +113,10 @@ impl BlackjackGrpcTrait for BlackjackGrpc {
     ) -> Result<Response<proto::BlackjackGameResult>, Status> {
         let id = parse_uuid(&request.into_inner().game_id)?;
         let result = self.svc.hit(id).await.map_err(domain_to_status)?;
+        let _ = self
+            .table_repo
+            .touch_activity_by_player(&result.game.guild_id, &result.game.user_id)
+            .await;
         if game_is_over(&result.game.status) {
             self.broadcast_result(&result.game, false);
         }
@@ -118,6 +129,10 @@ impl BlackjackGrpcTrait for BlackjackGrpc {
     ) -> Result<Response<proto::BlackjackGameResult>, Status> {
         let id = parse_uuid(&request.into_inner().game_id)?;
         let result = self.svc.stand(id).await.map_err(domain_to_status)?;
+        let _ = self
+            .table_repo
+            .touch_activity_by_player(&result.game.guild_id, &result.game.user_id)
+            .await;
         if game_is_over(&result.game.status) {
             self.broadcast_result(&result.game, false);
         }
@@ -130,6 +145,10 @@ impl BlackjackGrpcTrait for BlackjackGrpc {
     ) -> Result<Response<proto::BlackjackGameResult>, Status> {
         let id = parse_uuid(&request.into_inner().game_id)?;
         let result = self.svc.double_down(id).await.map_err(domain_to_status)?;
+        let _ = self
+            .table_repo
+            .touch_activity_by_player(&result.game.guild_id, &result.game.user_id)
+            .await;
         if game_is_over(&result.game.status) {
             self.broadcast_result(&result.game, true);
         }

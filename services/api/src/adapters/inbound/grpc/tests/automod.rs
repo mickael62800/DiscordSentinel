@@ -1,6 +1,6 @@
 use super::*;
 
-    use super::*;
+    
 
     #[test]
     fn proto_to_flags_round_trip_all_true() {

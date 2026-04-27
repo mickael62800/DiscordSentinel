@@ -80,6 +80,26 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         self.buy_insurance(guild_id, user_id, is_scam, duration_seconds).await
     }
 
+    /// Phase 2 #3 audit : decide cote API si l'assurance est un scam
+    /// (`gen_range(1..=100) <= scam_rate_pct`) et persiste avec le verdict.
+    /// Le bot ne fait plus de RNG.
+    ///
+    /// Retourne `(created, is_scam)`. `created == false` => assurance active
+    /// existait deja, le caller doit rembourser.
+    /// Default impl Ok((false, false)) pour preserver les mocks existants.
+    async fn buy_insurance_with_scam_roll(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _scam_rate_pct: u32,
+        _duration_seconds: i64,
+        _level: i32,
+    ) -> Result<(bool, bool), DomainError> {
+        Err(DomainError::NotImplemented(
+            "ManageCoudeInventoryUseCase::buy_insurance_with_scam_roll".into(),
+        ))
+    }
+
     async fn get_active_insurance(
         &self,
         guild_id: &str,

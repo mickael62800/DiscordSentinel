@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use uuid::Uuid;
 
 use crate::domain::entities::{
-    BetPayout, BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary, TauntEvent,
+    BetPayout, BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary,
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::manage_coude_bets::{

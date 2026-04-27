@@ -99,6 +99,42 @@ pub async fn add_points(
     Ok(single_dto(points))
 }
 
+#[derive(serde::Serialize)]
+pub struct ConductRegenTickResp {
+    pub regenerated: u64,
+}
+
+/// POST /api/conduct/regen-tick
+///
+/// Endpoint stateless appele par le `moderation-worker` a intervalle
+/// regulier. Delegue a `ManageConductUseCase::run_regen` qui applique
+/// la regle metier `apply_conduct_regen` (domain). Le worker ne fait
+/// que planifier — la decision vit cote API.
+pub async fn run_regen_tick(
+    State(state): State<AppState>,
+) -> Result<Json<ConductRegenTickResp>, ApiError> {
+    let regenerated = state.conduct_uc.run_regen().await?;
+    Ok(Json(ConductRegenTickResp { regenerated }))
+}
+
+#[derive(serde::Serialize)]
+pub struct ConductSyncBanProposalsResp {
+    pub created: u64,
+}
+
+/// POST /api/conduct/sync-ban-proposals
+///
+/// Cree des propositions de ban (`infractions` action='ban') pour les users
+/// tombes a 0 points de conduite et qui n'ont pas encore de proposition de
+/// ban liee a la conduite. Idempotent. Appele periodiquement par le
+/// `moderation-worker`.
+pub async fn sync_ban_proposals(
+    State(state): State<AppState>,
+) -> Result<Json<ConductSyncBanProposalsResp>, ApiError> {
+    let created = state.conduct_uc.sync_ban_proposals().await?;
+    Ok(Json(ConductSyncBanProposalsResp { created }))
+}
+
 #[cfg(test)]
 #[path = "tests/conduct.rs"]
 mod tests;

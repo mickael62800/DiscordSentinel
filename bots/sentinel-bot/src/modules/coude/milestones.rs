@@ -7,6 +7,7 @@
 //! cables commit par commit cote services.
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub struct Milestone {
     pub level: i32,
     pub key: &'static str,

@@ -24,7 +24,7 @@ use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::{
     PgAnalyticsRepository, PgBlackjackRepository, PgBlackjackTableRepository, PgBotConfigRepository,
     PgConductRepository, PgCoudeBetRepository, PgCoudeCashboxRepository, PgCoudeCombatRepository,
-    PgCoudeBountyRepository, PgCoudeCoalitionRepository, PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeRefusalCountRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeUltimateRepository, PgCoudeVendettaRepository,
+    PgCoudeBountyRepository, PgCoudeCoalitionRepository, PgCoudeCursesRepository, PgCoudeEconomyRepository, PgCoudeFlavorTemplatesRepository, PgCoudeHeistRepository, PgCoudeInventoryRepository, PgCoudeRefusalCountRepository, PgCoudeSafetyNetRepository, PgCoudeToutOuRienRepository, PgCoudeUltimateRepository, PgCoudeVendettaRepository,
     PgCoudePlayerRepository, PgCoudeSocialRepository, PgCoudeStealBoostRepository,
     PgCoudeStealProtectionRepository, PgCoudeTauntsRepository, PgDailyActivityRepository,
     PgDiscordRoleRepository, PgEvidenceRepository, PgGameRepository, PgGuildRepository,
@@ -47,7 +47,8 @@ use crate::application::{
     ManageLevelsService, ManageMembersService, ManageModerationService, ManageNotesService,
     ManageRemindersService, ManageRolePanelsService, ManageRulesService, ManageSecurityService,
     ManageStatsService, ManageStrikesService, ManageTicketsService, ManageVoiceChannelsService,
-    ManageWatchedUsersService, ResolveBettingBatchService, ResolveCombatNowService,
+    ManageWatchedUsersService, PlayToutOuRienService, PlayTravauxService, ResolveBettingBatchService,
+    ResolveCombatNowService, RollStealService,
 };
 use crate::config::AppConfig;
 use crate::adapters::outbound::{DiscordApiService, InferenceService, TextTokenizer};
@@ -364,8 +365,13 @@ pub async fn build_app_state(
         pg_pool.clone(),
         wallet_uc.clone(),
     ));
+    // Bets ne depend que d'une lecture de combat — on injecte le narrow port
+    // `CombatQueryRepository` (impl par `PgCoudeCombatRepository`) plutot que
+    // le use case complet `ManageCoudeCombatsUseCase`. Cf. P0 #2 audit.
+    let combat_query_repo: Arc<dyn crate::ports::outbound::CombatQueryRepository> =
+        coude_combat_repo.clone();
     let coude_bets_uc = Arc::new(
-        ManageCoudeBetsService::new(coude_bet_repo, coude_combats_uc.clone())
+        ManageCoudeBetsService::new(coude_bet_repo, combat_query_repo)
             .with_safety_net_repo(coude_safety_net_repo.clone())
             .with_bot_config_repo(bot_config_repo.clone()),
     );
@@ -416,9 +422,10 @@ pub async fn build_app_state(
         ManageCoudeInventoryService::new(coude_inventory_repo)
             .with_bot_config_repo(bot_config_repo.clone()),
     );
-    let coude_social_repo = Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
+    let coude_social_repo: Arc<dyn crate::ports::outbound::CoudeSocialRepository> =
+        Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
     let coude_social_uc = Arc::new(ManageCoudeSocialService::new(
-        coude_social_repo,
+        coude_social_repo.clone(),
         coude_player_repo.clone(),
         coude_economy_repo.clone(),
         bot_config_repo.clone(),
@@ -492,6 +499,34 @@ pub async fn build_app_state(
     // Memorial des clodos / tout-ou-rien log (cf. COUPE_AMELIORATIONS 6.1).
     let coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::CoudeToutOuRienRepository> =
         Arc::new(PgCoudeToutOuRienRepository::new(pg_pool.clone()));
+
+    // Phase 2 #1 audit : RNG /tout-ou-rien migre cote API.
+    let play_tout_ou_rien_uc: Arc<
+        dyn crate::ports::inbound::play_tout_ou_rien::PlayToutOuRienUseCase,
+    > = Arc::new(PlayToutOuRienService::new(
+        coude_player_repo.clone(),
+        wallet_uc.clone(),
+        coude_social_repo.clone(),
+        coude_tout_ou_rien_repo.clone(),
+    ));
+
+    // Phase 2 #2 audit : RNG /travaux migre cote API.
+    let play_travaux_uc: Arc<dyn crate::ports::inbound::play_travaux::PlayTravauxUseCase> =
+        Arc::new(PlayTravauxService::new(
+            coude_heist_repo.clone(),
+            coude_player_repo.clone(),
+            wallet_uc.clone(),
+            coude_social_repo.clone(),
+        ));
+
+    // Phase 2 #4 audit : RNG /voler (d20 + steal %) migre cote API.
+    let roll_steal_uc: Arc<dyn crate::ports::inbound::roll_steal::RollStealUseCase> =
+        Arc::new(RollStealService::new());
+
+    // Phase 3 #9 audit : catalogue de templates flavor (steal/heist/prank).
+    let coude_flavor_templates_repo: Arc<
+        dyn crate::ports::outbound::CoudeFlavorTemplatesRepository,
+    > = Arc::new(PgCoudeFlavorTemplatesRepository::new(pg_pool.clone()));
 
     // Primes collectives (cf. COUPE_AMELIORATIONS 5.3).
     let coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository> =
@@ -628,6 +663,10 @@ pub async fn build_app_state(
         coude_safety_net_uc,
         coude_vendetta_uc,
         coude_tout_ou_rien_repo,
+        play_tout_ou_rien_uc,
+        play_travaux_uc,
+        roll_steal_uc,
+        coude_flavor_templates_repo,
         coude_bounty_repo: coude_bounty_repo.clone(),
         coude_refusal_count_repo,
         coude_coalition_repo: coude_coalition_repo.clone(),

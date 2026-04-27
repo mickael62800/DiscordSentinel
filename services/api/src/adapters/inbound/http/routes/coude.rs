@@ -68,6 +68,11 @@ fn coude_inner() -> Router<AppState> {
         // Insurance
         .route("/{guild_id}/friendly-duels", post(handlers::coude::resolve_friendly_duel))
         .route("/{guild_id}/insurance/buy", post(handlers::coude::buy_insurance))
+        // Phase 2 #3 audit : RNG scam migre cote API.
+        .route(
+            "/{guild_id}/insurance/buy-with-roll",
+            post(handlers::coude::buy_insurance_with_roll),
+        )
         .route("/{guild_id}/insurance/{user_id}", get(handlers::coude::get_active_insurance))
         .route("/insurance/{insurance_id}/expire", post(handlers::coude::expire_insurance))
         // Leaderboard
@@ -162,6 +167,31 @@ fn coude_inner() -> Router<AppState> {
         .route(
             "/{guild_id}/tout-ou-rien/by-user/{user_id}",
             get(handlers::coude::get_user_stats),
+        )
+        // Phase 2 #1 audit : RNG /tout-ou-rien migre cote API.
+        .route(
+            "/{guild_id}/tout-ou-rien/play",
+            post(handlers::coude::play_tout_ou_rien),
+        )
+        // Phase 2 #2 audit : RNG /travaux migre cote API.
+        .route(
+            "/{guild_id}/travaux/play",
+            post(handlers::coude::play_travaux),
+        )
+        // Phase 2 #4 audit : RNG d20 + % de /voler migre cote API.
+        .route(
+            "/{guild_id}/steal/roll",
+            post(handlers::coude::roll_steal),
+        )
+        // Phase 3 #9 audit : catalogue de templates flavor.
+        .route(
+            "/flavor/{key}/random",
+            get(handlers::coude::get_random_flavor),
+        )
+        // Phase 3 finalisation : RNG fake_amount /prank cote API.
+        .route(
+            "/{guild_id}/prank/braquage/roll",
+            post(handlers::coude::roll_prank_braquage_amount),
         )
         // Migration 164 : primes collectives (cf. COUPE_AMELIORATIONS 5.3)
         .route(

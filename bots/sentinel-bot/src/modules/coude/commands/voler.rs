@@ -1,4 +1,3 @@
-use rand::Rng;
 use serenity::all::{
     ButtonStyle, CommandDataOptionValue, CommandInteraction, CommandOptionType,
     ComponentInteraction, Context, CreateActionRow, CreateButton, CreateCommand,
@@ -7,7 +6,7 @@ use serenity::all::{
 };
 use std::time::Duration;
 
-use sentinel_shared::discord_helpers::reply_ephemeral;
+use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id};
 
 use crate::modules::coude::api_client::ApiClient;
 use crate::modules::coude::catalog::{CatalogCache, CatalogCacheKey};
@@ -42,81 +41,15 @@ async fn try_trigger_protection(
     }
 }
 
-const STEAL_SUCCESS_AFK: &[&str] = &[
-    "\u{1f4b0} {voleur} a fait les poches de {victime} pendant sa sieste ! (-{montant} coins)",
-    "\u{1f575}\u{fe0f} {voleur} s'est glisse dans l'ombre et a chipe {montant} coins a {victime} !",
-    "\u{1f3ad} {voleur} a distrait {victime} avec un tour de magie et lui a pique {montant} coins !",
-    "\u{1f431} {voleur} a vole {montant} coins a {victime} avec l'agilite d'un chat !",
-    "\u{1f4a4} {victime} dormait sur son tresor... {voleur} en a profite pour prendre {montant} coins !",
-    "\u{1f3a9} Tour de magie reussi ! {voleur} fait disparaitre {montant} coins du portefeuille de {victime} !",
-    "\u{1f577}\u{fe0f} Silencieux comme une araignee, {voleur} derobe {montant} coins a {victime} !",
-    "\u{1f6b6} {victime} se promenait tranquille... {voleur} passe a cote et rafle {montant} coins !",
-    "\u{1f4f1} {victime} regardait son telephone, {voleur} a vide sa bourse de {montant} coins !",
-    "\u{1f94b} {voleur} applique la technique du ninja : {montant} coins voles a {victime} sans bruit !",
-    "\u{1f3a9} Abracadabra ! {voleur} fait voyager {montant} coins de {victime} vers sa poche !",
-    "\u{1f9e6} {voleur} a enfile un costume noir et volatilise {montant} coins a {victime} !",
-    "\u{1fa9d} {voleur} a sorti son piege a souris XL ! {montant} coins captures sur {victime} !",
-    "\u{1f6d2} {victime} faisait ses courses... {voleur} a charge le caddie avec {montant} coins !",
-    "\u{1f3b5} {voleur} siffle tranquillement en emportant {montant} coins de {victime} !",
-    "\u{1f512} {voleur} a crochete le coffre de {victime} et repart avec {montant} coins !",
-    "\u{1f4fa} Pendant que {victime} regardait la tele, {voleur} a empoche {montant} coins !",
-    "\u{1f304} {voleur} profite du clair de lune pour chiper {montant} coins a {victime} !",
-    "\u{1f4ce} {voleur} a trombone-crocheté la serrure. {victime} perd {montant} coins !",
-    "\u{1f3ad} Ocean's Eleven niveau debutant : {voleur} prend {montant} coins a {victime} !",
-];
-
-const STEAL_SUCCESS_FIGHT: &[&str] = &[
-    "\u{1f4aa} {victime} s'est debattu, mais {voleur} est plus malin ! {montant} coins voles !",
-    "\u{1f93c} Apres une lutte acharnee, {voleur} repart avec {montant} coins de {victime} !",
-    "\u{1f3c3} {voleur} a arrache le sac de {victime} et s'est enfui en courant ! {montant} coins !",
-    "\u{1f4a8} {voleur} pousse {victime}, attrape {montant} coins et disparait !",
-    "\u{1f94a} Apres un echange de coups, {voleur} plume {victime} de {montant} coins !",
-    "\u{1f422} {victime} a reagi trop lentement ! {voleur} file avec {montant} coins !",
-    "\u{1f6f9} {voleur} a fait du skate sur {victime} et ramasse {montant} coins au passage !",
-    "\u{1f3af} {voleur} vise juste et attrape {montant} coins malgre la defense de {victime} !",
-    "\u{1f512} {voleur} plaque {victime} au sol et arrache {montant} coins !",
-    "\u{1f6e1}\u{fe0f} {victime} a tente de bloquer mais {voleur} passe la garde ! {montant} coins voles !",
-    "\u{1f31f} Mouvement digne de Matrix ! {voleur} esquive {victime} et vole {montant} coins !",
-    "\u{1f4a5} {voleur} applique un plaquage rugby sur {victime} ! Gain : {montant} coins !",
-    "\u{1f3ae} Combo vol ! {voleur} chope {montant} coins malgre la resistance de {victime} !",
-    "\u{1f30b} Tornade de poings ! {voleur} sort de la melee avec {montant} coins de {victime} !",
-    "\u{1f984} {voleur} a embroche {victime} et ramasse {montant} coins !",
-];
-
-const STEAL_FAIL: &[&str] = &[
-    "\u{1f6a8} {victime} a attrape {voleur} la main dans le sac ! {voleur} perd {montant} coins !",
-    "\u{1f44a} {victime} a mis une gifle a {voleur} en pleine tentative ! -{montant} coins !",
-    "\u{1f34c} {voleur} a glisse sur une peau de banane en essayant de voler {victime} ! -{montant} coins !",
-    "\u{1f415} Le chien de {victime} a mordu {voleur} ! Vol rate et {montant} coins en frais medicaux !",
-    "\u{1fab4} {victime} avait pose un piege ! {voleur} se retrouve suspendu par les pieds ! -{montant} coins !",
-    "\u{1f921} {voleur} a essaye de pickpocket {victime} mais a sorti son propre portefeuille ! -{montant} coins !",
-    "\u{1f46e} {voleur} fait face a la police ! Amende de {montant} coins pour tentative de vol sur {victime} !",
-    "\u{1f3a5} Camera 4K ! {voleur} s'est fait filmer en train de voler {victime} ! -{montant} coins !",
-    "\u{1f4a8} {victime} a esquive, {voleur} percute un mur ! -{montant} coins de soins !",
-    "\u{1f41d} Un essaim d'abeilles a defendu {victime} ! {voleur} perd {montant} coins !",
-    "\u{1f911} {voleur} a tendu la main vers la mauvaise poche de {victime} ! -{montant} coins !",
-    "\u{1f4a9} {voleur} a marche dans une crotte en fuyant {victime} ! -{montant} coins de teinturier !",
-    "\u{1f645} {victime} a dit non tres fort ! {voleur} a fui et perdu {montant} coins en route !",
-    "\u{1f9ca} {voleur} a glisse sur du verglas en approchant {victime} ! -{montant} coins !",
-    "\u{1f3a3} {victime} a sorti un hamecon ! {voleur} est ferre et paye {montant} coins !",
-    "\u{1f4f7} Bobards ! {voleur} a pose devant un miroir en croyant voler {victime} ! -{montant} coins !",
-    "\u{1f52e} {victime} avait vu venir ! {voleur} repart avec -{montant} coins et une honte eternelle !",
-    "\u{1f6bd} {voleur} s'est cache dans les toilettes de {victime}... mauvaise idee ! -{montant} coins !",
-    "\u{1f922} {voleur} a eu peur et a rendu {montant} coins a {victime} sans raison !",
-    "\u{1f3ea} {voleur} s'est perdu dans le supermarche de {victime} ! Amende de {montant} coins !",
-];
+// Templates STEAL_SUCCESS_AFK / STEAL_SUCCESS_FIGHT / STEAL_FAIL migres
+// dans `coude_flavor_templates` (Phase 3 #9 audit). Le bot consomme via
+// `api.random_flavor`. Pas de fallback local.
 
 fn format_msg(template: &str, voleur: &str, victime: &str, montant: i64) -> String {
     template
         .replace("{voleur}", voleur)
         .replace("{victime}", victime)
         .replace("{montant}", &montant.to_string())
-}
-
-fn pick_random<'a>(messages: &[&'a str]) -> &'a str {
-    let mut rng = rand::thread_rng();
-    let idx = rng.gen_range(0..messages.len());
-    messages[idx]
 }
 
 pub fn register() -> CreateCommand {
@@ -129,13 +62,7 @@ pub fn register() -> CreateCommand {
 }
 
 pub async fn handle(ctx: &Context, command: &CommandInteraction) {
-    let guild_id = match command.guild_id {
-        Some(id) => id.to_string(),
-        None => {
-            reply_ephemeral(ctx, command, "Commande serveur uniquement.").await;
-            return;
-        }
-    };
+    let Some(guild_id) = require_guild_id(ctx, command).await else { return; };
 
     let target_id = command
         .data
@@ -257,7 +184,8 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
     };
 
-    if target_player.coins < 10 {
+    let min_target_coins = config.voler_min_target_coins();
+    if target_player.coins < min_target_coins {
         crate::modules::coude::interaction_helper::followup_text(
             ctx,
             command,
@@ -444,13 +372,19 @@ async fn resolve_steal_attempt(
     afk: bool,
     failure_penalty_pct: u64,
 ) -> (CreateEmbed, Vec<crate::modules::coude::api_client::TauntEvent>) {
-    use rand::Rng;
-
-    // Roll d20 + bonus
-    let (thief_roll, target_roll): (i32, i32) = {
-        let mut rng = rand::thread_rng();
-        (rng.gen_range(1..=20), rng.gen_range(1..=20))
+    // Phase 2 #4 audit : tirage RNG (d20 thief/victim + % wallet) cote API.
+    // Pas de fallback local : si l'API est down on retourne une erreur.
+    let api_roll = match api.roll_steal(guild_id, afk).await {
+        Ok(r) => r,
+        Err(_) => {
+            let embed = CreateEmbed::new()
+                .title("\u{26a0}\u{fe0f} API indisponible")
+                .description("Veuillez reessayer plus tard.")
+                .color(0x95A5A6);
+            return (embed, Vec::new());
+        }
     };
+    let (thief_roll, target_roll): (i32, i32) = (api_roll.thief_d20, api_roll.victim_d20);
     let class_bonus = if thief_player.class.as_deref() == Some("fourbe") {
         4
     } else {
@@ -535,16 +469,8 @@ async fn resolve_steal_attempt(
             return (embed, taunt_events);
         }
 
-        // Pas de protection : le vol reussit.
-        // AFK : 10-15% | defendu : 15-25%.
-        let steal_pct: f64 = {
-            let mut rng = rand::thread_rng();
-            if afk {
-                rng.gen_range(10.0..=15.0) / 100.0
-            } else {
-                rng.gen_range(15.0..=25.0) / 100.0
-            }
-        };
+        // Pas de protection : le vol reussit. % vole tire cote API plus haut.
+        let steal_pct: f64 = (api_roll.steal_pct_bp as f64) / 10_000.0;
         let stolen = ((target_player.coins as f64 * steal_pct) as i64).max(1);
 
         // Migration wallet unifie : record_steal delegue a
@@ -589,9 +515,21 @@ async fn resolve_steal_attempt(
             }
         }
 
-        let template = if afk { STEAL_SUCCESS_AFK } else { STEAL_SUCCESS_FIGHT };
+        // Phase 3 #9 audit : tirage du template via l'API (catalogue
+        // editable runtime). Pas de fallback local.
+        let key = if afk { "steal_success_afk" } else { "steal_success_fight" };
+        let template_str: String = match api.random_flavor(key, "fr").await {
+            Ok(Some(s)) => s,
+            Ok(None) | Err(_) => {
+                let embed = CreateEmbed::new()
+                    .title("\u{26a0}\u{fe0f} API indisponible")
+                    .description("Veuillez reessayer plus tard.")
+                    .color(0x95A5A6);
+                return (embed, taunt_events);
+            }
+        };
         let msg_text = format_msg(
-            pick_random(template),
+            &template_str,
             &format!("<@{}>", thief_id),
             &format!("<@{}>", target_id),
             stolen,
@@ -645,8 +583,18 @@ async fn resolve_steal_attempt(
             }
         }
 
+        let template_str: String = match api.random_flavor("steal_fail", "fr").await {
+            Ok(Some(s)) => s,
+            Ok(None) | Err(_) => {
+                let embed = CreateEmbed::new()
+                    .title("\u{26a0}\u{fe0f} API indisponible")
+                    .description("Veuillez reessayer plus tard.")
+                    .color(0x95A5A6);
+                return (embed, taunt_events);
+            }
+        };
         let msg_text = format_msg(
-            pick_random(STEAL_FAIL),
+            &template_str,
             &format!("<@{}>", thief_id),
             &format!("<@{}>", target_id),
             lost,
