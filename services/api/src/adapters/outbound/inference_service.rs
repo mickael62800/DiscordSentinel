@@ -150,7 +150,7 @@ impl InferenceService {
         let logits = output_view.1;
         let probabilities = softmax(logits);
 
-        // Nouveau modele 2 classes (cf. ai-trainer/python/configs/text/train_config.yaml).
+        // Nouveau modele 2 classes (cf. ai/training/text/configs/train_config.yaml).
         // 0 = safe (neutral + anger + harassment leger), 1 = severe (rage + threat).
         let labels = ["safe", "severe"];
         Ok(labels.iter().zip(probabilities.iter())

@@ -27,9 +27,6 @@ members = [
 
     # Bot Discord unifie
     "bots/sentinel-bot",
-
-    # Desktop
-    "apps/ai-trainer/src-tauri",
 ]
 
 [workspace.package]

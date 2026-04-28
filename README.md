@@ -1,6 +1,6 @@
 # DiscordSentinel
 
-Plateforme de modération distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **app desktop ai-trainer** (entraînement ML), **13 workers** périodiques, **inférence ONNX** embarquée.
+Plateforme de modération distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **13 workers** périodiques, **inférence ONNX** embarquée.
 
 ---
 
@@ -34,23 +34,23 @@ Discord Messages / Events / Images
        ▼              ▼                       ▼
 ┌───────────┐  ┌───────────┐        ┌────────────────────────┐
 │ Postgres  │  │  Redis    │        │ apps/web (Vue 3)       │
-│(PgBouncer)│  │ (cache +  │        │ apps/ai-trainer (Tauri)│
-│ 150 migs  │  │  pub/sub) │        │ OAuth2 Discord + WS    │
-└─────┬─────┘  └─────┬─────┘        └────────────────────────┘
+│(PgBouncer)│  │ (cache +  │        │ OAuth2 Discord + WS    │
+│ 150 migs  │  │  pub/sub) │        └────────────────────────┘
+└─────┬─────┘  └─────┬─────┘
       │              │
-      │   ┌──────────┴─────────────────────────────┐
-      ▼   ▼                                         ▼
-┌─────────────────────────────────────────┐   ┌──────────────────┐
-│ 13 Workers périodiques (Tokio)          │   │ AI Training      │
-│ ai · analytics · appeal-sla · audit-    │   │ (Python FastAPI) │
-│ cache · blackjack-cleanup · cache ·     │   │ PyTorch + ONNX   │
-│ cleanup · coude · discord-audit-sync ·  │   │ fine-tuning      │
-│ export · moderation · monitoring ·      │   │ déclenché depuis │
-│ temp-roles                              │   │ apps/ai-trainer  │
-└─────────────────────────────────────────┘   └──────────────────┘
+      └──────┬───────┘
+             ▼
+┌─────────────────────────────────────────┐
+│ 13 Workers périodiques (Tokio)          │
+│ ai · analytics · appeal-sla · audit-    │
+│ cache · blackjack-cleanup · cache ·     │
+│ cleanup · coude · discord-audit-sync ·  │
+│ export · moderation · monitoring ·      │
+│ temp-roles                              │
+└─────────────────────────────────────────┘
 ```
 
-**Philosophie** : Bot = interface légère (multi-module dans un seul process) · API = cerveau (décisions + IA + persistance) · Gateway = temps réel découplé · Workers = jobs DB-bound périodiques · Web = admin remote · ai-trainer = training ML local.
+**Philosophie** : Bot = interface légère (multi-module dans un seul process) · API = cerveau (décisions + IA + persistance) · Gateway = temps réel découplé · Workers = jobs DB-bound périodiques · Web = admin remote.
 
 ---
 
@@ -67,8 +67,6 @@ Discord Messages / Events / Images
 | Cache | Redis 7 | `maxmemory=2gb allkeys-lru`, pub/sub events, cache `user_guilds` multi-tenant |
 | Inférence IA | ONNX Runtime 2.0 / ndarray / tokenizers | Vision (NSFW/illicite) + Text (sentiments multilingues) |
 | Web dashboard | Vue 3 + TS + Vite + Pinia + Chart.js | `apps/web` — servi par Nginx (Dockerfile + nginx.conf) |
-| Desktop ai-trainer | Tauri 2 + Vue 3 + Python (PyTorch) | `apps/ai-trainer` — fine-tuning vision/text + export ONNX |
-| Entraînement IA | Python / PyTorch / Transformers / ONNX | EfficientNetV2-S (vision) + DistilBERT multilingual (text) |
 | Observabilité | Prometheus + Grafana + tokio-metrics | Middleware Axum metrics, dashboards provisionnés |
 | Containerisation | Docker Alpine multi-stage + Compose | Infra + API + gateway + bot + workers + web + monitoring |
 
@@ -81,11 +79,7 @@ Discord Messages / Events / Images
 ```
 DiscordSentinel/
 ├── apps/
-│   ├── web/                     # Vue 3 web dashboard (Pinia, vue-router, Chart.js, Nginx)
-│   └── ai-trainer/              # Tauri 2 desktop (Vue 3 front + Rust back + Python training)
-│       ├── src/                 # Vue 3 frontend
-│       ├── src-tauri/           # Rust backend (Tauri commands)
-│       └── python/              # Scripts PyTorch training + export ONNX
+│   └── web/                     # Vue 3 web dashboard (Pinia, vue-router, Chart.js, Nginx)
 │
 ├── bots/
 │   ├── sentinel-bot/            # Bot Discord unifié (single process)
@@ -123,7 +117,7 @@ DiscordSentinel/
 │       ├── monitoring-worker/   # Détection offline/online via Redis
 │       └── temp-roles-worker/   # Scan temp_roles → publish Redis
 │
-├── ai/                          # FastAPI Python (training ML) — entraînement + export ONNX
+├── ai/                          # Configs d'entraînement (YAML) + dossiers d'exports ONNX (montés par Docker)
 │
 ├── infra/                       # prometheus.yml + grafana provisioning
 ├── scripts/                     # build-all.sh, dev.sh, health-check.sh, seed-rules.sh, start-all.sh
@@ -230,7 +224,7 @@ DiscordSentinel/
 | Input | Tokens (max 256) + attention mask |
 | Tokenizer | HuggingFace tokenizers (Rust) |
 
-Les modèles sont chargés au démarrage de l'API. **Mode dégradé** automatique si absents (scoring règles seulement). L'**app ai-trainer** (`apps/ai-trainer`, Tauri + Python) pilote le fine-tuning et l'export ONNX ; le backend Python est dans `ai/`.
+Les modèles sont chargés au démarrage de l'API. **Mode dégradé** automatique si absents (scoring règles seulement). Les configs d'entraînement vivent dans `ai/training/{text,vision}/configs/`, les exports ONNX sont attendus dans `ai/training/{text,vision}/exports/` (montés en `/models/*` par `docker-compose.yml`). Le pipeline d'entraînement lui-même est externe au repo.
 
 ### Config IA per-guild
 
@@ -246,7 +240,7 @@ Alternative à `POST /analyze` (synchrone, timeout 5 s côté bot) : **`POST /ap
 
 Middleware **`guild_auth_middleware`** : filtre les requêtes selon l'appartenance Discord du user appelant.
 
-1. Le web / ai-trainer fait OAuth2 Discord (scopes `identify` + `guilds`) → `access_token`.
+1. Le web fait OAuth2 Discord (scopes `identify` + `guilds`) → `access_token`.
 2. L'adaptateur client envoie ce token dans `X-Discord-Token` sur toutes les requêtes.
 3. Le middleware extrait le `guild_id` de l'URI, interroge `/users/@me/guilds` (cache Redis 5 min par hash de token), et refuse `403` si le guild n'est pas dans la liste autorisée.
 4. Si `X-Discord-Token` est absent (appel bot/worker interne), le middleware est **pass-through** — `auth_middleware` (Bearer API key) reste obligatoire.
@@ -352,7 +346,6 @@ cd services/api && cargo run
 cd services/workers/ai-worker && cargo run
 cd bots/sentinel-bot && cargo run
 cd apps/web && npm run dev
-cd apps/ai-trainer && npm run tauri dev
 ```
 
 ---

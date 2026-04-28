@@ -47,8 +47,3 @@ export async function httpDelete<T>(path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${apiBase()}${path}`, { method: "DELETE", headers: headers(), body: body === undefined ? undefined : JSON.stringify(body) });
   return handle<T>(r);
 }
-
-// Base URL AI (Python FastAPI), separee de l'API principale.
-export function aiBase(): string {
-  return import.meta.env.VITE_AI_API_URL || "http://localhost:8000";
-}

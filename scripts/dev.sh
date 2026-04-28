@@ -110,20 +110,7 @@ start_service "api" \
     "cargo run" \
     "$GREEN"
 
-# ── 2. API ML (Python FastAPI) ──
-PYTHON_CMD="python3"
-if ! command -v python3 &>/dev/null; then
-    PYTHON_CMD="python"
-fi
-
-if [ -d "$ROOT_DIR/ai/api" ]; then
-    start_service "ml-api" \
-        "$ROOT_DIR/ai/api" \
-        "$PYTHON_CMD -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload" \
-        "$MAGENTA"
-fi
-
-# ── 3. Gateway WebSocket ──
+# ── 2. Gateway WebSocket ──
 start_service "gateway" \
     "$ROOT_DIR/services/gateway" \
     "cargo run" \
