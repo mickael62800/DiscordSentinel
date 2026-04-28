@@ -12,5 +12,6 @@ pub use moderation::action::Action;
 pub use moderation::flag_type::FlagType;
 pub use moderation::moderation_action_type::ModerationActionType;
 pub use moderation::moderation_gravity::ModerationGravity;
+pub use system::role::Role;
 pub use system::ticket_priority::TicketPriority;
 pub use system::ticket_status::TicketStatus;

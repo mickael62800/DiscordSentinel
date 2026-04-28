@@ -44,45 +44,10 @@ use crate::adapters::inbound::http::state::AppState;
 const USER_ID_CACHE_TTL_SECS: u64 = 600;
 const DISCORD_TOKEN_HEADER: &str = "x-discord-token";
 
-/// Hierarchie des roles RBAC (le plus fort en premier).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Role {
-    /// Read-only.
-    Viewer = 0,
-    /// Sanctions, tickets, notes.
-    Moderator = 1,
-    /// Full CRUD sauf RBAC.
-    Admin = 2,
-    /// Full access + gestion du RBAC.
-    Owner = 3,
-}
-
-impl Role {
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(s: &str) -> Option<Self> {
-        match s {
-            "viewer" => Some(Role::Viewer),
-            "moderator" => Some(Role::Moderator),
-            "admin" => Some(Role::Admin),
-            "owner" => Some(Role::Owner),
-            _ => None,
-        }
-    }
-
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Role::Viewer => "viewer",
-            Role::Moderator => "moderator",
-            Role::Admin => "admin",
-            Role::Owner => "owner",
-        }
-    }
-
-    /// `true` si ce role peut faire une action necessitant au moins `required`.
-    pub fn satisfies(&self, required: Role) -> bool {
-        *self >= required
-    }
-}
+// Le type `Role` (enum + hierarchie) est defini dans le domain. Re-export ici
+// pour que les imports historiques `middleware::rbac::Role` continuent de
+// marcher sans modification.
+pub use crate::domain::enums::Role;
 
 /// Contexte injecte dans les extensions de la requete pour les handlers.
 #[derive(Debug, Clone)]
