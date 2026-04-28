@@ -102,5 +102,5 @@ where
 }
 
 #[cfg(test)]
-#[path = "tests/coude_steal_boost.rs"]
+#[path = "tests/steal_boost.rs"]
 mod tests;

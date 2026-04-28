@@ -124,5 +124,5 @@ pub struct CoudeCurrentSeason {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_social.rs"]
+#[path = "tests/social.rs"]
 mod tests;

@@ -200,5 +200,5 @@ pub struct HeistOutcome {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_heist.rs"]
+#[path = "tests/heist.rs"]
 mod tests;

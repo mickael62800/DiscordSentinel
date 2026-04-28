@@ -101,5 +101,5 @@ impl CombatStat {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_player.rs"]
+#[path = "tests/player.rs"]
 mod tests;

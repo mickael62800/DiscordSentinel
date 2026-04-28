@@ -64,5 +64,5 @@ pub struct CombatResolution {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_combat.rs"]
+#[path = "tests/combat.rs"]
 mod tests;

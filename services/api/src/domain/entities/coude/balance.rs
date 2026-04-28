@@ -165,5 +165,5 @@ fn parse_bool(cfg: &HashMap<String, String>, key: &str, default: bool) -> bool {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_balance.rs"]
+#[path = "tests/balance.rs"]
 mod tests;

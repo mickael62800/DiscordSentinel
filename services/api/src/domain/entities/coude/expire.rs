@@ -10,5 +10,5 @@ pub fn cowardice_penalty(mise: i64) -> i64 {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_expire.rs"]
+#[path = "tests/expire.rs"]
 mod tests;

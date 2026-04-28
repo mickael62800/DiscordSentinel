@@ -196,5 +196,5 @@ pub struct RefundSummary {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_bet.rs"]
+#[path = "tests/bet.rs"]
 mod tests;

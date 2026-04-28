@@ -14,5 +14,5 @@ pub const DEFAULT_COUDE_OPPONENT_COUNT: i64 = 2;
 pub const DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT: i64 = 10;
 
 #[cfg(test)]
-#[path = "tests/coude_limits.rs"]
+#[path = "tests/limits.rs"]
 mod tests;

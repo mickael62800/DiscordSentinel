@@ -109,63 +109,63 @@ pub use coude::combat_resolution_rules::{
     InsuranceAdjustment, COMBAT_XP_LOSER, COMBAT_XP_WINNER_BASE, COMBAT_XP_WINNER_UNDERDOG,
     UNDERDOG_LEVEL_GAP,
 };
-pub use coude::coude_balance::{CoudeBalanceParams, DoubleCoupMode};
-pub use coude::coude_bet::{
+pub use coude::balance::{CoudeBalanceParams, DoubleCoupMode};
+pub use coude::bet::{
     calculate_bet_resolution, BetPayout, BetPayoutOutcome, BetResolutionPlan, CoudeBet,
     FighterBetBonus as CoudeFighterBetBonus, NewCoudeBet, RefundSummary,
 };
-pub use coude::coude_cashbox::{
+pub use coude::cashbox::{
     CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
 };
-pub use coude::coude_combat::{CombatResolution, CoudeCombat, NewCoudeCombat};
-pub use coude::coude_combat_validation::{
+pub use coude::combat::{CombatResolution, CoudeCombat, NewCoudeCombat};
+pub use coude::combat_validation::{
     check_min_hp_pct, check_surprise_hp_pct, validate_new_combat,
 };
-pub use coude::coude_economy::{clamp_steal_amount, clamp_steal_fail_penalty, ClampedSteal};
-pub use coude::coude_expire::cowardice_penalty;
-pub use coude::coude_heist::{
+pub use coude::economy::{clamp_steal_amount, clamp_steal_fail_penalty, ClampedSteal};
+pub use coude::expire::cowardice_penalty;
+pub use coude::heist::{
     compute_success_chance, find_heist_tool, CoudeHeistAttempt, CoudePrisonState, HeistOutcome,
     HeistToolDef, HEIST_BASE_SUCCESS_PERCENT, HEIST_COOLDOWN_DAYS, HEIST_GAIN_MAX_PERCENT,
     HEIST_GAIN_MIN_PERCENT, HEIST_ITEM_BONUS_PERCENT, HEIST_MAX_SUCCESS_PERCENT,
     HEIST_PRISON_HOURS, HEIST_TOOLS,
 };
-pub use coude::coude_inventory::{CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime};
-pub use coude::coude_limits::{
+pub use coude::inventory::{CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime};
+pub use coude::limits::{
     DEFAULT_COUDE_COMBATS_LIMIT, DEFAULT_COUDE_OPPONENT_COUNT,
     DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT,
 };
-pub use coude::coude_player::{
+pub use coude::player::{
     title_for_level as coude_title_for_level, xp_for_level as coude_xp_for_level, CombatStat,
     CoudePlayer, XpProgress, COUDE_MAX_LEVEL,
 };
-pub use coude::coude_purge::COUDE_PURGE_TABLES;
-pub use coude::coude_social::{
+pub use coude::purge::COUDE_PURGE_TABLES;
+pub use coude::social::{
     clamp_leaderboard_limit, daily_chaos_amount, CoudeCurrentSeason, CoudeEvent,
     CoudeLeaderboardEntry, DailyChaosOutcome, LeaderboardCategory, NewDailyChaos,
     DAILY_CHAOS_MAX, DEFAULT_CHAOS_PERCENT, LEADERBOARD_MAX_LIMIT, LEADERBOARD_MIN_LIMIT,
     MIN_COINS_ELIGIBLE,
 };
-pub use coude::coude_steal_boost::{
+pub use coude::steal_boost::{
     find_boost_item, sum_roll_bonus_for_active_keys, CoudeStealBoost, StealBoostDuration,
     StealBoostItemDef, STEAL_BOOST_ITEMS,
 };
-pub use coude::coude_steal_protection::{
+pub use coude::steal_protection::{
     find_protection_item, CoudeStealProtection, StealProtectionDuration, StealProtectionItemDef,
     STEAL_PROTECTION_ITEMS,
 };
-pub use coude::coude_steal_roll::{
+pub use coude::steal_roll::{
     steal_pct_range_bp, STEAL_D20_MAX, STEAL_D20_MIN, STEAL_PCT_ACTIVE_MAX_BP,
     STEAL_PCT_ACTIVE_MIN_BP, STEAL_PCT_AFK_MAX_BP, STEAL_PCT_AFK_MIN_BP,
 };
-pub use coude::coude_taunt::{
+pub use coude::taunt::{
     build_taunt_event, build_taunt_event_single, crossed_threshold, nickname_suffix_for,
     CoudeTauntsConfig, StreakKind, TauntEvent, TAUNT_THRESHOLDS,
 };
-pub use coude::coude_tournament::{
+pub use coude::tournament::{
     current_week_bounds, estimate_tournament_prize_pool, week_bounds_for,
     TOURNAMENT_PRIZE_POOL_PERCENT,
 };
-pub use coude::coude_travaux::{
+pub use coude::travaux::{
     fail_flavor_at, success_flavor_at, task_at, TravauxTask, TRAVAUX_COINS_MAX, TRAVAUX_COINS_MIN,
     TRAVAUX_COOLDOWN_KEY, TRAVAUX_COOLDOWN_SECS, TRAVAUX_FAIL_FLAVORS, TRAVAUX_SUCCESS_FLAVORS,
     TRAVAUX_SUCCESS_PCT, TRAVAUX_TASKS, TRAVAUX_XP_PER_TASK,

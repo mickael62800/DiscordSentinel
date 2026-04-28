@@ -31,5 +31,5 @@ pub fn estimate_tournament_prize_pool(cashbox_balance: Option<i64>) -> i64 {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_tournament.rs"]
+#[path = "tests/tournament.rs"]
 mod tests;

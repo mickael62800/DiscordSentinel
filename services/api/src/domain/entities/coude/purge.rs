@@ -18,5 +18,5 @@ pub const COUDE_PURGE_TABLES: &[&str] = &[
 ];
 
 #[cfg(test)]
-#[path = "tests/coude_purge.rs"]
+#[path = "tests/purge.rs"]
 mod tests;

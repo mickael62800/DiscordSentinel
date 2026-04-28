@@ -73,5 +73,5 @@ impl CashboxSource {
 }
 
 #[cfg(test)]
-#[path = "tests/coude_cashbox.rs"]
+#[path = "tests/cashbox.rs"]
 mod tests;

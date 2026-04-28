@@ -554,5 +554,5 @@ fn _keep_rng_used<R: Rng>(_: &mut R) {}
 
 
 #[cfg(test)]
-#[path = "tests/coude_taunt.rs"]
+#[path = "tests/taunt.rs"]
 mod tests;

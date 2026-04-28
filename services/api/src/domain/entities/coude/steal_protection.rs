@@ -173,5 +173,5 @@ pub fn find_protection_item(key: &str) -> Option<&'static StealProtectionItemDef
 }
 
 #[cfg(test)]
-#[path = "tests/coude_steal_protection.rs"]
+#[path = "tests/steal_protection.rs"]
 mod tests;
