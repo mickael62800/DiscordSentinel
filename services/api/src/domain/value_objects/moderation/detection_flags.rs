@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::flag_type::FlagType;
+use crate::domain::enums::FlagType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionFlags {
