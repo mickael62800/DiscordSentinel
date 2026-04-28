@@ -28,13 +28,13 @@ use crate::domain::entities::{
 };
 use crate::domain::errors::DomainError;
 use crate::domain::value_objects::CoudeClass;
-use crate::ports::inbound::manage_coude_bets::{
+use crate::ports::inbound::manage_bets::{
     ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
 };
-use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
-use crate::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
-use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
-use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::resolve_combat_now::ResolveCombatNowUseCase;
 use crate::ports::inbound::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::{BotConfigRepository, CoudeCombatRepository, WalletRepository};

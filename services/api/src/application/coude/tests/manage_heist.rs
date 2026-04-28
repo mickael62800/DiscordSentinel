@@ -18,7 +18,7 @@ use crate::domain::entities::{
     CoudePrisonState, NewCoudePrime, Wallet, WalletTransaction,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_heist::ManageCoudeHeistUseCase;
+use crate::ports::inbound::manage_heist::ManageCoudeHeistUseCase;
 use crate::ports::inbound::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::{
     BotConfigRepository, CoudeCashboxRepository, CoudeHeistRepository, WalletRepository,

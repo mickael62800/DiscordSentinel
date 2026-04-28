@@ -9,10 +9,10 @@ use crate::domain::entities::{
     NewCoudePrime, StealBoostDuration, StealProtectionDuration,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_steal_protections::{
+use crate::ports::inbound::manage_steal_protections::{
     ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
 };
-use crate::ports::inbound::manage_coude_steal_boosts::ManageCoudeStealBoostsUseCase;
+use crate::ports::inbound::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
 use crate::ports::inbound::ManageCoudeInventoryUseCase;
 
 // ── Mocks ──

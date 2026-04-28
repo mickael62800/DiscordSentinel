@@ -8,7 +8,7 @@ use crate::domain::entities::{
     CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::{BotConfigRepository, CoudeInventoryRepository};
 
 pub struct ManageCoudeInventoryService {
@@ -193,5 +193,5 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_inventory.rs"]
+#[path = "tests/manage_inventory.rs"]
 mod tests;

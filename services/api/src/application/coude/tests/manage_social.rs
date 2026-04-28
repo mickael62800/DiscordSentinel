@@ -16,7 +16,7 @@ use crate::domain::entities::{
 };
 use crate::domain::errors::DomainError;
 use crate::domain::value_objects::CoudeClass;
-use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::manage_wallet::{
     ManageWalletUseCase, TxWalletMutation, WalletMutation,
 };

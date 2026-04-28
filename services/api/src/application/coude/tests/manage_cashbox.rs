@@ -9,7 +9,7 @@ use crate::domain::entities::{
     WalletTransaction,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_cashbox::ManageCoudeCashboxUseCase;
+use crate::ports::inbound::manage_cashbox::ManageCoudeCashboxUseCase;
 use crate::ports::outbound::{CoudeCashboxRepository, WalletRepository};
 
 #[derive(Default)]

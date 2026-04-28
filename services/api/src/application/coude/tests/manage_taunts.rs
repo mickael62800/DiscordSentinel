@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use crate::domain::entities::{BotGuildConfig, CoudePlayer, CoudeTauntsConfig, XpProgress};
 use crate::domain::entities::CombatStat;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::{BotConfigRepository, CoudePlayerRepository, CoudeTauntsRepository};
 
 // ══════════════════════════════════════════════════════════

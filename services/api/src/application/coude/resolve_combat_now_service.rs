@@ -1796,8 +1796,8 @@ fn compute_outcome_flags_from_result(
     )
 }
 
-// `load_balance_params` deplace dans `application::coude_guild_settings`
+// `load_balance_params` deplace dans `application::guild_settings`
 // (cf. API P0 #3 audit). Le wrapper local conserve l'usage existant.
-use crate::application::coude_guild_settings::load_balance_params;
+use crate::application::guild_settings::load_balance_params;
 
 use crate::domain::entities::coude_title_for_level as title_for_level;

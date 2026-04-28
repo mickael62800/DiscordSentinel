@@ -4,7 +4,7 @@ use async_trait::async_trait;
 
 use crate::domain::entities::{CombatStat, CoudePlayer, XpProgress};
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::outbound::CoudePlayerRepository;
 
 pub struct ManageCoudePlayersService {
@@ -259,5 +259,5 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_players.rs"]
+#[path = "tests/manage_players.rs"]
 mod tests;

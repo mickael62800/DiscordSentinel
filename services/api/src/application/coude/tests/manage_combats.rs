@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
-use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
 use crate::ports::outbound::CoudeCombatRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
@@ -416,7 +416,7 @@ async fn cancel_continues_even_if_mark_bets_lost_fails() {
 // ── Gate HP (with_surprise_gate) ──
 
 use crate::domain::entities::BotGuildConfig;
-use crate::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::outbound::BotConfigRepository;
 use crate::domain::entities::{BotDefinition, CoudePlayer, XpProgress, CombatStat};
 

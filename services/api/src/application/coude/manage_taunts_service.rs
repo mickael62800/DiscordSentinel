@@ -11,7 +11,7 @@ use crate::domain::entities::{
     parse_i64_config, CoudeTauntsConfig, CurseKind, StreakKind, TauntEvent,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::{
     BotConfigRepository, CoudeCursesRepository, CoudePlayerRepository, CoudeTauntsRepository,
 };
@@ -328,5 +328,5 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_taunts.rs"]
+#[path = "tests/manage_taunts.rs"]
 mod tests;

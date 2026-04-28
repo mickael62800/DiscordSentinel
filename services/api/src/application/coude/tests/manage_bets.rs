@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::entities::{BetResolutionPlan, CoudeBet, CoudeCombat, NewCoudeBet, RefundSummary, TauntEvent};
-use crate::ports::inbound::manage_coude_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::outbound::{CombatQueryRepository, CoudeBetRepository};
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;

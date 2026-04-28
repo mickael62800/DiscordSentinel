@@ -9,13 +9,13 @@ use crate::ports::inbound::{
     ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
     ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageMembersUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
 };
-use crate::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
-use crate::ports::inbound::manage_coude_bets::ManageCoudeBetsUseCase;
-use crate::ports::inbound::manage_coude_economy::ManageCoudeEconomyUseCase;
-use crate::ports::inbound::manage_coude_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
 use crate::application::BlackjackService;
 use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, LogRepository, WalletRepository};
 

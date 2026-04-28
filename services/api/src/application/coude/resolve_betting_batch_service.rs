@@ -79,7 +79,7 @@ impl ResolveBettingBatchService {
 
     /// Charge les parametres de balance de la guild ou default.
     async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
-        crate::application::coude_guild_settings::load_balance_params(
+        crate::application::guild_settings::load_balance_params(
             &*self.bot_config_repo,
             guild_id,
         )

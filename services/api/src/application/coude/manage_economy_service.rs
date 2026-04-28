@@ -6,10 +6,10 @@ use crate::domain::entities::{
     clamp_steal_amount, clamp_steal_fail_penalty, CurseKind, TauntEvent, LEAKY_WALLET_FEE_COINS,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_economy::{
+use crate::ports::inbound::manage_economy::{
     ManageCoudeEconomyUseCase, StealOutcome,
 };
-use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::{
     CoudeCursesRepository, CoudeEconomyRepository, CoudePlayerRepository, WalletRepository,
@@ -391,5 +391,5 @@ impl ManageCoudeEconomyUseCase for ManageCoudeEconomyService {
 
 
 #[cfg(test)]
-#[path = "tests/manage_coude_economy.rs"]
+#[path = "tests/manage_economy.rs"]
 mod tests;

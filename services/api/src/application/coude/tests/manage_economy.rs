@@ -6,8 +6,8 @@ use sqlx::{Postgres, Transaction};
 use crate::application::ManageCoudeEconomyService;
 use crate::domain::entities::{CoudeTauntsConfig, StreakKind, TauntEvent};
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_economy::ManageCoudeEconomyUseCase;
-use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::{ManageWalletUseCase, TxWalletMutation, WalletMutation};
 use crate::ports::outbound::CoudeEconomyRepository;
 

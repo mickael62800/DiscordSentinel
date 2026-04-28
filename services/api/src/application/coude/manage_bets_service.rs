@@ -9,7 +9,7 @@ use crate::domain::entities::{
     RefundSummary,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_bets::{
+use crate::ports::inbound::manage_bets::{
     ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
 };
 use crate::ports::outbound::{
@@ -141,5 +141,5 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_bets.rs"]
+#[path = "tests/manage_bets.rs"]
 mod tests;

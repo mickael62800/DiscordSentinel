@@ -1,5 +1,5 @@
 #[cfg(test)]
-#[path = "tests/manage_coude_social.rs"]
+#[path = "tests/manage_social.rs"]
 mod tests;
 
 use std::sync::Arc;
@@ -14,7 +14,7 @@ use crate::domain::entities::{
     DAILY_CHAOS_MAX, DEFAULT_CHAOS_PERCENT, MIN_COINS_ELIGIBLE,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::{
     BotConfigRepository, CoudeEconomyRepository, CoudePlayerRepository, CoudeSocialRepository,

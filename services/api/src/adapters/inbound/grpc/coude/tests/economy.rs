@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::domain::entities::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_economy::{ManageCoudeEconomyUseCase, StealOutcome};
+use crate::ports::inbound::manage_economy::{ManageCoudeEconomyUseCase, StealOutcome};
 
 #[derive(Default)]
 struct MockEconomyUc {

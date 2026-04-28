@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat, TauntEvent};
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
 use crate::ports::inbound::resolve_betting_batch::{
     ResolveBettingBatchUseCase, ResolvedBettingCombatOutput,
 };

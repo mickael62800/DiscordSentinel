@@ -15,7 +15,7 @@ use crate::domain::entities::{
 };
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::expire_combats_batch::ExpireCombatsBatchUseCase;
-use crate::ports::inbound::manage_coude_bets::{
+use crate::ports::inbound::manage_bets::{
     ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
 };
 use crate::domain::entities::NewCoudeBet;

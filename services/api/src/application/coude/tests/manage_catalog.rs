@@ -1,5 +1,5 @@
 use super::*;
-use crate::ports::inbound::manage_coude_catalog::ManageCoudeCatalogUseCase;
+use crate::ports::inbound::manage_catalog::ManageCoudeCatalogUseCase;
 
 #[tokio::test]
 async fn catalog_contains_four_classes() {

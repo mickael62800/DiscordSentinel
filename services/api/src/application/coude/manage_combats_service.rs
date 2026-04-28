@@ -8,7 +8,7 @@ use crate::domain::entities::{
     CoudeBalanceParams, CoudeCombat, NewCoudeCombat,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
 use crate::ports::inbound::ManageCoudePlayersUseCase;
 use crate::ports::outbound::{BotConfigRepository, CoudeCombatRepository};
 
@@ -46,7 +46,7 @@ impl ManageCoudeCombatsService {
         let Some(repo) = self.bot_config_repo.as_ref() else {
             return CoudeBalanceParams::default();
         };
-        crate::application::coude_guild_settings::load_balance_params(&**repo, guild_id).await
+        crate::application::guild_settings::load_balance_params(&**repo, guild_id).await
     }
 }
 
@@ -228,5 +228,5 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_combats.rs"]
+#[path = "tests/manage_combats.rs"]
 mod tests;

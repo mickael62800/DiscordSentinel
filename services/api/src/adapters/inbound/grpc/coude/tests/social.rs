@@ -10,11 +10,11 @@ use crate::domain::entities::{
     TauntEvent,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_catalog::{
+use crate::ports::inbound::manage_catalog::{
     AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, MatchmakingBucket, ShopItemInfo,
 };
-use crate::ports::inbound::manage_coude_cashbox::RedistributionOutcome;
-use crate::ports::inbound::manage_coude_heist::{HeistCooldownStatus, PrisonStatusInfo};
+use crate::ports::inbound::manage_cashbox::RedistributionOutcome;
+use crate::ports::inbound::manage_heist::{HeistCooldownStatus, PrisonStatusInfo};
 use crate::ports::inbound::{
     ManageCoudeCashboxUseCase, ManageCoudeCatalogUseCase, ManageCoudeHeistUseCase,
     ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,

@@ -7,7 +7,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::{ActiveVendetta, VENDETTA_WINDOW_HOURS};
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_vendetta::ManageCoudeVendettaUseCase;
+use crate::ports::inbound::manage_vendetta::ManageCoudeVendettaUseCase;
 use crate::ports::outbound::CoudeVendettaRepository;
 
 pub struct ManageCoudeVendettaService {
@@ -75,5 +75,5 @@ impl ManageCoudeVendettaUseCase for ManageCoudeVendettaService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_vendetta.rs"]
+#[path = "tests/manage_vendetta.rs"]
 mod tests;

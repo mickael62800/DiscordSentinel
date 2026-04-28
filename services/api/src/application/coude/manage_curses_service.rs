@@ -9,7 +9,7 @@ use crate::domain::entities::{
     lift_cost, pick_curse_by_index, ActiveCurse, CurseKind,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_curses::{CastedCurse, ManageCoudeCursesUseCase};
+use crate::ports::inbound::manage_curses::{CastedCurse, ManageCoudeCursesUseCase};
 use crate::ports::outbound::{CoudeCursesRepository, WalletRepository};
 
 const CAST_SOURCE: &str = "curse_cast";
@@ -165,5 +165,5 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_curses.rs"]
+#[path = "tests/manage_curses.rs"]
 mod tests;

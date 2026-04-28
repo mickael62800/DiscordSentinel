@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::application::ManageWalletService;
 use crate::domain::entities::{CoudeTauntsConfig, StreakKind, TauntEvent, Wallet, WalletTransaction};
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::WalletRepository;
 

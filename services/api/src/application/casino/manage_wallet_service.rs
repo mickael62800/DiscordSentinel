@@ -37,7 +37,7 @@ use crate::domain::entities::{
     resolve_reset_balance, resolve_starting_coins, TauntEvent, Wallet, WalletTransaction,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::manage_wallet::{
     ManageWalletUseCase, TxWalletMutation, WalletMutation,
 };

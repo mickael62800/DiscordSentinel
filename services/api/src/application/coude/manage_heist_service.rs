@@ -11,7 +11,7 @@
 //! - consommation des outils (inventory_uc.use_item)
 
 #[cfg(test)]
-#[path = "tests/manage_coude_heist.rs"]
+#[path = "tests/manage_heist.rs"]
 mod tests;
 
 use std::sync::Arc;
@@ -26,7 +26,7 @@ use crate::domain::entities::{
     HEIST_GAIN_MAX_PERCENT, HEIST_GAIN_MIN_PERCENT, HEIST_TOOLS,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_heist::{
+use crate::ports::inbound::manage_heist::{
     HeistCooldownStatus, ManageCoudeHeistUseCase, PrisonStatusInfo,
 };
 use crate::ports::inbound::ManageCoudeInventoryUseCase;
@@ -84,7 +84,7 @@ impl ManageCoudeHeistService {
     }
 
     async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
-        crate::application::coude_guild_settings::load_balance_params(
+        crate::application::guild_settings::load_balance_params(
             &*self.bot_config_repo,
             guild_id,
         )

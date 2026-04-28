@@ -10,7 +10,7 @@ use crate::domain::entities::{
     StealBoostDuration,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_steal_boosts::ManageCoudeStealBoostsUseCase;
+use crate::ports::inbound::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
 use crate::ports::outbound::{BotConfigRepository, CoudeStealBoostRepository};
 
 pub struct ManageCoudeStealBoostsService {
@@ -41,7 +41,7 @@ impl ManageCoudeStealBoostsService {
         let Some(repo) = self.bot_config_repo.as_ref() else {
             return CoudeBalanceParams::default();
         };
-        crate::application::coude_guild_settings::load_balance_params(&**repo, guild_id).await
+        crate::application::guild_settings::load_balance_params(&**repo, guild_id).await
     }
 }
 
@@ -114,5 +114,5 @@ impl ManageCoudeStealBoostsUseCase for ManageCoudeStealBoostsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_steal_boosts.rs"]
+#[path = "tests/manage_steal_boosts.rs"]
 mod tests;

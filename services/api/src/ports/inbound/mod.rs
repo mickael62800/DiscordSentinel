@@ -53,34 +53,34 @@ pub use community::manage_welcome_config::{
 pub use coude::expire_combats_batch::{
     self, ExpireCombatsBatchUseCase, ExpiredCombatOutput,
 };
-pub use coude::manage_coude_bets::{
+pub use coude::manage_bets::{
     self, ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
 };
-pub use coude::manage_coude_cashbox::{
+pub use coude::manage_cashbox::{
     self, ManageCoudeCashboxUseCase, RedistributionOutcome,
 };
-pub use coude::manage_coude_catalog::{
+pub use coude::manage_catalog::{
     self, AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, ManageCoudeCatalogUseCase,
     MatchmakingBucket, ShopItemInfo,
 };
-pub use coude::manage_coude_combats::{self, ManageCoudeCombatsUseCase};
-pub use coude::manage_coude_curses::{self, CastedCurse, ManageCoudeCursesUseCase};
-pub use coude::manage_coude_economy::{
+pub use coude::manage_combats::{self, ManageCoudeCombatsUseCase};
+pub use coude::manage_curses::{self, CastedCurse, ManageCoudeCursesUseCase};
+pub use coude::manage_economy::{
     self, ManageCoudeEconomyUseCase, StealOutcome,
 };
-pub use coude::manage_coude_heist::{
+pub use coude::manage_heist::{
     self, HeistCooldownStatus, ManageCoudeHeistUseCase, PrisonStatusInfo,
 };
-pub use coude::manage_coude_inventory::{self, ManageCoudeInventoryUseCase};
-pub use coude::manage_coude_players::{self, ManageCoudePlayersUseCase};
-pub use coude::manage_coude_safety_net::{self, ManageCoudeSafetyNetUseCase};
-pub use coude::manage_coude_social::{self, ManageCoudeSocialUseCase};
-pub use coude::manage_coude_steal_boosts::{self, ManageCoudeStealBoostsUseCase};
-pub use coude::manage_coude_steal_protections::{
+pub use coude::manage_inventory::{self, ManageCoudeInventoryUseCase};
+pub use coude::manage_players::{self, ManageCoudePlayersUseCase};
+pub use coude::manage_safety_net::{self, ManageCoudeSafetyNetUseCase};
+pub use coude::manage_social::{self, ManageCoudeSocialUseCase};
+pub use coude::manage_steal_boosts::{self, ManageCoudeStealBoostsUseCase};
+pub use coude::manage_steal_protections::{
     self, ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
 };
-pub use coude::manage_coude_taunts::{self, ManageCoudeTauntsUseCase};
-pub use coude::manage_coude_vendetta::{self, ManageCoudeVendettaUseCase};
+pub use coude::manage_taunts::{self, ManageCoudeTauntsUseCase};
+pub use coude::manage_vendetta::{self, ManageCoudeVendettaUseCase};
 pub use coude::play_tout_ou_rien::{
     self, PlayToutOuRienCommand, PlayToutOuRienUseCase, ToutOuRienResolution,
     MIN_BALANCE_FOR_PLAY,

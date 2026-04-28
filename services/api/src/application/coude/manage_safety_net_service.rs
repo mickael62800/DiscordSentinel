@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use crate::application::CoudeGuildSettings;
 use crate::domain::entities::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_safety_net::ManageCoudeSafetyNetUseCase;
+use crate::ports::inbound::manage_safety_net::ManageCoudeSafetyNetUseCase;
 use crate::ports::outbound::{BotConfigRepository, CoudeSafetyNetRepository};
 
 pub struct ManageCoudeSafetyNetService {
@@ -73,5 +73,5 @@ impl ManageCoudeSafetyNetUseCase for ManageCoudeSafetyNetService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_safety_net.rs"]
+#[path = "tests/manage_safety_net.rs"]
 mod tests;

@@ -8,7 +8,7 @@ use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude_combat_engine::{classes, progression, shop};
-use crate::ports::inbound::manage_coude_catalog::{
+use crate::ports::inbound::manage_catalog::{
     AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, ManageCoudeCatalogUseCase,
     MatchmakingBucket, ShopItemInfo,
 };
@@ -116,5 +116,5 @@ impl ManageCoudeCatalogUseCase for ManageCoudeCatalogService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_catalog.rs"]
+#[path = "tests/manage_catalog.rs"]
 mod tests;

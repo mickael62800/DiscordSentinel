@@ -7,7 +7,7 @@ use uuid::Uuid;
 use crate::domain::entities::{CombatStat, CoudePlayer, TauntEvent, XpProgress};
 use crate::domain::errors::DomainError;
 use crate::domain::value_objects::CoudeClass;
-use crate::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::manage_wallet::{
     ManageWalletUseCase, TxWalletMutation, WalletMutation,
 };

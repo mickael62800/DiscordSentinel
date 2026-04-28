@@ -41,26 +41,26 @@ pub use community::welcome_config_repository::{WelcomeConfigData, WelcomeConfigR
 
 // ── coude ──────────────────────────────────────────────────────────────────
 pub use coude::combat_query_repository::CombatQueryRepository;
-pub use coude::coude_bet_repository::CoudeBetRepository;
-pub use coude::coude_bounty_repository::CoudeBountyRepository;
-pub use coude::coude_cashbox_repository::CoudeCashboxRepository;
-pub use coude::coude_coalition_repository::CoudeCoalitionRepository;
-pub use coude::coude_combat_repository::CoudeCombatRepository;
-pub use coude::coude_curses_repository::CoudeCursesRepository;
-pub use coude::coude_economy_repository::CoudeEconomyRepository;
-pub use coude::coude_flavor_templates_repository::CoudeFlavorTemplatesRepository;
-pub use coude::coude_heist_repository::CoudeHeistRepository;
-pub use coude::coude_inventory_repository::CoudeInventoryRepository;
-pub use coude::coude_player_repository::CoudePlayerRepository;
-pub use coude::coude_refusal_count_repository::CoudeRefusalCountRepository;
-pub use coude::coude_safety_net_repository::CoudeSafetyNetRepository;
-pub use coude::coude_social_repository::CoudeSocialRepository;
-pub use coude::coude_steal_boost_repository::CoudeStealBoostRepository;
-pub use coude::coude_steal_protection_repository::CoudeStealProtectionRepository;
-pub use coude::coude_taunts_repository::CoudeTauntsRepository;
-pub use coude::coude_tout_ou_rien_repository::CoudeToutOuRienRepository;
-pub use coude::coude_ultimate_repository::CoudeUltimateRepository;
-pub use coude::coude_vendetta_repository::CoudeVendettaRepository;
+pub use coude::bet_repository::CoudeBetRepository;
+pub use coude::bounty_repository::CoudeBountyRepository;
+pub use coude::cashbox_repository::CoudeCashboxRepository;
+pub use coude::coalition_repository::CoudeCoalitionRepository;
+pub use coude::combat_repository::CoudeCombatRepository;
+pub use coude::curses_repository::CoudeCursesRepository;
+pub use coude::economy_repository::CoudeEconomyRepository;
+pub use coude::flavor_templates_repository::CoudeFlavorTemplatesRepository;
+pub use coude::heist_repository::CoudeHeistRepository;
+pub use coude::inventory_repository::CoudeInventoryRepository;
+pub use coude::player_repository::CoudePlayerRepository;
+pub use coude::refusal_count_repository::CoudeRefusalCountRepository;
+pub use coude::safety_net_repository::CoudeSafetyNetRepository;
+pub use coude::social_repository::CoudeSocialRepository;
+pub use coude::steal_boost_repository::CoudeStealBoostRepository;
+pub use coude::steal_protection_repository::CoudeStealProtectionRepository;
+pub use coude::taunts_repository::CoudeTauntsRepository;
+pub use coude::tout_ou_rien_repository::CoudeToutOuRienRepository;
+pub use coude::ultimate_repository::CoudeUltimateRepository;
+pub use coude::vendetta_repository::CoudeVendettaRepository;
 pub use coude::sponsorship_repository::{Sponsorship, SponsorshipRepository};
 
 // ── moderation ─────────────────────────────────────────────────────────────

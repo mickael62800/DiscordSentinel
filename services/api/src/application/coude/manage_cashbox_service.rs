@@ -27,7 +27,7 @@ use crate::domain::entities::{
     CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_cashbox::{
+use crate::ports::inbound::manage_cashbox::{
     ManageCoudeCashboxUseCase, RedistributionOutcome,
 };
 use crate::ports::outbound::{CoudeCashboxRepository, WalletRepository};
@@ -241,5 +241,5 @@ impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
 
 
 #[cfg(test)]
-#[path = "tests/manage_coude_cashbox.rs"]
+#[path = "tests/manage_cashbox.rs"]
 mod tests;

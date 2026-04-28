@@ -10,7 +10,7 @@ use crate::domain::entities::{
     find_protection_item, CoudeStealProtection, StealProtectionDuration, STEAL_PROTECTION_ITEMS,
 };
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_coude_steal_protections::{
+use crate::ports::inbound::manage_steal_protections::{
     ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
 };
 use crate::ports::outbound::CoudeStealProtectionRepository;
@@ -111,5 +111,5 @@ impl ManageCoudeStealProtectionsUseCase for ManageCoudeStealProtectionsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_coude_steal_protections.rs"]
+#[path = "tests/manage_steal_protections.rs"]
 mod tests;
