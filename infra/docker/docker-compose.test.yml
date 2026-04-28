@@ -1,7 +1,7 @@
 # Docker Compose pour les tests d'integration.
-# Usage : docker compose -f docker-compose.test.yml up -d
+# Usage : docker compose -f infra/docker/docker-compose.test.yml up -d
 #         ./infra/scripts/run-tests.sh
-#         docker compose -f docker-compose.test.yml down -v
+#         docker compose -f infra/docker/docker-compose.test.yml down -v
 
 services:
   postgres-test:

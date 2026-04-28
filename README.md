@@ -122,8 +122,7 @@ DiscordSentinel/
 ├── infra/                       # prometheus.yml + grafana provisioning + scripts/ (build-all, dev, health-check, seed-rules, start-all, run-tests, tls-issue)
 ├── docs/                        # COUP_DE_COUDE_*.md, commandes-utilisateur.md, cmd_discord/, amélioration/
 │
-├── docker-compose.yml           # Stack complète (infra + API + bot + 13 workers + gateway + web + monitoring)
-├── docker-compose.test.yml      # Stack de tests
+├── infra/docker/                # docker-compose.yml + docker-compose.test.yml
 ├── Cargo.toml                   # Workspace Rust (20+ membres)
 └── README.md                    # ← ce fichier
 ```
@@ -284,7 +283,7 @@ Request
 ## Observabilité
 
 - **Prometheus** — endpoint `/metrics` sur l'API et chaque worker (port 9100). Compteurs `http_requests_total{route,method,status}`, histogrammes `http_request_duration_seconds`, gauges `tokio_busy_ratio`, `tokio_live_tasks_count`, `tokio_global_queue_depth`.
-- **Grafana** — dashboards auto-provisionnés dans `infra/grafana/`. Démarrage : `docker compose --profile monitoring up -d prometheus grafana`. UI sur `http://localhost:3002` (admin/admin).
+- **Grafana** — dashboards auto-provisionnés dans `infra/grafana/`. Démarrage : `docker compose -f infra/docker/docker-compose.yml --profile monitoring up -d prometheus grafana`. UI sur `http://localhost:3002` (admin/admin).
 - **pg_stat_statements** — extension activée (migration 099). `SELECT * FROM pg_stat_statements ORDER BY total_exec_time DESC`.
 - **Tracing structuré** — `tracing-subscriber` JSON en prod, correlation IDs `X-Request-ID` propagés via `tower_http::request_id`.
 
@@ -296,10 +295,10 @@ Request
 
 ```bash
 # Stack complète (infra + API + bot unifié + 13 workers + gateway + web)
-docker compose up -d
+docker compose -f infra/docker/docker-compose.yml up -d
 
 # Avec Prometheus + Grafana
-docker compose --profile monitoring up -d
+docker compose -f infra/docker/docker-compose.yml --profile monitoring up -d
 ```
 
 **Services infra** : `postgres` (tuning RAM : `shared_buffers=4GB`, `work_mem=64MB`, WAL tuning), `pgbouncer` (transaction pooling), `redis` (`maxmemory=2gb allkeys-lru`).
@@ -358,7 +357,7 @@ Tests `cargo test --lib` côté API + unitaires workers/modules bot. Couverture 
 - **Workers** : helpers `worker-common`.
 - **Gateway** : broadcaster.
 
-Stack de tests dédiée via `docker-compose.test.yml`.
+Stack de tests dédiée via `infra/docker/docker-compose.test.yml`.
 
 ---
 

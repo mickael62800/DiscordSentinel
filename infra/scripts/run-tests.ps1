@@ -2,7 +2,8 @@
 # Usage : .\scripts\run-tests.ps1
 
 $ErrorActionPreference = "Continue"
-$COMPOSE_FILE = "docker-compose.test.yml"
+Set-Location (Join-Path $PSScriptRoot "..\..")
+$COMPOSE_FILE = "infra/docker/docker-compose.test.yml"
 $DB_URL = "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test"
 $REDIS_URL = "redis://localhost:6380"
 $FAILED = 0

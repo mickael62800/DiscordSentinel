@@ -113,7 +113,7 @@ services:
     # Phase 7A : context = racine du repo car services/api depend de
     # services/proto via path. Le Dockerfile a ete adapte en consequence.
     build:
-      context: .
+      context: ../..
       dockerfile: services/api/Dockerfile
     # container_name retire : API scalable horizontalement derriere un LB
     # (ex: `docker compose up --scale api=3`). Le DNS Compose resout `api`
@@ -174,8 +174,8 @@ services:
       TEXT_MAX_LENGTH: "256"
       RUST_LOG: info
     volumes:
-      - ./ai/training/vision/exports:/models/vision:ro
-      - ./ai/training/text/exports:/models/text:ro
+      - ../../ai/training/vision/exports:/models/vision:ro
+      - ../../ai/training/text/exports:/models/text:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -186,7 +186,7 @@ services:
 
   gateway:
     build:
-      context: .
+      context: ../..
       dockerfile: services/gateway/Dockerfile
     # container_name retire : scalable horizontalement derriere un LB WS.
     restart: unless-stopped
@@ -215,7 +215,7 @@ services:
 
   moderation-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/moderation-worker/Dockerfile
     # container_name retire pour scaling horizontal (--scale moderation-worker=N).
     restart: unless-stopped
@@ -240,7 +240,7 @@ services:
 
   analytics-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/analytics-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -261,7 +261,7 @@ services:
 
   monitoring-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/monitoring-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -283,7 +283,7 @@ services:
 
   cache-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/cache-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -311,7 +311,7 @@ services:
   # Phase 4 A — File d'attente IA async (depile ai_jobs et appelle l'inference API)
   ai-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/ai-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -338,7 +338,7 @@ services:
   # Phase 4 B — Purge des roles temporaires expires (extrait de community-bot)
   temp-roles-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/temp-roles-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -364,7 +364,7 @@ services:
   # Phase 6A — Escalade SLA des tickets d'appel de sanction
   appeal-sla-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/appeal-sla-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -390,7 +390,7 @@ services:
   # Phase 6A — Exports asynchrones (CSV/JSON) infractions/audit_logs/moderation_actions
   export-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/export-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -414,7 +414,7 @@ services:
   # Phase 6A — Refresh du cache watched_users pour audit-bot (scaling horizontal)
   audit-cache-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/audit-cache-worker/Dockerfile
     # container_name retire pour scaling horizontal (Phase 6A).
     restart: unless-stopped
@@ -440,7 +440,7 @@ services:
   # Phase 6A — Cleanup des tables blackjack inactives (scaling horizontal)
   blackjack-cleanup-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/blackjack-cleanup-worker/Dockerfile
     # container_name retire pour scaling horizontal (Phase 6A).
     restart: unless-stopped
@@ -466,7 +466,7 @@ services:
   # Phase 6A — Reconciliation audit_logs avec l'API Discord audit-logs
   discord-audit-sync-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/discord-audit-sync-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -490,7 +490,7 @@ services:
 
   cleanup-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/cleanup-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -533,7 +533,7 @@ services:
 
   sentinel-bot:
     build:
-      context: .
+      context: ../..
       dockerfile: bots/sentinel-bot/Dockerfile
     # container_name retire : Phase 7C sharding multi-replica requiert
     # plusieurs instances (SHARD_MODE=manual + SHARD_ID/SHARD_TOTAL distincts).
@@ -573,7 +573,7 @@ services:
 
   coude-worker:
     build:
-      context: .
+      context: ../..
       dockerfile: services/workers/coude-worker/Dockerfile
     # container_name retire pour scaling horizontal.
     restart: unless-stopped
@@ -617,7 +617,7 @@ services:
 
   web:
     build:
-      context: .
+      context: ../..
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-}
@@ -765,7 +765,7 @@ services:
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
-      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -787,8 +787,8 @@ services:
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
       - grafana_data:/var/lib/grafana
-      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ../../infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
     profiles:
