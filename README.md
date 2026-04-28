@@ -1,6 +1,6 @@
 # DiscordSentinel
 
-Plateforme de modération distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **13 workers** périodiques, **inférence ONNX** embarquée.
+Plateforme de modération distribuée pour serveurs Discord. Architecture microservices : **un bot Discord unifié** (interface Serenity), **API centrale** (intelligence + IA), **gateway WebSocket** (temps réel), **app web** (administration), **13 workers** périodiques (ai, analytics, appeal-sla, audit-cache, blackjack-cleanup, cache, cleanup, coude, discord-audit-sync, export, moderation, monitoring, temp-roles), **inférence ONNX** embarquée.
 
 ---
 
@@ -12,9 +12,9 @@ Discord Messages / Events / Images
        ▼
 ┌─────────────────────────────────────────────────────────────┐
 │      Bot Discord unifié (Serenity 0.12)  — bots/sentinel-bot │
-│   13 modules : audit · automod · blackjack · cleanup ·       │
+│   15 modules : audit · automod · blackjack · cleanup ·       │
 │   community · coude · games · moderation · progression ·     │
-│   security · tickets · voice · welcome                       │
+│   security · slot · tickets · voice · welcome · wheel        │
 └────────────┬─────────────────────────────────┬──────────────┘
              │ HTTP (BaseApiClient keep-alive)  │ Redis pub/sub
              ▼                                  ▼
@@ -60,7 +60,7 @@ Discord Messages / Events / Images
 |---|---|---|
 | API backend | Rust / Axum 0.8 / Tokio / sqlx 0.8 | Hexagonal, ~40 handlers, 150 migrations, ONNX inference, OAuth Discord |
 | Gateway WebSocket | Rust / Axum 0.8 / Redis pub/sub | Service dédié temps réel, auto-reconnect exponential backoff |
-| Bot Discord unifié | Rust / Serenity 0.12 / lib `sentinel-shared` | Process unique, 13 modules chargés dynamiquement selon config per-guild |
+| Bot Discord unifié | Rust / Serenity 0.12 / lib `sentinel-shared` | Process unique, 15 modules chargés dynamiquement selon config per-guild |
 | 13 Workers | Rust / Tokio / sqlx / lib `worker-common` | `spawn_periodic` + heartbeat + métriques Prometheus |
 | gRPC (Phase 7) | `tonic` 0.12 + `prost` 0.13 | Crate `services/proto` (amorce scaling horizontal) |
 | PostgreSQL | Postgres 16 + **PgBouncer** | 150 migrations, partitionnement RANGE mensuel, vues matérialisées |
@@ -85,7 +85,7 @@ DiscordSentinel/
 │   ├── sentinel-bot/            # Bot Discord unifié (single process)
 │   │   └── src/modules/         # audit · automod · blackjack · cleanup · community ·
 │   │                            # coude · games · moderation · progression · security ·
-│   │                            # tickets · voice · welcome (13 modules)
+│   │                            # slot · tickets · voice · welcome · wheel (15 modules)
 │   └── shared/                  # Lib `sentinel-shared` (api_client, cache_settings, embeds, ...)
 │
 ├── services/
