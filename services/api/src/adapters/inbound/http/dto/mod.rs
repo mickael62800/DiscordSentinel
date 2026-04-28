@@ -1,21 +1,6 @@
-pub mod analyze;
-pub mod analyze_image;
-pub mod bot_config;
-pub mod conduct;
-pub mod dashboard;
-pub mod infractions;
+// Bounded contexts (mirror de handlers/).
+pub mod ai;
+pub mod audit;
+pub mod community;
 pub mod moderation;
-pub mod rules;
-pub mod security;
-pub mod stats;
-pub mod tickets;
-pub mod voice_channels;
-pub mod watched_users;
-pub mod audit_logs;
-pub mod levels;
-pub mod dashboard_charts;
-pub mod role_panels;
-pub mod analytics;
-pub mod notes;
-pub mod reminders;
-pub mod strikes;
+pub mod system;

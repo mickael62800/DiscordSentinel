@@ -2,8 +2,8 @@ use axum::extract::Path;
 use axum::extract::State;
 use axum::Json;
 
-use crate::adapters::inbound::http::dto::reminders::CreateReminderDto;
-use crate::adapters::inbound::http::dto::reminders::SanctionReminderDto;
+use crate::adapters::inbound::http::dto::moderation::reminders::CreateReminderDto;
+use crate::adapters::inbound::http::dto::moderation::reminders::SanctionReminderDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;

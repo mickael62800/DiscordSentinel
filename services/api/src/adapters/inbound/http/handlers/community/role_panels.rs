@@ -2,7 +2,7 @@ use axum::extract::Path;
 use axum::extract::State;
 use axum::Extension;
 use axum::Json;
-use crate::adapters::inbound::http::dto::role_panels::*;
+use crate::adapters::inbound::http::dto::community::role_panels::*;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;

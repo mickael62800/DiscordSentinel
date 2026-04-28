@@ -4,7 +4,7 @@ use axum::Json;
 use redis::AsyncCommands;
 use tracing::warn;
 
-use crate::adapters::inbound::http::dto::analytics::*;
+use crate::adapters::inbound::http::dto::audit::analytics::*;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 

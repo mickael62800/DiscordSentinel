@@ -7,14 +7,14 @@ use uuid::Uuid;
 
 use axum::extract::Query;
 
-use crate::adapters::inbound::http::dto::dashboard::CreateLogDto;
-use crate::adapters::inbound::http::dto::dashboard::DashboardInfractionDto;
-use crate::adapters::inbound::http::dto::dashboard::DashboardRuleDto;
-use crate::adapters::inbound::http::dto::dashboard::DashboardStatsDto;
-use crate::adapters::inbound::http::dto::dashboard::GuildDto;
-use crate::adapters::inbound::http::dto::dashboard::GuildFilterParams;
-use crate::adapters::inbound::http::dto::dashboard::LogEntryDto;
-use crate::adapters::inbound::http::dto::dashboard::RegisterGuildDto;
+use crate::adapters::inbound::http::dto::audit::dashboard::CreateLogDto;
+use crate::adapters::inbound::http::dto::audit::dashboard::DashboardInfractionDto;
+use crate::adapters::inbound::http::dto::audit::dashboard::DashboardRuleDto;
+use crate::adapters::inbound::http::dto::audit::dashboard::DashboardStatsDto;
+use crate::adapters::inbound::http::dto::audit::dashboard::GuildDto;
+use crate::adapters::inbound::http::dto::audit::dashboard::GuildFilterParams;
+use crate::adapters::inbound::http::dto::audit::dashboard::LogEntryDto;
+use crate::adapters::inbound::http::dto::audit::dashboard::RegisterGuildDto;
 use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;

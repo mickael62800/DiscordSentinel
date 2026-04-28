@@ -2,8 +2,8 @@ use axum::extract::Query;
 use axum::extract::State;
 use axum::Json;
 
-use crate::adapters::inbound::http::dto::dashboard_charts::ChartQueryParams;
-use crate::adapters::inbound::http::dto::dashboard_charts::DailyActivityDto;
+use crate::adapters::inbound::http::dto::audit::dashboard_charts::ChartQueryParams;
+use crate::adapters::inbound::http::dto::audit::dashboard_charts::DailyActivityDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_days;

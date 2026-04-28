@@ -5,10 +5,10 @@ use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::dto::moderation::BanEntryDto;
-use crate::adapters::inbound::http::dto::moderation::LogActionDto;
-use crate::adapters::inbound::http::dto::moderation::ModerationActionResponseDto;
-use crate::adapters::inbound::http::dto::moderation::UserHistoryDto;
+use crate::adapters::inbound::http::dto::moderation::actions::BanEntryDto;
+use crate::adapters::inbound::http::dto::moderation::actions::LogActionDto;
+use crate::adapters::inbound::http::dto::moderation::actions::ModerationActionResponseDto;
+use crate::adapters::inbound::http::dto::moderation::actions::UserHistoryDto;
 use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
@@ -670,7 +670,7 @@ pub async fn get_modstats(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
-) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::ModStatsEntryDto>>, ApiError> {
+) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
 
@@ -709,7 +709,7 @@ pub async fn get_modstats(
     let dtos = rows
         .into_iter()
         .map(
-            |r| crate::adapters::inbound::http::dto::moderation::ModStatsEntryDto {
+            |r| crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto {
                 moderator_id: r.moderator_id,
                 moderator_name: r.moderator_name,
                 total: r.total,

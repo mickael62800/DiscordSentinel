@@ -13,7 +13,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::adapters::inbound::http::dto::infractions::InfractionResponseDto;
+use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;

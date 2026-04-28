@@ -1,10 +1,10 @@
 use serde::Serialize;
 
-use crate::adapters::inbound::http::dto::infractions::InfractionResponseDto;
-use crate::adapters::inbound::http::dto::moderation::ModerationActionResponseDto;
-use crate::adapters::inbound::http::dto::security::SecurityEventResponseDto;
-use crate::adapters::inbound::http::dto::conduct::ConductPointsLogDto;
-use crate::adapters::inbound::http::dto::notes::UserNoteDto;
+use crate::adapters::inbound::http::dto::moderation::infractions::InfractionResponseDto;
+use crate::adapters::inbound::http::dto::moderation::actions::ModerationActionResponseDto;
+use crate::adapters::inbound::http::dto::audit::security::SecurityEventResponseDto;
+use crate::adapters::inbound::http::dto::community::conduct::ConductPointsLogDto;
+use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::ports::inbound::audit::manage_watched_users::UserDossier;
 

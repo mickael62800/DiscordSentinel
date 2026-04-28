@@ -1,8 +1,8 @@
 use axum::extract::State;
 use axum::Json;
 
-use crate::adapters::inbound::http::dto::analyze::AnalyzeRequestDto;
-use crate::adapters::inbound::http::dto::analyze::AnalyzeResponseDto;
+use crate::adapters::inbound::http::dto::ai::analyze::AnalyzeRequestDto;
+use crate::adapters::inbound::http::dto::ai::analyze::AnalyzeResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;

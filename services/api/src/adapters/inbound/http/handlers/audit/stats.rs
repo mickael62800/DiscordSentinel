@@ -4,13 +4,13 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 
-use crate::adapters::inbound::http::dto::stats::GuildOverviewDto;
-use crate::adapters::inbound::http::dto::stats::GuildVoiceStatsDto;
-use crate::adapters::inbound::http::dto::stats::LeaderboardQuery;
-use crate::adapters::inbound::http::dto::stats::RecordMessagesDto;
-use crate::adapters::inbound::http::dto::stats::RecordVoiceDto;
-use crate::adapters::inbound::http::dto::stats::UserStatsDto;
-use crate::adapters::inbound::http::dto::stats::VoiceStatsQuery;
+use crate::adapters::inbound::http::dto::audit::stats::GuildOverviewDto;
+use crate::adapters::inbound::http::dto::audit::stats::GuildVoiceStatsDto;
+use crate::adapters::inbound::http::dto::audit::stats::LeaderboardQuery;
+use crate::adapters::inbound::http::dto::audit::stats::RecordMessagesDto;
+use crate::adapters::inbound::http::dto::audit::stats::RecordVoiceDto;
+use crate::adapters::inbound::http::dto::audit::stats::UserStatsDto;
+use crate::adapters::inbound::http::dto::audit::stats::VoiceStatsQuery;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 

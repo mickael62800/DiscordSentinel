@@ -7,10 +7,10 @@ use redis::AsyncCommands;
 
 use tracing::warn;
 
-use crate::adapters::inbound::http::dto::bot_config::BotDefinitionDto;
-use crate::adapters::inbound::http::dto::bot_config::BotGuildConfigDto;
-use crate::adapters::inbound::http::dto::bot_config::DeleteConfigDto;
-use crate::adapters::inbound::http::dto::bot_config::SetConfigDto;
+use crate::adapters::inbound::http::dto::system::bot_config::BotDefinitionDto;
+use crate::adapters::inbound::http::dto::system::bot_config::BotGuildConfigDto;
+use crate::adapters::inbound::http::dto::system::bot_config::DeleteConfigDto;
+use crate::adapters::inbound::http::dto::system::bot_config::SetConfigDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::Role;

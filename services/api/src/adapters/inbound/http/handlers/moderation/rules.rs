@@ -4,8 +4,8 @@ use axum::Extension;
 use axum::Json;
 use uuid::Uuid;
 
-use crate::adapters::inbound::http::dto::rules::CreateRuleDto;
-use crate::adapters::inbound::http::dto::rules::RuleResponseDto;
+use crate::adapters::inbound::http::dto::moderation::rules::CreateRuleDto;
+use crate::adapters::inbound::http::dto::moderation::rules::RuleResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;

@@ -5,8 +5,8 @@ use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::dto::watched_users::UserDossierResponseDto;
-use crate::adapters::inbound::http::dto::watched_users::WatchedUserResponseDto;
+use crate::adapters::inbound::http::dto::audit::watched_users::UserDossierResponseDto;
+use crate::adapters::inbound::http::dto::audit::watched_users::WatchedUserResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::ok_response;

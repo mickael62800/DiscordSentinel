@@ -4,11 +4,11 @@ use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::dto::conduct::AddPointsDto;
-use crate::adapters::inbound::http::dto::conduct::ConductConfigDto;
-use crate::adapters::inbound::http::dto::conduct::ConductPointsLogDto;
-use crate::adapters::inbound::http::dto::conduct::SaveConductConfigDto;
-use crate::adapters::inbound::http::dto::conduct::UserConductPointsDto;
+use crate::adapters::inbound::http::dto::community::conduct::AddPointsDto;
+use crate::adapters::inbound::http::dto::community::conduct::ConductConfigDto;
+use crate::adapters::inbound::http::dto::community::conduct::ConductPointsLogDto;
+use crate::adapters::inbound::http::dto::community::conduct::SaveConductConfigDto;
+use crate::adapters::inbound::http::dto::community::conduct::UserConductPointsDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;

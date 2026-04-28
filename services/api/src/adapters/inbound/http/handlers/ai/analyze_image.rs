@@ -2,8 +2,8 @@ use axum::extract::State;
 use axum::Json;
 use base64::Engine;
 
-use crate::adapters::inbound::http::dto::analyze_image::AnalyzeImageRequestDto;
-use crate::adapters::inbound::http::dto::analyze_image::AnalyzeImageResponseDto;
+use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageRequestDto;
+use crate::adapters::inbound::http::dto::ai::analyze_image::AnalyzeImageResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
