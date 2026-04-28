@@ -119,8 +119,7 @@ DiscordSentinel/
 │
 ├── ai/                          # Configs d'entraînement (YAML) + dossiers d'exports ONNX (montés par Docker)
 │
-├── infra/                       # prometheus.yml + grafana provisioning
-├── scripts/                     # build-all.sh, dev.sh, health-check.sh, seed-rules.sh, start-all.sh
+├── infra/                       # prometheus.yml + grafana provisioning + scripts/ (build-all, dev, health-check, seed-rules, start-all, run-tests, tls-issue)
 ├── docs/                        # COUP_DE_COUDE_*.md, commandes-utilisateur.md, cmd_discord/, amélioration/
 │
 ├── docker-compose.yml           # Stack complète (infra + API + bot + 13 workers + gateway + web + monitoring)
@@ -335,11 +334,11 @@ VOICE_LOG_CHANNEL_ID=...
 ### Développement local
 
 ```bash
-bash scripts/dev.sh              # Lance API + bot + web
-bash scripts/build-all.sh        # Build release de tous les crates
-bash scripts/health-check.sh     # Vérifie que tous les services répondent
-bash scripts/seed-rules.sh       # Seed de règles de dev
-bash scripts/start-all.sh        # Démarre la stack complète
+bash infra/scripts/dev.sh              # Lance API + bot + web
+bash infra/scripts/build-all.sh        # Build release de tous les crates
+bash infra/scripts/health-check.sh     # Vérifie que tous les services répondent
+bash infra/scripts/seed-rules.sh       # Seed de règles de dev
+bash infra/scripts/start-all.sh        # Démarre la stack complète
 
 # Ou composant par composant :
 cd services/api && cargo run

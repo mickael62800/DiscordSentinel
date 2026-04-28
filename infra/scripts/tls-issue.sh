@@ -20,9 +20,9 @@
 #   - Port 80 ouvert depuis Internet (firewall, NAT, cloud provider).
 #
 # Exemples :
-#   ./scripts/tls-issue.sh --letsencrypt --domain bot.exemple.com --email toi@exemple.com
-#   ./scripts/tls-issue.sh --staging     --domain bot.exemple.com --email toi@exemple.com
-#   ./scripts/tls-issue.sh --self-signed --domain localhost
+#   ./infra/scripts/tls-issue.sh --letsencrypt --domain bot.exemple.com --email toi@exemple.com
+#   ./infra/scripts/tls-issue.sh --staging     --domain bot.exemple.com --email toi@exemple.com
+#   ./infra/scripts/tls-issue.sh --self-signed --domain localhost
 # ============================================
 
 set -euo pipefail
