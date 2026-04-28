@@ -13,7 +13,7 @@ use sentinel_api::application::casino::manage_wallet_service::ManageWalletServic
 use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use sentinel_api::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use sentinel_api::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use sentinel_api::ports::outbound::casino::wallet_repository::WalletRepository;

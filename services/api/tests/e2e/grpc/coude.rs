@@ -59,7 +59,7 @@ use sentinel_api::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCa
 use sentinel_api::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 use sentinel_api::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use sentinel_api::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
-use sentinel_api::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
+use sentinel_api::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_bets_service_client::CoudeBetsServiceClient;
 use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsServiceServer;
@@ -482,7 +482,7 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
         Ok(vec![])
     }
     async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(7) }
-    async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<sentinel_api::ports::inbound::manage_coude_economy::StealOutcome, DomainError> { unimplemented!() }
+    async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<sentinel_api::ports::inbound::coude::manage_economy::StealOutcome, DomainError> { unimplemented!() }
     async fn steal_fail_penalty(&self, _: &str, _: &str, _: i64) -> Result<(i64, Vec<sentinel_api::domain::entities::coude::taunt::TauntEvent>), DomainError> { unimplemented!() }
     async fn record_casino_win(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }

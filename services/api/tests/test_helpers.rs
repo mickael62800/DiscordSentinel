@@ -735,6 +735,25 @@ pub struct StubWelcomeConfigRepo;
     async fn save_config(&self, _: &str, d: &WelcomeConfigData) -> Result<WelcomeConfigData, DomainError> { Ok(d.clone()) }
 }
 
+pub struct StubAutomodReviewRepo;
+#[async_trait] impl sentinel_api::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository for StubAutomodReviewRepo {
+    async fn create(&self, _: sentinel_api::domain::entities::moderation::automod_review::NewAutomodReview) -> Result<sentinel_api::domain::entities::moderation::automod_review::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn get(&self, _: Uuid) -> Result<Option<sentinel_api::domain::entities::moderation::automod_review::AutomodReview>, DomainError> { Ok(None) }
+    async fn list_pending(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::moderation::automod_review::AutomodReview>, DomainError> { Ok(vec![]) }
+    async fn list_recent(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::moderation::automod_review::AutomodReview>, DomainError> { Ok(vec![]) }
+    async fn resolve(&self, _: Uuid, _: &str, _: &str, _: &str, _: &str) -> Result<sentinel_api::domain::entities::moderation::automod_review::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
+}
+
+pub struct StubDiscordActionMessageRepo;
+#[async_trait] impl sentinel_api::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository for StubDiscordActionMessageRepo {
+    async fn register(&self, _: sentinel_api::domain::entities::audit::discord_action_message::NewDiscordActionMessage) -> Result<(), DomainError> { Ok(()) }
+    async fn list_for_action(&self, _: Uuid) -> Result<Vec<sentinel_api::domain::entities::audit::discord_action_message::DiscordActionMessage>, DomainError> { Ok(vec![]) }
+    async fn get(&self, _: Uuid, _: &str) -> Result<Option<sentinel_api::domain::entities::audit::discord_action_message::DiscordActionMessage>, DomainError> { Ok(None) }
+    async fn touch_edited(&self, _: Uuid, _: &str) -> Result<(), DomainError> { Ok(()) }
+    async fn delete(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(false) }
+    async fn find_by_message(&self, _: &str, _: &str, _: &str) -> Result<Option<sentinel_api::domain::entities::audit::discord_action_message::DiscordActionMessage>, DomainError> { Ok(None) }
+}
+
 pub struct StubExportUC;
 #[async_trait] impl sentinel_api::application::system::export_service::ExecuteExportUseCase for StubExportUC {
     async fn execute(&self, _: &str, _: &str, _: &str, _: i64) -> Result<sentinel_api::application::system::export_service::ExportResult, DomainError> {
@@ -889,7 +908,21 @@ fn base_state() -> AppState {
         roll_steal_uc: Arc::new(StubRollSteal),
         coude_flavor_templates_repo: Arc::new(StubCoudeFlavorTemplates),
         user_activity_repo: Arc::new(StubUserActivityRepo),
-        welcome_config_repo: Arc::new(StubWelcomeConfigRepo),
+        welcome_config_uc: Arc::new(
+            sentinel_api::application::community::manage_welcome_config_service::ManageWelcomeConfigService::new(
+                Arc::new(StubWelcomeConfigRepo),
+            ),
+        ),
+        automod_reviews_uc: Arc::new(
+            sentinel_api::application::moderation::manage_automod_reviews_service::ManageAutomodReviewsService::new(
+                Arc::new(StubAutomodReviewRepo),
+            ),
+        ),
+        discord_action_messages_uc: Arc::new(
+            sentinel_api::application::audit::manage_discord_action_messages_service::ManageDiscordActionMessagesService::new(
+                Arc::new(StubDiscordActionMessageRepo),
+            ),
+        ),
         export_uc: Arc::new(StubExportUC),
         evidence_repo: Arc::new(StubEvidenceRepo),
         review_repo: Arc::new(StubReviewRepo),
@@ -1061,10 +1094,16 @@ pub fn build_test_state_role_panels(role_panels_uc: Arc<dyn ManageRolePanelsUseC
 }
 
 /// Construit un AppState avec un mock welcome config repository injecte.
+/// Le repo est wrappe dans le service applicatif pour exposer le use case
+/// (l'AppState n'expose plus le repo directement).
 #[allow(dead_code)]
 pub fn build_test_state_welcome(welcome_config_repo: Arc<dyn WelcomeConfigRepository>) -> AppState {
     let mut state = base_state();
-    state.welcome_config_repo = welcome_config_repo;
+    state.welcome_config_uc = Arc::new(
+        sentinel_api::application::community::manage_welcome_config_service::ManageWelcomeConfigService::new(
+            welcome_config_repo,
+        ),
+    );
     state
 }
 

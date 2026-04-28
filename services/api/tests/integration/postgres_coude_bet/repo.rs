@@ -16,7 +16,7 @@ use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
 use sentinel_api::domain::entities::coude::bet::NewCoudeBet;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
+use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use sentinel_api::ports::outbound::coude::bet_repository::CoudeBetRepository;
 
 async fn pool() -> PgPool {

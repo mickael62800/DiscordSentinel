@@ -16,7 +16,7 @@ use tower::ServiceExt;
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_coude_economy::StealOutcome;
+use sentinel_api::ports::inbound::coude::manage_economy::StealOutcome;
 use sentinel_api::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 
 #[derive(Default)]
