@@ -1,10 +1,12 @@
 use rand::Rng;
 
-use super::chaos::{self, ChaosEvent};
+use super::chaos;
+use super::chaos::ChaosEvent;
 use super::classes;
 use super::progression;
-use super::{PlayerLite as Player, ServerEventLite as ServerEvent};
-use crate::domain::entities::CoudeBalanceParams;
+use super::PlayerLite as Player;
+use super::ServerEventLite as ServerEvent;
+use crate::domain::entities::coude::balance::CoudeBalanceParams;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Flavor text ──
@@ -506,7 +508,7 @@ pub fn resolve_combat_with_curses(
         let roll_d20 = |rng: &mut rand::rngs::ThreadRng, banana: bool| -> i32 {
             let raw: i32 = rng.gen_range(1..=20);
             if banana {
-                use crate::domain::entities::apply_banana_to_d20;
+                use crate::domain::entities::coude::curse::apply_banana_to_d20;
                 let p: f64 = rng.gen_range(0.0..1.0);
                 apply_banana_to_d20(raw as u8, true, p) as i32
             } else {
@@ -772,7 +774,7 @@ pub fn resolve_combat_with_curses(
         // Commentaires de combat debiles (cf. COUPE_AMELIORATIONS 2.2) —
         // ~20% par round, aucune incidence mecanique, juste de l ambiance.
         {
-            use crate::domain::entities::pick_flavor_line;
+            use crate::domain::entities::coude::combat_flavor::pick_flavor_line;
             let proba: f64 = rng.gen_range(0.0..1.0);
             if let Some(line) = pick_flavor_line(&mut rng, proba, &atk_name, &def_name) {
                 round_msg.push_str(&format!("\n_\u{1f3ad} {}_\n", line));

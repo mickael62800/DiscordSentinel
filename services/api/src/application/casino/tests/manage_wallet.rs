@@ -1,15 +1,19 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ManageWalletService;
-use crate::domain::entities::{CoudeTauntsConfig, StreakKind, TauntEvent, Wallet, WalletTransaction};
+use crate::application::casino::manage_wallet_service::ManageWalletService;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::StreakKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::WalletRepository;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 
 struct MockWalletRepo {
     balance: Mutex<i64>,
@@ -297,7 +301,7 @@ async fn get_balance_reads_from_repo() {
 
 #[tokio::test]
 async fn post_commit_taunts_emits_bankruptcy_and_jackpot() {
-    use crate::ports::inbound::manage_wallet::TxWalletMutation;
+    use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
     let repo = Arc::new(MockWalletRepo::new(0));
     let taunts = Arc::new(MockTaunts::new());
     let svc = ManageWalletService::new(repo, taunts.clone());
@@ -316,7 +320,7 @@ async fn post_commit_taunts_emits_bankruptcy_and_jackpot() {
 
 #[tokio::test]
 async fn post_commit_taunts_skips_when_flags_unset() {
-    use crate::ports::inbound::manage_wallet::TxWalletMutation;
+    use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
     let repo = Arc::new(MockWalletRepo::new(0));
     let taunts = Arc::new(MockTaunts::new());
     let svc = ManageWalletService::new(repo, taunts.clone());
@@ -434,7 +438,7 @@ async fn reset_all_wallets_applies_resolve_reset_balance_and_returns_affected() 
 
 #[tokio::test]
 async fn post_commit_taunts_jackpot_below_threshold_emits_nothing() {
-    use crate::ports::inbound::manage_wallet::TxWalletMutation;
+    use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
     let repo = Arc::new(MockWalletRepo::new(0));
     let taunts = Arc::new(MockTaunts::new());
     let svc = ManageWalletService::new(repo, taunts.clone());

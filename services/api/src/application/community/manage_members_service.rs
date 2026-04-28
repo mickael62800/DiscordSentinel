@@ -2,10 +2,23 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{GuildMember, MemberConduct, MemberInfractions, MemberModeration, MemberStats, MemberSummary};
+use crate::domain::entities::community::guild_member::GuildMember;
+use crate::domain::entities::community::guild_member::MemberConduct;
+use crate::domain::entities::community::guild_member::MemberInfractions;
+use crate::domain::entities::community::guild_member::MemberModeration;
+use crate::domain::entities::community::guild_member::MemberStats;
+use crate::domain::entities::community::guild_member::MemberSummary;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{InfractionFilters, ManageConductUseCase, ManageInfractionsUseCase, ManageMembersUseCase, ManageModerationUseCase, ManageStatsUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand};
-use crate::ports::outbound::MemberRepository;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
+use crate::ports::inbound::community::manage_members::SyncMembersCommand;
+use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use crate::ports::outbound::community::member_repository::MemberRepository;
 
 pub struct ManageMembersService {
     member_repo: Arc<dyn MemberRepository>,
@@ -99,7 +112,7 @@ impl ManageMembersUseCase for ManageMembersService {
         };
         let conduct_config = match self.conduct_uc.get_config(guild_id).await {
             Ok(cfg) => cfg,
-            Err(_) => crate::domain::entities::ConductConfig::default_for_guild(guild_id),
+            Err(_) => crate::domain::entities::community::conduct::ConductConfig::default_for_guild(guild_id),
         };
         let points = conduct_points.as_ref().map(|c| c.points).unwrap_or(conduct_config.max_points);
         let max_points = conduct_config.max_points;

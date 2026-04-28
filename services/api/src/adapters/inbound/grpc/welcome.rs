@@ -5,12 +5,13 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::welcome::v1 as proto;
 use sentinel_proto::welcome::v1::welcome_service_server::WelcomeService;
 
-use crate::ports::inbound::ManageWelcomeConfigUseCase;
+use crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
 
 pub struct WelcomeGrpc {
     pub uc: Arc<dyn ManageWelcomeConfigUseCase>,

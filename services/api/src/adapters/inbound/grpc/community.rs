@@ -4,9 +4,11 @@
 //! pas de use case unifie cote API. Permet au community-bot de faire tous
 //! ses appels metier via gRPC (plus de HTTP fallback sur ce domaine).
 
-use chrono::{DateTime, Utc};
-use tonic::{Request, Response, Status};
-
+use chrono::DateTime;
+use chrono::Utc;
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use crate::adapters::inbound::grpc::errors::sqlx_to_status;
 
 use sentinel_proto::community::v1 as proto;

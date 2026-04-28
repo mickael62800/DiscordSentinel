@@ -10,15 +10,17 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::moderation::v1 as proto;
 use sentinel_proto::moderation::v1::moderation_service_server::ModerationService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{ModerationAction, UserModerationHistory};
-use crate::ports::inbound::{LogModerationCommand, ManageModerationUseCase};
-
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
+use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
 pub struct ModerationGrpc {
     pub moderation_uc: Arc<dyn ManageModerationUseCase>,
 }

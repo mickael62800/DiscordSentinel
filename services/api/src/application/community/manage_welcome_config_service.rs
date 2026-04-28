@@ -5,9 +5,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{ManageWelcomeConfigUseCase, WelcomeConfigPatch};
-use crate::ports::outbound::{WelcomeConfigData, WelcomeConfigRepository};
-
+use crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
+use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
+use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
 pub struct ManageWelcomeConfigService {
     repo: Arc<dyn WelcomeConfigRepository>,
 }

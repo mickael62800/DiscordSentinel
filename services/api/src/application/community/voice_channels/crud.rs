@@ -2,16 +2,15 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::adapters::outbound::cache_helpers::cached_json;
-use crate::domain::entities::{VoiceChannel, VoiceChannelDetail};
+use crate::domain::entities::community::voice_channel::VoiceChannel;
+use crate::domain::entities::community::voice_channel::VoiceChannelDetail;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    CreateVoiceChannelCommand, TransferOwnershipCommand, UpdateVoiceChannelCommand,
-};
-
-use super::{
-    ManageVoiceChannelsService, CHANNELS_LIST_TTL, CHANNEL_DETAIL_TTL,
-};
-
+use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use super::ManageVoiceChannelsService;
+use super::CHANNELS_LIST_TTL;
+use super::CHANNEL_DETAIL_TTL;
 impl ManageVoiceChannelsService {
     pub(super) async fn list_all_channels_impl(&self) -> Result<Vec<VoiceChannel>, DomainError> {
         self.repo.find_all().await
@@ -55,7 +54,7 @@ impl ManageVoiceChannelsService {
             queue_channel_id: cmd.queue_channel_id,
             category_id: cmd.category_id,
             channel_name: cmd.channel_name,
-            kind: crate::domain::value_objects::VoiceChannelKind::from_str_lossy(&cmd.kind),
+            kind: crate::domain::enums::community::voice_channel_kind::VoiceChannelKind::from_str_lossy(&cmd.kind),
             visibility: cmd.visibility,
             queue_enabled: cmd.queue_enabled,
             locked: false,

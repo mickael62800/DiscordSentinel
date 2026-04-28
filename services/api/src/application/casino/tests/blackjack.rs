@@ -1,15 +1,21 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::BlackjackService;
-use crate::domain::entities::{BlackjackGame, StreakKind, TauntEvent, Wallet, WalletTransaction};
+use crate::application::casino::blackjack_service::BlackjackService;
+use crate::domain::entities::casino::blackjack::BlackjackGame;
+use crate::domain::entities::coude::taunt::StreakKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_wallet::{ManageWalletUseCase, TxWalletMutation, WalletMutation};
-use crate::ports::outbound::{BlackjackRepository, WalletRepository};
-
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 fn fake_taunt(kind: StreakKind) -> TauntEvent {
     TauntEvent {
         channel_id: "chan".into(),

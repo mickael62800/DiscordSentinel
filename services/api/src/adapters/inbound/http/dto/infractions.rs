@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::Infraction;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::moderation::infraction::Infraction;
 
 #[derive(Debug, Deserialize)]
 pub struct InfractionQueryParams {

@@ -1,6 +1,7 @@
 use super::*;
-use crate::domain::entities::{BotDefinition, BotGuildConfig};
-use crate::ports::outbound::BotConfigRepository;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use chrono::Duration as ChronoDuration;
 use uuid::Uuid;
 

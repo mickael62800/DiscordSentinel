@@ -1,13 +1,15 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
+use chrono::Duration;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::SanctionReminder;
+use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{CreateReminderCommand, ManageRemindersUseCase};
-use crate::ports::outbound::ReminderRepository;
+use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
+use crate::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase;
+use crate::ports::outbound::moderation::reminder_repository::ReminderRepository;
 
 const DEFAULT_REMIND_BEFORE_SECS: u64 = 3600; // 1 heure avant expiration
 

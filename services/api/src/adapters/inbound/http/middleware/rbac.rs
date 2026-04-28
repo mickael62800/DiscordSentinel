@@ -47,7 +47,7 @@ const DISCORD_TOKEN_HEADER: &str = "x-discord-token";
 // Le type `Role` (enum + hierarchie) est defini dans le domain. Re-export ici
 // pour que les imports historiques `middleware::rbac::Role` continuent de
 // marcher sans modification.
-pub use crate::domain::enums::Role;
+pub use crate::domain::enums::system::role::Role;
 
 /// Contexte injecte dans les extensions de la requete pour les handlers.
 #[derive(Debug, Clone)]
@@ -387,7 +387,8 @@ fn extract_guild_id_from_path(path: &str) -> Option<String> {
 
 fn short_hash(input: &str) -> String {
     use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use std::hash::Hash;
+    use std::hash::Hasher;
     let mut hasher = DefaultHasher::new();
     input.hash(&mut hasher);
     format!("{:x}", hasher.finish())

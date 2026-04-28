@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::{WelcomeConfigData, WelcomeConfigRepository};
-
+use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
 pub struct PgWelcomeConfigRepository {
     pool: PgPool,
 }

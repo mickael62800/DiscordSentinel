@@ -1,6 +1,7 @@
 use super::*;
-use crate::domain::entities::{ImageAnalysis, ImageClassification};
-use crate::domain::value_objects::Action;
+use crate::domain::entities::ai::image_analysis::ImageAnalysis;
+use crate::domain::entities::ai::image_analysis::ImageClassification;
+use crate::domain::enums::moderation::action::Action;
 
 fn sample_analysis(action: Action, reason: &str, duration: Option<u64>) -> ImageAnalysis {
     ImageAnalysis {

@@ -3,7 +3,7 @@ use super::*;
     
     use chrono::TimeZone;
     use uuid::Uuid;
-    use crate::domain::value_objects::ModerationGravity;
+    use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 
     fn ts() -> chrono::DateTime<chrono::Utc> {
         chrono::Utc.with_ymd_and_hms(2026, 1, 15, 12, 0, 0).unwrap()
@@ -91,14 +91,15 @@ use super::*;
     // ── RPC tests avec mock ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
+    use std::sync::Mutex;
     use chrono::Utc;
-    use crate::domain::entities::{StrikeResult, UserStrike};
+    use crate::domain::entities::moderation::strikes::StrikeResult;
+    use crate::domain::entities::moderation::strikes::UserStrike;
     use crate::domain::errors::DomainError;
-    use crate::ports::inbound::{
-        LogModerationCommand, LoggedModerationAction, ManageModerationUseCase,
-    };
-
+    use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+    use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
+    use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
     #[derive(Default)]
     struct MockModerationUc {
         log_calls: Mutex<Vec<LogModerationCommand>>,

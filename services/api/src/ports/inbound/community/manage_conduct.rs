@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{ConductConfig, ConductPointsLog, UserConductPoints};
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::errors::DomainError;
 
 pub struct SaveConductConfigCommand {

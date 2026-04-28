@@ -1,13 +1,17 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 
-use crate::domain::entities::{BotGuildConfig, CoudePlayer, CoudeTauntsConfig, XpProgress};
-use crate::domain::entities::CombatStat;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::outbound::{BotConfigRepository, CoudePlayerRepository, CoudeTauntsRepository};
-
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
 // ══════════════════════════════════════════════════════════
 // Mocks
 // ══════════════════════════════════════════════════════════
@@ -159,7 +163,7 @@ impl MockBotConfigRepo {
 }
 #[async_trait]
 impl BotConfigRepository for MockBotConfigRepo {
-    async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::BotDefinition>, DomainError> { Ok(vec![]) }
+    async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::system::bot_config::BotDefinition>, DomainError> { Ok(vec![]) }
     async fn get_config(&self, _: &str, _: &str) -> Result<Vec<BotGuildConfig>, DomainError> {
         Ok(self.entries.lock().unwrap().clone())
     }
@@ -172,8 +176,8 @@ fn make_service(
     taunts: Arc<MockTauntsRepo>,
     players: Arc<MockPlayerRepo>,
     bot: Arc<MockBotConfigRepo>,
-) -> crate::application::ManageCoudeTauntsService {
-    crate::application::ManageCoudeTauntsService::new(taunts, players, bot)
+) -> crate::application::coude::manage_taunts_service::ManageCoudeTauntsService {
+    crate::application::coude::manage_taunts_service::ManageCoudeTauntsService::new(taunts, players, bot)
 }
 
 // ══════════════════════════════════════════════════════════

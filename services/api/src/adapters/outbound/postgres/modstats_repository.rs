@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::{ModeratorStat, ModstatsRepository};
+use crate::ports::outbound::audit::modstats_repository::ModeratorStat;
+use crate::ports::outbound::audit::modstats_repository::ModstatsRepository;
 use super::pg_err;
 
 pub struct PgModstatsRepository { pool: PgPool }

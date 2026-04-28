@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{UserStats, VoiceSessionStats};
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::StatsRepository;
+use crate::ports::outbound::audit::stats_repository::StatsRepository;
 
 pub struct PgStatsRepository {
     pool: PgPool,

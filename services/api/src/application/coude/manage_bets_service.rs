@@ -3,19 +3,20 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::CoudeGuildSettings;
-use crate::domain::entities::{
-    calculate_bet_resolution, safety_net_boost_bet_gain_with_multiplier, CoudeBet, NewCoudeBet,
-    RefundSummary,
-};
+use crate::application::coude::guild_settings::CoudeGuildSettings;
+use crate::domain::entities::coude::bet::calculate_bet_resolution;
+use crate::domain::entities::coude::safety_net::boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_bets::{
-    ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
-};
-use crate::ports::outbound::{
-    BotConfigRepository, CombatQueryRepository, CoudeBetRepository, CoudeSafetyNetRepository,
-};
-
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
+use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
+use crate::ports::outbound::coude::bet_repository::CoudeBetRepository;
+use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
 pub struct ManageCoudeBetsService {
     bet_repo: Arc<dyn CoudeBetRepository>,
     combat_query: Arc<dyn CombatQueryRepository>,

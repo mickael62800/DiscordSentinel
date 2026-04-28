@@ -1,10 +1,13 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{PgPool, Postgres, Transaction};
-
-use crate::domain::entities::{WheelSpin, WheelTopWinner};
+use chrono::DateTime;
+use chrono::Utc;
+use sqlx::PgPool;
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::domain::entities::casino::wheel::WheelSpin;
+use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::WheelRepository;
+use crate::ports::outbound::casino::wheel_repository::WheelRepository;
 
 use super::pg_err;
 

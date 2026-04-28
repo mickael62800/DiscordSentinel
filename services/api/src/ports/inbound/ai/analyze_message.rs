@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::MessageAnalysis;
+use crate::domain::entities::ai::message_analysis::MessageAnalysis;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::DetectionFlags;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
 
 /// Entree de contexte conversationnel (message precedent dans le canal).
 pub struct ContextMessageEntry {

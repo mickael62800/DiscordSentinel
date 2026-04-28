@@ -9,12 +9,14 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgWalletRepository;
-use sentinel_api::application::ManageWalletService;
-use sentinel_api::domain::entities::{CoudeTauntsConfig, TauntEvent};
+use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
+use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
+use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
-use sentinel_api::ports::inbound::manage_wallet::{ManageWalletUseCase, TxWalletMutation};
-use sentinel_api::ports::outbound::WalletRepository;
+use sentinel_api::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use sentinel_api::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use sentinel_api::ports::outbound::casino::wallet_repository::WalletRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {

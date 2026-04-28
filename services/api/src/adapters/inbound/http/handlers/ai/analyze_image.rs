@@ -2,17 +2,17 @@ use axum::extract::State;
 use axum::Json;
 use base64::Engine;
 
-use crate::adapters::inbound::http::dto::analyze_image::{AnalyzeImageRequestDto, AnalyzeImageResponseDto};
+use crate::adapters::inbound::http::dto::analyze_image::AnalyzeImageRequestDto;
+use crate::adapters::inbound::http::dto::analyze_image::AnalyzeImageResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::AnalyzeImageCommand;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 
 // Limites et content-types autorises sont definis dans `domain/entities/image_analysis.rs`.
-use crate::domain::entities::{
-    is_allowed_image_content_type, is_image_size_acceptable, MAX_IMAGE_BASE64_LEN,
-};
-
+use crate::domain::entities::ai::image_analysis::is_allowed_image_content_type;
+use crate::domain::entities::ai::image_analysis::is_image_size_acceptable;
+use crate::domain::entities::ai::image_analysis::MAX_IMAGE_BASE64_LEN;
 pub async fn analyze_image(
     State(state): State<AppState>,
     Json(dto): Json<AnalyzeImageRequestDto>,

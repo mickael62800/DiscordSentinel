@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 /// Combat 1v1 du mini-jeu Coup de Coude.

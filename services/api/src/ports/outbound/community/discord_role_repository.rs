@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::DiscordRole;
+use crate::domain::entities::system::discord_role::DiscordRole;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

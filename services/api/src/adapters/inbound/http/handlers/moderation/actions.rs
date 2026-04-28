@@ -1,19 +1,28 @@
-use axum::extract::{Path, Query, State};
-use axum::{Extension, Json};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::dto::moderation::{
-    BanEntryDto, LogActionDto, ModerationActionResponseDto, UserHistoryDto,
-};
+use crate::adapters::inbound::http::dto::moderation::BanEntryDto;
+use crate::adapters::inbound::http::dto::moderation::LogActionDto;
+use crate::adapters::inbound::http::dto::moderation::ModerationActionResponseDto;
+use crate::adapters::inbound::http::dto::moderation::UserHistoryDto;
 use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{check_role, check_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::helpers::map_to_dtos;
+use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::check_role;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::CreateReminderCommand;
+use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -95,7 +104,7 @@ pub async fn log_action(
 
     // Auto-create reminder for temporary sanctions (regle metier : voir
     // `ModerationActionType::is_temporary` dans domain/value_objects).
-    if crate::domain::value_objects::ModerationActionType::is_temporary_str(&action_type) {
+    if crate::domain::enums::moderation::moderation_action_type::ModerationActionType::is_temporary_str(&action_type) {
         if let Some(dur) = duration {
             let action_uuid = match dto.id.parse() {
                 Ok(uuid) => uuid,
@@ -185,7 +194,7 @@ pub async fn execute_ban(
 
     let reason = dto.reason.clone();
 
-    let command = crate::ports::inbound::LogModerationCommand {
+    let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new(),
         moderator_id: "desktop".into(),
@@ -261,7 +270,7 @@ pub async fn execute_mute(
     )
     .await?;
 
-    let duration = crate::domain::entities::resolve_mute_duration(dto.duration);
+    let duration = crate::domain::entities::moderation::moderation_review::resolve_mute_duration(dto.duration);
     state
         .discord_api
         .apply_timeout(&dto.guild_id, &dto.user_id, duration)
@@ -269,7 +278,7 @@ pub async fn execute_mute(
         .map_err(ApiError)?;
 
     let target_name = dto.target_name.unwrap_or_else(|| dto.user_id.clone());
-    let command = crate::ports::inbound::LogModerationCommand {
+    let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new(),
         moderator_id: "web-panel".into(),
@@ -332,7 +341,7 @@ pub async fn execute_unban(
     let target_id = dto.user_id.clone();
     let guild_id = dto.guild_id.clone();
 
-    let command = crate::ports::inbound::LogModerationCommand {
+    let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id,
         channel_id: String::new(),
         moderator_id: "desktop".into(),
@@ -449,7 +458,7 @@ pub async fn add_evidence(
         }
     }
     // Validation URL — regle metier dans `domain/entities/moderation_review.rs`.
-    crate::domain::entities::validate_evidence_url(&dto.url)
+    crate::domain::entities::moderation::moderation_review::validate_evidence_url(&dto.url)
         .map_err(|m| ApiError(crate::domain::errors::DomainError::ValidationError(m.into())))?;
     let action_uuid = uuid::Uuid::parse_str(&dto.action_id).map_err(|_| {
         ApiError(crate::domain::errors::DomainError::ValidationError(
@@ -457,7 +466,7 @@ pub async fn add_evidence(
         ))
     })?;
     validation::validate_discord_id("uploaded_by", &dto.uploaded_by).map_err(ApiError)?;
-    let description = dto.description.as_deref().map(crate::domain::entities::truncate_review_text);
+    let description = dto.description.as_deref().map(crate::domain::entities::moderation::moderation_review::truncate_review_text);
 
     let entry = state.evidence_repo
         .add(action_uuid, &dto.url, description.as_deref(), &dto.uploaded_by, &dto.uploaded_by_name)
@@ -535,7 +544,7 @@ pub struct ReviewQueueEntryDto {
     pub action_reason: Option<String>,
 }
 
-fn review_entry_to_dto(e: crate::ports::outbound::ReviewEntry) -> ReviewQueueEntryDto {
+fn review_entry_to_dto(e: crate::ports::outbound::moderation::review_repository::ReviewEntry) -> ReviewQueueEntryDto {
     ReviewQueueEntryDto {
         id: e.id.to_string(),
         action_id: e.action_id.to_string(),
@@ -576,7 +585,7 @@ pub async fn add_review(
         "moderator+ requis pour ajouter une review",
     )
     .await?;
-    let reason = dto.reason.as_deref().map(crate::domain::entities::truncate_review_text);
+    let reason = dto.reason.as_deref().map(crate::domain::entities::moderation::moderation_review::truncate_review_text);
 
     let entry = state.review_repo
         .add(action_uuid, &dto.guild_id, &dto.added_by, &dto.added_by_name, reason.as_deref())
@@ -630,13 +639,13 @@ pub async fn resolve_review(
         }
     }
 
-    if !crate::domain::entities::is_valid_review_status(&dto.status) {
+    if !crate::domain::entities::moderation::moderation_review::is_valid_review_status(&dto.status) {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
             "status doit etre approved/rejected/changed".into(),
         )));
     }
     validation::validate_discord_id("reviewer_id", &dto.reviewer_id).map_err(ApiError)?;
-    let notes = dto.reviewer_notes.as_deref().map(crate::domain::entities::truncate_review_text);
+    let notes = dto.reviewer_notes.as_deref().map(crate::domain::entities::moderation::moderation_review::truncate_review_text);
 
     let resolved = state.review_repo
         .resolve(review_uuid, &dto.reviewer_id, &dto.reviewer_name, notes.as_deref(), &dto.status)

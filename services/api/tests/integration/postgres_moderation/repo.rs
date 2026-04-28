@@ -6,7 +6,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgModerationRepository;
-use sentinel_api::ports::outbound::ModerationRepository;
+use sentinel_api::ports::outbound::moderation::moderation_repository::ModerationRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -40,7 +40,7 @@ async fn seed_audit(
 async fn save_is_noop_phase4() {
     // save() est un no-op (Phase 4).
     let repo = PgModerationRepository::new(pool().await);
-    let action = sentinel_api::domain::entities::ModerationAction {
+    let action = sentinel_api::domain::entities::moderation::moderation_action::ModerationAction {
         id: Uuid::new_v4(), guild_id: "g".into(), channel_id: "c".into(),
         moderator_id: "m".into(), moderator_name: "M".into(),
         target_id: "t".into(), target_name: "T".into(),

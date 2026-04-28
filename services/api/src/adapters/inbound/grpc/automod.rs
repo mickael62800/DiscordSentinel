@@ -4,16 +4,19 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::automod::v1 as proto;
 use sentinel_proto::automod::v1::automod_service_server::AutomodService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::MessageAnalysis;
-use crate::domain::value_objects::{Action, DetectionFlags};
-use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, ContextMessageEntry};
-
+use crate::domain::entities::ai::message_analysis::MessageAnalysis;
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use crate::ports::inbound::ai::analyze_message::ContextMessageEntry;
 pub struct AutomodGrpc {
     pub uc: Arc<dyn AnalyzeMessageUseCase>,
 }

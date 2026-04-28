@@ -4,7 +4,7 @@
 
 use sqlx::PgPool;
 use sentinel_api::adapters::outbound::postgres::PgWalletRepository;
-use sentinel_api::ports::outbound::WalletRepository;
+use sentinel_api::ports::outbound::casino::wallet_repository::WalletRepository;
 
 async fn setup_pool() -> PgPool {
     let url = std::env::var("DATABASE_URL")

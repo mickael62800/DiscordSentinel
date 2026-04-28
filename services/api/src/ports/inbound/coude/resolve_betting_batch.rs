@@ -18,7 +18,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::TauntEvent;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 
 /// Sortie retournee pour chaque combat resolu.

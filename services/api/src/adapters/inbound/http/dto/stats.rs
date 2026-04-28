@@ -1,8 +1,11 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{GuildStatsOverview, GuildVoiceStats, UserStats, VoiceSessionStats};
-use crate::ports::inbound::manage_stats::{RecordMessagesCommand, RecordVoiceCommand};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::entities::audit::user_stats::VoiceSessionStats;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]

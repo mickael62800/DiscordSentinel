@@ -1,7 +1,8 @@
 use async_trait::async_trait;
-use sqlx::{Postgres, Transaction};
-
-use crate::domain::entities::{WheelSpin, WheelTopWinner};
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::domain::entities::casino::wheel::WheelSpin;
+use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

@@ -4,7 +4,8 @@
 //! subit -20% sur tous ses gains pendant 48h, OU jusqu a ce qu elle
 //! batte UN des conspirateurs en combat direct.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 pub const COALITION_COST_PER_MEMBER: i64 = 500;

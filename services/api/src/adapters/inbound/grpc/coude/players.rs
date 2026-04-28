@@ -6,16 +6,18 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{CoudePlayer, XpProgress};
-use crate::domain::value_objects::CoudeClass;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::inbound::ManageCoudePlayersUseCase;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 
 pub struct CoudePlayerGrpc {
     pub players_uc: Arc<dyn ManageCoudePlayersUseCase>,

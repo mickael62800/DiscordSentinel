@@ -1,9 +1,9 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::VoiceChannelCoAdmin;
+use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::ManageCoAdminCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
 
 use super::ManageVoiceChannelsService;
 

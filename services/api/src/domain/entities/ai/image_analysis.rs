@@ -1,4 +1,4 @@
-use crate::domain::value_objects::Action;
+use crate::domain::enums::moderation::action::Action;
 
 /// Taille max (en octets bruts base64) d'une image acceptee par l'API IA.
 /// ~10 Mo d'image binaire ~= 13.3 Mo en base64.

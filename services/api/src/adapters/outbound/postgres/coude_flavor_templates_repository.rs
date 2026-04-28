@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeFlavorTemplatesRepository;
+use crate::ports::outbound::coude::flavor_templates_repository::CoudeFlavorTemplatesRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_flavor_templates";

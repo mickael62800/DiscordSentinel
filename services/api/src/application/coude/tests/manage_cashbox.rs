@@ -1,17 +1,20 @@
 use super::*;
 use async_trait::async_trait;
 use chrono::Utc;
-use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox, Wallet,
-    WalletTransaction,
-};
+use crate::domain::entities::coude::cashbox::CashboxRedistribution;
+use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
+use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_cashbox::ManageCoudeCashboxUseCase;
-use crate::ports::outbound::{CoudeCashboxRepository, WalletRepository};
-
+use crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase;
+use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 #[derive(Default)]
 struct MockCashboxRepo {
     active: StdMutex<Vec<(String, String)>>,

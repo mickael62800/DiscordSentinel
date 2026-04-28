@@ -4,10 +4,11 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::UserNote;
+use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{AddNoteCommand, ManageNotesUseCase};
-use crate::ports::outbound::NotesRepository;
+use crate::ports::inbound::moderation::manage_notes::AddNoteCommand;
+use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
+use crate::ports::outbound::moderation::notes_repository::NotesRepository;
 
 pub struct ManageNotesService {
     repo: Arc<dyn NotesRepository>,

@@ -10,8 +10,8 @@
 
 use std::collections::HashMap;
 
-use crate::domain::entities::CoudeBalanceParams;
-use crate::ports::outbound::BotConfigRepository;
+use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 const BOT_NAME: &str = "coude-bot";
 

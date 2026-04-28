@@ -1,15 +1,17 @@
 //! Impl Postgres de `CoudeCoalitionRepository`.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    ActiveCoalition, CoalitionMember, CoalitionStatus, COALITION_MIN_MEMBERS,
-};
+use crate::domain::entities::coude::coalition::ActiveCoalition;
+use crate::domain::entities::coude::coalition::CoalitionMember;
+use crate::domain::entities::coude::coalition::CoalitionStatus;
+use crate::domain::entities::coude::coalition::COALITION_MIN_MEMBERS;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeCoalitionRepository;
+use crate::ports::outbound::coude::coalition_repository::CoudeCoalitionRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_coalitions";

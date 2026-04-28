@@ -12,13 +12,13 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::batching::batch_writer::BatchWriterConfig;
-use sentinel_api::adapters::outbound::batching::{
-    BatchedPgAuditLogRepository, BatchedPgLogRepository,
-};
-use sentinel_api::domain::entities::{AuditLog, LogEntry};
-use sentinel_api::ports::inbound::manage_audit_logs::AuditLogFilters;
-use sentinel_api::ports::outbound::{AuditLogRepository, LogRepository};
-
+use sentinel_api::adapters::outbound::batching::BatchedPgAuditLogRepository;
+use sentinel_api::adapters::outbound::batching::BatchedPgLogRepository;
+use sentinel_api::domain::entities::audit::audit_log::AuditLog;
+use sentinel_api::domain::entities::system::log_entry::LogEntry;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_api::ports::outbound::audit::audit_log_repository::AuditLogRepository;
+use sentinel_api::ports::outbound::system::log_repository::LogRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

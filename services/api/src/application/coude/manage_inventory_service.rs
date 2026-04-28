@@ -3,14 +3,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::CoudeGuildSettings;
-use crate::domain::entities::{
-    CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
-};
+use crate::application::coude::guild_settings::CoudeGuildSettings;
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::outbound::{BotConfigRepository, CoudeInventoryRepository};
-
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::inventory_repository::CoudeInventoryRepository;
 pub struct ManageCoudeInventoryService {
     repo: Arc<dyn CoudeInventoryRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,

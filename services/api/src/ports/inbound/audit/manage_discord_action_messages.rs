@@ -6,7 +6,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{DiscordActionMessage, NewDiscordActionMessage};
+use crate::domain::entities::audit::discord_action_message::DiscordActionMessage;
+use crate::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

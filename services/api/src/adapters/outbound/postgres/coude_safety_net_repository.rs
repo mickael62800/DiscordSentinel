@@ -1,13 +1,14 @@
 //! Impl Postgres de `CoudeSafetyNetRepository` (cf. COUPE_AMELIORATIONS 4.4).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::ActiveSafetyNet;
+use crate::domain::entities::coude::safety_net::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeSafetyNetRepository;
+use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_safety_nets";

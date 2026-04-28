@@ -1,6 +1,9 @@
 use super::*;
-use crate::domain::entities::{CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime};
-use crate::ports::inbound::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use chrono::Utc as ChronoUtc;
 use std::sync::Mutex as StdMutex;
 use uuid::Uuid;

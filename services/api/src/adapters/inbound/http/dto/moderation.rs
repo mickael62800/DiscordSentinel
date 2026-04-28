@@ -1,7 +1,8 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{ModerationAction, UserModerationHistory};
-use crate::ports::inbound::LogModerationCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
+use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct LogActionDto {

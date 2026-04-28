@@ -5,8 +5,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgLevelRepository;
-use sentinel_api::domain::entities::{LevelConfig, LevelReward, UserLevel, XpSource};
-use sentinel_api::ports::outbound::LevelRepository;
+use sentinel_api::domain::entities::community::level::LevelConfig;
+use sentinel_api::domain::entities::community::level::LevelReward;
+use sentinel_api::domain::entities::community::level::UserLevel;
+use sentinel_api::domain::entities::community::level::XpSource;
+use sentinel_api::ports::outbound::community::level_repository::LevelRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

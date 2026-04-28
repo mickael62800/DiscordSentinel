@@ -1,13 +1,14 @@
 //! Impl Postgres de `CoudeStealBoostRepository` (Phase 9 Part C).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::CoudeStealBoost;
+use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeStealBoostRepository;
+use crate::ports::outbound::coude::steal_boost_repository::CoudeStealBoostRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "steal_boost";

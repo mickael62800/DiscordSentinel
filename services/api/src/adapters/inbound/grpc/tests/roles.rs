@@ -113,14 +113,16 @@ use super::*;
     // ── RPC tests avec mocks ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
-    use crate::domain::entities::{DiscordRole, RolePanelDetail};
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use crate::domain::entities::system::discord_role::DiscordRole;
+    use crate::domain::entities::community::role_panel::RolePanelDetail;
     use crate::domain::errors::DomainError;
-    use crate::ports::inbound::manage_role_panels::{
-        CreateAutoRoleCommand, CreateRolePanelCommand, ManageRolePanelsUseCase,
-        SetMessageIdCommand,
-    };
-    use crate::ports::outbound::DiscordRoleRepository;
+    use crate::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+    use crate::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+    use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+    use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+    use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 
     #[derive(Default)]
     struct MockPanelsUc {

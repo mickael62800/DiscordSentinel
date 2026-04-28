@@ -8,18 +8,21 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use chrono::{TimeZone, Utc};
+use axum::http::Request;
+use axum::http::StatusCode;
+use chrono::TimeZone;
+use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{
-    CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
-};
+use sentinel_api::domain::entities::coude::inventory::CoudeInsurance;
+use sentinel_api::domain::entities::coude::inventory::CoudeInventoryItem;
+use sentinel_api::domain::entities::coude::inventory::CoudePrime;
+use sentinel_api::domain::entities::coude::inventory::NewCoudePrime;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::ManageCoudeInventoryUseCase;
+use sentinel_api::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 
 #[derive(Default)]
 struct MockInventory {

@@ -1,10 +1,12 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-
-use crate::domain::entities::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, DailyChaosOutcome,
-    LeaderboardCategory, NewDailyChaos,
-};
+use chrono::DateTime;
+use chrono::Utc;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::DailyChaosOutcome;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::errors::DomainError;
 
 /// Use case "fonctionnalités sociales Coup de Coude".

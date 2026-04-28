@@ -1,13 +1,19 @@
-use axum::extract::{Path, Query, State};
-use axum::{Extension, Json};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::dto::watched_users::{
-    UserDossierResponseDto, WatchedUserResponseDto,
-};
+use crate::adapters::inbound::http::dto::watched_users::UserDossierResponseDto;
+use crate::adapters::inbound::http::dto::watched_users::WatchedUserResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::helpers::map_to_dtos;
+use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 
 #[derive(Debug, Deserialize)]

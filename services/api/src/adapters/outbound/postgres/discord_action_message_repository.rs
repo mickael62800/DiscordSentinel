@@ -1,14 +1,16 @@
 //! Adapter Postgres du `DiscordActionMessageRepository` (migration 175).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::domain::entities::{DiscordActionMessage, NewDiscordActionMessage};
+use crate::domain::entities::audit::discord_action_message::DiscordActionMessage;
+use crate::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::DiscordActionMessageRepository;
+use crate::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository;
 
 pub struct PgDiscordActionMessageRepository {
     pool: PgPool,

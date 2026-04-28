@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::ActiveVendetta;
+use crate::domain::entities::coude::vendetta::ActiveVendetta;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

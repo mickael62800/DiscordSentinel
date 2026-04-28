@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::GuildMember;
+use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

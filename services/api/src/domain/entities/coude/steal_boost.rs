@@ -4,10 +4,11 @@
 //! ajoute un bonus plat au roll du voleur. Les bonus s'additionnent quand
 //! plusieurs items sont actifs en parallele.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::StealProtectionDuration;
+use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
 
 #[derive(Debug, Clone)]
 pub struct CoudeStealBoost {

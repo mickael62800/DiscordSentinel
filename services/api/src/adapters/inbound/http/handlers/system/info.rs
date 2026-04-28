@@ -21,8 +21,9 @@ use axum::extract::State;
 use axum::Json;
 use redis::AsyncCommands;
 use serde::Serialize;
-use sysinfo::{ProcessRefreshKind, RefreshKind, System};
-
+use sysinfo::ProcessRefreshKind;
+use sysinfo::RefreshKind;
+use sysinfo::System;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 

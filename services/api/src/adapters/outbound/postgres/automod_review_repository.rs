@@ -1,12 +1,14 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::pg_err_ctx;
-use crate::domain::entities::{AutomodReview, NewAutomodReview};
+use crate::domain::entities::moderation::automod_review::AutomodReview;
+use crate::domain::entities::moderation::automod_review::NewAutomodReview;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::AutomodReviewRepository;
+use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 
 const TBL: &str = "automod_reviews";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }

@@ -1,13 +1,16 @@
 //! Impl Postgres de `CoudeToutOuRienRepository` (cf. COUPE_AMELIORATIONS 6.1).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogEntry;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeToutOuRienRepository;
+use crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_tout_ou_rien_log";

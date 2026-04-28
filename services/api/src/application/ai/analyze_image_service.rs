@@ -4,14 +4,23 @@ use async_trait::async_trait;
 use tracing::info;
 use uuid::Uuid;
 
-use crate::domain::entities::{ImageAnalysis, ImageClassification, Infraction};
+use crate::domain::entities::ai::image_analysis::ImageAnalysis;
+use crate::domain::entities::ai::image_analysis::ImageClassification;
+use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::errors::DomainError;
 use crate::adapters::outbound::InferenceService;
-use crate::domain::services::InferenceRateLimiter;
-use crate::domain::value_objects::{Action, DetectionFlags, FlagType};
-use crate::ports::inbound::{AnalyzeImageCommand, AnalyzeImageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::ports::outbound::{BotConfigRepository, CachePort, InfractionRepository, RuleRepository};
-
+use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
+use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::ports::outbound::moderation::rule_repository::RuleRepository;
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
 const DEFAULT_VISION_THRESHOLD: f32 = 0.5;
 
@@ -53,7 +62,7 @@ impl AnalyzeImageService {
 /// Parse les cles vision (`vision_enabled`, `vision_threshold`) depuis la
 /// config automod-bot. Defaut : enabled=true, threshold=0.5.
 fn parse_vision_config(
-    entries: &[crate::domain::entities::BotGuildConfig],
+    entries: &[crate::domain::entities::system::bot_config::BotGuildConfig],
 ) -> (bool, f32) {
     let mut enabled = true;
     let mut threshold = DEFAULT_VISION_THRESHOLD;
@@ -184,7 +193,7 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
 
         // Seuils depuis les rules (configurables per-guild), pas hardcodes.
         let (t_warn, t_delete, t_mute, t_ban) =
-            crate::domain::services::resolve_thresholds(&rules);
+            crate::domain::services::moderation::scoring_service::resolve_thresholds(&rules);
         let (action, duration) = if total_score >= t_ban {
             (Action::Ban, None)
         } else if total_score >= t_mute {

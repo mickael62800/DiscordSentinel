@@ -2,18 +2,26 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{
-    VoiceChannel, VoiceChannelConfig, VoiceChannelDetail, VoiceChannelInviteLink,
-    VoiceChannelTheme, VoiceChannelWhitelistEntry,
-};
+use crate::domain::entities::community::voice_channel::VoiceChannel;
+use crate::domain::entities::community::voice_channel::VoiceChannelConfig;
+use crate::domain::entities::community::voice_channel::VoiceChannelDetail;
+use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
+use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
-    ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
-    TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
-};
-use crate::ports::outbound::{BotConfigRepository, CachePort, VoiceChannelRepository};
-
+use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 mod access_control;
 mod co_admin;
 mod config;

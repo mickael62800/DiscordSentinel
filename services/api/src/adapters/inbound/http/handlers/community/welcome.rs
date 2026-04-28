@@ -1,11 +1,12 @@
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::WelcomeConfigPatch;
-use crate::ports::outbound::WelcomeConfigData;
+use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
+use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 
 #[derive(Debug, Serialize)]
 pub struct WelcomeConfigDto {

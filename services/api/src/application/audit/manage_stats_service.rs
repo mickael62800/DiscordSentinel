@@ -4,12 +4,19 @@ use async_trait::async_trait;
 
 use tracing::warn;
 
-use crate::domain::entities::{DashboardStats, GuildStatsOverview, GuildVoiceStats, UserStats};
+use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+use crate::domain::entities::audit::user_stats::UserStats;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_stats::{ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand};
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use crate::adapters::outbound::cache_helpers::cached_json;
-use crate::ports::outbound::{CachePort, InfractionRepository, StatsRepository};
-use crate::ports::inbound::InfractionFilters;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::ports::outbound::audit::stats_repository::StatsRepository;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 
 const OVERVIEW_TTL: u64 = 60; // 1 minute
 
@@ -54,7 +61,7 @@ impl ManageStatsService {
         let mut workers_total = 0u32;
 
         for name in &known {
-            let is_worker = crate::domain::entities::is_worker_service(name);
+            let is_worker = crate::domain::entities::system::config_parsers::is_worker_service(name);
             let exists: bool = match conn.exists(format!("bot:online:{}", name)).await {
                 Ok(v) => v,
                 Err(e) => {

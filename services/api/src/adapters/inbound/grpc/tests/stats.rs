@@ -66,12 +66,14 @@ use super::*;
     // ── RPC handler tests avec mock ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
+    use std::sync::Mutex;
     use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-    use crate::domain::entities::{DashboardStats, GuildVoiceStats};
-    use crate::ports::inbound::manage_stats::{
-        ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand,
-    };
+    use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+    use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+    use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+    use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+    use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
     use crate::domain::errors::DomainError;
     use chrono::Utc;
 

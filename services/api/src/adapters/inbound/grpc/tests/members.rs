@@ -104,13 +104,14 @@ use super::*;
     // ── RPC tests avec mock ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
-    use crate::domain::entities::MemberSummary;
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use crate::domain::entities::community::guild_member::MemberSummary;
     use crate::domain::errors::DomainError;
-    use crate::ports::inbound::manage_members::{
-        ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
-    };
-
+    use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
+    use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
+    use crate::ports::inbound::community::manage_members::SyncMembersCommand;
+    use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
     #[derive(Default)]
     struct MockMembersUc {
         member: Mutex<Option<GuildMember>>,

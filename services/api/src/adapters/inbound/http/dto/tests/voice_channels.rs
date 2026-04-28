@@ -16,7 +16,7 @@ use super::*;
             queue_channel_id: None,
             category_id: Some("cat1".into()),
             channel_name: "Salon de Owner".into(),
-            kind: crate::domain::value_objects::VoiceChannelKind::Private,
+            kind: crate::domain::enums::community::voice_channel_kind::VoiceChannelKind::Private,
             visibility: "visible".into(),
             queue_enabled: false,
             locked: false,

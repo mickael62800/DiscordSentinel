@@ -2,7 +2,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::ports::outbound::{PendingAction, PendingActionRepository};
+use crate::ports::outbound::moderation::pending_action_repository::PendingAction;
+use crate::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
 use super::pg_err;
 
 pub struct PgPendingActionRepository { pool: PgPool }

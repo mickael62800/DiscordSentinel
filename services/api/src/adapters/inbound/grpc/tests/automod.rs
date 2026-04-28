@@ -59,8 +59,10 @@ use super::*;
     // ── RPC handler tests avec mock AnalyzeMessageUseCase ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
-    use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase};
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+    use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
     use crate::domain::errors::DomainError;
 
     #[derive(Default)]

@@ -1,12 +1,14 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 use tracing::info;
 
-use crate::domain::entities::{Wallet, WalletTransaction};
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::WalletRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 
 pub struct PgWalletRepository {
     pool: PgPool,

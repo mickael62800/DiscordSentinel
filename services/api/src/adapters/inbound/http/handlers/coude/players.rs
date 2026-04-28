@@ -1,18 +1,30 @@
 //! Handlers joueurs : CRUD, progression (XP/level/stats), stats de combat,
 //! coins et HP. Tous délèguent à `state.coude_players_uc`.
 
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 
-use super::dto::{
-    AddXpDto, AddXpResponse, AdjustCoinsDto, AmountDto, FullPlayerDto, GetOrCreatePlayerDto,
-    PlayerDto, RandomPlayersQuery, RecordDrawDto, RecordLossDto, RecordWinDto, ResetStatsDto,
-    SpendStatDto, UpdateClassDto, UpdateHpDto,
-};
+use super::dto::AddXpDto;
+use super::dto::AddXpResponse;
+use super::dto::AdjustCoinsDto;
+use super::dto::AmountDto;
+use super::dto::FullPlayerDto;
+use super::dto::GetOrCreatePlayerDto;
+use super::dto::PlayerDto;
+use super::dto::RandomPlayersQuery;
+use super::dto::RecordDrawDto;
+use super::dto::RecordLossDto;
+use super::dto::RecordWinDto;
+use super::dto::ResetStatsDto;
+use super::dto::SpendStatDto;
+use super::dto::UpdateClassDto;
+use super::dto::UpdateHpDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::CombatStat;
+use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::errors::DomainError;
 
 // ── Listing & utilitaires ──
@@ -40,7 +52,7 @@ pub async fn get_random_players(
     Path(guild_id): Path<String>,
     Query(params): Query<RandomPlayersQuery>,
 ) -> Result<Json<Vec<FullPlayerDto>>, ApiError> {
-    let count = params.count.unwrap_or(crate::domain::entities::DEFAULT_COUDE_OPPONENT_COUNT);
+    let count = params.count.unwrap_or(crate::domain::entities::coude::limits::DEFAULT_COUDE_OPPONENT_COUNT);
     let players = state
         .coude_players_uc
         .random_active(&guild_id, count)
@@ -276,7 +288,7 @@ pub async fn record_coins_lost(
     // Clamp au solde reel pour preserver le comportement legacy.
     // Regle metier : `domain/entities/wallet.rs::clamp_debit_to_balance`.
     let balance = state.wallet_uc.get_balance(&guild_id, &user_id).await?;
-    let actual = crate::domain::entities::clamp_debit_to_balance(dto.amount, balance);
+    let actual = crate::domain::entities::casino::wallet::clamp_debit_to_balance(dto.amount, balance);
     if actual > 0 {
         state
             .wallet_uc

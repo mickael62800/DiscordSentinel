@@ -3,29 +3,37 @@
 //! wallet_uc.transfer sont testes via l'integration wallet et ne sont pas
 //! duplique ici.
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ManageCoudeSocialService;
-use crate::domain::entities::{
-    CombatStat, CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, CoudePlayer,
-    LeaderboardCategory, NewDailyChaos, TauntEvent, XpProgress,
-};
+use crate::application::coude::manage_social_service::ManageCoudeSocialService;
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::CoudeClass;
-use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
-use crate::ports::inbound::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
-use crate::ports::outbound::{
-    BotConfigRepository, CoudeEconomyRepository, CoudePlayerRepository, CoudeSocialRepository,
-};
-use crate::domain::entities::{BotDefinition, BotGuildConfig};
-use sqlx::{Postgres, Transaction};
-
+use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use sqlx::Postgres;
+use sqlx::Transaction;
 // ── Mock CoudeSocialRepository ──
 
 #[derive(Default)]

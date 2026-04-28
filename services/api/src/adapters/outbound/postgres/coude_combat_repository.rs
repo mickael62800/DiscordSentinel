@@ -1,14 +1,18 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat, COUDE_PURGE_TABLES};
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
+use crate::domain::entities::coude::purge::COUDE_PURGE_TABLES;
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
-use crate::ports::outbound::{CombatQueryRepository, CoudeCombatRepository};
-
+use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
 pub struct PgCoudeCombatRepository {
     pool: PgPool,
 }

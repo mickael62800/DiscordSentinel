@@ -9,19 +9,21 @@ use uuid::Uuid;
 
 use tracing::warn;
 
-use crate::domain::entities::SecurityEvent;
+use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::errors::DomainError;
-use crate::domain::services::security_analyzer;
-use crate::ports::inbound::{
-    AnalyzeNewMemberCommand, CreateAuditLogCommand, ManageAuditLogsUseCase,
-    ManageSecurityUseCase, ReportSecurityEventCommand, SecurityDecision,
-};
+use crate::domain::services::audit::security_analyzer;
+use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use crate::ports::inbound::audit::manage_security::SecurityDecision;
 use crate::adapters::outbound::cache_helpers::cached_json;
-use crate::ports::outbound::{
-    BotConfigRepository, CachePort, ModerationRepository, SecurityEventRepository,
-    WatchedUserRepository,
-};
-
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
+use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 const EVENTS_TTL: u64 = 60; // 1 minute
 
 pub struct ManageSecurityService {

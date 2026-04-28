@@ -1,22 +1,23 @@
 use super::*;
 use async_trait::async_trait;
 use chrono::Utc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat, TauntEvent};
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
-use crate::ports::inbound::resolve_betting_batch::{
-    ResolveBettingBatchUseCase, ResolvedBettingCombatOutput,
-};
-use crate::ports::inbound::expire_combats_batch::{
-    ExpireCombatsBatchUseCase, ExpiredCombatOutput,
-};
-use crate::ports::inbound::resolve_combat_now::{
-    ResolveCombatNowOutput, ResolveCombatNowUseCase, ResolvedCombatEmbedField,
-};
-
+use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase;
+use crate::ports::inbound::coude::resolve_betting_batch::ResolvedBettingCombatOutput;
+use crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase;
+use crate::ports::inbound::coude::expire_combats_batch::ExpiredCombatOutput;
+use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowOutput;
+use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase;
+use crate::ports::inbound::coude::resolve_combat_now::ResolvedCombatEmbedField;
 fn sample_combat() -> CoudeCombat {
     CoudeCombat {
         id: Uuid::new_v4(),

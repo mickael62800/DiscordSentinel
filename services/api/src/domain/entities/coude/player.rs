@@ -1,6 +1,6 @@
-use chrono::{DateTime, Utc};
-
-use crate::domain::value_objects::CoudeClass;
+use chrono::DateTime;
+use chrono::Utc;
+use crate::domain::enums::coude::coude_class::CoudeClass;
 
 /// Niveau maximum atteignable par un joueur.
 pub const COUDE_MAX_LEVEL: i32 = 25;

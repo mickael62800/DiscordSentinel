@@ -2,7 +2,10 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{TauntEvent, WheelCase, WheelSpin, WheelTopWinner};
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wheel::WheelCase;
+use crate::domain::entities::casino::wheel::WheelSpin;
+use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]

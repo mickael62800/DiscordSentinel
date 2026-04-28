@@ -8,16 +8,18 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{Wallet, WalletTransaction};
+use sentinel_api::domain::entities::casino::wallet::Wallet;
+use sentinel_api::domain::entities::casino::wallet::WalletTransaction;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::outbound::WalletRepository;
+use sentinel_api::ports::outbound::casino::wallet_repository::WalletRepository;
 
 use test_helpers::build_test_state_wallet;
 

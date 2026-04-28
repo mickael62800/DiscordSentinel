@@ -1,12 +1,13 @@
 //! Handler HTTP pour le duel amical (cf. COUPE_AMELIORATIONS 4.5).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::FriendlyDuelInput;
+use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelInput;
 
 #[derive(Debug, Deserialize)]
 pub struct FriendlyDuelRequest {

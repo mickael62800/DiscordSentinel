@@ -1,15 +1,17 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ManageInfractionsService;
-use crate::domain::entities::Infraction;
+use crate::application::moderation::manage_infractions_service::ManageInfractionsService;
+use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::{Action, DetectionFlags};
-use crate::ports::inbound::{InfractionFilters, ManageInfractionsUseCase};
-use crate::ports::outbound::InfractionRepository;
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 
 fn sample(id: &str) -> Infraction {
     Infraction {

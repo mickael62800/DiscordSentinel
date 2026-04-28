@@ -8,16 +8,20 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use chrono::{TimeZone, Utc};
+use axum::http::Request;
+use axum::http::StatusCode;
+use chrono::TimeZone;
+use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
+use sentinel_api::domain::entities::coude::combat::CombatResolution;
+use sentinel_api::domain::entities::coude::combat::CoudeCombat;
+use sentinel_api::domain::entities::coude::combat::NewCoudeCombat;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::ManageCoudeCombatsUseCase;
+use sentinel_api::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 
 fn sample_combat(id: Uuid, guild: &str, status: &str) -> CoudeCombat {
     CoudeCombat {

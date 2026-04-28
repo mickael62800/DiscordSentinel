@@ -1,13 +1,15 @@
 //! Impl Postgres de `CoudeCursesRepository` (cf. COUPE_AMELIORATIONS 5.1).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{ActiveCurse, CurseKind};
+use crate::domain::entities::coude::curse::ActiveCurse;
+use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeCursesRepository;
+use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_curses";

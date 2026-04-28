@@ -1,7 +1,9 @@
 use super::*;
-use crate::domain::entities::{CombatStat, CoudePlayer, XpProgress};
-use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::outbound::CoudePlayerRepository;
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 

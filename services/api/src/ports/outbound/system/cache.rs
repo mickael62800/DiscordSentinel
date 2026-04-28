@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::Rule;
+use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

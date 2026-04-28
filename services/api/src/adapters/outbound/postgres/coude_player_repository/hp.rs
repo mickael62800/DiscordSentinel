@@ -2,8 +2,8 @@
 
 use crate::domain::errors::DomainError;
 
-use super::{pg_err, PgCoudePlayerRepository};
-
+use super::pg_err;
+use super::PgCoudePlayerRepository;
 pub(super) async fn update_hp(
     repo: &PgCoudePlayerRepository,
     guild_id: &str,

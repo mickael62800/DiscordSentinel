@@ -1,12 +1,13 @@
 //! Impl Postgres de `CoudeRefusalCountRepository`.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 
-use crate::domain::entities::RefusalCount;
+use crate::domain::entities::coude::refusal_count::RefusalCount;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeRefusalCountRepository;
+use crate::ports::outbound::coude::refusal_count_repository::CoudeRefusalCountRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_refusal_counts";

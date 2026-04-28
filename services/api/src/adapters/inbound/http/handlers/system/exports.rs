@@ -8,15 +8,20 @@
 //! dumper toute la moderation d'un guild. Le GET est ouvert a tout role
 //! (on assume que si quelqu'un a le job_id, il l'a demande lui-meme).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, Json};
-use serde::{Deserialize, Serialize};
+use axum::Extension;
+use axum::Json;
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
@@ -68,13 +73,13 @@ pub async fn create_export_job(
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
     validation::validate_discord_id("requested_by", &dto.requested_by).map_err(ApiError)?;
 
-    if !crate::domain::entities::is_valid_export_job_type(&dto.job_type) {
+    if !crate::domain::entities::system::job_whitelists::is_valid_export_job_type(&dto.job_type) {
         return Err(ApiError(DomainError::ValidationError(format!(
             "job_type invalide : '{}'",
             dto.job_type
         ))));
     }
-    if !crate::domain::entities::is_valid_export_format(&dto.format) {
+    if !crate::domain::entities::system::job_whitelists::is_valid_export_format(&dto.format) {
         return Err(ApiError(DomainError::ValidationError(format!(
             "format invalide : '{}' (attendu csv|json)",
             dto.format

@@ -1,14 +1,25 @@
 use super::*;
 
-    use chrono::{TimeZone, Utc};
+    use chrono::TimeZone;
+    use chrono::Utc;
     use uuid::Uuid;
 
-    use crate::domain::entities::{
-        BetPayout, BetResolutionPlan, CoudeBet, CoudeCombat, CoudeCurrentSeason, CoudeEvent,
-        CoudeFighterBetBonus, CoudeInsurance, CoudeInventoryItem, CoudeLeaderboardEntry,
-        CoudePlayer, CoudePrime, LeaderboardCategory, RefundSummary, XpProgress,
-    };
-    use crate::domain::value_objects::CoudeClass;
+    use crate::domain::entities::coude::bet::BetPayout;
+    use crate::domain::entities::coude::bet::BetResolutionPlan;
+    use crate::domain::entities::coude::bet::CoudeBet;
+    use crate::domain::entities::coude::combat::CoudeCombat;
+    use crate::domain::entities::coude::social::CoudeCurrentSeason;
+    use crate::domain::entities::coude::social::CoudeEvent;
+    use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
+    use crate::domain::entities::coude::inventory::CoudeInsurance;
+    use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+    use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+    use crate::domain::entities::coude::player::CoudePlayer;
+    use crate::domain::entities::coude::inventory::CoudePrime;
+    use crate::domain::entities::coude::social::LeaderboardCategory;
+    use crate::domain::entities::coude::bet::RefundSummary;
+    use crate::domain::entities::coude::player::XpProgress;
+    use crate::domain::enums::coude::coude_class::CoudeClass;
 
     fn ts() -> chrono::DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 1, 15, 12, 30, 0).unwrap()
@@ -336,7 +347,7 @@ use super::*;
 
     #[test]
     fn taunt_event_to_proto_mapping() {
-        use crate::domain::entities::TauntEvent;
+        use crate::domain::entities::coude::taunt::TauntEvent;
         let t = TauntEvent {
             channel_id: "chan-42".into(),
             target_user_id: "u1".into(),
@@ -356,7 +367,7 @@ use super::*;
 
     #[test]
     fn taunt_event_to_proto_empty_suffix() {
-        use crate::domain::entities::TauntEvent;
+        use crate::domain::entities::coude::taunt::TauntEvent;
         let t = TauntEvent {
             channel_id: "c".into(),
             target_user_id: "u".into(),
@@ -386,7 +397,7 @@ use super::*;
 
     #[test]
     fn redistribution_to_proto_mapping_with_winners() {
-        use crate::ports::inbound::RedistributionOutcome;
+        use crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome;
         let rid = Uuid::new_v4();
         let outcome = RedistributionOutcome {
             redistribution_id: rid,
@@ -410,7 +421,7 @@ use super::*;
 
     #[test]
     fn redistribution_to_proto_empty_winners() {
-        use crate::ports::inbound::RedistributionOutcome;
+        use crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome;
         let outcome = RedistributionOutcome {
             redistribution_id: Uuid::nil(),
             total_amount: 0,
@@ -424,7 +435,7 @@ use super::*;
 
     #[test]
     fn proto_source_to_domain_all_variants() {
-        use crate::domain::entities::CashboxSource;
+        use crate::domain::entities::coude::cashbox::CashboxSource;
         assert_eq!(
             social::proto_source_to_domain(proto::CashboxDepositSource::CashboxSourceShopPurchase as i32),
             Some(CashboxSource::ShopPurchase)
@@ -467,7 +478,7 @@ use super::*;
 
     #[test]
     fn steal_boost_to_proto_mapping() {
-        use crate::domain::entities::CoudeStealBoost;
+        use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
         let id = Uuid::new_v4();
         let b = CoudeStealBoost {
             id,
@@ -486,7 +497,7 @@ use super::*;
 
     #[test]
     fn steal_protection_to_proto_mapping() {
-        use crate::domain::entities::CoudeStealProtection;
+        use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
         let id = Uuid::new_v4();
         let p = CoudeStealProtection {
             id,
@@ -504,7 +515,7 @@ use super::*;
 
     #[test]
     fn proto_steal_duration_to_domain_all_variants() {
-        use crate::domain::entities::StealProtectionDuration as D;
+        use crate::domain::entities::coude::steal_protection::StealProtectionDuration as D;
         assert_eq!(
             inventory::proto_steal_duration_to_domain(proto::StealProtectionDurationKind::StealProtectionDurationOneDay as i32),
             Some(D::OneDay)

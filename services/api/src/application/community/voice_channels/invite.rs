@@ -1,10 +1,11 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::{VoiceChannelInviteLink, VoiceChannelWhitelistEntry};
+use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{CreateInviteLinkCommand, UseInviteLinkCommand};
-
+use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use super::ManageVoiceChannelsService;
 
 impl ManageVoiceChannelsService {

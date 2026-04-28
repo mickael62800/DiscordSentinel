@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{UserStats, VoiceSessionStats};
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

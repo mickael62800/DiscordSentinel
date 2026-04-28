@@ -9,7 +9,8 @@
 //! Logique pure ici. La persistance vit dans `coude_safety_nets` et est
 //! geree par le service `ManageCoudeSafetyNetService`.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 /// Seuil de declenchement (en coins). Si le wallet tombe sous ce

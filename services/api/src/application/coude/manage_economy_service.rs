@@ -2,19 +2,20 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{
-    clamp_steal_amount, clamp_steal_fail_penalty, CurseKind, TauntEvent, LEAKY_WALLET_FEE_COINS,
-};
+use crate::domain::entities::coude::economy::clamp_steal_amount;
+use crate::domain::entities::coude::economy::clamp_steal_fail_penalty;
+use crate::domain::entities::coude::curse::CurseKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::curse::LEAKY_WALLET_FEE_COINS;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_economy::{
-    ManageCoudeEconomyUseCase, StealOutcome,
-};
-use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::{
-    CoudeCursesRepository, CoudeEconomyRepository, CoudePlayerRepository, WalletRepository,
-};
-
+use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::coude::manage_economy::StealOutcome;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Service "economie Coup de Coude".
 ///
 /// # Migration wallet unifie (PoC `/donner`)
@@ -93,7 +94,7 @@ impl ManageCoudeEconomyService {
     async fn season_steal_bonus(&self, guild_id: &str, thief_id: &str, stolen: i64) -> i64 {
         let Some(repo) = &self.player_repo else { return 0; };
         let Ok(Some(player)) = repo.get(guild_id, thief_id).await else { return 0; };
-        crate::domain::entities::compute_season_steal_bonus(player.season, stolen)
+        crate::domain::entities::coude::season_theme::compute_season_steal_bonus(player.season, stolen)
     }
 }
 

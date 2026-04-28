@@ -1,9 +1,10 @@
 //! Port outbound pour le systeme de braquage (Phase 10).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-
-use crate::domain::entities::{CoudeHeistAttempt, CoudePrisonState};
+use chrono::DateTime;
+use chrono::Utc;
+use crate::domain::entities::coude::heist::CoudeHeistAttempt;
+use crate::domain::entities::coude::heist::CoudePrisonState;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

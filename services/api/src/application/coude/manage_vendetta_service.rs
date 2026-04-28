@@ -5,10 +5,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{ActiveVendetta, VENDETTA_WINDOW_HOURS};
+use crate::domain::entities::coude::vendetta::ActiveVendetta;
+use crate::domain::entities::coude::vendetta::VENDETTA_WINDOW_HOURS;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_vendetta::ManageCoudeVendettaUseCase;
-use crate::ports::outbound::CoudeVendettaRepository;
+use crate::ports::inbound::coude::manage_vendetta::ManageCoudeVendettaUseCase;
+use crate::ports::outbound::coude::vendetta_repository::CoudeVendettaRepository;
 
 pub struct ManageCoudeVendettaService {
     repo: Arc<dyn CoudeVendettaRepository>,

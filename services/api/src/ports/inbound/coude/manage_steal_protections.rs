@@ -6,9 +6,10 @@
 //! dans l'ordre decroissant de block_chance sur une tentative de vol.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-
-use crate::domain::entities::{CoudeStealProtection, StealProtectionDuration};
+use chrono::DateTime;
+use chrono::Utc;
+use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
 use crate::domain::errors::DomainError;
 
 /// Resultat d'une tentative de blocage d'un vol : indique quel item

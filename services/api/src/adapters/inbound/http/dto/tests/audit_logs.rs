@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::entities::AuditLog;
+use crate::domain::entities::audit::audit_log::AuditLog;
 use chrono::Utc;
 use uuid::Uuid;
 

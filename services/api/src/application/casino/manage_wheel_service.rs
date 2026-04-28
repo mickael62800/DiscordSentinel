@@ -16,17 +16,19 @@ use chrono::Utc;
 use rand::SeedableRng;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    is_memorable_case, wheel_spin_with_rng_curses, CurseKind, TauntEvent, WheelSpin,
-    WheelTopWinner,
-};
+use crate::domain::entities::casino::wheel::is_memorable_case;
+use crate::domain::entities::casino::wheel::spin_with_rng_curses as wheel_spin_with_rng_curses;
+use crate::domain::entities::coude::curse::CurseKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wheel::WheelSpin;
+use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::inbound::manage_wheel::{
-    ManageWheelUseCase, WheelSpinCommand, WheelSpinResult,
-};
-use crate::ports::outbound::{CoudeCursesRepository, WheelRepository};
-
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wheel::ManageWheelUseCase;
+use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
+use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
+use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::casino::wheel_repository::WheelRepository;
 pub struct ManageWheelService {
     repo: Arc<dyn WheelRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,

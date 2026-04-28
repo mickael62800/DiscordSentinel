@@ -2,7 +2,8 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{UltimateKind, UltimateState};
+use crate::domain::entities::coude::ultimate::UltimateKind;
+use crate::domain::entities::coude::ultimate::UltimateState;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

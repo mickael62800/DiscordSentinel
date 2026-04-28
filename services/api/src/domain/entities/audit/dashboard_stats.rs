@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DashboardStats {
     pub total_servers: u32,

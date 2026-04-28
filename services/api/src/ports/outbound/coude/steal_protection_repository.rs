@@ -1,9 +1,9 @@
 //! Port outbound pour les abonnements anti-vol (Phase 9 Part B).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-
-use crate::domain::entities::CoudeStealProtection;
+use chrono::DateTime;
+use chrono::Utc;
+use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

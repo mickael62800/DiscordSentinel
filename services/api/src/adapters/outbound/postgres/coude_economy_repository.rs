@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
-use crate::ports::outbound::CoudeEconomyRepository;
+use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
 
 
 pub struct PgCoudeEconomyRepository {

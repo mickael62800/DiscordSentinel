@@ -1,7 +1,13 @@
-use serde::{Deserialize, Serialize};
-use crate::domain::entities::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
-use crate::ports::inbound::manage_role_panels::{CreateAutoRoleCommand, CreateRolePanelCommand, CreateRolePanelEntryCommand, SetMessageIdCommand};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::community::role_panel::AutoRole;
+use crate::domain::entities::community::role_panel::RolePanel;
+use crate::domain::entities::community::role_panel::RolePanelDetail;
+use crate::domain::entities::community::role_panel::RolePanelEntry;
+use crate::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+use crate::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+use crate::ports::inbound::community::manage_role_panels::CreateRolePanelEntryCommand;
+use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 #[derive(Debug, Deserialize)]
 pub struct CreateRolePanelDto {
     pub guild_id: String,

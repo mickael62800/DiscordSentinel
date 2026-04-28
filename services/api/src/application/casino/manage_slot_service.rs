@@ -17,16 +17,26 @@ use chrono::Utc;
 use rand::SeedableRng;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    compute_jackpot_contribution, compute_payout, evaluate_spin, parse_csv_multipliers,
-    parse_csv_symbols, parse_csv_weights, slot_spin_with_rng, validate_slot_config,
-    SlotConfig, SlotSpin, SlotTopWinner, SpinOutcome, TauntEvent,
-};
+use crate::domain::entities::casino::slot::compute_jackpot_contribution;
+use crate::domain::entities::casino::slot::compute_payout;
+use crate::domain::entities::casino::slot::evaluate_spin;
+use crate::domain::entities::casino::slot::parse_csv_multipliers;
+use crate::domain::entities::casino::slot::parse_csv_symbols;
+use crate::domain::entities::casino::slot::parse_csv_weights;
+use crate::domain::entities::casino::slot::spin_with_rng as slot_spin_with_rng;
+use crate::domain::entities::casino::slot::validate_slot_config;
+use crate::domain::entities::casino::slot::SlotConfig;
+use crate::domain::entities::casino::slot::SlotSpin;
+use crate::domain::entities::casino::slot::SlotTopWinner;
+use crate::domain::entities::casino::slot::SpinOutcome;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_slot::{ManageSlotUseCase, SpinCommand, SpinResult};
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::{BotConfigRepository, SlotRepository};
-
+use crate::ports::inbound::casino::manage_slot::ManageSlotUseCase;
+use crate::ports::inbound::casino::manage_slot::SpinCommand;
+use crate::ports::inbound::casino::manage_slot::SpinResult;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::casino::slot_repository::SlotRepository;
 const MODULE_BOT_NAME: &str = "slot-bot";
 
 pub struct ManageSlotService {

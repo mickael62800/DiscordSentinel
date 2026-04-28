@@ -8,12 +8,13 @@
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::domain::entities::{steal_pct_range_bp, STEAL_D20_MAX, STEAL_D20_MIN};
+use crate::domain::entities::coude::steal_roll::steal_pct_range_bp;
+use crate::domain::entities::coude::steal_roll::STEAL_D20_MAX;
+use crate::domain::entities::coude::steal_roll::STEAL_D20_MIN;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::roll_steal::{
-    RollStealCommand, RollStealUseCase, StealRoll,
-};
-
+use crate::ports::inbound::coude::roll_steal::RollStealCommand;
+use crate::ports::inbound::coude::roll_steal::RollStealUseCase;
+use crate::ports::inbound::coude::roll_steal::StealRoll;
 pub struct RollStealService;
 
 impl RollStealService {

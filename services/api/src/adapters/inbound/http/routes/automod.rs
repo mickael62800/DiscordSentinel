@@ -2,7 +2,8 @@
 //! Phase 4 — page web /automod : timeline des detections.
 //! Phase Sync — review cards (sync Discord <-> web).
 
-use axum::routing::{get, post};
+use axum::routing::get;
+use axum::routing::post;
 use axum::Router;
 
 use super::super::handlers;
@@ -12,19 +13,19 @@ fn automod_inner() -> Router<AppState> {
     Router::new()
         .route(
             "/{guild_id}/detections",
-            get(handlers::automod::list_detections),
+            get(handlers::moderation::automod::list_detections),
         )
         .route(
             "/{guild_id}/reviews",
-            get(handlers::automod::list_reviews),
+            get(handlers::moderation::automod::list_reviews),
         )
         .route(
             "/reviews",
-            post(handlers::automod::create_review),
+            post(handlers::moderation::automod::create_review),
         )
         .route(
             "/reviews/{review_id}/resolve",
-            post(handlers::automod::resolve_review),
+            post(handlers::moderation::automod::resolve_review),
         )
 }
 

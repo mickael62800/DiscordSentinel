@@ -9,14 +9,15 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{PgInfractionRepository, PgStatsRepository};
-use sentinel_api::application::ManageStatsService;
-use sentinel_api::domain::entities::Rule;
+use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
+use sentinel_api::adapters::outbound::postgres::PgStatsRepository;
+use sentinel_api::application::audit::manage_stats_service::ManageStatsService;
+use sentinel_api::domain::entities::system::rule::Rule;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_stats::{
-    ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand,
-};
-use sentinel_api::ports::outbound::CachePort;
+use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_api::ports::outbound::system::cache::CachePort;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {

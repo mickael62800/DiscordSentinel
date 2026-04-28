@@ -1,7 +1,9 @@
 use super::*;
-use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
-use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
-use crate::ports::outbound::CoudeCombatRepository;
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
+use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 use uuid::Uuid;
@@ -415,11 +417,13 @@ async fn cancel_continues_even_if_mark_bets_lost_fails() {
 
 // ── Gate HP (with_surprise_gate) ──
 
-use crate::domain::entities::BotGuildConfig;
-use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::outbound::BotConfigRepository;
-use crate::domain::entities::{BotDefinition, CoudePlayer, XpProgress, CombatStat};
-
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::entities::coude::player::CombatStat;
 #[derive(Default)]
 struct StubPlayersUc {
     player: std::sync::Mutex<Option<CoudePlayer>>,

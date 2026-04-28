@@ -1,6 +1,7 @@
 use super::*;
-use crate::domain::entities::analytics::{ActionDistribution, HourlyActivity, PeakActivity};
-
+use crate::domain::entities::system::analytics::ActionDistribution;
+use crate::domain::entities::system::analytics::HourlyActivity;
+use crate::domain::entities::system::analytics::PeakActivity;
 // ── AnalyticsQuery::days / limit ──
 
 #[test]

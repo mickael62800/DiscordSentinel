@@ -1,11 +1,15 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{StrikeConfig, StrikeThreshold, UserStrike};
+use crate::domain::entities::moderation::strikes::StrikeConfig;
+use crate::domain::entities::moderation::strikes::StrikeThreshold;
+use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::StrikeRepository;
+use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 
 pub struct PgStrikeRepository {
     pool: PgPool,

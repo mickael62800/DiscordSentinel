@@ -13,25 +13,28 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, LeaderboardCategory, NewDailyChaos,
-};
-use crate::ports::inbound::ManageCoudeSocialUseCase;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 
 use super::taunt_event_to_proto;
 
 pub struct CoudeSocialGrpc {
     pub uc: Arc<dyn ManageCoudeSocialUseCase>,
-    pub catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
-    pub cashbox_uc: Arc<dyn crate::ports::inbound::ManageCoudeCashboxUseCase>,
-    pub taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase>,
-    pub heist_uc: Arc<dyn crate::ports::inbound::ManageCoudeHeistUseCase>,
+    pub catalog_uc: Arc<dyn crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase>,
+    pub cashbox_uc: Arc<dyn crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase>,
+    pub taunts_uc: Arc<dyn crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase>,
+    pub heist_uc: Arc<dyn crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase>,
 }
 
 pub(super) fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
@@ -482,7 +485,7 @@ impl CoudeSocialService for CoudeSocialGrpc {
 
 pub(super) fn redistribution_to_proto(
     guild_id: String,
-    outcome: crate::ports::inbound::RedistributionOutcome,
+    outcome: crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome,
 ) -> proto::RedistributeCashboxResponse {
     proto::RedistributeCashboxResponse {
         executed: true,
@@ -507,8 +510,8 @@ mod tests;
 
 pub(super) fn proto_source_to_domain(
     source: i32,
-) -> Option<crate::domain::entities::CashboxSource> {
-    use crate::domain::entities::CashboxSource;
+) -> Option<crate::domain::entities::coude::cashbox::CashboxSource> {
+    use crate::domain::entities::coude::cashbox::CashboxSource;
     use proto::CashboxDepositSource as P;
     match P::try_from(source).ok()? {
         P::CashboxSourceUnspecified => None,

@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::{TempRole, TempRoleRepository};
+use crate::ports::outbound::community::temp_role_repository::TempRole;
+use crate::ports::outbound::community::temp_role_repository::TempRoleRepository;
 use super::pg_err;
 
 pub struct PgTempRoleRepository { pool: PgPool }

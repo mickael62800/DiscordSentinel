@@ -8,15 +8,16 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::TauntEvent;
+use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::manage_coude_economy::StealOutcome;
-use sentinel_api::ports::inbound::ManageCoudeEconomyUseCase;
+use sentinel_api::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 
 #[derive(Default)]
 struct MockEconomy {

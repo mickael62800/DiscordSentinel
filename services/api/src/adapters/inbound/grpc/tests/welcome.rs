@@ -1,10 +1,11 @@
 use super::*;
 use async_trait::async_trait;
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{ManageWelcomeConfigUseCase, WelcomeConfigPatch};
-use crate::ports::outbound::WelcomeConfigData;
+use crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase;
+use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
+use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 
 /// Mock du use case (et non plus du repo) — l'adapter gRPC ne doit
 /// connaitre que le port inbound (cf. archi hexagonale).

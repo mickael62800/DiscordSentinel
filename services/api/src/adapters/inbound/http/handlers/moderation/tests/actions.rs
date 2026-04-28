@@ -1,6 +1,7 @@
 use super::*;
-use crate::ports::outbound::ReviewEntry;
-use chrono::{TimeZone, Utc};
+use crate::ports::outbound::moderation::review_repository::ReviewEntry;
+use chrono::TimeZone;
+use chrono::Utc;
 use uuid::Uuid;
 
 fn sample_entry(resolved: Option<chrono::DateTime<Utc>>) -> ReviewEntry {

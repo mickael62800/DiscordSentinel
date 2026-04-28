@@ -20,18 +20,19 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use tracing::{info, warn};
+use tracing::info;
+use tracing::warn;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
-};
+use crate::domain::entities::coude::cashbox::CashboxRedistribution;
+use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
+use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::cashbox::CoudeCashbox;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_cashbox::{
-    ManageCoudeCashboxUseCase, RedistributionOutcome,
-};
-use crate::ports::outbound::{CoudeCashboxRepository, WalletRepository};
-
+use crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase;
+use crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome;
+use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Nombre max de gagnants par redistribution. Au-dela, on ne cape pas
 /// strictement : on met la valeur en env var lors de l'init ou on cape ici.
 ///

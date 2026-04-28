@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{AutomodReview, NewAutomodReview};
+use crate::domain::entities::moderation::automod_review::AutomodReview;
+use crate::domain::entities::moderation::automod_review::NewAutomodReview;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

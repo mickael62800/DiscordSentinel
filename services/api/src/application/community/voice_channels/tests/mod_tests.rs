@@ -1,10 +1,8 @@
     use super::*;
     use chrono::Utc;
     use uuid::Uuid;
-    use crate::domain::entities::{
-        VoiceChannelBan, VoiceChannelCoAdmin,
-    };
-
+    use crate::domain::entities::community::voice_channel::VoiceChannelBan;
+    use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
     fn make_theme_cmd(name: &str) -> CreateThemeCommand {
         CreateThemeCommand {
             guild_id: "guild1".to_string(),
@@ -196,8 +194,8 @@
     // ══════════════════════════════════════════════════════════
 
     use std::sync::Mutex;
-    use crate::domain::entities::Rule;
-    use crate::ports::outbound::CachePort;
+    use crate::domain::entities::system::rule::Rule;
+    use crate::ports::outbound::system::cache::CachePort;
 
     // ── Mock Cache ──
 
@@ -219,9 +217,9 @@
     struct MockBotConfig;
     #[async_trait]
     impl BotConfigRepository for MockBotConfig {
-        async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::BotDefinition>, DomainError> { Ok(vec![]) }
-        async fn get_config(&self, _: &str, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, DomainError> { Ok(vec![]) }
-        async fn get_all_config(&self, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, DomainError> { Ok(vec![]) }
+        async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::system::bot_config::BotDefinition>, DomainError> { Ok(vec![]) }
+        async fn get_config(&self, _: &str, _: &str) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, DomainError> { Ok(vec![]) }
+        async fn get_all_config(&self, _: &str) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, DomainError> { Ok(vec![]) }
         async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
         async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
     }
@@ -280,7 +278,7 @@
             queue_channel_id: None,
             category_id: None,
             channel_name: "Test".into(),
-            kind: crate::domain::value_objects::VoiceChannelKind::Private,
+            kind: crate::domain::enums::community::voice_channel_kind::VoiceChannelKind::Private,
             visibility: "visible".into(),
             queue_enabled: false,
             locked: false,
@@ -878,7 +876,7 @@
     // co_admin
     // ══════════════════════════════════════════════════════════
 
-    use crate::ports::inbound::ManageCoAdminCommand;
+    use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
 
     #[tokio::test]
     async fn add_co_admin_success() {
@@ -938,8 +936,8 @@
     // access_control : whitelist, ban, is_banned
     // ══════════════════════════════════════════════════════════
 
-    use crate::ports::inbound::{BanFromChannelCommand, ManageWhitelistCommand};
-
+    use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+    use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
     #[tokio::test]
     async fn get_whitelist_passes_through_repo() {
         let repo = MockVoiceRepo::new();

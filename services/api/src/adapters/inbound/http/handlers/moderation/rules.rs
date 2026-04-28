@@ -1,11 +1,17 @@
-use axum::extract::{Path, State};
-use axum::{Extension, Json};
+use axum::extract::Path;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 use uuid::Uuid;
 
-use crate::adapters::inbound::http::dto::rules::{CreateRuleDto, RuleResponseDto};
+use crate::adapters::inbound::http::dto::rules::CreateRuleDto;
+use crate::adapters::inbound::http::dto::rules::RuleResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
+use crate::adapters::inbound::http::helpers::map_to_dtos;
+use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::check_role;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 
 pub async fn get_rules(

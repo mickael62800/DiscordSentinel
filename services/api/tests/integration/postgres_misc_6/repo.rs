@@ -3,13 +3,14 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgEvidenceRepository, PgModstatsRepository, PgPendingActionRepository, PgReviewRepository,
-};
-use sentinel_api::ports::outbound::{
-    EvidenceRepository, ModstatsRepository, PendingActionRepository, ReviewRepository,
-};
-
+use sentinel_api::adapters::outbound::postgres::PgEvidenceRepository;
+use sentinel_api::adapters::outbound::postgres::PgModstatsRepository;
+use sentinel_api::adapters::outbound::postgres::PgPendingActionRepository;
+use sentinel_api::adapters::outbound::postgres::PgReviewRepository;
+use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceRepository;
+use sentinel_api::ports::outbound::audit::modstats_repository::ModstatsRepository;
+use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
+use sentinel_api::ports::outbound::moderation::review_repository::ReviewRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

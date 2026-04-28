@@ -2,8 +2,8 @@ use std::path::Path;
 
 use ndarray::Array2;
 use tokenizers::Tokenizer;
-use tracing::{info, warn};
-
+use tracing::info;
+use tracing::warn;
 /// Wrapper autour du tokenizer HuggingFace pour preparer les inputs du modele text ONNX.
 pub struct TextTokenizer {
     tokenizer: Option<Tokenizer>,

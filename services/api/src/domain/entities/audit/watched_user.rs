@@ -1,5 +1,5 @@
-use chrono::{DateTime, Utc};
-
+use chrono::DateTime;
+use chrono::Utc;
 #[derive(Debug, Clone)]
 pub struct WatchedUser {
     pub user_id: String,

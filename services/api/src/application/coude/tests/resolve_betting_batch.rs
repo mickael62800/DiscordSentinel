@@ -4,32 +4,51 @@
 //! Les règles métier (insurance, XP, formatage) sont testées en pur
 //! dans combat_resolution_rules.
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ResolveBettingBatchService;
-use crate::domain::entities::{
-    BotDefinition, BotGuildConfig,
-    CombatResolution, CombatStat, CoudeBet, CoudeCombat, CoudeCurrentSeason,
-    CoudeEvent, CoudeInsurance, CoudeInventoryItem, CoudeLeaderboardEntry, CoudePlayer, CoudePrime,
-    CoudeTauntsConfig, DailyChaosOutcome, LeaderboardCategory, NewCoudeBet, NewCoudeCombat,
-    NewCoudePrime, NewDailyChaos, RefundSummary, TauntEvent, Wallet, WalletTransaction, XpProgress,
-};
+use crate::application::coude::resolve_betting_batch_service::ResolveBettingBatchService;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::social::DailyChaosOutcome;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
+use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::CoudeClass;
-use crate::ports::inbound::manage_bets::{
-    ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
-};
-use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
-use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::inbound::resolve_betting_batch::ResolveBettingBatchUseCase;
-use crate::ports::inbound::ManageCoudeInventoryUseCase;
-use crate::ports::outbound::{
-    BotConfigRepository, CoudeCombatRepository, CoudePlayerRepository, WalletRepository,
-};
+use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
+use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use chrono::DateTime;
 
 // ══════════════════════════════════════════════════════════════════════
@@ -195,7 +214,7 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
     async fn resolve(&self, id: Uuid, winner: Option<String>) -> Result<ResolveBetsOutcome, DomainError> {
         self.resolve_calls.lock().unwrap().push((id, winner));
         Ok(ResolveBetsOutcome {
-            plan: crate::domain::entities::BetResolutionPlan { payouts: vec![], fighter_bonus: None },
+            plan: crate::domain::entities::coude::bet::BetResolutionPlan { payouts: vec![], fighter_bonus: None },
             taunt_events: vec![],
         })
     }

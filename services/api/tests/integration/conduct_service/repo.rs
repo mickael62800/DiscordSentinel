@@ -8,13 +8,14 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use sentinel_api::adapters::outbound::postgres::{PgConductRepository, PgInfractionRepository};
+use sentinel_api::adapters::outbound::postgres::PgConductRepository;
+use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
 use sentinel_api::adapters::outbound::DiscordApiService;
-use sentinel_api::application::ManageConductService;
-use sentinel_api::ports::inbound::{
-    AddPointsCommand, DeductPointsCommand, ManageConductUseCase, SaveConductConfigCommand,
-};
-
+use sentinel_api::application::community::manage_conduct_service::ManageConductService;
+use sentinel_api::ports::inbound::community::manage_conduct::AddPointsCommand;
+use sentinel_api::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use sentinel_api::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use sentinel_api::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()

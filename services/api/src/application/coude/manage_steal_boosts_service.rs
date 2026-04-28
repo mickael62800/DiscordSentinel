@@ -3,16 +3,17 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-
-use crate::domain::entities::{
-    find_boost_item, sum_roll_bonus_for_active_keys, CoudeBalanceParams, CoudeStealBoost,
-    StealBoostDuration,
-};
+use chrono::DateTime;
+use chrono::Utc;
+use crate::domain::entities::coude::steal_boost::find_boost_item;
+use crate::domain::entities::coude::steal_boost::sum_roll_bonus_for_active_keys;
+use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
+use crate::domain::entities::coude::steal_boost::StealBoostDuration;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
-use crate::ports::outbound::{BotConfigRepository, CoudeStealBoostRepository};
-
+use crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::steal_boost_repository::CoudeStealBoostRepository;
 pub struct ManageCoudeStealBoostsService {
     repo: Arc<dyn CoudeStealBoostRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
@@ -41,7 +42,7 @@ impl ManageCoudeStealBoostsService {
         let Some(repo) = self.bot_config_repo.as_ref() else {
             return CoudeBalanceParams::default();
         };
-        crate::application::guild_settings::load_balance_params(&**repo, guild_id).await
+        crate::application::coude::guild_settings::load_balance_params(&**repo, guild_id).await
     }
 }
 

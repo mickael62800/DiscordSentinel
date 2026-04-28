@@ -11,10 +11,13 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{AppliedAction, AutomodReview, NewAutomodReview};
+use crate::domain::entities::moderation::automod_review::AppliedAction;
+use crate::domain::entities::moderation::automod_review::AutomodReview;
+use crate::domain::entities::moderation::automod_review::NewAutomodReview;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{ManageAutomodReviewsUseCase, ResolveAutomodReviewCommand};
-use crate::ports::outbound::AutomodReviewRepository;
+use crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase;
+use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
+use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 
 pub struct ManageAutomodReviewsService {
     repo: Arc<dyn AutomodReviewRepository>,

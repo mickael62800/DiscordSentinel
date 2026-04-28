@@ -1,9 +1,9 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::VoiceChannelTheme;
+use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::CreateThemeCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
 
 use super::ManageVoiceChannelsService;
 

@@ -1,5 +1,7 @@
-use axum::extract::{Path, State};
-use axum::{Extension, Json};
+use axum::extract::Path;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 use redis::AsyncCommands;
 use serde::Deserialize;
 
@@ -7,16 +9,21 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::require_role;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{
-    GuildMember, MemberSummary, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES,
-    MEMBERS_CACHE_TTL_SECS,
-};
+use crate::domain::entities::community::guild_member::GuildMember;
+use crate::domain::entities::community::guild_member::MemberSummary;
+use crate::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS_CAP;
+use crate::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
+use crate::domain::entities::community::guild_member_reset::MEMBERS_CACHE_TTL_SECS;
 use crate::domain::errors::DomainError;
 use crate::adapters::outbound::DiscordMember;
-use crate::ports::inbound::{RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand};
-
+use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
+use crate::ports::inbound::community::manage_members::SyncMembersCommand;
+use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
 /// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<AppState>,

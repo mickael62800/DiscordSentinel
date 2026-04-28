@@ -1,8 +1,11 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{xp_progress, LevelConfig, LevelReward, UserLevel};
-use crate::ports::inbound::manage_levels::{AddXpResult, SaveLevelConfigCommand};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::community::level::xp_progress;
+use crate::domain::entities::community::level::LevelConfig;
+use crate::domain::entities::community::level::LevelReward;
+use crate::domain::entities::community::level::UserLevel;
+use crate::ports::inbound::community::manage_levels::AddXpResult;
+use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]

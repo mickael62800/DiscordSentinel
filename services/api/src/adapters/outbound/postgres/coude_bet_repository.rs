@@ -4,14 +4,17 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    BetPayoutOutcome, BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary, TauntEvent,
-};
+use crate::domain::entities::coude::bet::BetPayoutOutcome;
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 
 use super::pg_err;
-use crate::ports::outbound::CoudeBetRepository;
+use crate::ports::outbound::coude::bet_repository::CoudeBetRepository;
 
 /// Refund "neutre" dans une tx en cours : credite les coins sans toucher
 /// `total_earned` (l'argent revient, ce n'est pas un gain) et log la tx wallet.
@@ -196,7 +199,7 @@ impl CoudeBetRepository for PgCoudeBetRepository {
         // APRES commit (jackpot credit sur gros payout).
         let mut pending_taunts: Vec<(
             String,
-            crate::ports::inbound::manage_wallet::TxWalletMutation,
+            crate::ports::inbound::casino::manage_wallet::TxWalletMutation,
         )> = Vec::new();
 
         for payout in &plan.payouts {

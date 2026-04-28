@@ -1,5 +1,5 @@
 use super::*;
-use crate::ports::outbound::BotConfigRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 
 struct MockBotConfigRepo;
@@ -7,9 +7,9 @@ struct MockBotConfigRepo;
 
 #[async_trait]
 impl BotConfigRepository for MockBotConfigRepo {
-    async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::BotDefinition>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn get_all_config(&self, _: &str) -> Result<Vec<crate::domain::entities::BotGuildConfig>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn get_definitions(&self) -> Result<Vec<crate::domain::entities::system::bot_config::BotDefinition>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn get_config(&self, _: &str, _: &str) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn get_all_config(&self, _: &str) -> Result<Vec<crate::domain::entities::system::bot_config::BotGuildConfig>, crate::domain::errors::DomainError> { Ok(vec![]) }
     async fn set_config(&self, _: &str, _: &str, _: &str, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
     async fn delete_config(&self, _: &str, _: &str, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
 }
@@ -20,10 +20,10 @@ struct MockRuleRepo;
 
 #[async_trait]
 impl RuleRepository for MockRuleRepo {
-    async fn find_by_guild(&self, _: &str) -> Result<Vec<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn find_all(&self) -> Result<Vec<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn find_by_id(&self, _: uuid::Uuid) -> Result<Option<crate::domain::entities::Rule>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn save(&self, rule: &crate::domain::entities::Rule) -> Result<crate::domain::entities::Rule, crate::domain::errors::DomainError> { Ok(rule.clone()) }
+    async fn find_by_guild(&self, _: &str) -> Result<Vec<crate::domain::entities::system::rule::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn find_all(&self) -> Result<Vec<crate::domain::entities::system::rule::Rule>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn find_by_id(&self, _: uuid::Uuid) -> Result<Option<crate::domain::entities::system::rule::Rule>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn save(&self, rule: &crate::domain::entities::system::rule::Rule) -> Result<crate::domain::entities::system::rule::Rule, crate::domain::errors::DomainError> { Ok(rule.clone()) }
     async fn toggle(&self, _: uuid::Uuid, _: bool) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
     async fn delete(&self, _: uuid::Uuid) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
 }
@@ -34,11 +34,11 @@ struct MockInfractionRepo;
 
 #[async_trait]
 impl InfractionRepository for MockInfractionRepo {
-    async fn save(&self, _: &crate::domain::entities::Infraction) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
-    async fn find_by_guild(&self, _: &str, _: &crate::ports::inbound::InfractionFilters) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
-    async fn find_all(&self, _: i64, _: i64) -> Result<Vec<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn save(&self, _: &crate::domain::entities::moderation::infraction::Infraction) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn find_by_guild(&self, _: &str, _: &crate::ports::inbound::moderation::manage_infractions::InfractionFilters) -> Result<Vec<crate::domain::entities::moderation::infraction::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
+    async fn find_all(&self, _: i64, _: i64) -> Result<Vec<crate::domain::entities::moderation::infraction::Infraction>, crate::domain::errors::DomainError> { Ok(vec![]) }
     async fn count_today(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
-    async fn find_by_id(&self, _: &str) -> Result<Option<crate::domain::entities::Infraction>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn find_by_id(&self, _: &str) -> Result<Option<crate::domain::entities::moderation::infraction::Infraction>, crate::domain::errors::DomainError> { Ok(None) }
     async fn delete_by_id(&self, _: &str) -> Result<bool, crate::domain::errors::DomainError> { Ok(false) }
     async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
 }
@@ -49,8 +49,8 @@ struct MockCache;
 
 #[async_trait]
 impl CachePort for MockCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<crate::domain::entities::Rule>>, crate::domain::errors::DomainError> { Ok(None) }
-    async fn set_rules(&self, _: &str, _: &[crate::domain::entities::Rule]) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<crate::domain::entities::system::rule::Rule>>, crate::domain::errors::DomainError> { Ok(None) }
+    async fn set_rules(&self, _: &str, _: &[crate::domain::entities::system::rule::Rule]) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
     async fn invalidate_rules(&self, _: &str) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
     async fn get_json(&self, _: &str) -> Result<Option<String>, crate::domain::errors::DomainError> { Ok(None) }
     async fn set_json(&self, _: &str, _: &str, _: u64) -> Result<(), crate::domain::errors::DomainError> { Ok(()) }
@@ -64,16 +64,16 @@ struct MockConduct;
 
 #[async_trait]
 impl ManageConductUseCase for MockConduct {
-    async fn get_config(&self, _: &str) -> Result<crate::domain::entities::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn save_config(&self, _: crate::ports::inbound::SaveConductConfigCommand) -> Result<crate::domain::entities::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_points(&self, _: &str, _: &str) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::UserConductPoints>, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<crate::domain::entities::ConductPointsLog>, crate::domain::errors::DomainError> { unimplemented!() }
-    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> {
+    async fn get_config(&self, _: &str) -> Result<crate::domain::entities::community::conduct::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn save_config(&self, _: crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand) -> Result<crate::domain::entities::community::conduct::ConductConfig, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn get_points(&self, _: &str, _: &str) -> Result<crate::domain::entities::community::conduct::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::community::conduct::UserConductPoints>, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<crate::domain::entities::community::conduct::ConductPointsLog>, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn deduct_points(&self, _: DeductPointsCommand) -> Result<crate::domain::entities::community::conduct::UserConductPoints, crate::domain::errors::DomainError> {
         let now = chrono::Utc::now();
-        Ok(crate::domain::entities::UserConductPoints { id: uuid::Uuid::new_v4(), guild_id: String::new(), user_id: String::new(), username: String::new(), points: 100, last_regen_at: now, created_at: now, updated_at: now })
+        Ok(crate::domain::entities::community::conduct::UserConductPoints { id: uuid::Uuid::new_v4(), guild_id: String::new(), user_id: String::new(), username: String::new(), points: 100, last_regen_at: now, created_at: now, updated_at: now })
     }
-    async fn add_points(&self, _: crate::ports::inbound::AddPointsCommand) -> Result<crate::domain::entities::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
+    async fn add_points(&self, _: crate::ports::inbound::community::manage_conduct::AddPointsCommand) -> Result<crate::domain::entities::community::conduct::UserConductPoints, crate::domain::errors::DomainError> { unimplemented!() }
     async fn run_regen(&self) -> Result<u64, crate::domain::errors::DomainError> { Ok(0) }
 }
 
@@ -81,8 +81,8 @@ impl ManageConductUseCase for MockConduct {
     
     use chrono::Utc;
     use uuid::Uuid;
-    use crate::domain::entities::Rule;
-    use crate::domain::services::TensionAction;
+    use crate::domain::entities::system::rule::Rule;
+    use crate::domain::services::moderation::channel_tension::TensionAction;
     use crate::adapters::outbound::InferenceClassification;
 
     fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
@@ -159,8 +159,9 @@ impl ManageConductUseCase for MockConduct {
     #[test]
     fn test_with_text_inference_sets_fields() {
         use std::sync::Arc;
-        use crate::adapters::outbound::{InferenceService, TextTokenizer};
-        use crate::domain::services::InferenceRateLimiter;
+        use crate::adapters::outbound::InferenceService;
+        use crate::adapters::outbound::TextTokenizer;
+        use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 
         let inference = Arc::new(InferenceService::new(None, None));
         let tokenizer = Arc::new(TextTokenizer::new(None, 256));
@@ -179,8 +180,8 @@ impl ManageConductUseCase for MockConduct {
     //  Tests parse_ia_config_from_bot_config
     // ══════════════════════════════════════════════════════════
 
-    fn bot_entry(key: &str, value: &str) -> crate::domain::entities::BotGuildConfig {
-        crate::domain::entities::BotGuildConfig {
+    fn bot_entry(key: &str, value: &str) -> crate::domain::entities::system::bot_config::BotGuildConfig {
+        crate::domain::entities::system::bot_config::BotGuildConfig {
             id: uuid::Uuid::new_v4(),
             guild_id: "g".to_string(),
             bot_name: "automod-bot".to_string(),
@@ -640,8 +641,8 @@ impl ManageConductUseCase for MockConduct {
     //  Tests build_contextual_content
     // ══════════════════════════════════════════════════════════
 
-    fn ctx_msg(username: &str, content: &str) -> crate::ports::inbound::ContextMessageEntry {
-        crate::ports::inbound::ContextMessageEntry {
+    fn ctx_msg(username: &str, content: &str) -> crate::ports::inbound::ai::analyze_message::ContextMessageEntry {
+        crate::ports::inbound::ai::analyze_message::ContextMessageEntry {
             username: username.to_string(),
             content: content.to_string(),
         }

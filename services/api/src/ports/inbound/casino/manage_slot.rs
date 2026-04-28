@@ -17,7 +17,9 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{SlotSpin, SlotTopWinner, TauntEvent};
+use crate::domain::entities::casino::slot::SlotSpin;
+use crate::domain::entities::casino::slot::SlotTopWinner;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]

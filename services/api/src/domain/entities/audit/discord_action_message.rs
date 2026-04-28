@@ -1,7 +1,8 @@
 //! Mapping entite metier <-> message Discord (cf. migration 175 +
 //! SYNC_DISCORD_WEB_DESIGN.md).
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

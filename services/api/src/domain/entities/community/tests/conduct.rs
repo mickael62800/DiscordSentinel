@@ -55,8 +55,8 @@ fn penalty_for_action_unknown_with_subscriber_hits_tracing_branch() {
     // Couvre la branche d'expansion du tracing::warn! (100% coverage : la
     // macro contient un test d'enabled interne non execute sans subscriber).
     use tracing_subscriber::fmt::MakeWriter;
-    use std::sync::{Arc, Mutex};
-
+    use std::sync::Arc;
+    use std::sync::Mutex;
     // Writer in-memory pour eviter le spam stdout pendant les tests.
     #[derive(Clone, Default)]
     struct SinkWriter(Arc<Mutex<Vec<u8>>>);

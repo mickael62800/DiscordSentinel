@@ -158,10 +158,13 @@ use super::*;
     // ── RPC tests avec mock ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
+    use std::sync::Mutex;
     use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-    use crate::ports::inbound::manage_levels::{AddXpCommand, ManageLevelsUseCase, SaveLevelConfigCommand};
-    use crate::domain::entities::LevelConfig;
+    use crate::ports::inbound::community::manage_levels::AddXpCommand;
+    use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+    use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
+    use crate::domain::entities::community::level::LevelConfig;
     use crate::domain::errors::DomainError;
 
     #[derive(Default)]

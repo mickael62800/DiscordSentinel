@@ -3,13 +3,14 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::Rule;
+use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{CreateRuleCommand, ManageRulesUseCase};
+use crate::ports::inbound::moderation::manage_rules::CreateRuleCommand;
+use crate::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
 use tracing::warn;
 
-use crate::ports::outbound::{CachePort, RuleRepository};
-
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::rule_repository::RuleRepository;
 pub struct ManageRulesService {
     rule_repo: Arc<dyn RuleRepository>,
     cache: Arc<dyn CachePort>,

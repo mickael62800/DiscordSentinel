@@ -1,11 +1,12 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::UserNote;
+use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::NotesRepository;
+use crate::ports::outbound::moderation::notes_repository::NotesRepository;
 
 pub struct PgNotesRepository {
     pool: PgPool,

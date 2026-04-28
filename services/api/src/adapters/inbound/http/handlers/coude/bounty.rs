@@ -1,14 +1,17 @@
 //! Handlers HTTP pour les primes collectives (cf. COUPE_AMELIORATIONS 5.3).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
+use chrono::DateTime;
+use chrono::Utc;
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{ActiveBounty, BOUNTY_MIN_CONTRIBUTION};
+use crate::domain::entities::coude::bounty::ActiveBounty;
+use crate::domain::entities::coude::bounty::BOUNTY_MIN_CONTRIBUTION;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Serialize)]

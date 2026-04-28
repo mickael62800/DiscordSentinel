@@ -1,15 +1,17 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
-};
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
-use crate::ports::outbound::CoudeInventoryRepository;
+use crate::ports::outbound::coude::inventory_repository::CoudeInventoryRepository;
 
 pub struct PgCoudeInventoryRepository {
     pool: PgPool,

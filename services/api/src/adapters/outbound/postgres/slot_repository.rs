@@ -1,10 +1,14 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{PgPool, Postgres, Transaction};
-
-use crate::domain::entities::{SlotJackpotPool, SlotSpin, SlotTopWinner};
+use chrono::DateTime;
+use chrono::Utc;
+use sqlx::PgPool;
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::domain::entities::casino::slot::SlotJackpotPool;
+use crate::domain::entities::casino::slot::SlotSpin;
+use crate::domain::entities::casino::slot::SlotTopWinner;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::SlotRepository;
+use crate::ports::outbound::casino::slot_repository::SlotRepository;
 
 use super::pg_err;
 

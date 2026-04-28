@@ -25,7 +25,8 @@
 use std::time::Duration;
 
 use tonic::metadata::MetadataValue;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
+use tonic::transport::Endpoint;
 use tonic::Request;
 
 use sentinel_proto::blackjack::v1 as bj_proto;

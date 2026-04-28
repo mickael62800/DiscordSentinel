@@ -8,7 +8,8 @@
 //! **Choix d'architecture** : constantes hardcodees ici avec notes.
 //! Modifier ici puis redeployer.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 /// Cooldown entre deux tentatives de braquage (par joueur).

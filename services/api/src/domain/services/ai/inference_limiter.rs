@@ -1,9 +1,10 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Instant;
 
-use tokio::sync::{Semaphore, SemaphorePermit};
-
+use tokio::sync::Semaphore;
+use tokio::sync::SemaphorePermit;
 use crate::domain::errors::DomainError;
 
 /// Rate limiter pour les appels d'inference ONNX.

@@ -22,7 +22,7 @@ pub(super) use crate::adapters::inbound::grpc::parse_uuid;
 /// `CoudeSocialService.TrackStealVictim` (qui retourne un TauntEvent
 /// optionnel si la streak vol de la victime franchit un palier).
 pub(super) fn taunt_event_to_proto(
-    e: crate::domain::entities::TauntEvent,
+    e: crate::domain::entities::coude::taunt::TauntEvent,
 ) -> proto::TauntEvent {
     proto::TauntEvent {
         channel_id: e.channel_id,

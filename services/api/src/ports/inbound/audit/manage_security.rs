@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::SecurityEvent;
+use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::errors::DomainError;
-use crate::domain::services::security_analyzer::JoinInfo;
+use crate::domain::services::audit::security_analyzer::JoinInfo;
 
 pub struct ReportSecurityEventCommand {
     pub guild_id: String,

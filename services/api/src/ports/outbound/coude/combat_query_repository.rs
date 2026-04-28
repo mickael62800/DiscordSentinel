@@ -15,7 +15,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::CoudeCombat;
+use crate::domain::entities::coude::combat::CoudeCombat;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

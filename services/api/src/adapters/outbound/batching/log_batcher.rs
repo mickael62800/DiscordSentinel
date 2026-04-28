@@ -4,15 +4,15 @@
 //! Les autres methodes delegent au repository direct.
 
 use async_trait::async_trait;
-use sqlx::{PgPool, QueryBuilder};
-
+use sqlx::PgPool;
+use sqlx::QueryBuilder;
 use crate::adapters::outbound::postgres::PgLogRepository;
-use crate::domain::entities::LogEntry;
+use crate::domain::entities::system::log_entry::LogEntry;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::LogRepository;
+use crate::ports::outbound::system::log_repository::LogRepository;
 
-use super::batch_writer::{BatchWriter, BatchWriterConfig};
-
+use super::batch_writer::BatchWriter;
+use super::batch_writer::BatchWriterConfig;
 pub struct BatchedPgLogRepository {
     inner: PgLogRepository,
     writer: BatchWriter<LogEntry>,

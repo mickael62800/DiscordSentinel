@@ -1,6 +1,7 @@
 //! Entry persistee du Memorial des clodos (cf. COUPE_AMELIORATIONS 6.1).
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

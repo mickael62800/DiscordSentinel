@@ -1,17 +1,21 @@
 //! Handlers paris : place/list/resolve/refund. Le handler `get_betting_combat`
 //! est ici parce que c'est une lookup combat utilisée par le flow paris.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
 
-use super::dto::{
-    BetDto, FullCombatDto, PlaceBetDto, PlaceBetResponse, ResolveBetsDto, ResolveBetsResponse,
-};
+use super::dto::BetDto;
+use super::dto::FullCombatDto;
+use super::dto::PlaceBetDto;
+use super::dto::PlaceBetResponse;
+use super::dto::ResolveBetsDto;
+use super::dto::ResolveBetsResponse;
 use super::taunts::TauntEventDto;
 use super::parse_combat_id;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::NewCoudeBet;
+use crate::domain::entities::coude::bet::NewCoudeBet;
 
 /// POST /api/coude/{guild_id}/bets
 ///

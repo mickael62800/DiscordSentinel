@@ -8,11 +8,11 @@ use chrono::Utc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::application::ManageRemindersService;
-use crate::domain::entities::*;
+use crate::application::moderation::manage_reminders_service::ManageRemindersService;
+use crate::domain::entities::moderation::sanction_reminder::*;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::*;
-use crate::ports::outbound::ReminderRepository;
+use crate::ports::inbound::moderation::manage_reminders::*;
+use crate::ports::outbound::moderation::reminder_repository::ReminderRepository;
 
 // ══════════════════════════════════════════════════════════
 // In-memory Reminder Repository

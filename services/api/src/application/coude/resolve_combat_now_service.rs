@@ -19,27 +19,35 @@ use async_trait::async_trait;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    apply_insurance_to_loss, compute_combat_xp, detect_outcome_flags, format_bet_payout_lines,
-    CombatOutcomeFlags, COMEBACK_HP_PCT_MAX,
-};
+use crate::domain::entities::coude::combat_resolution_rules::apply_insurance_to_loss;
+use crate::domain::entities::coude::combat_resolution_rules::compute_combat_xp;
+use crate::domain::entities::coude::combat_outcome_flags::detect_outcome_flags;
+use crate::domain::entities::coude::combat_resolution_rules::format_bet_payout_lines;
+use crate::domain::entities::coude::combat_outcome_flags::CombatOutcomeFlags;
+use crate::domain::entities::coude::combat_outcome_flags::COMEBACK_HP_PCT_MAX;
 use crate::domain::errors::DomainError;
-use crate::domain::services::coude_combat_engine::{
-    self as engine, PlayerLite, ServerEventLite,
-};
-use crate::ports::inbound::resolve_combat_now::{
-    ResolveCombatNowOutput, ResolveCombatNowUseCase, ResolvedCombatEmbedField,
-};
-use crate::ports::inbound::{
-    ManageCoudeBetsUseCase, ManageCoudeCombatsUseCase, ManageCoudeInventoryUseCase,
-    ManageCoudePlayersUseCase, ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
-};
-use crate::ports::outbound::{
-    BotConfigRepository, CoudeBountyRepository, CoudeCoalitionRepository, CoudeCombatRepository,
-    CoudeCursesRepository, CoudePlayerRepository, CoudeSafetyNetRepository,
-    CoudeUltimateRepository, CoudeVendettaRepository, WalletRepository,
-};
-
+use crate::domain::services::coude::coude_combat_engine as engine;
+use crate::domain::services::coude::coude_combat_engine::PlayerLite;
+use crate::domain::services::coude::coude_combat_engine::ServerEventLite;
+use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowOutput;
+use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase;
+use crate::ports::inbound::coude::resolve_combat_now::ResolvedCombatEmbedField;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::bounty_repository::CoudeBountyRepository;
+use crate::ports::outbound::coude::coalition_repository::CoudeCoalitionRepository;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
+use crate::ports::outbound::coude::ultimate_repository::CoudeUltimateRepository;
+use crate::ports::outbound::coude::vendetta_repository::CoudeVendettaRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 pub struct ResolveCombatNowService {
     combat_repo: Arc<dyn CoudeCombatRepository>,
     combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
@@ -153,7 +161,7 @@ impl ResolveCombatNowService {
             Ok(Some(w)) => w.coins,
             _ => return,
         };
-        let settings = crate::application::CoudeGuildSettings::load(
+        let settings = crate::application::coude::guild_settings::CoudeGuildSettings::load(
             self.bot_config_repo.as_ref(),
             guild_id,
         )
@@ -174,7 +182,7 @@ impl ResolveCombatNowService {
 
     async fn fetch_banana(&self, guild_id: &str, user_id: &str) -> bool {
         let Some(repo) = &self.curses_repo else { return false; };
-        use crate::domain::entities::CurseKind;
+        use crate::domain::entities::coude::curse::CurseKind;
         matches!(
             repo.get_active_for_target(guild_id, user_id).await,
             Ok(Some(c)) if c.kind == CurseKind::Banana
@@ -186,7 +194,7 @@ impl ResolveCombatNowService {
     /// faire foirer la prochaine attaque speciale.
     async fn consume_graisser_if_active(&self, guild_id: &str, user_id: &str) -> bool {
         let Some(repo) = &self.curses_repo else { return false; };
-        use crate::domain::entities::CurseKind;
+        use crate::domain::entities::coude::curse::CurseKind;
         match repo.get_active_for_target(guild_id, user_id).await {
             Ok(Some(c)) if c.kind == CurseKind::Graisser => {
                 // Consume the curse — log et continue meme si lift echoue
@@ -236,8 +244,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // Roll des mythiques (cf. COUPE_AMELIORATIONS 2.1) en amont pour
         // pouvoir appliquer les effets qui modifient les inputs du moteur
         // (ex: Magicien -> swap classes).
-        let mythic_event: Option<crate::domain::entities::MythicEvent> = {
-            use crate::domain::entities::roll_mythic_event;
+        let mythic_event: Option<crate::domain::entities::coude::mythic_events::MythicEvent> = {
+            use crate::domain::entities::coude::mythic_events::roll_mythic_event;
             use rand::rngs::StdRng;
             use rand::SeedableRng;
             let mut myth_rng = StdRng::from_entropy();
@@ -284,7 +292,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         let balance = load_balance_params(self.bot_config_repo.as_ref(), &combat.guild_id).await;
         // Settings pour les features 4.1 / 3.3 / 4.4 (config par-guild,
         // cf. migration 170).
-        let settings = crate::application::CoudeGuildSettings::load(
+        let settings = crate::application::coude::guild_settings::CoudeGuildSettings::load(
             self.bot_config_repo.as_ref(),
             &combat.guild_id,
         )
@@ -317,10 +325,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // - "Saison du Chaos" -> chaos events x2
         // - "Saison du Tank"  -> +20% DEF pour les Tanks
         let (season_chaos_multiplier, season_tank_def_bonus) = {
-            use crate::domain::entities::{
-                season_chaos_multiplier as season_chaos,
-                season_tank_def_bonus_pct as season_tank,
-            };
+            use crate::domain::entities::coude::season_theme::season_chaos_multiplier as season_chaos;
+            use crate::domain::entities::coude::season_theme::season_tank_def_bonus_pct as season_tank;
             (season_chaos(attacker.season), season_tank(attacker.season))
         };
         // Palier "Riposte fulgurante" (cf. COUPE_AMELIORATIONS 3.2) :
@@ -376,7 +382,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
             let mut a = attacker.hp_current;
             let mut d = defender.hp_current;
             if let Some(ult_repo) = &self.ultimate_repo {
-                use crate::domain::entities::UltimateKind;
+                use crate::domain::entities::coude::ultimate::UltimateKind;
                 if let Ok(state) = ult_repo.get(&combat.guild_id, &combat.attacker_id).await {
                     match state.pending_kind {
                         Some(UltimateKind::Bourrin) => {
@@ -781,7 +787,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         self.combat_repo
             .resolve(
                 combat.id,
-                crate::domain::entities::CombatResolution {
+                crate::domain::entities::coude::combat::CombatResolution {
                     status: "accepted".into(),
                     winner_id: result.winner_id.clone(),
                     attacker_roll: Some(first_atk_roll),
@@ -837,13 +843,13 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // Migration #7 : taunts declenches par les mutations wallet des paris
         // (jackpots cote parieurs gagnants + bonus combattants). Fusionnes en
         // fin de fonction avec les taunts streaks win/loss.
-        let mut bets_draw_taunts: Vec<crate::domain::entities::TauntEvent> = Vec::new();
+        let mut bets_draw_taunts: Vec<crate::domain::entities::coude::taunt::TauntEvent> = Vec::new();
         if result.chaos_events_count > 0 {
             title_color = 0x9B59B6;
         }
 
         let mut vendetta_msg: Option<String> = None;
-        let mut vendetta_humiliation: Option<crate::ports::inbound::VendettaHumiliation> = None;
+        let mut vendetta_humiliation: Option<crate::ports::inbound::coude::resolve_combat_now::VendettaHumiliation> = None;
         // Bouclier malchance (4.1) : true si la 1ere defaite du jour a
         // ete adoucie. Visible aux deux match blocks (payout + streaks).
         let mut shield_active = false;
@@ -864,7 +870,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // une vendetta active contre le loser, c est sa revanche
                 // — gain double. Inversement si le loser avait declare une
                 // vendetta contre le winner, on la resout comme perdue.
-                use crate::domain::entities::apply_revenge_bonus;
+                use crate::domain::entities::coude::vendetta::apply_revenge_bonus;
                 let coins_transferred = if let Some(repo) = &self.vendetta_repo {
                     if let Ok(Some(v)) = repo.get_active(&combat.guild_id, winner_id, loser_id).await {
                         let boosted = apply_revenge_bonus(coins_transferred_nominal, true);
@@ -895,7 +901,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                             // Le bot va renommer le winner "le Bourreau
                             // de @loser" pendant 7 jours (cf. roadmap 5.3).
                             vendetta_humiliation = Some(
-                                crate::ports::inbound::VendettaHumiliation {
+                                crate::ports::inbound::coude::resolve_combat_now::VendettaHumiliation {
                                     target_user_id: winner_id.clone(),
                                     challenger_user_id: loser_id.clone(),
                                 },
@@ -915,9 +921,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 let mut coalition_msg: Option<String> = None;
                 let mut break_coalition_id: Option<uuid::Uuid> = None;
                 let coins_transferred = if let Some(coalition_repo) = &self.coalition_repo {
-                    use crate::domain::entities::{
-                        apply_coalition_penalty, COALITION_GAIN_MULTIPLIER,
-                    };
+                    use crate::domain::entities::coude::coalition::apply_coalition_penalty;
+                    use crate::domain::entities::coude::coalition::COALITION_GAIN_MULTIPLIER;
                     // Penalite si winner est cible d une coalition active.
                     let winner_in_coalition = coalition_repo
                         .get_active(&combat.guild_id, winner_id)
@@ -958,7 +963,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // +5% par prestige du gagnant sur le payout combat.
                 // Lecture via player_repo si dispo.
                 let coins_transferred = if let Some(prepo) = &self.player_repo {
-                    use crate::domain::entities::prestige_gain_multiplier_with_params;
+                    use crate::domain::entities::coude::prestige::prestige_gain_multiplier_with_params;
                     let prestige_count = prepo
                         .get_prestige_count(&combat.guild_id, winner_id)
                         .await
@@ -1012,7 +1017,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // redirige vers le saboteur. Consume une utilisation.
                 let mut poison_msg: Option<String> = None;
                 if let Some(curses_repo) = &self.curses_repo {
-                    use crate::domain::entities::{poison_redirect_amount, CurseKind};
+                    use crate::domain::entities::coude::curse::poison_redirect_amount;
+                    use crate::domain::entities::coude::curse::CurseKind;
                     if let Ok(Some(c)) = curses_repo
                         .get_active_for_target(&combat.guild_id, winner_id)
                         .await
@@ -1065,7 +1071,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // active, l assurance est annulee + 200c additionnels
                 // sont preleves vers le saboteur. La curse est consumee.
                 if let (Some(curses_repo), Some(_ins)) = (&self.curses_repo, &active_insurance) {
-                    use crate::domain::entities::{CurseKind, FAUSSE_ASSURANCE_FEE_COINS};
+                    use crate::domain::entities::coude::curse::CurseKind;
+                    use crate::domain::entities::coude::curse::FAUSSE_ASSURANCE_FEE_COINS;
                     if let Ok(Some(c)) = curses_repo
                         .get_active_for_target(&combat.guild_id, loser_id)
                         .await
@@ -1147,7 +1154,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 let shield_enabled = settings.get_bool("lucky_shield_enabled", true);
                 let shield_mult = settings.get_percent_ratio("lucky_shield_loss_percent", 50);
                 let actual_loss = if shield_enabled {
-                    crate::domain::entities::apply_lucky_shield_with_multiplier(
+                    crate::domain::entities::coude::lucky_shield::apply_lucky_shield_with_multiplier(
                         adj.actual_loss, is_first_defeat_today, shield_mult,
                     )
                 } else {
@@ -1169,7 +1176,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // perdant a un filet actif, sa perte est divisee par 2.
                 let has_safety_net = self.loser_has_safety_net(&combat.guild_id, loser_id).await;
                 let actual_loss = if has_safety_net {
-                    use crate::domain::entities::safety_net_reduce_loss_with_multiplier;
+                    use crate::domain::entities::coude::safety_net::reduce_loss_with_multiplier as safety_net_reduce_loss_with_multiplier;
                     let net_mult = settings.get_percent_ratio("safety_net_loss_percent", 50);
                     let reduced = safety_net_reduce_loss_with_multiplier(actual_loss, true, net_mult);
                     if reduced < actual_loss {
@@ -1516,9 +1523,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                 // credit le total au gagnant. Si pas de bounty mais
                 // streak >= 5 (cas legacy / pre-bounty), fallback bonus
                 // fixe pour preserver le comportement.
-                use crate::domain::entities::{
-                    BOUNTY_AUTO_OPEN_STREAK_THRESHOLD, BOUNTY_INITIAL_AMOUNT,
-                };
+                use crate::domain::entities::coude::bounty::BOUNTY_AUTO_OPEN_STREAK_THRESHOLD;
+                use crate::domain::entities::coude::bounty::BOUNTY_INITIAL_AMOUNT;
                 let mut loser_pre_streak: Option<i32> = None;
                 if let Some(repo) = &self.player_repo {
                     if let Ok(Some((win_streak, _loss_streak))) = repo
@@ -1631,7 +1637,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                                     warn!(error = %e, "Echec auto-open bounty");
                                 }
                             } else {
-                                taunt_events.push(crate::domain::entities::TauntEvent {
+                                taunt_events.push(crate::domain::entities::coude::taunt::TauntEvent {
                                     channel_id: combat.guild_id.clone(),
                                     target_user_id: winner_id.clone(),
                                     message: format!(
@@ -1667,7 +1673,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // Mythiques (cf. COUPE_AMELIORATIONS 2.1) — annonce de l event
         // deja roll au debut de la resolution (cf. plus haut).
         let mythic_announce: Option<String> = mythic_event.map(|ev| {
-            use crate::domain::entities::format_mythic_announce;
+            use crate::domain::entities::coude::mythic_events::format_mythic_announce;
             let winner_name = result.winner_id.as_deref().and_then(|id| {
                 if id == combat.attacker_id { Some(combat.attacker_name.as_str()) }
                 else if id == combat.defender_id { Some(combat.defender_name.as_str()) }
@@ -1691,7 +1697,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         // commentaires de "spectateurs" injectes en fin d embed pour
         // donner l illusion d une foule. Zero mecanique.
         {
-            use crate::domain::entities::{format_spectator_chat, pick_spectator_chat};
+            use crate::domain::entities::coude::fake_spectators::format_spectator_chat;
+            use crate::domain::entities::coude::fake_spectators::pick_spectator_chat;
             use rand::rngs::StdRng;
             use rand::SeedableRng;
             let mut chat_rng = StdRng::from_entropy();
@@ -1749,8 +1756,8 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
 /// Identifie le gagnant + ses HP finaux + son d20 du 1er round + les rounds
 /// passes en bas HP, puis appelle `detect_outcome_flags`.
 fn compute_outcome_flags_from_result(
-    result: &crate::domain::services::coude_combat_engine::combat::CombatResult,
-    combat: &crate::domain::entities::CoudeCombat,
+    result: &crate::domain::services::coude::coude_combat_engine::combat::CombatResult,
+    combat: &crate::domain::entities::coude::combat::CoudeCombat,
 ) -> CombatOutcomeFlags {
     let Some(winner_id) = result.winner_id.as_ref() else {
         // Match nul : pas de "winner" -> seul potentiel flag = zero_pointe
@@ -1798,6 +1805,6 @@ fn compute_outcome_flags_from_result(
 
 // `load_balance_params` deplace dans `application::guild_settings`
 // (cf. API P0 #3 audit). Le wrapper local conserve l'usage existant.
-use crate::application::guild_settings::load_balance_params;
+use crate::application::coude::guild_settings::load_balance_params;
 
-use crate::domain::entities::coude_title_for_level as title_for_level;
+use crate::domain::entities::coude::player::title_for_level as title_for_level;

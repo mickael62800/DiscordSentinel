@@ -1,11 +1,12 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::BlackjackGame;
+use crate::domain::entities::casino::blackjack::BlackjackGame;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::BlackjackRepository;
+use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 
 pub struct PgBlackjackRepository {
     pool: PgPool,

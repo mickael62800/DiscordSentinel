@@ -30,18 +30,21 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use sqlx::{Postgres, Transaction};
+use sqlx::Postgres;
+use sqlx::Transaction;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    resolve_reset_balance, resolve_starting_coins, TauntEvent, Wallet, WalletTransaction,
-};
+use crate::domain::entities::casino::wallet::resolve_reset_balance;
+use crate::domain::entities::casino::wallet::resolve_starting_coins;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::inbound::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
-use crate::ports::outbound::WalletRepository;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 
 pub struct ManageWalletService {
     repo: Arc<dyn WalletRepository>,

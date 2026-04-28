@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::{BlackjackTable, BlackjackTablePlayer, BlackjackTableRepository};
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTable;
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTablePlayer;
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
 use super::pg_err;
 
 pub struct PgBlackjackTableRepository { pool: PgPool }

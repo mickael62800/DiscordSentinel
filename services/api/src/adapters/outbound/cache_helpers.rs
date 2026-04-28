@@ -18,7 +18,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CachePort;
+use crate::ports::outbound::system::cache::CachePort;
 
 /// Pattern cache-aside : lit depuis le cache, sinon execute `fetch` et ecrit
 /// le resultat dans le cache avec le TTL specifie.

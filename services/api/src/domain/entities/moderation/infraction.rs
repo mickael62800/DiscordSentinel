@@ -1,8 +1,9 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::value_objects::{Action, DetectionFlags};
-
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
 #[derive(Debug, Clone)]
 pub struct Infraction {
     pub id: Uuid,

@@ -150,7 +150,8 @@ async fn get_or_fetch_user_guilds(
 /// On veut juste eviter de stocker le token complet en cle Redis.
 fn short_hash(input: &str) -> String {
     use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use std::hash::Hash;
+    use std::hash::Hasher;
     let mut hasher = DefaultHasher::new();
     input.hash(&mut hasher);
     format!("{:x}", hasher.finish())

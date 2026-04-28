@@ -1,13 +1,14 @@
 //! Impl Postgres de `CoudeStealProtectionRepository` (Phase 9 Part B).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::CoudeStealProtection;
+use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeStealProtectionRepository;
+use crate::ports::outbound::coude::steal_protection_repository::CoudeStealProtectionRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "steal_protection";

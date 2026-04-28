@@ -1,10 +1,11 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::{VoiceChannelBan, VoiceChannelWhitelistEntry};
+use crate::domain::entities::community::voice_channel::VoiceChannelBan;
+use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{BanFromChannelCommand, ManageWhitelistCommand};
-
+use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
 use super::ManageVoiceChannelsService;
 
 impl ManageVoiceChannelsService {

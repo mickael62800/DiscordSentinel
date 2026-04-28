@@ -9,16 +9,22 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::application::ManageModerationService;
-use crate::domain::entities::*;
+use crate::application::moderation::manage_moderation_service::ManageModerationService;
+use crate::domain::entities::audit::audit_log::*;
+use crate::domain::entities::community::conduct::*;
+use crate::domain::entities::moderation::moderation_action::*;
+use crate::domain::entities::moderation::strikes::*;
+use crate::domain::entities::system::rule::*;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::*;
-use crate::ports::outbound::{CachePort, ModerationRepository, StrikeRepository};
-
+use crate::ports::inbound::community::manage_conduct::*;
+use crate::ports::inbound::moderation::manage_moderation::*;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 struct NoOpAuditLogs;
 #[async_trait]
-impl crate::ports::inbound::manage_audit_logs::ManageAuditLogsUseCase for NoOpAuditLogs {
-    async fn create(&self, cmd: crate::ports::inbound::manage_audit_logs::CreateAuditLogCommand) -> Result<AuditLog, DomainError> {
+impl crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase for NoOpAuditLogs {
+    async fn create(&self, cmd: crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand) -> Result<AuditLog, DomainError> {
         Ok(AuditLog {
             id: Uuid::new_v4(),
             guild_id: cmd.guild_id,
@@ -33,7 +39,7 @@ impl crate::ports::inbound::manage_audit_logs::ManageAuditLogsUseCase for NoOpAu
             created_at: chrono::Utc::now(),
         })
     }
-    async fn list(&self, _: Option<&str>, _: crate::ports::inbound::manage_audit_logs::AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> { Ok(vec![]) }
+    async fn list(&self, _: Option<&str>, _: crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters) -> Result<Vec<AuditLog>, DomainError> { Ok(vec![]) }
     async fn delete_older_than_days(&self, _: &str, _: i32) -> Result<u64, DomainError> { Ok(0) }
 }
 
@@ -182,7 +188,7 @@ fn build_service() -> (ManageModerationService, Arc<InMemoryModerationRepo>, Arc
         strike_repo as Arc<dyn StrikeRepository>,
         cache as Arc<dyn CachePort>,
         conduct.clone() as Arc<dyn ManageConductUseCase>,
-    ).with_audit_logs_uc(Arc::new(NoOpAuditLogs) as Arc<dyn crate::ports::inbound::manage_audit_logs::ManageAuditLogsUseCase>);
+    ).with_audit_logs_uc(Arc::new(NoOpAuditLogs) as Arc<dyn crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase>);
     (svc, repo, conduct)
 }
 

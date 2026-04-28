@@ -7,7 +7,7 @@
 use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::WelcomeConfigData;
+use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 
 /// Patch partiel : chaque champ `Some` ecrase, `None` conserve l existant.
 /// Equivalent du `SaveWelcomeConfigDto` cote HTTP, mais decoupe du DTO

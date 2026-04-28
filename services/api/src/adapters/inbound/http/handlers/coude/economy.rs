@@ -1,12 +1,16 @@
 //! Handlers économie : transferts inter-joueurs, vol, casino et compteurs
 //! quotidiens. Délèguent à `state.coude_economy_uc`.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use serde::{Deserialize, Serialize};
-
-use super::dto::{GainDto, LostDto, StealDto, TransferCoinsDto};
+use serde::Deserialize;
+use serde::Serialize;
+use super::dto::GainDto;
+use super::dto::LostDto;
+use super::dto::StealDto;
+use super::dto::TransferCoinsDto;
 use super::taunts::TauntEventDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;

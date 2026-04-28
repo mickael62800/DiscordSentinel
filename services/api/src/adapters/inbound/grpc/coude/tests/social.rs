@@ -1,25 +1,37 @@
 use super::*;
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
-use std::sync::{Arc, Mutex};
+use chrono::Duration;
+use chrono::Utc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CashboxSource, CoudeCashbox, CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry,
-    CoudeTauntsConfig, DailyChaosOutcome, HeistOutcome, LeaderboardCategory, NewDailyChaos,
-    TauntEvent,
-};
+use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::social::DailyChaosOutcome;
+use crate::domain::entities::coude::heist::HeistOutcome;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_catalog::{
-    AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, MatchmakingBucket, ShopItemInfo,
-};
-use crate::ports::inbound::manage_cashbox::RedistributionOutcome;
-use crate::ports::inbound::manage_heist::{HeistCooldownStatus, PrisonStatusInfo};
-use crate::ports::inbound::{
-    ManageCoudeCashboxUseCase, ManageCoudeCatalogUseCase, ManageCoudeHeistUseCase,
-    ManageCoudeSocialUseCase, ManageCoudeTauntsUseCase,
-};
-
+use crate::ports::inbound::coude::manage_catalog::AntiTheftItemInfo;
+use crate::ports::inbound::coude::manage_catalog::ClassInfo;
+use crate::ports::inbound::coude::manage_catalog::CoudeCatalog;
+use crate::ports::inbound::coude::manage_catalog::LevelEntry;
+use crate::ports::inbound::coude::manage_catalog::MatchmakingBucket;
+use crate::ports::inbound::coude::manage_catalog::ShopItemInfo;
+use crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome;
+use crate::ports::inbound::coude::manage_heist::HeistCooldownStatus;
+use crate::ports::inbound::coude::manage_heist::PrisonStatusInfo;
+use crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase;
+use crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase;
+use crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 // ── Mocks ──
 
 #[derive(Default)]
@@ -119,10 +131,10 @@ impl ManageCoudeCashboxUseCase for MockCashboxUc {
     async fn redistribute_due_guilds(&self, _: i64) -> Result<Vec<(String, RedistributionOutcome)>, DomainError> {
         Ok(self.due_return.lock().unwrap().clone())
     }
-    async fn list_redistributions(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::CashboxRedistribution>, DomainError> {
+    async fn list_redistributions(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistribution>, DomainError> {
         unimplemented!()
     }
-    async fn list_entries(&self, _: Uuid) -> Result<Vec<crate::domain::entities::CashboxRedistributionEntry>, DomainError> {
+    async fn list_entries(&self, _: Uuid) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistributionEntry>, DomainError> {
         unimplemented!()
     }
 }

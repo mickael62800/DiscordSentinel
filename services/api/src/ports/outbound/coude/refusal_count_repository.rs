@@ -3,7 +3,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::RefusalCount;
+use crate::domain::entities::coude::refusal_count::RefusalCount;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

@@ -1,8 +1,8 @@
 //! Mapping `DomainError` -> `tonic::Status`. Aligne sur les codes HTTP
 //! deja utilises cote Axum (cf. `adapters/inbound/http/errors.rs`).
 
-use tonic::{Code, Status};
-
+use tonic::Code;
+use tonic::Status;
 use crate::domain::errors::DomainError;
 
 pub fn domain_to_status(err: DomainError) -> Status {

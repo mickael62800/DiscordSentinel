@@ -1,7 +1,8 @@
 use axum::extract::State;
 use axum::Json;
 
-use crate::adapters::inbound::http::dto::analyze::{AnalyzeRequestDto, AnalyzeResponseDto};
+use crate::adapters::inbound::http::dto::analyze::AnalyzeRequestDto;
+use crate::adapters::inbound::http::dto::analyze::AnalyzeResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
@@ -22,7 +23,7 @@ pub async fn analyze(
     // Broadcast event if an action was taken.
     // M7 — comparaison typee (enum) au lieu de string pour eviter la
     // divergence silencieuse si as_str() change un jour.
-    if analysis.action != crate::domain::value_objects::Action::None {
+    if analysis.action != crate::domain::enums::moderation::action::Action::None {
         state.broadcaster.broadcast(
             "infraction_new",
             serde_json::json!({

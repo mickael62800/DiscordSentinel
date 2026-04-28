@@ -1,4 +1,4 @@
-use crate::domain::entities::VoiceChannelConfig;
+use crate::domain::entities::community::voice_channel::VoiceChannelConfig;
 use crate::domain::errors::DomainError;
 
 use super::ManageVoiceChannelsService;

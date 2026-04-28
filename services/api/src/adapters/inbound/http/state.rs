@@ -3,22 +3,41 @@ use std::sync::Arc;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::redis_cache::RedisCache;
-use crate::adapters::outbound::{DiscordApi, InferenceService};
-use crate::ports::inbound::{
-    AnalyzeImageUseCase, AnalyzeMessageUseCase, ManageInfractionsUseCase, ManageModerationUseCase,
-    ManageNotesUseCase, ManageRemindersUseCase, ManageRulesUseCase, ManageSecurityUseCase, ManageStatsUseCase, ManageStrikesUseCase, ManageTicketsUseCase,
-    ManageAuditLogsUseCase, ManageConductUseCase, ManageLevelsUseCase, ManageMembersUseCase, ManageRolePanelsUseCase, ManageVoiceChannelsUseCase, ManageWatchedUsersUseCase,
-};
-use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
-use crate::ports::inbound::manage_bets::ManageCoudeBetsUseCase;
-use crate::ports::inbound::manage_economy::ManageCoudeEconomyUseCase;
-use crate::ports::inbound::manage_inventory::ManageCoudeInventoryUseCase;
-use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
-use crate::application::BlackjackService;
-use crate::ports::outbound::{AnalyticsRepository, BotConfigRepository, DailyActivityRepository, DiscordRoleRepository, GuildRepository, LogRepository, WalletRepository};
-
+use crate::adapters::outbound::DiscordApi;
+use crate::adapters::outbound::InferenceService;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
+use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
+use crate::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase;
+use crate::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
+use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
+use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
+use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::application::casino::blackjack_service::BlackjackService;
+use crate::ports::outbound::audit::analytics_repository::AnalyticsRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
+use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use crate::ports::outbound::system::guild_repository::GuildRepository;
+use crate::ports::outbound::system::log_repository::LogRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 #[derive(Clone)]
 pub struct AppState {
     pub analyze_uc: Arc<dyn AnalyzeMessageUseCase>,
@@ -48,39 +67,39 @@ pub struct AppState {
     pub wallet_repo: Arc<dyn WalletRepository>,
     pub wallet_uc: Arc<dyn ManageWalletUseCase>,
     pub blackjack_svc: Arc<BlackjackService>,
-    pub slot_uc: Arc<dyn crate::ports::inbound::manage_slot::ManageSlotUseCase>,
-    pub wheel_uc: Arc<dyn crate::ports::inbound::manage_wheel::ManageWheelUseCase>,
+    pub slot_uc: Arc<dyn crate::ports::inbound::casino::manage_slot::ManageSlotUseCase>,
+    pub wheel_uc: Arc<dyn crate::ports::inbound::casino::manage_wheel::ManageWheelUseCase>,
     pub coude_players_uc: Arc<dyn ManageCoudePlayersUseCase>,
     pub coude_combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
     pub coude_bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
     pub coude_economy_uc: Arc<dyn ManageCoudeEconomyUseCase>,
     pub coude_inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     pub coude_social_uc: Arc<dyn ManageCoudeSocialUseCase>,
-    pub resolve_betting_batch_uc: Arc<dyn crate::ports::inbound::ResolveBettingBatchUseCase>,
-    pub expire_combats_batch_uc: Arc<dyn crate::ports::inbound::ExpireCombatsBatchUseCase>,
-    pub resolve_combat_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase>,
-    pub resolve_friendly_duel_uc: Arc<dyn crate::ports::inbound::ResolveFriendlyDuelUseCase>,
-    pub coude_catalog_uc: Arc<dyn crate::ports::inbound::ManageCoudeCatalogUseCase>,
-    pub coude_cashbox_uc: Arc<dyn crate::ports::inbound::ManageCoudeCashboxUseCase>,
+    pub resolve_betting_batch_uc: Arc<dyn crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase>,
+    pub expire_combats_batch_uc: Arc<dyn crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase>,
+    pub resolve_combat_now_uc: Arc<dyn crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase>,
+    pub resolve_friendly_duel_uc: Arc<dyn crate::ports::inbound::coude::resolve_friendly_duel::ResolveFriendlyDuelUseCase>,
+    pub coude_catalog_uc: Arc<dyn crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase>,
+    pub coude_cashbox_uc: Arc<dyn crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase>,
     pub coude_steal_protections_uc:
-        Arc<dyn crate::ports::inbound::ManageCoudeStealProtectionsUseCase>,
-    pub coude_steal_boosts_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealBoostsUseCase>,
-    pub coude_taunts_uc: Arc<dyn crate::ports::inbound::ManageCoudeTauntsUseCase>,
-    pub coude_heist_uc: Arc<dyn crate::ports::inbound::ManageCoudeHeistUseCase>,
-    pub coude_curses_uc: Arc<dyn crate::ports::inbound::ManageCoudeCursesUseCase>,
-    pub coude_safety_net_uc: Arc<dyn crate::ports::inbound::ManageCoudeSafetyNetUseCase>,
-    pub coude_vendetta_uc: Arc<dyn crate::ports::inbound::ManageCoudeVendettaUseCase>,
-    pub coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::CoudeToutOuRienRepository>,
-    pub play_tout_ou_rien_uc: Arc<dyn crate::ports::inbound::play_tout_ou_rien::PlayToutOuRienUseCase>,
-    pub play_travaux_uc: Arc<dyn crate::ports::inbound::play_travaux::PlayTravauxUseCase>,
-    pub roll_steal_uc: Arc<dyn crate::ports::inbound::roll_steal::RollStealUseCase>,
-    pub coude_flavor_templates_repo: Arc<dyn crate::ports::outbound::CoudeFlavorTemplatesRepository>,
+        Arc<dyn crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase>,
+    pub coude_steal_boosts_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase>,
+    pub coude_taunts_uc: Arc<dyn crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase>,
+    pub coude_heist_uc: Arc<dyn crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase>,
+    pub coude_curses_uc: Arc<dyn crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase>,
+    pub coude_safety_net_uc: Arc<dyn crate::ports::inbound::coude::manage_safety_net::ManageCoudeSafetyNetUseCase>,
+    pub coude_vendetta_uc: Arc<dyn crate::ports::inbound::coude::manage_vendetta::ManageCoudeVendettaUseCase>,
+    pub coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository>,
+    pub play_tout_ou_rien_uc: Arc<dyn crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase>,
+    pub play_travaux_uc: Arc<dyn crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase>,
+    pub roll_steal_uc: Arc<dyn crate::ports::inbound::coude::roll_steal::RollStealUseCase>,
+    pub coude_flavor_templates_repo: Arc<dyn crate::ports::outbound::coude::flavor_templates_repository::CoudeFlavorTemplatesRepository>,
     pub discord_action_messages_uc:
-        Arc<dyn crate::ports::inbound::ManageDiscordActionMessagesUseCase>,
-    pub coude_bounty_repo: Arc<dyn crate::ports::outbound::CoudeBountyRepository>,
-    pub coude_refusal_count_repo: Arc<dyn crate::ports::outbound::CoudeRefusalCountRepository>,
-    pub coude_coalition_repo: Arc<dyn crate::ports::outbound::CoudeCoalitionRepository>,
-    pub coude_ultimate_repo: Arc<dyn crate::ports::outbound::CoudeUltimateRepository>,
+        Arc<dyn crate::ports::inbound::audit::manage_discord_action_messages::ManageDiscordActionMessagesUseCase>,
+    pub coude_bounty_repo: Arc<dyn crate::ports::outbound::coude::bounty_repository::CoudeBountyRepository>,
+    pub coude_refusal_count_repo: Arc<dyn crate::ports::outbound::coude::refusal_count_repository::CoudeRefusalCountRepository>,
+    pub coude_coalition_repo: Arc<dyn crate::ports::outbound::coude::coalition_repository::CoudeCoalitionRepository>,
+    pub coude_ultimate_repo: Arc<dyn crate::ports::outbound::coude::ultimate_repository::CoudeUltimateRepository>,
     pub broadcaster: Arc<EventBroadcaster>,
     #[allow(dead_code)]
     pub job_client: JobClient,
@@ -89,18 +108,18 @@ pub struct AppState {
     pub api_key: String,
     #[allow(dead_code)]
     pub discord_bot_token: String,
-    pub user_activity_repo: Arc<dyn crate::ports::outbound::UserActivityRepository>,
-    pub welcome_config_uc: Arc<dyn crate::ports::inbound::ManageWelcomeConfigUseCase>,
-    pub automod_reviews_uc: Arc<dyn crate::ports::inbound::ManageAutomodReviewsUseCase>,
-    pub export_uc: Arc<dyn crate::application::ExecuteExportUseCase>,
-    pub evidence_repo: Arc<dyn crate::ports::outbound::EvidenceRepository>,
-    pub review_repo: Arc<dyn crate::ports::outbound::ReviewRepository>,
-    pub modstats_repo: Arc<dyn crate::ports::outbound::ModstatsRepository>,
-    pub game_repo: Arc<dyn crate::ports::outbound::GameRepository>,
-    pub sponsorship_repo: Arc<dyn crate::ports::outbound::SponsorshipRepository>,
-    pub temp_role_repo: Arc<dyn crate::ports::outbound::TempRoleRepository>,
-    pub pending_action_repo: Arc<dyn crate::ports::outbound::PendingActionRepository>,
-    pub blackjack_table_repo: Arc<dyn crate::ports::outbound::BlackjackTableRepository>,
+    pub user_activity_repo: Arc<dyn crate::ports::outbound::audit::user_activity_repository::UserActivityRepository>,
+    pub welcome_config_uc: Arc<dyn crate::ports::inbound::community::manage_welcome_config::ManageWelcomeConfigUseCase>,
+    pub automod_reviews_uc: Arc<dyn crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase>,
+    pub export_uc: Arc<dyn crate::application::system::export_service::ExecuteExportUseCase>,
+    pub evidence_repo: Arc<dyn crate::ports::outbound::moderation::evidence_repository::EvidenceRepository>,
+    pub review_repo: Arc<dyn crate::ports::outbound::moderation::review_repository::ReviewRepository>,
+    pub modstats_repo: Arc<dyn crate::ports::outbound::audit::modstats_repository::ModstatsRepository>,
+    pub game_repo: Arc<dyn crate::ports::outbound::casino::game_repository::GameRepository>,
+    pub sponsorship_repo: Arc<dyn crate::ports::outbound::coude::sponsorship_repository::SponsorshipRepository>,
+    pub temp_role_repo: Arc<dyn crate::ports::outbound::community::temp_role_repository::TempRoleRepository>,
+    pub pending_action_repo: Arc<dyn crate::ports::outbound::moderation::pending_action_repository::PendingActionRepository>,
+    pub blackjack_table_repo: Arc<dyn crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository>,
     pub pg_pool: sqlx::PgPool,
     pub redis_client: redis::Client,
     pub cache: Option<Arc<RedisCache>>,

@@ -1,6 +1,10 @@
 use super::*;
-use crate::domain::entities::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
-use chrono::{TimeZone, Utc};
+use crate::domain::entities::community::role_panel::AutoRole;
+use crate::domain::entities::community::role_panel::RolePanel;
+use crate::domain::entities::community::role_panel::RolePanelDetail;
+use crate::domain::entities::community::role_panel::RolePanelEntry;
+use chrono::TimeZone;
+use chrono::Utc;
 use uuid::Uuid;
 
 fn sample_panel() -> RolePanel {

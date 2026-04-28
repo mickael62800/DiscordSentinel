@@ -1,8 +1,9 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
-use crate::domain::entities::SanctionReminder;
-use crate::ports::inbound::CreateReminderCommand;
+use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
+use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateReminderDto {

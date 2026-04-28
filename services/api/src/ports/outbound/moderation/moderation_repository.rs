@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::ModerationAction;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

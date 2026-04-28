@@ -8,16 +8,18 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{BotDefinition, BotGuildConfig};
+use sentinel_api::domain::entities::system::bot_config::BotDefinition;
+use sentinel_api::domain::entities::system::bot_config::BotGuildConfig;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::outbound::BotConfigRepository;
+use sentinel_api::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 use test_helpers::build_test_state_bot_config;
 

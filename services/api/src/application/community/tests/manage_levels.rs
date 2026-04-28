@@ -1,6 +1,10 @@
 use super::*;
-use crate::domain::entities::{LevelReward, UserLevel, XpSource};
-use crate::ports::inbound::manage_levels::{AddXpCommand, ManageLevelsUseCase, SaveLevelConfigCommand};
+use crate::domain::entities::community::level::LevelReward;
+use crate::domain::entities::community::level::UserLevel;
+use crate::domain::entities::community::level::XpSource;
+use crate::ports::inbound::community::manage_levels::AddXpCommand;
+use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use std::sync::Mutex as StdMutex;
 use chrono::Utc as ChronoUtc;
 

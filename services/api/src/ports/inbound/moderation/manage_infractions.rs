@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::Infraction;
+use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::errors::DomainError;
 
 pub struct InfractionFilters {

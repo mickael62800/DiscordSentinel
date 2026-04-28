@@ -5,8 +5,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgCoudeSocialRepository;
-use sentinel_api::domain::entities::{LeaderboardCategory, NewDailyChaos};
-use sentinel_api::ports::outbound::CoudeSocialRepository;
+use sentinel_api::domain::entities::coude::social::LeaderboardCategory;
+use sentinel_api::domain::entities::coude::social::NewDailyChaos;
+use sentinel_api::ports::outbound::coude::social_repository::CoudeSocialRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

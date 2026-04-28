@@ -1,26 +1,30 @@
 //! Tests de ManageConductService. Les flows sans HTTP Discord (config + CRUD points)
 //! sont couverts ici. Le mute_user (HTTP Discord PATCH) n'est pas testable sans mock.
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::application::ManageConductService;
-use crate::domain::entities::{
-    ConductConfig, ConductPointsLog, Infraction, UserConductPoints,
-};
+use crate::application::community::manage_conduct_service::ManageConductService;
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    AddPointsCommand, DeductPointsCommand, ManageConductUseCase, SaveConductConfigCommand,
-};
-use crate::ports::inbound::InfractionFilters;
-use crate::ports::outbound::{ConductRepository, InfractionRepository};
-use crate::adapters::outbound::{
-    DiscordApi, DiscordChannel, DiscordMember, DiscordUser,
-};
+use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
+use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::outbound::community::conduct_repository::ConductRepository;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::adapters::outbound::DiscordApi;
+use crate::adapters::outbound::DiscordChannel;
+use crate::adapters::outbound::DiscordMember;
+use crate::adapters::outbound::DiscordUser;
 use crate::adapters::outbound::discord_api::UserGuild;
 
 // ── Mocks ──

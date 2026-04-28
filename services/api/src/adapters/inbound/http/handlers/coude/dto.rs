@@ -3,14 +3,20 @@
 //! Chaque DTO de réponse dérive `Serialize` et fournit une conversion
 //! `From<domain_entity>` pour que les handlers restent des mappers triviaux.
 
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{
-    BetResolutionPlan, CoudeBet, CoudeCombat, CoudeCurrentSeason, CoudeEvent,
-    CoudeFighterBetBonus, CoudeInsurance, CoudeInventoryItem, CoudeLeaderboardEntry, CoudePlayer,
-    CoudePrime, XpProgress,
-};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::player::XpProgress;
 // ══════════════════════════════════════════════════════════════════════
 // ── Player DTOs ──
 // ══════════════════════════════════════════════════════════════════════

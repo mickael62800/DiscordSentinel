@@ -1,7 +1,10 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{DashboardStats, Guild, Infraction, LogEntry, Rule};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+use crate::domain::entities::system::guild::Guild;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::system::log_entry::LogEntry;
+use crate::domain::entities::system::rule::Rule;
 // ── Stats DTO (format desktop) ──
 
 #[derive(Debug, Serialize)]
@@ -122,8 +125,8 @@ impl From<Infraction> for DashboardInfractionDto {
     }
 }
 
-impl From<crate::domain::entities::ModerationAction> for DashboardInfractionDto {
-    fn from(action: crate::domain::entities::ModerationAction) -> Self {
+impl From<crate::domain::entities::moderation::moderation_action::ModerationAction> for DashboardInfractionDto {
+    fn from(action: crate::domain::entities::moderation::moderation_action::ModerationAction) -> Self {
         Self {
             id: action.id.to_string(),
             user_id: action.target_id,

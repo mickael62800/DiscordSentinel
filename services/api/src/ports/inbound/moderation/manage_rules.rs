@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::Rule;
+use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::FlagType;
+use crate::domain::enums::moderation::flag_type::FlagType;
 
 pub struct CreateRuleCommand {
     pub guild_id: String,

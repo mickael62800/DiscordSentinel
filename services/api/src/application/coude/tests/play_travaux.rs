@@ -1,25 +1,35 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
-use sqlx::{Postgres, Transaction};
-
-use crate::application::play_travaux_service::PlayTravauxService;
-use crate::domain::entities::{
-    CombatStat, CoudeCurrentSeason, CoudeEvent, CoudeHeistAttempt, CoudeLeaderboardEntry,
-    CoudePlayer, CoudePrisonState, LeaderboardCategory, NewDailyChaos, TauntEvent, XpProgress,
-    TRAVAUX_COOLDOWN_KEY, TRAVAUX_COOLDOWN_SECS,
-};
-use crate::domain::value_objects::CoudeClass;
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::Utc;
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::application::coude::play_travaux_service::PlayTravauxService;
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::heist::CoudeHeistAttempt;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::heist::CoudePrisonState;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::entities::coude::travaux::TRAVAUX_COOLDOWN_KEY;
+use crate::domain::entities::coude::travaux::TRAVAUX_COOLDOWN_SECS;
+use crate::domain::enums::coude::coude_class::CoudeClass;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
-use crate::ports::inbound::play_travaux::{PlayTravauxCommand, PlayTravauxUseCase};
-use crate::ports::outbound::{
-    CoudeHeistRepository, CoudePlayerRepository, CoudeSocialRepository,
-};
-
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::inbound::coude::play_travaux::PlayTravauxCommand;
+use crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase;
+use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
 // ── Mocks ───────────────────────────────────────────────────────────
 
 struct MockHeistRepo {

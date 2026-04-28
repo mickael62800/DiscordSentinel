@@ -5,7 +5,8 @@
 //! puis en les redistribuant aleatoirement chaque semaine aux joueurs
 //! actifs.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 /// Etat de la caisse d'une guild.

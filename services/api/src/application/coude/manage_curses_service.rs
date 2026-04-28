@@ -5,13 +5,15 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::domain::entities::{
-    lift_cost, pick_curse_by_index, ActiveCurse, CurseKind,
-};
+use crate::domain::entities::coude::curse::lift_cost;
+use crate::domain::entities::coude::curse::pick_curse_by_index;
+use crate::domain::entities::coude::curse::ActiveCurse;
+use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_curses::{CastedCurse, ManageCoudeCursesUseCase};
-use crate::ports::outbound::{CoudeCursesRepository, WalletRepository};
-
+use crate::ports::inbound::coude::manage_curses::CastedCurse;
+use crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase;
+use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 const CAST_SOURCE: &str = "curse_cast";
 const LIFT_SOURCE: &str = "curse_lift";
 

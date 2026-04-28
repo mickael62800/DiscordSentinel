@@ -5,8 +5,10 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgConductRepository;
-use sentinel_api::domain::entities::{ConductConfig, ConductPointsLog, UserConductPoints};
-use sentinel_api::ports::outbound::ConductRepository;
+use sentinel_api::domain::entities::community::conduct::ConductConfig;
+use sentinel_api::domain::entities::community::conduct::ConductPointsLog;
+use sentinel_api::domain::entities::community::conduct::UserConductPoints;
+use sentinel_api::ports::outbound::community::conduct_repository::ConductRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

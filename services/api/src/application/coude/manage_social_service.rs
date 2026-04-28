@@ -5,21 +5,28 @@ mod tests;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use tracing::info;
 
-use crate::domain::entities::{
-    clamp_leaderboard_limit, daily_chaos_amount, CoudeCurrentSeason, CoudeEvent,
-    CoudeLeaderboardEntry, DailyChaosOutcome, LeaderboardCategory, NewDailyChaos,
-    DAILY_CHAOS_MAX, DEFAULT_CHAOS_PERCENT, MIN_COINS_ELIGIBLE,
-};
+use crate::domain::entities::coude::social::clamp_leaderboard_limit;
+use crate::domain::entities::coude::social::daily_chaos_amount;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::DailyChaosOutcome;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::social::DAILY_CHAOS_MAX;
+use crate::domain::entities::coude::social::DEFAULT_CHAOS_PERCENT;
+use crate::domain::entities::coude::social::MIN_COINS_ELIGIBLE;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_social::ManageCoudeSocialUseCase;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::{
-    BotConfigRepository, CoudeEconomyRepository, CoudePlayerRepository, CoudeSocialRepository,
-};
-
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
 // DAILY_CHAOS_MAX / DEFAULT_CHAOS_PERCENT / MIN_COINS_ELIGIBLE vivent
 // dans domain/entities/coude_social.rs (regles metier reutilisables).
 

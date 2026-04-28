@@ -1,10 +1,11 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 
-use crate::domain::entities::GuildMember;
+use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::MemberRepository;
+use crate::ports::outbound::community::member_repository::MemberRepository;
 
 pub struct PgMemberRepository {
     pool: PgPool,

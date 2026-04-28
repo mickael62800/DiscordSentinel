@@ -12,21 +12,25 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_inventory_service_server::CoudeInventoryService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime};
-use crate::ports::inbound::ManageCoudeInventoryUseCase;
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 
 use super::parse_uuid;
 
 pub struct CoudeInventoryGrpc {
     pub uc: Arc<dyn ManageCoudeInventoryUseCase>,
-    pub steal_protections_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealProtectionsUseCase>,
-    pub steal_boosts_uc: Arc<dyn crate::ports::inbound::ManageCoudeStealBoostsUseCase>,
+    pub steal_protections_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase>,
+    pub steal_boosts_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase>,
 }
 
 pub(super) fn inventory_item_to_proto(i: CoudeInventoryItem) -> proto::CoudeInventoryItem {
@@ -366,7 +370,7 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
 #[path = "tests/inventory.rs"]
 mod tests;
 
-pub(super) fn steal_boost_to_proto(b: crate::domain::entities::CoudeStealBoost) -> proto::CoudeStealBoost {
+pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boost::CoudeStealBoost) -> proto::CoudeStealBoost {
     proto::CoudeStealBoost {
         id: b.id.to_string(),
         guild_id: b.guild_id,
@@ -378,7 +382,7 @@ pub(super) fn steal_boost_to_proto(b: crate::domain::entities::CoudeStealBoost) 
 }
 
 pub(super) fn steal_protection_to_proto(
-    p: crate::domain::entities::CoudeStealProtection,
+    p: crate::domain::entities::coude::steal_protection::CoudeStealProtection,
 ) -> proto::CoudeStealProtection {
     proto::CoudeStealProtection {
         id: p.id.to_string(),
@@ -392,8 +396,8 @@ pub(super) fn steal_protection_to_proto(
 
 pub(super) fn proto_steal_duration_to_domain(
     v: i32,
-) -> Option<crate::domain::entities::StealProtectionDuration> {
-    use crate::domain::entities::StealProtectionDuration as D;
+) -> Option<crate::domain::entities::coude::steal_protection::StealProtectionDuration> {
+    use crate::domain::entities::coude::steal_protection::StealProtectionDuration as D;
     use proto::StealProtectionDurationKind as P;
     match P::try_from(v).ok()? {
         P::StealProtectionDurationUnspecified => None,

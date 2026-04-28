@@ -14,16 +14,17 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::{cowardice_penalty, should_count_as_cowardice, CashboxSource};
+use crate::domain::entities::coude::expire::cowardice_penalty;
+use crate::domain::entities::coude::cowardice_relief::should_count_as_cowardice;
+use crate::domain::entities::coude::cashbox::CashboxSource;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::expire_combats_batch::{
-    ExpireCombatsBatchUseCase, ExpiredCombatOutput,
-};
-use crate::ports::inbound::ManageCoudeBetsUseCase;
-use crate::ports::outbound::{
-    CoudeCashboxRepository, CoudeCombatRepository, CoudePlayerRepository, WalletRepository,
-};
-
+use crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase;
+use crate::ports::inbound::coude::expire_combats_batch::ExpiredCombatOutput;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// 24h par defaut, override par guild via bot_guild_config.
 const DEFAULT_EXPIRY_HOURS: i64 = 24;
 

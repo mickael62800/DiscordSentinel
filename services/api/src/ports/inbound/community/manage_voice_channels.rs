@@ -1,6 +1,11 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{VoiceChannel, VoiceChannelConfig, VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry};
+use crate::domain::entities::community::voice_channel::VoiceChannel;
+use crate::domain::entities::community::voice_channel::VoiceChannelConfig;
+use crate::domain::entities::community::voice_channel::VoiceChannelDetail;
+use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
+use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
 
 pub struct CreateVoiceChannelCommand {

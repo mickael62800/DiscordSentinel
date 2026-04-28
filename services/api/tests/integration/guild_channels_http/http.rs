@@ -6,7 +6,8 @@ mod test_helpers;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
@@ -51,7 +52,10 @@ async fn list_text_channels_second_call_hits_cache() {
 // DiscordApi local qui retourne une liste configurable pour tester le path
 // "serialize + set cache" quand la reponse n'est pas vide.
 use async_trait::async_trait;
-use sentinel_api::adapters::outbound::{DiscordApi, DiscordChannel, DiscordMember, DiscordUser};
+use sentinel_api::adapters::outbound::DiscordApi;
+use sentinel_api::adapters::outbound::DiscordChannel;
+use sentinel_api::adapters::outbound::DiscordMember;
+use sentinel_api::adapters::outbound::DiscordUser;
 use sentinel_api::adapters::outbound::discord_api::UserGuild;
 use sentinel_api::domain::errors::DomainError;
 

@@ -6,17 +6,21 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgAuditLogRepository, PgBotConfigRepository, PgNotesRepository, PgReminderRepository,
-    PgSecurityEventRepository,
-};
-use sentinel_api::domain::entities::{AuditLog, SanctionReminder, SecurityEvent, UserNote};
-use sentinel_api::ports::inbound::manage_audit_logs::AuditLogFilters;
-use sentinel_api::ports::outbound::{
-    AuditLogRepository, BotConfigRepository, NotesRepository, ReminderRepository,
-    SecurityEventRepository,
-};
-
+use sentinel_api::adapters::outbound::postgres::PgAuditLogRepository;
+use sentinel_api::adapters::outbound::postgres::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::PgNotesRepository;
+use sentinel_api::adapters::outbound::postgres::PgReminderRepository;
+use sentinel_api::adapters::outbound::postgres::PgSecurityEventRepository;
+use sentinel_api::domain::entities::audit::audit_log::AuditLog;
+use sentinel_api::domain::entities::moderation::sanction_reminder::SanctionReminder;
+use sentinel_api::domain::entities::audit::security_event::SecurityEvent;
+use sentinel_api::domain::entities::moderation::user_note::UserNote;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_api::ports::outbound::audit::audit_log_repository::AuditLogRepository;
+use sentinel_api::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use sentinel_api::ports::outbound::moderation::notes_repository::NotesRepository;
+use sentinel_api::ports::outbound::moderation::reminder_repository::ReminderRepository;
+use sentinel_api::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

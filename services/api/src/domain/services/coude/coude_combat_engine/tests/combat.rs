@@ -70,8 +70,7 @@ fn draw_path_pas_de_winner() {
 //  Tests cibles sur les branches non couvertes
 // ══════════════════════════════════════════════════════════
 
-use crate::domain::services::coude_combat_engine::{ServerEventLite as Event};
-
+use crate::domain::services::coude::coude_combat_engine::ServerEventLite as Event;
 // ── effective_stats et calculate_hp_max ──
 
 #[test]

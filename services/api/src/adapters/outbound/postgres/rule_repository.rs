@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::Rule;
+use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::FlagType;
-use crate::ports::outbound::RuleRepository;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::ports::outbound::moderation::rule_repository::RuleRepository;
 
 pub struct PgRuleRepository {
     pool: PgPool,

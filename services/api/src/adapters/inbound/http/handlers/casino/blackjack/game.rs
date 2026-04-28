@@ -3,14 +3,18 @@
 //! Tous délèguent à `state.blackjack_svc` et broadcastent un événement
 //! `blackjack_result` via le broadcaster quand la partie se termine.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
 
-use super::dto::{game_is_over, to_dto, BlackjackGameDto, StartGameDto};
+use super::dto::game_is_over;
+use super::dto::to_dto;
+use super::dto::BlackjackGameDto;
+use super::dto::StartGameDto;
 use super::parse_uuid;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::BlackjackGame;
+use crate::domain::entities::casino::blackjack::BlackjackGame;
 
 /// Diffuse un événement `blackjack_result` pour la partie terminée.
 fn broadcast_result(state: &AppState, game: &BlackjackGame, doubled: bool) {
@@ -44,7 +48,7 @@ pub async fn start_game(
         .into_iter()
         .map(|c| (c.config_key, c.config_value))
         .collect();
-    let cfg = crate::domain::entities::BlackjackConfig::from_kv_pairs(&pairs);
+    let cfg = crate::domain::entities::casino::blackjack::BlackjackConfig::from_kv_pairs(&pairs);
 
     let result = state
         .blackjack_svc

@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::value_objects::FlagType;
+use crate::domain::enums::moderation::flag_type::FlagType;
 
 #[test]
 fn new_sets_default_weight_matching_flag_type() {

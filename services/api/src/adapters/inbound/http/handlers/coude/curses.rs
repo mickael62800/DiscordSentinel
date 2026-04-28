@@ -6,15 +6,18 @@
 //!
 //! Logique metier zero : delegation au use case.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
+use chrono::DateTime;
+use chrono::Utc;
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{ActiveCurse, CurseKind};
+use crate::domain::entities::coude::curse::ActiveCurse;
+use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]

@@ -4,10 +4,12 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::AuditLog;
+use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_audit_logs::{AuditLogFilters, CreateAuditLogCommand, ManageAuditLogsUseCase};
-use crate::ports::outbound::AuditLogRepository;
+use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 
 pub struct ManageAuditLogsService {
     repo: Arc<dyn AuditLogRepository>,

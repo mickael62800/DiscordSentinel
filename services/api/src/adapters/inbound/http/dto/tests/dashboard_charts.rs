@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::entities::DailyActivity;
+use crate::domain::entities::community::daily_activity::DailyActivity;
 use chrono::NaiveDate;
 use uuid::Uuid;
 

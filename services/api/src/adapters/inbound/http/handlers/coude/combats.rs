@@ -1,21 +1,28 @@
 //! Handlers combats : cycle de vie complet (création, transitions, résolution,
 //! expiration, annulation) + lectures associées. Délèguent à `state.coude_combats_uc`.
 
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, Json};
-
-use super::dto::{
-    CombatDto, CombatQueryParams, CreateCombatDto, DefenderSpecialDto, FullCombatDto,
-    ResolveCombatDto, SetBettingDto,
-};
+use axum::Extension;
+use axum::Json;
+use super::dto::CombatDto;
+use super::dto::CombatQueryParams;
+use super::dto::CreateCombatDto;
+use super::dto::DefenderSpecialDto;
+use super::dto::FullCombatDto;
+use super::dto::ResolveCombatDto;
+use super::dto::SetBettingDto;
 use super::parse_combat_id;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{CombatResolution, NewCoudeCombat};
-
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
 // ── Lecture ──
 
 /// GET /api/coude/{guild_id}/combats — liste des combats
@@ -24,7 +31,7 @@ pub async fn list_combats(
     Path(guild_id): Path<String>,
     Query(params): Query<CombatQueryParams>,
 ) -> Result<Json<Vec<CombatDto>>, ApiError> {
-    let limit = params.limit.unwrap_or(crate::domain::entities::DEFAULT_COUDE_COMBATS_LIMIT);
+    let limit = params.limit.unwrap_or(crate::domain::entities::coude::limits::DEFAULT_COUDE_COMBATS_LIMIT);
     let combats = state
         .coude_combats_uc
         .list(&guild_id, params.status.as_deref(), limit)

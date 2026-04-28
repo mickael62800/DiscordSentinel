@@ -8,19 +8,23 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{LevelConfig, LevelReward, UserLevel, XpSource};
+use sentinel_api::domain::entities::community::level::LevelConfig;
+use sentinel_api::domain::entities::community::level::LevelReward;
+use sentinel_api::domain::entities::community::level::UserLevel;
+use sentinel_api::domain::entities::community::level::XpSource;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_levels::{
-    AddXpCommand, AddXpResult, ManageLevelsUseCase, SaveLevelConfigCommand,
-};
-
+use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
+use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_api::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use test_helpers::build_test_state_levels;
 
 // ══════════════════════════════════════════════════════════

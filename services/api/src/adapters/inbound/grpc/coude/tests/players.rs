@@ -1,18 +1,22 @@
 use super::*;
 use async_trait::async_trait;
 use chrono::Utc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::domain::entities::{CombatStat, CoudePlayer, TauntEvent, XpProgress};
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::CoudeClass;
-use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::inbound::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
-use sqlx::{Postgres, Transaction};
-
+use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use sqlx::Postgres;
+use sqlx::Transaction;
 // ── Mocks ──
 
 #[derive(Default)]

@@ -1,14 +1,15 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use axum::extract::{Request, State};
+use axum::extract::Request;
+use axum::extract::State;
 use axum::middleware::Next;
 use axum::response::Response;
 
 use tracing::warn;
 
-use crate::domain::entities::LogEntry;
-use crate::ports::outbound::LogRepository;
+use crate::domain::entities::system::log_entry::LogEntry;
+use crate::ports::outbound::system::log_repository::LogRepository;
 
 pub async fn api_logger_middleware(
     State(log_repo): State<Arc<dyn LogRepository>>,

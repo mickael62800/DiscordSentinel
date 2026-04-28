@@ -1,7 +1,12 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry};
+use crate::domain::entities::community::voice_channel::VoiceChannel;
+use crate::domain::entities::community::voice_channel::VoiceChannelBan;
+use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
+use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
+use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::LogEntry;
+use crate::domain::entities::system::log_entry::LogEntry;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

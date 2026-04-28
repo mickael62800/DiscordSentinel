@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::DailyActivity;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::community::daily_activity::DailyActivity;
 
 #[derive(Debug, Deserialize)]
 pub struct ChartQueryParams {

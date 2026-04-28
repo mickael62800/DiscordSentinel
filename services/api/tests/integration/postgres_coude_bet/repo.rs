@@ -8,16 +8,16 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgCoudeBetRepository, PgWalletRepository,
-};
-use sentinel_api::application::ManageWalletService;
-use sentinel_api::domain::entities::{
-    calculate_bet_resolution, CoudeTauntsConfig, NewCoudeBet, TauntEvent,
-};
+use sentinel_api::adapters::outbound::postgres::PgCoudeBetRepository;
+use sentinel_api::adapters::outbound::postgres::PgWalletRepository;
+use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
+use sentinel_api::domain::entities::coude::bet::calculate_bet_resolution;
+use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
+use sentinel_api::domain::entities::coude::bet::NewCoudeBet;
+use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::manage_coude_taunts::ManageCoudeTauntsUseCase;
-use sentinel_api::ports::outbound::CoudeBetRepository;
+use sentinel_api::ports::outbound::coude::bet_repository::CoudeBetRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

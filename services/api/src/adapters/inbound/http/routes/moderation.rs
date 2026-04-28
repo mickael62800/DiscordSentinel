@@ -1,6 +1,9 @@
 //! Routes moderation + strikes + notes + reminders.
 
-use axum::routing::{delete, get, patch, post};
+use axum::routing::delete;
+use axum::routing::get;
+use axum::routing::patch;
+use axum::routing::post;
 use axum::Router;
 
 use super::super::handlers;
@@ -25,23 +28,23 @@ fn moderation_inner() -> Router<AppState> {
 
 fn strikes_inner() -> Router<AppState> {
     Router::new()
-        .route("/config/{guild_id}", get(handlers::strikes::get_config).put(handlers::strikes::save_config))
-        .route("/{guild_id}/{user_id}", get(handlers::strikes::get_active_strikes).delete(handlers::strikes::reset_strikes))
-        .route("/", post(handlers::strikes::add_strike))
+        .route("/config/{guild_id}", get(handlers::moderation::strikes::get_config).put(handlers::moderation::strikes::save_config))
+        .route("/{guild_id}/{user_id}", get(handlers::moderation::strikes::get_active_strikes).delete(handlers::moderation::strikes::reset_strikes))
+        .route("/", post(handlers::moderation::strikes::add_strike))
 }
 
 fn notes_inner() -> Router<AppState> {
     Router::new()
-        .route("/", post(handlers::notes::add_note))
-        .route("/{guild_id}/{user_id}", get(handlers::notes::get_notes))
-        .route("/{id}", delete(handlers::notes::delete_note))
+        .route("/", post(handlers::moderation::notes::add_note))
+        .route("/{guild_id}/{user_id}", get(handlers::moderation::notes::get_notes))
+        .route("/{id}", delete(handlers::moderation::notes::delete_note))
 }
 
 fn reminders_inner() -> Router<AppState> {
     Router::new()
-        .route("/", post(handlers::reminders::create_reminder))
-        .route("/pending", get(handlers::reminders::get_pending))
-        .route("/{guild_id}", get(handlers::reminders::list_by_guild))
+        .route("/", post(handlers::moderation::reminders::create_reminder))
+        .route("/pending", get(handlers::moderation::reminders::get_pending))
+        .route("/{guild_id}", get(handlers::moderation::reminders::list_by_guild))
 }
 
 pub fn routes() -> Router<AppState> {

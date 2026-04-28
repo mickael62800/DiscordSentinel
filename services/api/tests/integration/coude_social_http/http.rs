@@ -8,18 +8,24 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use axum::http::Request;
+use axum::http::StatusCode;
+use chrono::DateTime;
+use chrono::Duration;
+use chrono::TimeZone;
+use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, DailyChaosOutcome,
-    LeaderboardCategory, NewDailyChaos,
-};
+use sentinel_api::domain::entities::coude::social::CoudeCurrentSeason;
+use sentinel_api::domain::entities::coude::social::CoudeEvent;
+use sentinel_api::domain::entities::coude::social::CoudeLeaderboardEntry;
+use sentinel_api::domain::entities::coude::social::DailyChaosOutcome;
+use sentinel_api::domain::entities::coude::social::LeaderboardCategory;
+use sentinel_api::domain::entities::coude::social::NewDailyChaos;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::ManageCoudeSocialUseCase;
+use sentinel_api::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 
 #[derive(Default)]
 struct MockSocial {

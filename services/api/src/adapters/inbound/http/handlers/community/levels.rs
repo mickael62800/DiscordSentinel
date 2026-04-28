@@ -1,15 +1,23 @@
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::Json;
 
-use crate::adapters::inbound::http::dto::levels::{
-    AddXpDto, AddXpResponseDto, LevelConfigDto, LevelLeaderboardParams, LevelRewardDto,
-    SaveLevelConfigDto, SetRewardDto, UserLevelDto,
-};
+use crate::adapters::inbound::http::dto::levels::AddXpDto;
+use crate::adapters::inbound::http::dto::levels::AddXpResponseDto;
+use crate::adapters::inbound::http::dto::levels::LevelConfigDto;
+use crate::adapters::inbound::http::dto::levels::LevelLeaderboardParams;
+use crate::adapters::inbound::http::dto::levels::LevelRewardDto;
+use crate::adapters::inbound::http::dto::levels::SaveLevelConfigDto;
+use crate::adapters::inbound::http::dto::levels::SetRewardDto;
+use crate::adapters::inbound::http::dto::levels::UserLevelDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
+use crate::adapters::inbound::http::helpers::map_to_dtos;
+use crate::adapters::inbound::http::helpers::normalize_limit;
+use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::XpSource;
-use crate::ports::inbound::manage_levels::AddXpCommand;
+use crate::domain::entities::community::level::XpSource;
+use crate::ports::inbound::community::manage_levels::AddXpCommand;
 
 pub async fn get_config(
     State(state): State<AppState>,

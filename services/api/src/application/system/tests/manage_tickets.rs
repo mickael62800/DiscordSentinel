@@ -1,17 +1,20 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::ManageTicketsService;
-use crate::domain::entities::{Rule, Ticket, TicketMessage};
+use crate::application::system::manage_tickets_service::ManageTicketsService;
+use crate::domain::entities::system::rule::Rule;
+use crate::domain::entities::system::ticket::Ticket;
+use crate::domain::entities::system::ticket::TicketMessage;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
-    UpdateTicketChannelCommand,
-};
-use crate::ports::outbound::{CachePort, TicketRepository};
-
+use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
+use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
+use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
+use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
+use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::system::ticket_repository::TicketRepository;
 #[derive(Default)]
 struct MockTicketRepo {
     tickets: Mutex<Vec<Ticket>>,

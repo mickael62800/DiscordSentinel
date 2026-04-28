@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::WatchedUser;
+use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

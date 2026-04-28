@@ -21,26 +21,44 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::{DateTime, TimeZone, Utc};
+use chrono::DateTime;
+use chrono::TimeZone;
+use chrono::Utc;
 use tokio::sync::oneshot;
-use tonic::transport::{Endpoint, Server};
+use tonic::transport::Endpoint;
+use tonic::transport::Server;
 use uuid::Uuid;
 
-use sentinel_api::adapters::inbound::grpc::coude::{
-    CoudeBetsGrpc, CoudeCombatsGrpc, CoudeEconomyGrpc, CoudeInventoryGrpc, CoudePlayerGrpc,
-    CoudeSocialGrpc,
-};
-use sentinel_api::domain::entities::{
-    CombatResolution, CombatStat, CoudeBet, CoudeCombat, CoudeCurrentSeason, CoudeEvent,
-    CoudeInsurance, CoudeInventoryItem, CoudeLeaderboardEntry, CoudePlayer, CoudePrime,
-    LeaderboardCategory, NewCoudeBet, NewCoudeCombat, NewCoudePrime, NewDailyChaos, RefundSummary,
-    XpProgress,
-};
+use sentinel_api::adapters::inbound::grpc::coude::CoudeBetsGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::CoudeCombatsGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::CoudeEconomyGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::CoudeInventoryGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::CoudePlayerGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::CoudeSocialGrpc;
+use sentinel_api::domain::entities::coude::combat::CombatResolution;
+use sentinel_api::domain::entities::coude::player::CombatStat;
+use sentinel_api::domain::entities::coude::bet::CoudeBet;
+use sentinel_api::domain::entities::coude::combat::CoudeCombat;
+use sentinel_api::domain::entities::coude::social::CoudeCurrentSeason;
+use sentinel_api::domain::entities::coude::social::CoudeEvent;
+use sentinel_api::domain::entities::coude::inventory::CoudeInsurance;
+use sentinel_api::domain::entities::coude::inventory::CoudeInventoryItem;
+use sentinel_api::domain::entities::coude::social::CoudeLeaderboardEntry;
+use sentinel_api::domain::entities::coude::player::CoudePlayer;
+use sentinel_api::domain::entities::coude::inventory::CoudePrime;
+use sentinel_api::domain::entities::coude::social::LeaderboardCategory;
+use sentinel_api::domain::entities::coude::bet::NewCoudeBet;
+use sentinel_api::domain::entities::coude::combat::NewCoudeCombat;
+use sentinel_api::domain::entities::coude::inventory::NewCoudePrime;
+use sentinel_api::domain::entities::coude::social::NewDailyChaos;
+use sentinel_api::domain::entities::coude::bet::RefundSummary;
+use sentinel_api::domain::entities::coude::player::XpProgress;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::{
-    ManageCoudeBetsUseCase, ManageCoudeCombatsUseCase, ManageCoudeEconomyUseCase,
-    ManageCoudeInventoryUseCase, ManageCoudeSocialUseCase,
-};
+use sentinel_api::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use sentinel_api::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use sentinel_api::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use sentinel_api::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use sentinel_api::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use sentinel_api::ports::inbound::manage_coude_players::ManageCoudePlayersUseCase;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_bets_service_client::CoudeBetsServiceClient;
@@ -414,14 +432,14 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
     async fn place(
         &self,
         _: NewCoudeBet,
-    ) -> Result<sentinel_api::ports::inbound::PlaceBetOutcome, DomainError> {
+    ) -> Result<sentinel_api::ports::inbound::coude::manage_bets::PlaceBetOutcome, DomainError> {
         unimplemented!()
     }
     async fn resolve(
         &self,
         _: Uuid,
         _: Option<String>,
-    ) -> Result<sentinel_api::ports::inbound::ResolveBetsOutcome, DomainError> {
+    ) -> Result<sentinel_api::ports::inbound::coude::manage_bets::ResolveBetsOutcome, DomainError> {
         unimplemented!()
     }
     async fn refund(&self, _: Uuid) -> Result<RefundSummary, DomainError> { unimplemented!() }
@@ -457,7 +475,7 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
         from: &str,
         to: &str,
         amount: i64,
-    ) -> Result<Vec<sentinel_api::domain::entities::TauntEvent>, DomainError> {
+    ) -> Result<Vec<sentinel_api::domain::entities::coude::taunt::TauntEvent>, DomainError> {
         if from == to || amount <= 0 {
             return Err(DomainError::ValidationError("transfer invalide".into()));
         }
@@ -465,7 +483,7 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
     }
     async fn count_casino_today(&self, _: &str, _: &str) -> Result<i64, DomainError> { Ok(7) }
     async fn steal(&self, _: &str, _: &str, _: &str, _: i64) -> Result<sentinel_api::ports::inbound::manage_coude_economy::StealOutcome, DomainError> { unimplemented!() }
-    async fn steal_fail_penalty(&self, _: &str, _: &str, _: i64) -> Result<(i64, Vec<sentinel_api::domain::entities::TauntEvent>), DomainError> { unimplemented!() }
+    async fn steal_fail_penalty(&self, _: &str, _: &str, _: i64) -> Result<(i64, Vec<sentinel_api::domain::entities::coude::taunt::TauntEvent>), DomainError> { unimplemented!() }
     async fn record_casino_win(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_casino_faillite(&self, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
@@ -565,7 +583,7 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
             value: 1000 - i * 100,
         }).collect())
     }
-    async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<sentinel_api::domain::entities::DailyChaosOutcome>, DomainError> { Ok(None) }
+    async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<sentinel_api::domain::entities::coude::social::DailyChaosOutcome>, DomainError> { Ok(None) }
     async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
         Ok(CoudeCurrentSeason {
             season_number: 5,

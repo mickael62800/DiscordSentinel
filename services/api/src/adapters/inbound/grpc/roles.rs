@@ -3,16 +3,21 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::roles::v1 as proto;
 use sentinel_proto::roles::v1::role_panels_service_server::RolePanelsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{AutoRole, DiscordRole, RolePanel, RolePanelDetail, RolePanelEntry};
-use crate::ports::inbound::manage_role_panels::SetMessageIdCommand;
-use crate::ports::inbound::ManageRolePanelsUseCase;
-use crate::ports::outbound::DiscordRoleRepository;
+use crate::domain::entities::community::role_panel::AutoRole;
+use crate::domain::entities::system::discord_role::DiscordRole;
+use crate::domain::entities::community::role_panel::RolePanel;
+use crate::domain::entities::community::role_panel::RolePanelDetail;
+use crate::domain::entities::community::role_panel::RolePanelEntry;
+use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 
 pub struct RolePanelsGrpc {
     pub uc: Arc<dyn ManageRolePanelsUseCase>,

@@ -1,15 +1,18 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, LeaderboardCategory, NewDailyChaos,
-};
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
-use crate::ports::outbound::CoudeSocialRepository;
+use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
 
 pub struct PgCoudeSocialRepository {
     pool: PgPool,

@@ -7,17 +7,21 @@ use std::sync::Mutex as StdMutex;
 
 use async_trait::async_trait;
 use chrono::Utc;
-use sqlx::{Postgres, Transaction};
+use sqlx::Postgres;
+use sqlx::Transaction;
 use uuid::Uuid;
 
-use crate::application::ManageWheelService;
-use crate::domain::entities::{TauntEvent, WheelSpin, WheelTopWinner};
+use crate::application::casino::manage_wheel_service::ManageWheelService;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wheel::WheelSpin;
+use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
-use crate::ports::inbound::manage_wheel::{ManageWheelUseCase, WheelSpinCommand};
-use crate::ports::outbound::WheelRepository;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::inbound::casino::manage_wheel::ManageWheelUseCase;
+use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
+use crate::ports::outbound::casino::wheel_repository::WheelRepository;
 
 #[derive(Default)]
 struct MockWheelRepo {

@@ -5,11 +5,13 @@
 //! prend `&PgCoudePlayerRepository` en argument, appelee par la thin
 //! trait impl dans `mod.rs`.
 
-use crate::domain::entities::CoudePlayer;
+use crate::domain::entities::coude::player::CoudePlayer;
 use crate::domain::errors::DomainError;
 
-use super::{pg_err, PgCoudePlayerRepository, PlayerRow, PLAYER_COLUMNS};
-
+use super::pg_err;
+use super::PgCoudePlayerRepository;
+use super::PlayerRow;
+use super::PLAYER_COLUMNS;
 pub(super) async fn get_or_create(
     repo: &PgCoudePlayerRepository,
     guild_id: &str,

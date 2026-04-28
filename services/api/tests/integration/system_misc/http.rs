@@ -4,7 +4,8 @@
 mod test_helpers;
 
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 

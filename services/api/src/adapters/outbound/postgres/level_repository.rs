@@ -2,9 +2,12 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{LevelConfig, LevelReward, UserLevel, XpSource};
+use crate::domain::entities::community::level::LevelConfig;
+use crate::domain::entities::community::level::LevelReward;
+use crate::domain::entities::community::level::UserLevel;
+use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::LevelRepository;
+use crate::ports::outbound::community::level_repository::LevelRepository;
 
 pub struct PgLevelRepository {
     pool: PgPool,

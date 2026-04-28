@@ -1,7 +1,9 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{Ticket, TicketDetail, TicketMessage};
-use crate::ports::inbound::CreateTicketCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::system::ticket::Ticket;
+use crate::domain::entities::system::ticket::TicketDetail;
+use crate::domain::entities::system::ticket::TicketMessage;
+use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
 
 #[derive(Debug, Deserialize, Default)]
 pub struct ListTicketsQuery {

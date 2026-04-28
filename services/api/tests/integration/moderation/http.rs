@@ -7,16 +7,17 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::*;
+use sentinel_api::domain::entities::moderation::moderation_action::*;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::*;
+use sentinel_api::ports::inbound::moderation::manage_moderation::*;
 
 // ══════════════════════════════════════════════════════════
 // Mock Moderation Use Case
@@ -57,7 +58,7 @@ fn make_action(
         target_name: target_name.into(),
         action_type: action_type.into(),
         reason: reason.into(),
-        gravity: gravity.and_then(sentinel_api::domain::value_objects::ModerationGravity::from_str_lossy),
+        gravity: gravity.and_then(sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity::from_str_lossy),
         duration,
         created_at: Utc::now(),
     }
@@ -77,7 +78,7 @@ impl ManageModerationUseCase for MockModerationUC {
             target_name: cmd.target_name,
             action_type: cmd.action_type,
             reason: cmd.reason,
-            gravity: cmd.gravity.as_deref().and_then(sentinel_api::domain::value_objects::ModerationGravity::from_str_lossy),
+            gravity: cmd.gravity.as_deref().and_then(sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity::from_str_lossy),
             duration: cmd.duration,
             created_at: Utc::now(),
         })

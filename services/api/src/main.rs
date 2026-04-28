@@ -10,9 +10,10 @@ use std::time::Duration;
 
 use sqlx::PgPool;
 use tokio::signal;
-use tracing::{info, warn};
-
-use sentinel_api::adapters::inbound::http::{router, state::AppState};
+use tracing::info;
+use tracing::warn;
+use sentinel_api::adapters::inbound::http::router;
+use sentinel_api::adapters::inbound::http::state::AppState;
 use sentinel_api::bootstrap;
 use sentinel_api::config::AppConfig;
 
@@ -116,7 +117,7 @@ async fn serve_http(state: AppState, config: &AppConfig, pg_pool: PgPool) {
 
     // Log demarrage en BDD
     {
-        let entry = sentinel_api::domain::entities::LogEntry {
+        let entry = sentinel_api::domain::entities::system::log_entry::LogEntry {
             id: uuid::Uuid::new_v4(),
             timestamp: chrono::Utc::now(),
             level: "info".into(),
@@ -150,7 +151,7 @@ async fn serve_http(state: AppState, config: &AppConfig, pg_pool: PgPool) {
 
     // Log arret en BDD
     {
-        let entry = sentinel_api::domain::entities::LogEntry {
+        let entry = sentinel_api::domain::entities::system::log_entry::LogEntry {
             id: uuid::Uuid::new_v4(),
             timestamp: chrono::Utc::now(),
             level: "warn".into(),

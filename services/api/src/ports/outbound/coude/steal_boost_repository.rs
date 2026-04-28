@@ -1,9 +1,9 @@
 //! Port outbound pour les abonnements boost voleur (Phase 9 Part C).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-
-use crate::domain::entities::CoudeStealBoost;
+use chrono::DateTime;
+use chrono::Utc;
+use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

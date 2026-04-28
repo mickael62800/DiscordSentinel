@@ -2,10 +2,11 @@ use super::*;
 
 use std::sync::Mutex;
 
-use chrono::{Duration as ChronoDuration, Utc};
+use chrono::Duration as ChronoDuration;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::VendettaStatus;
+use crate::domain::entities::coude::vendetta::VendettaStatus;
 
 #[derive(Default)]
 struct MockRepo {

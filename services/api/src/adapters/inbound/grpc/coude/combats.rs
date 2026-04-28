@@ -8,22 +8,25 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
-use crate::ports::inbound::ManageCoudeCombatsUseCase;
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
+use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 
-use super::{parse_uuid, taunt_event_to_proto};
-
+use super::parse_uuid;
+use super::taunt_event_to_proto;
 pub struct CoudeCombatsGrpc {
     pub uc: Arc<dyn ManageCoudeCombatsUseCase>,
-    pub resolve_batch_uc: Arc<dyn crate::ports::inbound::ResolveBettingBatchUseCase>,
-    pub expire_batch_uc: Arc<dyn crate::ports::inbound::ExpireCombatsBatchUseCase>,
-    pub resolve_now_uc: Arc<dyn crate::ports::inbound::ResolveCombatNowUseCase>,
+    pub resolve_batch_uc: Arc<dyn crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase>,
+    pub expire_batch_uc: Arc<dyn crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase>,
+    pub resolve_now_uc: Arc<dyn crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase>,
 }
 
 #[cfg(test)]

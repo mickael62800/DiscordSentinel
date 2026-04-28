@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::ImageAnalysis;
+use crate::domain::entities::ai::image_analysis::ImageAnalysis;
 use crate::domain::errors::DomainError;
 
 #[allow(dead_code)]

@@ -3,15 +3,18 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    check_min_hp_pct, check_surprise_hp_pct, validate_new_combat, CombatResolution,
-    CoudeBalanceParams, CoudeCombat, NewCoudeCombat,
-};
+use crate::domain::entities::coude::combat_validation::check_min_hp_pct;
+use crate::domain::entities::coude::combat_validation::check_surprise_hp_pct;
+use crate::domain::entities::coude::combat_validation::validate_new_combat;
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_combats::ManageCoudeCombatsUseCase;
-use crate::ports::inbound::ManageCoudePlayersUseCase;
-use crate::ports::outbound::{BotConfigRepository, CoudeCombatRepository};
-
+use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
 pub struct ManageCoudeCombatsService {
     repo: Arc<dyn CoudeCombatRepository>,
     /// Optionnel : requis pour appliquer le gate `surprise_min_hp_percent`.
@@ -46,7 +49,7 @@ impl ManageCoudeCombatsService {
         let Some(repo) = self.bot_config_repo.as_ref() else {
             return CoudeBalanceParams::default();
         };
-        crate::application::guild_settings::load_balance_params(&**repo, guild_id).await
+        crate::application::coude::guild_settings::load_balance_params(&**repo, guild_id).await
     }
 }
 

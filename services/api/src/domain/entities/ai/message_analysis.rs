@@ -1,4 +1,4 @@
-use crate::domain::value_objects::Action;
+use crate::domain::enums::moderation::action::Action;
 
 /// Résultat de l'analyse d'un message par le domaine.
 #[derive(Debug, Clone)]

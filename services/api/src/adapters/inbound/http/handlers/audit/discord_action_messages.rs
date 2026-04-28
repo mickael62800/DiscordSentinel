@@ -2,16 +2,18 @@
 //! phase 1). Permet au bot d'enregistrer les messages qu'il poste, et au
 //! reste de l'API de retrouver `(channel_id, message_id)` pour edit.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{DiscordActionMessage, NewDiscordActionMessage};
-
+use crate::domain::entities::audit::discord_action_message::DiscordActionMessage;
+use crate::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 #[derive(Debug, Deserialize)]
 pub struct RegisterDto {
     pub action_id: Uuid,

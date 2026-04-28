@@ -8,7 +8,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::TauntEvent;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 
 /// Champ d'un embed Discord construit cote API, pret a etre affiche par le bot.

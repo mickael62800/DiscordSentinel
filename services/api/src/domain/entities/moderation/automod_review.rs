@@ -6,7 +6,8 @@
 //! Du coup la web peut lister les reviews pending et resoudre depuis l UI ;
 //! le bot edite la carte Discord en reaction (sync bilateral).
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

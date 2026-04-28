@@ -1,15 +1,19 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
-use sqlx::{Postgres, Transaction};
-
-use crate::application::ManageCoudeEconomyService;
-use crate::domain::entities::{CoudeTauntsConfig, StreakKind, TauntEvent};
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::application::coude::manage_economy_service::ManageCoudeEconomyService;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::StreakKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_economy::ManageCoudeEconomyUseCase;
-use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::inbound::manage_wallet::{ManageWalletUseCase, TxWalletMutation, WalletMutation};
-use crate::ports::outbound::CoudeEconomyRepository;
+use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
 
 struct MockEconomyRepo {
     coins: Mutex<std::collections::HashMap<String, i64>>,

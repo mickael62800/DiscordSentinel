@@ -1,13 +1,18 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
+use chrono::Duration;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::{StrikeConfig, StrikeResult, UserStrike};
+use crate::domain::entities::moderation::strikes::StrikeConfig;
+use crate::domain::entities::moderation::strikes::StrikeResult;
+use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{AddStrikeCommand, ManageStrikesUseCase, SaveStrikeConfigCommand};
-use crate::ports::outbound::StrikeRepository;
+use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
+use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
+use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
+use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 
 pub struct ManageStrikesService {
     repo: Arc<dyn StrikeRepository>,

@@ -2,27 +2,32 @@
 //! penalty debit → cashbox deposit → stats record → refund bets, avec les
 //! chemins degrades (debit echoue → pas de deposit, pas de stats).
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ExpireCombatsBatchService;
-use crate::domain::entities::{
-    CashboxSource, CombatResolution, CoudeBet, CoudeCashbox, CoudeCombat, NewCoudeCombat,
-    RefundSummary, Wallet, WalletTransaction,
-};
+use crate::application::coude::expire_combats_batch_service::ExpireCombatsBatchService;
+use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
+use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::expire_combats_batch::ExpireCombatsBatchUseCase;
-use crate::ports::inbound::manage_bets::{
-    ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
-};
-use crate::domain::entities::NewCoudeBet;
-use crate::ports::outbound::{
-    CoudeCashboxRepository, CoudeCombatRepository, CoudePlayerRepository, WalletRepository,
-};
-
+use crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
+use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 // ── MockCombatRepo (seul claim_expired_pending_combats est exerce) ──
 
 #[derive(Default)]
@@ -62,15 +67,15 @@ struct MockPlayerRepo {
 
 #[async_trait]
 impl CoudePlayerRepository for MockPlayerRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<crate::domain::entities::CoudePlayer, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::CoudePlayer>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::CoudePlayer>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<crate::domain::entities::CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<crate::domain::entities::coude::player::CoudePlayer, DomainError> { unimplemented!() }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(None) }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(vec![]) }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
-    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: crate::domain::entities::CombatStat) -> Result<Option<crate::domain::entities::CoudePlayer>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::CoudePlayer>, DomainError> { Ok(None) }
+    async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::coude::player::XpProgress>, DomainError> { Ok(None) }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: crate::domain::entities::coude::player::CombatStat) -> Result<Option<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(None) }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(None) }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
     async fn record_coins_lost(&self, g: &str, u: &str, amount: i64) -> Result<bool, DomainError> {
         self.record_lost_calls.lock().unwrap().push((g.into(), u.into(), amount));
@@ -152,8 +157,8 @@ impl CoudeCashboxRepository for MockCashboxRepo {
     async fn claim_all_for_redistribution(&self, _: &str) -> Result<i64, DomainError> { Ok(0) }
     async fn withdraw(&self, _: &str, _: i64) -> Result<i64, DomainError> { Ok(0) }
     async fn record_redistribution(&self, _: &str, _: i64, _: Vec<(String, String, i64)>) -> Result<Uuid, DomainError> { Ok(Uuid::new_v4()) }
-    async fn list_redistributions(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::CashboxRedistribution>, DomainError> { Ok(vec![]) }
-    async fn list_entries(&self, _: Uuid) -> Result<Vec<crate::domain::entities::CashboxRedistributionEntry>, DomainError> { Ok(vec![]) }
+    async fn list_redistributions(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistribution>, DomainError> { Ok(vec![]) }
+    async fn list_entries(&self, _: Uuid) -> Result<Vec<crate::domain::entities::coude::cashbox::CashboxRedistributionEntry>, DomainError> { Ok(vec![]) }
     async fn list_active_players(&self, _: &str, _: i64) -> Result<Vec<(String, String)>, DomainError> { Ok(vec![]) }
     async fn list_guilds_due_for_redistribution(&self, _: i64) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
 }

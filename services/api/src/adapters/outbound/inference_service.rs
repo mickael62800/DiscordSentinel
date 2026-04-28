@@ -1,11 +1,12 @@
 use std::path::Path;
-use std::sync::{Mutex, RwLock};
-
-use ndarray::{Array2, Array4};
+use std::sync::Mutex;
+use std::sync::RwLock;
+use ndarray::Array2;
+use ndarray::Array4;
 use ort::session::Session;
 use ort::value::Value;
-use tracing::{info, warn};
-
+use tracing::info;
+use tracing::warn;
 /// Classification produite par un modele ONNX.
 #[derive(Debug, Clone)]
 pub struct InferenceClassification {

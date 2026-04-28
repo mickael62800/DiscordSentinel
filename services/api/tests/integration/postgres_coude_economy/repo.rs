@@ -4,7 +4,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgCoudeEconomyRepository;
-use sentinel_api::ports::outbound::CoudeEconomyRepository;
+use sentinel_api::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

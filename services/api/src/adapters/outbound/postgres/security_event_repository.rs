@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::SecurityEvent;
+use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::SecurityEventRepository;
+use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
 
 pub struct PgSecurityEventRepository {
     pool: PgPool,

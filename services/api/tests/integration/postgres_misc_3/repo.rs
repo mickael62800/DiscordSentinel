@@ -5,14 +5,16 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgCoudeTauntsRepository, PgRolePanelRepository, PgWelcomeConfigRepository,
-};
-use sentinel_api::domain::entities::{AutoRole, RolePanel, RolePanelEntry};
-use sentinel_api::ports::outbound::{
-    CoudeTauntsRepository, RolePanelRepository, WelcomeConfigData, WelcomeConfigRepository,
-};
-
+use sentinel_api::adapters::outbound::postgres::PgCoudeTauntsRepository;
+use sentinel_api::adapters::outbound::postgres::PgRolePanelRepository;
+use sentinel_api::adapters::outbound::postgres::PgWelcomeConfigRepository;
+use sentinel_api::domain::entities::community::role_panel::AutoRole;
+use sentinel_api::domain::entities::community::role_panel::RolePanel;
+use sentinel_api::domain::entities::community::role_panel::RolePanelEntry;
+use sentinel_api::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
+use sentinel_api::ports::outbound::community::role_panel_repository::RolePanelRepository;
+use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

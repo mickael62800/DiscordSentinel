@@ -1,13 +1,17 @@
-use axum::extract::{Path, State};
-use axum::{Extension, Json};
-use serde::{Deserialize, Serialize};
-
+use axum::extract::Path;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
-use crate::adapters::inbound::http::middleware::rbac::{check_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::check_role;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{parse_discord_permissions_bitfield, DiscordRole};
-
+use crate::domain::entities::system::discord_role::parse_discord_permissions_bitfield;
+use crate::domain::entities::system::discord_role::DiscordRole;
 #[derive(Debug, Serialize)]
 pub struct DiscordRoleDto {
     pub id: String,

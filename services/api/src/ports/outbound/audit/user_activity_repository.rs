@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::UserActivity;
+use crate::domain::entities::audit::user_activity::UserActivity;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

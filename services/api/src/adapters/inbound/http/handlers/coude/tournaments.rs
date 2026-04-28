@@ -8,9 +8,11 @@
 //! que de passer par un use case / repository dedie. La logique metier
 //! (resolution, distribution du prix) vit dans le coude-worker, pas ici.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
@@ -50,8 +52,8 @@ pub struct PastTournamentDto {
 
 // Bornes de semaine + prize_pool : regles metier extraites vers
 // `domain/entities/coude_tournament.rs` (purement testables).
-use crate::domain::entities::{current_week_bounds, estimate_tournament_prize_pool};
-
+use crate::domain::entities::coude::tournament::current_week_bounds;
+use crate::domain::entities::coude::tournament::estimate_tournament_prize_pool;
 /// GET /api/coude/{guild_id}/tournaments/current
 pub async fn get_current_tournament(
     State(state): State<AppState>,

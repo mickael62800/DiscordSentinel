@@ -1,19 +1,24 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ManageStatsService;
-use crate::domain::entities::{Infraction, UserStats, VoiceSessionStats};
+use crate::application::audit::manage_stats_service::ManageStatsService;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::{Action, DetectionFlags};
-use crate::ports::inbound::manage_stats::{
-    ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand,
-};
-use crate::ports::inbound::InfractionFilters;
-use crate::ports::outbound::{CachePort, InfractionRepository, StatsRepository};
-use crate::domain::entities::Rule;
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::ports::outbound::audit::stats_repository::StatsRepository;
+use crate::domain::entities::system::rule::Rule;
 
 // ── MockStatsRepo ──
 

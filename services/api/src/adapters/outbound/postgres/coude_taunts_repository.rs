@@ -3,9 +3,9 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeTauntsRepository;
+use crate::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "taunts";

@@ -5,8 +5,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgBlackjackRepository;
-use sentinel_api::domain::entities::{BlackjackGame, Card};
-use sentinel_api::ports::outbound::BlackjackRepository;
+use sentinel_api::domain::entities::casino::blackjack::BlackjackGame;
+use sentinel_api::domain::entities::casino::blackjack::Card;
+use sentinel_api::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

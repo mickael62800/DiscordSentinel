@@ -1,15 +1,19 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 
-use crate::application::ManageRolePanelsService;
-use crate::domain::entities::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
+use crate::application::community::manage_role_panels_service::ManageRolePanelsService;
+use crate::domain::entities::community::role_panel::AutoRole;
+use crate::domain::entities::community::role_panel::RolePanel;
+use crate::domain::entities::community::role_panel::RolePanelDetail;
+use crate::domain::entities::community::role_panel::RolePanelEntry;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_role_panels::{
-    CreateAutoRoleCommand, CreateRolePanelCommand, CreateRolePanelEntryCommand,
-    ManageRolePanelsUseCase, SetMessageIdCommand,
-};
-use crate::ports::outbound::RolePanelRepository;
+use crate::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+use crate::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+use crate::ports::inbound::community::manage_role_panels::CreateRolePanelEntryCommand;
+use crate::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use crate::ports::outbound::community::role_panel_repository::RolePanelRepository;
 
 #[derive(Default)]
 struct MockRepo {

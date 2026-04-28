@@ -1,13 +1,15 @@
 //! Impl Postgres de `CoudeVendettaRepository` (cf. COUPE_AMELIORATIONS 5.3).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{ActiveVendetta, VendettaStatus};
+use crate::domain::entities::coude::vendetta::ActiveVendetta;
+use crate::domain::entities::coude::vendetta::VendettaStatus;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeVendettaRepository;
+use crate::ports::outbound::coude::vendetta_repository::CoudeVendettaRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_vendettas";

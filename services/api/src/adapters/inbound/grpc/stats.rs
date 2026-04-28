@@ -3,18 +3,19 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::stats::v1 as proto;
 use sentinel_proto::stats::v1::stats_service_server::StatsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::domain::entities::{GuildStatsOverview, UserStats};
-use crate::ports::inbound::manage_stats::{
-    ManageStatsUseCase, RecordMessagesCommand, RecordVoiceCommand,
-};
-
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 pub struct StatsGrpc {
     pub stats_uc: Arc<dyn ManageStatsUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,

@@ -5,7 +5,7 @@
 //! les regles metier ("mise > 0", "pas de self-duel", "HP min %") pour
 //! permettre une couverture unitaire 100% sans I/O.
 
-use crate::domain::entities::NewCoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 
 /// Valide la coherence basique d'une demande de combat (avant tout I/O).
@@ -72,7 +72,7 @@ pub fn check_surprise_hp_pct(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::entities::NewCoudeCombat;
+    use crate::domain::entities::coude::combat::NewCoudeCombat;
 
     fn nc(mise: i64, att: &str, def: &str) -> NewCoudeCombat {
         NewCoudeCombat {

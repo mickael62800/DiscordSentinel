@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::ActiveBounty;
+use crate::domain::entities::coude::bounty::ActiveBounty;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

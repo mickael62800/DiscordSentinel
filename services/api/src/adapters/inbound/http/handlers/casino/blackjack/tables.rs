@@ -1,26 +1,32 @@
 //! Handlers multiplayer : tables, joueurs, clôture, listing des parties.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, Json};
-
-use super::dto::{CreateTableDto, JoinTableDto};
+use axum::Extension;
+use axum::Json;
+use super::dto::CreateTableDto;
+use super::dto::JoinTableDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::{BlackjackTable, BlackjackTablePlayer};
-
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTable;
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTablePlayer;
 /// POST /api/blackjack/tables
 pub async fn create_table(
     State(state): State<AppState>,
     Json(dto): Json<CreateTableDto>,
 ) -> Result<Json<BlackjackTable>, ApiError> {
-    use crate::domain::entities::{create_deck, BLACKJACK_SHOE_DECKS, BLACKJACK_SHOE_TOTAL_CARDS};
+    use crate::domain::entities::casino::blackjack::create_deck;
+    use crate::domain::entities::casino::blackjack::BLACKJACK_SHOE_DECKS;
+    use crate::domain::entities::casino::blackjack::BLACKJACK_SHOE_TOTAL_CARDS;
     use rand::seq::SliceRandom;
 
     // Regle metier : shoe de 6 decks standard casino (cf. domain::entities::blackjack).
-    let mut shoe: Vec<crate::domain::entities::Card> = Vec::with_capacity(BLACKJACK_SHOE_TOTAL_CARDS);
+    let mut shoe: Vec<crate::domain::entities::casino::blackjack::Card> = Vec::with_capacity(BLACKJACK_SHOE_TOTAL_CARDS);
     for _ in 0..BLACKJACK_SHOE_DECKS { shoe.extend(create_deck()); }
     shoe.shuffle(&mut rand::thread_rng());
 
@@ -52,7 +58,7 @@ pub async fn join_table(
         .get_config(&guild_id, "blackjack-bot").await.unwrap_or_default()
         .iter().find(|c| c.config_key == "max_players_per_table")
         .and_then(|c| c.config_value.parse().ok())
-        .unwrap_or(crate::domain::entities::DEFAULT_BLACKJACK_MAX_PLAYERS);
+        .unwrap_or(crate::domain::entities::casino::blackjack::DEFAULT_BLACKJACK_MAX_PLAYERS);
 
     if current_count >= max_players {
         return Err(DomainError::ValidationError(format!("Table pleine ({current_count}/{max_players} joueurs)")).into());

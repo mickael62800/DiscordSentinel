@@ -2,11 +2,12 @@ use super::*;
 
 use std::sync::Mutex;
 
-use chrono::{Duration as ChronoDuration, Utc};
+use chrono::Duration as ChronoDuration;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::{Wallet, WalletTransaction};
-
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 #[derive(Default)]
 struct MockCursesRepo {
     actives: Mutex<Vec<ActiveCurse>>,

@@ -2,9 +2,12 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
+use crate::domain::entities::community::role_panel::AutoRole;
+use crate::domain::entities::community::role_panel::RolePanel;
+use crate::domain::entities::community::role_panel::RolePanelDetail;
+use crate::domain::entities::community::role_panel::RolePanelEntry;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::RolePanelRepository;
+use crate::ports::outbound::community::role_panel_repository::RolePanelRepository;
 
 pub struct PgRolePanelRepository {
     pool: PgPool,

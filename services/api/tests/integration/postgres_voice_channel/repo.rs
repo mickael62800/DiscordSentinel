@@ -1,17 +1,20 @@
 //! Tests d'integration postgres pour PgVoiceChannelRepository.
 //! Repo massif (792L) — couvre channels + co-admins + whitelist + bans + invites + themes.
 
-use chrono::{Duration, Utc};
+use chrono::Duration;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgVoiceChannelRepository;
-use sentinel_api::domain::entities::{
-    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelInviteLink, VoiceChannelTheme,
-    VoiceChannelWhitelistEntry,
-};
-use sentinel_api::domain::value_objects::VoiceChannelKind;
-use sentinel_api::ports::outbound::VoiceChannelRepository;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannel;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelBan;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelTheme;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
+use sentinel_api::domain::enums::community::voice_channel_kind::VoiceChannelKind;
+use sentinel_api::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{CombatStat, CoudePlayer, XpProgress};
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 
 /// Use case "gérer les joueurs Coup de Coude".

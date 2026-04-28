@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::ImageAnalysis;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::ai::image_analysis::ImageAnalysis;
 
 #[derive(Debug, Deserialize)]
 pub struct AnalyzeImageRequestDto {

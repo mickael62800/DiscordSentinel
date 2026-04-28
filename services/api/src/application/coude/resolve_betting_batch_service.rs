@@ -22,22 +22,23 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::{apply_insurance_to_loss, CoudeBalanceParams, CoudeCombat};
+use crate::domain::entities::coude::combat_resolution_rules::apply_insurance_to_loss;
+use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::combat::CoudeCombat;
 use crate::domain::errors::DomainError;
-use crate::domain::services::coude_combat_engine::{
-    self as engine, PlayerLite, ServerEventLite,
-};
-use crate::ports::inbound::resolve_betting_batch::{
-    ResolveBettingBatchUseCase, ResolvedBettingCombatOutput,
-};
-use crate::ports::inbound::{
-    ManageCoudeBetsUseCase, ManageCoudeInventoryUseCase, ManageCoudeSocialUseCase,
-    ManageCoudeTauntsUseCase,
-};
-use crate::ports::outbound::{
-    BotConfigRepository, CoudeCombatRepository, CoudePlayerRepository, WalletRepository,
-};
-
+use crate::domain::services::coude::coude_combat_engine as engine;
+use crate::domain::services::coude::coude_combat_engine::PlayerLite;
+use crate::domain::services::coude::coude_combat_engine::ServerEventLite;
+use crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase;
+use crate::ports::inbound::coude::resolve_betting_batch::ResolvedBettingCombatOutput;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Delai de paris par defaut (5 min), override par guild via bot_guild_config.
 const DEFAULT_BET_DELAY_SECS: i64 = 300;
 /// Au-dela de 120s en 'resolving', on considere le combat stuck et on retry.
@@ -79,7 +80,7 @@ impl ResolveBettingBatchService {
 
     /// Charge les parametres de balance de la guild ou default.
     async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
-        crate::application::guild_settings::load_balance_params(
+        crate::application::coude::guild_settings::load_balance_params(
             &*self.bot_config_repo,
             guild_id,
         )
@@ -165,7 +166,7 @@ impl ResolveBettingBatchService {
             self.combat_repo
                 .resolve(
                     combat.id,
-                    crate::domain::entities::CombatResolution {
+                    crate::domain::entities::coude::combat::CombatResolution {
                         status: "accepted".into(),
                         winner_id: None,
                         attacker_roll: Some(first_atk_roll),
@@ -308,7 +309,7 @@ impl ResolveBettingBatchService {
         self.combat_repo
             .resolve(
                 combat.id,
-                crate::domain::entities::CombatResolution {
+                crate::domain::entities::coude::combat::CombatResolution {
                     status: "accepted".into(),
                     winner_id: Some(winner_id.clone()),
                     attacker_roll: Some(first_atk_roll),

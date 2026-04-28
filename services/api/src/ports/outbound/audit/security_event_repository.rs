@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::SecurityEvent;
+use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

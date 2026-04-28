@@ -1,5 +1,6 @@
 use super::*;
-use chrono::{TimeZone, Utc};
+use chrono::TimeZone;
+use chrono::Utc;
 use uuid::Uuid;
 
 fn ts() -> chrono::DateTime<chrono::Utc> {

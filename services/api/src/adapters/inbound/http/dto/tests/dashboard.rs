@@ -1,7 +1,16 @@
 use super::*;
-use crate::domain::entities::{DashboardStats, Guild, Infraction, LogEntry, ModerationAction, Rule};
-use crate::domain::value_objects::{Action, DetectionFlags, FlagType, ModerationGravity};
-use chrono::{TimeZone, Utc};
+use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+use crate::domain::entities::system::guild::Guild;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::system::log_entry::LogEntry;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::system::rule::Rule;
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
+use chrono::TimeZone;
+use chrono::Utc;
 use uuid::Uuid;
 
 fn flags() -> DetectionFlags {

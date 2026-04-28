@@ -1,27 +1,35 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{Postgres, Transaction};
-
-use crate::application::play_tout_ou_rien_service::PlayToutOuRienService;
-use crate::domain::entities::{
-    CombatStat, CoudeCurrentSeason, CoudeEvent, CoudeLeaderboardEntry, CoudePlayer,
-    LeaderboardCategory, NewDailyChaos, TauntEvent, ToutOuRienLogEntry, ToutOuRienLogOutcome,
-    ToutOuRienOutcome, ToutOuRienUserStats, XpProgress,
-};
-use crate::domain::value_objects::CoudeClass;
+use chrono::DateTime;
+use chrono::Utc;
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::application::coude::play_tout_ou_rien_service::PlayToutOuRienService;
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogEntry;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
+use crate::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::enums::coude::coude_class::CoudeClass;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
-use crate::ports::inbound::play_tout_ou_rien::{
-    PlayToutOuRienCommand, PlayToutOuRienUseCase, MIN_BALANCE_FOR_PLAY,
-};
-use crate::ports::outbound::{
-    CoudePlayerRepository, CoudeSocialRepository, CoudeToutOuRienRepository,
-};
-
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienCommand;
+use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase;
+use crate::ports::inbound::coude::play_tout_ou_rien::MIN_BALANCE_FOR_PLAY;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository;
 // ── Mocks (minimal — seules les methodes utilisees sont implementees) ─
 
 struct MockPlayerRepo {

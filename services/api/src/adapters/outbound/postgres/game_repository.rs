@@ -2,7 +2,9 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::{Game, GamePanel, GameRepository};
+use crate::ports::outbound::casino::game_repository::Game;
+use crate::ports::outbound::casino::game_repository::GamePanel;
+use crate::ports::outbound::casino::game_repository::GameRepository;
 use super::pg_err;
 
 pub struct PgGameRepository { pool: PgPool }

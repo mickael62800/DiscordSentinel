@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

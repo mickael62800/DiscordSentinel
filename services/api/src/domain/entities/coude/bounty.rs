@@ -4,7 +4,8 @@
 //! est auto-creee. Tout le monde peut contribuer via /contribuer-prime,
 //! et le joueur qui bat la cible empoche tout le pot + titre Regicide.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 /// Seuil de declenchement de la prime automatique.

@@ -13,8 +13,11 @@
 //! La fonction `spin_with_rng` accepte un `RngCore` -> seedable et donc
 //! testable de maniere deterministe (cf. tests).
 
-use chrono::{DateTime, Utc};
-use rand::{distributions::WeightedIndex, prelude::Distribution, RngCore};
+use chrono::DateTime;
+use chrono::Utc;
+use rand::distributions::WeightedIndex;
+use rand::prelude::Distribution;
+use rand::RngCore;
 use uuid::Uuid;
 
 /// Entree persistee dans `slot_spin_log` : trace d un spin.

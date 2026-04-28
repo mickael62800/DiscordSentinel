@@ -8,13 +8,18 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
-use chrono::{TimeZone, Utc};
+use axum::http::Request;
+use axum::http::StatusCode;
+use chrono::TimeZone;
+use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{CombatStat, CoudePlayer, TauntEvent, XpProgress};
+use sentinel_api::domain::entities::coude::player::CombatStat;
+use sentinel_api::domain::entities::coude::player::CoudePlayer;
+use sentinel_api::domain::entities::coude::taunt::TauntEvent;
+use sentinel_api::domain::entities::coude::player::XpProgress;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::{
     manage_wallet::{ManageWalletUseCase, TxWalletMutation, WalletMutation},

@@ -4,7 +4,8 @@
 //! 5_000c et 50_000c. C'est purement cosmetique (pas persiste) mais le
 //! RNG vit cote API pour eviter qu'il reste de la "decision" cote bot.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
 use rand::Rng;
 use serde::Serialize;

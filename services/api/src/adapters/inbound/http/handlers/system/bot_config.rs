@@ -1,15 +1,20 @@
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, Json};
+use axum::Extension;
+use axum::Json;
 use redis::AsyncCommands;
 
 use tracing::warn;
 
-use crate::adapters::inbound::http::dto::bot_config::{
-    BotDefinitionDto, BotGuildConfigDto, DeleteConfigDto, SetConfigDto,
-};
+use crate::adapters::inbound::http::dto::bot_config::BotDefinitionDto;
+use crate::adapters::inbound::http::dto::bot_config::BotGuildConfigDto;
+use crate::adapters::inbound::http::dto::bot_config::DeleteConfigDto;
+use crate::adapters::inbound::http::dto::bot_config::SetConfigDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 

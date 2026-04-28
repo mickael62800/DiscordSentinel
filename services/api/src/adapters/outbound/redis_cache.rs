@@ -1,12 +1,12 @@
-use std::sync::atomic::{AtomicU64, Ordering};
-
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
 use async_trait::async_trait;
 use redis::AsyncCommands;
 
-use crate::domain::entities::Rule;
+use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::FlagType;
-use crate::ports::outbound::CachePort;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::ports::outbound::system::cache::CachePort;
 
 const RULES_TTL: u64 = 300; // 5 minutes
 

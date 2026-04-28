@@ -1,15 +1,23 @@
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, Json};
-use serde::{Deserialize, Serialize};
-
+use axum::Extension;
+use axum::Json;
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::require_role;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{
-    format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, normalize_optional_tag,
-    parse_role_color_hex, slugify_emoji_name, DEFAULT_GAME_ROLE_COLOR, MAX_EMOJI_IMAGE_BYTES,
-};
+use crate::domain::entities::casino::game::format_custom_emoji;
+use crate::domain::entities::casino::game::is_allowed_emoji_mime;
+use crate::domain::entities::casino::game::normalize_game_name;
+use crate::domain::entities::casino::game::normalize_optional_tag;
+use crate::domain::entities::casino::game::parse_role_color_hex;
+use crate::domain::entities::casino::game::slugify_emoji_name;
+use crate::domain::entities::casino::game::DEFAULT_GAME_ROLE_COLOR;
+use crate::domain::entities::casino::game::MAX_EMOJI_IMAGE_BYTES;
 use crate::domain::errors::DomainError;
 
 // ── DTOs ──
@@ -26,8 +34,8 @@ pub struct GameDto {
     pub role_id: Option<String>,
 }
 
-impl From<crate::ports::outbound::Game> for GameDto {
-    fn from(g: crate::ports::outbound::Game) -> Self {
+impl From<crate::ports::outbound::casino::game_repository::Game> for GameDto {
+    fn from(g: crate::ports::outbound::casino::game_repository::Game) -> Self {
         Self {
             id: g.id,
             guild_id: g.guild_id,
@@ -72,8 +80,8 @@ pub struct GamePanelDto {
     pub category: Option<String>,
 }
 
-impl From<crate::ports::outbound::GamePanel> for GamePanelDto {
-    fn from(p: crate::ports::outbound::GamePanel) -> Self {
+impl From<crate::ports::outbound::casino::game_repository::GamePanel> for GamePanelDto {
+    fn from(p: crate::ports::outbound::casino::game_repository::GamePanel) -> Self {
         Self {
             id: p.id,
             guild_id: p.guild_id,

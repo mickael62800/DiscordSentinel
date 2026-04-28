@@ -1,13 +1,15 @@
 //! Handlers HTTP pour les vendettas (cf. COUPE_AMELIORATIONS 5.3).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
+use chrono::DateTime;
+use chrono::Utc;
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::ActiveVendetta;
+use crate::domain::entities::coude::vendetta::ActiveVendetta;
 
 #[derive(Debug, Deserialize)]
 pub struct DeclareVendettaDto {

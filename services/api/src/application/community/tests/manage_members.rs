@@ -2,17 +2,18 @@
 //! (404 path + success). get_member_summary est couvert par les tests HTTP
 //! integration (members_http) qui testent le flow complet avec stubs.
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 
-use crate::application::ManageMembersService;
-use crate::domain::entities::GuildMember;
+use crate::application::community::manage_members_service::ManageMembersService;
+use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_members::{
-    ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
-};
-use crate::ports::outbound::MemberRepository;
+use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
+use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
+use crate::ports::inbound::community::manage_members::SyncMembersCommand;
+use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use crate::ports::outbound::community::member_repository::MemberRepository;
 
 fn sample_member(g: &str, u: &str, name: &str) -> GuildMember {
     GuildMember {
@@ -52,17 +53,27 @@ impl MemberRepository for MockMemberRepo {
 
 // ── Stubs minimaux pour les use cases satellites (non utilises ici) ──
 
-use crate::ports::inbound::{
-    AddPointsCommand, DeductPointsCommand, InfractionFilters, LogModerationCommand,
-    ManageConductUseCase, ManageInfractionsUseCase, ManageModerationUseCase, ManageStatsUseCase,
-    SaveConductConfigCommand,
-};
-use crate::ports::inbound::manage_stats::{RecordMessagesCommand, RecordVoiceCommand};
-use crate::domain::entities::{
-    ConductConfig, ConductPointsLog, DashboardStats, GuildStatsOverview, GuildVoiceStats,
-    Infraction, ModerationAction, UserConductPoints, UserModerationHistory, UserStats,
-};
-
+use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
+use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::community::conduct::UserConductPoints;
+use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
+use crate::domain::entities::audit::user_stats::UserStats;
 struct StubInfUc;
 #[async_trait]
 impl ManageInfractionsUseCase for StubInfUc {
@@ -278,10 +289,10 @@ impl ManageInfractionsUseCase for RichInfUc {
             channel_id: "c".into(), user_id: "u".into(),
             username: "u".into(), message_id: "m".into(),
             content: format!("msg{i}"),
-            flags: crate::domain::value_objects::DetectionFlags {
+            flags: crate::domain::value_objects::moderation::detection_flags::DetectionFlags {
                 spam: false, insult: false, link: false, phishing: false,
             },
-            action: crate::domain::value_objects::Action::Warn,
+            action: crate::domain::enums::moderation::action::Action::Warn,
             score: 1.0 + i as f64, reason: format!("r{i}"),
             duration: None,
             created_at: now,

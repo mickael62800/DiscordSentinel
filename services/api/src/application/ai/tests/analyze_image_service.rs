@@ -11,7 +11,8 @@ fn test_preprocess_invalid_bytes_returns_error() {
 fn test_preprocess_valid_png() {
     let mut buf = Vec::new();
     {
-        use image::{ImageBuffer, Rgb};
+        use image::ImageBuffer;
+        use image::Rgb;
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(2, 2, |_, _| Rgb([128, 64, 200]));
         let mut cursor = std::io::Cursor::new(&mut buf);
         img.write_to(&mut cursor, image::ImageFormat::Png).unwrap();
@@ -24,7 +25,8 @@ fn test_preprocess_valid_png() {
 fn test_preprocess_normalization_range() {
     let mut buf = Vec::new();
     {
-        use image::{ImageBuffer, Rgb};
+        use image::ImageBuffer;
+        use image::Rgb;
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(1, 1, |_, _| Rgb([255, 255, 255]));
         let mut cursor = std::io::Cursor::new(&mut buf);
         img.write_to(&mut cursor, image::ImageFormat::Png).unwrap();
@@ -38,7 +40,8 @@ fn test_preprocess_normalization_range() {
 fn test_preprocess_black_pixel_normalization() {
     let mut buf = Vec::new();
     {
-        use image::{ImageBuffer, Rgb};
+        use image::ImageBuffer;
+        use image::Rgb;
         let img: ImageBuffer<Rgb<u8>, Vec<u8>> = ImageBuffer::from_fn(1, 1, |_, _| Rgb([0, 0, 0]));
         let mut cursor = std::io::Cursor::new(&mut buf);
         img.write_to(&mut cursor, image::ImageFormat::Png).unwrap();
@@ -50,7 +53,7 @@ fn test_preprocess_black_pixel_normalization() {
 
 // ── parse_vision_config (pure helper) ──
 
-use crate::domain::entities::BotGuildConfig;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 
 fn cfg(key: &str, value: &str) -> BotGuildConfig {
     BotGuildConfig {

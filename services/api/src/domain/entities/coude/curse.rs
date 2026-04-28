@@ -11,7 +11,8 @@
 
 use std::fmt;
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 /// Une malediction posee (persistance + lecture).

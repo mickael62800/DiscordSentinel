@@ -1,4 +1,5 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 // ══════════════════════════════════════════════════════════════════════
@@ -106,7 +107,7 @@ pub struct DailyChaosOutcome {
     pub winner_name: String,
     pub amount: i64,
     pub channel_id: String,
-    pub taunt_events: Vec<crate::domain::entities::TauntEvent>,
+    pub taunt_events: Vec<crate::domain::entities::coude::taunt::TauntEvent>,
 }
 
 // ══════════════════════════════════════════════════════════════════════

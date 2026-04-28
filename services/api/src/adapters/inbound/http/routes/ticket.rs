@@ -1,6 +1,9 @@
 //! Routes tickets (montees sous `/api/tickets`).
 
-use axum::routing::{delete, get, patch, post};
+use axum::routing::delete;
+use axum::routing::get;
+use axum::routing::patch;
+use axum::routing::post;
 use axum::Router;
 
 use super::super::handlers;
@@ -8,14 +11,14 @@ use super::super::state::AppState;
 
 fn ticket_inner() -> Router<AppState> {
     Router::new()
-        .route("/", get(handlers::tickets::list_tickets).post(handlers::tickets::create_ticket))
-        .route("/bulk", delete(handlers::tickets::bulk_delete_tickets))
-        .route("/{id}", get(handlers::tickets::get_ticket_detail))
-        .route("/{id}/messages", post(handlers::tickets::reply_ticket))
-        .route("/{id}/close", patch(handlers::tickets::close_ticket))
-        .route("/{id}/assign", patch(handlers::tickets::assign_ticket))
-        .route("/{id}/status", patch(handlers::tickets::update_status))
-        .route("/{id}/channels", patch(handlers::tickets::update_ticket_channel))
+        .route("/", get(handlers::system::tickets::list_tickets).post(handlers::system::tickets::create_ticket))
+        .route("/bulk", delete(handlers::system::tickets::bulk_delete_tickets))
+        .route("/{id}", get(handlers::system::tickets::get_ticket_detail))
+        .route("/{id}/messages", post(handlers::system::tickets::reply_ticket))
+        .route("/{id}/close", patch(handlers::system::tickets::close_ticket))
+        .route("/{id}/assign", patch(handlers::system::tickets::assign_ticket))
+        .route("/{id}/status", patch(handlers::system::tickets::update_status))
+        .route("/{id}/channels", patch(handlers::system::tickets::update_ticket_channel))
 }
 
 pub fn routes() -> Router<AppState> {

@@ -1,8 +1,8 @@
 use super::*;
-use crate::domain::entities::WatchedUser;
-use crate::ports::inbound::manage_watched_users::UserDossier;
-use chrono::{TimeZone, Utc};
-
+use crate::domain::entities::audit::watched_user::WatchedUser;
+use crate::ports::inbound::audit::manage_watched_users::UserDossier;
+use chrono::TimeZone;
+use chrono::Utc;
 fn sample_user(last: Option<chrono::DateTime<Utc>>) -> WatchedUser {
     WatchedUser {
         user_id: "u".into(),

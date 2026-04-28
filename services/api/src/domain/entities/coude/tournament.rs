@@ -1,7 +1,10 @@
 //! Regles metier pour les tournois hebdomadaires "Coup de Coude".
 
-use chrono::{DateTime, Datelike, Duration, TimeZone, Utc};
-
+use chrono::DateTime;
+use chrono::Datelike;
+use chrono::Duration;
+use chrono::TimeZone;
+use chrono::Utc;
 /// Pourcentage du cashbox attribue au prize pool estime du tournoi courant.
 /// Regle metier : 10% du solde de la cashbox de la guild constitue le pot.
 pub const TOURNAMENT_PRIZE_POOL_PERCENT: i64 = 10;

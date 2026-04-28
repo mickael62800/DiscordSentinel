@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::entities::SecurityEvent;
+use crate::domain::entities::audit::security_event::SecurityEvent;
 use chrono::Utc;
 use uuid::Uuid;
 

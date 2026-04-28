@@ -1,9 +1,11 @@
 //! Handlers HTTP pour les refusals/dette d honneur (cf. COUPE_AMELIORATIONS 5.3).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
@@ -25,7 +27,7 @@ pub async fn increment_refusal(
         .coude_refusal_count_repo
         .increment(&guild_id, &requester_id, &refuser_id)
         .await?;
-    use crate::domain::entities::HONOR_DEBT_THRESHOLD;
+    use crate::domain::entities::coude::refusal_count::HONOR_DEBT_THRESHOLD;
     Ok(Json(RefusalCountDto {
         count,
         last_refused_at: Some(Utc::now()),
@@ -42,7 +44,7 @@ pub async fn get_refusal(
         .coude_refusal_count_repo
         .get(&guild_id, &requester_id, &refuser_id)
         .await?;
-    use crate::domain::entities::HONOR_DEBT_THRESHOLD;
+    use crate::domain::entities::coude::refusal_count::HONOR_DEBT_THRESHOLD;
     let (count, ts) = match r {
         Some(rc) => (rc.count, Some(rc.last_refused_at)),
         None => (0, None),

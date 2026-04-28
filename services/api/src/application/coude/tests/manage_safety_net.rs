@@ -2,7 +2,8 @@ use super::*;
 
 use std::sync::Mutex;
 
-use chrono::{Duration as ChronoDuration, Utc};
+use chrono::Duration as ChronoDuration;
+use chrono::Utc;
 use uuid::Uuid;
 
 #[derive(Default)]

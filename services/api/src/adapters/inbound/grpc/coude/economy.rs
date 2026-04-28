@@ -5,14 +5,15 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_economy_service_server::CoudeEconomyService;
 
 use crate::adapters::inbound::grpc::coude::taunt_event_to_proto;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::ports::inbound::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 
 pub struct CoudeEconomyGrpc {
     pub uc: Arc<dyn ManageCoudeEconomyUseCase>,

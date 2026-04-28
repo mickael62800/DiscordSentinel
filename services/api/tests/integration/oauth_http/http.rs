@@ -11,7 +11,8 @@ mod test_helpers;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use redis::AsyncCommands;
 use tower::ServiceExt;
 

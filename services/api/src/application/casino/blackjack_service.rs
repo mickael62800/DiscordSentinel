@@ -3,11 +3,14 @@ use std::sync::Arc;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::{BlackjackGame, TauntEvent, calculate_score, create_deck};
+use crate::domain::entities::casino::blackjack::BlackjackGame;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::blackjack::calculate_score;
+use crate::domain::entities::casino::blackjack::create_deck;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::{BlackjackRepository, WalletRepository};
-
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Resultat d'une action de jeu : la partie mise a jour + la liste des
 /// `TauntEvent` declenches par les mutations wallet (faillite, jackpot).
 /// La couche transport (gRPC / HTTP) est responsable de propager ces

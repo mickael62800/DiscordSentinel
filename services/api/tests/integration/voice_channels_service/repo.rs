@@ -2,23 +2,30 @@
 //! Instancie le vrai service avec PgVoiceChannelRepository + stubs cache/config
 //! pour exercer les chemins application/voice_channels/crud.rs.
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgVoiceChannelRepository;
-use sentinel_api::application::ManageVoiceChannelsService;
-use sentinel_api::domain::entities::{BotDefinition, BotGuildConfig, Rule};
+use sentinel_api::application::community::voice_channels::ManageVoiceChannelsService;
+use sentinel_api::domain::entities::system::bot_config::BotDefinition;
+use sentinel_api::domain::entities::system::bot_config::BotGuildConfig;
+use sentinel_api::domain::entities::system::rule::Rule;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::{
-    BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
-    ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
-    TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
-};
-use sentinel_api::ports::outbound::{BotConfigRepository, CachePort};
-
+use sentinel_api::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use sentinel_api::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use sentinel_api::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use sentinel_api::ports::outbound::system::cache::CachePort;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into()

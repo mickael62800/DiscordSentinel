@@ -1,14 +1,14 @@
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 
-use crate::application::ManageAuditLogsService;
-use crate::domain::entities::AuditLog;
+use crate::application::audit::manage_audit_logs_service::ManageAuditLogsService;
+use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_audit_logs::{
-    AuditLogFilters, CreateAuditLogCommand, ManageAuditLogsUseCase,
-};
-use crate::ports::outbound::AuditLogRepository;
+use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 
 #[derive(Default)]
 struct MockRepo {

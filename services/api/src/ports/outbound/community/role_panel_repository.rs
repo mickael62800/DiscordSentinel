@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
+use crate::domain::entities::community::role_panel::AutoRole;
+use crate::domain::entities::community::role_panel::RolePanel;
+use crate::domain::entities::community::role_panel::RolePanelDetail;
+use crate::domain::entities::community::role_panel::RolePanelEntry;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

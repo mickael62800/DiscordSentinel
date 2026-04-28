@@ -1,19 +1,24 @@
 use super::*;
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use std::sync::{Arc, Mutex};
+use chrono::DateTime;
+use chrono::Utc;
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CoudeInsurance, CoudeInventoryItem, CoudePrime, CoudeStealBoost, CoudeStealProtection,
-    NewCoudePrime, StealBoostDuration, StealProtectionDuration,
-};
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
+use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::domain::entities::coude::steal_boost::StealBoostDuration;
+use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_steal_protections::{
-    ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
-};
-use crate::ports::inbound::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
-use crate::ports::inbound::ManageCoudeInventoryUseCase;
+use crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase;
+use crate::ports::inbound::coude::manage_steal_protections::StealProtectionTrigger;
+use crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 
 // ── Mocks ──
 

@@ -3,18 +3,21 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::tickets::v1 as proto;
 use sentinel_proto::tickets::v1::tickets_service_server::TicketsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{Ticket, TicketDetail, TicketMessage};
-use crate::ports::inbound::{
-    AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
-    UpdateTicketChannelCommand,
-};
-
+use crate::domain::entities::system::ticket::Ticket;
+use crate::domain::entities::system::ticket::TicketDetail;
+use crate::domain::entities::system::ticket::TicketMessage;
+use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
+use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
+use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
+use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
+use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
 pub struct TicketsGrpc {
     pub tickets_uc: Arc<dyn ManageTicketsUseCase>,
 }

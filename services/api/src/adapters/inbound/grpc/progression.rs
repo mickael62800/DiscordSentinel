@@ -4,17 +4,22 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::common::v1 as proto_common;
 use sentinel_proto::progression::v1 as proto;
 use sentinel_proto::progression::v1::progression_service_server::ProgressionService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::domain::entities::{xp_progress, LevelReward, UserLevel, XpSource};
-use crate::ports::inbound::manage_levels::{AddXpCommand, AddXpResult, ManageLevelsUseCase};
-
+use crate::domain::entities::community::level::xp_progress;
+use crate::domain::entities::community::level::LevelReward;
+use crate::domain::entities::community::level::UserLevel;
+use crate::domain::entities::community::level::XpSource;
+use crate::ports::inbound::community::manage_levels::AddXpCommand;
+use crate::ports::inbound::community::manage_levels::AddXpResult;
+use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
 pub struct ProgressionGrpc {
     pub levels_uc: Arc<dyn ManageLevelsUseCase>,
     pub broadcaster: Arc<EventBroadcaster>,

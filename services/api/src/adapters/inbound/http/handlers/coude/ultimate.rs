@@ -1,13 +1,16 @@
 //! Handlers HTTP pour les ultimates par classe (cf. COUPE_AMELIORATIONS 3.1).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
-
+use chrono::DateTime;
+use chrono::Utc;
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{ultimate_ready, UltimateKind};
+use crate::domain::entities::coude::ultimate::ultimate_ready;
+use crate::domain::entities::coude::ultimate::UltimateKind;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]

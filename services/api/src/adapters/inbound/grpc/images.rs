@@ -4,16 +4,18 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::images::v1 as proto;
 use sentinel_proto::images::v1::images_service_server::ImagesService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{ImageAnalysis, ImageClassification};
-use crate::domain::value_objects::Action;
-use crate::ports::inbound::{AnalyzeImageCommand, AnalyzeImageUseCase};
-
+use crate::domain::entities::ai::image_analysis::ImageAnalysis;
+use crate::domain::entities::ai::image_analysis::ImageClassification;
+use crate::domain::enums::moderation::action::Action;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 pub struct ImagesGrpc {
     pub uc: Arc<dyn AnalyzeImageUseCase>,
 }

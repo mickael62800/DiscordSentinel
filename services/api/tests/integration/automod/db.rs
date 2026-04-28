@@ -4,15 +4,18 @@
 use std::sync::Arc;
 use sqlx::PgPool;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgBotConfigRepository, PgRuleRepository, PgInfractionRepository,
-};
-use sentinel_api::application::AnalyzeMessageService;
-use sentinel_api::adapters::outbound::{InferenceService, TextTokenizer};
-use sentinel_api::domain::services::InferenceRateLimiter;
-use sentinel_api::domain::value_objects::DetectionFlags;
-use sentinel_api::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, ContextMessageEntry};
-use sentinel_api::ports::outbound::RuleRepository;
+use sentinel_api::adapters::outbound::postgres::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::PgRuleRepository;
+use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
+use sentinel_api::application::ai::analyze_message_service::AnalyzeMessageService;
+use sentinel_api::adapters::outbound::InferenceService;
+use sentinel_api::adapters::outbound::TextTokenizer;
+use sentinel_api::domain::services::ai::inference_limiter::InferenceRateLimiter;
+use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_api::ports::inbound::ai::analyze_message::ContextMessageEntry;
+use sentinel_api::ports::outbound::moderation::rule_repository::RuleRepository;
 
 async fn setup_pool() -> PgPool {
     let url = std::env::var("DATABASE_URL")
@@ -349,27 +352,27 @@ fn build_analyze_service(pool: PgPool) -> AnalyzeMessageService {
 struct StubConductUC;
 
 #[async_trait::async_trait]
-impl sentinel_api::ports::inbound::ManageConductUseCase for StubConductUC {
-    async fn get_config(&self, _: &str) -> Result<sentinel_api::domain::entities::ConductConfig, sentinel_api::domain::errors::DomainError> {
-        Ok(sentinel_api::domain::entities::ConductConfig::default_for_guild(""))
+impl sentinel_api::ports::inbound::community::manage_conduct::ManageConductUseCase for StubConductUC {
+    async fn get_config(&self, _: &str) -> Result<sentinel_api::domain::entities::community::conduct::ConductConfig, sentinel_api::domain::errors::DomainError> {
+        Ok(sentinel_api::domain::entities::community::conduct::ConductConfig::default_for_guild(""))
     }
-    async fn save_config(&self, _: sentinel_api::ports::inbound::SaveConductConfigCommand) -> Result<sentinel_api::domain::entities::ConductConfig, sentinel_api::domain::errors::DomainError> {
+    async fn save_config(&self, _: sentinel_api::ports::inbound::community::manage_conduct::SaveConductConfigCommand) -> Result<sentinel_api::domain::entities::community::conduct::ConductConfig, sentinel_api::domain::errors::DomainError> {
         unimplemented!()
     }
-    async fn get_points(&self, _: &str, _: &str) -> Result<sentinel_api::domain::entities::UserConductPoints, sentinel_api::domain::errors::DomainError> {
+    async fn get_points(&self, _: &str, _: &str) -> Result<sentinel_api::domain::entities::community::conduct::UserConductPoints, sentinel_api::domain::errors::DomainError> {
         unimplemented!()
     }
-    async fn add_points(&self, _: sentinel_api::ports::inbound::AddPointsCommand) -> Result<sentinel_api::domain::entities::UserConductPoints, sentinel_api::domain::errors::DomainError> {
+    async fn add_points(&self, _: sentinel_api::ports::inbound::community::manage_conduct::AddPointsCommand) -> Result<sentinel_api::domain::entities::community::conduct::UserConductPoints, sentinel_api::domain::errors::DomainError> {
         unimplemented!()
     }
-    async fn deduct_points(&self, _: sentinel_api::ports::inbound::DeductPointsCommand) -> Result<sentinel_api::domain::entities::UserConductPoints, sentinel_api::domain::errors::DomainError> {
+    async fn deduct_points(&self, _: sentinel_api::ports::inbound::community::manage_conduct::DeductPointsCommand) -> Result<sentinel_api::domain::entities::community::conduct::UserConductPoints, sentinel_api::domain::errors::DomainError> {
         // Retourner un stub minimal — le test n'utilise pas la valeur
         Err(sentinel_api::domain::errors::DomainError::NotFound("stub".into()))
     }
-    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::UserConductPoints>, sentinel_api::domain::errors::DomainError> {
+    async fn get_leaderboard(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::community::conduct::UserConductPoints>, sentinel_api::domain::errors::DomainError> {
         unimplemented!()
     }
-    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::ConductPointsLog>, sentinel_api::domain::errors::DomainError> {
+    async fn get_points_log(&self, _: &str, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::community::conduct::ConductPointsLog>, sentinel_api::domain::errors::DomainError> {
         unimplemented!()
     }
     async fn run_regen(&self) -> Result<u64, sentinel_api::domain::errors::DomainError> {
@@ -381,11 +384,11 @@ impl sentinel_api::ports::inbound::ManageConductUseCase for StubConductUC {
 struct NoCache;
 
 #[async_trait::async_trait]
-impl sentinel_api::ports::outbound::CachePort for NoCache {
-    async fn get_rules(&self, _: &str) -> Result<Option<Vec<sentinel_api::domain::entities::Rule>>, sentinel_api::domain::errors::DomainError> {
+impl sentinel_api::ports::outbound::system::cache::CachePort for NoCache {
+    async fn get_rules(&self, _: &str) -> Result<Option<Vec<sentinel_api::domain::entities::system::rule::Rule>>, sentinel_api::domain::errors::DomainError> {
         Ok(None) // Force lecture DB a chaque fois
     }
-    async fn set_rules(&self, _: &str, _: &[sentinel_api::domain::entities::Rule]) -> Result<(), sentinel_api::domain::errors::DomainError> {
+    async fn set_rules(&self, _: &str, _: &[sentinel_api::domain::entities::system::rule::Rule]) -> Result<(), sentinel_api::domain::errors::DomainError> {
         Ok(())
     }
     async fn invalidate_rules(&self, _: &str) -> Result<(), sentinel_api::domain::errors::DomainError> {

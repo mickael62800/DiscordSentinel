@@ -5,8 +5,8 @@ use crate::adapters::inbound::http::dto::moderation::ModerationActionResponseDto
 use crate::adapters::inbound::http::dto::security::SecurityEventResponseDto;
 use crate::adapters::inbound::http::dto::conduct::ConductPointsLogDto;
 use crate::adapters::inbound::http::dto::notes::UserNoteDto;
-use crate::domain::entities::WatchedUser;
-use crate::ports::inbound::manage_watched_users::UserDossier;
+use crate::domain::entities::audit::watched_user::WatchedUser;
+use crate::ports::inbound::audit::manage_watched_users::UserDossier;
 
 #[derive(Debug, Serialize)]
 pub struct WatchedUserResponseDto {

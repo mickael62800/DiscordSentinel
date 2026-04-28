@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::DiscordRole;
+use crate::domain::entities::system::discord_role::DiscordRole;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::DiscordRoleRepository;
+use crate::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 
 pub struct PgDiscordRoleRepository {
     pool: PgPool,

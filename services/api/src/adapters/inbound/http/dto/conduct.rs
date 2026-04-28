@@ -1,7 +1,9 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{ConductConfig, ConductPointsLog, UserConductPoints};
-use crate::ports::inbound::SaveConductConfigCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::community::conduct::UserConductPoints;
+use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 
 // ── Request DTOs ──
 

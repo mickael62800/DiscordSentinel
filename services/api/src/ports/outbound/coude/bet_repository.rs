@@ -1,9 +1,11 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary, TauntEvent,
-};
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 
 /// Repository pour les paris Coup de Coude (`coude_bets`).

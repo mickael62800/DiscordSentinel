@@ -8,20 +8,21 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{
-    BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary,
-};
+use sentinel_api::domain::entities::coude::bet::BetResolutionPlan;
+use sentinel_api::domain::entities::coude::bet::CoudeBet;
+use sentinel_api::domain::entities::coude::bet::NewCoudeBet;
+use sentinel_api::domain::entities::coude::bet::RefundSummary;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::{
-    ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
-};
-
+use sentinel_api::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use sentinel_api::ports::inbound::coude::manage_bets::PlaceBetOutcome;
+use sentinel_api::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
 #[derive(Default)]
 struct MockBets {
     placed: Mutex<Vec<NewCoudeBet>>,

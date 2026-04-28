@@ -2,10 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::Infraction;
+use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{InfractionFilters, ManageInfractionsUseCase};
-use crate::ports::outbound::InfractionRepository;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 
 pub struct ManageInfractionsService {
     infraction_repo: Arc<dyn InfractionRepository>,

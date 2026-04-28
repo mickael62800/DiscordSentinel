@@ -8,19 +8,19 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::AuditLog;
+use sentinel_api::domain::entities::audit::audit_log::AuditLog;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_audit_logs::{
-    AuditLogFilters, CreateAuditLogCommand, ManageAuditLogsUseCase,
-};
-
+use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
 use test_helpers::build_test_state_audit_logs;
 
 // ══════════════════════════════════════════════════════════

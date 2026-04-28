@@ -2,17 +2,17 @@
 //! (Les tests ia_config ont ete supprimes avec la migration 146 qui fusionne
 //!  les cles IA dans la config automod-bot.)
 
-use chrono::{Duration, Utc};
+use chrono::Duration;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgDailyActivityRepository, PgSponsorshipRepository, PgTempRoleRepository,
-};
-use sentinel_api::ports::outbound::{
-    DailyActivityRepository, SponsorshipRepository, TempRoleRepository,
-};
-
+use sentinel_api::adapters::outbound::postgres::PgDailyActivityRepository;
+use sentinel_api::adapters::outbound::postgres::PgSponsorshipRepository;
+use sentinel_api::adapters::outbound::postgres::PgTempRoleRepository;
+use sentinel_api::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
+use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
+use sentinel_api::ports::outbound::community::temp_role_repository::TempRoleRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

@@ -49,9 +49,12 @@ use super::*;
     // ── RPC handlers avec mock ManageSecurityUseCase ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
-    use crate::ports::inbound::{AnalyzeNewMemberCommand, ManageSecurityUseCase,
-        ReportSecurityEventCommand, SecurityDecision};
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+    use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+    use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+    use crate::ports::inbound::audit::manage_security::SecurityDecision;
     use crate::domain::errors::DomainError;
 
     #[derive(Default)]

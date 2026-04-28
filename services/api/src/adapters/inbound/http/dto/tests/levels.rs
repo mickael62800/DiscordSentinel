@@ -1,5 +1,8 @@
 use super::*;
-use crate::domain::entities::{LevelConfig, LevelReward, UserLevel, XpSource};
+use crate::domain::entities::community::level::LevelConfig;
+use crate::domain::entities::community::level::LevelReward;
+use crate::domain::entities::community::level::UserLevel;
+use crate::domain::entities::community::level::XpSource;
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -111,7 +114,7 @@ fn level_reward_dto_source_as_str() {
     assert_eq!(dto.level, 5);
 }
 
-use crate::ports::inbound::manage_levels::AddXpResult;
+use crate::ports::inbound::community::manage_levels::AddXpResult;
 
 #[test]
 fn save_config_dto_deserializes_with_defaults() {

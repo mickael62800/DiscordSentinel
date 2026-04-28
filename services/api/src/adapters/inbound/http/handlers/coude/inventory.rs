@@ -1,17 +1,22 @@
 //! Handlers inventaire/primes/assurances. Délèguent à `state.coude_inventory_uc`.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use uuid::Uuid;
 
-use super::dto::{
-    AddItemDto, BuyInsuranceDto, ClaimPrimesDto, CreatePrimeDto, InsuranceDto, InventoryItemDto,
-    PrimeDto, UseItemDto,
-};
+use super::dto::AddItemDto;
+use super::dto::BuyInsuranceDto;
+use super::dto::ClaimPrimesDto;
+use super::dto::CreatePrimeDto;
+use super::dto::InsuranceDto;
+use super::dto::InventoryItemDto;
+use super::dto::PrimeDto;
+use super::dto::UseItemDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::NewCoudePrime;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 
 // ── Items ──

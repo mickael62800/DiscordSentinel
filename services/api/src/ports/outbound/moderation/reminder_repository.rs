@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::SanctionReminder;
+use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

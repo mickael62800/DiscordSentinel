@@ -1,6 +1,6 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::analytics::*;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::system::analytics::*;
 
 #[derive(Debug, Deserialize)]
 pub struct AnalyticsQuery {

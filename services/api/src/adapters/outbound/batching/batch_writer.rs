@@ -22,8 +22,8 @@ use std::time::Duration;
 
 use tokio::sync::mpsc;
 use tokio::time::MissedTickBehavior;
-use tracing::{debug, warn};
-
+use tracing::debug;
+use tracing::warn;
 #[derive(Debug, Clone, Copy)]
 pub struct BatchWriterConfig {
     /// Intervalle max entre deux flushs (meme si le batch n'est pas plein).

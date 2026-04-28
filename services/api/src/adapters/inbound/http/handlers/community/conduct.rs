@@ -1,15 +1,20 @@
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::dto::conduct::{
-    AddPointsDto, ConductConfigDto, ConductPointsLogDto, SaveConductConfigDto,
-    UserConductPointsDto,
-};
+use crate::adapters::inbound::http::dto::conduct::AddPointsDto;
+use crate::adapters::inbound::http::dto::conduct::ConductConfigDto;
+use crate::adapters::inbound::http::dto::conduct::ConductPointsLogDto;
+use crate::adapters::inbound::http::dto::conduct::SaveConductConfigDto;
+use crate::adapters::inbound::http::dto::conduct::UserConductPointsDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, single_dto};
+use crate::adapters::inbound::http::helpers::map_to_dtos;
+use crate::adapters::inbound::http::helpers::normalize_limit;
+use crate::adapters::inbound::http::helpers::single_dto;
 use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::AddPointsCommand;
+use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
 
 #[derive(Deserialize)]
 pub struct LeaderboardQuery {

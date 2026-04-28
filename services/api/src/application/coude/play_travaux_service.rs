@@ -5,20 +5,26 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::domain::entities::{
-    fail_flavor_at, success_flavor_at, task_at, TRAVAUX_COINS_MAX, TRAVAUX_COINS_MIN,
-    TRAVAUX_COOLDOWN_KEY, TRAVAUX_COOLDOWN_SECS, TRAVAUX_FAIL_FLAVORS, TRAVAUX_SUCCESS_FLAVORS,
-    TRAVAUX_SUCCESS_PCT, TRAVAUX_TASKS, TRAVAUX_XP_PER_TASK,
-};
+use crate::domain::entities::coude::travaux::fail_flavor_at;
+use crate::domain::entities::coude::travaux::success_flavor_at;
+use crate::domain::entities::coude::travaux::task_at;
+use crate::domain::entities::coude::travaux::TRAVAUX_COINS_MAX;
+use crate::domain::entities::coude::travaux::TRAVAUX_COINS_MIN;
+use crate::domain::entities::coude::travaux::TRAVAUX_COOLDOWN_KEY;
+use crate::domain::entities::coude::travaux::TRAVAUX_COOLDOWN_SECS;
+use crate::domain::entities::coude::travaux::TRAVAUX_FAIL_FLAVORS;
+use crate::domain::entities::coude::travaux::TRAVAUX_SUCCESS_FLAVORS;
+use crate::domain::entities::coude::travaux::TRAVAUX_SUCCESS_PCT;
+use crate::domain::entities::coude::travaux::TRAVAUX_TASKS;
+use crate::domain::entities::coude::travaux::TRAVAUX_XP_PER_TASK;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::play_travaux::{
-    PlayTravauxCommand, PlayTravauxUseCase, TravauxResolution,
-};
-use crate::ports::inbound::ManageWalletUseCase;
-use crate::ports::outbound::{
-    CoudeHeistRepository, CoudePlayerRepository, CoudeSocialRepository,
-};
-
+use crate::ports::inbound::coude::play_travaux::PlayTravauxCommand;
+use crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase;
+use crate::ports::inbound::coude::play_travaux::TravauxResolution;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
 pub struct PlayTravauxService {
     heist_repo: Arc<dyn CoudeHeistRepository>,
     player_repo: Arc<dyn CoudePlayerRepository>,

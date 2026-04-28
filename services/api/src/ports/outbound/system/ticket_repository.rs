@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{Ticket, TicketMessage};
+use crate::domain::entities::system::ticket::Ticket;
+use crate::domain::entities::system::ticket::TicketMessage;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

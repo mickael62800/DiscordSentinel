@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::Infraction;
+use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::InfractionFilters;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 
 #[async_trait]
 pub trait InfractionRepository: Send + Sync {

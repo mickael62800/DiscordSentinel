@@ -1,9 +1,9 @@
 //! DTOs HTTP pour le blackjack (solo + multiplayer tables).
 
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{BlackjackGame, Card};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::casino::blackjack::BlackjackGame;
+use crate::domain::entities::casino::blackjack::Card;
 // ══════════════════════════════════════════════════════════════════════
 // ── Solo game DTOs ──
 // ══════════════════════════════════════════════════════════════════════
@@ -54,7 +54,7 @@ pub struct BlackjackGameDto {
 /// `true` si la partie est dans un état final (plus d'action possible).
 /// Delegue a la regle metier dans `domain::entities::is_blackjack_game_over`.
 pub fn game_is_over(status: &str) -> bool {
-    crate::domain::entities::is_blackjack_game_over(status)
+    crate::domain::entities::casino::blackjack::is_blackjack_game_over(status)
 }
 
 /// Convertit un `BlackjackGame` domaine vers un DTO HTTP.

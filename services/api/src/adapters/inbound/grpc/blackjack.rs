@@ -8,17 +8,22 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::blackjack::v1 as proto;
 use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackService as BlackjackGrpcTrait;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::application::BlackjackService as BlackjackApp;
-use crate::domain::entities::{BlackjackGame, Card, TauntEvent, Wallet};
-use crate::ports::outbound::{BlackjackTableRepository, BotConfigRepository, WalletRepository};
-
+use crate::application::casino::blackjack_service::BlackjackService as BlackjackApp;
+use crate::domain::entities::casino::blackjack::BlackjackGame;
+use crate::domain::entities::casino::blackjack::Card;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 pub struct BlackjackGrpc {
     pub svc: Arc<BlackjackApp>,
     pub wallet_repo: Arc<dyn WalletRepository>,
@@ -233,7 +238,7 @@ fn taunt_to_proto(t: TauntEvent) -> proto::TauntEvent {
 }
 
 fn action_result_to_proto(
-    result: crate::application::BlackjackActionResult,
+    result: crate::application::casino::blackjack_service::BlackjackActionResult,
 ) -> proto::BlackjackGameResult {
     proto::BlackjackGameResult {
         game: Some(blackjack_game_to_proto(result.game)),

@@ -1,15 +1,19 @@
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 use tracing::info;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{normalize_limit, ok_response};
+use crate::adapters::inbound::http::helpers::normalize_limit;
+use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::domain::entities::{
-    validate_positive_amount, validate_transfer_distinct_users, Wallet, WalletTransaction,
-};
+use crate::domain::entities::casino::wallet::validate_positive_amount;
+use crate::domain::entities::casino::wallet::validate_transfer_distinct_users;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
 
 // ── DTOs ──

@@ -2,7 +2,9 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogEntry;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

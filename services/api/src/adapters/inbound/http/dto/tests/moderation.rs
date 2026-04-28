@@ -1,6 +1,7 @@
 use super::*;
-use crate::domain::entities::{ModerationAction, UserModerationHistory};
-use crate::domain::value_objects::ModerationGravity;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
+use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use chrono::Utc;
 use uuid::Uuid;
 

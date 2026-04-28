@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 /// Phase 2 A.3 — Classes de joueur Coude (mappe sur le type Postgres `coude_class`).
 ///
 /// Le `#[sqlx(type_name = "coude_class")]` lie ce type au CREATE TYPE de la

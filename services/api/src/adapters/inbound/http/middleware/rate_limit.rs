@@ -3,10 +3,12 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Instant;
 
-use axum::extract::{ConnectInfo, Request};
+use axum::extract::ConnectInfo;
+use axum::extract::Request;
 use axum::http::StatusCode;
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
+use axum::response::IntoResponse;
+use axum::response::Response;
 use tokio::sync::Mutex;
 
 /// Simple in-memory token bucket rate limiter per IP address.

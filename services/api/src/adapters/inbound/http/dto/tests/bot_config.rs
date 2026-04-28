@@ -1,5 +1,6 @@
 use super::*;
-use crate::domain::entities::{BotDefinition, BotGuildConfig};
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use chrono::Utc;
 use uuid::Uuid;
 

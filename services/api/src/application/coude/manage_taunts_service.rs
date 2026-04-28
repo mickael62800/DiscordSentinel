@@ -4,18 +4,23 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tracing::{debug, warn};
-
-use crate::domain::entities::{
-    build_taunt_event, build_taunt_event_single, crossed_threshold, parse_bool_config,
-    parse_i64_config, CoudeTauntsConfig, CurseKind, StreakKind, TauntEvent,
-};
+use tracing::debug;
+use tracing::warn;
+use crate::domain::entities::coude::taunt::build_taunt_event;
+use crate::domain::entities::coude::taunt::build_taunt_event_single;
+use crate::domain::entities::coude::taunt::crossed_threshold;
+use crate::domain::entities::system::config_parsers::parse_bool_config;
+use crate::domain::entities::system::config_parsers::parse_i64_config;
+use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::curse::CurseKind;
+use crate::domain::entities::coude::taunt::StreakKind;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_taunts::ManageCoudeTauntsUseCase;
-use crate::ports::outbound::{
-    BotConfigRepository, CoudeCursesRepository, CoudePlayerRepository, CoudeTauntsRepository,
-};
-
+use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
 const ECO_BOT_NAME: &str = "coude-bot";
 const CFG_BANKRUPTCY_ENABLED: &str = "bankruptcy_taunt_enabled";
 const CFG_JACKPOT_THRESHOLD: &str = "jackpot_threshold";

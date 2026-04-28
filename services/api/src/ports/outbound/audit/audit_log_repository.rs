@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::AuditLog;
+use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
+use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 
 #[async_trait]
 pub trait AuditLogRepository: Send + Sync {

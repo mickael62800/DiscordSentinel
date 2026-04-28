@@ -9,16 +9,17 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::CoudeGuildSettings;
-use crate::domain::entities::CoudeBalanceParams;
+use crate::application::coude::guild_settings::CoudeGuildSettings;
+use crate::domain::entities::coude::balance::CoudeBalanceParams;
 use crate::domain::errors::DomainError;
-use crate::domain::services::coude_combat_engine::{resolve_combat, PlayerLite};
-use crate::ports::inbound::{
-    FriendlyDuelInput, FriendlyDuelOutput, ManageCoudePlayersUseCase,
-    ResolveFriendlyDuelUseCase,
-};
-use crate::ports::outbound::{BotConfigRepository, CoudePlayerRepository};
-
+use crate::domain::services::coude::coude_combat_engine::resolve_combat;
+use crate::domain::services::coude::coude_combat_engine::PlayerLite;
+use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelInput;
+use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelOutput;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::inbound::coude::resolve_friendly_duel::ResolveFriendlyDuelUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
 const DEFAULT_FRIENDLY_WINNER_XP: i64 = 20;
 const DEFAULT_FRIENDLY_LOSER_XP: i64 = 5;
 

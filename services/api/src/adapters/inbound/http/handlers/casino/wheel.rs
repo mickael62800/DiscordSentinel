@@ -1,15 +1,18 @@
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::Json;
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::handlers::coude::taunts::TauntEventDto;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::domain::entities::{WheelSpin, WheelTopWinner};
-use crate::ports::inbound::manage_wheel::{WheelSpinCommand, WheelSpinResult};
-
+use crate::domain::entities::casino::wheel::WheelSpin;
+use crate::domain::entities::casino::wheel::WheelTopWinner;
+use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
+use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
 // ── DTOs ──
 
 #[derive(Debug, Deserialize)]

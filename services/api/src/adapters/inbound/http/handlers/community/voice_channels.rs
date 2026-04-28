@@ -1,19 +1,33 @@
-use axum::extract::{Path, Query, State};
-use axum::{Extension, Json};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 use serde::Deserialize;
 
-use crate::adapters::inbound::http::dto::voice_channels::{
-    AddCoAdminDto, AddWhitelistDto, BanFromChannelDto, CreateInviteLinkDto, CreateThemeDto,
-    CreateVoiceChannelDto, InviteLinkResponseDto, ThemeResponseDto, TransferOwnershipDto,
-    UpdateVoiceChannelDto, UseInviteLinkDto, VoiceChannelDetailDto, VoiceChannelResponseDto,
-    WhitelistEntryResponseDto,
-};
+use crate::adapters::inbound::http::dto::voice_channels::AddCoAdminDto;
+use crate::adapters::inbound::http::dto::voice_channels::AddWhitelistDto;
+use crate::adapters::inbound::http::dto::voice_channels::BanFromChannelDto;
+use crate::adapters::inbound::http::dto::voice_channels::CreateInviteLinkDto;
+use crate::adapters::inbound::http::dto::voice_channels::CreateThemeDto;
+use crate::adapters::inbound::http::dto::voice_channels::CreateVoiceChannelDto;
+use crate::adapters::inbound::http::dto::voice_channels::InviteLinkResponseDto;
+use crate::adapters::inbound::http::dto::voice_channels::ThemeResponseDto;
+use crate::adapters::inbound::http::dto::voice_channels::TransferOwnershipDto;
+use crate::adapters::inbound::http::dto::voice_channels::UpdateVoiceChannelDto;
+use crate::adapters::inbound::http::dto::voice_channels::UseInviteLinkDto;
+use crate::adapters::inbound::http::dto::voice_channels::VoiceChannelDetailDto;
+use crate::adapters::inbound::http::dto::voice_channels::VoiceChannelResponseDto;
+use crate::adapters::inbound::http::dto::voice_channels::WhitelistEntryResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, ok_response, single_dto};
-use crate::adapters::inbound::http::middleware::rbac::{
-    check_role_for_guild, require_role, Role, RoleContext,
-};
+use crate::adapters::inbound::http::helpers::map_to_dtos;
+use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::helpers::single_dto;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::require_role;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
 
@@ -47,11 +61,15 @@ async fn gate_by_channel_id(
     }
     Ok(())
 }
-use crate::ports::inbound::{
-    BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, ManageCoAdminCommand,
-    ManageWhitelistCommand, TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
-};
-use crate::ports::inbound::manage_audit_logs::CreateAuditLogCommand;
+use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 
 async fn log_voice_event(
     state: &AppState,

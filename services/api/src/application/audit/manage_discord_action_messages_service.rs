@@ -10,10 +10,11 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{DiscordActionMessage, NewDiscordActionMessage};
+use crate::domain::entities::audit::discord_action_message::DiscordActionMessage;
+use crate::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::ManageDiscordActionMessagesUseCase;
-use crate::ports::outbound::DiscordActionMessageRepository;
+use crate::ports::inbound::audit::manage_discord_action_messages::ManageDiscordActionMessagesUseCase;
+use crate::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository;
 
 pub struct ManageDiscordActionMessagesService {
     repo: Arc<dyn DiscordActionMessageRepository>,

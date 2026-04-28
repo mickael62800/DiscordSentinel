@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{BotDefinition, BotGuildConfig};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BotDefinitionDto {
     pub bot_name: String,

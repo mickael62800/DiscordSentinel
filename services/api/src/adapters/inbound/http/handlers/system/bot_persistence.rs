@@ -5,15 +5,20 @@
 //! Approche pragmatique : sqlx direct depuis le handler (pas de full hexagonal)
 //! car ces endpoints sont simples et fire-and-forget cote bot.
 
-use axum::extract::{Path, State};
-use axum::{Extension, Json};
+use axum::extract::Path;
+use axum::extract::State;
+use axum::Extension;
+use axum::Json;
 use serde::Deserialize;
 
 use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
-use crate::adapters::inbound::http::middleware::rbac::{check_role_for_guild, require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::require_role;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
@@ -51,14 +56,14 @@ pub async fn list_name_history(
 ) -> Result<Json<Vec<NameHistoryEntryDto>>, ApiError> {
     validation::validate_guild_user_path(&guild_id, &user_id).map_err(ApiError)?;
 
-    use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
+    use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
     let logs = state
         .audit_logs_uc
         .list(
             Some(&guild_id),
             AuditLogFilters {
                 event_type: Some(
-                    crate::domain::entities::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.to_string(),
+                    crate::domain::entities::audit::audit_log::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.to_string(),
                 ),
                 actor_id: None,
                 target_id: Some(user_id.clone()),
@@ -101,9 +106,9 @@ pub async fn create_name_history(
     // Validation
     validation::validate_guild_user_path(&dto.guild_id, &dto.user_id).map_err(ApiError)?;
 
-    state.audit_logs_uc.create(crate::ports::inbound::CreateAuditLogCommand {
+    state.audit_logs_uc.create(crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand {
         guild_id: dto.guild_id,
-        event_type: crate::domain::entities::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.into(),
+        event_type: crate::domain::entities::audit::audit_log::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.into(),
         actor_id: None,
         actor_name: None,
         target_id: Some(dto.user_id.clone()),
@@ -241,7 +246,7 @@ pub async fn create_sponsorship(
 pub async fn list_sponsorships(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
-) -> Result<Json<Vec<crate::ports::outbound::Sponsorship>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::coude::sponsorship_repository::Sponsorship>>, ApiError> {
     // Validation
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
@@ -306,7 +311,7 @@ pub async fn create_temp_role(
 pub async fn list_temp_roles(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
-) -> Result<Json<Vec<crate::ports::outbound::TempRole>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::community::temp_role_repository::TempRole>>, ApiError> {
     // Validation
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 
@@ -408,7 +413,7 @@ pub async fn create_pending_action(
 pub async fn list_pending_actions(
     State(state): State<AppState>,
     Path(guild_id): Path<String>,
-) -> Result<Json<Vec<crate::ports::outbound::PendingAction>>, ApiError> {
+) -> Result<Json<Vec<crate::ports::outbound::moderation::pending_action_repository::PendingAction>>, ApiError> {
     // Validation
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
 

@@ -19,7 +19,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::ToutOuRienOutcome;
+use crate::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
 use crate::domain::errors::DomainError;
 
 /// Solde minimum requis pour declencher un tout-ou-rien (centralise ici

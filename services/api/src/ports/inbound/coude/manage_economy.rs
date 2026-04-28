@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::TauntEvent;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 
 /// Resultat d'un vol reussi (migration wallet unifie).

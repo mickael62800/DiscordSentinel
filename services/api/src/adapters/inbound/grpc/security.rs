@@ -3,18 +3,18 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::security::v1 as proto;
 use sentinel_proto::security::v1::security_service_server::SecurityService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::SecurityEvent;
-use crate::domain::services::security_analyzer::JoinInfo;
-use crate::ports::inbound::{
-    AnalyzeNewMemberCommand, ManageSecurityUseCase, ReportSecurityEventCommand,
-};
-
+use crate::domain::entities::audit::security_event::SecurityEvent;
+use crate::domain::services::audit::security_analyzer::JoinInfo;
+use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
 pub struct SecurityGrpc {
     pub uc: Arc<dyn ManageSecurityUseCase>,
 }

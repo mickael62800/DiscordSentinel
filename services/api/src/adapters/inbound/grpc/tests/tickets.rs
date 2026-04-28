@@ -94,13 +94,14 @@ use super::*;
     // ── RPC tests avec mock ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
+    use std::sync::Mutex;
     use crate::domain::errors::DomainError;
-    use crate::ports::inbound::{
-        AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
-        UpdateTicketChannelCommand,
-    };
-
+    use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
+    use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
+    use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
+    use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
+    use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
     #[derive(Default)]
     struct MockTicketsUc {
         list_tickets: Mutex<Vec<Ticket>>,

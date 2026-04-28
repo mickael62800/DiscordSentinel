@@ -1,8 +1,9 @@
 use super::*;
-use crate::domain::entities::Rule;
-use crate::domain::value_objects::FlagType;
-use crate::ports::inbound::{CreateRuleCommand, ManageRulesUseCase};
-use crate::ports::outbound::CachePort;
+use crate::domain::entities::system::rule::Rule;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::ports::inbound::moderation::manage_rules::CreateRuleCommand;
+use crate::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
+use crate::ports::outbound::system::cache::CachePort;
 use std::sync::Mutex as StdMutex;
 
 #[derive(Default)]

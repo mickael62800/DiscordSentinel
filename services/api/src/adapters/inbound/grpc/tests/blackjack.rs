@@ -119,7 +119,7 @@ use super::*;
 
     #[test]
     fn action_result_to_proto_bundles_game_and_taunts() {
-        use crate::application::BlackjackActionResult;
+        use crate::application::casino::blackjack_service::BlackjackActionResult;
         let game = BlackjackGame {
             id: Uuid::nil(), guild_id: "g".into(), user_id: "u".into(),
             username: "x".into(), bet: 10,
@@ -147,7 +147,7 @@ use super::*;
 
     #[test]
     fn action_result_to_proto_no_taunts() {
-        use crate::application::BlackjackActionResult;
+        use crate::application::casino::blackjack_service::BlackjackActionResult;
         let game = BlackjackGame {
             id: Uuid::nil(), guild_id: "g".into(), user_id: "u".into(),
             username: "x".into(), bet: 0,

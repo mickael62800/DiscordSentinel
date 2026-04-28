@@ -3,18 +3,24 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{ModerationAction, UserModerationHistory};
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    AddStrikeCommand, CreateAuditLogCommand, DeductPointsCommand, LoggedModerationAction,
-    LogModerationCommand, ManageAuditLogsUseCase, ManageConductUseCase, ManageModerationUseCase,
-    ManageStrikesUseCase,
-};
+use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use crate::ports::inbound::moderation::manage_moderation::LoggedModerationAction;
+use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;
 use tracing::warn;
 
 use crate::adapters::outbound::cache_helpers::cached_json;
-use crate::ports::outbound::{CachePort, ModerationRepository, StrikeRepository};
-
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 const HISTORY_TTL: u64 = 180; // 3 minutes
 
 pub struct ManageModerationService {
@@ -70,7 +76,7 @@ impl ManageModerationUseCase for ManageModerationService {
             target_name: cmd.target_name,
             action_type: cmd.action_type,
             reason: truncated_reason,
-            gravity: cmd.gravity.as_deref().and_then(crate::domain::value_objects::ModerationGravity::from_str_lossy),
+            gravity: cmd.gravity.as_deref().and_then(crate::domain::enums::moderation::moderation_gravity::ModerationGravity::from_str_lossy),
             duration: cmd.duration,
             created_at: chrono::Utc::now(),
         };

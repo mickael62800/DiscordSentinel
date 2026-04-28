@@ -1,11 +1,12 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::SanctionReminder;
+use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::ReminderRepository;
+use crate::ports::outbound::moderation::reminder_repository::ReminderRepository;
 
 pub struct PgReminderRepository {
     pool: PgPool,

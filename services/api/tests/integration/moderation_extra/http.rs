@@ -12,7 +12,8 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
@@ -21,8 +22,10 @@ use uuid::Uuid;
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::outbound::{EvidenceEntry, EvidenceRepository, ReviewEntry, ReviewRepository};
-
+use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceEntry;
+use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceRepository;
+use sentinel_api::ports::outbound::moderation::review_repository::ReviewEntry;
+use sentinel_api::ports::outbound::moderation::review_repository::ReviewRepository;
 // ══════════════════════════════════════════════════════════
 // Mocks
 // ══════════════════════════════════════════════════════════
@@ -106,12 +109,11 @@ fn build_state(evidence: Arc<MockEvidenceRepo>, review: Arc<MockReviewRepo>) -> 
 /// Construit un state avec un MockDiscordApi + mock moderation UC pour
 /// couvrir le code apres discord_api.ban_user().await? dans execute_ban/mute/unban.
 fn build_state_with_discord_mock() -> AppState {
-    use sentinel_api::domain::entities::ModerationAction;
-    use sentinel_api::domain::value_objects::ModerationGravity;
-    use sentinel_api::ports::inbound::{
-        LogModerationCommand, ManageModerationUseCase,
-    };
-    use sentinel_api::domain::entities::UserModerationHistory;
+    use sentinel_api::domain::entities::moderation::moderation_action::ModerationAction;
+    use sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity;
+    use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+    use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+    use sentinel_api::domain::entities::moderation::moderation_action::UserModerationHistory;
     use chrono::Utc;
     use async_trait::async_trait;
 
@@ -771,10 +773,11 @@ async fn seed_rbac(pool: &sqlx::PgPool, user_id: &str, guild_id: &str, role: &st
 }
 
 fn build_state_full_mocks() -> AppState {
-    use sentinel_api::domain::entities::ModerationAction;
-    use sentinel_api::domain::value_objects::ModerationGravity;
-    use sentinel_api::ports::inbound::{LogModerationCommand, ManageModerationUseCase};
-    use sentinel_api::domain::entities::UserModerationHistory;
+    use sentinel_api::domain::entities::moderation::moderation_action::ModerationAction;
+    use sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity;
+    use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+    use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+    use sentinel_api::domain::entities::moderation::moderation_action::UserModerationHistory;
     use chrono::Utc;
     use async_trait::async_trait;
 

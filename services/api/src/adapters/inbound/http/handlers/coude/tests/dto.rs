@@ -2,8 +2,15 @@
 //! request du module Coup de Coude.
 
 use super::*;
-use crate::domain::entities::*;
-use crate::domain::value_objects::CoudeClass;
+use crate::domain::entities::coude::bet::BetPayout;
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
+use crate::domain::entities::coude::combat::*;
+use crate::domain::entities::coude::inventory::*;
+use crate::domain::entities::coude::player::*;
+use crate::domain::entities::coude::social::*;
+use crate::domain::enums::coude::coude_class::CoudeClass;
 use chrono::Utc;
 use uuid::Uuid;
 

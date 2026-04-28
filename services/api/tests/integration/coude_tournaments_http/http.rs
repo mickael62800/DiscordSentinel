@@ -7,13 +7,14 @@ mod test_helpers;
 use std::sync::Arc;
 
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::current_week_bounds;
+use sentinel_api::domain::entities::coude::tournament::current_week_bounds;
 
 async fn get(app: axum::Router, uri: &str) -> (StatusCode, serde_json::Value) {
     let req = Request::builder().method("GET").uri(uri).body(Body::empty()).unwrap();

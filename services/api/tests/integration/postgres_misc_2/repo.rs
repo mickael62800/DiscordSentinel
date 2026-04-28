@@ -5,15 +5,19 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgDiscordRoleRepository, PgLogRepository, PgRuleRepository, PgUserActivityRepository,
-};
-use sentinel_api::domain::entities::{DiscordRole, LogEntry, Rule, UserActivity};
-use sentinel_api::domain::value_objects::FlagType;
-use sentinel_api::ports::outbound::{
-    DiscordRoleRepository, LogRepository, RuleRepository, UserActivityRepository,
-};
-
+use sentinel_api::adapters::outbound::postgres::PgDiscordRoleRepository;
+use sentinel_api::adapters::outbound::postgres::PgLogRepository;
+use sentinel_api::adapters::outbound::postgres::PgRuleRepository;
+use sentinel_api::adapters::outbound::postgres::PgUserActivityRepository;
+use sentinel_api::domain::entities::system::discord_role::DiscordRole;
+use sentinel_api::domain::entities::system::log_entry::LogEntry;
+use sentinel_api::domain::entities::system::rule::Rule;
+use sentinel_api::domain::entities::audit::user_activity::UserActivity;
+use sentinel_api::domain::enums::moderation::flag_type::FlagType;
+use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
+use sentinel_api::ports::outbound::system::log_repository::LogRepository;
+use sentinel_api::ports::outbound::moderation::rule_repository::RuleRepository;
+use sentinel_api::ports::outbound::audit::user_activity_repository::UserActivityRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

@@ -3,10 +3,10 @@ use sqlx::PgPool;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::domain::entities::ModerationAction;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::ModerationGravity;
-use crate::ports::outbound::ModerationRepository;
+use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
+use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
 
 /// Phase 2 helper : reconstruit une ModerationAction a partir d'une ligne
 /// audit_logs (event_type `mod_*`).

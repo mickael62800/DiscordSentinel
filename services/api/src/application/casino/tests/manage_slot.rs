@@ -9,20 +9,25 @@ use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{Postgres, Transaction};
-
-use crate::application::ManageSlotService;
-use crate::domain::entities::{
-    BotDefinition, BotGuildConfig, SlotJackpotPool, SlotSpin, SlotTopWinner, TauntEvent,
-};
+use chrono::DateTime;
+use chrono::Utc;
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::application::casino::manage_slot_service::ManageSlotService;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::casino::slot::SlotJackpotPool;
+use crate::domain::entities::casino::slot::SlotSpin;
+use crate::domain::entities::casino::slot::SlotTopWinner;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_slot::{ManageSlotUseCase, SpinCommand};
-use crate::ports::inbound::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
-use crate::ports::outbound::{BotConfigRepository, SlotRepository};
-
+use crate::ports::inbound::casino::manage_slot::ManageSlotUseCase;
+use crate::ports::inbound::casino::manage_slot::SpinCommand;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use crate::ports::inbound::casino::manage_wallet::WalletMutation;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::casino::slot_repository::SlotRepository;
 // ── Mocks ──
 
 #[derive(Default)]

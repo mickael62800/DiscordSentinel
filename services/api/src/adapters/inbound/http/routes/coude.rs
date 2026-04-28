@@ -1,6 +1,9 @@
 //! Routes Coup de Coude (jeu de combat).
 
-use axum::routing::{delete, get, patch, post};
+use axum::routing::delete;
+use axum::routing::get;
+use axum::routing::patch;
+use axum::routing::post;
 use axum::Router;
 
 use super::super::handlers;

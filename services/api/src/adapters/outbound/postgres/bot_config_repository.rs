@@ -2,9 +2,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{BotDefinition, BotGuildConfig};
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::BotConfigRepository;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 pub struct PgBotConfigRepository {
     pool: PgPool,

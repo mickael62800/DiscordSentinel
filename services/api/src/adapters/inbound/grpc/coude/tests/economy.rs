@@ -1,11 +1,11 @@
 use super::*;
 use async_trait::async_trait;
-use std::sync::{Arc, Mutex};
-
-use crate::domain::entities::TauntEvent;
+use std::sync::Arc;
+use std::sync::Mutex;
+use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_economy::{ManageCoudeEconomyUseCase, StealOutcome};
-
+use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
+use crate::ports::inbound::coude::manage_economy::StealOutcome;
 #[derive(Default)]
 struct MockEconomyUc {
     transfer_calls: Mutex<Vec<(String, String, String, i64)>>,

@@ -3,20 +3,22 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::voice::v1 as proto;
 use sentinel_proto::voice::v1::voice_channels_service_server::VoiceChannelsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::VoiceChannel;
+use crate::domain::entities::community::voice_channel::VoiceChannel;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    BanFromChannelCommand, CreateVoiceChannelCommand, ManageCoAdminCommand,
-    ManageVoiceChannelsUseCase, ManageWhitelistCommand, TransferOwnershipCommand,
-    UpdateVoiceChannelCommand,
-};
-
+use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 pub struct VoiceChannelsGrpc {
     pub uc: Arc<dyn ManageVoiceChannelsUseCase>,
 }
@@ -227,7 +229,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
     }
 }
 
-fn voice_theme_to_proto(t: crate::domain::entities::VoiceChannelTheme) -> proto::VoiceChannelTheme {
+fn voice_theme_to_proto(t: crate::domain::entities::community::voice_channel::VoiceChannelTheme) -> proto::VoiceChannelTheme {
     proto::VoiceChannelTheme {
         id: t.id.to_string(),
         guild_id: t.guild_id,

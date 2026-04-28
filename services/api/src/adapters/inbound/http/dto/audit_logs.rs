@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::AuditLog;
-use crate::ports::inbound::manage_audit_logs::CreateAuditLogCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::audit::audit_log::AuditLog;
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateAuditLogDto {

@@ -1,13 +1,15 @@
 //! Impl Postgres de `CoudeBountyRepository` (cf. COUPE_AMELIORATIONS 5.3).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{ActiveBounty, BountyStatus};
+use crate::domain::entities::coude::bounty::ActiveBounty;
+use crate::domain::entities::coude::bounty::BountyStatus;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeBountyRepository;
+use crate::ports::outbound::coude::bounty_repository::CoudeBountyRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_bounties";

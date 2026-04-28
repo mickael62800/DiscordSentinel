@@ -1,11 +1,12 @@
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use tracing::info;
 
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::format_model_display_name;
+use crate::domain::entities::ai::ai_models::format_model_display_name;
 
 #[derive(Debug, Serialize)]
 pub struct ModelInfo {

@@ -5,18 +5,19 @@
 use std::sync::Arc;
 
 use chrono::DateTime;
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::members::v1 as proto;
 use sentinel_proto::members::v1::members_service_server::MembersService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::GuildMember;
+use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
-};
-
+use crate::ports::inbound::community::manage_members::ManageMembersUseCase;
+use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
+use crate::ports::inbound::community::manage_members::SyncMembersCommand;
+use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
 pub struct MembersGrpc {
     pub uc: Arc<dyn ManageMembersUseCase>,
 }

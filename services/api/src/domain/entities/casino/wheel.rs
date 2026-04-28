@@ -3,8 +3,11 @@
 //! 10 cases ponderees, chaque case a un effet coins (positif, negatif, ou
 //! neutre). RNG seedable via `spin_with_rng(rng)` -> testable.
 
-use chrono::{DateTime, Utc};
-use rand::{distributions::WeightedIndex, prelude::Distribution, RngCore};
+use chrono::DateTime;
+use chrono::Utc;
+use rand::distributions::WeightedIndex;
+use rand::prelude::Distribution;
+use rand::RngCore;
 use uuid::Uuid;
 
 /// Une case de la roue : identifiant stable, libelle affiche, payout fixe

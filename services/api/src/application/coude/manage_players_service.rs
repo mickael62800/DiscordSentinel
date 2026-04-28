@@ -2,10 +2,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::{CombatStat, CoudePlayer, XpProgress};
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::outbound::CoudePlayerRepository;
+use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
 
 pub struct ManageCoudePlayersService {
     repo: Arc<dyn CoudePlayerRepository>,

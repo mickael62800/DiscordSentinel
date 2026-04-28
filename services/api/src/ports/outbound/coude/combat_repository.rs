@@ -1,7 +1,9 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{CombatResolution, CoudeCombat, NewCoudeCombat};
+use crate::domain::entities::coude::combat::CombatResolution;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 
 /// Repository d'accès aux combats Coup de Coude.

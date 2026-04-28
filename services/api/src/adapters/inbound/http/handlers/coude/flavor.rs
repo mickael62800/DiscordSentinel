@@ -3,10 +3,12 @@
 //! Endpoint read-only : le bot tire un template au hasard pour une cle
 //! donnee (`steal_success_afk`, `heist_fail`, etc.) et `locale` (default `fr`).
 
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::Json;
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 

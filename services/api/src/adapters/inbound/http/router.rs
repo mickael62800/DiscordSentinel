@@ -1,20 +1,28 @@
-use axum::http::{header, HeaderValue, Method};
+use axum::http::header;
+use axum::http::HeaderValue;
+use axum::http::Method;
 use axum::middleware;
-use axum::routing::{get, post};
+use axum::routing::get;
+use axum::routing::post;
 use axum::Router;
 use tower_http::compression::CompressionLayer;
-use tower_http::cors::{AllowOrigin, CorsLayer};
+use tower_http::cors::AllowOrigin;
+use tower_http::cors::CorsLayer;
 use tower_http::limit::RequestBodyLimitLayer;
-use tower_http::request_id::{MakeRequestUuid, PropagateRequestIdLayer, SetRequestIdLayer};
+use tower_http::request_id::MakeRequestUuid;
+use tower_http::request_id::PropagateRequestIdLayer;
+use tower_http::request_id::SetRequestIdLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 use tower_http::trace::TraceLayer;
 use tracing::Span;
 
 use super::handlers;
-use super::metrics::{metrics_handler, metrics_middleware};
+use super::metrics::metrics_handler;
+use super::metrics::metrics_middleware;
 use super::middleware::api_logger::api_logger_middleware;
 use super::middleware::auth::auth_middleware;
-use super::middleware::rate_limit::{rate_limit_middleware, RateLimiter};
+use super::middleware::rate_limit::rate_limit_middleware;
+use super::middleware::rate_limit::RateLimiter;
 use super::routes;
 use super::state::AppState;
 
@@ -91,8 +99,8 @@ fn protected_domain_routes() -> Router<AppState> {
 pub fn build_for_test(state: AppState) -> Router {
     let protected = Router::new()
         // Endpoints lourds (sans rate limit en test)
-        .route("/analyze", post(handlers::analyze::analyze))
-        .route("/analyze/image", post(handlers::analyze_image::analyze_image))
+        .route("/analyze", post(handlers::ai::analyze::analyze))
+        .route("/analyze/image", post(handlers::ai::analyze_image::analyze_image))
         .merge(routes::analytics::routes())
         // Routes standard
         .merge(protected_domain_routes())
@@ -102,9 +110,9 @@ pub fn build_for_test(state: AppState) -> Router {
         ));
 
     let public = Router::new()
-        .route("/health", get(handlers::health::health))
-        .route("/auth/discord/authorize", get(handlers::oauth::authorize))
-        .route("/auth/discord/callback", get(handlers::oauth::callback));
+        .route("/health", get(handlers::system::health::health))
+        .route("/auth/discord/authorize", get(handlers::system::oauth::authorize))
+        .route("/auth/discord/callback", get(handlers::system::oauth::callback));
 
     Router::new()
         .merge(protected)
@@ -136,8 +144,8 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
 
     // Routes lourdes avec rate limit strict (inference IA + analytics)
     let heavy_routes = Router::new()
-        .route("/analyze", post(handlers::analyze::analyze))
-        .route("/analyze/image", post(handlers::analyze_image::analyze_image))
+        .route("/analyze", post(handlers::ai::analyze::analyze))
+        .route("/analyze/image", post(handlers::ai::analyze_image::analyze_image))
         .merge(routes::analytics::routes())
         .route_layer(middleware::from_fn_with_state(
             heavy_limiter,
@@ -180,12 +188,12 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
     // Pour restreindre en prod, faire un firewall sur l'IP du Prometheus ou
     // ajouter une couche basic auth via reverse proxy.
     let public = Router::new()
-        .route("/health", get(handlers::health::health))
+        .route("/health", get(handlers::system::health::health))
         .route("/metrics", get(metrics_handler))
         // OAuth Discord web : publiques car pas de token prealable.
         // Le state CSRF + l'echange code cote serveur protegent le flux.
-        .route("/auth/discord/authorize", get(handlers::oauth::authorize))
-        .route("/auth/discord/callback", get(handlers::oauth::callback));
+        .route("/auth/discord/authorize", get(handlers::system::oauth::authorize))
+        .route("/auth/discord/callback", get(handlers::system::oauth::callback));
 
     // TraceLayer configure pour inclure le request_id dans chaque span
     let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {

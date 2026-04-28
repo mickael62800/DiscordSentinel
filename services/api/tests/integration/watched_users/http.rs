@@ -8,16 +8,17 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::WatchedUser;
+use sentinel_api::domain::entities::audit::watched_user::WatchedUser;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_watched_users::{ManageWatchedUsersUseCase, UserDossier};
-
+use sentinel_api::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
+use sentinel_api::ports::inbound::audit::manage_watched_users::UserDossier;
 use test_helpers::build_test_state_watched_users;
 
 // ══════════════════════════════════════════════════════════

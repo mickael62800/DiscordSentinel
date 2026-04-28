@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{LevelConfig, LevelReward, UserLevel, XpSource};
+use crate::domain::entities::community::level::LevelConfig;
+use crate::domain::entities::community::level::LevelReward;
+use crate::domain::entities::community::level::UserLevel;
+use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

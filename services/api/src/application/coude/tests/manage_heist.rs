@@ -5,25 +5,35 @@
 //! - attempt_heist success path (withdraw + credit + record)
 //! - attempt_heist failure path (prison 24h)
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
-use chrono::{Duration as ChronoDuration, Utc};
+use chrono::Duration as ChronoDuration;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ManageCoudeHeistService;
-use crate::domain::entities::{
-    BotDefinition, BotGuildConfig, CashboxRedistribution, CashboxRedistributionEntry, CashboxSource,
-    CoudeCashbox, CoudeHeistAttempt, CoudeInsurance, CoudeInventoryItem, CoudePrime,
-    CoudePrisonState, NewCoudePrime, Wallet, WalletTransaction,
-};
+use crate::application::coude::manage_heist_service::ManageCoudeHeistService;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::coude::cashbox::CashboxRedistribution;
+use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
+use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::heist::CoudeHeistAttempt;
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::heist::CoudePrisonState;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_heist::ManageCoudeHeistUseCase;
-use crate::ports::inbound::ManageCoudeInventoryUseCase;
-use crate::ports::outbound::{
-    BotConfigRepository, CoudeCashboxRepository, CoudeHeistRepository, WalletRepository,
-};
-
+use crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase;
+use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
+use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 // ── MockHeistRepo ──
 
 #[derive(Default)]
@@ -385,7 +395,7 @@ async fn attempt_heist_success_withdraws_and_credits() {
     // Seed avec tous les outils HEIST_TOOLS -> chance maximale (55%).
     // Rend le test stable : P(aucun succes en 50 iterations) ~= 1e-18.
     let (h, c, i, w, b) = default_service_parts();
-    use crate::domain::entities::HEIST_TOOLS;
+    use crate::domain::entities::coude::heist::HEIST_TOOLS;
     for tool in HEIST_TOOLS {
         i.inventory.lock().unwrap().push(CoudeInventoryItem {
             guild_id: "g".into(), user_id: "u".into(),

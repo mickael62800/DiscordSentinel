@@ -3,9 +3,9 @@ use chrono::NaiveDate;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::DailyActivity;
+use crate::domain::entities::community::daily_activity::DailyActivity;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::DailyActivityRepository;
+use crate::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 
 pub struct PgDailyActivityRepository {
     pool: PgPool,

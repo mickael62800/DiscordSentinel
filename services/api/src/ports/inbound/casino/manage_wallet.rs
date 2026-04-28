@@ -17,9 +17,11 @@
 //! Voir `application/manage_wallet_service.rs` pour l'implementation.
 
 use async_trait::async_trait;
-use sqlx::{Postgres, Transaction};
-
-use crate::domain::entities::{TauntEvent, Wallet, WalletTransaction};
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
 
 /// Resultat d'une mutation de wallet. Contient le nouveau solde + les taunts

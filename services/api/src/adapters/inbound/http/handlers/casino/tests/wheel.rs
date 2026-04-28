@@ -3,11 +3,13 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::adapters::inbound::http::handlers::wheel::{
-    WheelSpinLogDto, WheelSpinResponseDto, WheelTopWinnerDto,
-};
-use crate::domain::entities::{WheelCase, WheelSpin, WheelTopWinner};
-use crate::ports::inbound::manage_wheel::WheelSpinResult;
+use crate::adapters::inbound::http::handlers::casino::wheel::WheelSpinLogDto;
+use crate::adapters::inbound::http::handlers::casino::wheel::WheelSpinResponseDto;
+use crate::adapters::inbound::http::handlers::casino::wheel::WheelTopWinnerDto;
+use crate::domain::entities::casino::wheel::WheelCase;
+use crate::domain::entities::casino::wheel::WheelSpin;
+use crate::domain::entities::casino::wheel::WheelTopWinner;
+use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
 
 fn sample_jackpot_case() -> WheelCase {
     WheelCase { key: "jackpot", label: "🎰 Jackpot", payout: 5000, weight: 3 }

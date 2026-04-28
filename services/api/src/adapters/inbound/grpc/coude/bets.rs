@@ -6,19 +6,23 @@
 
 use std::sync::Arc;
 
-use tonic::{Request, Response, Status};
-
+use tonic::Request;
+use tonic::Response;
+use tonic::Status;
 use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::{
-    BetPayout, BetResolutionPlan, CoudeBet, CoudeFighterBetBonus, NewCoudeBet, RefundSummary,
-};
-use crate::ports::inbound::ManageCoudeBetsUseCase;
+use crate::domain::entities::coude::bet::BetPayout;
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::bet::RefundSummary;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 
-use super::{parse_uuid, taunt_event_to_proto};
-
+use super::parse_uuid;
+use super::taunt_event_to_proto;
 pub struct CoudeBetsGrpc {
     pub uc: Arc<dyn ManageCoudeBetsUseCase>,
 }

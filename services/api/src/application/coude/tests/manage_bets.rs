@@ -1,7 +1,13 @@
 use super::*;
-use crate::domain::entities::{BetResolutionPlan, CoudeBet, CoudeCombat, NewCoudeBet, RefundSummary, TauntEvent};
-use crate::ports::inbound::manage_bets::ManageCoudeBetsUseCase;
-use crate::ports::outbound::{CombatQueryRepository, CoudeBetRepository};
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::bet::RefundSummary;
+use crate::domain::entities::coude::taunt::TauntEvent;
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
+use crate::ports::outbound::coude::bet_repository::CoudeBetRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 use uuid::Uuid;

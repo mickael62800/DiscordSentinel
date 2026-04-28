@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::AuditLog;
+use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
 
 pub struct CreateAuditLogCommand {

@@ -1,9 +1,11 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::{ConductConfig, ConductPointsLog, UserConductPoints};
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::ConductRepository;
+use crate::ports::outbound::community::conduct_repository::ConductRepository;
 
 pub struct PgConductRepository {
     pool: PgPool,

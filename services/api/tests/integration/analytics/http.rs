@@ -8,17 +8,20 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::NaiveDate;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::analytics::{
-    ActionDistribution, HourlyActivity, ModerationTrend, PeakActivity, TopInfractor,
-};
+use sentinel_api::domain::entities::system::analytics::ActionDistribution;
+use sentinel_api::domain::entities::system::analytics::HourlyActivity;
+use sentinel_api::domain::entities::system::analytics::ModerationTrend;
+use sentinel_api::domain::entities::system::analytics::PeakActivity;
+use sentinel_api::domain::entities::system::analytics::TopInfractor;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::outbound::AnalyticsRepository;
+use sentinel_api::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 use test_helpers::build_test_state_analytics;
 

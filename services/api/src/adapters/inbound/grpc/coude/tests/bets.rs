@@ -1,16 +1,18 @@
 use super::*;
 use async_trait::async_trait;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    BetPayout, BetResolutionPlan, CoudeBet, NewCoudeBet, RefundSummary,
-};
+use crate::domain::entities::coude::bet::BetPayout;
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::NewCoudeBet;
+use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_bets::{
-    ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
-};
-
+use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
+use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
+use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
 #[derive(Default)]
 struct MockBetsUc {
     placed: Mutex<Vec<NewCoudeBet>>,

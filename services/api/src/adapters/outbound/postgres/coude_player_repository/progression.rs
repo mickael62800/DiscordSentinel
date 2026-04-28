@@ -5,13 +5,18 @@
 //! dans `mod.rs` delegate ici.
 
 use crate::adapters::outbound::postgres::wallet_tx_log::log_wallet_tx;
-use crate::domain::entities::{
-    coude_title_for_level, coude_xp_for_level, CombatStat, CoudePlayer, XpProgress, COUDE_MAX_LEVEL,
-};
+use crate::domain::entities::coude::player::title_for_level as coude_title_for_level;
+use crate::domain::entities::coude::player::xp_for_level as coude_xp_for_level;
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::entities::coude::player::COUDE_MAX_LEVEL;
 use crate::domain::errors::DomainError;
 
-use super::{pg_err, PgCoudePlayerRepository, PlayerRow, PLAYER_COLUMNS};
-
+use super::pg_err;
+use super::PgCoudePlayerRepository;
+use super::PlayerRow;
+use super::PLAYER_COLUMNS;
 pub(super) async fn update_class(
     repo: &PgCoudePlayerRepository,
     guild_id: &str,

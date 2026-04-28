@@ -7,17 +7,19 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use base64::Engine;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{ImageAnalysis, ImageClassification};
+use sentinel_api::domain::entities::ai::image_analysis::ImageAnalysis;
+use sentinel_api::domain::entities::ai::image_analysis::ImageClassification;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::domain::value_objects::Action;
-use sentinel_api::ports::inbound::{AnalyzeImageCommand, AnalyzeImageUseCase};
-
+use sentinel_api::domain::enums::moderation::action::Action;
+use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
 struct OkAnalyzeImage;
 #[async_trait]
 impl AnalyzeImageUseCase for OkAnalyzeImage {

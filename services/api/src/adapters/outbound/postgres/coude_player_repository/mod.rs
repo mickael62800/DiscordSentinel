@@ -1,13 +1,16 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 
-use crate::domain::entities::{CombatStat, CoudePlayer, XpProgress};
+use crate::domain::entities::coude::player::CombatStat;
+use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::domain::value_objects::CoudeClass;
-use crate::ports::outbound::CoudePlayerRepository;
+use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
 
 pub struct PgCoudePlayerRepository {
     pool: PgPool,

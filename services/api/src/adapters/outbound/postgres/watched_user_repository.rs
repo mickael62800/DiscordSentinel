@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::{classify_risk_level, WatchedUser};
+use crate::domain::entities::audit::watched_user::classify_risk_level;
+use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::WatchedUserRepository;
+use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 
 pub struct PgWatchedUserRepository {
     pool: PgPool,

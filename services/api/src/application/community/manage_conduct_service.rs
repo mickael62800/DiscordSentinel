@@ -6,17 +6,22 @@ use uuid::Uuid;
 
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
 use crate::adapters::outbound::DiscordApi;
-use crate::domain::entities::{
-    apply_conduct_penalty, apply_conduct_regen, ConductConfig, ConductPointsLog, Infraction,
-    UserConductPoints, MUTE_AT_ZERO_POINTS_DURATION_MINS,
-};
+use crate::domain::entities::community::conduct::apply_conduct_penalty;
+use crate::domain::entities::community::conduct::apply_conduct_regen;
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::community::conduct::UserConductPoints;
+use crate::domain::entities::community::conduct::MUTE_AT_ZERO_POINTS_DURATION_MINS;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::{Action, DetectionFlags};
-use crate::ports::inbound::{
-    AddPointsCommand, DeductPointsCommand, ManageConductUseCase, SaveConductConfigCommand,
-};
-use crate::ports::outbound::{ConductRepository, InfractionRepository};
-
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
+use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
+use crate::ports::outbound::community::conduct_repository::ConductRepository;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 #[cfg(test)]
 #[path = "tests/manage_conduct.rs"]
 mod tests;

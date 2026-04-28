@@ -1,12 +1,14 @@
 use axum::extract::State;
-use axum::{Extension, Json};
+use axum::Extension;
+use axum::Json;
 use serde::Deserialize;
 use tracing::info;
 
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{
-    check_role_for_guild, require_superadmin, Role, RoleContext,
-};
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
@@ -30,7 +32,7 @@ pub async fn purge_infractions(
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
-    crate::domain::entities::validate_purge_days_allow_zero(dto.days)
+    crate::domain::entities::moderation::purge::validate_purge_days_allow_zero(dto.days)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate RBAC : owner requis pour une purge massive.
@@ -63,7 +65,7 @@ pub async fn purge_audit_logs(
     Json(dto): Json<PurgeByDaysDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_discord_id("guild_id", &dto.guild_id).map_err(ApiError)?;
-    crate::domain::entities::validate_purge_days_strictly_positive(dto.days)
+    crate::domain::entities::moderation::purge::validate_purge_days_strictly_positive(dto.days)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate RBAC : owner requis pour purger l'audit log.
@@ -101,7 +103,7 @@ pub async fn purge_logs(
     rbac: Option<Extension<RoleContext>>,
     Json(dto): Json<PurgeLogsDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    crate::domain::entities::validate_purge_days_strictly_positive(dto.days)
+    crate::domain::entities::moderation::purge::validate_purge_days_strictly_positive(dto.days)
         .map_err(|m| ApiError(DomainError::ValidationError(m.into())))?;
 
     // Phase 7 B — Gate superadmin pour les appels desktop.

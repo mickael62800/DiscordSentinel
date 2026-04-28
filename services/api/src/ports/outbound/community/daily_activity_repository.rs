@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::DailyActivity;
+use crate::domain::entities::community::daily_activity::DailyActivity;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

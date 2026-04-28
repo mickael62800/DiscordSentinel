@@ -8,16 +8,17 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::domain::entities::DiscordRole;
+use sentinel_api::domain::entities::system::discord_role::DiscordRole;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::outbound::DiscordRoleRepository;
+use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 
 // ══════════════════════════════════════════════════════════
 // Mock DiscordRoleRepository

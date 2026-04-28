@@ -1,6 +1,8 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use rand::seq::SliceRandom;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

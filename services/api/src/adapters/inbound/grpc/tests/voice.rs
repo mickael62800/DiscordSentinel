@@ -3,7 +3,7 @@ use super::*;
     
     use chrono::TimeZone;
     use uuid::Uuid;
-    use crate::domain::value_objects::VoiceChannelKind;
+    use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 
     fn ts() -> chrono::DateTime<chrono::Utc> {
         chrono::Utc.with_ymd_and_hms(2026, 1, 15, 12, 0, 0).unwrap()
@@ -52,7 +52,7 @@ use super::*;
 
     #[test]
     fn voice_theme_to_proto_full_mapping() {
-        use crate::domain::entities::VoiceChannelTheme;
+        use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
         let id = Uuid::new_v4();
         let theme = VoiceChannelTheme {
             id,
@@ -89,7 +89,7 @@ use super::*;
 
     #[test]
     fn voice_theme_to_proto_minimal_optionals() {
-        use crate::domain::entities::VoiceChannelTheme;
+        use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
         let theme = VoiceChannelTheme {
             id: Uuid::nil(),
             guild_id: "g".into(),
@@ -131,20 +131,27 @@ use super::*;
     // ── RPC tests avec mock ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
+    use std::sync::Arc;
+    use std::sync::Mutex;
     use chrono::Utc;
-    use crate::domain::entities::{
-        VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelConfig, VoiceChannelDetail,
-        VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry,
-    };
+    use crate::domain::entities::community::voice_channel::VoiceChannelBan;
+    use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
+    use crate::domain::entities::community::voice_channel::VoiceChannelConfig;
+    use crate::domain::entities::community::voice_channel::VoiceChannelDetail;
+    use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+    use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
+    use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
     use crate::domain::errors::DomainError;
-    use crate::ports::inbound::{
-        BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand,
-        CreateVoiceChannelCommand, ManageCoAdminCommand, ManageVoiceChannelsUseCase,
-        ManageWhitelistCommand, TransferOwnershipCommand, UpdateVoiceChannelCommand,
-        UseInviteLinkCommand,
-    };
-
+    use crate::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+    use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+    use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+    use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+    use crate::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+    use crate::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+    use crate::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+    use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+    use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+    use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
     #[derive(Default)]
     struct MockVoiceUc {
         channels: Mutex<Vec<VoiceChannel>>,

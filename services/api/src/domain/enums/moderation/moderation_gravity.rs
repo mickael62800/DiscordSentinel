@@ -1,5 +1,5 @@
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 /// Phase 2 A.3 — Gravite d'une action de moderation.
 ///
 /// Lie au type Postgres `moderation_gravity` (migration 103).

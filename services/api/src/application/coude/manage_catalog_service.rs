@@ -7,12 +7,16 @@
 use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
-use crate::domain::services::coude_combat_engine::{classes, progression, shop};
-use crate::ports::inbound::manage_catalog::{
-    AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, ManageCoudeCatalogUseCase,
-    MatchmakingBucket, ShopItemInfo,
-};
-
+use crate::domain::services::coude::coude_combat_engine::classes;
+use crate::domain::services::coude::coude_combat_engine::progression;
+use crate::domain::services::coude::coude_combat_engine::shop;
+use crate::ports::inbound::coude::manage_catalog::AntiTheftItemInfo;
+use crate::ports::inbound::coude::manage_catalog::ClassInfo;
+use crate::ports::inbound::coude::manage_catalog::CoudeCatalog;
+use crate::ports::inbound::coude::manage_catalog::LevelEntry;
+use crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase;
+use crate::ports::inbound::coude::manage_catalog::MatchmakingBucket;
+use crate::ports::inbound::coude::manage_catalog::ShopItemInfo;
 pub struct ManageCoudeCatalogService;
 
 impl ManageCoudeCatalogService {

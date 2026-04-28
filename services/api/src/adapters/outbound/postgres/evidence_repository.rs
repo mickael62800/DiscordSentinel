@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::{EvidenceEntry, EvidenceRepository};
+use crate::ports::outbound::moderation::evidence_repository::EvidenceEntry;
+use crate::ports::outbound::moderation::evidence_repository::EvidenceRepository;
 use super::pg_err;
 
 pub struct PgEvidenceRepository { pool: PgPool }

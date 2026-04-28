@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::analytics::*;
+use crate::domain::entities::system::analytics::*;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

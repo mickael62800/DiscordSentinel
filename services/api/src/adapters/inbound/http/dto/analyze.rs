@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::MessageAnalysis;
-use crate::domain::value_objects::DetectionFlags;
-use crate::ports::inbound::AnalyzeMessageCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::ai::message_analysis::MessageAnalysis;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 
 /// DTO de la requête reçue depuis le bot automod.
 #[derive(Debug, Deserialize)]
@@ -60,7 +60,7 @@ impl From<AnalyzeRequestDto> for AnalyzeMessageCommand {
         let context_messages = dto
             .context_messages
             .into_iter()
-            .map(|m| crate::ports::inbound::ContextMessageEntry {
+            .map(|m| crate::ports::inbound::ai::analyze_message::ContextMessageEntry {
                 username: m.username,
                 content: m.content,
             })

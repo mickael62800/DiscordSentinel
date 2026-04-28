@@ -8,21 +8,25 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::domain::entities::{
-    GuildMember, MemberConduct, MemberInfractions, MemberModeration, MemberStats, MemberSummary,
-};
+use sentinel_api::domain::entities::community::guild_member::GuildMember;
+use sentinel_api::domain::entities::community::guild_member::MemberConduct;
+use sentinel_api::domain::entities::community::guild_member::MemberInfractions;
+use sentinel_api::domain::entities::community::guild_member::MemberModeration;
+use sentinel_api::domain::entities::community::guild_member::MemberStats;
+use sentinel_api::domain::entities::community::guild_member::MemberSummary;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::{
-    ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
-};
-
+use sentinel_api::ports::inbound::community::manage_members::ManageMembersUseCase;
+use sentinel_api::ports::inbound::community::manage_members::RegisterMemberCommand;
+use sentinel_api::ports::inbound::community::manage_members::SyncMembersCommand;
+use sentinel_api::ports::inbound::community::manage_members::UpdateMemberCommand;
 // ══════════════════════════════════════════════════════════
 // Mock ManageMembersUseCase
 // ══════════════════════════════════════════════════════════

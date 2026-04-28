@@ -1,13 +1,15 @@
 //! Impl Postgres de `CoudeHeistRepository` (Phase 10).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{CoudeHeistAttempt, CoudePrisonState};
+use crate::domain::entities::coude::heist::CoudeHeistAttempt;
+use crate::domain::entities::coude::heist::CoudePrisonState;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeHeistRepository;
+use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "heist";

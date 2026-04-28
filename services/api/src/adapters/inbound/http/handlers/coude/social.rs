@@ -1,17 +1,22 @@
 //! Handlers sociaux : cooldowns, leaderboard, événements, daily chaos, saisons.
 //! Délèguent à `state.coude_social_uc`.
 
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 
-use super::dto::{
-    CurrentSeasonDto, DailyChaosDto, DurationDto, EventDto, LeaderboardEntry,
-    LeaderboardQueryParams,
-};
+use super::dto::CurrentSeasonDto;
+use super::dto::DailyChaosDto;
+use super::dto::DurationDto;
+use super::dto::EventDto;
+use super::dto::LeaderboardEntry;
+use super::dto::LeaderboardQueryParams;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::{LeaderboardCategory, NewDailyChaos};
+use crate::domain::entities::coude::social::LeaderboardCategory;
+use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::errors::DomainError;
 
 // ── Cooldowns ──
@@ -58,7 +63,7 @@ pub async fn leaderboard(
     })?;
     let entries = state
         .coude_social_uc
-        .leaderboard(&guild_id, cat, params.limit.unwrap_or(crate::domain::entities::DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT))
+        .leaderboard(&guild_id, cat, params.limit.unwrap_or(crate::domain::entities::coude::limits::DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT))
         .await?;
     Ok(Json(entries.into_iter().map(LeaderboardEntry::from).collect()))
 }

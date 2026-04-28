@@ -1,5 +1,7 @@
 use super::*;
-use crate::domain::entities::{ConductConfig, ConductPointsLog, UserConductPoints};
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::community::conduct::UserConductPoints;
 use chrono::Utc;
 use uuid::Uuid;
 

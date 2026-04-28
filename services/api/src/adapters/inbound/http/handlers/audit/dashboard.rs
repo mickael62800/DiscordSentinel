@@ -1,4 +1,5 @@
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use redis::AsyncCommands;
@@ -6,15 +7,19 @@ use uuid::Uuid;
 
 use axum::extract::Query;
 
-use crate::adapters::inbound::http::dto::dashboard::{
-    CreateLogDto, DashboardInfractionDto, DashboardRuleDto, DashboardStatsDto, GuildDto,
-    GuildFilterParams, LogEntryDto, RegisterGuildDto,
-};
+use crate::adapters::inbound::http::dto::dashboard::CreateLogDto;
+use crate::adapters::inbound::http::dto::dashboard::DashboardInfractionDto;
+use crate::adapters::inbound::http::dto::dashboard::DashboardRuleDto;
+use crate::adapters::inbound::http::dto::dashboard::DashboardStatsDto;
+use crate::adapters::inbound::http::dto::dashboard::GuildDto;
+use crate::adapters::inbound::http::dto::dashboard::GuildFilterParams;
+use crate::adapters::inbound::http::dto::dashboard::LogEntryDto;
+use crate::adapters::inbound::http::dto::dashboard::RegisterGuildDto;
 use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::LogEntry;
+use crate::domain::entities::system::log_entry::LogEntry;
 
 /// GET /api/stats — stats globales pour le dashboard desktop
 pub async fn get_dashboard_stats(
@@ -105,7 +110,7 @@ pub async fn get_all_infractions(
 ) -> Result<Json<Vec<DashboardInfractionDto>>, ApiError> {
     let infractions = match &params.guild_id {
         Some(gid) => {
-            let filters = crate::ports::inbound::InfractionFilters {
+            let filters = crate::ports::inbound::moderation::manage_infractions::InfractionFilters {
                 user_id: None,
                 action: None,
                 limit: 200,
@@ -228,7 +233,7 @@ pub async fn register_guild(
     let guild_id = dto.guild_id.clone();
     let owner_id = dto.owner_id.clone();
 
-    let guild = crate::domain::entities::Guild {
+    let guild = crate::domain::entities::system::guild::Guild {
         guild_id: dto.guild_id,
         name: dto.name,
         icon: dto.icon,

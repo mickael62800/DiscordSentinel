@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::value_objects::DetectionFlags;
+use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
 
 fn make_dto(content: String, n_context: usize) -> AnalyzeRequestDto {
     let context_messages = (0..n_context)
@@ -20,7 +20,7 @@ fn make_dto(content: String, n_context: usize) -> AnalyzeRequestDto {
 #[test]
 fn from_dto_short_content_preserved() {
     let dto = make_dto("hello world".into(), 0);
-    let cmd: crate::ports::inbound::AnalyzeMessageCommand = dto.into();
+    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content, "hello world");
 }
 
@@ -28,7 +28,7 @@ fn from_dto_short_content_preserved() {
 fn from_dto_content_exactly_2500_preserved() {
     let content = "a".repeat(2500);
     let dto = make_dto(content.clone(), 0);
-    let cmd: crate::ports::inbound::AnalyzeMessageCommand = dto.into();
+    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content.len(), 2500);
     assert_eq!(cmd.content, content);
 }
@@ -37,7 +37,7 @@ fn from_dto_content_exactly_2500_preserved() {
 fn from_dto_content_above_2500_truncated() {
     let content = "x".repeat(3000);
     let dto = make_dto(content, 0);
-    let cmd: crate::ports::inbound::AnalyzeMessageCommand = dto.into();
+    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content.chars().count(), 2500);
     assert!(cmd.content.chars().all(|c| c == 'x'));
 }
@@ -48,14 +48,14 @@ fn from_dto_truncation_counts_chars_not_bytes() {
     // Apres truncation : 2500 chars = 5000 bytes.
     let content: String = "é".repeat(3000);
     let dto = make_dto(content, 0);
-    let cmd: crate::ports::inbound::AnalyzeMessageCommand = dto.into();
+    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.content.chars().count(), 2500);
 }
 
 #[test]
 fn from_dto_copies_ids_and_flags() {
     let dto = make_dto("hi".into(), 0);
-    let cmd: crate::ports::inbound::AnalyzeMessageCommand = dto.into();
+    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.guild_id, "g");
     assert_eq!(cmd.channel_id, "c");
     assert_eq!(cmd.user_id, "u");
@@ -67,7 +67,7 @@ fn from_dto_copies_ids_and_flags() {
 #[test]
 fn from_dto_maps_context_messages() {
     let dto = make_dto("hi".into(), 3);
-    let cmd: crate::ports::inbound::AnalyzeMessageCommand = dto.into();
+    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert_eq!(cmd.context_messages.len(), 3);
     assert_eq!(cmd.context_messages[0].username, "u0");
     assert_eq!(cmd.context_messages[0].content, "msg0");
@@ -77,7 +77,7 @@ fn from_dto_maps_context_messages() {
 #[test]
 fn from_dto_empty_context_produces_empty_vec() {
     let dto = make_dto("x".into(), 0);
-    let cmd: crate::ports::inbound::AnalyzeMessageCommand = dto.into();
+    let cmd: crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand = dto.into();
     assert!(cmd.context_messages.is_empty());
 }
 
@@ -85,8 +85,8 @@ fn from_dto_empty_context_produces_empty_vec() {
 
 #[test]
 fn response_dto_empty_reason_becomes_none() {
-    use crate::domain::entities::MessageAnalysis;
-    use crate::domain::value_objects::Action;
+    use crate::domain::entities::ai::message_analysis::MessageAnalysis;
+    use crate::domain::enums::moderation::action::Action;
     let analysis = MessageAnalysis {
         action: Action::Warn,
         reason: String::new(),
@@ -100,8 +100,8 @@ fn response_dto_empty_reason_becomes_none() {
 
 #[test]
 fn response_dto_non_empty_reason_is_some() {
-    use crate::domain::entities::MessageAnalysis;
-    use crate::domain::value_objects::Action;
+    use crate::domain::entities::ai::message_analysis::MessageAnalysis;
+    use crate::domain::enums::moderation::action::Action;
     let analysis = MessageAnalysis {
         action: Action::Ban,
         reason: "spam".into(),

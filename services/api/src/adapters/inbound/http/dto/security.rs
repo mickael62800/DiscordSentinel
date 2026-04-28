@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::SecurityEvent;
-use crate::ports::inbound::ReportSecurityEventCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::audit::security_event::SecurityEvent;
+use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct ReportEventDto {

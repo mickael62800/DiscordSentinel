@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::entities::UserNote;
+use crate::domain::entities::moderation::user_note::UserNote;
 use chrono::Utc;
 use uuid::Uuid;
 

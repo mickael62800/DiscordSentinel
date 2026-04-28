@@ -8,16 +8,17 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::*;
+use sentinel_api::domain::entities::community::voice_channel::*;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::*;
+use sentinel_api::ports::inbound::community::manage_voice_channels::*;
 
 use test_helpers::build_test_state;
 
@@ -68,7 +69,7 @@ fn make_channel(guild_id: &str, channel_id: &str) -> VoiceChannel {
         queue_channel_id: None,
         category_id: None,
         channel_name: "Test".into(),
-        kind: sentinel_api::domain::value_objects::VoiceChannelKind::Private,
+        kind: sentinel_api::domain::enums::community::voice_channel_kind::VoiceChannelKind::Private,
         visibility: "visible".into(),
         queue_enabled: false,
         locked: false,
@@ -152,7 +153,7 @@ impl ManageVoiceChannelsUseCase for MockVoiceUC {
             queue_channel_id: cmd.queue_channel_id,
             category_id: cmd.category_id,
             channel_name: cmd.channel_name,
-            kind: sentinel_api::domain::value_objects::VoiceChannelKind::from_str_lossy(&cmd.kind),
+            kind: sentinel_api::domain::enums::community::voice_channel_kind::VoiceChannelKind::from_str_lossy(&cmd.kind),
             visibility: cmd.visibility,
             queue_enabled: cmd.queue_enabled,
             locked: false,

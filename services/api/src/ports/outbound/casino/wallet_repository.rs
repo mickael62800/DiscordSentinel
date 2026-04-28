@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{Wallet, WalletTransaction};
+use crate::domain::entities::casino::wallet::Wallet;
+use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

@@ -1,13 +1,16 @@
 //! Tests d'integration postgres pour PgStrikeRepository.
 //! Utilisent la vraie DB (DATABASE_URL) via sqlx.
 
-use chrono::{Duration, Utc};
+use chrono::Duration;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgStrikeRepository;
-use sentinel_api::domain::entities::{StrikeConfig, StrikeThreshold, UserStrike};
-use sentinel_api::ports::outbound::StrikeRepository;
+use sentinel_api::domain::entities::moderation::strikes::StrikeConfig;
+use sentinel_api::domain::entities::moderation::strikes::StrikeThreshold;
+use sentinel_api::domain::entities::moderation::strikes::UserStrike;
+use sentinel_api::ports::outbound::moderation::strike_repository::StrikeRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|

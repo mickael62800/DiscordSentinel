@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::UserNote;
+use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::errors::DomainError;
 
 pub struct AddNoteCommand {

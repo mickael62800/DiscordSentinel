@@ -2,9 +2,9 @@
 
 use chrono::Utc;
 use sentinel_api::adapters::outbound::redis_cache::RedisCache;
-use sentinel_api::domain::entities::Rule;
-use sentinel_api::domain::value_objects::FlagType;
-use sentinel_api::ports::outbound::CachePort;
+use sentinel_api::domain::entities::system::rule::Rule;
+use sentinel_api::domain::enums::moderation::flag_type::FlagType;
+use sentinel_api::ports::outbound::system::cache::CachePort;
 use uuid::Uuid;
 
 async fn cache() -> RedisCache {

@@ -8,16 +8,17 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::MessageAnalysis;
+use sentinel_api::domain::entities::ai::message_analysis::MessageAnalysis;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::domain::value_objects::Action;
-use sentinel_api::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase};
-
+use sentinel_api::domain::enums::moderation::action::Action;
+use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use test_helpers::build_test_state_analyze;
 
 // ══════════════════════════════════════════════════════════

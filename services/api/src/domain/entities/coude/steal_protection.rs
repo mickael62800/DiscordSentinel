@@ -5,7 +5,8 @@
 //! blocage, et une tentative de vol fait rouler tous les items actifs
 //! de la cible dans l'ordre d'efficacite.
 
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]

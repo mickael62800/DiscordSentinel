@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::Guild;
+use crate::domain::entities::system::guild::Guild;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::GuildRepository;
+use crate::ports::outbound::system::guild_repository::GuildRepository;
 
 pub struct PgGuildRepository {
     pool: PgPool,

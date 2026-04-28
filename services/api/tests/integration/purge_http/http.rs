@@ -8,21 +8,24 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::domain::entities::{AuditLog, LogEntry};
+use sentinel_api::domain::entities::audit::audit_log::AuditLog;
+use sentinel_api::domain::entities::system::log_entry::LogEntry;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::{
-    InfractionFilters, ManageAuditLogsUseCase, ManageInfractionsUseCase,
-};
-use sentinel_api::ports::inbound::manage_audit_logs::{AuditLogFilters, CreateAuditLogCommand};
-use sentinel_api::domain::entities::Infraction;
-use sentinel_api::ports::outbound::LogRepository;
+use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use sentinel_api::domain::entities::moderation::infraction::Infraction;
+use sentinel_api::ports::outbound::system::log_repository::LogRepository;
 
 #[derive(Default)]
 struct MockInfUC {

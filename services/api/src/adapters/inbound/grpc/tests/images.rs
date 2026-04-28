@@ -58,8 +58,10 @@ use super::*;
     // ── RPC handler tests avec mock ──
 
     use async_trait::async_trait;
-    use std::sync::{Arc, Mutex};
-    use crate::ports::inbound::{AnalyzeImageCommand, AnalyzeImageUseCase};
+    use std::sync::Arc;
+    use std::sync::Mutex;
+    use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+    use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
     use crate::domain::errors::DomainError;
 
     #[derive(Default)]

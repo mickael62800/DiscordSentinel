@@ -8,15 +8,17 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::outbound::{Game, GamePanel, GameRepository};
-
+use sentinel_api::ports::outbound::casino::game_repository::Game;
+use sentinel_api::ports::outbound::casino::game_repository::GamePanel;
+use sentinel_api::ports::outbound::casino::game_repository::GameRepository;
 use test_helpers::build_test_state_game;
 
 // ══════════════════════════════════════════════════════════
@@ -652,7 +654,8 @@ async fn upload_emoji_unsupported_mime_422() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn upload_emoji_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::{Role, RoleContext};
+    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::adapters::inbound::http::middleware::rbac::RoleContext;
     let (ct, body) = multipart_body(&[
         ("name", "n", None, &[]),
         ("image", "n.png", Some("image/png"), b"xx"),

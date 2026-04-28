@@ -1,8 +1,10 @@
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use chrono::DateTime;
+use chrono::Utc;
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
-use crate::domain::value_objects::ModerationGravity;
+use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModerationAction {

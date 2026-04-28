@@ -1,27 +1,43 @@
 //! Tests ManageWatchedUsersService : pass-throughs + 404 dossier.
 //! get_user_dossier est couvert par integration HTTP watched_users_http.
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 
-use crate::application::ManageWatchedUsersService;
-use crate::domain::entities::{
-    ConductConfig, ConductPointsLog, DashboardStats, GuildStatsOverview, GuildVoiceStats,
-    Infraction, ModerationAction, SecurityEvent, UserConductPoints, UserModerationHistory,
-    UserNote, UserStats, WatchedUser,
-};
+use crate::application::audit::manage_watched_users_service::ManageWatchedUsersService;
+use crate::domain::entities::community::conduct::ConductConfig;
+use crate::domain::entities::community::conduct::ConductPointsLog;
+use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::audit::security_event::SecurityEvent;
+use crate::domain::entities::community::conduct::UserConductPoints;
+use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
+use crate::domain::entities::moderation::user_note::UserNote;
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    AddPointsCommand, AnalyzeNewMemberCommand, DeductPointsCommand, InfractionFilters,
-    LogModerationCommand, ManageConductUseCase, ManageInfractionsUseCase,
-    ManageModerationUseCase, ManageSecurityUseCase,
-    ReportSecurityEventCommand, SaveConductConfigCommand, SecurityDecision,
-};
-use crate::ports::inbound::manage_notes::{AddNoteCommand, ManageNotesUseCase};
-use crate::ports::inbound::manage_stats::{RecordMessagesCommand, RecordVoiceCommand};
-use crate::ports::inbound::manage_watched_users::ManageWatchedUsersUseCase;
-use crate::ports::outbound::WatchedUserRepository;
+use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
+use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
+use crate::ports::inbound::audit::manage_security::SecurityDecision;
+use crate::ports::inbound::moderation::manage_notes::AddNoteCommand;
+use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
+use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
+use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 
 fn sample_watched(uid: &str) -> WatchedUser {
     WatchedUser {

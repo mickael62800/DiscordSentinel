@@ -3,12 +3,17 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 
-use crate::domain::entities::{level_from_xp, LevelConfig, LevelReward, UserLevel, XpSource};
+use crate::domain::entities::community::level::level_from_xp;
+use crate::domain::entities::community::level::LevelConfig;
+use crate::domain::entities::community::level::LevelReward;
+use crate::domain::entities::community::level::UserLevel;
+use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_levels::{
-    AddXpCommand, AddXpResult, ManageLevelsUseCase, SaveLevelConfigCommand,
-};
-use crate::ports::outbound::LevelRepository;
+use crate::ports::inbound::community::manage_levels::AddXpCommand;
+use crate::ports::inbound::community::manage_levels::AddXpResult;
+use crate::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
+use crate::ports::outbound::community::level_repository::LevelRepository;
 
 pub struct ManageLevelsService {
     repo: Arc<dyn LevelRepository>,

@@ -1,5 +1,8 @@
 use super::*;
-use crate::domain::entities::{GuildStatsOverview, GuildVoiceStats, UserStats, VoiceSessionStats};
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+use crate::domain::entities::audit::user_stats::UserStats;
+use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use chrono::Utc;
 use uuid::Uuid;
 

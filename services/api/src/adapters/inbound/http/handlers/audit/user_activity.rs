@@ -1,11 +1,13 @@
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::Json;
 use serde::Deserialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::UserActivity;
+use crate::domain::entities::audit::user_activity::UserActivity;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateActivityDto {

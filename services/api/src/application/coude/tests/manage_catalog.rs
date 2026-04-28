@@ -1,5 +1,5 @@
 use super::*;
-use crate::ports::inbound::manage_catalog::ManageCoudeCatalogUseCase;
+use crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase;
 
 #[tokio::test]
 async fn catalog_contains_four_classes() {
@@ -67,7 +67,7 @@ async fn catalog_hp_constants() {
 
 #[tokio::test]
 async fn catalog_shop_items_match_source() {
-    use crate::domain::services::coude_combat_engine::shop::SHOP_ITEMS;
+    use crate::domain::services::coude::coude_combat_engine::shop::SHOP_ITEMS;
     let svc = ManageCoudeCatalogService::new();
     let cat = svc.get_catalog().await.unwrap();
     assert_eq!(cat.shop_items.len(), SHOP_ITEMS.len());

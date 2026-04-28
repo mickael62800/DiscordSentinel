@@ -8,19 +8,23 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
+use sentinel_api::domain::entities::community::role_panel::AutoRole;
+use sentinel_api::domain::entities::community::role_panel::RolePanel;
+use sentinel_api::domain::entities::community::role_panel::RolePanelDetail;
+use sentinel_api::domain::entities::community::role_panel::RolePanelEntry;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_role_panels::{
-    CreateAutoRoleCommand, CreateRolePanelCommand, ManageRolePanelsUseCase, SetMessageIdCommand,
-};
-
+use sentinel_api::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+use sentinel_api::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+use sentinel_api::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use sentinel_api::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 use test_helpers::build_test_state_role_panels;
 
 #[derive(Default)]

@@ -8,16 +8,17 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::NaiveDate;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::DailyActivity;
+use sentinel_api::domain::entities::community::daily_activity::DailyActivity;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::outbound::DailyActivityRepository;
+use sentinel_api::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 
 // ══════════════════════════════════════════════════════════
 // Mock

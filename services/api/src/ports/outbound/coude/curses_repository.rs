@@ -3,7 +3,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{ActiveCurse, CurseKind};
+use crate::domain::entities::coude::curse::ActiveCurse;
+use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

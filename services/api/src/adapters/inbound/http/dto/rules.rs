@@ -1,8 +1,8 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::Rule;
-use crate::domain::value_objects::FlagType;
-use crate::ports::inbound::CreateRuleCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::system::rule::Rule;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::ports::inbound::moderation::manage_rules::CreateRuleCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateRuleDto {

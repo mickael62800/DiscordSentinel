@@ -1,7 +1,7 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::UserNote;
-use crate::ports::inbound::AddNoteCommand;
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::moderation::user_note::UserNote;
+use crate::ports::inbound::moderation::manage_notes::AddNoteCommand;
 
 #[derive(Debug, Deserialize)]
 pub struct AddNoteDto {

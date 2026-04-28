@@ -1,7 +1,7 @@
 use redis::AsyncCommands;
 use serde::Serialize;
-use tracing::{debug, error};
-
+use tracing::debug;
+use tracing::error;
 /// Client pour enqueue des jobs dans la queue Redis du worker
 #[derive(Clone)]
 #[allow(dead_code)]

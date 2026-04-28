@@ -2,11 +2,17 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::domain::entities::WatchedUser;
+use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_watched_users::{ManageWatchedUsersUseCase, UserDossier};
-use crate::ports::inbound::{InfractionFilters, ManageInfractionsUseCase, ManageModerationUseCase, ManageNotesUseCase, ManageSecurityUseCase, ManageConductUseCase};
-use crate::ports::outbound::WatchedUserRepository;
+use crate::ports::inbound::audit::manage_watched_users::ManageWatchedUsersUseCase;
+use crate::ports::inbound::audit::manage_watched_users::UserDossier;
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use crate::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use crate::ports::inbound::moderation::manage_notes::ManageNotesUseCase;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 
 pub struct ManageWatchedUsersService {
     watched_repo: Arc<dyn WatchedUserRepository>,

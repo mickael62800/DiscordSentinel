@@ -18,9 +18,10 @@ use tonic::codec::CompressionEncoding;
 use tonic::metadata::MetadataValue;
 use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Server;
-use tonic::{Request, Status};
-use tracing::{error, info};
-
+use tonic::Request;
+use tonic::Status;
+use tracing::error;
+use tracing::info;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
 use sentinel_proto::blackjack::v1::blackjack_service_server::BlackjackServiceServer;
 use sentinel_proto::community::v1::community_service_server::CommunityServiceServer;
@@ -45,10 +46,12 @@ use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
 use crate::adapters::inbound::grpc::automod::AutomodGrpc;
 use crate::adapters::inbound::grpc::blackjack::BlackjackGrpc;
 use crate::adapters::inbound::grpc::community::CommunityGrpc;
-use crate::adapters::inbound::grpc::coude::{
-    CoudeBetsGrpc, CoudeCombatsGrpc, CoudeEconomyGrpc, CoudeInventoryGrpc, CoudePlayerGrpc,
-    CoudeSocialGrpc,
-};
+use crate::adapters::inbound::grpc::coude::CoudeBetsGrpc;
+use crate::adapters::inbound::grpc::coude::CoudeCombatsGrpc;
+use crate::adapters::inbound::grpc::coude::CoudeEconomyGrpc;
+use crate::adapters::inbound::grpc::coude::CoudeInventoryGrpc;
+use crate::adapters::inbound::grpc::coude::CoudePlayerGrpc;
+use crate::adapters::inbound::grpc::coude::CoudeSocialGrpc;
 use crate::adapters::inbound::grpc::images::ImagesGrpc;
 use crate::adapters::inbound::grpc::members::MembersGrpc;
 use crate::adapters::inbound::grpc::moderation::ModerationGrpc;

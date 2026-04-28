@@ -2,10 +2,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::AuditLog;
+use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
-use crate::ports::outbound::AuditLogRepository;
+use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use crate::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 
 pub struct PgAuditLogRepository {
     pool: PgPool,

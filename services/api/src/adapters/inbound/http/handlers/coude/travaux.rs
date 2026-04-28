@@ -1,13 +1,14 @@
 //! Handler HTTP /travaux (Phase 2 #2 audit).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
-use serde::{Deserialize, Serialize};
-
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::ports::inbound::play_travaux::{PlayTravauxCommand, TravauxResolution};
-
+use crate::ports::inbound::coude::play_travaux::PlayTravauxCommand;
+use crate::ports::inbound::coude::play_travaux::TravauxResolution;
 #[derive(Debug, Deserialize)]
 pub struct PlayTravauxDto {
     pub user_id: String,

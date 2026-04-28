@@ -5,7 +5,8 @@
 //! Buffer in-memory, thread-safe, pas persistant (on reinitialise si le
 //! bot restart — c'est OK, les messages toxiques passes sont deja traites).
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::sync::Mutex;
 
 /// Entry dans le buffer glissant : score IA + auteur + message_id pour

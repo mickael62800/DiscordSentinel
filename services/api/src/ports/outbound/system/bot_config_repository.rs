@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{BotDefinition, BotGuildConfig};
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

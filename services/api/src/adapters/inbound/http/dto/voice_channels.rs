@@ -1,11 +1,15 @@
-use serde::{Deserialize, Serialize};
-
-use crate::domain::entities::{
-    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelDetail,
-    VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry,
-};
-use crate::ports::inbound::{CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand};
-
+use serde::Deserialize;
+use serde::Serialize;
+use crate::domain::entities::community::voice_channel::VoiceChannel;
+use crate::domain::entities::community::voice_channel::VoiceChannelBan;
+use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
+use crate::domain::entities::community::voice_channel::VoiceChannelDetail;
+use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
+use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
+use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]

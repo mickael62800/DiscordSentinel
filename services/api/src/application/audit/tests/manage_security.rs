@@ -10,30 +10,34 @@
 //! Les chemins complexes (raid detection, alt detection) delegueraient
 //! au domain::security_analyzer qui est deja teste en isolation.
 
-use std::sync::{Arc, Mutex};
-
+use std::sync::Arc;
+use std::sync::Mutex;
 use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::ManageSecurityService;
-use crate::domain::entities::{
-    AuditLog, BotDefinition, BotGuildConfig, ModerationAction, Rule, SecurityEvent, WatchedUser,
-};
+use crate::application::audit::manage_security_service::ManageSecurityService;
+use crate::domain::entities::audit::audit_log::AuditLog;
+use crate::domain::entities::system::bot_config::BotDefinition;
+use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::system::rule::Rule;
+use crate::domain::entities::audit::security_event::SecurityEvent;
+use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_audit_logs::{
-    AuditLogFilters, CreateAuditLogCommand, ManageAuditLogsUseCase,
-};
-use crate::ports::inbound::{
-    AnalyzeNewMemberCommand, ManageSecurityUseCase, ReportSecurityEventCommand,
-};
+use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use crate::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use crate::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+use crate::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
 #[allow(unused_imports)]
-use crate::domain::services::security_analyzer::JoinInfo;
-use crate::ports::outbound::{
-    BotConfigRepository, CachePort, ModerationRepository, SecurityEventRepository,
-    WatchedUserRepository,
-};
-
+use crate::domain::services::audit::security_analyzer::JoinInfo;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
+use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 // ── Mocks ──
 
 #[derive(Default)]
@@ -417,7 +421,7 @@ async fn analyze_new_member_suspicious_account_triggers_event() {
 
 #[tokio::test]
 async fn analyze_new_member_raid_pattern_overrides_suspicious() {
-    use crate::domain::services::security_analyzer::JoinInfo;
+    use crate::domain::services::audit::security_analyzer::JoinInfo;
     // Config : raid enabled + lockdown + slowmode
     let (svc, repo, _watched, _audit) = build_service_with_configs(
         vec![

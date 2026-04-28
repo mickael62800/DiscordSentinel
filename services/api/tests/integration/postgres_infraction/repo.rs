@@ -5,10 +5,11 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
-use sentinel_api::domain::entities::Infraction;
-use sentinel_api::domain::value_objects::{Action, DetectionFlags};
-use sentinel_api::ports::inbound::InfractionFilters;
-use sentinel_api::ports::outbound::InfractionRepository;
+use sentinel_api::domain::entities::moderation::infraction::Infraction;
+use sentinel_api::domain::enums::moderation::action::Action;
+use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_api::ports::outbound::moderation::infraction_repository::InfractionRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {

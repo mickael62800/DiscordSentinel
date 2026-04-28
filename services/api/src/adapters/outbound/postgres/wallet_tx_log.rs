@@ -1,4 +1,5 @@
-use sqlx::{Postgres, Transaction};
+use sqlx::Postgres;
+use sqlx::Transaction;
 use uuid::Uuid;
 
 use crate::domain::errors::DomainError;

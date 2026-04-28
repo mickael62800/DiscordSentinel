@@ -3,11 +3,12 @@
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::adapters::inbound::http::handlers::slot::{
-    SlotSpinDto, SlotTopWinnerDto, SpinResponseDto,
-};
-use crate::domain::entities::{SlotSpin, SlotTopWinner};
-use crate::ports::inbound::manage_slot::SpinResult;
+use crate::adapters::inbound::http::handlers::casino::slot::SlotSpinDto;
+use crate::adapters::inbound::http::handlers::casino::slot::SlotTopWinnerDto;
+use crate::adapters::inbound::http::handlers::casino::slot::SpinResponseDto;
+use crate::domain::entities::casino::slot::SlotSpin;
+use crate::domain::entities::casino::slot::SlotTopWinner;
+use crate::ports::inbound::casino::manage_slot::SpinResult;
 
 fn sample_spin() -> SlotSpin {
     SlotSpin {

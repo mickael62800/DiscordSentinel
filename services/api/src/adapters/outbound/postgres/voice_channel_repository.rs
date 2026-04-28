@@ -2,10 +2,15 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry};
+use crate::domain::entities::community::voice_channel::VoiceChannel;
+use crate::domain::entities::community::voice_channel::VoiceChannelBan;
+use crate::domain::entities::community::voice_channel::VoiceChannelCoAdmin;
+use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
+use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
-use crate::domain::value_objects::VoiceChannelKind;
-use crate::ports::outbound::VoiceChannelRepository;
+use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
+use crate::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 
 pub struct PgVoiceChannelRepository {
     pool: PgPool,

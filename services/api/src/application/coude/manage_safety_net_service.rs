@@ -4,12 +4,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::CoudeGuildSettings;
-use crate::domain::entities::ActiveSafetyNet;
+use crate::application::coude::guild_settings::CoudeGuildSettings;
+use crate::domain::entities::coude::safety_net::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_safety_net::ManageCoudeSafetyNetUseCase;
-use crate::ports::outbound::{BotConfigRepository, CoudeSafetyNetRepository};
-
+use crate::ports::inbound::coude::manage_safety_net::ManageCoudeSafetyNetUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
 pub struct ManageCoudeSafetyNetService {
     repo: Arc<dyn CoudeSafetyNetRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,

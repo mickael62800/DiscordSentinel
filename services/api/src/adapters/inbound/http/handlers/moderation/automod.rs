@@ -5,20 +5,27 @@
 //! `/automod` cote web consomme ce endpoint pour la timeline des
 //! detections automod.
 
-use axum::extract::{Path, Query, State};
+use axum::extract::Path;
+use axum::extract::Query;
+use axum::extract::State;
 use axum::Json;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::adapters::inbound::http::dto::infractions::InfractionResponseDto;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::helpers::{map_to_dtos, normalize_limit, normalize_offset};
+use crate::adapters::inbound::http::helpers::map_to_dtos;
+use crate::adapters::inbound::http::helpers::normalize_limit;
+use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
-use crate::domain::entities::{AutomodReview, NewAutomodReview, SuggestedAction};
+use crate::domain::entities::moderation::automod_review::AutomodReview;
+use crate::domain::entities::moderation::automod_review::NewAutomodReview;
+use crate::domain::entities::moderation::automod_review::SuggestedAction;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{InfractionFilters, ResolveAutomodReviewCommand};
-
+use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
 #[derive(Debug, Deserialize)]
 pub struct DetectionQuery {
     /// Defaut 50, max 200.

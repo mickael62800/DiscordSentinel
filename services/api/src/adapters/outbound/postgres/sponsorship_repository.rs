@@ -1,7 +1,8 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::ports::outbound::{Sponsorship, SponsorshipRepository};
+use crate::ports::outbound::coude::sponsorship_repository::Sponsorship;
+use crate::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
 use super::pg_err;
 
 pub struct PgSponsorshipRepository { pool: PgPool }

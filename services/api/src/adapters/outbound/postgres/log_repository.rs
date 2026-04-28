@@ -2,9 +2,9 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::LogEntry;
+use crate::domain::entities::system::log_entry::LogEntry;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::LogRepository;
+use crate::ports::outbound::system::log_repository::LogRepository;
 
 pub struct PgLogRepository {
     pool: PgPool,

@@ -4,7 +4,8 @@
 //! (config railleries, config salons d'activite, etc.). Cache Redis 10min
 //! pour eviter de taper Discord a chaque ouverture de page.
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
 use redis::AsyncCommands;
 use tracing::warn;
@@ -12,7 +13,7 @@ use tracing::warn;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::outbound::DiscordChannel;
-use crate::domain::entities::CHANNELS_CACHE_TTL_SECS;
+use crate::domain::entities::community::guild_member_reset::CHANNELS_CACHE_TTL_SECS;
 
 /// GET /api/guilds/{guild_id}/channels — liste les salons texte.
 pub async fn list_text_channels(

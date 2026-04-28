@@ -1,12 +1,14 @@
 //! Impl Postgres de `CoudeUltimateRepository`.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 
-use crate::domain::entities::{UltimateKind, UltimateState};
+use crate::domain::entities::coude::ultimate::UltimateKind;
+use crate::domain::entities::coude::ultimate::UltimateState;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeUltimateRepository;
+use crate::ports::outbound::coude::ultimate_repository::CoudeUltimateRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "coude_ultimate_states";

@@ -1,7 +1,10 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
+use crate::domain::entities::moderation::strikes::StrikeConfig;
+use crate::domain::entities::moderation::strikes::StrikeResult;
+use crate::domain::entities::moderation::strikes::StrikeThreshold;
+use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::domain::errors::DomainError;
 
 pub struct AddStrikeCommand {

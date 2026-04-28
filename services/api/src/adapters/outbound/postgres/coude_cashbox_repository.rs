@@ -1,15 +1,17 @@
 //! Impl Postgres de `CoudeCashboxRepository`.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
-};
+use crate::domain::entities::coude::cashbox::CashboxRedistribution;
+use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
+use crate::domain::entities::coude::cashbox::CashboxSource;
+use crate::domain::entities::coude::cashbox::CoudeCashbox;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::CoudeCashboxRepository;
+use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
 
 use super::pg_err_ctx;
 const TBL: &str = "cashbox";

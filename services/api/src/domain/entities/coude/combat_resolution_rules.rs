@@ -3,8 +3,8 @@
 //! application d'assurance sur les pertes + calcul des XP (Giant Killer)
 //! + formatage des résultats de paris.
 
-use crate::domain::entities::{BetResolutionPlan, CoudeInsurance};
-
+use crate::domain::entities::coude::bet::BetResolutionPlan;
+use crate::domain::entities::coude::inventory::CoudeInsurance;
 /// Résultat de l'ajustement d'une perte par une assurance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InsuranceAdjustment {
@@ -346,8 +346,8 @@ mod tests {
 
     // ── format_bet_payout_lines ──
 
-    use crate::domain::entities::{BetPayout, CoudeFighterBetBonus};
-
+    use crate::domain::entities::coude::bet::BetPayout;
+    use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
     fn payout(name: &str, amount: i64, payout_amt: i64, won: bool) -> BetPayout {
         BetPayout {
             bet_id: Uuid::new_v4(),

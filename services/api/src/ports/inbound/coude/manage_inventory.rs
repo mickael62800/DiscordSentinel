@@ -1,9 +1,10 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{
-    CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
-};
+use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::CoudeInventoryItem;
+use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 
 /// Use case "gérer l'inventaire/primes/assurances Coup de Coude".

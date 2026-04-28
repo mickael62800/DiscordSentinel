@@ -1,19 +1,30 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use tracing::{debug, info};
+use tracing::debug;
+use tracing::info;
 use uuid::Uuid;
 
-use crate::domain::entities::{Infraction, MessageAnalysis};
+use crate::domain::entities::moderation::infraction::Infraction;
+use crate::domain::entities::ai::message_analysis::MessageAnalysis;
 use crate::domain::errors::DomainError;
-use crate::adapters::outbound::{InferenceService, TextTokenizer};
-use crate::domain::services::{
-    ChannelTensionBuffer, InferenceRateLimiter, ScoringService, TensionAction, TensionEntry,
-};
-use crate::domain::value_objects::{Action, FlagType};
-use crate::ports::inbound::{AnalyzeMessageCommand, AnalyzeMessageUseCase, DeductPointsCommand, ManageConductUseCase};
-use crate::ports::outbound::{BotConfigRepository, CachePort, InfractionRepository, RuleRepository};
-
+use crate::adapters::outbound::InferenceService;
+use crate::adapters::outbound::TextTokenizer;
+use crate::domain::services::moderation::channel_tension::ChannelTensionBuffer;
+use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
+use crate::domain::services::moderation::scoring_service::ScoringService;
+use crate::domain::services::moderation::channel_tension::TensionAction;
+use crate::domain::services::moderation::channel_tension::TensionEntry;
+use crate::domain::enums::moderation::action::Action;
+use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
+use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
+use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::ports::outbound::moderation::rule_repository::RuleRepository;
 /// Seuil de confiance par defaut (utilise si pas de config per-guild).
 const DEFAULT_TEXT_THRESHOLD: f32 = 0.5;
 
@@ -100,7 +111,7 @@ impl Default for IaConfigValues {
 /// `context_format`) depuis la liste des `BotGuildConfig` de `automod-bot`.
 /// Fallback sur les defauts si cles absentes/malformees.
 pub(crate) fn parse_ia_config_from_bot_config(
-    entries: &[crate::domain::entities::BotGuildConfig],
+    entries: &[crate::domain::entities::system::bot_config::BotGuildConfig],
 ) -> IaConfigValues {
     let mut cfg = IaConfigValues::default();
     for e in entries {
@@ -157,7 +168,7 @@ impl Default for TensionConfig {
 
 /// Parse la config tension depuis la liste des `BotGuildConfig` de
 /// `automod-bot`. Defaut si cles absentes/mal formees.
-fn parse_tension_config(entries: &[crate::domain::entities::BotGuildConfig]) -> TensionConfig {
+fn parse_tension_config(entries: &[crate::domain::entities::system::bot_config::BotGuildConfig]) -> TensionConfig {
     let mut cfg = TensionConfig::default();
     for e in entries {
         match e.config_key.as_str() {
@@ -468,7 +479,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 /// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.
 pub fn score_classifications(
     classifications: &[crate::adapters::outbound::InferenceClassification],
-    rules: &[crate::domain::entities::Rule],
+    rules: &[crate::domain::entities::system::rule::Rule],
     threshold: f32,
 ) -> Option<(f64, Vec<FlagType>, String)> {
     let mut detected: Vec<(FlagType, f32)> = Vec::new();
@@ -527,7 +538,7 @@ pub fn score_classifications(
 /// - "tagged"  : balises [message]/[context] pour structurer l'input
 fn build_contextual_content(
     content: &str,
-    context: &[crate::ports::inbound::ContextMessageEntry],
+    context: &[crate::ports::inbound::ai::analyze_message::ContextMessageEntry],
     format: &str,
 ) -> String {
     if context.is_empty() {
@@ -550,7 +561,7 @@ const DEFAULT_THRESHOLD_DELETE: f64 = 4.0;
 const DEFAULT_THRESHOLD_MUTE: f64 = 6.0;
 const DEFAULT_THRESHOLD_BAN: f64 = 9.0;
 
-fn resolve_thresholds(rules: &[crate::domain::entities::Rule]) -> (f64, f64, f64, f64) {
+fn resolve_thresholds(rules: &[crate::domain::entities::system::rule::Rule]) -> (f64, f64, f64, f64) {
     let enabled: Vec<_> = rules.iter().filter(|r| r.enabled).collect();
 
     if enabled.is_empty() {

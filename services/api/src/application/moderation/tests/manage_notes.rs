@@ -7,11 +7,11 @@ use async_trait::async_trait;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-use crate::application::ManageNotesService;
-use crate::domain::entities::*;
+use crate::application::moderation::manage_notes_service::ManageNotesService;
+use crate::domain::entities::moderation::user_note::*;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::*;
-use crate::ports::outbound::NotesRepository;
+use crate::ports::inbound::moderation::manage_notes::*;
+use crate::ports::outbound::moderation::notes_repository::NotesRepository;
 
 // ══════════════════════════════════════════════════════════
 // In-memory Notes Repository

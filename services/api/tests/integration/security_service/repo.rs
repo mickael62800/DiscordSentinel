@@ -7,18 +7,19 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgBotConfigRepository, PgModerationRepository, PgSecurityEventRepository,
-    PgWatchedUserRepository,
-};
-use sentinel_api::application::{ManageAuditLogsService, ManageSecurityService};
-use sentinel_api::domain::entities::Rule;
+use sentinel_api::adapters::outbound::postgres::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::PgModerationRepository;
+use sentinel_api::adapters::outbound::postgres::PgSecurityEventRepository;
+use sentinel_api::adapters::outbound::postgres::PgWatchedUserRepository;
+use sentinel_api::application::audit::manage_audit_logs_service::ManageAuditLogsService;
+use sentinel_api::application::audit::manage_security_service::ManageSecurityService;
+use sentinel_api::domain::entities::system::rule::Rule;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::manage_audit_logs::ManageAuditLogsUseCase;
-use sentinel_api::ports::inbound::{
-    AnalyzeNewMemberCommand, ManageSecurityUseCase, ReportSecurityEventCommand,
-};
-use sentinel_api::ports::outbound::CachePort;
+use sentinel_api::ports::inbound::audit::manage_audit_logs::ManageAuditLogsUseCase;
+use sentinel_api::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand;
+use sentinel_api::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use sentinel_api::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use sentinel_api::ports::outbound::system::cache::CachePort;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| {
@@ -176,7 +177,7 @@ async fn analyze_new_member_alt_detection_no_match_when_names_differ() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn analyze_new_member_alt_detection_skipped_when_raid() {
-    use sentinel_api::domain::services::security_analyzer::JoinInfo;
+    use sentinel_api::domain::services::audit::security_analyzer::JoinInfo;
     let (svc, p) = build().await;
     let g = fresh_id();
     set_config(&p, &g, "alt_detection_enabled", "true").await;

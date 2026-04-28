@@ -1,11 +1,11 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::UserActivity;
+use crate::domain::entities::audit::user_activity::UserActivity;
 use crate::domain::errors::DomainError;
 
 use super::pg_err;
-use crate::ports::outbound::UserActivityRepository;
+use crate::ports::outbound::audit::user_activity_repository::UserActivityRepository;
 
 pub struct PgUserActivityRepository {
     pool: PgPool,

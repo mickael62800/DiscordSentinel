@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{DashboardStats, GuildStatsOverview, GuildVoiceStats, UserStats};
+use crate::domain::entities::audit::dashboard_stats::DashboardStats;
+use crate::domain::entities::audit::user_stats::GuildStatsOverview;
+use crate::domain::entities::audit::user_stats::GuildVoiceStats;
+use crate::domain::entities::audit::user_stats::UserStats;
 use crate::domain::errors::DomainError;
 
 pub struct RecordMessagesCommand {

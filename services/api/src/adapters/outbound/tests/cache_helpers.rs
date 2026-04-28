@@ -2,9 +2,9 @@ use super::*;
 
     
     use async_trait::async_trait;
-    use std::sync::atomic::{AtomicUsize, Ordering};
-
-    use crate::domain::entities::Rule;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+    use crate::domain::entities::system::rule::Rule;
 
     #[derive(Default)]
     struct MemoryCache {

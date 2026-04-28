@@ -9,13 +9,17 @@
 //! Pattern : direct sqlx (comme `bot_persistence.rs`, `rbac` simple, pas de
 //! logique metier complexe, pas besoin de use-case).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::http::StatusCode;
-use axum::{Extension, Json};
-use serde::{Deserialize, Serialize};
-
+use axum::Extension;
+use axum::Json;
+use serde::Deserialize;
+use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::{require_role, Role, RoleContext};
+use crate::adapters::inbound::http::middleware::rbac::require_role;
+use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 
@@ -72,7 +76,7 @@ pub async fn grant_role(
     validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
     let role = parse_role(&dto.role)?;
-    let display_name = crate::domain::entities::truncate_display_name(
+    let display_name = crate::domain::entities::system::rbac::truncate_display_name(
         dto.display_name.as_deref().unwrap_or("user"),
     );
 
@@ -137,7 +141,7 @@ pub async fn update_role(
     validation::validate_discord_id("user_id", &user_id).map_err(ApiError)?;
 
     // Regle metier : anti-lockout du dernier owner-caller.
-    if crate::domain::entities::is_owner_self_demotion(&ctx.discord_user_id, &user_id, &dto.role) {
+    if crate::domain::entities::system::rbac::is_owner_self_demotion(&ctx.discord_user_id, &user_id, &dto.role) {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
             "un owner ne peut pas se retrograder (lockout risk)".into(),
         )));
@@ -199,7 +203,7 @@ pub async fn revoke_role(
     .await
     .map_err(|e| internal(format!("check target owner: {e}")))?;
 
-    if crate::domain::entities::would_revoke_last_owner(is_target_owner, total_owners) {
+    if crate::domain::entities::system::rbac::would_revoke_last_owner(is_target_owner, total_owners) {
         return Err(ApiError(crate::domain::errors::DomainError::ValidationError(
             "impossible de revoquer le dernier owner de la guild".into(),
         )));

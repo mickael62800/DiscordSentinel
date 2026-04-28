@@ -5,15 +5,14 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgGameRepository, PgPendingActionRepository,
-    PgSponsorshipRepository, PgTempRoleRepository,
-};
-use sentinel_api::ports::outbound::{
-    GameRepository, PendingActionRepository,
-    SponsorshipRepository, TempRoleRepository,
-};
-
+use sentinel_api::adapters::outbound::postgres::PgGameRepository;
+use sentinel_api::adapters::outbound::postgres::PgPendingActionRepository;
+use sentinel_api::adapters::outbound::postgres::PgSponsorshipRepository;
+use sentinel_api::adapters::outbound::postgres::PgTempRoleRepository;
+use sentinel_api::ports::outbound::casino::game_repository::GameRepository;
+use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
+use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
+use sentinel_api::ports::outbound::community::temp_role_repository::TempRoleRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

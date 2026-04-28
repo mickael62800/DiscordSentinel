@@ -3,17 +3,20 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::{Ticket, TicketDetail, TicketMessage};
+use crate::domain::entities::system::ticket::Ticket;
+use crate::domain::entities::system::ticket::TicketDetail;
+use crate::domain::entities::system::ticket::TicketMessage;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::{
-    AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
-    UpdateTicketChannelCommand,
-};
+use crate::ports::inbound::system::manage_tickets::AssignTicketCommand;
+use crate::ports::inbound::system::manage_tickets::CreateTicketCommand;
+use crate::ports::inbound::system::manage_tickets::ManageTicketsUseCase;
+use crate::ports::inbound::system::manage_tickets::ReplyTicketCommand;
+use crate::ports::inbound::system::manage_tickets::UpdateTicketChannelCommand;
 use tracing::warn;
 
 use crate::adapters::outbound::cache_helpers::cached_json;
-use crate::ports::outbound::{CachePort, TicketRepository};
-
+use crate::ports::outbound::system::cache::CachePort;
+use crate::ports::outbound::system::ticket_repository::TicketRepository;
 const TICKETS_LIST_TTL: u64 = 60; // 1 minute
 const TICKET_DETAIL_TTL: u64 = 120; // 2 minutes
 

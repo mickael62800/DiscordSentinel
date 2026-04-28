@@ -14,14 +14,15 @@
 //! `/users/456` partagent le label `/users/{id}`.
 
 use std::sync::OnceLock;
-use std::time::{Duration, Instant};
-
+use std::time::Duration;
+use std::time::Instant;
 use axum::extract::MatchedPath;
 use axum::http::Request;
 use axum::middleware::Next;
-use axum::response::{IntoResponse, Response};
-use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
-
+use axum::response::IntoResponse;
+use axum::response::Response;
+use metrics_exporter_prometheus::PrometheusBuilder;
+use metrics_exporter_prometheus::PrometheusHandle;
 /// Handle global vers le recorder Prometheus.
 ///
 /// Initialisé une seule fois via `init_prometheus()` au démarrage.
@@ -115,8 +116,11 @@ pub async fn metrics_middleware(req: Request<axum::body::Body>, next: Next) -> R
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::body::{to_bytes, Body};
-    use axum::http::{Method, Request, StatusCode};
+    use axum::body::to_bytes;
+    use axum::body::Body;
+    use axum::http::Method;
+    use axum::http::Request;
+    use axum::http::StatusCode;
     use axum::middleware::from_fn;
     use axum::routing::get;
     use axum::Router;

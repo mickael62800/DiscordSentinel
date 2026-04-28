@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{Ticket, TicketDetail};
+use crate::domain::entities::system::ticket::Ticket;
+use crate::domain::entities::system::ticket::TicketDetail;
 use crate::domain::errors::DomainError;
 
 pub struct CreateTicketCommand {

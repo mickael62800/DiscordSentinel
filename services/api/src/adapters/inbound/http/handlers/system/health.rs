@@ -2,8 +2,8 @@ use axum::extract::State;
 use axum::http::StatusCode;
 use axum::Json;
 use redis::AsyncCommands;
-use serde_json::{json, Value};
-
+use serde_json::json;
+use serde_json::Value;
 use crate::adapters::inbound::http::state::AppState;
 
 /// Health check complet : vérifie API + PostgreSQL + Redis.

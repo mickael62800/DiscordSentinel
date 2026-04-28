@@ -1,12 +1,13 @@
 //! Handlers HTTP pour le systeme de Prestige (cf. COUPE_AMELIORATIONS 3.3).
 
-use axum::extract::{Path, State};
+use axum::extract::Path;
+use axum::extract::State;
 use axum::Json;
 use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::entities::PRESTIGE_MAX_COUNT;
+use crate::domain::entities::coude::prestige::PRESTIGE_MAX_COUNT;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Serialize)]
@@ -25,14 +26,14 @@ pub async fn prestige_player(
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<PrestigeOutcomeDto>, ApiError> {
     // Cf. migration 170 : seuils configurables par-guild.
-    let settings = crate::application::CoudeGuildSettings::load(
+    let settings = crate::application::coude::guild_settings::CoudeGuildSettings::load(
         state.bot_config_repo.as_ref(),
         &guild_id,
     )
     .await;
     let unlock_level = settings.get_i32(
         "prestige_unlock_level",
-        crate::domain::entities::PRESTIGE_UNLOCK_LEVEL,
+        crate::domain::entities::coude::prestige::PRESTIGE_UNLOCK_LEVEL,
     );
     let max_count = settings.get_i32("prestige_max_count", PRESTIGE_MAX_COUNT);
     // Atomic : UPDATE conditionnel (WHERE level >= 25 AND prestige_count
@@ -72,6 +73,6 @@ pub async fn prestige_player(
     })?;
     Ok(Json(PrestigeOutcomeDto {
         new_prestige_count: new_count,
-        stars: crate::domain::entities::prestige_stars(new_count),
+        stars: crate::domain::entities::coude::prestige::prestige_stars(new_count),
     }))
 }

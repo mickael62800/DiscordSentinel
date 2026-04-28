@@ -10,7 +10,8 @@ use std::sync::Mutex;
 
 use async_trait::async_trait;
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
+use axum::http::Request;
+use axum::http::StatusCode;
 use chrono::Utc;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
@@ -18,18 +19,28 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::adapters::inbound::http::state::AppState;
-use sentinel_api::domain::entities::{
-    DashboardStats, GuildStatsOverview, GuildVoiceStats, Infraction, ModerationAction, Rule,
-    UserModerationHistory, UserStats,
-};
+use sentinel_api::domain::entities::audit::dashboard_stats::DashboardStats;
+use sentinel_api::domain::entities::audit::user_stats::GuildStatsOverview;
+use sentinel_api::domain::entities::audit::user_stats::GuildVoiceStats;
+use sentinel_api::domain::entities::moderation::infraction::Infraction;
+use sentinel_api::domain::entities::moderation::moderation_action::ModerationAction;
+use sentinel_api::domain::entities::system::rule::Rule;
+use sentinel_api::domain::entities::moderation::moderation_action::UserModerationHistory;
+use sentinel_api::domain::entities::audit::user_stats::UserStats;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::domain::value_objects::{Action, DetectionFlags, FlagType, ModerationGravity};
-use sentinel_api::ports::inbound::{
-    CreateRuleCommand, InfractionFilters, LogModerationCommand, ManageInfractionsUseCase,
-    ManageModerationUseCase, ManageRulesUseCase, ManageStatsUseCase,
-};
-use sentinel_api::ports::inbound::manage_stats::{RecordMessagesCommand, RecordVoiceCommand};
-
+use sentinel_api::domain::enums::moderation::action::Action;
+use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use sentinel_api::domain::enums::moderation::flag_type::FlagType;
+use sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity;
+use sentinel_api::ports::inbound::moderation::manage_rules::CreateRuleCommand;
+use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
+use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
+use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use sentinel_api::ports::inbound::moderation::manage_rules::ManageRulesUseCase;
+use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use test_helpers::build_test_state_stats;
 
 // ══════════════════════════════════════════════════════════

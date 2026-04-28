@@ -1,20 +1,22 @@
 //! Tests d'integration postgres pour 5 repos : guild, coude_heist,
 //! coude_steal_protection, coude_steal_boost, blackjack_table.
 
-use chrono::{Duration, Utc};
+use chrono::Duration;
+use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::{
-    PgBlackjackTableRepository, PgCoudeHeistRepository, PgCoudeStealBoostRepository,
-    PgCoudeStealProtectionRepository, PgGuildRepository,
-};
-use sentinel_api::domain::entities::Guild;
-use sentinel_api::ports::outbound::{
-    BlackjackTableRepository, CoudeHeistRepository, CoudeStealBoostRepository,
-    CoudeStealProtectionRepository, GuildRepository,
-};
-
+use sentinel_api::adapters::outbound::postgres::PgBlackjackTableRepository;
+use sentinel_api::adapters::outbound::postgres::PgCoudeHeistRepository;
+use sentinel_api::adapters::outbound::postgres::PgCoudeStealBoostRepository;
+use sentinel_api::adapters::outbound::postgres::PgCoudeStealProtectionRepository;
+use sentinel_api::adapters::outbound::postgres::PgGuildRepository;
+use sentinel_api::domain::entities::system::guild::Guild;
+use sentinel_api::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
+use sentinel_api::ports::outbound::coude::heist_repository::CoudeHeistRepository;
+use sentinel_api::ports::outbound::coude::steal_boost_repository::CoudeStealBoostRepository;
+use sentinel_api::ports::outbound::coude::steal_protection_repository::CoudeStealProtectionRepository;
+use sentinel_api::ports::outbound::system::guild_repository::GuildRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
         "postgres://sentinel_test:sentinel_test@localhost:5433/sentinel_test".into());

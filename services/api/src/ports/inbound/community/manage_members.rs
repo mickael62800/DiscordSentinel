@@ -1,6 +1,7 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{GuildMember, MemberSummary};
+use crate::domain::entities::community::guild_member::GuildMember;
+use crate::domain::entities::community::guild_member::MemberSummary;
 use crate::domain::errors::DomainError;
 
 pub struct SyncMembersCommand {

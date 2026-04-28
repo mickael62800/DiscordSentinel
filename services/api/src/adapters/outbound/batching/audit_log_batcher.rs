@@ -1,16 +1,16 @@
 //! BatchedPgAuditLogRepository — wrap PgAuditLogRepository avec un BatchWriter<AuditLog>.
 
 use async_trait::async_trait;
-use sqlx::{PgPool, QueryBuilder};
-
+use sqlx::PgPool;
+use sqlx::QueryBuilder;
 use crate::adapters::outbound::postgres::PgAuditLogRepository;
-use crate::domain::entities::AuditLog;
+use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_audit_logs::AuditLogFilters;
-use crate::ports::outbound::AuditLogRepository;
+use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
+use crate::ports::outbound::audit::audit_log_repository::AuditLogRepository;
 
-use super::batch_writer::{BatchWriter, BatchWriterConfig};
-
+use super::batch_writer::BatchWriter;
+use super::batch_writer::BatchWriterConfig;
 pub struct BatchedPgAuditLogRepository {
     inner: PgAuditLogRepository,
     writer: BatchWriter<AuditLog>,

@@ -1,9 +1,13 @@
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
-use crate::domain::entities::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
-use crate::ports::inbound::{AddStrikeCommand, SaveStrikeConfigCommand};
-
+use crate::domain::entities::moderation::strikes::StrikeConfig;
+use crate::domain::entities::moderation::strikes::StrikeResult;
+use crate::domain::entities::moderation::strikes::StrikeThreshold;
+use crate::domain::entities::moderation::strikes::UserStrike;
+use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
+use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]

@@ -9,20 +9,21 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::domain::entities::{
-    tout_ou_rien_delta as coin_delta, tout_ou_rien_resolve as resolve_outcome,
-    ToutOuRienLogOutcome, ToutOuRienOutcome, TOUT_OU_RIEN_COOLDOWN_KEY,
-    TOUT_OU_RIEN_COOLDOWN_SECS,
-};
+use crate::domain::entities::coude::tout_ou_rien::coin_delta as coin_delta;
+use crate::domain::entities::coude::tout_ou_rien::resolve_outcome as resolve_outcome;
+use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
+use crate::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
+use crate::domain::entities::coude::tout_ou_rien::TOUT_OU_RIEN_COOLDOWN_KEY;
+use crate::domain::entities::coude::tout_ou_rien::TOUT_OU_RIEN_COOLDOWN_SECS;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::play_tout_ou_rien::{
-    PlayToutOuRienCommand, PlayToutOuRienUseCase, ToutOuRienResolution, MIN_BALANCE_FOR_PLAY,
-};
-use crate::ports::inbound::ManageWalletUseCase;
-use crate::ports::outbound::{
-    CoudePlayerRepository, CoudeSocialRepository, CoudeToutOuRienRepository,
-};
-
+use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienCommand;
+use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase;
+use crate::ports::inbound::coude::play_tout_ou_rien::ToutOuRienResolution;
+use crate::ports::inbound::coude::play_tout_ou_rien::MIN_BALANCE_FOR_PLAY;
+use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository;
 pub struct PlayToutOuRienService {
     player_repo: Arc<dyn CoudePlayerRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,

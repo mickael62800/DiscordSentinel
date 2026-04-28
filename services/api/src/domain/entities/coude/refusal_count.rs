@@ -1,7 +1,7 @@
 //! Compteur de refus par paire (cf. COUPE_AMELIORATIONS 5.3 — Dette d honneur).
 
-use chrono::{DateTime, Utc};
-
+use chrono::DateTime;
+use chrono::Utc;
 /// Seuil au-dessus duquel le requester peut invoquer la dette d honneur.
 pub const HONOR_DEBT_THRESHOLD: i32 = 3;
 

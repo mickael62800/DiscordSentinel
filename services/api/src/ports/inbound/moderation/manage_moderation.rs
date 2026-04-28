@@ -1,6 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::{ModerationAction, StrikeResult, UserModerationHistory};
+use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::moderation::strikes::StrikeResult;
+use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
 use crate::domain::errors::DomainError;
 
 pub struct LogModerationCommand {

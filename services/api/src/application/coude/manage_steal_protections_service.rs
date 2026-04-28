@@ -3,17 +3,18 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use rand::Rng;
 
-use crate::domain::entities::{
-    find_protection_item, CoudeStealProtection, StealProtectionDuration, STEAL_PROTECTION_ITEMS,
-};
+use crate::domain::entities::coude::steal_protection::find_protection_item;
+use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
+use crate::domain::entities::coude::steal_protection::STEAL_PROTECTION_ITEMS;
 use crate::domain::errors::DomainError;
-use crate::ports::inbound::manage_steal_protections::{
-    ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
-};
-use crate::ports::outbound::CoudeStealProtectionRepository;
+use crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase;
+use crate::ports::inbound::coude::manage_steal_protections::StealProtectionTrigger;
+use crate::ports::outbound::coude::steal_protection_repository::CoudeStealProtectionRepository;
 
 pub struct ManageCoudeStealProtectionsService {
     repo: Arc<dyn CoudeStealProtectionRepository>,

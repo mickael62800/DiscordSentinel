@@ -31,9 +31,11 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
-use chrono::{TimeZone, Utc};
+use chrono::TimeZone;
+use chrono::Utc;
 use tokio::sync::oneshot;
-use tonic::transport::{Endpoint, Server};
+use tonic::transport::Endpoint;
+use tonic::transport::Server;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::grpc::automod::AutomodGrpc;
@@ -46,35 +48,67 @@ use sentinel_api::adapters::inbound::grpc::security::SecurityGrpc;
 use sentinel_api::adapters::inbound::grpc::stats::StatsGrpc;
 use sentinel_api::adapters::inbound::grpc::voice::VoiceChannelsGrpc;
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use sentinel_api::domain::entities::{
-    AutoRole, DashboardStats, DiscordRole, GuildMember, GuildStatsOverview, GuildVoiceStats,
-    ImageAnalysis, LevelConfig, LevelReward, MemberSummary, MessageAnalysis, ModerationAction,
-    RolePanel, RolePanelDetail, SecurityEvent, UserLevel, UserModerationHistory,
-    UserStats, VoiceChannel, VoiceChannelDetail, VoiceChannelInviteLink,
-    VoiceChannelTheme, VoiceChannelWhitelistEntry, XpSource,
-};
-use sentinel_api::domain::value_objects::VoiceChannelKind;
+use sentinel_api::domain::entities::community::role_panel::AutoRole;
+use sentinel_api::domain::entities::audit::dashboard_stats::DashboardStats;
+use sentinel_api::domain::entities::system::discord_role::DiscordRole;
+use sentinel_api::domain::entities::community::guild_member::GuildMember;
+use sentinel_api::domain::entities::audit::user_stats::GuildStatsOverview;
+use sentinel_api::domain::entities::audit::user_stats::GuildVoiceStats;
+use sentinel_api::domain::entities::ai::image_analysis::ImageAnalysis;
+use sentinel_api::domain::entities::community::level::LevelConfig;
+use sentinel_api::domain::entities::community::level::LevelReward;
+use sentinel_api::domain::entities::community::guild_member::MemberSummary;
+use sentinel_api::domain::entities::ai::message_analysis::MessageAnalysis;
+use sentinel_api::domain::entities::moderation::moderation_action::ModerationAction;
+use sentinel_api::domain::entities::community::role_panel::RolePanel;
+use sentinel_api::domain::entities::community::role_panel::RolePanelDetail;
+use sentinel_api::domain::entities::audit::security_event::SecurityEvent;
+use sentinel_api::domain::entities::community::level::UserLevel;
+use sentinel_api::domain::entities::moderation::moderation_action::UserModerationHistory;
+use sentinel_api::domain::entities::audit::user_stats::UserStats;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannel;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelDetail;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelInviteLink;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelTheme;
+use sentinel_api::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
+use sentinel_api::domain::entities::community::level::XpSource;
+use sentinel_api::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::domain::value_objects::Action;
-use sentinel_api::ports::inbound::{
-    AnalyzeImageCommand, AnalyzeImageUseCase, AnalyzeMessageCommand, AnalyzeMessageUseCase,
-    LogModerationCommand, ManageModerationUseCase, ManageSecurityUseCase, ManageStatsUseCase,
-    ReportSecurityEventCommand,
-};
-use sentinel_api::ports::inbound::manage_stats::{RecordMessagesCommand, RecordVoiceCommand};
-use sentinel_api::ports::inbound::manage_levels::{AddXpCommand, AddXpResult, ManageLevelsUseCase, SaveLevelConfigCommand};
-use sentinel_api::ports::inbound::manage_members::{
-    ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
-};
-use sentinel_api::ports::inbound::manage_role_panels::{
-    CreateAutoRoleCommand, CreateRolePanelCommand, ManageRolePanelsUseCase, SetMessageIdCommand,
-};
-use sentinel_api::ports::inbound::{
-    BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
-    ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
-    TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
-};
-use sentinel_api::ports::outbound::DiscordRoleRepository;
+use sentinel_api::domain::enums::moderation::action::Action;
+use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
+use sentinel_api::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;
+use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
+use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
+use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
+use sentinel_api::ports::inbound::audit::manage_security::ManageSecurityUseCase;
+use sentinel_api::ports::inbound::audit::manage_stats::ManageStatsUseCase;
+use sentinel_api::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordMessagesCommand;
+use sentinel_api::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use sentinel_api::ports::inbound::community::manage_levels::AddXpCommand;
+use sentinel_api::ports::inbound::community::manage_levels::AddXpResult;
+use sentinel_api::ports::inbound::community::manage_levels::ManageLevelsUseCase;
+use sentinel_api::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
+use sentinel_api::ports::inbound::community::manage_members::ManageMembersUseCase;
+use sentinel_api::ports::inbound::community::manage_members::RegisterMemberCommand;
+use sentinel_api::ports::inbound::community::manage_members::SyncMembersCommand;
+use sentinel_api::ports::inbound::community::manage_members::UpdateMemberCommand;
+use sentinel_api::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
+use sentinel_api::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
+use sentinel_api::ports::inbound::community::manage_role_panels::ManageRolePanelsUseCase;
+use sentinel_api::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::BanFromChannelCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::ManageCoAdminCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::ManageVoiceChannelsUseCase;
+use sentinel_api::ports::inbound::community::manage_voice_channels::ManageWhitelistCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::TransferOwnershipCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
+use sentinel_api::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
+use sentinel_api::ports::outbound::community::discord_role_repository::DiscordRoleRepository;
 use sentinel_proto::automod::v1 as automod_proto;
 use sentinel_proto::automod::v1::automod_service_client::AutomodServiceClient;
 use sentinel_proto::automod::v1::automod_service_server::AutomodServiceServer;
@@ -268,7 +302,7 @@ impl ManageSecurityUseCase for MockSecurityUc {
             created_at: ts(),
         })
     }
-    async fn analyze_new_member(&self, _: sentinel_api::ports::inbound::AnalyzeNewMemberCommand) -> Result<sentinel_api::ports::inbound::SecurityDecision, DomainError> { unimplemented!() }
+    async fn analyze_new_member(&self, _: sentinel_api::ports::inbound::audit::manage_security::AnalyzeNewMemberCommand) -> Result<sentinel_api::ports::inbound::audit::manage_security::SecurityDecision, DomainError> { unimplemented!() }
     async fn list_events(&self, _: Option<&str>) -> Result<Vec<SecurityEvent>, DomainError> {
         Ok(vec![SecurityEvent {
             id: Uuid::nil(),
@@ -726,7 +760,7 @@ struct MockVoiceChannelsUc;
 #[async_trait]
 impl ManageVoiceChannelsUseCase for MockVoiceChannelsUc {
     async fn list_history_channels(&self, _: &str, _: i64) -> Result<Vec<VoiceChannel>, DomainError> { Ok(vec![]) }
-    async fn get_voice_config(&self, _: &str) -> Result<sentinel_api::domain::entities::VoiceChannelConfig, DomainError> { Ok(Default::default()) }
+    async fn get_voice_config(&self, _: &str) -> Result<sentinel_api::domain::entities::community::voice_channel::VoiceChannelConfig, DomainError> { Ok(Default::default()) }
     async fn list_channels(&self, guild_id: &str) -> Result<Vec<VoiceChannel>, DomainError> {
         Ok(vec![
             sample_voice_channel(guild_id, "ch1", "Salon de Joe"),

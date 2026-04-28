@@ -1,8 +1,11 @@
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
-use sqlx::{Postgres, Transaction};
-
-use crate::domain::entities::{SlotJackpotPool, SlotSpin, SlotTopWinner};
+use chrono::DateTime;
+use chrono::Utc;
+use sqlx::Postgres;
+use sqlx::Transaction;
+use crate::domain::entities::casino::slot::SlotJackpotPool;
+use crate::domain::entities::casino::slot::SlotSpin;
+use crate::domain::entities::casino::slot::SlotTopWinner;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

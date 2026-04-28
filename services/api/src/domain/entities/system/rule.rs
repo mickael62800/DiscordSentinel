@@ -1,7 +1,8 @@
-use chrono::{DateTime, Utc};
+use chrono::DateTime;
+use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::value_objects::FlagType;
+use crate::domain::enums::moderation::flag_type::FlagType;
 
 #[derive(Debug, Clone)]
 pub struct Rule {

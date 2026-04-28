@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::analytics::*;
+use crate::domain::entities::system::analytics::*;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::AnalyticsRepository;
+use crate::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 pub struct PgAnalyticsRepository {
     pool: PgPool,
