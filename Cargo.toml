@@ -77,6 +77,12 @@ serenity = { version = "0.12", default-features = false, features = ["client", "
 # Redis
 redis = { version = "0.27", features = ["tokio-comp", "aio", "streams"] }
 
+# Postgres (sqlx) — features maximales unionees entre tous les crates :
+# runtime-tokio + tls-rustls + postgres + uuid + chrono + json. Cargo unifie
+# de toute facon les features sur le workspace, donc declarer le superset
+# n'ajoute pas de cout binaire.
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
+
 # Internes (paths)
 sentinel-proto = { path = "services/proto" }
 sentinel-shared = { path = "bots/shared" }

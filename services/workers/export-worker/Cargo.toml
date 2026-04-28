@@ -6,7 +6,7 @@ description = "Worker DiscordSentinel — exports asynchrones (CSV/JSON) de mode
 
 [dependencies]
 tokio = { workspace = true }
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
+sqlx = { workspace = true }
 reqwest = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

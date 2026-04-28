@@ -6,7 +6,7 @@ description = "Infrastructure partagee entre les workers DiscordSentinel"
 
 [dependencies]
 tokio = { workspace = true }
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres"] }
+sqlx = { workspace = true }
 reqwest = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true }

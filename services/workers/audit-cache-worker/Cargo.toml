@@ -6,7 +6,7 @@ description = "Worker DiscordSentinel — refresh du cache watched_users pour au
 
 [dependencies]
 tokio = { workspace = true }
-sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres"] }
+sqlx = { workspace = true }
 reqwest = { workspace = true }
 redis = { workspace = true }
 serde = { workspace = true }
