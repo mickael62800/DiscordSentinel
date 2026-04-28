@@ -1,12 +1,19 @@
 /// <reference types="vitest" />
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
+import { compression } from "vite-plugin-compression2";
 import { fileURLToPath, URL } from "node:url";
 
 // App web standalone : la couche Vue parle directement a l'API Axum via fetch.
 // Aucune dependance Tauri : tout passe par src/api/*.
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    // Pre-compression a la build : nginx les sert directement (gzip_static on)
+    // sans compresser a chaque requete. Threshold 1 KB : pas la peine pour
+    // les petits fichiers.
+    compression({ algorithm: "gzip", threshold: 1024 }),
+  ],
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
@@ -16,6 +23,21 @@ export default defineConfig({
     host: true,
     port: 5180,
     strictPort: false,
+  },
+  build: {
+    // Code splitting : separer Vue/router/Pinia de Chart.js (~190 KB) pour
+    // que les pages sans graphes ne paient pas le cout de chart.js.
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          "vendor-vue": ["vue", "vue-router", "pinia"],
+          "vendor-charts": ["chart.js", "vue-chartjs"],
+        },
+      },
+    },
+    // Genere un manifest pour debug du splitting (optionnel mais utile).
+    reportCompressedSize: true,
+    chunkSizeWarningLimit: 500,
   },
   test: {
     environment: "happy-dom",

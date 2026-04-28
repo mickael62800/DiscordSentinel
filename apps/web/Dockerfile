@@ -3,7 +3,7 @@
 # Build context = racine du repo (cf. docker-compose.yml).
 
 # ----- Stage 1 : build SPA -----
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Cache des deps : copie juste les manifests d'abord.
