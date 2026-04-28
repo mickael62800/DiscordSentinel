@@ -36,12 +36,19 @@ scrape_configs:
     metrics_path: '/metrics'
     static_configs:
       - targets:
-          - 'moderation-worker:9100'
+          - 'ai-worker:9100'
           - 'analytics-worker:9100'
+          - 'appeal-sla-worker:9100'
+          - 'audit-cache-worker:9100'
+          - 'blackjack-cleanup-worker:9100'
           - 'cache-worker:9100'
           - 'cleanup-worker:9100'
           - 'coude-worker:9100'
+          - 'discord-audit-sync-worker:9100'
+          - 'export-worker:9100'
+          - 'moderation-worker:9100'
           - 'monitoring-worker:9100'
+          - 'temp-roles-worker:9100'
         labels:
           component: 'worker'
     relabel_configs:
