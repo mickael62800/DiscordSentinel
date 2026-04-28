@@ -1,159 +1,83 @@
-mod bot_config_repository;
-mod cache;
-mod conduct_repository;
-mod guild_repository;
-mod infraction_repository;
-mod log_repository;
-mod moderation_repository;
-mod rule_repository;
-mod security_event_repository;
-mod stats_repository;
-mod ticket_repository;
-mod voice_channel_repository;
-mod watched_user_repository;
-mod audit_log_repository;
-mod level_repository;
-mod daily_activity_repository;
-mod role_panel_repository;
-mod analytics_repository;
-mod discord_role_repository;
-mod notes_repository;
-mod reminder_repository;
-mod strike_repository;
+// Bounded contexts.
+pub mod audit;
+pub mod casino;
+pub mod community;
+pub mod coude;
+pub mod moderation;
+pub mod system;
 
-pub use analytics_repository::AnalyticsRepository;
-pub use audit_log_repository::AuditLogRepository;
-pub use daily_activity_repository::DailyActivityRepository;
-pub use role_panel_repository::RolePanelRepository;
-pub use level_repository::LevelRepository;
-pub use bot_config_repository::BotConfigRepository;
-pub use cache::CachePort;
-pub use conduct_repository::ConductRepository;
-pub use guild_repository::GuildRepository;
-pub use infraction_repository::InfractionRepository;
-pub use log_repository::LogRepository;
-pub use moderation_repository::ModerationRepository;
-pub use rule_repository::RuleRepository;
-pub use security_event_repository::SecurityEventRepository;
-pub use stats_repository::StatsRepository;
-pub use ticket_repository::TicketRepository;
-pub use voice_channel_repository::VoiceChannelRepository;
-pub use watched_user_repository::WatchedUserRepository;
-pub use discord_role_repository::DiscordRoleRepository;
-pub use notes_repository::NotesRepository;
-pub use reminder_repository::ReminderRepository;
-pub use strike_repository::StrikeRepository;
+// Re-exports preservant l'API publique historique.
 
-mod member_repository;
-pub use member_repository::MemberRepository;
+// ── audit ──────────────────────────────────────────────────────────────────
+pub use audit::analytics_repository::AnalyticsRepository;
+pub use audit::audit_log_repository::AuditLogRepository;
+pub use audit::discord_action_message_repository::DiscordActionMessageRepository;
+pub use audit::modstats_repository::{ModeratorStat, ModstatsRepository};
+pub use audit::security_event_repository::SecurityEventRepository;
+pub use audit::stats_repository::StatsRepository;
+pub use audit::user_activity_repository::UserActivityRepository;
+pub use audit::watched_user_repository::WatchedUserRepository;
 
-mod wallet_repository;
-pub use wallet_repository::WalletRepository;
+// ── casino ─────────────────────────────────────────────────────────────────
+pub use casino::blackjack_repository::BlackjackRepository;
+pub use casino::blackjack_table_repository::{
+    BlackjackTable, BlackjackTablePlayer, BlackjackTableRepository,
+};
+pub use casino::game_repository::{Game, GamePanel, GameRepository};
+pub use casino::slot_repository::SlotRepository;
+pub use casino::wallet_repository::WalletRepository;
+pub use casino::wheel_repository::WheelRepository;
 
-mod blackjack_repository;
-pub use blackjack_repository::BlackjackRepository;
+// ── community ──────────────────────────────────────────────────────────────
+pub use community::conduct_repository::ConductRepository;
+pub use community::daily_activity_repository::DailyActivityRepository;
+pub use community::discord_role_repository::DiscordRoleRepository;
+pub use community::level_repository::LevelRepository;
+pub use community::member_repository::MemberRepository;
+pub use community::role_panel_repository::RolePanelRepository;
+pub use community::temp_role_repository::{TempRole, TempRoleRepository};
+pub use community::voice_channel_repository::VoiceChannelRepository;
+pub use community::welcome_config_repository::{WelcomeConfigData, WelcomeConfigRepository};
 
-mod coude_player_repository;
-pub use coude_player_repository::CoudePlayerRepository;
+// ── coude ──────────────────────────────────────────────────────────────────
+pub use coude::combat_query_repository::CombatQueryRepository;
+pub use coude::coude_bet_repository::CoudeBetRepository;
+pub use coude::coude_bounty_repository::CoudeBountyRepository;
+pub use coude::coude_cashbox_repository::CoudeCashboxRepository;
+pub use coude::coude_coalition_repository::CoudeCoalitionRepository;
+pub use coude::coude_combat_repository::CoudeCombatRepository;
+pub use coude::coude_curses_repository::CoudeCursesRepository;
+pub use coude::coude_economy_repository::CoudeEconomyRepository;
+pub use coude::coude_flavor_templates_repository::CoudeFlavorTemplatesRepository;
+pub use coude::coude_heist_repository::CoudeHeistRepository;
+pub use coude::coude_inventory_repository::CoudeInventoryRepository;
+pub use coude::coude_player_repository::CoudePlayerRepository;
+pub use coude::coude_refusal_count_repository::CoudeRefusalCountRepository;
+pub use coude::coude_safety_net_repository::CoudeSafetyNetRepository;
+pub use coude::coude_social_repository::CoudeSocialRepository;
+pub use coude::coude_steal_boost_repository::CoudeStealBoostRepository;
+pub use coude::coude_steal_protection_repository::CoudeStealProtectionRepository;
+pub use coude::coude_taunts_repository::CoudeTauntsRepository;
+pub use coude::coude_tout_ou_rien_repository::CoudeToutOuRienRepository;
+pub use coude::coude_ultimate_repository::CoudeUltimateRepository;
+pub use coude::coude_vendetta_repository::CoudeVendettaRepository;
+pub use coude::sponsorship_repository::{Sponsorship, SponsorshipRepository};
 
-mod coude_combat_repository;
-pub use coude_combat_repository::CoudeCombatRepository;
+// ── moderation ─────────────────────────────────────────────────────────────
+pub use moderation::automod_review_repository::AutomodReviewRepository;
+pub use moderation::evidence_repository::{EvidenceEntry, EvidenceRepository};
+pub use moderation::infraction_repository::InfractionRepository;
+pub use moderation::moderation_repository::ModerationRepository;
+pub use moderation::notes_repository::NotesRepository;
+pub use moderation::pending_action_repository::{PendingAction, PendingActionRepository};
+pub use moderation::reminder_repository::ReminderRepository;
+pub use moderation::review_repository::{ReviewEntry, ReviewRepository};
+pub use moderation::rule_repository::RuleRepository;
+pub use moderation::strike_repository::StrikeRepository;
 
-mod combat_query_repository;
-pub use combat_query_repository::CombatQueryRepository;
-
-mod coude_bet_repository;
-pub use coude_bet_repository::CoudeBetRepository;
-
-mod coude_economy_repository;
-pub use coude_economy_repository::CoudeEconomyRepository;
-
-mod coude_inventory_repository;
-pub use coude_inventory_repository::CoudeInventoryRepository;
-
-mod coude_social_repository;
-pub use coude_social_repository::CoudeSocialRepository;
-
-mod coude_cashbox_repository;
-pub use coude_cashbox_repository::CoudeCashboxRepository;
-
-mod coude_steal_protection_repository;
-pub use coude_steal_protection_repository::CoudeStealProtectionRepository;
-
-mod coude_steal_boost_repository;
-pub use coude_steal_boost_repository::CoudeStealBoostRepository;
-
-mod coude_taunts_repository;
-pub use coude_taunts_repository::CoudeTauntsRepository;
-
-mod coude_heist_repository;
-pub use coude_heist_repository::CoudeHeistRepository;
-
-mod user_activity_repository;
-pub use user_activity_repository::UserActivityRepository;
-
-mod welcome_config_repository;
-pub use welcome_config_repository::{WelcomeConfigData, WelcomeConfigRepository};
-
-mod evidence_repository;
-pub use evidence_repository::{EvidenceEntry, EvidenceRepository};
-
-mod review_repository;
-pub use review_repository::{ReviewEntry, ReviewRepository};
-
-mod modstats_repository;
-pub use modstats_repository::{ModeratorStat, ModstatsRepository};
-
-mod game_repository;
-pub use game_repository::{Game, GamePanel, GameRepository};
-
-mod sponsorship_repository;
-pub use sponsorship_repository::{Sponsorship, SponsorshipRepository};
-
-mod temp_role_repository;
-pub use temp_role_repository::{TempRole, TempRoleRepository};
-
-mod pending_action_repository;
-pub use pending_action_repository::{PendingAction, PendingActionRepository};
-
-mod blackjack_table_repository;
-pub use blackjack_table_repository::{BlackjackTable, BlackjackTablePlayer, BlackjackTableRepository};
-
-mod slot_repository;
-pub use slot_repository::SlotRepository;
-
-mod wheel_repository;
-pub use wheel_repository::WheelRepository;
-
-mod coude_curses_repository;
-pub use coude_curses_repository::CoudeCursesRepository;
-
-mod coude_safety_net_repository;
-pub use coude_safety_net_repository::CoudeSafetyNetRepository;
-
-mod coude_vendetta_repository;
-pub use coude_vendetta_repository::CoudeVendettaRepository;
-
-mod coude_tout_ou_rien_repository;
-pub use coude_tout_ou_rien_repository::CoudeToutOuRienRepository;
-
-mod coude_bounty_repository;
-pub use coude_bounty_repository::CoudeBountyRepository;
-
-mod coude_refusal_count_repository;
-pub use coude_refusal_count_repository::CoudeRefusalCountRepository;
-
-mod coude_coalition_repository;
-pub use coude_coalition_repository::CoudeCoalitionRepository;
-
-mod coude_ultimate_repository;
-pub use coude_ultimate_repository::CoudeUltimateRepository;
-
-mod coude_flavor_templates_repository;
-pub use coude_flavor_templates_repository::CoudeFlavorTemplatesRepository;
-
-mod discord_action_message_repository;
-pub use discord_action_message_repository::DiscordActionMessageRepository;
-
-mod automod_review_repository;
-pub use automod_review_repository::AutomodReviewRepository;
+// ── system ─────────────────────────────────────────────────────────────────
+pub use system::bot_config_repository::BotConfigRepository;
+pub use system::cache::CachePort;
+pub use system::guild_repository::GuildRepository;
+pub use system::log_repository::LogRepository;
+pub use system::ticket_repository::TicketRepository;

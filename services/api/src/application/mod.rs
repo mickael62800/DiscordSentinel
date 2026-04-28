@@ -1,131 +1,73 @@
-mod analyze_image_service;
-mod analyze_message_service;
-mod manage_conduct_service;
-mod manage_infractions_service;
-mod manage_moderation_service;
-mod manage_rules_service;
-mod manage_security_service;
-mod manage_stats_service;
-mod manage_tickets_service;
-mod voice_channels;
-mod manage_watched_users_service;
-mod manage_audit_logs_service;
-mod manage_role_panels_service;
-mod manage_levels_service;
-mod manage_notes_service;
-mod manage_reminders_service;
-mod manage_strikes_service;
+// Bounded contexts.
+pub mod ai;
+pub mod audit;
+pub mod casino;
+pub mod community;
+pub mod coude;
+pub mod moderation;
+pub mod system;
 
-pub use analyze_image_service::AnalyzeImageService;
-pub use analyze_message_service::{AnalyzeMessageService, score_classifications};
-pub use manage_conduct_service::ManageConductService;
-pub use manage_infractions_service::ManageInfractionsService;
-pub use manage_moderation_service::ManageModerationService;
-pub use manage_rules_service::ManageRulesService;
-pub use manage_security_service::ManageSecurityService;
-pub use manage_stats_service::ManageStatsService;
-pub use manage_tickets_service::ManageTicketsService;
-pub use voice_channels::ManageVoiceChannelsService;
-pub use manage_audit_logs_service::ManageAuditLogsService;
-pub use manage_role_panels_service::ManageRolePanelsService;
-pub use manage_levels_service::ManageLevelsService;
-pub use manage_notes_service::ManageNotesService;
-pub use manage_reminders_service::ManageRemindersService;
-pub use manage_strikes_service::ManageStrikesService;
-pub use manage_watched_users_service::ManageWatchedUsersService;
+// Re-exports preservant l'API publique historique.
 
-mod manage_members_service;
-pub use manage_members_service::ManageMembersService;
+// ── ai ─────────────────────────────────────────────────────────────────────
+pub use ai::analyze_image_service::AnalyzeImageService;
+pub use ai::analyze_message_service::{score_classifications, AnalyzeMessageService};
 
-mod blackjack_service;
-pub use blackjack_service::{BlackjackActionResult, BlackjackService};
+// ── audit ──────────────────────────────────────────────────────────────────
+pub use audit::manage_audit_logs_service::ManageAuditLogsService;
+pub use audit::manage_discord_action_messages_service::ManageDiscordActionMessagesService;
+pub use audit::manage_security_service::ManageSecurityService;
+pub use audit::manage_stats_service::ManageStatsService;
+pub use audit::manage_watched_users_service::ManageWatchedUsersService;
 
-mod manage_coude_players_service;
-pub use manage_coude_players_service::ManageCoudePlayersService;
+// ── casino ─────────────────────────────────────────────────────────────────
+pub use casino::blackjack_service::{BlackjackActionResult, BlackjackService};
+pub use casino::manage_slot_service::{self, ManageSlotService};
+pub use casino::manage_wallet_service::ManageWalletService;
+pub use casino::manage_wheel_service::{self, ManageWheelService};
 
-mod manage_coude_combats_service;
-pub use manage_coude_combats_service::ManageCoudeCombatsService;
+// ── community ──────────────────────────────────────────────────────────────
+pub use community::manage_conduct_service::ManageConductService;
+pub use community::manage_levels_service::ManageLevelsService;
+pub use community::manage_members_service::ManageMembersService;
+pub use community::manage_role_panels_service::ManageRolePanelsService;
+pub use community::manage_welcome_config_service::ManageWelcomeConfigService;
+pub use community::voice_channels::ManageVoiceChannelsService;
 
-mod manage_coude_bets_service;
-pub use manage_coude_bets_service::ManageCoudeBetsService;
+// ── coude ──────────────────────────────────────────────────────────────────
+pub use coude::coude_guild_settings::{self, CoudeGuildSettings};
+pub use coude::expire_combats_batch_service::ExpireCombatsBatchService;
+pub use coude::manage_coude_bets_service::ManageCoudeBetsService;
+pub use coude::manage_coude_cashbox_service::ManageCoudeCashboxService;
+pub use coude::manage_coude_catalog_service::ManageCoudeCatalogService;
+pub use coude::manage_coude_combats_service::ManageCoudeCombatsService;
+pub use coude::manage_coude_curses_service::{self, ManageCoudeCursesService};
+pub use coude::manage_coude_economy_service::ManageCoudeEconomyService;
+pub use coude::manage_coude_heist_service::ManageCoudeHeistService;
+pub use coude::manage_coude_inventory_service::ManageCoudeInventoryService;
+pub use coude::manage_coude_players_service::ManageCoudePlayersService;
+pub use coude::manage_coude_safety_net_service::{self, ManageCoudeSafetyNetService};
+pub use coude::manage_coude_social_service::ManageCoudeSocialService;
+pub use coude::manage_coude_steal_boosts_service::ManageCoudeStealBoostsService;
+pub use coude::manage_coude_steal_protections_service::ManageCoudeStealProtectionsService;
+pub use coude::manage_coude_taunts_service::ManageCoudeTauntsService;
+pub use coude::manage_coude_vendetta_service::{self, ManageCoudeVendettaService};
+pub use coude::play_tout_ou_rien_service::{self, PlayToutOuRienService};
+pub use coude::play_travaux_service::{self, PlayTravauxService};
+pub use coude::resolve_betting_batch_service::ResolveBettingBatchService;
+pub use coude::resolve_combat_now_service::ResolveCombatNowService;
+pub use coude::resolve_friendly_duel_service::ResolveFriendlyDuelService;
+pub use coude::roll_steal_service::{self, RollStealService};
 
-mod manage_coude_economy_service;
-pub use manage_coude_economy_service::ManageCoudeEconomyService;
+// ── moderation ─────────────────────────────────────────────────────────────
+pub use moderation::manage_automod_reviews_service::ManageAutomodReviewsService;
+pub use moderation::manage_infractions_service::ManageInfractionsService;
+pub use moderation::manage_moderation_service::ManageModerationService;
+pub use moderation::manage_notes_service::ManageNotesService;
+pub use moderation::manage_reminders_service::ManageRemindersService;
+pub use moderation::manage_rules_service::ManageRulesService;
+pub use moderation::manage_strikes_service::ManageStrikesService;
 
-mod manage_coude_inventory_service;
-pub use manage_coude_inventory_service::ManageCoudeInventoryService;
-
-mod manage_coude_social_service;
-pub use manage_coude_social_service::ManageCoudeSocialService;
-
-mod resolve_betting_batch_service;
-pub use resolve_betting_batch_service::ResolveBettingBatchService;
-
-mod expire_combats_batch_service;
-pub use expire_combats_batch_service::ExpireCombatsBatchService;
-
-mod resolve_combat_now_service;
-pub use resolve_combat_now_service::ResolveCombatNowService;
-
-mod resolve_friendly_duel_service;
-pub use resolve_friendly_duel_service::ResolveFriendlyDuelService;
-
-pub mod coude_guild_settings;
-pub use coude_guild_settings::CoudeGuildSettings;
-
-mod manage_discord_action_messages_service;
-pub use manage_discord_action_messages_service::ManageDiscordActionMessagesService;
-
-mod manage_welcome_config_service;
-pub use manage_welcome_config_service::ManageWelcomeConfigService;
-
-mod manage_automod_reviews_service;
-pub use manage_automod_reviews_service::ManageAutomodReviewsService;
-
-mod manage_coude_catalog_service;
-pub use manage_coude_catalog_service::ManageCoudeCatalogService;
-
-mod manage_coude_cashbox_service;
-pub use manage_coude_cashbox_service::ManageCoudeCashboxService;
-
-mod manage_coude_steal_protections_service;
-pub use manage_coude_steal_protections_service::ManageCoudeStealProtectionsService;
-
-mod manage_coude_steal_boosts_service;
-pub use manage_coude_steal_boosts_service::ManageCoudeStealBoostsService;
-
-mod manage_coude_taunts_service;
-pub use manage_coude_taunts_service::ManageCoudeTauntsService;
-
-mod manage_coude_heist_service;
-pub use manage_coude_heist_service::ManageCoudeHeistService;
-
-mod manage_wallet_service;
-pub use manage_wallet_service::ManageWalletService;
-
-pub mod export_service;
-pub use export_service::{ExportService, ExecuteExportUseCase};
-
-pub mod manage_slot_service;
-pub use manage_slot_service::ManageSlotService;
-
-pub mod manage_wheel_service;
-pub use manage_wheel_service::ManageWheelService;
-
-pub mod manage_coude_curses_service;
-pub use manage_coude_curses_service::ManageCoudeCursesService;
-
-pub mod manage_coude_safety_net_service;
-pub use manage_coude_safety_net_service::ManageCoudeSafetyNetService;
-
-pub mod manage_coude_vendetta_service;
-pub use manage_coude_vendetta_service::ManageCoudeVendettaService;
-
-pub mod play_tout_ou_rien_service;
-pub use play_tout_ou_rien_service::PlayToutOuRienService;
-
-pub mod play_travaux_service;
-pub use play_travaux_service::PlayTravauxService;
-
-pub mod roll_steal_service;
-pub use roll_steal_service::RollStealService;
+// ── system ─────────────────────────────────────────────────────────────────
+pub use system::export_service::{self, ExecuteExportUseCase, ExportService};
+pub use system::manage_tickets_service::ManageTicketsService;

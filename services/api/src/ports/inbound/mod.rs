@@ -1,135 +1,122 @@
-mod analyze_image;
-mod analyze_message;
-mod manage_conduct;
-mod manage_infractions;
-mod manage_moderation;
-mod manage_rules;
-mod manage_security;
-pub mod manage_stats;
-mod manage_tickets;
-mod manage_voice_channels;
-pub mod manage_watched_users;
-pub mod manage_audit_logs;
-pub mod manage_levels;
-pub mod manage_role_panels;
-pub mod manage_notes;
-pub mod manage_reminders;
-pub mod manage_strikes;
+// Bounded contexts.
+pub mod ai;
+pub mod audit;
+pub mod casino;
+pub mod community;
+pub mod coude;
+pub mod moderation;
+pub mod system;
 
-pub use analyze_image::{AnalyzeImageCommand, AnalyzeImageUseCase};
-pub use analyze_message::{AnalyzeMessageCommand, AnalyzeMessageUseCase, ContextMessageEntry};
-pub use manage_conduct::{
+// Re-exports preservant l'API publique historique.
+
+// ── ai ─────────────────────────────────────────────────────────────────────
+pub use ai::analyze_image::{AnalyzeImageCommand, AnalyzeImageUseCase};
+pub use ai::analyze_message::{
+    AnalyzeMessageCommand, AnalyzeMessageUseCase, ContextMessageEntry,
+};
+
+// ── audit ──────────────────────────────────────────────────────────────────
+pub use audit::manage_audit_logs::{self, CreateAuditLogCommand, ManageAuditLogsUseCase};
+pub use audit::manage_discord_action_messages::{
+    self, ManageDiscordActionMessagesUseCase,
+};
+pub use audit::manage_security::{
+    AnalyzeNewMemberCommand, ManageSecurityUseCase, ReportSecurityEventCommand, SecurityDecision,
+};
+pub use audit::manage_stats::{self, ManageStatsUseCase};
+pub use audit::manage_watched_users::{self, ManageWatchedUsersUseCase};
+
+// ── casino ─────────────────────────────────────────────────────────────────
+pub use casino::manage_slot::{self, ManageSlotUseCase, SpinCommand, SpinResult};
+pub use casino::manage_wallet::{self, ManageWalletUseCase, WalletMutation};
+pub use casino::manage_wheel::{self, ManageWheelUseCase, WheelSpinCommand, WheelSpinResult};
+
+// ── community ──────────────────────────────────────────────────────────────
+pub use community::manage_conduct::{
     AddPointsCommand, DeductPointsCommand, ManageConductUseCase, SaveConductConfigCommand,
 };
-pub use manage_infractions::{InfractionFilters, ManageInfractionsUseCase};
-pub use manage_rules::{CreateRuleCommand, ManageRulesUseCase};
-pub use manage_moderation::{LoggedModerationAction, LogModerationCommand, ManageModerationUseCase};
-pub use manage_security::{AnalyzeNewMemberCommand, ManageSecurityUseCase, ReportSecurityEventCommand, SecurityDecision};
-pub use manage_stats::ManageStatsUseCase;
-pub use manage_tickets::{
-    AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
-    UpdateTicketChannelCommand,
+pub use community::manage_levels::{self, ManageLevelsUseCase};
+pub use community::manage_members::{
+    self, ManageMembersUseCase, RegisterMemberCommand, SyncMembersCommand, UpdateMemberCommand,
 };
-pub use manage_audit_logs::{CreateAuditLogCommand, ManageAuditLogsUseCase};
-pub mod resolve_betting_batch;
-pub use resolve_betting_batch::{ResolveBettingBatchUseCase, ResolvedBettingCombatOutput};
-pub mod expire_combats_batch;
-pub use expire_combats_batch::{ExpireCombatsBatchUseCase, ExpiredCombatOutput};
-pub mod resolve_combat_now;
-pub use resolve_combat_now::{
-    ResolveCombatNowOutput, ResolveCombatNowUseCase, ResolvedCombatEmbedField,
-    VendettaHumiliation,
-};
-pub mod resolve_friendly_duel;
-pub use resolve_friendly_duel::{
-    FriendlyDuelInput, FriendlyDuelOutput, ResolveFriendlyDuelUseCase,
-};
-pub mod manage_coude_catalog;
-pub use manage_coude_catalog::{
-    AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, ManageCoudeCatalogUseCase,
-    MatchmakingBucket, ShopItemInfo,
-};
-pub mod manage_coude_cashbox;
-pub use manage_coude_cashbox::{ManageCoudeCashboxUseCase, RedistributionOutcome};
-pub mod manage_coude_steal_protections;
-pub use manage_coude_steal_protections::{
-    ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
-};
-pub mod manage_coude_steal_boosts;
-pub use manage_coude_steal_boosts::ManageCoudeStealBoostsUseCase;
-pub mod manage_coude_taunts;
-pub use manage_coude_taunts::ManageCoudeTauntsUseCase;
-pub mod manage_coude_heist;
-pub use manage_coude_heist::{
-    HeistCooldownStatus, ManageCoudeHeistUseCase, PrisonStatusInfo,
-};
-pub use manage_role_panels::ManageRolePanelsUseCase;
-pub use manage_levels::ManageLevelsUseCase;
-pub use manage_watched_users::ManageWatchedUsersUseCase;
-pub use manage_notes::{AddNoteCommand, ManageNotesUseCase};
-pub use manage_reminders::{CreateReminderCommand, ManageRemindersUseCase};
-pub use manage_strikes::{AddStrikeCommand, ManageStrikesUseCase, SaveStrikeConfigCommand};
-pub mod manage_members;
-pub use manage_members::{ManageMembersUseCase, SyncMembersCommand, RegisterMemberCommand, UpdateMemberCommand};
-
-pub mod manage_coude_players;
-pub use manage_coude_players::ManageCoudePlayersUseCase;
-
-pub mod manage_coude_combats;
-pub use manage_coude_combats::ManageCoudeCombatsUseCase;
-
-pub mod manage_coude_bets;
-pub use manage_coude_bets::{ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome};
-
-pub mod manage_coude_economy;
-pub use manage_coude_economy::{ManageCoudeEconomyUseCase, StealOutcome};
-
-pub mod manage_coude_inventory;
-pub use manage_coude_inventory::ManageCoudeInventoryUseCase;
-
-pub mod manage_coude_social;
-pub use manage_coude_social::ManageCoudeSocialUseCase;
-
-pub mod manage_wallet;
-pub use manage_wallet::{ManageWalletUseCase, WalletMutation};
-
-pub use manage_voice_channels::{
+pub use community::manage_role_panels::{self, ManageRolePanelsUseCase};
+pub use community::manage_voice_channels::{
     BanFromChannelCommand, CreateInviteLinkCommand, CreateThemeCommand, CreateVoiceChannelCommand,
     ManageCoAdminCommand, ManageVoiceChannelsUseCase, ManageWhitelistCommand,
     TransferOwnershipCommand, UpdateVoiceChannelCommand, UseInviteLinkCommand,
 };
-
-pub mod manage_slot;
-pub use manage_slot::{ManageSlotUseCase, SpinCommand, SpinResult};
-
-pub mod manage_wheel;
-pub use manage_wheel::{ManageWheelUseCase, WheelSpinCommand, WheelSpinResult};
-
-pub mod manage_coude_curses;
-pub use manage_coude_curses::{CastedCurse, ManageCoudeCursesUseCase};
-
-pub mod manage_coude_safety_net;
-pub use manage_coude_safety_net::ManageCoudeSafetyNetUseCase;
-
-pub mod manage_coude_vendetta;
-pub use manage_coude_vendetta::ManageCoudeVendettaUseCase;
-
-pub mod play_tout_ou_rien;
-pub use play_tout_ou_rien::{
-    PlayToutOuRienCommand, PlayToutOuRienUseCase, ToutOuRienResolution, MIN_BALANCE_FOR_PLAY,
+pub use community::manage_welcome_config::{
+    self, ManageWelcomeConfigUseCase, WelcomeConfigPatch,
 };
 
-pub mod play_travaux;
-pub use play_travaux::{PlayTravauxCommand, PlayTravauxUseCase, TravauxResolution};
+// ── coude ──────────────────────────────────────────────────────────────────
+pub use coude::expire_combats_batch::{
+    self, ExpireCombatsBatchUseCase, ExpiredCombatOutput,
+};
+pub use coude::manage_coude_bets::{
+    self, ManageCoudeBetsUseCase, PlaceBetOutcome, ResolveBetsOutcome,
+};
+pub use coude::manage_coude_cashbox::{
+    self, ManageCoudeCashboxUseCase, RedistributionOutcome,
+};
+pub use coude::manage_coude_catalog::{
+    self, AntiTheftItemInfo, ClassInfo, CoudeCatalog, LevelEntry, ManageCoudeCatalogUseCase,
+    MatchmakingBucket, ShopItemInfo,
+};
+pub use coude::manage_coude_combats::{self, ManageCoudeCombatsUseCase};
+pub use coude::manage_coude_curses::{self, CastedCurse, ManageCoudeCursesUseCase};
+pub use coude::manage_coude_economy::{
+    self, ManageCoudeEconomyUseCase, StealOutcome,
+};
+pub use coude::manage_coude_heist::{
+    self, HeistCooldownStatus, ManageCoudeHeistUseCase, PrisonStatusInfo,
+};
+pub use coude::manage_coude_inventory::{self, ManageCoudeInventoryUseCase};
+pub use coude::manage_coude_players::{self, ManageCoudePlayersUseCase};
+pub use coude::manage_coude_safety_net::{self, ManageCoudeSafetyNetUseCase};
+pub use coude::manage_coude_social::{self, ManageCoudeSocialUseCase};
+pub use coude::manage_coude_steal_boosts::{self, ManageCoudeStealBoostsUseCase};
+pub use coude::manage_coude_steal_protections::{
+    self, ManageCoudeStealProtectionsUseCase, StealProtectionTrigger,
+};
+pub use coude::manage_coude_taunts::{self, ManageCoudeTauntsUseCase};
+pub use coude::manage_coude_vendetta::{self, ManageCoudeVendettaUseCase};
+pub use coude::play_tout_ou_rien::{
+    self, PlayToutOuRienCommand, PlayToutOuRienUseCase, ToutOuRienResolution,
+    MIN_BALANCE_FOR_PLAY,
+};
+pub use coude::play_travaux::{
+    self, PlayTravauxCommand, PlayTravauxUseCase, TravauxResolution,
+};
+pub use coude::resolve_betting_batch::{
+    self, ResolveBettingBatchUseCase, ResolvedBettingCombatOutput,
+};
+pub use coude::resolve_combat_now::{
+    self, ResolveCombatNowOutput, ResolveCombatNowUseCase, ResolvedCombatEmbedField,
+    VendettaHumiliation,
+};
+pub use coude::resolve_friendly_duel::{
+    self, FriendlyDuelInput, FriendlyDuelOutput, ResolveFriendlyDuelUseCase,
+};
+pub use coude::roll_steal::{self, RollStealCommand, RollStealUseCase, StealRoll};
 
-pub mod roll_steal;
-pub use roll_steal::{RollStealCommand, RollStealUseCase, StealRoll};
+// ── moderation ─────────────────────────────────────────────────────────────
+pub use moderation::manage_automod_reviews::{
+    self, ManageAutomodReviewsUseCase, ResolveAutomodReviewCommand,
+};
+pub use moderation::manage_infractions::{InfractionFilters, ManageInfractionsUseCase};
+pub use moderation::manage_moderation::{
+    LogModerationCommand, LoggedModerationAction, ManageModerationUseCase,
+};
+pub use moderation::manage_notes::{self, AddNoteCommand, ManageNotesUseCase};
+pub use moderation::manage_reminders::{CreateReminderCommand, ManageRemindersUseCase};
+pub use moderation::manage_rules::{CreateRuleCommand, ManageRulesUseCase};
+pub use moderation::manage_strikes::{
+    AddStrikeCommand, ManageStrikesUseCase, SaveStrikeConfigCommand,
+};
 
-pub mod manage_discord_action_messages;
-pub use manage_discord_action_messages::ManageDiscordActionMessagesUseCase;
-
-pub mod manage_welcome_config;
-pub use manage_welcome_config::{ManageWelcomeConfigUseCase, WelcomeConfigPatch};
-
-pub mod manage_automod_reviews;
-pub use manage_automod_reviews::{ManageAutomodReviewsUseCase, ResolveAutomodReviewCommand};
+// ── system ─────────────────────────────────────────────────────────────────
+pub use system::manage_tickets::{
+    AssignTicketCommand, CreateTicketCommand, ManageTicketsUseCase, ReplyTicketCommand,
+    UpdateTicketChannelCommand,
+};

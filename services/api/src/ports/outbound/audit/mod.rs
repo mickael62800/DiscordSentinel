@@ -1,0 +1,8 @@
+pub mod analytics_repository;
+pub mod audit_log_repository;
+pub mod discord_action_message_repository;
+pub mod modstats_repository;
+pub mod security_event_repository;
+pub mod stats_repository;
+pub mod user_activity_repository;
+pub mod watched_user_repository;

@@ -211,5 +211,5 @@ pub async fn get_system_info(
 }
 
 #[cfg(test)]
-#[path = "tests/system.rs"]
+#[path = "tests/info.rs"]
 mod tests;

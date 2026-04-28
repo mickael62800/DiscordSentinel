@@ -801,5 +801,5 @@ pub async fn delete_action(
 }
 
 #[cfg(test)]
-#[path = "tests/moderation.rs"]
+#[path = "tests/actions.rs"]
 mod tests;

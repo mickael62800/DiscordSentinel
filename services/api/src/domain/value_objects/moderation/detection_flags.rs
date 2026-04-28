@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-use super::FlagType;
+use super::flag_type::FlagType;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DetectionFlags {

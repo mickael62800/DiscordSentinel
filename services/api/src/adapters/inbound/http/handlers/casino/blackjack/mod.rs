@@ -20,7 +20,7 @@ pub use game::*;
 pub use tables::*;
 
 /// Parse un UUID de game_id. Erreur 400 explicite si invalide.
-pub(in crate::adapters::inbound::http::handlers::blackjack) fn parse_uuid(
+pub(in crate::adapters::inbound::http::handlers::casino::blackjack) fn parse_uuid(
     s: &str,
 ) -> Result<Uuid, ApiError> {
     Uuid::parse_str(s).map_err(|_| {

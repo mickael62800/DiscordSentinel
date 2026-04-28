@@ -1,9 +1,14 @@
-pub mod channel_tension;
-pub mod coude_combat_engine;
-pub mod security_analyzer;
-mod inference_limiter;
-mod scoring_service;
+// Bounded contexts.
+pub mod ai;
+pub mod audit;
+pub mod coude;
+pub mod moderation;
 
-pub use channel_tension::{ChannelTensionBuffer, TensionAction, TensionEntry};
-pub use inference_limiter::InferenceRateLimiter;
-pub use scoring_service::{resolve_thresholds, ScoringService};
+// Re-exports preservant l'API publique historique.
+pub use ai::inference_limiter::InferenceRateLimiter;
+pub use audit::security_analyzer;
+pub use coude::coude_combat_engine;
+pub use moderation::channel_tension::{
+    self, ChannelTensionBuffer, TensionAction, TensionEntry,
+};
+pub use moderation::scoring_service::{resolve_thresholds, ScoringService};
