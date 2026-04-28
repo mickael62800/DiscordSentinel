@@ -5,10 +5,10 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgGameRepository;
-use sentinel_api::adapters::outbound::postgres::PgPendingActionRepository;
-use sentinel_api::adapters::outbound::postgres::PgSponsorshipRepository;
-use sentinel_api::adapters::outbound::postgres::PgTempRoleRepository;
+use sentinel_api::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
+use sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
+use sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
 use sentinel_api::ports::outbound::casino::game_repository::GameRepository;
 use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;
 use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;

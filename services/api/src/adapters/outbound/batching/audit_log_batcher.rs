@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 use sqlx::QueryBuilder;
-use crate::adapters::outbound::postgres::PgAuditLogRepository;
+use crate::adapters::outbound::postgres::audit::audit_log_repository::PgAuditLogRepository;
 use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;

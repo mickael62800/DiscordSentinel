@@ -3,7 +3,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgCoudeInventoryRepository;
+use sentinel_api::adapters::outbound::postgres::coude::inventory_repository::PgCoudeInventoryRepository;
 use sentinel_api::domain::entities::coude::inventory::NewCoudePrime;
 use sentinel_api::ports::outbound::coude::inventory_repository::CoudeInventoryRepository;
 

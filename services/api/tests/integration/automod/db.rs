@@ -4,9 +4,9 @@
 use std::sync::Arc;
 use sqlx::PgPool;
 
-use sentinel_api::adapters::outbound::postgres::PgBotConfigRepository;
-use sentinel_api::adapters::outbound::postgres::PgRuleRepository;
-use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
 use sentinel_api::application::ai::analyze_message_service::AnalyzeMessageService;
 use sentinel_api::adapters::outbound::InferenceService;
 use sentinel_api::adapters::outbound::TextTokenizer;

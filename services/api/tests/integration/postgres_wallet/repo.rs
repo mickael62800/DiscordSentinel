@@ -3,7 +3,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgWalletRepository;
+use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
 use sentinel_api::ports::outbound::casino::wallet_repository::WalletRepository;
 
 async fn pool() -> PgPool {

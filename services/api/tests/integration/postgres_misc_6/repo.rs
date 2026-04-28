@@ -3,10 +3,10 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgEvidenceRepository;
-use sentinel_api::adapters::outbound::postgres::PgModstatsRepository;
-use sentinel_api::adapters::outbound::postgres::PgPendingActionRepository;
-use sentinel_api::adapters::outbound::postgres::PgReviewRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::evidence_repository::PgEvidenceRepository;
+use sentinel_api::adapters::outbound::postgres::audit::modstats_repository::PgModstatsRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::review_repository::PgReviewRepository;
 use sentinel_api::ports::outbound::moderation::evidence_repository::EvidenceRepository;
 use sentinel_api::ports::outbound::audit::modstats_repository::ModstatsRepository;
 use sentinel_api::ports::outbound::moderation::pending_action_repository::PendingActionRepository;

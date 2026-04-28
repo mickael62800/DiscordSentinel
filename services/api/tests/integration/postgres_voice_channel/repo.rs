@@ -6,7 +6,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgVoiceChannelRepository;
+use sentinel_api::adapters::outbound::postgres::community::voice_channel_repository::PgVoiceChannelRepository;
 use sentinel_api::domain::entities::community::voice_channel::VoiceChannel;
 use sentinel_api::domain::entities::community::voice_channel::VoiceChannelBan;
 use sentinel_api::domain::entities::community::voice_channel::VoiceChannelCoAdmin;

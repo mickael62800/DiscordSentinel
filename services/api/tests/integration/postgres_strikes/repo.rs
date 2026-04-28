@@ -6,7 +6,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgStrikeRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::strike_repository::PgStrikeRepository;
 use sentinel_api::domain::entities::moderation::strikes::StrikeConfig;
 use sentinel_api::domain::entities::moderation::strikes::StrikeThreshold;
 use sentinel_api::domain::entities::moderation::strikes::UserStrike;

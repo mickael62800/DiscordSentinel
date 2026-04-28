@@ -4,7 +4,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgCoudePlayerRepository;
+use sentinel_api::adapters::outbound::postgres::coude::player_repository::PgCoudePlayerRepository;
 use sentinel_api::domain::entities::coude::player::CombatStat;
 use sentinel_api::ports::outbound::coude::player_repository::CoudePlayerRepository;
 

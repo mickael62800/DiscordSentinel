@@ -7,10 +7,10 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgBotConfigRepository;
-use sentinel_api::adapters::outbound::postgres::PgModerationRepository;
-use sentinel_api::adapters::outbound::postgres::PgSecurityEventRepository;
-use sentinel_api::adapters::outbound::postgres::PgWatchedUserRepository;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::moderation_repository::PgModerationRepository;
+use sentinel_api::adapters::outbound::postgres::audit::security_event_repository::PgSecurityEventRepository;
+use sentinel_api::adapters::outbound::postgres::audit::watched_user_repository::PgWatchedUserRepository;
 use sentinel_api::application::audit::manage_audit_logs_service::ManageAuditLogsService;
 use sentinel_api::application::audit::manage_security_service::ManageSecurityService;
 use sentinel_api::domain::entities::system::rule::Rule;
@@ -51,7 +51,7 @@ async fn build() -> (ManageSecurityService, PgPool) {
     let bot_config = Arc::new(PgBotConfigRepository::new(p.clone()));
     let moderation = Arc::new(PgModerationRepository::new(p.clone()));
     let audit_uc = Arc::new(ManageAuditLogsService::new(
-        Arc::new(sentinel_api::adapters::outbound::postgres::PgAuditLogRepository::new(p.clone())),
+        Arc::new(sentinel_api::adapters::outbound::postgres::audit::audit_log_repository::PgAuditLogRepository::new(p.clone())),
     ));
     let svc = ManageSecurityService::new(repo, Arc::new(NoopCache), watched, bot_config, moderation)
         .with_audit_logs_uc(audit_uc as Arc<dyn ManageAuditLogsUseCase>);

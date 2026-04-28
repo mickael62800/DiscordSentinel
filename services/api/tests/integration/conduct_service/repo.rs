@@ -8,8 +8,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use sentinel_api::adapters::outbound::postgres::PgConductRepository;
-use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
+use sentinel_api::adapters::outbound::postgres::community::conduct_repository::PgConductRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
 use sentinel_api::adapters::outbound::DiscordApiService;
 use sentinel_api::application::community::manage_conduct_service::ManageConductService;
 use sentinel_api::ports::inbound::community::manage_conduct::AddPointsCommand;

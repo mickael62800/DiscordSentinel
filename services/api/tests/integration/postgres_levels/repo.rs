@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgLevelRepository;
+use sentinel_api::adapters::outbound::postgres::community::level_repository::PgLevelRepository;
 use sentinel_api::domain::entities::community::level::LevelConfig;
 use sentinel_api::domain::entities::community::level::LevelReward;
 use sentinel_api::domain::entities::community::level::UserLevel;

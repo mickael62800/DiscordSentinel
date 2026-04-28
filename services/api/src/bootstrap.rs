@@ -22,58 +22,58 @@ use crate::adapters::outbound::batching::BatchWriterConfig;
 use crate::adapters::outbound::batching::BatchedPgAuditLogRepository;
 use crate::adapters::outbound::batching::BatchedPgLogRepository;
 use crate::adapters::outbound::job_client::JobClient;
-use crate::adapters::outbound::postgres::PgAnalyticsRepository;
-use crate::adapters::outbound::postgres::PgBlackjackRepository;
-use crate::adapters::outbound::postgres::PgBlackjackTableRepository;
-use crate::adapters::outbound::postgres::PgBotConfigRepository;
-use crate::adapters::outbound::postgres::PgConductRepository;
-use crate::adapters::outbound::postgres::PgCoudeBetRepository;
-use crate::adapters::outbound::postgres::PgCoudeCashboxRepository;
-use crate::adapters::outbound::postgres::PgCoudeCombatRepository;
-use crate::adapters::outbound::postgres::PgCoudeBountyRepository;
-use crate::adapters::outbound::postgres::PgCoudeCoalitionRepository;
-use crate::adapters::outbound::postgres::PgCoudeCursesRepository;
-use crate::adapters::outbound::postgres::PgCoudeEconomyRepository;
-use crate::adapters::outbound::postgres::PgCoudeFlavorTemplatesRepository;
-use crate::adapters::outbound::postgres::PgCoudeHeistRepository;
-use crate::adapters::outbound::postgres::PgCoudeInventoryRepository;
-use crate::adapters::outbound::postgres::PgCoudeRefusalCountRepository;
-use crate::adapters::outbound::postgres::PgCoudeSafetyNetRepository;
-use crate::adapters::outbound::postgres::PgCoudeToutOuRienRepository;
-use crate::adapters::outbound::postgres::PgCoudeUltimateRepository;
-use crate::adapters::outbound::postgres::PgCoudeVendettaRepository;
-use crate::adapters::outbound::postgres::PgCoudePlayerRepository;
-use crate::adapters::outbound::postgres::PgCoudeSocialRepository;
-use crate::adapters::outbound::postgres::PgCoudeStealBoostRepository;
-use crate::adapters::outbound::postgres::PgCoudeStealProtectionRepository;
-use crate::adapters::outbound::postgres::PgCoudeTauntsRepository;
-use crate::adapters::outbound::postgres::PgDailyActivityRepository;
-use crate::adapters::outbound::postgres::PgDiscordRoleRepository;
-use crate::adapters::outbound::postgres::PgEvidenceRepository;
-use crate::adapters::outbound::postgres::PgGameRepository;
-use crate::adapters::outbound::postgres::PgGuildRepository;
-use crate::adapters::outbound::postgres::PgInfractionRepository;
-use crate::adapters::outbound::postgres::PgLevelRepository;
-use crate::adapters::outbound::postgres::PgMemberRepository;
-use crate::adapters::outbound::postgres::PgModerationRepository;
-use crate::adapters::outbound::postgres::PgModstatsRepository;
-use crate::adapters::outbound::postgres::PgNotesRepository;
-use crate::adapters::outbound::postgres::PgPendingActionRepository;
-use crate::adapters::outbound::postgres::PgReminderRepository;
-use crate::adapters::outbound::postgres::PgReviewRepository;
-use crate::adapters::outbound::postgres::PgRolePanelRepository;
-use crate::adapters::outbound::postgres::PgRuleRepository;
-use crate::adapters::outbound::postgres::PgSecurityEventRepository;
-use crate::adapters::outbound::postgres::PgSponsorshipRepository;
-use crate::adapters::outbound::postgres::PgStatsRepository;
-use crate::adapters::outbound::postgres::PgStrikeRepository;
-use crate::adapters::outbound::postgres::PgTempRoleRepository;
-use crate::adapters::outbound::postgres::PgTicketRepository;
-use crate::adapters::outbound::postgres::PgUserActivityRepository;
-use crate::adapters::outbound::postgres::PgVoiceChannelRepository;
-use crate::adapters::outbound::postgres::PgWalletRepository;
-use crate::adapters::outbound::postgres::PgWatchedUserRepository;
-use crate::adapters::outbound::postgres::PgWelcomeConfigRepository;
+use crate::adapters::outbound::postgres::audit::analytics_repository::PgAnalyticsRepository;
+use crate::adapters::outbound::postgres::casino::blackjack_repository::PgBlackjackRepository;
+use crate::adapters::outbound::postgres::casino::blackjack_table_repository::PgBlackjackTableRepository;
+use crate::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
+use crate::adapters::outbound::postgres::community::conduct_repository::PgConductRepository;
+use crate::adapters::outbound::postgres::coude::bet_repository::PgCoudeBetRepository;
+use crate::adapters::outbound::postgres::coude::cashbox_repository::PgCoudeCashboxRepository;
+use crate::adapters::outbound::postgres::coude::combat_repository::PgCoudeCombatRepository;
+use crate::adapters::outbound::postgres::coude::bounty_repository::PgCoudeBountyRepository;
+use crate::adapters::outbound::postgres::coude::coalition_repository::PgCoudeCoalitionRepository;
+use crate::adapters::outbound::postgres::coude::curses_repository::PgCoudeCursesRepository;
+use crate::adapters::outbound::postgres::coude::economy_repository::PgCoudeEconomyRepository;
+use crate::adapters::outbound::postgres::coude::flavor_templates_repository::PgCoudeFlavorTemplatesRepository;
+use crate::adapters::outbound::postgres::coude::heist_repository::PgCoudeHeistRepository;
+use crate::adapters::outbound::postgres::coude::inventory_repository::PgCoudeInventoryRepository;
+use crate::adapters::outbound::postgres::coude::refusal_count_repository::PgCoudeRefusalCountRepository;
+use crate::adapters::outbound::postgres::coude::safety_net_repository::PgCoudeSafetyNetRepository;
+use crate::adapters::outbound::postgres::coude::tout_ou_rien_repository::PgCoudeToutOuRienRepository;
+use crate::adapters::outbound::postgres::coude::ultimate_repository::PgCoudeUltimateRepository;
+use crate::adapters::outbound::postgres::coude::vendetta_repository::PgCoudeVendettaRepository;
+use crate::adapters::outbound::postgres::coude::player_repository::PgCoudePlayerRepository;
+use crate::adapters::outbound::postgres::coude::social_repository::PgCoudeSocialRepository;
+use crate::adapters::outbound::postgres::coude::steal_boost_repository::PgCoudeStealBoostRepository;
+use crate::adapters::outbound::postgres::coude::steal_protection_repository::PgCoudeStealProtectionRepository;
+use crate::adapters::outbound::postgres::coude::taunts_repository::PgCoudeTauntsRepository;
+use crate::adapters::outbound::postgres::community::daily_activity_repository::PgDailyActivityRepository;
+use crate::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
+use crate::adapters::outbound::postgres::moderation::evidence_repository::PgEvidenceRepository;
+use crate::adapters::outbound::postgres::casino::game_repository::PgGameRepository;
+use crate::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
+use crate::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
+use crate::adapters::outbound::postgres::community::level_repository::PgLevelRepository;
+use crate::adapters::outbound::postgres::community::member_repository::PgMemberRepository;
+use crate::adapters::outbound::postgres::moderation::moderation_repository::PgModerationRepository;
+use crate::adapters::outbound::postgres::audit::modstats_repository::PgModstatsRepository;
+use crate::adapters::outbound::postgres::moderation::notes_repository::PgNotesRepository;
+use crate::adapters::outbound::postgres::moderation::pending_action_repository::PgPendingActionRepository;
+use crate::adapters::outbound::postgres::moderation::reminder_repository::PgReminderRepository;
+use crate::adapters::outbound::postgres::moderation::review_repository::PgReviewRepository;
+use crate::adapters::outbound::postgres::community::role_panel_repository::PgRolePanelRepository;
+use crate::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
+use crate::adapters::outbound::postgres::audit::security_event_repository::PgSecurityEventRepository;
+use crate::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
+use crate::adapters::outbound::postgres::audit::stats_repository::PgStatsRepository;
+use crate::adapters::outbound::postgres::moderation::strike_repository::PgStrikeRepository;
+use crate::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
+use crate::adapters::outbound::postgres::system::ticket_repository::PgTicketRepository;
+use crate::adapters::outbound::postgres::audit::user_activity_repository::PgUserActivityRepository;
+use crate::adapters::outbound::postgres::community::voice_channel_repository::PgVoiceChannelRepository;
+use crate::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
+use crate::adapters::outbound::postgres::audit::watched_user_repository::PgWatchedUserRepository;
+use crate::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
 use crate::adapters::outbound::redis_cache::RedisCache;
 use crate::application::ai::analyze_image_service::AnalyzeImageService;
 use crate::application::ai::analyze_message_service::AnalyzeMessageService;
@@ -330,7 +330,7 @@ pub async fn build_app_state(
         ));
     // Automod reviews (sync Discord <-> web).
     let automod_review_repo: Arc<dyn crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository> = Arc::new(
-        crate::adapters::outbound::postgres::PgAutomodReviewRepository::new(pg_pool.clone()),
+        crate::adapters::outbound::postgres::moderation::automod_review_repository::PgAutomodReviewRepository::new(pg_pool.clone()),
     );
     let automod_reviews_uc: Arc<dyn crate::ports::inbound::moderation::manage_automod_reviews::ManageAutomodReviewsUseCase> =
         Arc::new(crate::application::moderation::manage_automod_reviews_service::ManageAutomodReviewsService::new(
@@ -471,7 +471,7 @@ pub async fn build_app_state(
     ));
 
     // Slot machine — nouvelle feature (migration 157).
-    let slot_repo = Arc::new(crate::adapters::outbound::postgres::PgSlotRepository::new(pg_pool.clone()));
+    let slot_repo = Arc::new(crate::adapters::outbound::postgres::casino::slot_repository::PgSlotRepository::new(pg_pool.clone()));
     let slot_uc: Arc<dyn crate::ports::inbound::casino::manage_slot::ManageSlotUseCase> =
         Arc::new(crate::application::casino::manage_slot_service::ManageSlotService::new(
             slot_repo,
@@ -481,7 +481,7 @@ pub async fn build_app_state(
         ));
 
     // Roue du Destin — Sprint 2 sign'ature (migration 158).
-    let wheel_repo = Arc::new(crate::adapters::outbound::postgres::PgWheelRepository::new(pg_pool.clone()));
+    let wheel_repo = Arc::new(crate::adapters::outbound::postgres::casino::wheel_repository::PgWheelRepository::new(pg_pool.clone()));
     let wheel_uc: Arc<dyn crate::ports::inbound::casino::manage_wheel::ManageWheelUseCase> =
         Arc::new(
             crate::application::casino::manage_wheel_service::ManageWheelService::new(
@@ -619,7 +619,7 @@ pub async fn build_app_state(
     let discord_action_message_repo: Arc<
         dyn crate::ports::outbound::audit::discord_action_message_repository::DiscordActionMessageRepository,
     > = Arc::new(
-        crate::adapters::outbound::postgres::PgDiscordActionMessageRepository::new(
+        crate::adapters::outbound::postgres::audit::discord_action_message_repository::PgDiscordActionMessageRepository::new(
             pg_pool.clone(),
         ),
     );

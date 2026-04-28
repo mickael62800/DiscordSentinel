@@ -5,7 +5,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgModerationRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::moderation_repository::PgModerationRepository;
 use sentinel_api::ports::outbound::moderation::moderation_repository::ModerationRepository;
 
 async fn pool() -> PgPool {

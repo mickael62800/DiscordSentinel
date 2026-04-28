@@ -6,7 +6,7 @@
 use async_trait::async_trait;
 use sqlx::PgPool;
 use sqlx::QueryBuilder;
-use crate::adapters::outbound::postgres::PgLogRepository;
+use crate::adapters::outbound::postgres::system::log_repository::PgLogRepository;
 use crate::domain::entities::system::log_entry::LogEntry;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::system::log_repository::LogRepository;

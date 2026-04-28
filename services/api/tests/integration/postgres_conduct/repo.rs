@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgConductRepository;
+use sentinel_api::adapters::outbound::postgres::community::conduct_repository::PgConductRepository;
 use sentinel_api::domain::entities::community::conduct::ConductConfig;
 use sentinel_api::domain::entities::community::conduct::ConductPointsLog;
 use sentinel_api::domain::entities::community::conduct::UserConductPoints;

@@ -5,10 +5,10 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgDiscordRoleRepository;
-use sentinel_api::adapters::outbound::postgres::PgLogRepository;
-use sentinel_api::adapters::outbound::postgres::PgRuleRepository;
-use sentinel_api::adapters::outbound::postgres::PgUserActivityRepository;
+use sentinel_api::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
+use sentinel_api::adapters::outbound::postgres::system::log_repository::PgLogRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
+use sentinel_api::adapters::outbound::postgres::audit::user_activity_repository::PgUserActivityRepository;
 use sentinel_api::domain::entities::system::discord_role::DiscordRole;
 use sentinel_api::domain::entities::system::log_entry::LogEntry;
 use sentinel_api::domain::entities::system::rule::Rule;

@@ -3,7 +3,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgAnalyticsRepository;
+use sentinel_api::adapters::outbound::postgres::audit::analytics_repository::PgAnalyticsRepository;
 use sentinel_api::ports::outbound::audit::analytics_repository::AnalyticsRepository;
 
 async fn pool() -> PgPool {

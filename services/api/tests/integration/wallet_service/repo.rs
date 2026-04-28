@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgWalletRepository;
+use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
 use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
 use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;

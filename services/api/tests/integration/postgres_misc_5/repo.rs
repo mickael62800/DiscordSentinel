@@ -7,9 +7,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgDailyActivityRepository;
-use sentinel_api::adapters::outbound::postgres::PgSponsorshipRepository;
-use sentinel_api::adapters::outbound::postgres::PgTempRoleRepository;
+use sentinel_api::adapters::outbound::postgres::community::daily_activity_repository::PgDailyActivityRepository;
+use sentinel_api::adapters::outbound::postgres::coude::sponsorship_repository::PgSponsorshipRepository;
+use sentinel_api::adapters::outbound::postgres::community::temp_role_repository::PgTempRoleRepository;
 use sentinel_api::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
 use sentinel_api::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
 use sentinel_api::ports::outbound::community::temp_role_repository::TempRoleRepository;

@@ -3,7 +3,7 @@
 //! Lancer : cargo test --test integration_wallet
 
 use sqlx::PgPool;
-use sentinel_api::adapters::outbound::postgres::PgWalletRepository;
+use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
 use sentinel_api::ports::outbound::casino::wallet_repository::WalletRepository;
 
 async fn setup_pool() -> PgPool {

@@ -5,9 +5,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgCoudeTauntsRepository;
-use sentinel_api::adapters::outbound::postgres::PgRolePanelRepository;
-use sentinel_api::adapters::outbound::postgres::PgWelcomeConfigRepository;
+use sentinel_api::adapters::outbound::postgres::coude::taunts_repository::PgCoudeTauntsRepository;
+use sentinel_api::adapters::outbound::postgres::community::role_panel_repository::PgRolePanelRepository;
+use sentinel_api::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
 use sentinel_api::domain::entities::community::role_panel::AutoRole;
 use sentinel_api::domain::entities::community::role_panel::RolePanel;
 use sentinel_api::domain::entities::community::role_panel::RolePanelEntry;

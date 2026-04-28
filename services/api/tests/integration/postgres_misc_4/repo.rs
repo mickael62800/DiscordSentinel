@@ -6,11 +6,11 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgBlackjackTableRepository;
-use sentinel_api::adapters::outbound::postgres::PgCoudeHeistRepository;
-use sentinel_api::adapters::outbound::postgres::PgCoudeStealBoostRepository;
-use sentinel_api::adapters::outbound::postgres::PgCoudeStealProtectionRepository;
-use sentinel_api::adapters::outbound::postgres::PgGuildRepository;
+use sentinel_api::adapters::outbound::postgres::casino::blackjack_table_repository::PgBlackjackTableRepository;
+use sentinel_api::adapters::outbound::postgres::coude::heist_repository::PgCoudeHeistRepository;
+use sentinel_api::adapters::outbound::postgres::coude::steal_boost_repository::PgCoudeStealBoostRepository;
+use sentinel_api::adapters::outbound::postgres::coude::steal_protection_repository::PgCoudeStealProtectionRepository;
+use sentinel_api::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
 use sentinel_api::domain::entities::system::guild::Guild;
 use sentinel_api::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
 use sentinel_api::ports::outbound::coude::heist_repository::CoudeHeistRepository;

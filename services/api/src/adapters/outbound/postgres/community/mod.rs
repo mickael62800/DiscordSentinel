@@ -1,0 +1,9 @@
+pub mod conduct_repository;
+pub mod daily_activity_repository;
+pub mod discord_role_repository;
+pub mod level_repository;
+pub mod member_repository;
+pub mod role_panel_repository;
+pub mod temp_role_repository;
+pub mod voice_channel_repository;
+pub mod welcome_config_repository;

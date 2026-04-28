@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgVoiceChannelRepository;
+use sentinel_api::adapters::outbound::postgres::community::voice_channel_repository::PgVoiceChannelRepository;
 use sentinel_api::application::community::voice_channels::ManageVoiceChannelsService;
 use sentinel_api::domain::entities::system::bot_config::BotDefinition;
 use sentinel_api::domain::entities::system::bot_config::BotGuildConfig;

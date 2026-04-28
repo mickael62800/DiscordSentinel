@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgBlackjackRepository;
+use sentinel_api::adapters::outbound::postgres::casino::blackjack_repository::PgBlackjackRepository;
 use sentinel_api::domain::entities::casino::blackjack::BlackjackGame;
 use sentinel_api::domain::entities::casino::blackjack::Card;
 use sentinel_api::ports::outbound::casino::blackjack_repository::BlackjackRepository;

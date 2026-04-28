@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgCoudeSocialRepository;
+use sentinel_api::adapters::outbound::postgres::coude::social_repository::PgCoudeSocialRepository;
 use sentinel_api::domain::entities::coude::social::LeaderboardCategory;
 use sentinel_api::domain::entities::coude::social::NewDailyChaos;
 use sentinel_api::ports::outbound::coude::social_repository::CoudeSocialRepository;

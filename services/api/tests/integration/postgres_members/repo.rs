@@ -3,7 +3,7 @@
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgMemberRepository;
+use sentinel_api::adapters::outbound::postgres::community::member_repository::PgMemberRepository;
 use sentinel_api::domain::entities::community::guild_member::GuildMember;
 use sentinel_api::ports::outbound::community::member_repository::MemberRepository;
 

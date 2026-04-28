@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
 use sentinel_api::domain::entities::moderation::infraction::Infraction;
 use sentinel_api::domain::enums::moderation::action::Action;
 use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;

@@ -9,8 +9,8 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgInfractionRepository;
-use sentinel_api::adapters::outbound::postgres::PgStatsRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
+use sentinel_api::adapters::outbound::postgres::audit::stats_repository::PgStatsRepository;
 use sentinel_api::application::audit::manage_stats_service::ManageStatsService;
 use sentinel_api::domain::entities::system::rule::Rule;
 use sentinel_api::domain::errors::DomainError;

@@ -6,11 +6,11 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgAuditLogRepository;
-use sentinel_api::adapters::outbound::postgres::PgBotConfigRepository;
-use sentinel_api::adapters::outbound::postgres::PgNotesRepository;
-use sentinel_api::adapters::outbound::postgres::PgReminderRepository;
-use sentinel_api::adapters::outbound::postgres::PgSecurityEventRepository;
+use sentinel_api::adapters::outbound::postgres::audit::audit_log_repository::PgAuditLogRepository;
+use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::notes_repository::PgNotesRepository;
+use sentinel_api::adapters::outbound::postgres::moderation::reminder_repository::PgReminderRepository;
+use sentinel_api::adapters::outbound::postgres::audit::security_event_repository::PgSecurityEventRepository;
 use sentinel_api::domain::entities::audit::audit_log::AuditLog;
 use sentinel_api::domain::entities::moderation::sanction_reminder::SanctionReminder;
 use sentinel_api::domain::entities::audit::security_event::SecurityEvent;

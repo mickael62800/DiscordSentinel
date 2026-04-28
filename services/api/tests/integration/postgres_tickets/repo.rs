@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::PgTicketRepository;
+use sentinel_api::adapters::outbound::postgres::system::ticket_repository::PgTicketRepository;
 use sentinel_api::domain::entities::system::ticket::Ticket;
 use sentinel_api::domain::entities::system::ticket::TicketMessage;
 use sentinel_api::ports::outbound::system::ticket_repository::TicketRepository;
