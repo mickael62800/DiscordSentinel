@@ -5,4 +5,4 @@ pub mod moderation;
 pub mod system;
 
 // Re-exports plats (chaque enum etait avant accessible via
-// `crate::domain::value_objects::Type` -- on garde le meme racourci ici).
+// `crate::domain::enums::Type` (re-export plat aussi disponible).

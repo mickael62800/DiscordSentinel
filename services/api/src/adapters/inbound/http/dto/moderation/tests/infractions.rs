@@ -1,7 +1,7 @@
 use super::*;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use chrono::Utc;
 use uuid::Uuid;
 

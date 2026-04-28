@@ -7,7 +7,7 @@ use uuid::Uuid;
 use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
 use sentinel_api::domain::entities::moderation::infraction::Infraction;
 use sentinel_api::domain::enums::moderation::action::Action;
-use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use sentinel_api::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use sentinel_api::ports::outbound::moderation::infraction_repository::InfractionRepository;
 

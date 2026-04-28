@@ -15,7 +15,7 @@ use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::entities::community::conduct::MUTE_AT_ZERO_POINTS_DURATION_MINS;
 use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::ports::inbound::community::manage_conduct::AddPointsCommand;
 use crate::ports::inbound::community::manage_conduct::DeductPointsCommand;
 use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;

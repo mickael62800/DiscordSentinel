@@ -10,7 +10,7 @@ use crate::domain::entities::audit::user_stats::UserStats;
 use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::ports::inbound::audit::manage_stats::ManageStatsUseCase;
 use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;

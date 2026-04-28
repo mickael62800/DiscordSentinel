@@ -29,7 +29,7 @@ use sentinel_api::domain::entities::moderation::moderation_action::UserModeratio
 use sentinel_api::domain::entities::audit::user_stats::UserStats;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::domain::enums::moderation::action::Action;
-use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use sentinel_api::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_api::domain::enums::moderation::flag_type::FlagType;
 use sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use sentinel_api::ports::inbound::moderation::manage_rules::CreateRuleCommand;

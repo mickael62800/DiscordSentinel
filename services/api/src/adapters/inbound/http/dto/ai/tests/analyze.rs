@@ -1,5 +1,5 @@
 use super::*;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 
 fn make_dto(content: String, n_context: usize) -> AnalyzeRequestDto {
     let context_messages = (0..n_context)

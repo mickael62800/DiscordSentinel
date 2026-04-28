@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::ai::message_analysis::MessageAnalysis;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 
 /// DTO de la requête reçue depuis le bot automod.

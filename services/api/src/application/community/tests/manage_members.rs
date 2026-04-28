@@ -289,7 +289,7 @@ impl ManageInfractionsUseCase for RichInfUc {
             channel_id: "c".into(), user_id: "u".into(),
             username: "u".into(), message_id: "m".into(),
             content: format!("msg{i}"),
-            flags: crate::domain::value_objects::moderation::detection_flags::DetectionFlags {
+            flags: crate::domain::entities::moderation::detection_flags::DetectionFlags {
                 spam: false, insult: false, link: false, phishing: false,
             },
             action: crate::domain::enums::moderation::action::Action::Warn,

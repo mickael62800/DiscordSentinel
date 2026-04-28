@@ -1,6 +1,6 @@
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::domain::enums::moderation::flag_type::FlagType;
 /// Poids par défaut quand aucune règle n'est configurée pour un flag.
 const DEFAULT_WEIGHT_SPAM: f64 = 3.0;

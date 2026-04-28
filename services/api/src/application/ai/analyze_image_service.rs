@@ -11,7 +11,7 @@ use crate::domain::errors::DomainError;
 use crate::adapters::outbound::InferenceService;
 use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageCommand;
 use crate::ports::inbound::ai::analyze_image::AnalyzeImageUseCase;

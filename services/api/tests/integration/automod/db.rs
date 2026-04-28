@@ -11,7 +11,7 @@ use sentinel_api::application::ai::analyze_message_service::AnalyzeMessageServic
 use sentinel_api::adapters::outbound::InferenceService;
 use sentinel_api::adapters::outbound::TextTokenizer;
 use sentinel_api::domain::services::ai::inference_limiter::InferenceRateLimiter;
-use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use sentinel_api::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use sentinel_api::ports::inbound::ai::analyze_message::ContextMessageEntry;

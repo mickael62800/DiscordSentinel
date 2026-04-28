@@ -19,7 +19,7 @@ use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::entities::moderation::infraction::Infraction;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::domain::enums::moderation::action::Action;
-use sentinel_api::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use sentinel_api::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_api::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use sentinel_api::ports::inbound::moderation::manage_infractions::ManageInfractionsUseCase;
 use test_helpers::build_test_state_infractions;

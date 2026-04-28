@@ -13,7 +13,7 @@ use sentinel_proto::automod::v1::automod_service_server::AutomodService;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::domain::entities::ai::message_analysis::MessageAnalysis;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageUseCase;
 use crate::ports::inbound::ai::analyze_message::ContextMessageEntry;

@@ -3,7 +3,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 #[derive(Debug, Clone)]
 pub struct Infraction {
     pub id: Uuid,

@@ -6,3 +6,4 @@ pub mod purge;
 pub mod sanction_reminder;
 pub mod strikes;
 pub mod user_note;
+pub mod detection_flags;

@@ -6,7 +6,7 @@ use crate::domain::entities::system::log_entry::LogEntry;
 use crate::domain::entities::moderation::moderation_action::ModerationAction;
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::enums::moderation::action::Action;
-use crate::domain::value_objects::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use chrono::TimeZone;
