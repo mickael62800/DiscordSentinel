@@ -1,5 +1,8 @@
-# Phase 7A — .dockerignore racine pour drastiquement reduire le contexte de
-# build (sans ce fichier, ~545 MB de target/ locaux sont copies a chaque build).
+# .dockerignore racine — reduit drastiquement le contexte de build (sinon
+# ~545 MB de target/ et coverage/ locaux sont copies a chaque build).
+#
+# IMPORTANT : ce fichier DOIT rester a la racine — Docker le lit depuis le
+# contexte de build (= racine du repo, cf. context: ../.. dans compose).
 
 # Rust
 target/
@@ -7,23 +10,16 @@ target/
 **/*.rs.bk
 Cargo.lock.bak
 
-# Node / desktop
+# Node / build artifacts
 node_modules/
 **/node_modules/
 dist/
 **/dist/
-.next/
-**/.next/
-.svelte-kit/
-**/.svelte-kit/
 
-# Tauri
-apps/desktop/src-tauri/target/
-apps/desktop/.tauri/
-
-# Git / IDE
+# Git / IDE / outils locaux
 .git/
 .gitignore
+.gitattributes
 .github/
 .vscode/
 .idea/
@@ -33,28 +29,35 @@ apps/desktop/.tauri/
 .DS_Store
 Thumbs.db
 
-# Docs / tests artifacts (pas necessaires aux builds)
+# Docs / tests / coverage (pas necessaires aux builds)
 docs/
 *.md
 !**/Cargo.toml
 test-results/
 coverage/
+coverage-html/
 *.log
 
 # Env (jamais dans une image)
 .env
 .env.local
 .env.*.local
+.env.test
 
-# AI artifacts (montes en volume au runtime)
-ai/training/
-ai/data/
+# AI artifacts (montes en volume au runtime, pas builds-in)
+ai/training/checkpoints/
+ai/training/*/checkpoints/
+ai/training/*/datasets/
 
-# Docker meta
+# Docker meta (les Dockerfiles eux-memes ne servent a rien dans le contexte)
 docker-compose.yml
 docker-compose.*.yml
-Dockerfile
+infra/docker/docker-compose*.yml
 **/Dockerfile
 
-# Memory tools
-memory/
+# Logos / assets non-builds
+*.ico
+*.png
+!apps/web/public/**
+!bots/sentinel-bot/assets/**
+!infra/docker/empty-assets/**

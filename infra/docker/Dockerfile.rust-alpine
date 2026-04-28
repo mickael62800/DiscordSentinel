@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.7
+# ============================================================================
+# Generic Alpine Rust builder — utilise par gateway, sentinel-bot, et les 13
+# workers. Remplace 15 Dockerfiles quasi-identiques par un seul parametre via
+# BIN_NAME (et optionnellement ASSETS_SRC pour le bot).
+#
+# Build args :
+#   BIN_NAME    (requis)  ex: sentinel-analytics-worker
+#   ASSETS_SRC  (optional) chemin vers un dossier d'assets a embarquer.
+#                          Defaut = infra/docker/empty-assets (placeholder vide).
+#                          Le bot l'utilise pour copier ses cartes blackjack.
+#   CHEF_IMAGE  (optional) image cargo-chef base. TODO pin a une version
+#                          specifique (ex: 0.1.71-rust-1.83-alpine3.21) une
+#                          fois validee, pour la reproductibilite.
+#
+# Compose example :
+#   build:
+#     context: ../..
+#     dockerfile: infra/docker/Dockerfile.rust-alpine
+#     args:
+#       BIN_NAME: sentinel-analytics-worker
+#
+# Optimisations :
+#   - cargo-chef : deps cookees une fois, cachees par BuildKit.
+#   - sharing=private : permet builds parallels (`docker buildx bake`) sans
+#     verrou global sur le cache.
+#   - User non-root (uid 1000) au runtime.
+#   - Binaire renomme en /usr/local/bin/sentinel-app pour un ENTRYPOINT
+#     uniforme (le service_label vrai est passe explicitement par chaque
+#     binaire via spawn_metrics_server / tracing fields).
+# ============================================================================
+
+ARG CHEF_IMAGE=lukemathwalker/cargo-chef:latest-rust-alpine
+FROM ${CHEF_IMAGE} AS chef
+RUN apk add --no-cache \
+    musl-dev pkgconf openssl-dev openssl-libs-static \
+    protoc protobuf-dev \
+    make g++ linux-headers
+WORKDIR /app
+
+# ----- Planner -----
+FROM chef AS planner
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# ----- Builder -----
+FROM chef AS builder
+ARG BIN_NAME
+RUN test -n "$BIN_NAME" || (echo "ERROR: BIN_NAME build-arg requis" && exit 1)
+COPY --from=planner /app/recipe.json recipe.json
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=private \
+    --mount=type=cache,target=/app/target,sharing=private \
+    cargo chef cook --release --recipe-path recipe.json --bin "$BIN_NAME"
+COPY . .
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=private \
+    --mount=type=cache,target=/app/target,sharing=private \
+    cargo build --release --bin "$BIN_NAME" && \
+    cp "target/release/$BIN_NAME" /tmp/app
+
+# ----- Runtime -----
+FROM alpine:3.21 AS runtime
+RUN apk add --no-cache ca-certificates && \
+    addgroup -g 1000 -S sentinel && \
+    adduser -u 1000 -S -G sentinel sentinel && \
+    mkdir -p /app && chown -R sentinel:sentinel /app
+
+ARG ASSETS_SRC=infra/docker/empty-assets
+COPY --from=builder /tmp/app /usr/local/bin/sentinel-app
+COPY --chown=sentinel:sentinel ${ASSETS_SRC}/ /app/assets/
+
+WORKDIR /app
+USER sentinel
+ENTRYPOINT ["/usr/local/bin/sentinel-app"]

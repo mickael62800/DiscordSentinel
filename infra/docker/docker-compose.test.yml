@@ -3,6 +3,10 @@
 #         ./infra/scripts/run-tests.sh
 #         docker compose -f infra/docker/docker-compose.test.yml down -v
 
+# Project name dedie pour eviter toute collision avec le stack prod
+# (`discordsentinel`).
+name: discordsentinel-test
+
 services:
   postgres-test:
     image: postgres:16-alpine

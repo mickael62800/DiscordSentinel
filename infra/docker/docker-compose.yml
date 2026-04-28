@@ -1,14 +1,80 @@
+# ============================================================================
+# DiscordSentinel — Docker Compose stack
+#
+# Convention :
+#   - context: ../..  (racine du repo)
+#   - Tous les services Rust utilisent les Dockerfiles generiques :
+#       infra/docker/Dockerfile.rust-alpine  (gateway, bot, 13 workers)
+#       infra/docker/Dockerfile.rust-debian  (api, glibc 2.38+ pour ONNX)
+#   - YAML anchors (x-...) pour eliminer la duplication entre workers.
+# ============================================================================
+
+# CRITIQUE — project name fige a `discordsentinel` pour preserver les volumes
+# existants (postgres_data, redis_data, etc.) malgre le deplacement du compose
+# vers infra/docker/. Sans ca, un `docker compose up` lance depuis un autre
+# dossier creerait de NOUVEAUX volumes vides.
+name: discordsentinel
+
+# ── Anchors partages ────────────────────────────────────────────────────────
+
+x-default-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+# Defaults pour tous les services Rust : restart policy, init (tini PID 1),
+# logging avec rotation. A merger avec `<<: *rust-base`.
+x-rust-base: &rust-base
+  restart: unless-stopped
+  init: true
+  logging: *default-logging
+
+# Env partagee par les workers (pgbouncer + redis + api). Override possible
+# via merge ou redefinition. METRICS_PORT est utilise par worker-common pour
+# exposer /metrics (utilise par les healthchecks).
+x-worker-env: &worker-env
+  DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
+  REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
+  API_URL: http://api:3000
+  API_KEY: ${API_KEY:-}
+  METRICS_PORT: "9100"
+  RUST_LOG: ${RUST_LOG:-info}
+
+# Healthcheck commun aux workers : ping /metrics expose par worker-common.
+# Plus fiable que `pidof` (process bloque mais vivant => pidof passe).
+x-worker-healthcheck: &worker-healthcheck
+  test: ["CMD-SHELL", "wget --spider -q http://localhost:9100/metrics || exit 1"]
+  interval: 30s
+  timeout: 3s
+  retries: 3
+  start_period: 15s
+
+# Build alpine generique (workers, gateway, bot). Le BIN_NAME est specifie
+# par chaque service (le seul element qui change reellement).
+x-build-alpine: &build-alpine
+  context: ../..
+  dockerfile: infra/docker/Dockerfile.rust-alpine
+
+# depends_on standard pour les workers DB-bound : pgbouncer + redis.
+x-worker-deps-db-redis: &worker-deps-db-redis
+  pgbouncer:
+    condition: service_started
+  redis:
+    condition: service_healthy
+
 services:
 
-  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────────
   # Infrastructure
-  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────────
 
   postgres:
     image: postgres:16-alpine
     container_name: sentinel-postgres
     restart: unless-stopped
-    # NOTE Phase 0 — observabilité : `shared_preload_libraries=pg_stat_statements`
+    logging: *default-logging
+    # NOTE Phase 0 — observabilite : `shared_preload_libraries=pg_stat_statements`
     # est obligatoire pour identifier les queries lentes (cf. docs/BASELINE_METRICS.md).
     # Le `CREATE EXTENSION` correspondant est dans la migration `099_enable_pg_stat_statements.sql`.
     #
@@ -18,8 +84,6 @@ services:
     #   - work_mem 64MB (sorts/joins 10-100x, budget 30 conn x 64MB x 2 = 3.8GB max)
     #   - maintenance_work_mem 1GB (VACUUM/REINDEX 5-10x)
     #   - WAL tuning : wal_buffers=16MB, max_wal_size=4GB pour lisser les checkpoints
-    # Pour un serveur < 16 GB, diviser shared_buffers et effective_cache_size
-    # par 2 ou 4 selon la RAM disponible.
     command: >-
       postgres
       -c max_connections=150
@@ -38,7 +102,6 @@ services:
       POSTGRES_USER: sentinel
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sentinel_secret}
       POSTGRES_DB: discord_sentinel
-    # Port expose uniquement en localhost (dev). En prod, supprimer cette ligne.
     ports:
       - "127.0.0.1:5432:5432"
     volumes:
@@ -49,35 +112,27 @@ services:
       timeout: 5s
       retries: 5
 
-  # Phase 2 A.6 — PgBouncer en transaction pooling devant Postgres.
-  # Multiplie x5-10 le nombre de clients simultanes sans fatiguer Postgres.
-  # CAVEAT transaction pooling : pas de SET, LISTEN/NOTIFY ni advisory locks
-  # session-scoped (le code actuel n'en utilise pas).
+  # PgBouncer en transaction pooling devant Postgres (pas de healthcheck CMD :
+  # edoburu/pgbouncer n'a ni nc ni pg_isready ; il demarre en ~1s apres postgres
+  # healthy donc `condition: service_started` cote consommateur suffit).
   pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: sentinel-pgbouncer
     restart: unless-stopped
+    logging: *default-logging
     environment:
-      # Phase 7A opt C.1 : DATABASE_URL doit pointer sur **postgres** (upstream),
-      # pas sur pgbouncer lui-meme. Bug pre-existant qui causait des boucles.
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@postgres:5432/discord_sentinel
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 25
       RESERVE_POOL_SIZE: 5
       RESERVE_POOL_TIMEOUT: 3
-      # PgBouncer 1.21+ supporte les prepared statements en transaction pooling
-      # via cette option. sqlx les utilise via son cache implicite, donc
-      # critique pour ne pas casser l'API.
       MAX_PREPARED_STATEMENTS: 100
       SERVER_RESET_QUERY: DISCARD ALL
       ADMIN_USERS: sentinel
       AUTH_TYPE: scram-sha-256
     ports:
       - "127.0.0.1:6432:5432"
-    # Phase 7A opt C.2 : pas de healthcheck CMD (edoburu/pgbouncer n'a ni nc
-    # ni pg_isready). pgbouncer demarre en ~1s apres postgres healthy, donc
-    # `condition: service_started` cote api est suffisant.
     depends_on:
       postgres:
         condition: service_healthy
@@ -86,15 +141,12 @@ services:
     image: redis:7-alpine
     container_name: sentinel-redis
     restart: unless-stopped
-    # Phase 2 A.5 — Tuning RAM Redis :
-    #   - maxmemory 2gb : limite haute (hit rate cible > 85 %)
-    #   - allkeys-lru : eviction LRU sur toutes les cles quand maxmemory atteint
+    logging: *default-logging
     command: >-
       redis-server
       --requirepass ${REDIS_PASSWORD:-sentinel_redis}
       --maxmemory 2gb
       --maxmemory-policy allkeys-lru
-    # Port expose uniquement en localhost (dev). En prod, supprimer cette ligne.
     ports:
       - "127.0.0.1:6379:6379"
     volumes:
@@ -105,42 +157,27 @@ services:
       timeout: 5s
       retries: 5
 
-  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────────
   # Backend
-  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────────
 
   api:
-    # Phase 7A : context = racine du repo car services/api depend de
-    # services/proto via path. Le Dockerfile a ete adapte en consequence.
+    <<: *rust-base
     build:
       context: ../..
-      dockerfile: services/api/Dockerfile
-    # container_name retire : API scalable horizontalement derriere un LB
-    # (ex: `docker compose up --scale api=3`). Le DNS Compose resout `api`
-    # en round-robin sur les replicas.
-    restart: unless-stopped
+      dockerfile: infra/docker/Dockerfile.rust-debian
+      args:
+        BIN_NAME: sentinel-api
+        MIGRATIONS_SRC: services/api/migrations
     # SECURITE — `pid: host` partage le namespace PID de l'host avec le
-    # conteneur. Consequences :
-    #   - /proc du conteneur expose TOUS les process de l'host (lecture).
-    #   - Un attaquant avec RCE dans l'API peut enumerer les process host
-    #     (pas les killer sauf si UID 0 + capability SYS_PTRACE).
-    # Justification : sysinfo a besoin de /proc de l'host pour remonter
-    # le CPU/RAM reel de la machine (endpoint /api/system/info), pas du
-    # conteneur (toujours biaise par cgroups).
-    # Mitigations appliquees :
-    #   - `no-new-privileges` bloque toute escalade via setuid/fscaps.
-    #   - Conteneur en read-only non active car sqlx/tonic ecrivent dans
-    #     /tmp ; si besoin, ajouter `read_only: true` + `tmpfs: /tmp`.
-    # Alternative long terme : extraire l'endpoint /api/system/info vers
-    # un node_exporter et supprimer `pid: host` cote API.
+    # conteneur pour que sysinfo remonte le CPU/RAM reel (endpoint /api/system/info).
+    # Mitigations : `no-new-privileges` bloque toute escalade.
     pid: host
     security_opt:
       - no-new-privileges:true
     ports:
-      - "3000:3000"     # HTTP/Axum (legacy + endpoints non migres)
-      - "50051:50051"   # Phase 7A : gRPC/tonic interne aux bots
-    # Phase 7A opt B.2 : healthcheck gRPC via grpc_health_probe (tonic-health).
-    # Verifie que le serveur tonic repond sur les 12 services simultanement.
+      - "3000:3000"     # HTTP/Axum
+      - "50051:50051"   # gRPC/tonic interne aux bots
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
@@ -148,10 +185,6 @@ services:
       retries: 5
       start_period: 30s
     environment:
-      # Phase 7A opt C.1 : pgbouncer transaction pooling reactive.
-      # Le fix sqlx statement_cache_capacity(0) cote main.rs resout les
-      # query_wait_timeout. Pool sizing : 25 connexions par replica API
-      # (cf. DEFAULT_POOL_SIZE du service pgbouncer).
       DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       API_KEY: ${API_KEY}
@@ -161,18 +194,13 @@ services:
       DISCORD_CLIENT_SECRET: ${DISCORD_CLIENT_SECRET:-}
       DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI:-}
       WEB_FRONT_URL: ${WEB_FRONT_URL:-}
-      # Liste (comma-separated) des Discord user_ids superadmin — bypassent
-      # toutes les gates RBAC (y compris owner) sur toutes les guilds.
       SUPERADMIN_USER_IDS: ${SUPERADMIN_USER_IDS:-}
-      # Token Discord unifie (fallback sur DISCORD_TOKEN si non defini).
-      # Utilise par l'API pour fetcher les images Discord (AnalyzeImageService)
-      # et pour les actions moderation (mute, ban via Discord REST).
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       VISION_MODEL_PATH: /models/vision/vision_sentinel.onnx
       TEXT_MODEL_PATH: /models/text/text_sentinel.onnx
       TEXT_TOKENIZER_PATH: /models/text/tokenizer.json
       TEXT_MAX_LENGTH: "256"
-      RUST_LOG: info
+      RUST_LOG: ${RUST_LOG:-info}
     volumes:
       - ../../ai/training/vision/exports:/models/vision:ro
       - ../../ai/training/text/exports:/models/text:ro
@@ -185,15 +213,13 @@ services:
         condition: service_started
 
   gateway:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/gateway/Dockerfile
-    # container_name retire : scalable horizontalement derriere un LB WS.
-    restart: unless-stopped
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-gateway
     ports:
       - "3001:3001"
-    # Healthcheck via endpoint HTTP /health (services/gateway/src/health.rs).
-    # Utilise le wget de BusyBox (image alpine) — pas de curl installe.
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://localhost:3001/health || exit 1"]
       interval: 15s
@@ -208,412 +234,250 @@ services:
       HOST: 0.0.0.0
       PORT: "3001"
       MAX_CONNECTIONS: "1000"
-      RUST_LOG: info
+      RUST_LOG: ${RUST_LOG:-info}
     depends_on:
       redis:
         condition: service_healthy
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Workers (13)
+  # Pattern uniforme : Dockerfile.rust-alpine + BIN_NAME, healthcheck /metrics,
+  # logging rotated, init: true. Les depends_on et env specifiques sont
+  # surcharges par service.
+  # ──────────────────────────────────────────────────────────────────────────
 
   moderation-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/moderation-worker/Dockerfile
-    # container_name retire pour scaling horizontal (--scale moderation-worker=N).
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-moderation-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-moderation-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      # Phase 4 B — Redis requis pour publier les events sanction_expiry_reminder
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+      <<: *worker-env
+    depends_on: *worker-deps-db-redis
 
   analytics-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/analytics-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-analytics-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-analytics-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
-      RUST_LOG: info
+      <<: *worker-env
     depends_on:
-      postgres:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
   monitoring-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/monitoring-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-monitoring-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-monitoring-worker
+    healthcheck: *worker-healthcheck
     environment:
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       MONITOR_CHECK_INTERVAL: ${MONITOR_CHECK_INTERVAL:-30}
-      RUST_LOG: info
     depends_on:
       redis:
         condition: service_healthy
 
   cache-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/cache-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-cache-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-cache-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       ANALYTICS_CACHE_REFRESH: ${ANALYTICS_CACHE_REFRESH:-300}
       DASHBOARD_CACHE_REFRESH: ${DASHBOARD_CACHE_REFRESH:-600}
       VOICE_STATS_CACHE_REFRESH: ${VOICE_STATS_CACHE_REFRESH:-3600}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
 
-  # Phase 4 A — File d'attente IA async (depile ai_jobs et appelle l'inference API)
   ai-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/ai-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-ai-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-ai-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       AI_POLL_INTERVAL: ${AI_POLL_INTERVAL:-2}
       AI_JOB_TIMEOUT: ${AI_JOB_TIMEOUT:-120}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
 
-  # Phase 4 B — Purge des roles temporaires expires (extrait de community-bot)
   temp-roles-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/temp-roles-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-temp-roles-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-temp-roles-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       TEMP_ROLES_SCAN_INTERVAL: ${TEMP_ROLES_SCAN_INTERVAL:-60}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
 
-  # Phase 6A — Escalade SLA des tickets d'appel de sanction
   appeal-sla-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/appeal-sla-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-appeal-sla-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-appeal-sla-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       APPEAL_SLA_SCAN_INTERVAL: ${APPEAL_SLA_SCAN_INTERVAL:-120}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
 
-  # Phase 6A — Exports asynchrones (CSV/JSON) infractions/audit_logs/moderation_actions
   export-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/export-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-export-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-export-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      API_URL: http://api:3000
+      <<: *worker-env
       GRPC_API_URL: http://api:50051
-      API_KEY: ${API_KEY:-}
       EXPORT_SCAN_INTERVAL: ${EXPORT_SCAN_INTERVAL:-5}
-      RUST_LOG: info
     depends_on:
-      postgres:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
-  # Phase 6A — Refresh du cache watched_users pour audit-bot (scaling horizontal)
   audit-cache-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/audit-cache-worker/Dockerfile
-    # container_name retire pour scaling horizontal (Phase 6A).
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-audit-cache-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-audit-cache-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       AUDIT_CACHE_REFRESH_INTERVAL: ${AUDIT_CACHE_REFRESH_INTERVAL:-60}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
 
-  # Phase 6A — Cleanup des tables blackjack inactives (scaling horizontal)
   blackjack-cleanup-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/blackjack-cleanup-worker/Dockerfile
-    # container_name retire pour scaling horizontal (Phase 6A).
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-blackjack-cleanup-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-blackjack-cleanup-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       BLACKJACK_CLEANUP_SCAN_INTERVAL: ${BLACKJACK_CLEANUP_SCAN_INTERVAL:-60}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
 
-  # Phase 6A — Reconciliation audit_logs avec l'API Discord audit-logs
   discord-audit-sync-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/discord-audit-sync-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-discord-audit-sync-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-discord-audit-sync-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
-      # Token Discord unifie (doit avoir VIEW_AUDIT_LOG sur toutes les guilds).
+      <<: *worker-env
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       AUDIT_SYNC_INTERVAL: ${AUDIT_SYNC_INTERVAL:-300}
-      RUST_LOG: info
     depends_on:
-      postgres:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
   cleanup-worker:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: services/workers/cleanup-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-cleanup-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-cleanup-worker
+    healthcheck: *worker-healthcheck
     environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      API_URL: http://api:3000
-      API_KEY: ${API_KEY:-}
+      <<: *worker-env
       VOICE_SESSIONS_RETENTION_DAYS: ${VOICE_SESSIONS_RETENTION_DAYS:-90}
       LOGS_RETENTION_DAYS: ${LOGS_RETENTION_DAYS:-30}
       CLOSED_TICKETS_RETENTION_DAYS: ${CLOSED_TICKETS_RETENTION_DAYS:-180}
       CLEANUP_INTERVAL_HOURS: ${CLEANUP_INTERVAL_HOURS:-1}
       VACUUM_ENABLED: ${VACUUM_ENABLED:-true}
       VACUUM_INTERVAL_HOURS: ${VACUUM_INTERVAL_HOURS:-24}
-      RUST_LOG: info
     depends_on:
-      postgres:
-        condition: service_healthy
+      pgbouncer:
+        condition: service_started
 
-  # ──────────────────────────────────────────────
+  coude-worker:
+    <<: *rust-base
+    build:
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-coude-worker
+    healthcheck: *worker-healthcheck
+    environment:
+      <<: *worker-env
+      GRPC_API_URL: http://api:50051
+      COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
+      BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
+      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
+    depends_on:
+      pgbouncer:
+        condition: service_started
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Bot unifie
-  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────────
   #
   # Les 15 anciens bots (audit, automod, blackjack, cleanup, community, coude,
   # games, moderation, progression, roles, security, tickets, voice, welcome,
   # image) ont ete fusionnes en un seul binaire `sentinel-bot` structure en
   # modules. Un seul processus, une seule connexion Gateway Discord, un seul
-  # cache, une seule TypeMap. Les env vars VOICE_GUILD_ID / CREATOR_CHANNEL_IDs
-  # sont conservees pour la fonctionnalite salons vocaux dynamiques.
+  # cache, une seule TypeMap.
   #
-  # Phase 7 C — Sharding Discord :
+  # Sharding Discord :
   #   SHARD_MODE=single  (defaut) : 1 shard, OK jusqu'a ~2500 guilds.
   #   SHARD_MODE=auto             : Serenity spawn tous les shards recommandes.
   #   SHARD_MODE=manual           : requiert SHARD_ID + SHARD_TOTAL (multi-replica).
 
   sentinel-bot:
+    <<: *rust-base
     build:
-      context: ../..
-      dockerfile: bots/sentinel-bot/Dockerfile
-    # container_name retire : Phase 7C sharding multi-replica requiert
-    # plusieurs instances (SHARD_MODE=manual + SHARD_ID/SHARD_TOTAL distincts).
-    restart: unless-stopped
+      <<: *build-alpine
+      args:
+        BIN_NAME: sentinel-bot
+        ASSETS_SRC: bots/sentinel-bot/assets
+    # Le bot n'expose pas /metrics par worker-common ; on retombe sur pidof.
     healthcheck:
-      test: ["CMD", "pidof", "sentinel-bot"]
+      test: ["CMD-SHELL", "pidof sentinel-app || exit 1"]
       interval: 30s
       timeout: 3s
       retries: 3
       start_period: 20s
     environment:
-      # Token Discord unifie (fallback sur DISCORD_TOKEN si non defini)
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
-      # API (HTTP + gRPC)
       API_BASE_URL: http://api:3000
       GRPC_API_URL: http://api:50051
       API_KEY: ${API_KEY:-}
-      # Redis pour les event streams (moderation, tickets, blackjack AFK, coude)
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
-      # Config voice (optionnel — desactive le module si non defini)
       VOICE_GUILD_ID: ${VOICE_GUILD_ID:-}
       VOICE_PUBLIC_CREATOR_CHANNEL_ID: ${VOICE_PUBLIC_CREATOR_CHANNEL_ID:-}
       VOICE_PRIVATE_CREATOR_CHANNEL_ID: ${VOICE_PRIVATE_CREATOR_CHANNEL_ID:-}
       VOICE_LOG_CHANNEL_ID: ${VOICE_LOG_CHANNEL_ID:-}
-      # Config tickets (optionnel)
       TICKET_CATEGORY_ID: ${TICKET_CATEGORY_ID:-}
       TICKET_CHANNEL_ID: ${TICKET_CHANNEL_ID:-}
-      # Sharding (single par defaut)
       SHARD_MODE: ${SHARD_MODE:-single}
-      RUST_LOG: info
+      RUST_LOG: ${RUST_LOG:-info}
     depends_on:
       api:
         condition: service_healthy
       redis:
         condition: service_healthy
 
-  coude-worker:
-    build:
-      context: ../..
-      dockerfile: services/workers/coude-worker/Dockerfile
-    # container_name retire pour scaling horizontal.
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "pidof", "sentinel-coude-worker"]
-      interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 10s
-    environment:
-      DATABASE_URL: postgres://sentinel:${POSTGRES_PASSWORD:-sentinel_secret}@pgbouncer:5432/discord_sentinel
-      API_URL: http://api:3000
-      GRPC_API_URL: http://api:50051
-      API_KEY: ${API_KEY:-}
-      COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
-      BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
-      SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
-      RUST_LOG: info
-    depends_on:
-      postgres:
-        condition: service_healthy
-
-  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────────
   # Web (SPA Vue 3 servie par nginx, HTTPS)
-  # ──────────────────────────────────────────────
-  #
-  # nginx sert le build Vite et reverse-proxy :
-  #   /api/*                         -> api:3000       (routes Axum)
-  #   /ws                            -> gateway:3001   (WebSocket)
-  #   /.well-known/acme-challenge/   -> /var/www/certbot (Let's Encrypt HTTP-01)
-  #   /  (HTTP 80)                   -> redirect 301 vers HTTPS 443
-  #
-  # TLS :
-  #   - Au demarrage, l'entrypoint cherche un cert Let's Encrypt dans
-  #     /etc/letsencrypt/live/${WEB_DOMAIN}/. S'il existe, il est utilise ;
-  #     sinon, un cert self-signed 30j est genere automatiquement (dev).
-  #   - Pour obtenir un vrai cert LE : `docker compose --profile tls up -d certbot`
-  #     apres avoir defini WEB_DOMAIN + LETSENCRYPT_EMAIL dans .env.
-  #
-  # VITE_API_URL vide par defaut => fetch relatif, tout passe par nginx (zero CORS).
+  # ──────────────────────────────────────────────────────────────────────────
 
   web:
     build:
@@ -621,24 +485,18 @@ services:
       dockerfile: apps/web/Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-}
-    # container_name retire : scalable horizontalement derriere un LB externe.
     restart: unless-stopped
+    init: true
+    logging: *default-logging
     ports:
-      - "80:80"     # HTTP (redirect + ACME challenge)
-      - "443:443"   # HTTPS
+      - "80:80"
+      - "443:443"
     environment:
-      # Utilise pour le CN du cert self-signed ET pour retrouver le cert LE
-      # au bon chemin (/etc/letsencrypt/live/<WEB_DOMAIN>/).
       WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
     volumes:
-      # Partage le dossier de certs avec certbot. En RW car l'entrypoint
-      # ecrit les symlinks et les certs self-signed sous /etc/nginx/self-signed.
       - letsencrypt_etc:/etc/letsencrypt
-      # Webroot pour les challenges HTTP-01.
       - letsencrypt_www:/var/www/certbot
     healthcheck:
-      # On tape le /healthz HTTP (port 80) plutot que HTTPS : evite le cas
-      # self-signed non trustable par wget dans busybox.
       test: ["CMD-SHELL", "wget --spider -q http://localhost/healthz || exit 1"]
       interval: 30s
       timeout: 3s
@@ -650,27 +508,14 @@ services:
       gateway:
         condition: service_started
 
-  # Certbot Let's Encrypt — obtient et renouvelle automatiquement les certs.
-  # Active via profile : `docker compose --profile tls up -d certbot`.
-  # Prerequis .env : WEB_DOMAIN=ton-domaine.com, LETSENCRYPT_EMAIL=toi@exemple.com
-  # Optionnel      : LETSENCRYPT_STAGING=1 pour tester sans rate-limit.
-  #
-  # Comportement :
-  #   1. Obtient un cert la premiere fois (si pas deja present).
-  #   2. Boucle `certbot renew` toutes les 12h (LE renouvelle a 30j avant expiry).
-  #   3. Apres renouvellement, envoie SIGHUP au conteneur web via socket Docker.
-  #
-  # Note securite : l'acces au socket Docker donne un privilege equivalent root
-  # sur l'host. Acceptable pour un sidecar de confiance. Alternative sans socket :
-  # supprimer le --deploy-hook et lancer `docker compose restart web` en cron host.
+  # Certbot Let's Encrypt — active via profile `tls`.
   certbot:
     image: certbot/certbot:latest
     restart: unless-stopped
+    logging: *default-logging
     volumes:
       - letsencrypt_etc:/etc/letsencrypt
       - letsencrypt_www:/var/www/certbot
-      # Socket Docker (RW) : requis pour envoyer SIGHUP au conteneur web via
-      # `docker kill`. L'API Docker n'honore pas le flag :ro sur un socket unix.
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
       WEB_DOMAIN: ${WEB_DOMAIN:-}
@@ -681,9 +526,6 @@ services:
       - -c
       - |
         set -eu
-        # L'image certbot/certbot est alpine-based mais sans CLI docker.
-        # On l'installe pour pouvoir envoyer un SIGHUP au conteneur web lors du
-        # deploy-hook (reload nginx sans restart => pas de downtime).
         apk add --no-cache docker-cli >/dev/null
         if [ -z "$${WEB_DOMAIN:-}" ] || [ -z "$${LETSENCRYPT_EMAIL:-}" ]; then
           echo "[certbot] WEB_DOMAIN et LETSENCRYPT_EMAIL requis dans .env"
@@ -694,20 +536,12 @@ services:
           STAGING_FLAG="--staging"
           echo "[certbot] STAGING mode actif (certs non trustables, pour tests)"
         fi
-        # Deploy hook : reload nginx dans le(s) conteneur(s) web sans restart.
-        # Le label compose permet de cibler tous les replicas en cas de scaling.
-        # Certbot execute le hook via `sh -c`, donc $(...) est expanse a ce moment.
         DEPLOY_HOOK='docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) || true'
-        # Obtention initiale (idempotent grace a --keep-until-expiring).
         certbot certonly --webroot -w /var/www/certbot \
           --non-interactive --agree-tos --email "$$LETSENCRYPT_EMAIL" \
           $$STAGING_FLAG --keep-until-expiring \
           -d "$$WEB_DOMAIN" || echo "[certbot] premiere obtention echouee, retry au prochain cycle"
-        # Apres la premiere obtention, on signale le conteneur web pour qu'il
-        # recharge le cert (sinon il reste sur le self-signed jusqu'au prochain
-        # redemarrage).
         docker kill --signal=HUP $$(docker ps -q -f label=com.docker.compose.service=web) 2>/dev/null || true
-        # Boucle de renouvellement.
         trap exit TERM
         while :; do
           certbot renew --webroot -w /var/www/certbot --quiet \
@@ -720,14 +554,15 @@ services:
     profiles:
       - tls
 
-  # ──────────────────────────────────────────────
-  # Monitoring
-  # ──────────────────────────────────────────────
+  # ──────────────────────────────────────────────────────────────────────────
+  # Monitoring (profile `monitoring`)
+  # ──────────────────────────────────────────────────────────────────────────
 
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: sentinel-pgadmin
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "5050:80"
     environment:
@@ -743,6 +578,7 @@ services:
     image: rediscommander/redis-commander:latest
     container_name: sentinel-redis-commander
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "8081:8081"
     environment:
@@ -753,15 +589,11 @@ services:
     profiles:
       - monitoring
 
-  # Phase 0 — Observabilité : Prometheus + Grafana
-  # Démarrage : `docker compose --profile monitoring up -d prometheus grafana`
-  # Cible Prometheus → API (port 3000) + workers (port 9100 chacun)
-  # Grafana → http://localhost:3002 (admin/admin par défaut, à changer)
-  # Note : port host 3002 car 3001 est utilise par le service `gateway`.
   prometheus:
     image: prom/prometheus:latest
     container_name: sentinel-prometheus
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:9090:9090"
     volumes:
@@ -779,6 +611,7 @@ services:
     image: grafana/grafana:latest
     container_name: sentinel-grafana
     restart: unless-stopped
+    logging: *default-logging
     ports:
       - "127.0.0.1:3002:3000"
     environment:
@@ -799,17 +632,10 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
-  # TLS — /etc/letsencrypt persistant (certs + config certbot + accounts).
   letsencrypt_etc:
-  # TLS — webroot pour les challenges ACME HTTP-01 (partage web <-> certbot).
   letsencrypt_www:
 
-# Network explicite : isole la stack des autres projets Compose de la machine
-# et donne un nom lisible aux conteneurs (`sentinel` au lieu de
-# `discordsentinel_default`). Tous les services s'y rattachent implicitement
-# via le network `default`, donc pas besoin de `networks:` par service.
-# Pour une segmentation plus fine (ex: DMZ api/gateway vs infra interne),
-# declarer plusieurs networks et attribuer chaque service explicitement.
+# Network explicite : isole la stack et donne un nom lisible aux conteneurs.
 networks:
   default:
     name: sentinel
