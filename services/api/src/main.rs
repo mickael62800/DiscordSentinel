@@ -22,7 +22,7 @@ async fn main() {
     dotenvy::dotenv().ok();
 
     // Fixe le t0 pour l'uptime expose via /api/system/info.
-    sentinel_api::adapters::inbound::http::handlers::system::record_startup();
+    sentinel_api::adapters::inbound::http::handlers::system::info::record_startup();
 
     init_tracing();
 
@@ -96,7 +96,7 @@ fn spawn_grpc_server(state: AppState, config: &AppConfig) {
         .parse()
         .expect("GRPC_PORT/HOST invalide");
     tokio::spawn(async move {
-        sentinel_api::adapters::inbound::grpc::serve_grpc(state, grpc_addr).await;
+        sentinel_api::adapters::inbound::grpc::server::serve_grpc(state, grpc_addr).await;
     });
 }
 

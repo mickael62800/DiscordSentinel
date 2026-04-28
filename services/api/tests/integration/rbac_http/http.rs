@@ -13,7 +13,7 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 use uuid::Uuid;
 
-use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+use sentinel_api::domain::enums::system::role::Role;
 use sentinel_api::adapters::inbound::http::router;
 
 fn state() -> sentinel_api::adapters::inbound::http::state::AppState {

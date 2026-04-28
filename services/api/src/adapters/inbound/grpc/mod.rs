@@ -25,8 +25,6 @@ pub mod tickets;
 pub mod voice;
 pub mod welcome;
 
-pub use server::serve_grpc;
-
 /// Parse un UUID depuis une string proto. Retourne `Status::invalid_argument` si invalide.
 pub(crate) fn parse_uuid(s: &str) -> Result<uuid::Uuid, tonic::Status> {
     uuid::Uuid::from_str(s)

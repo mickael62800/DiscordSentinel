@@ -11,4 +11,3 @@ pub mod tickets;
 
 // Glob re-export du fichier `info.rs` (l'ancien `system.rs` au root)
 // pour preserver `handlers::system::get_system_info` via son ancien path.
-pub use info::*;

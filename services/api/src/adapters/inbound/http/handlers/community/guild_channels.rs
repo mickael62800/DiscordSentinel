@@ -12,7 +12,7 @@ use tracing::warn;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
-use crate::adapters::outbound::DiscordChannel;
+use crate::adapters::outbound::discord_api::DiscordChannel;
 use crate::domain::entities::community::guild_member_reset::CHANNELS_CACHE_TTL_SECS;
 
 /// GET /api/guilds/{guild_id}/channels — liste les salons texte.

@@ -11,19 +11,19 @@ use super::super::state::AppState;
 
 fn moderation_inner() -> Router<AppState> {
     Router::new()
-        .route("/actions", post(handlers::moderation::log_action))
-        .route("/actions/{id}", delete(handlers::moderation::delete_action))
-        .route("/bans", get(handlers::moderation::list_bans))
-        .route("/execute-ban", post(handlers::moderation::execute_ban))
-        .route("/execute-unban", post(handlers::moderation::execute_unban))
-        .route("/execute-mute", post(handlers::moderation::execute_mute))
-        .route("/history/{guild_id}/{user_id}", get(handlers::moderation::get_history))
-        .route("/modstats/{guild_id}", get(handlers::moderation::get_modstats))
-        .route("/evidence", post(handlers::moderation::add_evidence))
-        .route("/evidence/{action_id}", get(handlers::moderation::list_evidence))
-        .route("/review", post(handlers::moderation::add_review))
-        .route("/review/{guild_id}/pending", get(handlers::moderation::list_pending_reviews))
-        .route("/review/{id}/resolve", patch(handlers::moderation::resolve_review))
+        .route("/actions", post(handlers::moderation::actions::log_action))
+        .route("/actions/{id}", delete(handlers::moderation::actions::delete_action))
+        .route("/bans", get(handlers::moderation::actions::list_bans))
+        .route("/execute-ban", post(handlers::moderation::actions::execute_ban))
+        .route("/execute-unban", post(handlers::moderation::actions::execute_unban))
+        .route("/execute-mute", post(handlers::moderation::actions::execute_mute))
+        .route("/history/{guild_id}/{user_id}", get(handlers::moderation::actions::get_history))
+        .route("/modstats/{guild_id}", get(handlers::moderation::actions::get_modstats))
+        .route("/evidence", post(handlers::moderation::actions::add_evidence))
+        .route("/evidence/{action_id}", get(handlers::moderation::actions::list_evidence))
+        .route("/review", post(handlers::moderation::actions::add_review))
+        .route("/review/{guild_id}/pending", get(handlers::moderation::actions::list_pending_reviews))
+        .route("/review/{id}/resolve", patch(handlers::moderation::actions::resolve_review))
 }
 
 fn strikes_inner() -> Router<AppState> {

@@ -21,10 +21,10 @@ use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::outbound::community::conduct_repository::ConductRepository;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
-use crate::adapters::outbound::DiscordApi;
-use crate::adapters::outbound::DiscordChannel;
-use crate::adapters::outbound::DiscordMember;
-use crate::adapters::outbound::DiscordUser;
+use crate::adapters::outbound::discord_api::DiscordApi;
+use crate::adapters::outbound::discord_api::DiscordChannel;
+use crate::adapters::outbound::discord_api::DiscordMember;
+use crate::adapters::outbound::discord_api::DiscordUser;
 use crate::adapters::outbound::discord_api::UserGuild;
 
 // ── Mocks ──

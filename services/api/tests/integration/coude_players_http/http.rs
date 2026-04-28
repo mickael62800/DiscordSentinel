@@ -21,9 +21,9 @@ use sentinel_api::domain::entities::coude::player::CoudePlayer;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::entities::coude::player::XpProgress;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::ports::inbound::casino::manage_wallet::{
-    ManageWalletUseCase, TxWalletMutation, WalletMutation,
-};
+use sentinel_api::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
+use sentinel_api::ports::inbound::casino::manage_wallet::TxWalletMutation;
+use sentinel_api::ports::inbound::casino::manage_wallet::WalletMutation;
 use sentinel_api::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 
 fn sample_player(guild: &str, user: &str) -> CoudePlayer {

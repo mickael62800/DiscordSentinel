@@ -15,10 +15,6 @@ pub mod dto;
 pub mod game;
 pub mod tables;
 
-pub use dto::*;
-pub use game::*;
-pub use tables::*;
-
 /// Parse un UUID de game_id. Erreur 400 explicite si invalide.
 pub(in crate::adapters::inbound::http::handlers::casino::blackjack) fn parse_uuid(
     s: &str,

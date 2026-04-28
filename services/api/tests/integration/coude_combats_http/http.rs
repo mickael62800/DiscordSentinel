@@ -331,7 +331,7 @@ async fn purge_all_without_rbac_returns_7_table_totals() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_all_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let m = Arc::new(MockCombats::new());
     let app = router::build_for_test(state_with(m));
     let req = test_helpers::request_with_rbac(

@@ -51,11 +51,11 @@ use sentinel_api::domain::entities::system::rule::*;
 use sentinel_api::domain::entities::system::ticket::*;
 use sentinel_api::domain::entities::system::analytics::*;
 use sentinel_api::domain::errors::DomainError;
-use sentinel_api::adapters::outbound::DiscordApi;
-use sentinel_api::adapters::outbound::DiscordApiService;
-use sentinel_api::adapters::outbound::DiscordChannel;
-use sentinel_api::adapters::outbound::DiscordMember;
-use sentinel_api::adapters::outbound::DiscordUser;
+use sentinel_api::adapters::outbound::discord_api::DiscordApi;
+use sentinel_api::adapters::outbound::discord_api::DiscordApiService;
+use sentinel_api::adapters::outbound::discord_api::DiscordChannel;
+use sentinel_api::adapters::outbound::discord_api::DiscordMember;
+use sentinel_api::adapters::outbound::discord_api::DiscordUser;
 use sentinel_api::adapters::outbound::discord_api::UserGuild;
 use sentinel_api::ports::inbound::ai::analyze_image::*;
 use sentinel_api::ports::inbound::ai::analyze_message::*;
@@ -935,7 +935,7 @@ fn base_state() -> AppState {
         broadcaster: Arc::new(EventBroadcaster::new()),
         job_client: JobClient::new(redis_client.clone(), "test:jobs".into()),
         discord_api: Arc::new(DiscordApiService::new(String::new())),
-        inference: Arc::new(sentinel_api::adapters::outbound::InferenceService::new(None, None)),
+        inference: Arc::new(sentinel_api::adapters::outbound::inference_service::InferenceService::new(None, None)),
         api_key: String::new(),
         discord_bot_token: String::new(),
         pg_pool,
@@ -1154,7 +1154,7 @@ pub fn request_with_rbac(
     method: &str,
     uri: &str,
     user_id: &str,
-    role: Option<sentinel_api::adapters::inbound::http::middleware::rbac::Role>,
+    role: Option<sentinel_api::domain::enums::system::role::Role>,
     guild_id: Option<String>,
     body: Option<serde_json::Value>,
 ) -> axum::http::Request<axum::body::Body> {

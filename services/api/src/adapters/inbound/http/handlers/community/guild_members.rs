@@ -11,7 +11,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
-use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::community::guild_member::GuildMember;
@@ -20,7 +20,7 @@ use crate::domain::entities::community::guild_member_reset::DISCORD_LIST_MEMBERS
 use crate::domain::entities::community::guild_member_reset::MEMBER_RESET_TABLES;
 use crate::domain::entities::community::guild_member_reset::MEMBERS_CACHE_TTL_SECS;
 use crate::domain::errors::DomainError;
-use crate::adapters::outbound::DiscordMember;
+use crate::adapters::outbound::discord_api::DiscordMember;
 use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
 use crate::ports::inbound::community::manage_members::SyncMembersCommand;
 use crate::ports::inbound::community::manage_members::UpdateMemberCommand;

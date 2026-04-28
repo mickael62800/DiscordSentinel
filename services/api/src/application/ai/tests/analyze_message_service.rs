@@ -83,7 +83,7 @@ impl ManageConductUseCase for MockConduct {
     use uuid::Uuid;
     use crate::domain::entities::system::rule::Rule;
     use crate::domain::services::moderation::channel_tension::TensionAction;
-    use crate::adapters::outbound::InferenceClassification;
+    use crate::adapters::outbound::inference_service::InferenceClassification;
 
     fn make_rule(flag_type: FlagType, weight: f64) -> Rule {
         let now = Utc::now();
@@ -159,8 +159,8 @@ impl ManageConductUseCase for MockConduct {
     #[test]
     fn test_with_text_inference_sets_fields() {
         use std::sync::Arc;
-        use crate::adapters::outbound::InferenceService;
-        use crate::adapters::outbound::TextTokenizer;
+        use crate::adapters::outbound::inference_service::InferenceService;
+        use crate::adapters::outbound::text_tokenizer::TextTokenizer;
         use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 
         let inference = Arc::new(InferenceService::new(None, None));

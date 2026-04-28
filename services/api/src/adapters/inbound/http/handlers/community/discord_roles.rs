@@ -7,7 +7,7 @@ use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::middleware::rbac::check_role;
-use crate::adapters::inbound::http::middleware::rbac::Role;
+use crate::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::system::discord_role::parse_discord_permissions_bitfield;

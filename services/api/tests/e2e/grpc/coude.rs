@@ -29,12 +29,12 @@ use tonic::transport::Endpoint;
 use tonic::transport::Server;
 use uuid::Uuid;
 
-use sentinel_api::adapters::inbound::grpc::coude::CoudeBetsGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::CoudeCombatsGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::CoudeEconomyGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::CoudeInventoryGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::CoudePlayerGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::CoudeSocialGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::bets::CoudeBetsGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::combats::CoudeCombatsGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::economy::CoudeEconomyGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::inventory::CoudeInventoryGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::players::CoudePlayerGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::social::CoudeSocialGrpc;
 use sentinel_api::domain::entities::coude::combat::CombatResolution;
 use sentinel_api::domain::entities::coude::player::CombatStat;
 use sentinel_api::domain::entities::coude::bet::CoudeBet;

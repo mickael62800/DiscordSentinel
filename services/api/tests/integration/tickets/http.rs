@@ -504,7 +504,7 @@ async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (Sta
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bulk_delete_with_rbac_admin_allowed() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let author = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let app = build_app(MockTicketsUC::new());
     let req = test_helpers::request_with_rbac(
@@ -517,7 +517,7 @@ async fn bulk_delete_with_rbac_admin_allowed() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bulk_delete_with_rbac_moderator_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = build_app(MockTicketsUC::new());
     let req = test_helpers::request_with_rbac(
         "DELETE", "/api/tickets/bulk?all=true",

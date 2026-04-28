@@ -183,7 +183,7 @@ async fn create_sponsorship_invalid_sponsor_422() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn create_sponsorship_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = router::build_for_test(base_state());
     let req = test_helpers::request_with_rbac(
         "POST", "/api/sponsorships",
@@ -268,7 +268,7 @@ async fn delete_temp_role_invalid_role_id_422() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_temp_role_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = router::build_for_test(base_state());
     let req = test_helpers::request_with_rbac(
         "DELETE", "/api/temp-roles/111111111111111111/444444444444444444/555555555555555555",

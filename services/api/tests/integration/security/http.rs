@@ -285,7 +285,7 @@ async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (Sta
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_events_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -305,7 +305,7 @@ async fn purge_events_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_events_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);

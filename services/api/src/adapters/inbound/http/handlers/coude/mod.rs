@@ -34,29 +34,6 @@ pub mod ultimate;
 pub mod prestige;
 pub mod friendly_duel;
 
-pub use bets::*;
-pub use combats::*;
-pub use dto::*;
-pub use economy::*;
-pub use inventory::*;
-pub use players::*;
-pub use social::*;
-pub use taunts::*;
-pub use tournaments::*;
-pub use curses::*;
-pub use vendetta::*;
-pub use tout_ou_rien::*;
-pub use travaux::*;
-pub use steal_roll::*;
-pub use flavor::*;
-pub use prank::*;
-pub use bounty::*;
-pub use refusal::*;
-pub use coalition::*;
-pub use ultimate::*;
-pub use prestige::*;
-pub use friendly_duel::*;
-
 /// Parse l'`id` UUID textuel reçu en path. Erreur 400 explicite si invalide.
 ///
 /// Partagé entre `combats::*` et `bets::*` (qui référencent tous les deux

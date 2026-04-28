@@ -18,9 +18,9 @@ use tracing::error;
 use tracing::info;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::ws::broadcaster::EventBroadcaster;
-use crate::adapters::outbound::batching::BatchWriterConfig;
-use crate::adapters::outbound::batching::BatchedPgAuditLogRepository;
-use crate::adapters::outbound::batching::BatchedPgLogRepository;
+use crate::adapters::outbound::batching::batch_writer::BatchWriterConfig;
+use crate::adapters::outbound::batching::audit_log_batcher::BatchedPgAuditLogRepository;
+use crate::adapters::outbound::batching::log_batcher::BatchedPgLogRepository;
 use crate::adapters::outbound::job_client::JobClient;
 use crate::adapters::outbound::postgres::audit::analytics_repository::PgAnalyticsRepository;
 use crate::adapters::outbound::postgres::casino::blackjack_repository::PgBlackjackRepository;
@@ -118,9 +118,9 @@ use crate::application::coude::resolve_betting_batch_service::ResolveBettingBatc
 use crate::application::coude::resolve_combat_now_service::ResolveCombatNowService;
 use crate::application::coude::roll_steal_service::RollStealService;
 use crate::config::AppConfig;
-use crate::adapters::outbound::DiscordApiService;
-use crate::adapters::outbound::InferenceService;
-use crate::adapters::outbound::TextTokenizer;
+use crate::adapters::outbound::discord_api::DiscordApiService;
+use crate::adapters::outbound::inference_service::InferenceService;
+use crate::adapters::outbound::text_tokenizer::TextTokenizer;
 use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 
 /// Connecte a PostgreSQL avec pgbouncer transaction pooling compat.
@@ -270,7 +270,7 @@ pub async fn build_app_state(
     let (inference, tokenizer, inference_limiter) = build_inference();
 
     // Discord API (un seul client partage, cree ici avant conduct pour l'injecter).
-    let discord_api: Arc<dyn crate::adapters::outbound::DiscordApi> =
+    let discord_api: Arc<dyn crate::adapters::outbound::discord_api::DiscordApi> =
         Arc::new(DiscordApiService::new(config.discord_bot_token.clone()));
 
     // ── Services applicatifs ──

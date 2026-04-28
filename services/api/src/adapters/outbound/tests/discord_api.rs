@@ -100,7 +100,7 @@ fn discord_member_roundtrip_json() {
 // Chaque methode appelle `ensure_configured()` en premier : avec un token vide,
 // elle doit retourner DomainError::Internal sans tenter d'appel HTTP.
 
-use crate::adapters::outbound::DiscordApi;
+use crate::adapters::outbound::discord_api::DiscordApi;
 
 async fn unconfigured_service() -> DiscordApiService {
     DiscordApiService::new(String::new())

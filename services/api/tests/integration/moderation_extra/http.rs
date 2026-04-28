@@ -593,7 +593,7 @@ async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (Sta
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_evidence_with_rbac_admin_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
 
     // Insere une action pour que le lookup sqlx trouve le guild_id.
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -628,7 +628,7 @@ async fn add_evidence_with_rbac_admin_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_evidence_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
 
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let p = pool().await;
@@ -659,7 +659,7 @@ async fn add_evidence_with_rbac_viewer_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn resolve_review_with_rbac_admin_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
 
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let p = pool().await;
@@ -814,7 +814,7 @@ fn build_state_full_mocks() -> AppState {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_ban_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -835,7 +835,7 @@ async fn execute_ban_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_ban_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -855,7 +855,7 @@ async fn execute_ban_with_rbac_viewer_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_mute_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -876,7 +876,7 @@ async fn execute_mute_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn execute_unban_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -896,7 +896,7 @@ async fn execute_unban_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_action_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -914,7 +914,7 @@ async fn delete_action_with_rbac_viewer_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_review_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -935,7 +935,7 @@ async fn add_review_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_pending_reviews_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = "111111111111111111";
     let app = router::build_for_test(build_state_full_mocks());
     let req = test_helpers::request_with_rbac(
@@ -948,7 +948,7 @@ async fn list_pending_reviews_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_pending_reviews_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = "111111111111111111";
     let app = router::build_for_test(build_state_full_mocks());
     let req = test_helpers::request_with_rbac(
@@ -961,7 +961,7 @@ async fn list_pending_reviews_with_rbac_viewer_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_modstats_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let app = router::build_for_test(build_state_full_mocks());
     let req = test_helpers::request_with_rbac(
@@ -974,7 +974,7 @@ async fn get_modstats_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_modstats_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let app = router::build_for_test(build_state_full_mocks());
     let req = test_helpers::request_with_rbac(

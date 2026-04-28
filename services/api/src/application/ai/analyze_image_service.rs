@@ -8,7 +8,7 @@ use crate::domain::entities::ai::image_analysis::ImageAnalysis;
 use crate::domain::entities::ai::image_analysis::ImageClassification;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::errors::DomainError;
-use crate::adapters::outbound::InferenceService;
+use crate::adapters::outbound::inference_service::InferenceService;
 use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use crate::domain::enums::moderation::action::Action;
 use crate::domain::entities::moderation::detection_flags::DetectionFlags;

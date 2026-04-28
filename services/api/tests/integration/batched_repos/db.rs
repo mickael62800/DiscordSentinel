@@ -12,8 +12,8 @@ use std::time::Duration;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::batching::batch_writer::BatchWriterConfig;
-use sentinel_api::adapters::outbound::batching::BatchedPgAuditLogRepository;
-use sentinel_api::adapters::outbound::batching::BatchedPgLogRepository;
+use sentinel_api::adapters::outbound::batching::audit_log_batcher::BatchedPgAuditLogRepository;
+use sentinel_api::adapters::outbound::batching::log_batcher::BatchedPgLogRepository;
 use sentinel_api::domain::entities::audit::audit_log::AuditLog;
 use sentinel_api::domain::entities::system::log_entry::LogEntry;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;

@@ -250,7 +250,7 @@ async fn send_request(app: axum::Router, req: axum::http::Request<Body>) -> (Sta
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_note_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let p = pool().await;
     let note_id = insert_note(&p, &guild_id).await;
@@ -272,7 +272,7 @@ async fn delete_note_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_note_with_rbac_invalid_uuid_422() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
         "DELETE", "/api/notes/not-a-uuid",
@@ -286,7 +286,7 @@ async fn delete_note_with_rbac_invalid_uuid_422() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_note_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let p = pool().await;
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -314,7 +314,7 @@ async fn add_note_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_note_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let p = pool().await;
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -342,7 +342,7 @@ async fn add_note_with_rbac_viewer_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_notes_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
         "GET", "/api/notes/111111111111111111/444444444444444444",
@@ -354,7 +354,7 @@ async fn get_notes_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_notes_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = build_app(MockNotesUC::new());
     let req = test_helpers::request_with_rbac(
         "GET", "/api/notes/111111111111111111/444444444444444444",
@@ -366,7 +366,7 @@ async fn get_notes_with_rbac_viewer_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_note_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let p = pool().await;
     let note_id = insert_note(&p, &guild_id).await;

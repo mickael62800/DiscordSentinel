@@ -8,8 +8,8 @@ use uuid::Uuid;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::ai::message_analysis::MessageAnalysis;
 use crate::domain::errors::DomainError;
-use crate::adapters::outbound::InferenceService;
-use crate::adapters::outbound::TextTokenizer;
+use crate::adapters::outbound::inference_service::InferenceService;
+use crate::adapters::outbound::text_tokenizer::TextTokenizer;
 use crate::domain::services::moderation::channel_tension::ChannelTensionBuffer;
 use crate::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use crate::domain::services::moderation::scoring_service::ScoringService;
@@ -478,7 +478,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
 /// Fonction pure : transforme les classifications IA en score, flags et raison.
 /// Retourne None si aucun sentiment toxique n'est detecte au-dessus du seuil.
 pub fn score_classifications(
-    classifications: &[crate::adapters::outbound::InferenceClassification],
+    classifications: &[crate::adapters::outbound::inference_service::InferenceClassification],
     rules: &[crate::domain::entities::system::rule::Rule],
     threshold: f32,
 ) -> Option<(f64, Vec<FlagType>, String)> {

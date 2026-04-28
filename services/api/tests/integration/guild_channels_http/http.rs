@@ -52,10 +52,10 @@ async fn list_text_channels_second_call_hits_cache() {
 // DiscordApi local qui retourne une liste configurable pour tester le path
 // "serialize + set cache" quand la reponse n'est pas vide.
 use async_trait::async_trait;
-use sentinel_api::adapters::outbound::DiscordApi;
-use sentinel_api::adapters::outbound::DiscordChannel;
-use sentinel_api::adapters::outbound::DiscordMember;
-use sentinel_api::adapters::outbound::DiscordUser;
+use sentinel_api::adapters::outbound::discord_api::DiscordApi;
+use sentinel_api::adapters::outbound::discord_api::DiscordChannel;
+use sentinel_api::adapters::outbound::discord_api::DiscordMember;
+use sentinel_api::adapters::outbound::discord_api::DiscordUser;
 use sentinel_api::adapters::outbound::discord_api::UserGuild;
 use sentinel_api::domain::errors::DomainError;
 

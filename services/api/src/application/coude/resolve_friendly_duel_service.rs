@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use crate::application::coude::guild_settings::CoudeGuildSettings;
 use crate::domain::entities::coude::balance::CoudeBalanceParams;
 use crate::domain::errors::DomainError;
-use crate::domain::services::coude::coude_combat_engine::resolve_combat;
+use crate::domain::services::coude::coude_combat_engine::combat::resolve_combat;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;
 use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelInput;
 use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelOutput;

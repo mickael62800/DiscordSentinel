@@ -34,20 +34,12 @@ pub(super) fn taunt_event_to_proto(
     }
 }
 
-mod bets;
-mod combats;
-mod economy;
-mod inventory;
-mod players;
-mod social;
-
-pub use bets::CoudeBetsGrpc;
-pub use combats::CoudeCombatsGrpc;
-pub use economy::CoudeEconomyGrpc;
-pub use inventory::CoudeInventoryGrpc;
-pub use players::CoudePlayerGrpc;
-pub use social::CoudeSocialGrpc;
-
+pub mod bets;
+pub mod combats;
+pub mod economy;
+pub mod inventory;
+pub mod players;
+pub mod social;
 
 // ══════════════════════════════════════════════════════════════════════
 // Tests unitaires des converters proto <-> domain (Phase 7A.opt F.1)
@@ -56,7 +48,6 @@ pub use social::CoudeSocialGrpc;
 // Ces tests verifient que la traduction entre les entites de domaine et
 // les messages protobuf est complete et correcte (aucun champ oublie ou
 // melange). Ce sont des fonctions pures, donc pas de DB ni de mock.
-
 
 #[cfg(test)]
 #[path = "tests/coude.rs"]

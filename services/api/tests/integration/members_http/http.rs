@@ -286,7 +286,7 @@ async fn remove_member_without_rbac_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remove_member_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = router::build_for_test(build_state(Arc::new(MockMembersUC::new())));
     let req = test_helpers::request_with_rbac(
         "DELETE", "/api/members/111111111111111111/u1",
@@ -300,7 +300,7 @@ async fn remove_member_with_rbac_viewer_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn remove_member_with_rbac_moderator_allowed() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = router::build_for_test(build_state(Arc::new(MockMembersUC::new())));
     let req = test_helpers::request_with_rbac(
         "DELETE", "/api/members/111111111111111111/u1",
@@ -327,7 +327,7 @@ async fn seed_rbac_admin(guild_id: &str, user_id: &str) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reset_member_success_returns_totals() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let admin_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -350,7 +350,7 @@ async fn reset_member_success_returns_totals() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reset_member_with_rbac_moderator_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let mod_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);

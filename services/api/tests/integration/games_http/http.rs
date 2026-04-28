@@ -363,7 +363,7 @@ async fn update_game_name_over_100_chars_422() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn update_game_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let game = sample_game("111111111111111111", "Old");
     let id = game.id.clone();
     let repo = Arc::new(MockGameRepo::new().with_game(game));
@@ -402,7 +402,7 @@ async fn delete_game_not_found_404() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_game_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let app = build_app(Arc::new(MockGameRepo::new()));
     let fake_id = Uuid::new_v4().to_string();
     let req = test_helpers::request_with_rbac(
@@ -654,7 +654,7 @@ async fn upload_emoji_unsupported_mime_422() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn upload_emoji_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     use sentinel_api::adapters::inbound::http::middleware::rbac::RoleContext;
     let (ct, body) = multipart_body(&[
         ("name", "n", None, &[]),

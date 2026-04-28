@@ -15,7 +15,3 @@ pub mod audit_log_batcher;
 pub mod batch_writer;
 pub mod log_batcher;
 
-pub use audit_log_batcher::BatchedPgAuditLogRepository;
-pub use batch_writer::BatchWriter;
-pub use batch_writer::BatchWriterConfig;
-pub use log_batcher::BatchedPgLogRepository;

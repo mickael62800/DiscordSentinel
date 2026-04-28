@@ -172,7 +172,7 @@ fn load_session_with_invalid_file_content_fails_gracefully() {
 const ONNX_PATH: &str = "../../ai/training/text/exports/text_sentinel.onnx";
 const TOKENIZER_PATH: &str = "../../ai/training/text/exports/tokenizer.json";
 
-use crate::adapters::outbound::TextTokenizer;
+use crate::adapters::outbound::text_tokenizer::TextTokenizer;
 
 fn load_real_pipeline() -> Option<(InferenceService, TextTokenizer)> {
     let service = InferenceService::new(None, Some(ONNX_PATH));

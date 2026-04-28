@@ -13,7 +13,7 @@ use axum::http::StatusCode;
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
-use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+use sentinel_api::domain::enums::system::role::Role;
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;

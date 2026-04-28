@@ -31,6 +31,8 @@ API_TESTS_ROOT = Path("services/api/tests")
 MODS = [
     (API_ROOT / "domain/entities/mod.rs",            "crate::domain::entities"),
     (API_ROOT / "domain/services/mod.rs",            "crate::domain::services"),
+    (API_ROOT / "domain/services/coude/coude_combat_engine/mod.rs",
+                                                     "crate::domain::services::coude::coude_combat_engine"),
     (API_ROOT / "domain/value_objects/mod.rs",       "crate::domain::value_objects"),
     (API_ROOT / "domain/enums/mod.rs",               "crate::domain::enums"),
     (API_ROOT / "application/mod.rs",                "crate::application"),
@@ -38,6 +40,19 @@ MODS = [
     (API_ROOT / "ports/outbound/mod.rs",             "crate::ports::outbound"),
     (API_ROOT / "adapters/inbound/http/handlers/mod.rs",
                                                      "crate::adapters::inbound::http::handlers"),
+    (API_ROOT / "adapters/inbound/http/handlers/coude/mod.rs",
+                                                     "crate::adapters::inbound::http::handlers::coude"),
+    (API_ROOT / "adapters/inbound/http/handlers/casino/blackjack/mod.rs",
+                                                     "crate::adapters::inbound::http::handlers::casino::blackjack"),
+    (API_ROOT / "adapters/inbound/http/handlers/moderation/mod.rs",
+                                                     "crate::adapters::inbound::http::handlers::moderation"),
+    (API_ROOT / "adapters/inbound/http/handlers/system/mod.rs",
+                                                     "crate::adapters::inbound::http::handlers::system"),
+    (API_ROOT / "adapters/inbound/grpc/mod.rs",      "crate::adapters::inbound::grpc"),
+    (API_ROOT / "adapters/inbound/grpc/coude/mod.rs",
+                                                     "crate::adapters::inbound::grpc::coude"),
+    (API_ROOT / "adapters/outbound/mod.rs",          "crate::adapters::outbound"),
+    (API_ROOT / "adapters/outbound/batching/mod.rs", "crate::adapters::outbound::batching"),
     # rbac.rs has only `pub use crate::domain::enums::Role;` — handled inline
 ]
 
@@ -209,7 +224,8 @@ def rewrite_mod(mod_path: Path):
     text = re.sub(r"pub\s+use\s+[\w:]+::\{[^}]*\};", collapse_braces, text)
     # Now strip them
     text = re.sub(
-        r"^pub\s+use\s+[\w:]+(?:\s*::\s*\{[^}]*\})?(?:\s+as\s+\w+)?\s*;\s*\n",
+        # Match pub use BASE; or BASE::{...}; or BASE as X; or BASE::*;
+        r"^pub\s+use\s+[\w:]+(?:\s*::\s*(?:\*|\{[^}]*\}))?(?:\s+as\s+\w+)?\s*;\s*\n",
         "",
         text,
         flags=re.MULTILINE,

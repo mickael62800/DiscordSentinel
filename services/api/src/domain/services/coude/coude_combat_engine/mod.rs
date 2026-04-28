@@ -26,8 +26,6 @@ pub mod combat;
 pub mod progression;
 pub mod shop;
 
-pub use combat::resolve_combat;
-
 /// Donnees joueur minimales necessaires au moteur de combat.
 /// Cree depuis un `SELECT` sur `coude_players` dans le worker.
 #[derive(Debug, Clone)]

@@ -19,7 +19,7 @@ pub fn routes() -> Router<AppState> {
         // Cache monitoring
         .route("/api/cache/stats", get(handlers::system::cache_stats::get_cache_stats))
         // Detail systeme (bots/workers list + CPU/RAM host + uptime + taille BDD)
-        .route("/api/system/info", get(handlers::system::get_system_info))
+        .route("/api/system/info", get(handlers::system::info::get_system_info))
         // Welcome config
         .route("/api/welcome/{guild_id}", get(handlers::community::welcome::get_config).put(handlers::community::welcome::save_config))
         // Phase 4 A — File d'attente IA async (POST = enqueue, GET = statut)

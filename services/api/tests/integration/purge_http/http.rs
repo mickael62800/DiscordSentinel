@@ -147,7 +147,7 @@ async fn purge_infractions_invalid_guild_422() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_infractions_with_rbac_moderator_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let (state, _, _, _) = build_state();
     let app = router::build_for_test(state);
     let req = test_helpers::request_with_rbac(
@@ -162,7 +162,7 @@ async fn purge_infractions_with_rbac_moderator_forbidden() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_infractions_with_rbac_owner_allowed() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     // Seed api_user_guilds pour que check_role_for_guild valide owner en DB
     let pool = sqlx::PgPool::connect(
         &std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -248,7 +248,7 @@ async fn purge_logs_rejects_zero() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn purge_logs_with_rbac_non_superadmin_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     // User avec RBAC mais pas dans SUPERADMIN_USER_IDS -> forbidden
     let (state, _, _, _) = build_state();
     let app = router::build_for_test(state);

@@ -44,10 +44,7 @@ use crate::adapters::inbound::http::state::AppState;
 const USER_ID_CACHE_TTL_SECS: u64 = 600;
 const DISCORD_TOKEN_HEADER: &str = "x-discord-token";
 
-// Le type `Role` (enum + hierarchie) est defini dans le domain. Re-export ici
-// pour que les imports historiques `middleware::rbac::Role` continuent de
-// marcher sans modification.
-pub use crate::domain::enums::system::role::Role;
+use crate::domain::enums::system::role::Role;
 
 /// Contexte injecte dans les extensions de la requete pour les handlers.
 #[derive(Debug, Clone)]
@@ -134,7 +131,8 @@ pub async fn rbac_middleware(
 /// Exemple d'usage dans un handler :
 /// ```ignore
 /// use axum::Extension;
-/// use crate::adapters::inbound::http::middleware::rbac::{Role, RoleContext, require_role};
+/// use crate::adapters::inbound::http::middleware::rbac::{RoleContext, require_role};
+/// use crate::domain::enums::system::role::Role;
 ///
 /// pub async fn delete_config(
 ///     Extension(ctx): Extension<RoleContext>,

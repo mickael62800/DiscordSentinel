@@ -8,8 +8,8 @@ use sentinel_api::adapters::outbound::postgres::system::bot_config_repository::P
 use sentinel_api::adapters::outbound::postgres::moderation::rule_repository::PgRuleRepository;
 use sentinel_api::adapters::outbound::postgres::moderation::infraction_repository::PgInfractionRepository;
 use sentinel_api::application::ai::analyze_message_service::AnalyzeMessageService;
-use sentinel_api::adapters::outbound::InferenceService;
-use sentinel_api::adapters::outbound::TextTokenizer;
+use sentinel_api::adapters::outbound::inference_service::InferenceService;
+use sentinel_api::adapters::outbound::text_tokenizer::TextTokenizer;
 use sentinel_api::domain::services::ai::inference_limiter::InferenceRateLimiter;
 use sentinel_api::domain::entities::moderation::detection_flags::DetectionFlags;
 use sentinel_api::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;

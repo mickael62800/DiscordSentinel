@@ -731,7 +731,7 @@ async fn seed_voice_channel(pool: &sqlx::PgPool, guild_id: &str, channel_id: &st
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn create_channel_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -759,7 +759,7 @@ async fn create_channel_with_rbac_moderator_succeeds() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn delete_channel_with_rbac_viewer_forbidden() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
@@ -835,7 +835,7 @@ async fn list_channel_events_empty_returns_array() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn transfer_ownership_with_rbac_moderator_succeeds() {
-    use sentinel_api::adapters::inbound::http::middleware::rbac::Role;
+    use sentinel_api::domain::enums::system::role::Role;
     let p = pool().await;
     let guild_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
     let user_id = format!("{}", Uuid::new_v4().as_u128() % 1_000_000_000_000_000_000_u128);
