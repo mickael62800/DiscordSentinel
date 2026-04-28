@@ -1,347 +1,257 @@
-mod bot_config;
-mod dashboard_stats;
-mod guild;
-mod infraction;
-mod log_entry;
-mod message_analysis;
-mod moderation_action;
-mod rule;
-mod security_event;
-mod ticket;
-mod user_stats;
-mod conduct;
-mod voice_channel;
-mod watched_user;
-mod audit_log;
-mod image_analysis;
-mod level;
-mod daily_activity;
-mod role_panel;
-mod discord_role;
-mod strikes;
-mod sanction_reminder;
-mod user_note;
-mod ai_models;
-mod coude_purge;
-mod rbac;
-mod config_parsers;
-mod coude_expire;
-mod discord_action_message;
-pub use discord_action_message::{DiscordActionMessage, NewDiscordActionMessage, kinds as discord_action_kinds};
-mod automod_review;
-pub use automod_review::{AppliedAction, AutomodReview, NewAutomodReview, SuggestedAction};
-pub mod analytics;
+// Bounded contexts (regroupent les ~80 entites par domaine fonctionnel).
+pub mod ai;
+pub mod audit;
+pub mod casino;
+pub mod community;
+pub mod coude;
+pub mod moderation;
+pub mod system;
 
-pub use coude_expire::cowardice_penalty;
+// Re-export pour preserver l'API publique historique : tout le reste du code
+// continue a faire `use crate::domain::entities::Type` ou
+// `use crate::domain::entities::analytics::Foo` sans changer un import.
+// PR2 (cosmetique) renommera les fichiers `coude_*.rs` -> `*.rs` dans coude/.
 
-pub use ai_models::{
+// ── ai ─────────────────────────────────────────────────────────────────────
+pub use ai::ai_models::{
     format_model_display_name, is_valid_model_type, path_basename, SUPPORTED_MODEL_TYPES,
 };
-pub use coude_purge::COUDE_PURGE_TABLES;
-pub use rbac::{
-    is_owner_self_demotion, truncate_display_name, would_revoke_last_owner,
-    RBAC_DISPLAY_NAME_MAX,
+pub use ai::image_analysis::{
+    is_allowed_image_content_type, is_image_size_acceptable, ImageAnalysis, ImageClassification,
+    ALLOWED_IMAGE_CONTENT_TYPES, MAX_IMAGE_BASE64_LEN,
 };
-pub use config_parsers::{is_worker_service, parse_bool_config, parse_i64_config};
+pub use ai::message_analysis::MessageAnalysis;
 
-pub use audit_log::{
+// ── audit ──────────────────────────────────────────────────────────────────
+pub use audit::audit_log::{
     is_security_audit_event, AuditLog, AUDIT_EVENT_MEMBER_NICKNAME_HISTORY,
     AUDIT_EVENT_SECURITY_PREFIX,
 };
-pub use image_analysis::{is_allowed_image_content_type, is_image_size_acceptable, ImageAnalysis, ImageClassification, ALLOWED_IMAGE_CONTENT_TYPES, MAX_IMAGE_BASE64_LEN};
-pub use bot_config::{BotDefinition, BotGuildConfig};
-pub use conduct::{
-    apply_conduct_penalty, apply_conduct_regen, ConductConfig, ConductPointsLog,
-    UserConductPoints, MUTE_AT_ZERO_POINTS_DURATION_MINS,
+pub use audit::dashboard_stats::DashboardStats;
+pub use audit::discord_action_message::{
+    kinds as discord_action_kinds, DiscordActionMessage, NewDiscordActionMessage,
 };
-pub use daily_activity::DailyActivity;
-pub use role_panel::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
-pub use dashboard_stats::DashboardStats;
-pub use guild::Guild;
-pub use infraction::Infraction;
-pub use level::{xp_progress, xp_for_level, level_from_xp, LevelConfig, LevelReward, UserLevel, XpSource};
-pub use log_entry::LogEntry;
-pub use message_analysis::MessageAnalysis;
-pub use moderation_action::{ModerationAction, UserModerationHistory};
-pub use rule::Rule;
-pub use security_event::SecurityEvent;
-pub use ticket::{Ticket, TicketDetail, TicketMessage};
-pub use user_stats::{GuildStatsOverview, GuildVoiceStats, UserStats, VoiceSessionStats};
-pub use voice_channel::{
-    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelConfig,
-    VoiceChannelDetail, VoiceChannelInviteLink, VoiceChannelTheme,
-    VoiceChannelWhitelistEntry,
+pub use audit::security_event::SecurityEvent;
+pub use audit::user_activity::UserActivity;
+pub use audit::user_stats::{
+    GuildStatsOverview, GuildVoiceStats, UserStats, VoiceSessionStats,
 };
-pub use watched_user::{classify_risk_level, WatchedUser};
-pub use discord_role::{parse_discord_permissions_bitfield, DiscordRole};
-pub use strikes::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
-pub use sanction_reminder::SanctionReminder;
-pub use user_note::UserNote;
+pub use audit::watched_user::{classify_risk_level, WatchedUser};
 
-mod user_activity;
-pub use user_activity::UserActivity;
-
-mod guild_member;
-pub use guild_member::{GuildMember, MemberSummary, MemberConduct, MemberInfractions, MemberModeration, MemberStats};
-
-mod blackjack;
-pub use blackjack::{
+// ── casino ─────────────────────────────────────────────────────────────────
+pub use casino::blackjack::{
     calculate_score, create_deck, is_blackjack_game_over, BlackjackConfig, BlackjackGame, Card,
     BLACKJACK_FINAL_STATUSES, BLACKJACK_SHOE_DECKS, BLACKJACK_SHOE_TOTAL_CARDS,
     DEFAULT_BLACKJACK_MAX_PLAYERS,
 };
-
-mod moderation_review;
-pub use moderation_review::{
-    is_valid_review_status, resolve_mute_duration, truncate_review_text, validate_evidence_url,
-    DEFAULT_MUTE_DURATION_SECS, MAX_EVIDENCE_URL_LEN, MAX_REVIEW_TEXT_LEN, VALID_REVIEW_STATUSES,
-};
-
-mod coude_tournament;
-pub use coude_tournament::{
-    current_week_bounds, estimate_tournament_prize_pool, week_bounds_for,
-    TOURNAMENT_PRIZE_POOL_PERCENT,
-};
-
-mod job_whitelists;
-pub use job_whitelists::{
-    is_valid_ai_job_type, is_valid_export_format, is_valid_export_job_type,
-    VALID_AI_JOB_TYPES, VALID_EXPORT_FORMATS, VALID_EXPORT_JOB_TYPES,
-};
-
-mod purge;
-pub use purge::{validate_purge_days_allow_zero, validate_purge_days_strictly_positive};
-
-mod guild_member_reset;
-pub use guild_member_reset::{
-    MemberResetTable, CHANNELS_CACHE_TTL_SECS, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES,
-    MEMBERS_CACHE_TTL_SECS,
-};
-
-mod coude_limits;
-pub use coude_limits::{
-    DEFAULT_COUDE_COMBATS_LIMIT, DEFAULT_COUDE_OPPONENT_COUNT,
-    DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT,
-};
-
-mod coude_economy;
-pub use coude_economy::{clamp_steal_amount, clamp_steal_fail_penalty, ClampedSteal};
-
-mod coude_combat_validation;
-pub use coude_combat_validation::{check_min_hp_pct, check_surprise_hp_pct, validate_new_combat};
-
-mod coude_travaux;
-pub use coude_travaux::{
-    fail_flavor_at, success_flavor_at, task_at, TravauxTask, TRAVAUX_COINS_MAX, TRAVAUX_COINS_MIN,
-    TRAVAUX_COOLDOWN_KEY, TRAVAUX_COOLDOWN_SECS, TRAVAUX_FAIL_FLAVORS, TRAVAUX_SUCCESS_FLAVORS,
-    TRAVAUX_SUCCESS_PCT, TRAVAUX_TASKS, TRAVAUX_XP_PER_TASK,
-};
-
-mod coude_steal_roll;
-pub use coude_steal_roll::{
-    steal_pct_range_bp, STEAL_D20_MAX, STEAL_D20_MIN, STEAL_PCT_ACTIVE_MAX_BP,
-    STEAL_PCT_ACTIVE_MIN_BP, STEAL_PCT_AFK_MAX_BP, STEAL_PCT_AFK_MIN_BP,
-};
-
-mod game;
-pub use game::{
+pub use casino::game::{
     format_custom_emoji, is_allowed_emoji_mime, normalize_game_name, normalize_optional_tag,
     parse_role_color_hex, slugify_emoji_name, DEFAULT_GAME_ROLE_COLOR, MAX_EMOJI_IMAGE_BYTES,
 };
-
-mod wallet;
-pub use wallet::{
+pub use casino::slot::{
+    compute_jackpot_contribution, compute_payout, evaluate_spin, parse_csv_multipliers,
+    parse_csv_symbols, parse_csv_weights, spin_with_rng as slot_spin_with_rng,
+    validate_slot_config, SlotConfig, SlotConfigError, SlotJackpotPool, SlotSpin, SlotTopWinner,
+    SpinOutcome,
+};
+pub use casino::wallet::{
     clamp_debit_to_balance, resolve_reset_balance, resolve_starting_coins,
     validate_positive_amount, validate_transfer_distinct_users, Wallet, WalletTransaction,
 };
-
-mod coude_player;
-pub use coude_player::{
-    title_for_level as coude_title_for_level, xp_for_level as coude_xp_for_level, CombatStat,
-    CoudePlayer, XpProgress, COUDE_MAX_LEVEL,
-};
-
-mod coude_combat;
-pub use coude_combat::{CombatResolution, CoudeCombat, NewCoudeCombat};
-
-mod combat_resolution_rules;
-pub use combat_resolution_rules::{
-    apply_insurance_to_loss, compute_combat_xp, format_bet_payout_lines, CombatXpAwards,
-    InsuranceAdjustment, COMBAT_XP_LOSER, COMBAT_XP_WINNER_BASE, COMBAT_XP_WINNER_UNDERDOG,
-    UNDERDOG_LEVEL_GAP,
-};
-
-mod coude_bet;
-pub use coude_bet::{
-    calculate_bet_resolution, BetPayout, BetPayoutOutcome, BetResolutionPlan, CoudeBet,
-    FighterBetBonus as CoudeFighterBetBonus, NewCoudeBet, RefundSummary,
-};
-
-mod coude_inventory;
-pub use coude_inventory::{
-    CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime,
-};
-
-mod coude_social;
-pub use coude_social::{
-    clamp_leaderboard_limit, daily_chaos_amount, CoudeCurrentSeason, CoudeEvent,
-    CoudeLeaderboardEntry, DailyChaosOutcome, LeaderboardCategory, NewDailyChaos,
-    DAILY_CHAOS_MAX, DEFAULT_CHAOS_PERCENT, LEADERBOARD_MAX_LIMIT, LEADERBOARD_MIN_LIMIT,
-    MIN_COINS_ELIGIBLE,
-};
-
-mod coude_cashbox;
-pub use coude_cashbox::{
-    CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
-};
-
-mod coude_steal_protection;
-pub use coude_steal_protection::{
-    find_protection_item, CoudeStealProtection, StealProtectionDuration, StealProtectionItemDef,
-    STEAL_PROTECTION_ITEMS,
-};
-
-mod coude_steal_boost;
-pub use coude_steal_boost::{
-    find_boost_item, sum_roll_bonus_for_active_keys, CoudeStealBoost, StealBoostDuration,
-    StealBoostItemDef, STEAL_BOOST_ITEMS,
-};
-
-mod coude_taunt;
-pub use coude_taunt::{
-    build_taunt_event, build_taunt_event_single, crossed_threshold, nickname_suffix_for,
-    CoudeTauntsConfig, StreakKind, TauntEvent, TAUNT_THRESHOLDS,
-};
-
-mod coude_balance;
-pub use coude_balance::{CoudeBalanceParams, DoubleCoupMode};
-
-mod coude_heist;
-pub use coude_heist::{
-    compute_success_chance, find_heist_tool, CoudeHeistAttempt, CoudePrisonState, HeistOutcome,
-    HeistToolDef, HEIST_BASE_SUCCESS_PERCENT, HEIST_COOLDOWN_DAYS, HEIST_GAIN_MAX_PERCENT,
-    HEIST_GAIN_MIN_PERCENT, HEIST_ITEM_BONUS_PERCENT, HEIST_MAX_SUCCESS_PERCENT,
-    HEIST_PRISON_HOURS, HEIST_TOOLS,
-};
-
-mod slot;
-pub use slot::{
-    compute_jackpot_contribution, compute_payout, evaluate_spin, parse_csv_multipliers,
-    parse_csv_symbols, parse_csv_weights, spin_with_rng as slot_spin_with_rng,
-    validate_slot_config, SlotConfig, SlotConfigError, SlotJackpotPool, SlotSpin,
-    SlotTopWinner, SpinOutcome,
-};
-
-mod wheel;
-pub use wheel::{
+pub use casino::wheel::{
     is_memorable_case, spin_with_rng as wheel_spin_with_rng,
     spin_with_rng_curses as wheel_spin_with_rng_curses, WheelCase, WheelOutcome, WheelSpin,
     WheelTopWinner, WHEEL_CASES,
 };
 
-mod combat_outcome_flags;
-pub use combat_outcome_flags::{
-    detect_outcome_flags, CombatOutcomeFlags, CLUTCH_HP_PCT_MAX, COMEBACK_HP_PCT_MAX,
-    COMEBACK_MIN_ROUNDS_LOW_HP, PERFECT_HP_PCT_MIN,
+// ── community ──────────────────────────────────────────────────────────────
+pub use community::conduct::{
+    apply_conduct_penalty, apply_conduct_regen, ConductConfig, ConductPointsLog,
+    UserConductPoints, MUTE_AT_ZERO_POINTS_DURATION_MINS,
+};
+pub use community::daily_activity::DailyActivity;
+pub use community::guild_member::{
+    GuildMember, MemberConduct, MemberInfractions, MemberModeration, MemberStats, MemberSummary,
+};
+pub use community::guild_member_reset::{
+    MemberResetTable, CHANNELS_CACHE_TTL_SECS, DISCORD_LIST_MEMBERS_CAP, MEMBER_RESET_TABLES,
+    MEMBERS_CACHE_TTL_SECS,
+};
+pub use community::level::{
+    level_from_xp, xp_for_level, xp_progress, LevelConfig, LevelReward, UserLevel, XpSource,
+};
+pub use community::role_panel::{AutoRole, RolePanel, RolePanelDetail, RolePanelEntry};
+pub use community::voice_channel::{
+    VoiceChannel, VoiceChannelBan, VoiceChannelCoAdmin, VoiceChannelConfig, VoiceChannelDetail,
+    VoiceChannelInviteLink, VoiceChannelTheme, VoiceChannelWhitelistEntry,
 };
 
-mod cowardice_relief;
-pub use cowardice_relief::{should_count_as_cowardice, COWARDICE_RELIEF_HP_PCT};
-
-mod lucky_shield;
-pub use lucky_shield::{
-    apply_lucky_shield, apply_lucky_shield_with_multiplier,
-    should_preserve_win_streak_after_shielded_defeat, LUCKY_SHIELD_LOSS_MULTIPLIER,
-};
-
-mod smart_default_bet;
-pub use smart_default_bet::{quick_bet_buttons, suggest_default_bet, DEFAULT_BET_PCT};
-
-mod branding;
-pub use branding::{
-    coude_bet_footer, coude_combat_footer, COUDE_TAGLINE, COUDE_TAGLINE_SHORT, SENTINEL_TAGLINE,
-};
-
-mod combat_flavor;
-pub use combat_flavor::{pick_flavor_line, FLAVOR_LINES, FLAVOR_LINE_PROBABILITY};
-
-mod fake_spectators;
-pub use fake_spectators::{
-    format_spectator_chat, pick_spectator_chat, SPECTATOR_COUNT_MAX, SPECTATOR_COUNT_MIN,
-    SPECTATOR_LINES, SPECTATOR_USERNAMES,
-};
-
-mod mythic_events;
-pub use mythic_events::{
-    format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
-};
-
-mod bounty;
-pub use bounty::{
+// ── coude (le jeu) ─────────────────────────────────────────────────────────
+pub use coude::bounty::{
     ActiveBounty, BountyStatus, BOUNTY_AUTO_OPEN_STREAK_THRESHOLD, BOUNTY_INITIAL_AMOUNT,
     BOUNTY_MIN_CONTRIBUTION,
 };
-
-mod refusal_count;
-pub use refusal_count::{RefusalCount, HONOR_DEBT_THRESHOLD};
-
-mod coalition;
-pub use coalition::{
+pub use coude::branding::{
+    coude_bet_footer, coude_combat_footer, COUDE_TAGLINE, COUDE_TAGLINE_SHORT, SENTINEL_TAGLINE,
+};
+pub use coude::coalition::{
     apply_coalition_penalty, ActiveCoalition, CoalitionMember, CoalitionStatus,
     COALITION_COST_PER_MEMBER, COALITION_DURATION_HOURS, COALITION_GAIN_MULTIPLIER,
     COALITION_MIN_MEMBERS,
 };
-
-mod ultimate;
-pub use ultimate::{
-    ultimate_ready, UltimateKind, UltimateState, ULTIMATE_UNLOCK_LEVEL,
+pub use coude::combat_flavor::{pick_flavor_line, FLAVOR_LINES, FLAVOR_LINE_PROBABILITY};
+pub use coude::combat_outcome_flags::{
+    detect_outcome_flags, CombatOutcomeFlags, CLUTCH_HP_PCT_MAX, COMEBACK_HP_PCT_MAX,
+    COMEBACK_MIN_ROUNDS_LOW_HP, PERFECT_HP_PCT_MIN,
 };
-
-mod prestige;
-pub use prestige::{
-    can_prestige, prestige_gain_multiplier, prestige_gain_multiplier_with_params,
-    prestige_stars, PRESTIGE_GAIN_BONUS_PCT,
-    PRESTIGE_MAX_COUNT, PRESTIGE_UNLOCK_LEVEL,
+pub use coude::combat_resolution_rules::{
+    apply_insurance_to_loss, compute_combat_xp, format_bet_payout_lines, CombatXpAwards,
+    InsuranceAdjustment, COMBAT_XP_LOSER, COMBAT_XP_WINNER_BASE, COMBAT_XP_WINNER_UNDERDOG,
+    UNDERDOG_LEVEL_GAP,
 };
-
-mod vendetta;
-pub use vendetta::{
-    apply_revenge_bonus, ActiveVendetta, VendettaStatus, VENDETTA_BOURREAU_SUFFIX_PREFIX,
-    VENDETTA_WINDOW_HOURS, VENDETTA_WIN_BONUS_MULTIPLIER,
+pub use coude::coude_balance::{CoudeBalanceParams, DoubleCoupMode};
+pub use coude::coude_bet::{
+    calculate_bet_resolution, BetPayout, BetPayoutOutcome, BetResolutionPlan, CoudeBet,
+    FighterBetBonus as CoudeFighterBetBonus, NewCoudeBet, RefundSummary,
 };
-
-mod safety_net;
-pub use safety_net::{
-    boost_bet_gain as safety_net_boost_bet_gain,
-    boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier,
-    reduce_loss as safety_net_reduce_loss,
-    reduce_loss_with_multiplier as safety_net_reduce_loss_with_multiplier,
-    should_trigger as safety_net_should_trigger, ActiveSafetyNet, SAFETY_NET_BET_GAIN_MULTIPLIER,
-    SAFETY_NET_DURATION_HOURS, SAFETY_NET_LOSS_MULTIPLIER, SAFETY_NET_TRIGGER_COINS,
+pub use coude::coude_cashbox::{
+    CashboxRedistribution, CashboxRedistributionEntry, CashboxSource, CoudeCashbox,
 };
-
-mod tout_ou_rien;
-pub use tout_ou_rien::{
-    coin_delta as tout_ou_rien_delta, resolve_outcome as tout_ou_rien_resolve,
-    ToutOuRienOutcome, TOUT_OU_RIEN_COOLDOWN_KEY, TOUT_OU_RIEN_COOLDOWN_SECS,
-    TOUT_OU_RIEN_LOSS_KEEP_PCT, TOUT_OU_RIEN_WIN_MULTIPLIER, TOUT_OU_RIEN_WIN_PROBABILITY,
+pub use coude::coude_combat::{CombatResolution, CoudeCombat, NewCoudeCombat};
+pub use coude::coude_combat_validation::{
+    check_min_hp_pct, check_surprise_hp_pct, validate_new_combat,
 };
-
-mod tout_ou_rien_log;
-pub use tout_ou_rien_log::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
-
-mod season_theme;
-pub use season_theme::{
-    apply_season_braquage_cooldown, compute_season_steal_bonus, season_chaos_multiplier,
-    season_tank_def_bonus_pct, season_theme_by_key, theme_for_season, SeasonTheme,
-    CURRENT_SEASON_THEME_CONFIG_KEY, SEASON_THEMES,
+pub use coude::coude_economy::{clamp_steal_amount, clamp_steal_fail_penalty, ClampedSteal};
+pub use coude::coude_expire::cowardice_penalty;
+pub use coude::coude_heist::{
+    compute_success_chance, find_heist_tool, CoudeHeistAttempt, CoudePrisonState, HeistOutcome,
+    HeistToolDef, HEIST_BASE_SUCCESS_PERCENT, HEIST_COOLDOWN_DAYS, HEIST_GAIN_MAX_PERCENT,
+    HEIST_GAIN_MIN_PERCENT, HEIST_ITEM_BONUS_PERCENT, HEIST_MAX_SUCCESS_PERCENT,
+    HEIST_PRISON_HOURS, HEIST_TOOLS,
 };
-
-mod curse;
-pub use curse::{
+pub use coude::coude_inventory::{CoudeInsurance, CoudeInventoryItem, CoudePrime, NewCoudePrime};
+pub use coude::coude_limits::{
+    DEFAULT_COUDE_COMBATS_LIMIT, DEFAULT_COUDE_OPPONENT_COUNT,
+    DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT,
+};
+pub use coude::coude_player::{
+    title_for_level as coude_title_for_level, xp_for_level as coude_xp_for_level, CombatStat,
+    CoudePlayer, XpProgress, COUDE_MAX_LEVEL,
+};
+pub use coude::coude_purge::COUDE_PURGE_TABLES;
+pub use coude::coude_social::{
+    clamp_leaderboard_limit, daily_chaos_amount, CoudeCurrentSeason, CoudeEvent,
+    CoudeLeaderboardEntry, DailyChaosOutcome, LeaderboardCategory, NewDailyChaos,
+    DAILY_CHAOS_MAX, DEFAULT_CHAOS_PERCENT, LEADERBOARD_MAX_LIMIT, LEADERBOARD_MIN_LIMIT,
+    MIN_COINS_ELIGIBLE,
+};
+pub use coude::coude_steal_boost::{
+    find_boost_item, sum_roll_bonus_for_active_keys, CoudeStealBoost, StealBoostDuration,
+    StealBoostItemDef, STEAL_BOOST_ITEMS,
+};
+pub use coude::coude_steal_protection::{
+    find_protection_item, CoudeStealProtection, StealProtectionDuration, StealProtectionItemDef,
+    STEAL_PROTECTION_ITEMS,
+};
+pub use coude::coude_steal_roll::{
+    steal_pct_range_bp, STEAL_D20_MAX, STEAL_D20_MIN, STEAL_PCT_ACTIVE_MAX_BP,
+    STEAL_PCT_ACTIVE_MIN_BP, STEAL_PCT_AFK_MAX_BP, STEAL_PCT_AFK_MIN_BP,
+};
+pub use coude::coude_taunt::{
+    build_taunt_event, build_taunt_event_single, crossed_threshold, nickname_suffix_for,
+    CoudeTauntsConfig, StreakKind, TauntEvent, TAUNT_THRESHOLDS,
+};
+pub use coude::coude_tournament::{
+    current_week_bounds, estimate_tournament_prize_pool, week_bounds_for,
+    TOURNAMENT_PRIZE_POOL_PERCENT,
+};
+pub use coude::coude_travaux::{
+    fail_flavor_at, success_flavor_at, task_at, TravauxTask, TRAVAUX_COINS_MAX, TRAVAUX_COINS_MIN,
+    TRAVAUX_COOLDOWN_KEY, TRAVAUX_COOLDOWN_SECS, TRAVAUX_FAIL_FLAVORS, TRAVAUX_SUCCESS_FLAVORS,
+    TRAVAUX_SUCCESS_PCT, TRAVAUX_TASKS, TRAVAUX_XP_PER_TASK,
+};
+pub use coude::cowardice_relief::{should_count_as_cowardice, COWARDICE_RELIEF_HP_PCT};
+pub use coude::curse::{
     apply_banana_to_d20, apply_insomnia_to_taunt_weight, apply_leaky_wallet, lift_cost,
     pick_curse_by_index, poison_redirect_amount, ActiveCurse, CurseKind, BANANA_FAIL_PROBABILITY,
     CURSE_COST_COINS, CURSE_DURATION_HOURS, CURSE_LIFT_MULTIPLIER, FAUSSE_ASSURANCE_FEE_COINS,
     INSOMNIA_TAUNT_MULTIPLIER, LEAKY_WALLET_FEE_COINS, POISON_GAIN_REDIRECT_PCT,
     SLOWNESS_DELAY_SECS,
 };
+pub use coude::fake_spectators::{
+    format_spectator_chat, pick_spectator_chat, SPECTATOR_COUNT_MAX, SPECTATOR_COUNT_MIN,
+    SPECTATOR_LINES, SPECTATOR_USERNAMES,
+};
+pub use coude::lucky_shield::{
+    apply_lucky_shield, apply_lucky_shield_with_multiplier,
+    should_preserve_win_streak_after_shielded_defeat, LUCKY_SHIELD_LOSS_MULTIPLIER,
+};
+pub use coude::mythic_events::{
+    format_mythic_announce, roll_mythic_event, MythicEvent, MYTHIC_EVENTS,
+};
+pub use coude::prestige::{
+    can_prestige, prestige_gain_multiplier, prestige_gain_multiplier_with_params, prestige_stars,
+    PRESTIGE_GAIN_BONUS_PCT, PRESTIGE_MAX_COUNT, PRESTIGE_UNLOCK_LEVEL,
+};
+pub use coude::refusal_count::{RefusalCount, HONOR_DEBT_THRESHOLD};
+pub use coude::safety_net::{
+    boost_bet_gain as safety_net_boost_bet_gain,
+    boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier,
+    reduce_loss as safety_net_reduce_loss,
+    reduce_loss_with_multiplier as safety_net_reduce_loss_with_multiplier,
+    should_trigger as safety_net_should_trigger, ActiveSafetyNet,
+    SAFETY_NET_BET_GAIN_MULTIPLIER, SAFETY_NET_DURATION_HOURS, SAFETY_NET_LOSS_MULTIPLIER,
+    SAFETY_NET_TRIGGER_COINS,
+};
+pub use coude::season_theme::{
+    apply_season_braquage_cooldown, compute_season_steal_bonus, season_chaos_multiplier,
+    season_tank_def_bonus_pct, season_theme_by_key, theme_for_season, SeasonTheme,
+    CURRENT_SEASON_THEME_CONFIG_KEY, SEASON_THEMES,
+};
+pub use coude::smart_default_bet::{quick_bet_buttons, suggest_default_bet, DEFAULT_BET_PCT};
+pub use coude::tout_ou_rien::{
+    coin_delta as tout_ou_rien_delta, resolve_outcome as tout_ou_rien_resolve, ToutOuRienOutcome,
+    TOUT_OU_RIEN_COOLDOWN_KEY, TOUT_OU_RIEN_COOLDOWN_SECS, TOUT_OU_RIEN_LOSS_KEEP_PCT,
+    TOUT_OU_RIEN_WIN_MULTIPLIER, TOUT_OU_RIEN_WIN_PROBABILITY,
+};
+pub use coude::tout_ou_rien_log::{ToutOuRienLogEntry, ToutOuRienLogOutcome, ToutOuRienUserStats};
+pub use coude::ultimate::{ultimate_ready, UltimateKind, UltimateState, ULTIMATE_UNLOCK_LEVEL};
+pub use coude::vendetta::{
+    apply_revenge_bonus, ActiveVendetta, VendettaStatus, VENDETTA_BOURREAU_SUFFIX_PREFIX,
+    VENDETTA_WINDOW_HOURS, VENDETTA_WIN_BONUS_MULTIPLIER,
+};
+
+// ── moderation ─────────────────────────────────────────────────────────────
+pub use moderation::automod_review::{AppliedAction, AutomodReview, NewAutomodReview, SuggestedAction};
+pub use moderation::infraction::Infraction;
+pub use moderation::moderation_action::{ModerationAction, UserModerationHistory};
+pub use moderation::moderation_review::{
+    is_valid_review_status, resolve_mute_duration, truncate_review_text, validate_evidence_url,
+    DEFAULT_MUTE_DURATION_SECS, MAX_EVIDENCE_URL_LEN, MAX_REVIEW_TEXT_LEN, VALID_REVIEW_STATUSES,
+};
+pub use moderation::purge::{
+    validate_purge_days_allow_zero, validate_purge_days_strictly_positive,
+};
+pub use moderation::sanction_reminder::SanctionReminder;
+pub use moderation::strikes::{StrikeConfig, StrikeResult, StrikeThreshold, UserStrike};
+pub use moderation::user_note::UserNote;
+
+// ── system (transverses) ───────────────────────────────────────────────────
+// `analytics` reste accessible aussi en tant que sous-module qualifie
+// (`crate::domain::entities::analytics::Foo`) :
+pub use system::analytics;
+
+pub use system::bot_config::{BotDefinition, BotGuildConfig};
+pub use system::config_parsers::{is_worker_service, parse_bool_config, parse_i64_config};
+pub use system::discord_role::{parse_discord_permissions_bitfield, DiscordRole};
+pub use system::guild::Guild;
+pub use system::job_whitelists::{
+    is_valid_ai_job_type, is_valid_export_format, is_valid_export_job_type, VALID_AI_JOB_TYPES,
+    VALID_EXPORT_FORMATS, VALID_EXPORT_JOB_TYPES,
+};
+pub use system::log_entry::LogEntry;
+pub use system::rbac::{
+    is_owner_self_demotion, truncate_display_name, would_revoke_last_owner, RBAC_DISPLAY_NAME_MAX,
+};
+pub use system::rule::Rule;
+pub use system::ticket::{Ticket, TicketDetail, TicketMessage};
