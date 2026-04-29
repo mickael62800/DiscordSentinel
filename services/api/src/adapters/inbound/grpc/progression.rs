@@ -41,7 +41,7 @@ impl ProgressionService for ProgressionGrpc {
             .levels_uc
             .add_xp(AddXpCommand {
                 guild_id: req.guild_id,
-                user_id: req.user_id,
+                user_id: req.user_id.into(),
                 username: req.username,
                 amount: req.amount,
                 source,
@@ -150,7 +150,7 @@ fn user_level_to_proto(u: UserLevel) -> proto::UserLevel {
     proto::UserLevel {
         id: u.id.to_string(),
         guild_id: u.guild_id,
-        user_id: u.user_id,
+        user_id: u.user_id.into(),
         username: u.username,
         xp: u.xp,
         level: u.level,

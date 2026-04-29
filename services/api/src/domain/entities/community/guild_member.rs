@@ -2,10 +2,11 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
+use crate::domain::entities::system::discord_ids::UserId;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuildMember {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub display_name: Option<String>,
     pub avatar: Option<String>,

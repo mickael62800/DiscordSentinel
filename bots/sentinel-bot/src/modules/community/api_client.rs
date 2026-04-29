@@ -23,7 +23,7 @@ use sentinel_proto::roles::v1 as proto;
 #[derive(Debug, Deserialize)]
 pub struct TempRoleApiEntry {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub role_id: RoleId,
     pub expires_at: String,
 }
@@ -358,3 +358,4 @@ fn proto_auto_role_to_dto(r: proto::AutoRole) -> AutoRole {
 use sentinel_shared::grpc_client::grpc_err_to_string;
 use sentinel_api::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::UserId;

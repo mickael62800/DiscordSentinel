@@ -90,7 +90,7 @@ impl BlackjackGrpcTrait for BlackjackGrpc {
             .svc
             .start_game(
                 req.guild_id,
-                req.user_id,
+                req.user_id.into(),
                 req.username,
                 req.bet,
                 min_bet,
@@ -211,7 +211,7 @@ fn blackjack_game_to_proto(g: BlackjackGame) -> proto::BlackjackGame {
     proto::BlackjackGame {
         id: g.id.to_string(),
         guild_id: g.guild_id,
-        user_id: g.user_id,
+        user_id: g.user_id.into(),
         username: g.username,
         bet: g.bet,
         player_hand: g.player_hand.iter().map(card_to_proto).collect(),
@@ -251,7 +251,7 @@ fn wallet_to_proto(w: Wallet) -> proto::Wallet {
     proto::Wallet {
         id: w.id.to_string(),
         guild_id: w.guild_id,
-        user_id: w.user_id,
+        user_id: w.user_id.into(),
         username: w.username,
         coins: w.coins,
         total_earned: w.total_earned,

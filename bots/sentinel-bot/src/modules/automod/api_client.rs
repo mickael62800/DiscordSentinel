@@ -28,7 +28,7 @@ use super::detectors::DetectionFlags;
 pub struct AnalyzeRequest {
     pub guild_id: String,
     pub channel_id: ChannelId,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub content: String,
     pub flags: DetectionFlags,
@@ -142,3 +142,4 @@ fn proto_action_to_action(value: i32) -> Action {
 use sentinel_shared::grpc_client::grpc_err_to_string;
 use sentinel_api::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::UserId;

@@ -14,6 +14,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::UserId;
 const TBL: &str = "cashbox";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -77,7 +78,7 @@ impl From<RedistributionRow> for CashboxRedistribution {
 struct EntryRow {
     id: Uuid,
     redistribution_id: Uuid,
-    user_id: String,
+    user_id: UserId,
     username: String,
     amount_won: i64,
     created_at: DateTime<Utc>,

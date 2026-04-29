@@ -7,6 +7,7 @@ use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::audit::stats_repository::StatsRepository;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgStatsRepository {
     pool: PgPool,
@@ -22,7 +23,7 @@ impl PgStatsRepository {
 struct StatsRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     username: String,
     message_count: i64,
     voice_seconds: i64,

@@ -120,7 +120,7 @@ impl ManageModerationUseCase for ManageModerationService {
         // Deduire les points de conduite
         if let Err(e) = self.conduct_uc.deduct_points(DeductPointsCommand {
             guild_id: action.guild_id.clone(),
-            user_id: action.target_id.clone(),
+            user_id: action.target_id.clone().into(),
             username: action.target_name.clone(),
             action: action.action_type.clone(),
         }).await {
@@ -145,7 +145,7 @@ impl ManageModerationUseCase for ManageModerationService {
                 match uc
                     .add_strike(AddStrikeCommand {
                         guild_id,
-                        user_id: target_id,
+                        user_id: target_id.into(),
                         reason,
                         source: "moderator".into(),
                         infraction_id: Some(action.id),

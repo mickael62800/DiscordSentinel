@@ -49,7 +49,7 @@ pub(super) fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
 
 pub(super) fn leaderboard_entry_to_proto(e: LeaderboardEntry) -> proto::LeaderboardEntry {
     proto::LeaderboardEntry {
-        user_id: e.user_id,
+        user_id: e.user_id.into(),
         username: e.username,
         value: e.value,
     }

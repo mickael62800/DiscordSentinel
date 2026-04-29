@@ -7,6 +7,7 @@ use crate::domain::entities::community::level::UserLevel;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::UserId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -36,7 +37,7 @@ fn default_enabled() -> bool { true }
 #[derive(Debug, Deserialize)]
 pub struct AddXpDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub amount: i64,
     /// "text" ou "voice" (defaut: "text")
@@ -81,7 +82,7 @@ pub struct LevelConfigDto {
 pub struct UserLevelDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub xp: i64,
     pub level: i32,

@@ -237,7 +237,7 @@ impl ManageSecurityUseCase for ManageSecurityService {
                 event_type: decision.event_type.clone(),
                 severity: if decision.is_raid { "critical" } else { "high" }.into(),
                 description: decision.event_description.clone(),
-                user_ids: vec![cmd.user_id.clone()],
+                user_ids: vec![cmd.user_id.clone().into()],
             }).await;
         }
 

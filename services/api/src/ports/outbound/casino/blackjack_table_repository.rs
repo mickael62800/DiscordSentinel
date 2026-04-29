@@ -2,6 +2,7 @@ use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
 pub struct BlackjackTable {
@@ -16,7 +17,7 @@ pub struct BlackjackTable {
 
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
 pub struct BlackjackTablePlayer {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub joined_at: String,
 }

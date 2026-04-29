@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::ApiClient;
+use sentinel_api::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Serialize)]
 pub struct RecordToutOuRienBody<'a> {
@@ -15,7 +16,7 @@ pub struct RecordToutOuRienBody<'a> {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct MemorialEntryResp {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub mise: i64,
     pub outcome: String,

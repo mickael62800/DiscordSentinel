@@ -21,6 +21,7 @@ use sentinel_shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::coude::v1 as proto_coude;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::UserId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Response DTOs (preservation de la surface publique) ──
@@ -30,7 +31,7 @@ use crate::domain::entities::system::discord_ids::ChannelId;
 #[allow(dead_code)]
 pub struct Player {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub coins: i64,
     pub total_wins: i32,
@@ -180,7 +181,7 @@ pub(super) fn taunt_event_from_proto(e: proto_coude::TauntEvent) -> TauntEvent {
 pub struct WalletTransaction {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub amount: i64,
     pub balance_after: i64,
     pub source: String,
@@ -209,7 +210,7 @@ pub struct Prime {
 #[allow(dead_code)]
 pub struct InventoryItem {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub item_key: String,
     pub quantity: i32,
 }
@@ -229,7 +230,7 @@ pub struct ServerEvent {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct LeaderboardEntry {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub value: i64,
 }

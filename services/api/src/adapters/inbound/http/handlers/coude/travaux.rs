@@ -9,9 +9,10 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::coude::play_travaux::PlayTravauxCommand;
 use crate::ports::inbound::coude::play_travaux::TravauxResolution;
+use crate::domain::entities::system::discord_ids::UserId;
 #[derive(Debug, Deserialize)]
 pub struct PlayTravauxDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 

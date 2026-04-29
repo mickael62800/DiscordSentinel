@@ -11,6 +11,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 /// Resultat d'une action de jeu : la partie mise a jour + la liste des
 /// `TauntEvent` declenches par les mutations wallet (faillite, jackpot).
 /// La couche transport (gRPC / HTTP) est responsable de propager ces
@@ -62,7 +63,7 @@ impl BlackjackService {
     pub async fn start_game(
         &self,
         guild_id: String,
-        user_id: String,
+        user_id: UserId,
         username: String,
         bet: i64,
         min_bet: i64,

@@ -73,7 +73,7 @@ impl SecurityService for SecurityGrpc {
             .uc
             .analyze_new_member(AnalyzeNewMemberCommand {
                 guild_id: req.guild_id,
-                user_id: req.user_id,
+                user_id: req.user_id.into(),
                 username: req.username,
                 has_avatar: req.has_avatar,
                 account_created_timestamp: req.account_created_timestamp,

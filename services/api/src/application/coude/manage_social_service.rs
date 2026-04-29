@@ -170,9 +170,9 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         self.repo
             .log_daily_chaos(NewDailyChaos {
                 guild_id: guild_id.to_string(),
-                loser_id: victim.user_id.clone(),
+                loser_id: victim.user_id.clone().into(),
                 loser_name: victim.username.clone(),
-                winner_id: winner.user_id.clone(),
+                winner_id: winner.user_id.clone().into(),
                 winner_name: winner.username.clone(),
                 amount: actual,
             })
@@ -189,9 +189,9 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         );
 
         Ok(Some(DailyChaosOutcome {
-            loser_id: victim.user_id.clone(),
+            loser_id: victim.user_id.clone().into(),
             loser_name: victim.username.clone(),
-            winner_id: winner.user_id.clone(),
+            winner_id: winner.user_id.clone().into(),
             winner_name: winner.username.clone(),
             amount: actual,
             channel_id: channel_id.into(),

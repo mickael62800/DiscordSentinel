@@ -11,6 +11,7 @@ use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SuggestedAction {
@@ -77,7 +78,7 @@ pub struct AutomodReview {
     pub guild_id: String,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub content_preview: String,
     pub suggested_action: String,
@@ -98,7 +99,7 @@ pub struct NewAutomodReview {
     pub guild_id: String,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub content_preview: String,
     pub suggested_action: SuggestedAction,

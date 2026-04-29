@@ -18,13 +18,14 @@ use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::UserId;
 // ══════════════════════════════════════════════════════════════════════
 // ── Player DTOs ──
 // ══════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Serialize)]
 pub struct PlayerDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub coins: i64,
     pub total_wins: i32,
@@ -68,7 +69,7 @@ impl From<&Player> for PlayerDto {
 #[derive(Debug, Serialize)]
 pub struct FullPlayerDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub coins: i64,
     pub total_wins: i32,
@@ -136,7 +137,7 @@ impl From<Player> for FullPlayerDto {
 
 #[derive(Debug, Deserialize)]
 pub struct GetOrCreatePlayerDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 
@@ -505,7 +506,7 @@ pub struct StealDto {
 #[derive(Debug, Serialize)]
 pub struct InventoryItemDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub item_key: String,
     pub quantity: i32,
 }
@@ -601,7 +602,7 @@ impl From<Insurance> for InsuranceDto {
 
 #[derive(Debug, Deserialize)]
 pub struct BuyInsuranceDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub is_scam: bool,
     /// Duree en secondes. 0 ou absent = defaut 3600 (1h) pour retrocompat.
     #[serde(default)]
@@ -614,7 +615,7 @@ pub struct BuyInsuranceDto {
 
 #[derive(Debug, Serialize)]
 pub struct LeaderboardEntryDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub value: i64,
 }

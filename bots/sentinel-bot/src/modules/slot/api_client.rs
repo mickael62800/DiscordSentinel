@@ -4,17 +4,18 @@ use serde::{Deserialize, Serialize};
 
 use sentinel_shared::api_client::BaseApiClient;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Serialize)]
 pub struct SpinRequest {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub mise: i64,
 }
 
 #[derive(Debug, Serialize)]
 pub struct DailyRequest {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 

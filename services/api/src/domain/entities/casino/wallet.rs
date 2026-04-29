@@ -3,12 +3,13 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Wallet {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub coins: i64,
     pub total_earned: i64,
@@ -21,7 +22,7 @@ pub struct Wallet {
 pub struct WalletTransaction {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub amount: i64,
     pub balance_after: i64,
     pub source: String,

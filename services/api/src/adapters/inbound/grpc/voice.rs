@@ -110,7 +110,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
                     .co_admins
                     .iter()
                     .map(|ca| proto::CoAdmin {
-                        user_id: ca.user_id.clone(),
+                        user_id: ca.user_id.clone().into(),
                         user_name: ca.user_name.clone(),
                     })
                     .collect();
@@ -151,7 +151,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         self.uc
             .add_co_admin(ManageCoAdminCommand {
                 channel_id: req.channel_id.into(),
-                user_id: req.user_id,
+                user_id: req.user_id.into(),
                 user_name: req.user_name,
             })
             .await
@@ -184,7 +184,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         self.uc
             .ban_from_channel(BanFromChannelCommand {
                 channel_id: req.channel_id.into(),
-                user_id: req.user_id,
+                user_id: req.user_id.into(),
                 user_name: req.user_name,
                 banned_by: req.banned_by,
                 reason: req.reason,

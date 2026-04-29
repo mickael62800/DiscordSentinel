@@ -13,6 +13,7 @@ use crate::domain::errors::DomainError;
 
 use super::super::pg_err;
 use crate::ports::outbound::coude::social_repository::SocialRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgSocialRepository {
     pool: PgPool,
@@ -27,7 +28,7 @@ impl PgSocialRepository {
 
 #[derive(sqlx::FromRow)]
 struct LeaderboardRow {
-    user_id: String,
+    user_id: UserId,
     username: String,
     value: i64,
 }

@@ -9,6 +9,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 /// Entry dans le buffer glissant : score IA + auteur + message_id pour
 /// pouvoir agir sur le dernier speaker si un seuil est franchi.
@@ -16,7 +17,7 @@ use crate::domain::entities::system::discord_ids::MessageId;
 #[allow(dead_code)]
 pub struct TensionEntry {
     pub score: f64,
-    pub user_id: String,
+    pub user_id: UserId,
     pub message_id: MessageId,
     pub timestamp_ms: i64,
 }

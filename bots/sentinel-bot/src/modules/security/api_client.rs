@@ -27,7 +27,7 @@ pub struct SecurityEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemberPayload {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub display_name: Option<String>,
     pub avatar: Option<String>,
@@ -278,3 +278,4 @@ fn member_payload_to_proto(p: &MemberPayload) -> Result<proto_members::GuildMemb
 }
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
+use sentinel_api::domain::entities::system::discord_ids::UserId;

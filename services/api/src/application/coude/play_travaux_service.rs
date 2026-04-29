@@ -119,14 +119,14 @@ impl PlayTravauxUseCase for PlayTravauxService {
                 )
                 .await
             {
-                tracing::warn!(error = %e, user_id, "Echec credit wallet travaux");
+                tracing::warn!(error = %e, user_id = %user_id, "Echec credit wallet travaux");
             }
             if let Err(e) = self
                 .player_repo
                 .add_xp(&guild_id, &user_id, TRAVAUX_XP_PER_TASK)
                 .await
             {
-                tracing::warn!(error = %e, user_id, "Echec add_xp travaux");
+                tracing::warn!(error = %e, user_id = %user_id, "Echec add_xp travaux");
             }
         }
 

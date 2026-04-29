@@ -3,6 +3,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrikeThreshold {
@@ -39,7 +40,7 @@ impl StrikeConfig {
 pub struct UserStrike {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub reason: String,
     pub source: String,
     pub infraction_id: Option<Uuid>,

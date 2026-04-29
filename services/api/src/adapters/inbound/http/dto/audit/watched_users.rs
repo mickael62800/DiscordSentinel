@@ -7,10 +7,11 @@ use crate::adapters::inbound::http::dto::community::conduct::ConductPointsLogDto
 use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::ports::inbound::audit::manage_watched_users::UserDossier;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Serialize)]
 pub struct WatchedUserResponseDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub guild_id: String,
     pub guild_name: String,

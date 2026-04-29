@@ -62,7 +62,7 @@ impl ManageWatchedUsersUseCase for ManageWatchedUsersService {
         let users = self.watched_repo.find_watched_users(Some(guild_id), 1000, 0).await?;
         let user = users
             .into_iter()
-            .find(|u| u.user_id == user_id)
+            .find(|u| u.user_id.as_str() == user_id)
             .ok_or_else(|| DomainError::NotFound(format!("Utilisateur {} introuvable", user_id)))?;
 
         let filters = InfractionFilters {

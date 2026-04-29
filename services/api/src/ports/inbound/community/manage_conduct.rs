@@ -4,6 +4,7 @@ use crate::domain::entities::community::conduct::ConductConfig;
 use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct SaveConductConfigCommand {
     pub guild_id: String,
@@ -18,14 +19,14 @@ pub struct SaveConductConfigCommand {
 
 pub struct DeductPointsCommand {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub action: String,
 }
 
 pub struct AddPointsCommand {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub amount: i32,
     pub reason: String,
 }

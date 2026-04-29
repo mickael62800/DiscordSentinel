@@ -11,6 +11,7 @@ use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCom
 use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -62,7 +63,7 @@ pub struct TransferOwnershipDto {
 
 #[derive(Debug, Deserialize)]
 pub struct AddCoAdminDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
 }
 
@@ -76,7 +77,7 @@ pub struct AddWhitelistDto {
 
 #[derive(Debug, Deserialize)]
 pub struct BanFromChannelDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub banned_by: String,
     pub reason: Option<String>,
@@ -93,7 +94,7 @@ pub struct CreateInviteLinkDto {
 
 #[derive(Debug, Deserialize)]
 pub struct UseInviteLinkDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
 }
 
@@ -153,7 +154,7 @@ pub struct VoiceChannelResponseDto {
 #[derive(Debug, Serialize)]
 pub struct CoAdminResponseDto {
     pub id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub granted_at: String,
 }
@@ -170,7 +171,7 @@ pub struct WhitelistEntryResponseDto {
 #[derive(Debug, Serialize)]
 pub struct BanResponseDto {
     pub id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub banned_by: String,
     pub reason: Option<String>,

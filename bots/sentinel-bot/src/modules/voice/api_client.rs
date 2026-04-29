@@ -58,7 +58,7 @@ pub struct TransferOwnershipRequest {
 
 #[derive(Debug, Serialize)]
 pub struct AddCoAdminRequest {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
 }
 
@@ -72,7 +72,7 @@ pub struct AddWhitelistRequest {
 
 #[derive(Debug, Serialize)]
 pub struct BanFromChannelRequest {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub banned_by: String,
     pub reason: Option<String>,
@@ -461,3 +461,4 @@ fn proto_to_response(c: proto::VoiceChannel) -> VoiceChannelResponse {
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::UserId;

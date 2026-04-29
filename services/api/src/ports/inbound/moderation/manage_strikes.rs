@@ -6,10 +6,11 @@ use crate::domain::entities::moderation::strikes::StrikeResult;
 use crate::domain::entities::moderation::strikes::StrikeThreshold;
 use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct AddStrikeCommand {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub reason: String,
     pub source: String,
     pub infraction_id: Option<Uuid>,

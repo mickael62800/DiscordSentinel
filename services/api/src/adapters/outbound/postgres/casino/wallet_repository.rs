@@ -9,6 +9,7 @@ use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgWalletRepository {
     pool: PgPool,
@@ -24,7 +25,7 @@ impl PgWalletRepository {
 struct WalletRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     username: String,
     coins: i64,
     total_earned: i64,
@@ -53,7 +54,7 @@ impl From<WalletRow> for Wallet {
 struct WalletTransactionRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     amount: i64,
     balance_after: i64,
     source: String,

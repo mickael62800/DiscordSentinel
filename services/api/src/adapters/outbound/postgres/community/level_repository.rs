@@ -9,6 +9,7 @@ use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::level_repository::LevelRepository;
 use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgLevelRepository {
     pool: PgPool,
@@ -38,7 +39,7 @@ struct LevelConfigRow {
 struct UserLevelRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     username: String,
     xp: i64,
     level: i32,

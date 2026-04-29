@@ -21,6 +21,7 @@ use async_trait::async_trait;
 
 use crate::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::UserId;
 
 /// Solde minimum requis pour declencher un tout-ou-rien (centralise ici
 /// plutot que cote bot pour cloturer Phase 1 / 12 magic constants).
@@ -29,7 +30,7 @@ pub const MIN_BALANCE_FOR_PLAY: i64 = 100;
 #[derive(Debug, Clone)]
 pub struct PlayToutOuRienCommand {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 

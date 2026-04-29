@@ -3,6 +3,7 @@ use async_trait::async_trait;
 use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::entities::community::guild_member::MemberSummary;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct SyncMembersCommand {
     pub guild_id: String,
@@ -15,7 +16,7 @@ pub struct RegisterMemberCommand {
 
 pub struct UpdateMemberCommand {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: Option<String>,
     pub display_name: Option<String>,
     pub avatar: Option<String>,

@@ -28,6 +28,7 @@ use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
 use sentinel_proto::blackjack::v1 as proto;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::UserId;
 
 // ── Response DTOs (surface inchangee) ──
 
@@ -44,7 +45,7 @@ pub struct CardDto {
 pub struct BlackjackGameDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub bet: i64,
     pub player_hand: Vec<CardDto>,
@@ -63,7 +64,7 @@ pub struct BlackjackGameDto {
 pub struct WalletDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub coins: i64,
     pub total_earned: i64,
@@ -102,7 +103,7 @@ struct MaybeTauntEvent {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TablePlayerDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
 }
 
@@ -511,7 +512,7 @@ fn grpc_err_to_string(e: GrpcCallError) -> String {
 #[allow(dead_code)]
 struct StartGamePayload {
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     username: String,
     bet: i64,
 }

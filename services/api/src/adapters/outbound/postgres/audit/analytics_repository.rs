@@ -145,7 +145,7 @@ impl AnalyticsRepository for PgAnalyticsRepository {
         Ok(rows
             .into_iter()
             .map(|(uid, uname, total, w, d, m, b)| TopInfractor {
-                user_id: uid,
+                user_id: uid.into(),
                 username: uname,
                 total_infractions: total.unwrap_or(0),
                 warns: w.unwrap_or(0),

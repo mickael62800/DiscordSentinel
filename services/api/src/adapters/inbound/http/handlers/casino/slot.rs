@@ -13,18 +13,19 @@ use crate::domain::entities::casino::slot::SlotSpin;
 use crate::domain::entities::casino::slot::SlotTopWinner;
 use crate::ports::inbound::casino::manage_slot::SpinCommand;
 use crate::ports::inbound::casino::manage_slot::SpinResult;
+use crate::domain::entities::system::discord_ids::UserId;
 // ── DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct SpinDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub mise: i64,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct DailyDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 
@@ -64,7 +65,7 @@ impl From<SpinResult> for SpinResponseDto {
 #[derive(Debug, Serialize)]
 pub struct SlotSpinDto {
     pub id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub mise: i64,
     pub symbols: Vec<String>,
@@ -94,7 +95,7 @@ impl From<SlotSpin> for SlotSpinDto {
 
 #[derive(Debug, Serialize)]
 pub struct SlotTopWinnerDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub total_payout: i64,
     pub jackpot_count: u32,

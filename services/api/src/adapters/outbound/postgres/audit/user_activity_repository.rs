@@ -6,6 +6,7 @@ use crate::domain::errors::DomainError;
 
 use super::super::pg_err;
 use crate::ports::outbound::audit::user_activity_repository::UserActivityRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgUserActivityRepository {
     pool: PgPool,
@@ -22,7 +23,7 @@ impl PgUserActivityRepository {
 struct ActivityRow {
     id: uuid::Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     event_type: String,
     channel_id: Option<String>,
     channel_name: Option<String>,

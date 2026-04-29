@@ -10,6 +10,7 @@ use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgInfractionRepository {
     pool: PgPool,
@@ -26,7 +27,7 @@ struct InfractionRow {
     id: Uuid,
     guild_id: String,
     channel_id: ChannelId,
-    user_id: String,
+    user_id: UserId,
     username: String,
     message_id: MessageId,
     content: String,

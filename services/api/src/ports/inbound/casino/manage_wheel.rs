@@ -7,11 +7,12 @@ use crate::domain::entities::casino::wheel::WheelCase;
 use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone)]
 pub struct WheelSpinCommand {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 

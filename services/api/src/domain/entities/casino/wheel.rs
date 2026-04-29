@@ -9,6 +9,7 @@ use rand::distributions::WeightedIndex;
 use rand::prelude::Distribution;
 use rand::RngCore;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 /// Une case de la roue : identifiant stable, libelle affiche, payout fixe
 /// en coins, et poids RNG (plus eleve = sort plus souvent).
@@ -88,7 +89,7 @@ pub fn is_memorable_case(key: &str) -> bool {
 pub struct WheelSpin {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub case_key: String,
     pub case_label: String,
@@ -99,7 +100,7 @@ pub struct WheelSpin {
 /// Top winner cumule sur N derniers jours pour le leaderboard.
 #[derive(Debug, Clone)]
 pub struct WheelTopWinner {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub total_payout: i64,
     pub spin_count: u32,

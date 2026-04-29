@@ -2,6 +2,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Daily chaos : regles metier ──
@@ -62,7 +63,7 @@ impl LeaderboardCategory {
 /// Entrée d'un classement. `value` = critère du classement (coins, level, etc.)
 #[derive(Debug, Clone)]
 pub struct LeaderboardEntry {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub value: i64,
 }

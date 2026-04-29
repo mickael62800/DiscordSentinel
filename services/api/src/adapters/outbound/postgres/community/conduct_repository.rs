@@ -6,6 +6,7 @@ use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::conduct_repository::ConductRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgConductRepository {
     pool: PgPool,
@@ -52,7 +53,7 @@ impl From<ConfigRow> for ConductConfig {
 struct PointsRow {
     id: uuid::Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     username: String,
     points: i32,
     last_regen_at: chrono::DateTime<chrono::Utc>,
@@ -79,7 +80,7 @@ impl From<PointsRow> for UserConductPoints {
 struct LogRow {
     id: uuid::Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     delta: i32,
     reason: String,
     points_before: i32,

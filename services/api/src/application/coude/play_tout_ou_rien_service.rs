@@ -135,7 +135,7 @@ impl PlayToutOuRienUseCase for PlayToutOuRienService {
             .record(&guild_id, &user_id, &username, initial_coins, log_outcome, delta)
             .await
         {
-            tracing::warn!(error = %e, user_id, "Echec record tout-ou-rien log");
+            tracing::warn!(error = %e, user_id = %user_id, "Echec record tout-ou-rien log");
         }
 
         let final_balance = (initial_coins + delta).max(0);

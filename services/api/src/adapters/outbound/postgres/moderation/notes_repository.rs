@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::notes_repository::NotesRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgNotesRepository {
     pool: PgPool,
@@ -22,7 +23,7 @@ impl PgNotesRepository {
 struct NoteRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     author_id: String,
     author_name: String,
     content: String,

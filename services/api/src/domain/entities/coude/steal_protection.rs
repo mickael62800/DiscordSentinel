@@ -8,12 +8,13 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone)]
 pub struct StealProtection {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub item_key: String,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,

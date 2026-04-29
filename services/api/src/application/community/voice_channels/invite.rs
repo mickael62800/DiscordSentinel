@@ -70,7 +70,7 @@ impl ManageVoiceChannelsService {
             id: Uuid::new_v4(),
             guild_id: link.guild_id.clone(),
             owner_id: channel.owner_id.clone(),
-            target_id: cmd.user_id,
+            target_id: cmd.user_id.into(),
             target_name: cmd.user_name,
             created_at: Utc::now(),
         };

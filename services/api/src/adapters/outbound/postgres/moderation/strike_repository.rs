@@ -10,6 +10,7 @@ use crate::domain::entities::moderation::strikes::StrikeThreshold;
 use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgStrikeRepository {
     pool: PgPool,
@@ -25,7 +26,7 @@ impl PgStrikeRepository {
 struct StrikeRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     reason: String,
     source: String,
     infraction_id: Option<Uuid>,

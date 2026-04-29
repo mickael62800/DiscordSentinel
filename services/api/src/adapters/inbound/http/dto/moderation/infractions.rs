@@ -3,6 +3,7 @@ use serde::Serialize;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Deserialize)]
 pub struct InfractionQueryParams {
@@ -17,7 +18,7 @@ pub struct InfractionResponseDto {
     pub id: String,
     pub guild_id: String,
     pub channel_id: ChannelId,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub message_id: MessageId,
     pub content: String,

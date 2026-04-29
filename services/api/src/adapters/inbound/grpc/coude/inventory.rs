@@ -36,7 +36,7 @@ pub struct InventoryGrpc {
 pub(super) fn inventory_item_to_proto(i: InventoryItem) -> proto::InventoryItem {
     proto::InventoryItem {
         guild_id: i.guild_id,
-        user_id: i.user_id,
+        user_id: i.user_id.into(),
         item_key: i.item_key,
         quantity: i.quantity,
     }
@@ -374,7 +374,7 @@ pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boos
     proto::StealBoost {
         id: b.id.to_string(),
         guild_id: b.guild_id,
-        user_id: b.user_id,
+        user_id: b.user_id.into(),
         item_key: b.item_key,
         expires_at: b.expires_at.to_rfc3339(),
         created_at: b.created_at.to_rfc3339(),
@@ -387,7 +387,7 @@ pub(super) fn steal_protection_to_proto(
     proto::StealProtection {
         id: p.id.to_string(),
         guild_id: p.guild_id,
-        user_id: p.user_id,
+        user_id: p.user_id.into(),
         item_key: p.item_key,
         expires_at: p.expires_at.to_rfc3339(),
         created_at: p.created_at.to_rfc3339(),

@@ -1,3 +1,5 @@
+use crate::domain::entities::system::discord_ids::UserId;
+
 /// Activite par heure — pour heatmaps.
 #[derive(Debug, Clone)]
 pub struct HourlyActivity {
@@ -18,7 +20,7 @@ pub struct ActionDistribution {
 /// Top infracteur.
 #[derive(Debug, Clone)]
 pub struct TopInfractor {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub total_infractions: i64,
     pub warns: i64,

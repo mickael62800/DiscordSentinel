@@ -11,6 +11,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::steal_boost_repository::StealBoostRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::UserId;
 const TBL: &str = "steal_boost";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -28,7 +29,7 @@ impl PgStealBoostRepository {
 struct BoostRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     item_key: String,
     expires_at: DateTime<Utc>,
     created_at: DateTime<Utc>,

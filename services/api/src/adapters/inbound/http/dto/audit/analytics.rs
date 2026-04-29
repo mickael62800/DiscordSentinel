@@ -1,6 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::system::analytics::*;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Deserialize)]
 pub struct AnalyticsQuery {
@@ -65,7 +66,7 @@ impl From<ActionDistribution> for ActionDistributionDto {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TopInfractorDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub total_infractions: i64,
     pub warns: i64,

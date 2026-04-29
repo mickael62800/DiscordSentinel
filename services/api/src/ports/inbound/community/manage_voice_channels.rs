@@ -8,6 +8,7 @@ use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct CreateVoiceChannelCommand {
     pub guild_id: String,
@@ -45,7 +46,7 @@ pub struct TransferOwnershipCommand {
 
 pub struct ManageCoAdminCommand {
     pub channel_id: ChannelId,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
 }
 
@@ -58,7 +59,7 @@ pub struct ManageWhitelistCommand {
 
 pub struct BanFromChannelCommand {
     pub channel_id: ChannelId,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub banned_by: String,
     pub reason: Option<String>,
@@ -75,7 +76,7 @@ pub struct CreateInviteLinkCommand {
 
 pub struct UseInviteLinkCommand {
     pub code: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
 }
 

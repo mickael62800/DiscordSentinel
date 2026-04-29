@@ -18,6 +18,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::UserId;
 
 // ── Items ──
 
@@ -140,7 +141,7 @@ pub async fn buy_insurance(
 
 #[derive(Debug, serde::Deserialize)]
 pub struct BuyInsuranceWithRollDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub scam_rate_pct: u32,
     pub duration_seconds: i64,
     pub level: i32,

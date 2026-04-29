@@ -102,7 +102,7 @@ impl WheelRepository for PgWheelRepository {
         Ok(rows.into_iter().map(|r| WheelSpin {
             id: r.0,
             guild_id: r.1,
-            user_id: r.2,
+            user_id: r.2.into(),
             username: r.3,
             case_key: r.4,
             case_label: r.5,
@@ -137,7 +137,7 @@ impl WheelRepository for PgWheelRepository {
         .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(|(uid, name, total, count)| WheelTopWinner {
-            user_id: uid,
+            user_id: uid.into(),
             username: name,
             total_payout: total,
             spin_count: count as u32,

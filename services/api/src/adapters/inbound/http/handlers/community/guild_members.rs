@@ -125,7 +125,7 @@ pub async fn update_member(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.members_uc.update_member(UpdateMemberCommand {
         guild_id,
-        user_id,
+        user_id: user_id.into(),
         username: payload.username,
         display_name: payload.display_name,
         avatar: payload.avatar,

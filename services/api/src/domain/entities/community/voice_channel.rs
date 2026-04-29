@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannel {
@@ -35,7 +36,7 @@ pub struct VoiceChannel {
 pub struct VoiceChannelCoAdmin {
     pub id: Uuid,
     pub voice_channel_id: Uuid,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub granted_at: DateTime<Utc>,
 }
@@ -54,7 +55,7 @@ pub struct VoiceChannelWhitelistEntry {
 pub struct VoiceChannelBan {
     pub id: Uuid,
     pub voice_channel_id: Uuid,
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub banned_by: String,
     pub reason: Option<String>,

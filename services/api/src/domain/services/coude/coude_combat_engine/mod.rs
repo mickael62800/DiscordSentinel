@@ -26,11 +26,13 @@ pub mod combat;
 pub mod progression;
 pub mod shop;
 
+use crate::domain::entities::system::discord_ids::UserId;
+
 /// Donnees joueur minimales necessaires au moteur de combat.
 /// Cree depuis un `SELECT` sur `coude_players` dans le worker.
 #[derive(Debug, Clone)]
 pub struct PlayerLite {
-    pub user_id: String,
+    pub user_id: UserId,
     pub class: Option<String>,
     pub level: i32,
     pub atk: i32,

@@ -24,6 +24,7 @@ use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -158,7 +159,7 @@ pub async fn log_action(
 #[derive(Debug, Deserialize)]
 pub struct ExecuteBanDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub reason: String,
     /// Phase 1 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : si fourni, l API
     /// publie un event `moderation.ban.executed` avec cet `action_id`,
@@ -200,8 +201,8 @@ pub async fn execute_ban(
         channel_id: String::new().into(),
         moderator_id: "desktop".into(),
         moderator_name: "Desktop App".into(),
-        target_id: dto.user_id.clone(),
-        target_name: dto.user_id.clone(),
+        target_id: dto.user_id.clone().into(),
+        target_name: dto.user_id.clone().into(),
         action_type: "ban_permanent".into(),
         reason: dto.reason,
         gravity: None,
@@ -242,7 +243,7 @@ pub async fn execute_ban(
 #[derive(Debug, Deserialize)]
 pub struct ExecuteMuteDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub reason: String,
     /// Duree du timeout en secondes. Defaut : 1h. Max : 28 jours (clamp cote Discord).
     #[serde(default)]
@@ -278,13 +279,13 @@ pub async fn execute_mute(
         .await
         .map_err(ApiError)?;
 
-    let target_name = dto.target_name.unwrap_or_else(|| dto.user_id.clone());
+    let target_name = dto.target_name.unwrap_or_else(|| dto.user_id.clone().into());
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
         channel_id: String::new().into(),
         moderator_id: "web-panel".into(),
         moderator_name: "Web Admin".into(),
-        target_id: dto.user_id.clone(),
+        target_id: dto.user_id.clone().into(),
         target_name: target_name.clone(),
         action_type: "mute".into(),
         reason: dto.reason.clone(),
@@ -312,7 +313,7 @@ pub async fn execute_mute(
 #[derive(Debug, Deserialize)]
 pub struct ExecuteUnbanDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
 }
 
 /// POST /api/moderation/execute-unban — debannir un utilisateur Discord
@@ -347,8 +348,8 @@ pub async fn execute_unban(
         channel_id: String::new().into(),
         moderator_id: "desktop".into(),
         moderator_name: "Desktop App".into(),
-        target_id: target_id.clone(),
-        target_name: target_id.clone(),
+        target_id: target_id.clone().into(),
+        target_name: target_id.clone().into(),
         action_type: "unban".into(),
         reason: "Deban depuis le desktop".into(),
         gravity: None,

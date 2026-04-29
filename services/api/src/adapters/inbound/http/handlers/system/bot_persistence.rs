@@ -23,6 +23,7 @@ use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 // ═══════════════════════════════════════════════════
 // Name History (Audit Bot)
@@ -31,7 +32,7 @@ use crate::domain::entities::system::discord_ids::RoleId;
 #[derive(Debug, Deserialize)]
 pub struct CreateNameHistoryDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub old_name: String,
     pub new_name: String,
 }
@@ -40,7 +41,7 @@ pub struct CreateNameHistoryDto {
 pub struct NameHistoryEntryDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub old_name: String,
     pub new_name: String,
     pub created_at: String,
@@ -79,7 +80,7 @@ pub async fn list_name_history(
         .map(|l| NameHistoryEntryDto {
             id: l.id.to_string(),
             guild_id: l.guild_id,
-            user_id: l.target_id.clone().unwrap_or_default(),
+            user_id: l.target_id.clone().unwrap_or_default().into(),
             old_name: l
                 .details
                 .get("old_name")
@@ -112,7 +113,7 @@ pub async fn create_name_history(
         event_type: crate::domain::entities::audit::audit_log::AUDIT_EVENT_MEMBER_NICKNAME_HISTORY.into(),
         actor_id: None,
         actor_name: None,
-        target_id: Some(dto.user_id.clone()),
+        target_id: Some(dto.user_id.clone().into()),
         target_name: Some(dto.new_name.clone()),
         channel_id: None,
         channel_name: None,
@@ -266,7 +267,7 @@ pub async fn list_sponsorships(
 #[derive(Debug, Deserialize)]
 pub struct CreateTempRoleDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub role_id: RoleId,
     pub expires_at: String,
 }
@@ -275,7 +276,7 @@ pub struct CreateTempRoleDto {
 pub struct TempRoleRow {
     pub id: sqlx::types::Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub role_id: RoleId,
     pub expires_at: chrono::DateTime<chrono::Utc>,
     pub created_at: chrono::DateTime<chrono::Utc>,

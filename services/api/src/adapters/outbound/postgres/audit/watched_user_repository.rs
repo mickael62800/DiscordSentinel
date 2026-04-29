@@ -5,6 +5,7 @@ use crate::domain::entities::audit::watched_user::classify_risk_level;
 use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgWatchedUserRepository {
     pool: PgPool,
@@ -18,7 +19,7 @@ impl PgWatchedUserRepository {
 
 #[derive(sqlx::FromRow)]
 struct WatchedUserRow {
-    user_id: String,
+    user_id: UserId,
     username: String,
     guild_id: String,
     guild_name: String,

@@ -1068,8 +1068,8 @@ pub fn resolve_combat_with_curses(
     }
 
     CombatResult {
-        winner_id,
-        loser_id,
+        winner_id: winner_id.map(Into::into),
+        loser_id: loser_id.map(Into::into),
         rounds,
         total_rounds,
         attacker_hp_final: atk_hp,

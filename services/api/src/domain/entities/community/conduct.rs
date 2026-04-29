@@ -3,6 +3,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConductConfig {
@@ -68,7 +69,7 @@ pub fn apply_conduct_regen(current: i32, amount: i32, max_points: i32) -> i32 {
 pub struct UserConductPoints {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub points: i32,
     pub last_regen_at: DateTime<Utc>,
@@ -80,7 +81,7 @@ pub struct UserConductPoints {
 pub struct ConductPointsLog {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub delta: i32,
     pub reason: String,
     pub points_before: i32,

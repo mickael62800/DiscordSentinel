@@ -12,6 +12,7 @@ use crate::domain::errors::DomainError;
 use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 use crate::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgVoiceChannelRepository {
     pool: PgPool,
@@ -78,7 +79,7 @@ impl From<VoiceChannelRow> for VoiceChannel {
 struct CoAdminRow {
     id: Uuid,
     voice_channel_id: Uuid,
-    user_id: String,
+    user_id: UserId,
     user_name: String,
     granted_at: chrono::DateTime<chrono::Utc>,
 }
@@ -122,7 +123,7 @@ impl From<WhitelistRow> for VoiceChannelWhitelistEntry {
 struct BanRow {
     id: Uuid,
     voice_channel_id: Uuid,
-    user_id: String,
+    user_id: UserId,
     user_name: String,
     banned_by: String,
     reason: Option<String>,

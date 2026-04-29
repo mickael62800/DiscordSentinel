@@ -35,7 +35,7 @@ impl StatsService for StatsGrpc {
         self.stats_uc
             .record_messages(RecordMessagesCommand {
                 guild_id: req.guild_id,
-                user_id: req.user_id,
+                user_id: req.user_id.into(),
                 username: req.username,
                 count: req.count,
             })
@@ -61,7 +61,7 @@ impl StatsService for StatsGrpc {
         self.stats_uc
             .record_voice(RecordVoiceCommand {
                 guild_id: req.guild_id,
-                user_id: req.user_id,
+                user_id: req.user_id.into(),
                 username: req.username,
                 seconds: req.seconds,
                 channel_id: req.channel_id.into(),
@@ -126,7 +126,7 @@ fn user_stats_to_proto(u: UserStats) -> proto::UserStats {
     proto::UserStats {
         id: u.id.to_string(),
         guild_id: u.guild_id,
-        user_id: u.user_id,
+        user_id: u.user_id.into(),
         username: u.username,
         message_count: u.message_count,
         voice_seconds: u.voice_seconds,

@@ -21,7 +21,7 @@ use crate::domain::errors::DomainError;
 
 #[derive(Debug, Serialize)]
 pub struct StandingDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub net_gain: i64,
     pub rank: i32,
@@ -54,6 +54,7 @@ pub struct PastTournamentDto {
 // `domain/entities/coude_tournament.rs` (purement testables).
 use crate::domain::entities::coude::tournament::current_week_bounds;
 use crate::domain::entities::coude::tournament::estimate_tournament_prize_pool;
+use crate::domain::entities::system::discord_ids::UserId;
 /// GET /api/coude/{guild_id}/tournaments/current
 pub async fn get_current_tournament(
     State(state): State<AppState>,
@@ -95,7 +96,7 @@ pub async fn get_current_tournament(
         .map_err(|e| ApiError::from(DomainError::Internal(format!("username lookup: {e}"))))?;
 
         standings.push(StandingDto {
-            user_id,
+            user_id: user_id.into(),
             username: username.unwrap_or_else(|| "?".to_string()),
             net_gain: net,
             rank: (idx + 1) as i32,

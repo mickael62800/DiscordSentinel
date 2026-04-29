@@ -4,6 +4,7 @@ use crate::domain::entities::community::conduct::ConductConfig;
 use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
+use crate::domain::entities::system::discord_ids::UserId;
 
 // ── Request DTOs ──
 
@@ -58,7 +59,7 @@ pub struct ConductConfigDto {
 pub struct UserConductPointsDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub points: i32,
     pub last_regen_at: String,

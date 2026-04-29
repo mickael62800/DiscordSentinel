@@ -8,6 +8,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 /// Etat de la caisse d'une guild.
 #[derive(Debug, Clone)]
@@ -36,7 +37,7 @@ pub struct CashboxRedistribution {
 pub struct CashboxRedistributionEntry {
     pub id: Uuid,
     pub redistribution_id: Uuid,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub amount_won: i64,
     pub created_at: DateTime<Utc>,

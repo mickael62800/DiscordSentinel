@@ -73,6 +73,7 @@ use sentinel_proto::coude::v1::coude_player_service_client::CoudePlayerServiceCl
 use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerServiceServer;
 use sentinel_proto::coude::v1::coude_social_service_client::CoudeSocialServiceClient;
 use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialServiceServer;
+use crate::domain::entities::system::discord_ids::UserId;
 
 // ── Mock du use case : n'implemente que ce qui est appele dans les tests ──
 
@@ -83,7 +84,7 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
     async fn get_or_create(
         &self,
         guild_id: String,
-        user_id: String,
+        user_id: UserId,
         username: String,
     ) -> Result<Player, DomainError> {
         Ok(Player {

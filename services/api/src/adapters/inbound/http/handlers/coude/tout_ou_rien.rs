@@ -21,9 +21,10 @@ use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienCommand;
 use crate::ports::inbound::coude::play_tout_ou_rien::ToutOuRienResolution;
+use crate::domain::entities::system::discord_ids::UserId;
 #[derive(Debug, Deserialize)]
 pub struct RecordToutOuRienDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub mise: i64,
     /// "won" | "lost"
@@ -33,7 +34,7 @@ pub struct RecordToutOuRienDto {
 
 #[derive(Debug, Serialize)]
 pub struct MemorialEntryDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub mise: i64,
     pub outcome: String,
@@ -128,7 +129,7 @@ impl From<ToutOuRienUserStats> for ToutOuRienUserStatsDto {
 
 #[derive(Debug, Deserialize)]
 pub struct PlayToutOuRienDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 

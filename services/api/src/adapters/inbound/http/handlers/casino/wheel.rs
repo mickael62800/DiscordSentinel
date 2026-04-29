@@ -13,11 +13,12 @@ use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
+use crate::domain::entities::system::discord_ids::UserId;
 // ── DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct WheelSpinDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 
@@ -49,7 +50,7 @@ impl From<WheelSpinResult> for WheelSpinResponseDto {
 #[derive(Debug, Serialize)]
 pub struct WheelSpinLogDto {
     pub id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub case_key: String,
     pub case_label: String,
@@ -73,7 +74,7 @@ impl From<WheelSpin> for WheelSpinLogDto {
 
 #[derive(Debug, Serialize)]
 pub struct WheelTopWinnerDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub total_payout: i64,
     pub spin_count: u32,

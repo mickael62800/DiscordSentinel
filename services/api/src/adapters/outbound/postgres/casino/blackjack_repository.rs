@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::domain::entities::casino::blackjack::BlackjackGame;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
+use crate::domain::entities::system::discord_ids::UserId;
 
 pub struct PgBlackjackRepository {
     pool: PgPool,
@@ -22,7 +23,7 @@ impl PgBlackjackRepository {
 struct BlackjackRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     username: String,
     bet: i64,
     player_hand: serde_json::Value,

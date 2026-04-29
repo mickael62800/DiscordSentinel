@@ -214,7 +214,7 @@ impl SlotRepository for PgSlotRepository {
         Ok(rows.into_iter().map(|r| SlotSpin {
             id: r.0,
             guild_id: r.1,
-            user_id: r.2,
+            user_id: r.2.into(),
             username: r.3,
             mise: r.4,
             symbols: serde_json::from_value(r.5).unwrap_or_default(),
@@ -253,7 +253,7 @@ impl SlotRepository for PgSlotRepository {
         .map_err(pg_err)?;
 
         Ok(rows.into_iter().map(|(uid, name, total, jackpots, spins)| SlotTopWinner {
-            user_id: uid,
+            user_id: uid.into(),
             username: name,
             total_payout: total,
             jackpot_count: jackpots as u32,

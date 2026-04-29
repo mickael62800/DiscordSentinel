@@ -12,6 +12,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::heist_repository::HeistRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::UserId;
 const TBL: &str = "heist";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -29,7 +30,7 @@ impl PgHeistRepository {
 struct HeistRow {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     success: bool,
     amount_stolen: i64,
     chance_percent: i32,
@@ -55,7 +56,7 @@ impl From<HeistRow> for HeistAttempt {
 #[derive(sqlx::FromRow)]
 struct PrisonRow {
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     released_at: DateTime<Utc>,
     reason: String,
     created_at: DateTime<Utc>,

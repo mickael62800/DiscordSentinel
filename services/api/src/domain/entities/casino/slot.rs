@@ -19,13 +19,14 @@ use rand::distributions::WeightedIndex;
 use rand::prelude::Distribution;
 use rand::RngCore;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 /// Entree persistee dans `slot_spin_log` : trace d un spin.
 #[derive(Debug, Clone)]
 pub struct SlotSpin {
     pub id: Uuid,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub mise: i64,
     pub symbols: Vec<String>, // 3 elements
@@ -49,7 +50,7 @@ pub struct SlotJackpotPool {
 /// Top winner pour le leaderboard.
 #[derive(Debug, Clone)]
 pub struct SlotTopWinner {
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub total_payout: i64,
     pub jackpot_count: u32,

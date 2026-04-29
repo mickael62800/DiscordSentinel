@@ -108,7 +108,7 @@ impl MembersService for MembersGrpc {
         self.uc
             .update_member(UpdateMemberCommand {
                 guild_id: req.guild_id,
-                user_id: req.user_id,
+                user_id: req.user_id.into(),
                 username: req.username,
                 display_name: req.display_name,
                 avatar: req.avatar,
@@ -125,7 +125,7 @@ fn member_to_proto(m: GuildMember) -> Result<proto::GuildMember, Status> {
         .map_err(|e| Status::internal(format!("serialisation roles: {e}")))?;
     Ok(proto::GuildMember {
         guild_id: m.guild_id,
-        user_id: m.user_id,
+        user_id: m.user_id.into(),
         username: m.username,
         display_name: m.display_name,
         avatar: m.avatar,
@@ -141,7 +141,7 @@ fn proto_to_member(p: proto::GuildMember) -> Result<GuildMember, Status> {
     let roles = serde_json::from_str(&p.roles_json).unwrap_or(serde_json::Value::Array(vec![]));
     Ok(GuildMember {
         guild_id: p.guild_id,
-        user_id: p.user_id,
+        user_id: p.user_id.into(),
         username: p.username,
         display_name: p.display_name,
         avatar: p.avatar,

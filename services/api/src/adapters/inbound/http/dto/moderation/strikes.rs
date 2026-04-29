@@ -8,12 +8,13 @@ use crate::domain::entities::moderation::strikes::StrikeThreshold;
 use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
+use crate::domain::entities::system::discord_ids::UserId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct AddStrikeDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub reason: String,
     pub source: String,
     pub infraction_id: Option<String>,
@@ -101,7 +102,7 @@ impl From<StrikeConfig> for StrikeConfigDto {
 pub struct UserStrikeDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub reason: String,
     pub source: String,
     pub infraction_id: Option<String>,
@@ -128,7 +129,7 @@ impl From<UserStrike> for UserStrikeDto {
 pub struct StrikeResultDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub reason: String,
     pub source: String,
     pub active_count: u32,

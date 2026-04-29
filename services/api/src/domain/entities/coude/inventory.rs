@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::UserId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Inventaire ──
@@ -10,7 +11,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct InventoryItem {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub item_key: String,
     pub quantity: i32,
 }

@@ -5,6 +5,7 @@ use serde::Serialize;
 use crate::domain::entities::casino::blackjack::BlackjackGame;
 use crate::domain::entities::casino::blackjack::Card;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::UserId;
 // ══════════════════════════════════════════════════════════════════════
 // ── Solo game DTOs ──
 // ══════════════════════════════════════════════════════════════════════
@@ -12,7 +13,7 @@ use crate::domain::entities::system::discord_ids::ChannelId;
 #[derive(Debug, Deserialize)]
 pub struct StartGameDto {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub bet: i64,
 }
@@ -38,7 +39,7 @@ impl From<&Card> for CardDto {
 pub struct BlackjackGameDto {
     pub id: String,
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub bet: i64,
     pub player_hand: Vec<CardDto>,
@@ -135,14 +136,14 @@ pub struct TableDto {
 
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct TablePlayerDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
     pub joined_at: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct JoinTableDto {
-    pub user_id: String,
+    pub user_id: UserId,
     pub user_name: String,
 }
 

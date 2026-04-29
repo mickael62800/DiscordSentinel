@@ -10,11 +10,12 @@
 use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Clone)]
 pub struct PlayTravauxCommand {
     pub guild_id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
 }
 

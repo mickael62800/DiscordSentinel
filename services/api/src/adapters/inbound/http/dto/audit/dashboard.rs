@@ -5,6 +5,7 @@ use crate::domain::entities::system::guild::Guild;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::system::log_entry::LogEntry;
 use crate::domain::entities::system::rule::Rule;
+use crate::domain::entities::system::discord_ids::UserId;
 // ── Stats DTO (format desktop) ──
 
 #[derive(Debug, Serialize)]
@@ -83,7 +84,7 @@ pub struct CreateLogDto {
 #[derive(Debug, Serialize)]
 pub struct DashboardInfractionDto {
     pub id: String,
-    pub user_id: String,
+    pub user_id: UserId,
     pub username: String,
     pub server: String,
     pub infraction_type: String,
@@ -129,7 +130,7 @@ impl From<crate::domain::entities::moderation::moderation_action::ModerationActi
     fn from(action: crate::domain::entities::moderation::moderation_action::ModerationAction) -> Self {
         Self {
             id: action.id.to_string(),
-            user_id: action.target_id,
+            user_id: action.target_id.into(),
             username: action.target_name,
             server: action.guild_id,
             infraction_type: action.action_type,

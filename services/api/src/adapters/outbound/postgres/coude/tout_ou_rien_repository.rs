@@ -13,6 +13,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::UserId;
 const TBL: &str = "coude_tout_ou_rien_log";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -30,7 +31,7 @@ impl PgToutOuRienRepository {
 struct Row {
     id: Uuid,
     guild_id: String,
-    user_id: String,
+    user_id: UserId,
     username: String,
     mise: i64,
     outcome: String,
