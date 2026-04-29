@@ -2,6 +2,7 @@
 import { reactive, watch } from "vue";
 import { useStrikes } from "@/composables/useStrikes";
 import type { StrikeThreshold } from "@/types/strikes";
+import AppToggle from "@/components/atoms/AppToggle.vue";
 
 const {
   config,
@@ -88,9 +89,9 @@ function formatDuration(secs: number | null): string {
         Sélectionne une guild pour configurer.
       </div>
       <form v-else @submit.prevent="onSave" class="config-form">
-        <label class="toggle">
-          <input v-model="draft.enabled" type="checkbox" />
-          Système de strikes actif
+        <label class="toggle-row">
+          <AppToggle v-model="draft.enabled" />
+          <span>Système de strikes actif</span>
         </label>
         <label class="full">
           Fenêtre (secondes — au-delà, les strikes expirent)
@@ -124,13 +125,15 @@ function formatDuration(secs: number | null): string {
                   </select>
                 </td>
                 <td>
-                  <input
-                    v-model.number="t.duration"
-                    type="number"
-                    placeholder="vide = permanent"
-                    :disabled="t.action === 'warn' || t.action === 'kick'"
-                  />
-                  <small class="muted" v-if="t.duration">{{ formatDuration(t.duration) }}</small>
+                  <div class="cell-inline">
+                    <input
+                      v-model.number="t.duration"
+                      type="number"
+                      placeholder="vide = permanent"
+                      :disabled="t.action === 'warn' || t.action === 'kick'"
+                    />
+                    <small class="muted" v-if="t.duration">{{ formatDuration(t.duration) }}</small>
+                  </div>
                 </td>
                 <td>
                   <button type="button" class="btn-icon" @click="removeThreshold(idx)">🗑️</button>
@@ -208,12 +211,12 @@ function formatDuration(secs: number | null): string {
   font-size: 1.6rem;
 }
 .lede {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   margin: 0;
 }
 .card {
-  background: var(--bg-card, #1f1f1f);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 20px;
@@ -226,39 +229,76 @@ function formatDuration(secs: number | null): string {
   flex-direction: column;
   gap: 16px;
 }
-.toggle {
+.toggle-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
+  font-weight: 500;
 }
 label.full {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 label.full input,
-.lookup input {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: inherit;
+.lookup input,
+.thresholds-table input,
+.thresholds-table select {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 12px;
+  color: var(--text-primary);
   font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
   width: 100%;
   max-width: 280px;
+  outline: none;
+  transition: border-color var(--transition-fast, 0.15s),
+    box-shadow var(--transition-fast, 0.15s);
+}
+label.full input:hover,
+.lookup input:hover,
+.thresholds-table input:hover,
+.thresholds-table select:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+label.full input:focus,
+.lookup input:focus,
+.thresholds-table input:focus,
+.thresholds-table select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+label.full input:disabled,
+.thresholds-table input:disabled,
+.thresholds-table select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+/* Reduit la fleche native moche des inputs number sur Chrome/Edge */
+label.full input[type="number"]::-webkit-inner-spin-button,
+.thresholds-table input[type="number"]::-webkit-inner-spin-button {
+  opacity: 0.6;
+  cursor: pointer;
 }
 .muted {
-  color: var(--text-muted, #888);
-  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-size: 12px;
 }
 .thresholds h3 {
   margin: 0 0 4px 0;
-  font-size: 1rem;
+  font-size: 14px;
+  font-weight: 700;
 }
 .hint {
-  color: var(--text-muted, #888);
-  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-size: 12px;
   margin: 0 0 8px 0;
 }
 .thresholds-table,
@@ -272,56 +312,129 @@ label.full input,
 .strikes-table th,
 .strikes-table td {
   text-align: left;
-  padding: 6px 10px;
-  border-bottom: 1px solid var(--border-color, #333);
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
   vertical-align: middle;
 }
 .thresholds-table th,
 .strikes-table th {
-  font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  font-size: 11px;
+  color: var(--text-secondary);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.6px;
+  font-weight: 700;
 }
 .thresholds-table input,
 .thresholds-table select {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
-  border-radius: 4px;
-  padding: 4px 8px;
-  color: inherit;
-  width: 90%;
+  max-width: none;
+  padding: 6px 10px;
+}
+.thresholds-table th:nth-child(1),
+.thresholds-table td:nth-child(1) {
+  width: 22%;
+}
+.thresholds-table th:nth-child(2),
+.thresholds-table td:nth-child(2) {
+  width: 28%;
+}
+.thresholds-table th:nth-child(3),
+.thresholds-table td:nth-child(3) {
+  width: 42%;
+}
+.thresholds-table th:nth-child(4),
+.thresholds-table td:nth-child(4) {
+  width: 8%;
+  text-align: right;
+}
+.thresholds-table input,
+.thresholds-table select {
+  max-width: 100%;
+}
+.thresholds-table tbody td {
+  vertical-align: middle;
+}
+.cell-inline {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cell-inline input {
+  flex: 1;
+  min-width: 0;
+}
+.cell-inline .muted {
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .btn-icon {
-  background: none;
-  border: none;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-secondary);
   cursor: pointer;
-  font-size: 1.1rem;
+  font-size: 14px;
+  transition: all var(--transition-fast, 0.15s);
 }
+.btn-icon:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
 .btn-secondary,
 .btn-primary,
 .btn-danger {
-  border: none;
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
   padding: 8px 18px;
   cursor: pointer;
+  font-size: 13px;
   font-weight: 600;
+  transition: background-color var(--transition-fast, 0.15s),
+    border-color var(--transition-fast, 0.15s),
+    color var(--transition-fast, 0.15s),
+    box-shadow var(--transition-fast, 0.15s);
 }
+
 .btn-secondary {
-  background: var(--bg-input, #2a2a2a);
-  color: inherit;
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text-primary);
 }
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+
 .btn-primary {
-  background: #5865F2;
+  background: var(--accent);
   color: white;
 }
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, white);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
 .btn-danger {
-  background: #E74C3C;
+  background: var(--danger);
   color: white;
 }
-.btn-primary:disabled {
-  opacity: 0.6;
+.btn-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 88%, white);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--danger) 35%, transparent);
+}
+
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled {
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 .actions {
   display: flex;
@@ -343,7 +456,7 @@ label.full input,
 .empty {
   padding: 16px;
   text-align: center;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 .reason {
   max-width: 480px;

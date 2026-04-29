@@ -140,136 +140,216 @@ function formatDate(iso: string): string {
 .notes-page {
   max-width: 900px;
   margin: 0 auto;
-  padding: 24px;
 }
 .page-header {
   margin-bottom: 24px;
 }
 .page-header h1 {
   margin: 0 0 8px 0;
-  font-size: 1.6rem;
+  font-size: 22px;
 }
 .lede {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   margin: 0;
+  font-size: 13px;
 }
+
 .card {
-  background: var(--bg-card, #1f1f1f);
-  border: 1px solid var(--border-color, #333);
-  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
   padding: 20px;
   margin-bottom: 20px;
 }
 .card h2 {
-  margin: 0 0 12px 0;
+  margin: 0 0 16px 0;
+  font-size: 16px;
+  font-weight: 700;
 }
+
+/* ── Inputs / select / textarea ────────────── */
 .lookup {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .lookup input,
 .add-form input,
 .add-form select,
 .add-form textarea {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
-  border-radius: 4px;
-  padding: 6px 10px;
-  color: inherit;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 12px;
+  color: var(--text-primary);
   font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  outline: none;
+  transition: border-color var(--transition-fast, 0.15s),
+    box-shadow var(--transition-fast, 0.15s);
+}
+.lookup input:hover,
+.add-form input:hover,
+.add-form select:hover,
+.add-form textarea:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.lookup input:focus,
+.add-form input:focus,
+.add-form select:focus,
+.add-form textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 .lookup input {
   flex: 1;
+  min-width: 220px;
   max-width: 320px;
 }
+
 .add-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 .add-form label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 0.9rem;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
 }
 .add-form label.full textarea {
   width: 100%;
   resize: vertical;
+  min-height: 80px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-primary);
 }
+
+/* ── Buttons ──────────────────────────────── */
 .btn-secondary,
 .btn-primary {
-  border: none;
-  border-radius: 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
   padding: 8px 18px;
   cursor: pointer;
+  font-size: 13px;
   font-weight: 600;
+  transition: background-color var(--transition-fast, 0.15s),
+    border-color var(--transition-fast, 0.15s),
+    color var(--transition-fast, 0.15s),
+    box-shadow var(--transition-fast, 0.15s);
 }
 .btn-secondary {
-  background: var(--bg-input, #2a2a2a);
-  color: inherit;
+  background: var(--bg-card);
+  border-color: var(--border);
+  color: var(--text-primary);
+}
+.btn-secondary:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
 }
 .btn-primary {
-  background: #5865F2;
+  background: var(--accent);
   color: white;
 }
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, white);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
 }
+.btn-primary:disabled,
+.btn-secondary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn-icon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all var(--transition-fast, 0.15s);
+}
+.btn-icon:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
 .actions {
   display: flex;
   justify-content: flex-end;
 }
+
+/* ── Notes list ───────────────────────────── */
 .notes-list {
   list-style: none;
   padding: 0;
   margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .note {
-  background: var(--bg-input, #181818);
-  border-left: 4px solid var(--border-color, #333);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
   padding: 12px 16px;
-  margin-bottom: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-md, 8px);
 }
 .note-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   margin-bottom: 6px;
 }
 .category-badge {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 3px 10px;
+  border-radius: 999px;
   color: white;
-  font-size: 0.75rem;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
 }
 .note-author {
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 13px;
+  color: var(--text-primary);
 }
 .note-date {
-  font-size: 0.8rem;
-  color: var(--text-muted, #888);
+  font-size: 11px;
+  color: var(--text-secondary);
   margin-left: auto;
+  font-family: "JetBrains Mono", monospace;
 }
 .note-content {
   white-space: pre-wrap;
   word-break: break-word;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
 }
-.btn-icon {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-}
+
 .loading,
 .empty {
-  padding: 16px;
+  padding: 24px;
   text-align: center;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 </style>

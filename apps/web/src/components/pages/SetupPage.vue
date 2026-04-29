@@ -64,7 +64,7 @@ async function handleSubmit() {
   <div class="setup-page">
     <div class="setup-card">
       <div class="setup-logo">
-        <span class="logo-icon">S</span>
+        <img src="/logo.png" alt="DiscordSentinel" class="logo-icon" />
       </div>
       <h1>DiscordSentinel</h1>
       <p class="subtitle">Configuration initiale</p>
@@ -186,16 +186,11 @@ async function handleSubmit() {
 }
 
 .logo-icon {
-  display: inline-flex;
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+  width: 80px;
+  height: 80px;
   border-radius: 16px;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 32px;
-  color: white;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
 }
 
 h1 {

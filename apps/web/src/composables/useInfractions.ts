@@ -26,8 +26,16 @@ export function useInfractions() {
         success("Infraction supprimee avec succes.");
       }
     } catch (e) {
-      console.error("Erreur lors de la suppression de l'infraction :", e);
-      showError("Erreur lors de la suppression de l'infraction.");
+      // 404 = la ligne n existe deja plus en BDD (le journal etait stale).
+      // On rafraichit silencieusement et on previent l utilisateur sans erreur.
+      const msg = String(e);
+      if (msg.includes("404")) {
+        await fetchInfractions();
+        success("Ligne deja supprimee, journal rafraichi.");
+      } else {
+        console.error("Erreur lors de la suppression de l'infraction :", e);
+        showError("Erreur lors de la suppression de l'infraction.");
+      }
     } finally {
       deleting.value = false;
     }

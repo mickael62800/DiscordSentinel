@@ -534,7 +534,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 
 .hero-subtitle {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -582,7 +582,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 
 .kpi-label {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 500;
@@ -618,7 +618,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
   min-width: 120px;
   padding: 10px 16px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   border: none;
   border-radius: 7px;
   font-size: 0.85rem;
@@ -662,7 +662,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
   border-bottom: 2px solid var(--border);
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -705,7 +705,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 .player-id {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -724,7 +724,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 
 .bet-unit {
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .doubled-badge {
@@ -752,7 +752,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 
 .score-label {
   width: 12px;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -780,7 +780,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 .col-payout .muted,
 .muted,
 .muted-text {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* Status badge */
@@ -815,13 +815,13 @@ onMounted(() => { fetchGames(); fetchTables(); });
 }
 
 .status-badge.status-muted {
-  background: color-mix(in srgb, var(--text-muted) 20%, transparent);
-  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-secondary) 20%, transparent);
+  color: var(--text-secondary);
 }
 
 .col-date {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .col-chevron {
@@ -830,7 +830,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 
 .chevron {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .table-row.expanded .chevron {
@@ -862,7 +862,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 .detail-block h4 {
   margin: 0 0 12px;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -882,7 +882,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 }
 
 .detail-label {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .detail-row code {
@@ -912,7 +912,7 @@ onMounted(() => { fetchGames(); fetchTables(); });
 .muted-text {
   margin: 0;
   padding: 12px;
-  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
   border-radius: 8px;
   text-align: center;
   font-size: 0.85rem;

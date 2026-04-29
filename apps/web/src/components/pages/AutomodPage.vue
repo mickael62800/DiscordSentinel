@@ -261,11 +261,11 @@ function severityLabel(s: number): { label: string; color: string } {
   font-size: 1.6rem;
 }
 .lede {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   margin: 0;
 }
 .lede a {
-  color: #5865F2;
+  color: var(--accent);
   text-decoration: none;
 }
 .lede a:hover {
@@ -278,8 +278,8 @@ function severityLabel(s: number): { label: string; color: string } {
   margin-bottom: 20px;
 }
 .kpi-card {
-  background: var(--bg-card, #1f1f1f);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px 20px;
   display: flex;
@@ -291,7 +291,7 @@ function severityLabel(s: number): { label: string; color: string } {
 }
 .kpi-label {
   font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 .grid {
@@ -301,8 +301,8 @@ function severityLabel(s: number): { label: string; color: string } {
   margin-bottom: 20px;
 }
 .card {
-  background: var(--bg-card, #1f1f1f);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 20px;
 }
@@ -311,7 +311,7 @@ function severityLabel(s: number): { label: string; color: string } {
   font-size: 1.1rem;
 }
 .empty {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   font-style: italic;
 }
 .cat-list,
@@ -325,7 +325,7 @@ function severityLabel(s: number): { label: string; color: string } {
   display: flex;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
 }
 .cat-list li:last-child,
 .user-list li:last-child {
@@ -334,7 +334,7 @@ function severityLabel(s: number): { label: string; color: string } {
 .cat-count,
 .user-count {
   font-weight: 600;
-  color: #5865F2;
+  color: var(--accent);
 }
 .user-list li {
   display: grid;
@@ -345,7 +345,7 @@ function severityLabel(s: number): { label: string; color: string } {
 .user-id {
   font-family: monospace;
   font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 .user-count {
   text-align: right;
@@ -361,14 +361,14 @@ function severityLabel(s: number): { label: string; color: string } {
   gap: 8px;
 }
 .filters input {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 10px;
   color: inherit;
 }
 .btn-secondary {
-  background: #5865F2;
+  background: var(--accent);
   color: white;
   border: none;
   border-radius: 4px;
@@ -383,20 +383,20 @@ function severityLabel(s: number): { label: string; color: string } {
 .detections-table td {
   text-align: left;
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
   vertical-align: top;
 }
 .detections-table th {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 .detections-table small.muted {
   display: block;
   font-size: 0.75rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 .severity-badge {
@@ -414,7 +414,7 @@ function severityLabel(s: number): { label: string; color: string } {
 .loading {
   padding: 32px;
   text-align: center;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 
 /* Reviews pending */
@@ -431,7 +431,7 @@ function severityLabel(s: number): { label: string; color: string } {
 .lede.small { font-size: 0.85rem; margin-bottom: 12px; }
 .reviews-list { list-style: none; padding: 0; margin: 0; }
 .review-card {
-  background: var(--bg-input, #181818);
+  background: var(--bg-card);
   border-left: 4px solid #E67E22;
   padding: 12px 14px;
   border-radius: 6px;
@@ -464,7 +464,7 @@ function severityLabel(s: number): { label: string; color: string } {
 }
 .review-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .action-btn {
-  border: 1px solid var(--border-color, #444);
+  border: 1px solid var(--border);
   background: transparent;
   color: inherit;
   border-radius: 4px;

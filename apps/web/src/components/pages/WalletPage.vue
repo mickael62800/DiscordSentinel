@@ -393,7 +393,7 @@ onMounted(() => fetchWallets());
 
 .hero-subtitle {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -441,7 +441,7 @@ onMounted(() => fetchWallets());
 
 .kpi-label {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 500;
@@ -498,7 +498,7 @@ onMounted(() => fetchWallets());
 .danger-info p {
   margin: 0;
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .danger-actions {
@@ -515,7 +515,7 @@ onMounted(() => fetchWallets());
 
 .input-group label {
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -551,7 +551,7 @@ onMounted(() => fetchWallets());
 }
 
 .count {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
 }
@@ -604,7 +604,7 @@ onMounted(() => fetchWallets());
   border-bottom: 2px solid var(--border);
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -641,7 +641,7 @@ onMounted(() => fetchWallets());
   font-weight: 700;
   font-size: 0.85rem;
   background: var(--bg);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .rank-badge.rank-1 {
@@ -667,7 +667,7 @@ onMounted(() => fetchWallets());
 .player-id {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -686,7 +686,7 @@ onMounted(() => fetchWallets());
 
 .coins-unit {
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
 }
 
@@ -702,7 +702,7 @@ onMounted(() => fetchWallets());
 
 .col-updated {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .col-actions {
@@ -711,7 +711,7 @@ onMounted(() => fetchWallets());
 
 .chevron {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   transition: transform var(--transition-fast);
 }
 
@@ -741,7 +741,7 @@ onMounted(() => fetchWallets());
 .action-panel h4 {
   margin: 0 0 12px;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;

@@ -201,12 +201,12 @@ async function onAddAutoRole() {
 .back-link {
   display: inline-block;
   margin-top: 8px;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   text-decoration: none;
   font-size: 0.9rem;
 }
 .back-link:hover {
-  color: #5865F2;
+  color: var(--accent);
 }
 .form {
   display: grid;
@@ -225,8 +225,8 @@ async function onAddAutoRole() {
 .form input,
 .form select,
 .form textarea {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 10px;
   color: inherit;
@@ -258,8 +258,8 @@ async function onAddAutoRole() {
 }
 .entry-row input,
 .entry-row select {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 8px;
   color: inherit;
@@ -275,7 +275,7 @@ async function onAddAutoRole() {
   padding: 4px;
 }
 .hint {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   font-size: 0.85rem;
   margin-bottom: 12px;
 }
@@ -291,7 +291,7 @@ async function onAddAutoRole() {
   gap: 12px;
   align-items: center;
   padding: 6px 12px;
-  background: var(--bg-input, #181818);
+  background: var(--bg-card);
   border-radius: 4px;
 }
 .auto-role-form {
@@ -301,8 +301,8 @@ async function onAddAutoRole() {
   align-items: center;
 }
 .auto-role-form input {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 10px;
   color: inherit;

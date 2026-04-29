@@ -687,19 +687,24 @@ pub async fn get_modstats(
         kicks: i64,
     }
 
+    // Phase 4 : on lit depuis `audit_logs` (event_type='mod_*') et plus
+    // depuis `moderation_actions` qui n'est plus alimentee.
     let rows: Vec<StatsRow> = sqlx::query_as::<_, StatsRow>(
         "SELECT \
-            moderator_id, \
-            MAX(moderator_name) AS moderator_name, \
+            actor_id AS moderator_id, \
+            MAX(actor_name) AS moderator_name, \
             COUNT(*) AS total, \
-            COUNT(*) FILTER (WHERE action_type = 'warn') AS warns, \
-            COUNT(*) FILTER (WHERE action_type IN ('mute_temp','mute_permanent','mute')) AS mutes, \
-            COUNT(*) FILTER (WHERE action_type IN ('ban_temp','ban_permanent','ban')) AS bans, \
-            COUNT(*) FILTER (WHERE action_type = 'kick') AS kicks \
-         FROM moderation_actions \
+            COUNT(*) FILTER (WHERE event_type = 'mod_warn') AS warns, \
+            COUNT(*) FILTER (WHERE event_type IN ('mod_mute_temp','mod_mute_permanent','mod_mute')) AS mutes, \
+            COUNT(*) FILTER (WHERE event_type IN ('mod_ban_temp','mod_ban_permanent','mod_ban')) AS bans, \
+            COUNT(*) FILTER (WHERE event_type = 'mod_kick') AS kicks \
+         FROM audit_logs \
          WHERE guild_id = $1 \
+           AND event_type LIKE 'mod_%' \
+           AND event_type NOT IN ('mod_unban','mod_unmute') \
+           AND actor_id IS NOT NULL \
            AND created_at >= NOW() - INTERVAL '30 days' \
-         GROUP BY moderator_id \
+         GROUP BY actor_id \
          ORDER BY total DESC \
          LIMIT 20",
     )

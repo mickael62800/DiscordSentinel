@@ -200,8 +200,8 @@ const avgPayout = computed(() =>
   margin-bottom: 20px;
 }
 .kpi-card {
-  background: var(--bg-card, #1f1f1f);
-  border: 1px solid var(--border-color, #333);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px 20px;
 }
@@ -212,7 +212,7 @@ const avgPayout = computed(() =>
 }
 .kpi-label {
   font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 .grid {
   display: grid;

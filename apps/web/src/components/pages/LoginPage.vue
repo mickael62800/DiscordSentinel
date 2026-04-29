@@ -18,7 +18,7 @@ async function handleLogin() {
   <div class="login-page">
     <div class="card card--elevated login-card">
       <div class="login-logo">
-        <span class="logo-icon">S</span>
+        <img src="/logo.png" alt="DiscordSentinel" class="logo-img" />
       </div>
       <h1>DiscordSentinel</h1>
       <p class="subtitle">Panneau d'administration</p>
@@ -66,17 +66,16 @@ async function handleLogin() {
   margin-bottom: var(--space-lg);
 }
 
-.logo-icon {
-  display: inline-flex;
-  width: 64px;
-  height: 64px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-alt));
+.logo-img {
+  width: 96px;
+  height: 96px;
   border-radius: var(--radius-xl);
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 32px;
-  color: white;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+  transition: transform 0.3s ease;
+}
+.logo-img:hover {
+  transform: scale(1.05);
 }
 
 h1 {

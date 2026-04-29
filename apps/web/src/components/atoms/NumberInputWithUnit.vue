@@ -72,7 +72,7 @@ function onInput(e: Event) {
   align-items: stretch;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg-input, #1e2128);
+  background: var(--bg-card);
   overflow: hidden;
   transition: border-color 0.15s;
 }

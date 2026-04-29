@@ -1,22 +1,90 @@
 <script setup lang="ts">
 import { computed, toRef } from "vue";
 import { useDashboardCharts } from "@/composables/useDashboardCharts";
-import { Line, Bar, Doughnut } from "vue-chartjs";
-import type { ScriptableContext } from "chart.js";
-
+import { useAnalytics } from "@/composables/useAnalytics";
+import { Line, Bar } from "vue-chartjs";
 const props = defineProps<{ days: number }>();
 const daysRef = toRef(props, "days");
 
-const { activity, topUsers, loading, error, fetchAll } = useDashboardCharts(
-  // On passe un ref derive du prop pour que le composable l'utilise comme source
-  computed({
-    get: () => daysRef.value,
-    // pas de setter : la periode est pilotee par le parent
-    set: () => {},
-  }),
-);
+const sharedDays = computed({
+  get: () => daysRef.value,
+  set: () => {},
+});
 
-defineExpose({ refresh: fetchAll });
+const { activity, topUsers, loading, error, fetchAll } = useDashboardCharts(sharedDays);
+const { analytics, fetchAnalytics } = useAnalytics(sharedDays);
+
+defineExpose({
+  refresh: async () => {
+    await Promise.all([fetchAll(), fetchAnalytics()]);
+  },
+});
+
+// Heatmap d'activite (messages) par jour-de-semaine x heure.
+// Recuperee de l'ancienne section Analytics : c'est la "partie active" qui
+// montre QUAND les membres parlent — utile pour caler des animations.
+const heatmapGrid = computed(() => {
+  if (!analytics.value) return null;
+  const points = analytics.value.heatmap;
+  if (points.length === 0) return null;
+
+  const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  const hours = Array.from({ length: 24 }, (_, i) => i);
+
+  const lookup = new Map<string, number>();
+  let maxVal = 1;
+  for (const p of points) {
+    const key = `${p.day_of_week}-${p.hour}`;
+    lookup.set(key, p.messages);
+    if (p.messages > maxVal) maxVal = p.messages;
+  }
+
+  return { dayNames, hours, lookup, maxVal };
+});
+
+function heatColor(value: number, max: number): string {
+  if (value === 0) return "rgba(88, 101, 242, 0.05)";
+  const intensity = Math.min(value / max, 1);
+  return `rgba(88, 101, 242, ${0.1 + intensity * 0.8})`;
+}
+
+// Doughnut "Repartition des infractions" - re-ajoute a la demande de
+// l'utilisateur (le camembert lui plait).
+const totalInfractions = computed(() => ({
+  w: activity.value.reduce((s, a) => s + a.warns, 0),
+  m: activity.value.reduce((s, a) => s + a.mutes, 0),
+  b: activity.value.reduce((s, a) => s + a.bans, 0),
+}));
+
+const infractionsBarData = computed(() => ({
+  labels: ["Avertissements", "Sourdines", "Bannissements"],
+  datasets: [
+    {
+      label: "Total",
+      data: [totalInfractions.value.w, totalInfractions.value.m, totalInfractions.value.b],
+      backgroundColor: ["#5bc0eb", "#fee75c", "#ed4245"],
+      borderRadius: 6,
+    },
+  ],
+}));
+
+const infractionsBarOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  indexAxis: "y" as const,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: {
+      ticks: { color: "#9495b0", font: { size: 10 } },
+      grid: { color: "rgba(58, 59, 92, 0.5)" },
+      beginAtZero: true,
+    },
+    y: {
+      ticks: { color: "#9495b0", font: { size: 11 } },
+      grid: { display: false },
+    },
+  },
+};
 
 const chartOptions = {
   responsive: true,
@@ -58,70 +126,17 @@ const messagesChartData = computed(() => ({
   ],
 }));
 
-const voiceChartData = computed(() => {
-  let cumul = 0;
-  const cumulData = activity.value.map((a) => {
-    cumul += Math.round((a.voice_minutes / 60) * 10) / 10;
-    return cumul;
-  });
-  return {
-    labels: labels.value,
-    datasets: [
-      {
-        label: "Heures vocales (cumule)",
-        data: cumulData,
-        borderColor: "#57f287",
-        backgroundColor: "rgba(87, 242, 135, 0.12)",
-        fill: true,
-        tension: 0.3,
-      },
-      {
-        label: "Heures / jour",
-        data: activity.value.map((a) => Math.round((a.voice_minutes / 60) * 10) / 10),
-        borderColor: "#2ecc71",
-        backgroundColor: "rgba(46, 204, 113, 0.4)",
-        type: "bar" as const,
-      },
-    ],
-  } as any;
-});
-
-const infractionsChartData = computed(() => ({
+const voiceChartData = computed(() => ({
   labels: labels.value,
   datasets: [
-    { label: "Avertissements", data: activity.value.map((a) => a.warns), backgroundColor: "#5bc0eb" },
-    { label: "Sourdines", data: activity.value.map((a) => a.mutes), backgroundColor: "#fee75c" },
-    { label: "Bannissements", data: activity.value.map((a) => a.bans), backgroundColor: "#ed4245" },
-  ],
-}));
-
-const totalInfractions = computed(() => ({
-  w: activity.value.reduce((s, a) => s + a.warns, 0),
-  m: activity.value.reduce((s, a) => s + a.mutes, 0),
-  b: activity.value.reduce((s, a) => s + a.bans, 0),
-}));
-
-const doughnutData = computed(() => ({
-  labels: ["Avertissements", "Sourdines", "Bannissements"],
-  datasets: [
     {
-      data: [totalInfractions.value.w, totalInfractions.value.m, totalInfractions.value.b],
-      backgroundColor: ["#5bc0eb", "#fee75c", "#ed4245"],
-      borderWidth: 0,
+      label: "Heures vocales / jour",
+      data: activity.value.map((a) => Math.round((a.voice_minutes / 60) * 10) / 10),
+      backgroundColor: "#2ecc71",
+      borderRadius: 4,
     },
   ],
 }));
-
-const doughnutOptions = {
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: "bottom" as const,
-      labels: { color: "#9495b0", font: { size: 11 }, padding: 16 },
-    },
-  },
-};
 
 const memberGrowthData = computed(() => ({
   labels: labels.value,
@@ -145,28 +160,6 @@ const memberGrowthData = computed(() => ({
   ],
 }));
 
-const netGrowthData = computed(() => {
-  let cumul = 0;
-  const data = activity.value.map((a) => {
-    cumul += a.new_members - a.leaves;
-    return cumul;
-  });
-  return {
-    labels: labels.value,
-    datasets: [
-      {
-        label: "Croissance nette (cumul)",
-        data,
-        borderColor: "#5865f2",
-        backgroundColor: (ctx: ScriptableContext<"line">) =>
-          (ctx.raw as number) >= 0 ? "rgba(87, 242, 135, 0.3)" : "rgba(237, 66, 69, 0.3)",
-        fill: true,
-        tension: 0.3,
-      },
-    ],
-  };
-});
-
 const engagementData = computed(() => ({
   labels: labels.value,
   datasets: [
@@ -183,40 +176,37 @@ const engagementData = computed(() => ({
   ],
 }));
 
-const serverHealthData = computed(() => ({
-  labels: labels.value,
-  datasets: [
-    {
-      label: "Infractions pour 100 messages",
-      data: activity.value.map((a) =>
-        a.messages > 0 ? Math.round((a.infractions / a.messages) * 10000) / 100 : 0,
-      ),
-      borderColor: "#e74c3c",
-      backgroundColor: "rgba(231, 76, 60, 0.15)",
-      fill: true,
-      tension: 0.3,
-    },
-  ],
-}));
+// Top 5 messages (l'API renvoie 10, on coupe localement).
+const topMessageUsers = computed(() => topUsers.value.slice(0, 5));
 
 const topMessagesData = computed(() => ({
-  labels: topUsers.value.map((u) => u.username || u.user_id),
+  labels: topMessageUsers.value.map((u) => u.username || u.user_id),
   datasets: [
     {
       label: "Messages",
-      data: topUsers.value.map((u) => u.message_count),
+      data: topMessageUsers.value.map((u) => u.message_count),
       backgroundColor: "#5865f2",
       borderRadius: 6,
     },
   ],
 }));
 
+// Le top voice est un classement DIFFERENT du top messages : on re-trie
+// localement par voice_hours desc et on filtre les users a 0h, puis on
+// coupe au top 5.
+const topVoiceUsers = computed(() =>
+  [...topUsers.value]
+    .filter((u) => u.voice_hours > 0)
+    .sort((a, b) => b.voice_hours - a.voice_hours)
+    .slice(0, 5),
+);
+
 const topVoiceData = computed(() => ({
-  labels: topUsers.value.map((u) => u.username || u.user_id),
+  labels: topVoiceUsers.value.map((u) => u.username || u.user_id),
   datasets: [
     {
       label: "Heures vocales",
-      data: topUsers.value.map((u) => Math.round(u.voice_hours * 10) / 10),
+      data: topVoiceUsers.value.map((u) => Math.round(u.voice_hours * 10) / 10),
       backgroundColor: "#57f287",
       borderRadius: 6,
     },
@@ -258,7 +248,7 @@ const membersChartData = computed(() => ({
 
 <template>
   <section class="dash-section">
-    <h2 class="section-title">Graphiques d'activite</h2>
+    <h2 class="section-title">Activite du serveur</h2>
 
     <div v-if="error" class="error-msg">Erreur chargement graphiques : {{ error }}</div>
     <div v-else-if="!loading && activity.length > 0" class="charts-grid">
@@ -268,49 +258,65 @@ const membersChartData = computed(() => ({
       </div>
       <div class="card chart-card">
         <h3>Activite vocale</h3>
-        <div class="chart-container"><Line :data="voiceChartData" :options="chartOptions" /></div>
-      </div>
-      <div class="card chart-card">
-        <h3>Infractions</h3>
-        <div class="chart-container"><Bar :data="infractionsChartData" :options="chartOptions" /></div>
-      </div>
-      <div class="card chart-card">
-        <h3>Repartition des infractions</h3>
-        <div class="chart-container chart-container--small">
-          <Doughnut :data="doughnutData" :options="doughnutOptions" />
-        </div>
+        <div class="chart-container"><Bar :data="voiceChartData" :options="chartOptions" /></div>
       </div>
       <div class="card chart-card">
         <h3>Croissance membres</h3>
         <div class="chart-container"><Line :data="memberGrowthData" :options="chartOptions" /></div>
       </div>
       <div class="card chart-card">
-        <h3>Croissance nette du serveur</h3>
-        <div class="chart-container"><Line :data="netGrowthData" :options="chartOptions" /></div>
-      </div>
-      <div class="card chart-card">
         <h3>Engagement (messages / membre)</h3>
         <div class="chart-container"><Line :data="engagementData" :options="chartOptions" /></div>
       </div>
-      <div class="card chart-card">
-        <h3>Sante du serveur</h3>
-        <div class="chart-container"><Line :data="serverHealthData" :options="chartOptions" /></div>
-      </div>
-      <div v-if="topUsers.length > 0" class="card chart-card">
-        <h3>Top membres (messages)</h3>
-        <div class="chart-container chart-container--tall">
+      <div v-if="topMessageUsers.length > 0" class="card chart-card">
+        <h3>Top 5 membres (messages)</h3>
+        <div class="chart-container">
           <Bar :data="topMessagesData" :options="horizontalBarOptions" />
         </div>
       </div>
-      <div v-if="topUsers.length > 0" class="card chart-card">
-        <h3>Top membres (vocal)</h3>
-        <div class="chart-container chart-container--tall">
+      <div v-if="topVoiceUsers.length > 0" class="card chart-card">
+        <h3>Top 5 membres (vocal)</h3>
+        <div class="chart-container">
           <Bar :data="topVoiceData" :options="horizontalBarOptions" />
         </div>
       </div>
       <div class="card chart-card">
         <h3>Membres actifs</h3>
         <div class="chart-container"><Line :data="membersChartData" :options="chartOptions" /></div>
+      </div>
+      <div class="card chart-card">
+        <h3>Repartition des infractions</h3>
+        <div class="chart-container">
+          <Bar :data="infractionsBarData" :options="infractionsBarOptions" />
+        </div>
+      </div>
+      <div class="card chart-card">
+        <h3>Heatmap activite (messages par heure)</h3>
+        <div v-if="heatmapGrid" class="heatmap-wrapper">
+          <table class="heatmap-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th v-for="h in heatmapGrid.hours" :key="h" class="heatmap-hour">{{ h }}h</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(dayName, dayIdx) in heatmapGrid.dayNames" :key="dayIdx">
+                <td class="heatmap-day">{{ dayName }}</td>
+                <td
+                  v-for="h in heatmapGrid.hours"
+                  :key="h"
+                  class="heatmap-cell"
+                  :style="{ backgroundColor: heatColor(heatmapGrid.lookup.get(`${dayIdx}-${h}`) || 0, heatmapGrid.maxVal) }"
+                  :title="`${dayName} ${h}h: ${heatmapGrid.lookup.get(`${dayIdx}-${h}`) || 0} msgs`"
+                ></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-else class="heatmap-empty">
+          Pas encore assez de donnees pour afficher la heatmap.
+        </div>
       </div>
     </div>
     <div v-else-if="loading" class="loading">Chargement des graphiques...</div>
@@ -341,7 +347,7 @@ const membersChartData = computed(() => ({
   /* 3 colonnes sur ecrans larges, 2 colonnes au milieu, 1 sur mobile.
      minmax(0, 1fr) empeche les cells de deborder leur largeur. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  gap: 24px;
 }
 
 @media (max-width: 1300px) {
@@ -373,16 +379,49 @@ const membersChartData = computed(() => ({
 }
 
 .chart-container {
-  height: 220px;
+  height: 240px;
   position: relative;
 }
 
-.chart-container--tall { height: 300px; }
+.chart-container--tall { height: 320px; }
 
 .chart-container--small {
   height: 200px;
   max-width: 300px;
   margin: 0 auto;
+}
+
+.heatmap-wrapper { width: 100%; }
+.heatmap-table {
+  border-collapse: separate;
+  border-spacing: 2px;
+  width: 100%;
+  table-layout: fixed;
+}
+.heatmap-hour {
+  font-size: 9px;
+  color: var(--text-secondary);
+  padding: 1px 0;
+  text-align: center;
+}
+.heatmap-day {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-right: 6px;
+  white-space: nowrap;
+  text-align: right;
+  width: 36px;
+}
+.heatmap-cell {
+  height: 24px;
+  border-radius: 3px;
+  cursor: default;
+}
+.heatmap-empty {
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 
 .error-msg {

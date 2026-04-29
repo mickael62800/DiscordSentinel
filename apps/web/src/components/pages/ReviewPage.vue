@@ -126,7 +126,7 @@ function formatDate(iso: string): string {
   margin: 0;
 }
 .review {
-  background: var(--bg-input, #181818);
+  background: var(--bg-card);
   border-left: 4px solid #F1C40F;
   padding: 12px 16px;
   margin-bottom: 12px;
@@ -143,7 +143,7 @@ function formatDate(iso: string): string {
   display: inline-block;
   padding: 2px 8px;
   border-radius: 4px;
-  background: var(--bg-card, #1f1f1f);
+  background: var(--bg-secondary);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -153,7 +153,7 @@ function formatDate(iso: string): string {
 .review-date {
   margin-left: auto;
   font-size: 0.8rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 .review-body {
   margin-bottom: 12px;
@@ -175,7 +175,7 @@ function formatDate(iso: string): string {
   z-index: 100;
 }
 .modal {
-  background: var(--bg-card, #1f1f1f);
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 24px;
   width: 90%;
@@ -194,8 +194,8 @@ function formatDate(iso: string): string {
   font-size: 0.9rem;
 }
 .modal textarea {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 10px;
   color: inherit;

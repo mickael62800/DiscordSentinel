@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from "vue";
-import SidebarNav from "../organisms/SidebarNav.vue";
+import TopBar from "../organisms/TopBar.vue";
 import ConnectionBanner from "../atoms/ConnectionBanner.vue";
 import { useRealtime } from "../../composables/useRealtime";
 import { useNotifications } from "../../composables/useNotifications";
@@ -21,8 +21,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <SidebarNav />
   <div class="main-wrapper">
+    <TopBar />
     <ConnectionBanner />
     <main class="main-content" @click="closePanel()">
       <slot />

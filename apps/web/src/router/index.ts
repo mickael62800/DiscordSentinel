@@ -2,6 +2,7 @@ import type { RouteRecordRaw } from "vue-router";
 import SetupPage from "../components/pages/SetupPage.vue";
 import LoginPage from "../components/pages/LoginPage.vue";
 import DashboardPage from "../components/pages/DashboardPage.vue";
+import StatsPage from "../components/pages/StatsPage.vue";
 import LogsPage from "../components/pages/LogsPage.vue";
 import ModerationHubPage from "../components/pages/ModerationHubPage.vue";
 import RulesPage from "../components/pages/RulesPage.vue";
@@ -47,6 +48,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/login", name: "login", component: LoginPage, meta: { public: true } },
   { path: "/auth/callback", name: "auth-callback", component: AuthCallbackPage, meta: { public: true } },
   { path: "/", name: "dashboard", component: DashboardPage },
+  { path: "/stats", name: "stats", component: StatsPage },
   { path: "/logs", name: "logs", component: LogsPage },
   { path: "/moderation", name: "moderation", component: ModerationHubPage },
   { path: "/rules", name: "rules", component: RulesPage },

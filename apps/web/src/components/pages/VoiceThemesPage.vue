@@ -251,7 +251,7 @@ async function onRemove(theme: VoiceChannelTheme) {
   color: white;
 }
 .flag.default {
-  background: #5865F2;
+  background: var(--accent);
 }
 .flag.locked {
   background: #E67E22;
@@ -276,7 +276,7 @@ async function onRemove(theme: VoiceChannelTheme) {
   z-index: 100;
 }
 .modal {
-  background: var(--bg-card, #1f1f1f);
+  background: var(--bg-secondary);
   border-radius: 8px;
   padding: 24px;
   width: 90%;
@@ -303,8 +303,8 @@ async function onRemove(theme: VoiceChannelTheme) {
 }
 .form-grid input,
 .form-grid select {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 10px;
   color: inherit;

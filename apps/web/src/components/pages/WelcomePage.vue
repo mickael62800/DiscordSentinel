@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
 import { useWelcome } from "@/composables/useWelcome";
+import AppToggle from "@/components/atoms/AppToggle.vue";
 
 const { config, loading, saving, saveConfig } = useWelcome();
 
@@ -158,9 +159,9 @@ async function onSave() {
       <!-- ── Welcome ── -->
       <fieldset class="card">
         <legend>
-          <label class="toggle">
-            <input v-model="draft.welcome_enabled" type="checkbox" />
-            Message de bienvenue actif
+          <label class="toggle-row">
+            <AppToggle v-model="draft.welcome_enabled" />
+            <span>Message de bienvenue actif</span>
           </label>
         </legend>
         <div class="grid">
@@ -192,9 +193,9 @@ async function onSave() {
 
         <details class="dm-details">
           <summary>DM de bienvenue (optionnel)</summary>
-          <label class="toggle">
-            <input v-model="draft.welcome_dm_enabled" type="checkbox" />
-            Activer le DM
+          <label class="toggle-row">
+            <AppToggle v-model="draft.welcome_dm_enabled" />
+            <span>Activer le DM</span>
           </label>
           <label class="full">
             Message DM
@@ -215,9 +216,9 @@ async function onSave() {
       <!-- ── Verification gate (règles) ── -->
       <fieldset class="card">
         <legend>
-          <label class="toggle">
-            <input v-model="draft.rules_enabled" type="checkbox" />
-            🔒 Verification gate (lecture des règles)
+          <label class="toggle-row">
+            <AppToggle v-model="draft.rules_enabled" />
+            <span>🔒 Verification gate (lecture des règles)</span>
           </label>
         </legend>
         <p class="hint">
@@ -247,9 +248,9 @@ async function onSave() {
       <!-- ── Compteur de membres ── -->
       <fieldset class="card">
         <legend>
-          <label class="toggle">
-            <input v-model="draft.counter_enabled" type="checkbox" />
-            🔢 Compteur de membres
+          <label class="toggle-row">
+            <AppToggle v-model="draft.counter_enabled" />
+            <span>🔢 Compteur de membres</span>
           </label>
         </legend>
         <div class="grid">
@@ -267,9 +268,9 @@ async function onSave() {
       <!-- ── Anniversaire ── -->
       <fieldset class="card">
         <legend>
-          <label class="toggle">
-            <input v-model="draft.anniversary_enabled" type="checkbox" />
-            🎂 Anniversaire d'arrivée
+          <label class="toggle-row">
+            <AppToggle v-model="draft.anniversary_enabled" />
+            <span>🎂 Anniversaire d'arrivée</span>
           </label>
         </legend>
         <div class="grid">
@@ -299,9 +300,9 @@ async function onSave() {
       <!-- ── Départ ── -->
       <fieldset class="card">
         <legend>
-          <label class="toggle">
-            <input v-model="draft.leave_enabled" type="checkbox" />
-            👋 Message de départ
+          <label class="toggle-row">
+            <AppToggle v-model="draft.leave_enabled" />
+            <span>👋 Message de départ</span>
           </label>
         </legend>
         <div class="grid">
@@ -368,129 +369,206 @@ async function onSave() {
 .welcome-page {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 24px;
 }
 .page-header {
   margin-bottom: 24px;
 }
 .page-header h1 {
   margin: 0 0 8px 0;
-  font-size: 1.6rem;
+  font-size: 22px;
 }
 .lede {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
 }
 .lede code {
-  background: var(--bg-muted, #2a2a2a);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   padding: 1px 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-sm, 6px);
   font-size: 0.9em;
+  font-family: "JetBrains Mono", monospace;
+  color: var(--accent);
 }
 .loading,
 .empty {
   padding: 48px;
   text-align: center;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
+  font-size: 13px;
 }
+
 .welcome-form {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
+
+/* ── Cards (fieldsets) ────────────────────── */
 .card {
-  background: var(--bg-card, #1f1f1f);
-  border: 1px solid var(--border-color, #333);
-  border-radius: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 12px);
   padding: 20px;
 }
 .card legend {
   padding: 0 8px;
-  font-weight: 600;
+  font-weight: 700;
+  font-size: 14px;
 }
-.toggle {
+
+.toggle-row {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
 }
+
+/* ── Inputs / textarea ────────────────────── */
 .grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 14px;
+  margin-top: 14px;
 }
 .grid label {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  font-size: 0.9rem;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
 }
 .grid label.full {
   grid-column: span 2;
 }
 .grid input,
 .grid textarea {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
-  border-radius: 4px;
-  padding: 6px 8px;
-  color: inherit;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  padding: 8px 12px;
+  color: var(--text-primary);
   font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-transform: none;
+  letter-spacing: 0;
+  outline: none;
+  transition: border-color var(--transition-fast, 0.15s),
+    box-shadow var(--transition-fast, 0.15s);
+}
+.grid input:hover,
+.grid textarea:hover {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+}
+.grid input:focus,
+.grid textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.grid textarea {
+  resize: vertical;
+  min-height: 70px;
 }
 .grid input[type="color"] {
-  height: 36px;
-  padding: 2px;
+  height: 38px;
+  padding: 3px;
+  cursor: pointer;
 }
+
 .hint {
-  font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  font-size: 12px;
+  color: var(--text-secondary);
   margin: 0 0 8px 0;
+  line-height: 1.5;
 }
+
+/* ── Details (DM, preview) ────────────────── */
 .dm-details,
 .preview {
-  margin-top: 12px;
-  padding: 8px 12px;
-  background: var(--bg-muted, #2a2a2a);
-  border-radius: 6px;
+  margin-top: 14px;
+  padding: 10px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
 }
+.dm-details summary,
+.preview summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  user-select: none;
+}
+.dm-details summary:hover,
+.preview summary:hover {
+  color: var(--text-primary);
+}
+.dm-details[open] summary,
+.preview[open] summary {
+  margin-bottom: 10px;
+}
+
 .preview-embed {
   margin-top: 8px;
-  padding: 12px;
-  background: var(--bg-card-deep, #181818);
-  border-left: 4px solid #5865F2;
-  border-radius: 4px;
+  padding: 14px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius-md, 8px);
 }
 .preview-embed strong {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  font-size: 14px;
+  color: var(--text-primary);
 }
 .preview-embed p {
   margin: 0;
   white-space: pre-wrap;
+  font-size: 13px;
+  color: var(--text-primary);
+  line-height: 1.5;
 }
 .preview-embed small {
   display: block;
   margin-top: 8px;
-  color: var(--text-muted, #888);
-  font-size: 0.8rem;
+  color: var(--text-secondary);
+  font-size: 11px;
 }
+
+/* ── Actions / button ─────────────────────── */
 .actions {
   display: flex;
   justify-content: flex-end;
-  padding: 16px 0;
+  padding: 8px 0 0;
 }
 .btn-primary {
-  background: #5865F2;
+  background: var(--accent);
   color: white;
   padding: 10px 24px;
-  border: none;
-  border-radius: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
+  transition: background-color var(--transition-fast, 0.15s),
+    box-shadow var(--transition-fast, 0.15s);
+}
+.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 88%, white);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
 }
 </style>

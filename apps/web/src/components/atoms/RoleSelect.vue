@@ -89,7 +89,7 @@ function fmtColor(c: number): string | undefined {
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg-input, #1e2128);
+  background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
   font-family: inherit;

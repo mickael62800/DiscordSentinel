@@ -253,7 +253,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
   flex-wrap: wrap;
   gap: 0.5rem;
   padding: 1rem;
-  background: var(--color-bg-secondary, #2a2a2a);
+  background: var(--bg-secondary);
   border-radius: 6px;
 }
 
@@ -262,7 +262,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
   padding: 0.5rem;
   border: 1px solid var(--color-border, #444);
   border-radius: 4px;
-  background: var(--color-bg, #1a1a1a);
+  background: var(--bg-primary);
   color: var(--color-text, #eee);
 }
 
@@ -285,14 +285,14 @@ function roleVariant(role: RbacRole): BadgeVariant {
 }
 
 .add-form button[type="button"] {
-  background: var(--color-bg-tertiary, #333);
+  background: var(--bg-card);
   color: var(--color-text, #eee);
 }
 
 .rbac-table {
   width: 100%;
   border-collapse: collapse;
-  background: var(--color-bg-secondary, #2a2a2a);
+  background: var(--bg-secondary);
   border-radius: 6px;
   overflow: hidden;
 }
@@ -305,7 +305,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
 }
 
 .rbac-table th {
-  background: var(--color-bg-tertiary, #333);
+  background: var(--bg-card);
   font-weight: 600;
   color: var(--color-text-muted, #aaa);
   font-size: 0.85rem;
@@ -347,7 +347,7 @@ function roleVariant(role: RbacRole): BadgeVariant {
 .btn-refresh {
   margin-top: 1rem;
   padding: 0.5rem 1rem;
-  background: var(--color-bg-tertiary, #333);
+  background: var(--bg-card);
   color: var(--color-text, #eee);
   border: 1px solid var(--color-border, #444);
   border-radius: 4px;

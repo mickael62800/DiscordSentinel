@@ -1,194 +1,140 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import DashboardStatsSection from "../organisms/DashboardStatsSection.vue";
-import DashboardSystemDetail from "../organisms/DashboardSystemDetail.vue";
-import DashboardChartsSection from "../organisms/DashboardChartsSection.vue";
-import AnalyticsSection from "../organisms/AnalyticsSection.vue";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from "chart.js";
+import SectionCard from "../molecules/SectionCard.vue";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-);
+// Sections affichées sur la page d accueil. La clé `sectionKey` est
+// stable et destinée a etre utilisee par le RBAC pour autoriser ou non
+// l acces a chaque tuile selon l utilisateur.
+type Section = {
+  key: string;
+  path: string;
+  label: string;
+  icon: string;
+};
 
-const days = ref(30);
+const sections: Section[] = [
+  { key: "general.stats", path: "/stats", label: "Statistiques serveur", icon: "bar-chart-2" },
+  { key: "general.modstats", path: "/modstats", label: "Statistiques admin", icon: "bar-chart-2" },
 
-const statsRef = ref<InstanceType<typeof DashboardStatsSection> | null>(null);
-const systemRef = ref<InstanceType<typeof DashboardSystemDetail> | null>(null);
-const chartsRef = ref<InstanceType<typeof DashboardChartsSection> | null>(null);
-const analyticsRef = ref<InstanceType<typeof AnalyticsSection> | null>(null);
+  { key: "moderation.hub", path: "/moderation", label: "Moderation", icon: "gavel" },
+  { key: "moderation.members", path: "/members", label: "Membres", icon: "users" },
+  { key: "moderation.rules", path: "/rules", label: "Regles", icon: "shield" },
+  { key: "moderation.strikes", path: "/strikes", label: "Strikes", icon: "alert-triangle" },
+  { key: "moderation.notes", path: "/notes", label: "Notes", icon: "edit-3" },
+  { key: "moderation.reminders", path: "/reminders", label: "Reminders", icon: "clock" },
+  { key: "moderation.evidence", path: "/evidence", label: "Preuves", icon: "paperclip" },
+  { key: "moderation.review", path: "/review", label: "Reviews", icon: "check-circle" },
+  { key: "moderation.name-history", path: "/name-history", label: "Historique pseudos", icon: "user-x" },
 
-const refreshing = ref(false);
+  { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus" },
+  { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket" },
+  { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic" },
+  { key: "community.voice-themes", path: "/voice-themes", label: "Themes vocaux", icon: "layers" },
+  { key: "community.role-panels", path: "/role-panels", label: "Roles", icon: "users" },
+  { key: "community.levels", path: "/levels", label: "Niveaux", icon: "trending-up" },
+  { key: "community.levels-config", path: "/levels-config", label: "Niveaux config", icon: "sliders" },
+  { key: "community.sponsorships", path: "/sponsorships", label: "Parrainages", icon: "user-check" },
+  { key: "community.temp-roles", path: "/temp-roles", label: "Roles temp.", icon: "clock" },
 
-async function handleRefresh() {
-  refreshing.value = true;
-  try {
-    await Promise.all([
-      statsRef.value?.refresh(),
-      systemRef.value?.refresh(),
-      chartsRef.value?.refresh(),
-      analyticsRef.value?.refresh(),
-    ]);
-  } finally {
-    refreshing.value = false;
-  }
-}
+  { key: "security.hub", path: "/security", label: "Securite", icon: "zap" },
+  { key: "security.automod", path: "/automod", label: "Automod", icon: "shield" },
+  { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard" },
 
-const periods = computed(() => [7, 14, 30, 90]);
+  { key: "logs.journal", path: "/logs", label: "Journaux", icon: "list" },
+
+  { key: "games.hub", path: "/games", label: "Jeux", icon: "layers" },
+  { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap" },
+  { key: "games.coude-social", path: "/coude/social", label: "Coude social", icon: "users" },
+  { key: "games.blackjack", path: "/blackjack", label: "Blackjack", icon: "layers" },
+  { key: "games.slot", path: "/slot", label: "Slot machine", icon: "dollar-sign" },
+  { key: "games.wheel", path: "/wheel", label: "Roue du Destin", icon: "refresh-cw" },
+  { key: "games.wallet", path: "/wallet", label: "Wallet", icon: "dollar-sign" },
+  { key: "games.tournaments", path: "/tournaments", label: "Tournoi hebdo", icon: "zap" },
+  { key: "games.taunts", path: "/taunts", label: "Railleries", icon: "zap" },
+
+  { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
+  { key: "config.rbac", path: "/rbac", label: "Acces RBAC", icon: "shield" },
+  { key: "config.system-ops", path: "/system/operations", label: "System ops", icon: "activity" },
+  { key: "config.settings", path: "/settings", label: "Parametres", icon: "settings" },
+];
 </script>
 
 <template>
-  <div class="dashboard">
-    <div class="dashboard-header">
-      <h1>Tableau de bord</h1>
-      <div class="header-actions">
-        <div class="period-selector">
-          <button
-            v-for="p in periods"
-            :key="p"
-            :class="['period-btn', { active: days === p }]"
-            @click="days = p"
-          >
-            {{ p }}j
-          </button>
-        </div>
-        <button
-          class="refresh-btn"
-          :disabled="refreshing"
-          :title="refreshing ? 'Actualisation en cours…' : 'Actualiser les donnees'"
-          @click="handleRefresh"
-        >
-          <svg
-            :class="['refresh-icon', { spinning: refreshing }]"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-            <path d="M21 3v5h-5" />
-            <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-            <path d="M3 21v-5h5" />
-          </svg>
-          <span>Actualiser</span>
-        </button>
+  <div class="home">
+    <header class="dash-hero">
+      <img src="/logo.png" alt="DiscordSentinel" class="hero-logo" />
+      <div class="hero-text">
+        <h1>DiscordSentinel</h1>
+        <p>Panneau d'administration unifié — modération, communauté, jeux.</p>
       </div>
+    </header>
+    <div class="section-grid">
+      <SectionCard
+        v-for="s in sections"
+        :key="s.key"
+        :path="s.path"
+        :label="s.label"
+        :icon="s.icon"
+        :section-key="s.key"
+      />
     </div>
-
-    <DashboardStatsSection ref="statsRef" />
-    <DashboardSystemDetail ref="systemRef" />
-    <DashboardChartsSection ref="chartsRef" :days="days" />
-    <AnalyticsSection ref="analyticsRef" :days="days" />
   </div>
 </template>
 
 <style scoped>
-.dashboard-header {
+.home {
+  height: 100%;
+  min-height: 0;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  overflow: auto;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.dash-hero {
+  display: flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
+  gap: 20px;
+  padding: 24px 28px;
   margin-bottom: 24px;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 12%, transparent),
+    color-mix(in srgb, var(--accent-alt, var(--accent)) 6%, transparent));
+  border: 1px solid var(--border);
+  border-radius: 16px;
 }
-
-.dashboard-header h1 {
+.hero-logo {
+  width: 84px;
+  height: 84px;
+  border-radius: 18px;
+  object-fit: contain;
+  filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.4));
+  flex-shrink: 0;
+}
+.hero-text h1 {
+  margin: 0 0 6px;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.hero-text p {
   margin: 0;
+  color: var(--text-muted, #888);
+  font-size: 0.95rem;
 }
 
-.header-actions {
-  display: flex;
-  align-items: center;
+.section-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-auto-rows: 120px;
   gap: 12px;
-  flex-wrap: wrap;
 }
 
-.period-selector {
-  display: flex;
-  gap: 4px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 3px;
-}
-
-.period-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  background: none;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.period-btn.active {
-  background-color: var(--accent);
-  color: white;
-}
-
-.period-btn:hover:not(.active) {
-  background-color: var(--bg-hover);
-}
-
-.refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 8px;
-  background-color: var(--bg-card);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
-}
-
-.refresh-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  background-color: var(--bg-hover);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.refresh-icon {
-  width: 14px;
-  height: 14px;
-}
-
-.refresh-icon.spinning {
-  animation: spin 0.9s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+@media (max-width: 640px) {
+  .dash-hero {
+    flex-direction: column;
+    text-align: center;
+    padding: 20px;
+  }
 }
 </style>

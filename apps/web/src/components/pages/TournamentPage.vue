@@ -123,7 +123,7 @@ watch(selectedGuildId, reload);
   margin: 0 0 0.25rem 0;
 }
 .subtitle {
-  color: var(--text-muted, #999);
+  color: var(--text-secondary);
   margin: 0;
 }
 .current-card {
@@ -142,7 +142,7 @@ watch(selectedGuildId, reload);
 }
 .label {
   font-size: 0.8rem;
-  color: var(--text-muted, #999);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }

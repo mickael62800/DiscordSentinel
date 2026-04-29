@@ -70,8 +70,8 @@ function typeIcon(type: string): string {
 <style scoped>
 .notification-panel {
   position: absolute;
-  bottom: 80px;
-  left: var(--sidebar-width);
+  top: calc(100% + 8px);
+  right: 16px;
   width: 380px;
   max-height: 500px;
   padding: 0; /* panel sans padding, chaque notif-item gere le sien */

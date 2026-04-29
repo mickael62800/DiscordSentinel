@@ -134,12 +134,4 @@ function formatDate(iso: string): string {
 
 <style scoped>
 @import "./_moderation-advanced-shared.css";
-.table a {
-  color: #5865F2;
-  text-decoration: none;
-  word-break: break-all;
-}
-.table a:hover {
-  text-decoration: underline;
-}
 </style>

@@ -350,8 +350,8 @@ watch(guildIdFilter, () => {
 }
 .form input,
 .form select {
-  background: var(--bg-input, #2a2a2a);
-  border: 1px solid var(--border-color, #444);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
   border-radius: 4px;
   padding: 6px 10px;
   color: inherit;
@@ -370,7 +370,7 @@ watch(guildIdFilter, () => {
 }
 .hint {
   font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   margin-bottom: 12px;
 }
 </style>

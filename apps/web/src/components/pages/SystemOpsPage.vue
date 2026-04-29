@@ -152,7 +152,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
 }
 .stat-row:last-child {
   border-bottom: none;
@@ -165,14 +165,14 @@ onUnmounted(() => {
 }
 .hit-bar {
   height: 8px;
-  background: var(--bg-input, #2a2a2a);
+  background: var(--bg-card);
   border-radius: 4px;
   overflow: hidden;
   margin-top: 8px;
 }
 .hit-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #5865F2, #2ECC71);
+  background: linear-gradient(90deg, var(--accent), #2ECC71);
   transition: width 0.3s ease;
 }
 </style>

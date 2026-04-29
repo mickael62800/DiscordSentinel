@@ -135,8 +135,8 @@ const isMultilineText = computed(
 }
 
 .field-row.modified {
-  border-color: var(--accent, #5865f2);
-  box-shadow: 0 0 0 1px var(--accent, #5865f2);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
 }
 
 .field-label-row {
@@ -186,7 +186,7 @@ const isMultilineText = computed(
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent, #5865f2);
+  background: var(--accent);
 }
 
 .field-input {
@@ -194,7 +194,7 @@ const isMultilineText = computed(
   padding: 8px 12px;
   border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--bg-input, #1e2128);
+  background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
   font-family: inherit;

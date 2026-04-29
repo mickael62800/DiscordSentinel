@@ -21,11 +21,11 @@ async function onRemoveAutoRole(roleId: string, name: string) {
 
 function styleColor(style: string): string {
   switch (style) {
-    case "primary": return "var(--accent)";
+    case "primary": return "#5865F2";
     case "secondary": return "var(--text-secondary)";
     case "success": return "var(--success)";
     case "danger": return "var(--danger)";
-    default: return "var(--accent)";
+    default: return "#5865F2";
   }
 }
 </script>
@@ -209,7 +209,7 @@ function styleColor(style: string): string {
 .cross-link { font-size: 13px; font-weight: 600; color: var(--accent); text-decoration: none; padding: 8px 16px; border: 1px solid var(--accent); border-radius: 8px; white-space: nowrap; transition: all var(--transition-fast); }
 .cross-link:hover { background: var(--accent); color: white; }
 .header-actions { display: flex; gap: 12px; align-items: center; }
-.btn-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent, #5865F2); color: white; cursor: pointer; text-decoration: none; }
+.btn-primary { font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; border-radius: 8px; background: var(--accent, var(--accent)); color: white; cursor: pointer; text-decoration: none; }
 .btn-primary:hover { opacity: 0.9; }
 .btn-icon-danger { background: none; border: none; color: var(--danger, #E74C3C); cursor: pointer; font-size: 1rem; padding: 4px; opacity: 0.6; }
 .btn-icon-danger:hover { opacity: 1; }

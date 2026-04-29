@@ -738,7 +738,7 @@ onMounted(() => fetchCombats());
 
 .hero-subtitle {
   margin: 0;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-size: 0.95rem;
 }
 
@@ -756,7 +756,7 @@ onMounted(() => fetchCombats());
   flex: 1;
   padding: 12px 20px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   border: none;
   border-radius: 7px;
   font-size: 0.95rem;
@@ -820,7 +820,7 @@ onMounted(() => fetchCombats());
 
 .kpi-label {
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 500;
@@ -860,7 +860,7 @@ onMounted(() => fetchCombats());
   min-width: 120px;
   padding: 10px 16px;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   border: none;
   border-radius: 7px;
   font-size: 0.85rem;
@@ -913,7 +913,7 @@ onMounted(() => fetchCombats());
   border-bottom: 2px solid var(--border);
   font-size: 0.72rem;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -958,7 +958,7 @@ onMounted(() => fetchCombats());
   font-weight: 700;
   font-size: 0.85rem;
   background: var(--bg);
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .rank-badge.rank-1 {
@@ -996,7 +996,7 @@ onMounted(() => fetchCombats());
 
 .vs {
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   font-weight: 700;
   text-transform: uppercase;
 }
@@ -1004,7 +1004,7 @@ onMounted(() => fetchCombats());
 .match-id {
   font-family: "JetBrains Mono", monospace;
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -1022,7 +1022,7 @@ onMounted(() => fetchCombats());
 
 .bet-unit {
   font-size: 0.7rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .rolls {
@@ -1037,7 +1037,7 @@ onMounted(() => fetchCombats());
 
 .col-date {
   font-size: 0.82rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 /* Player display */
@@ -1078,7 +1078,7 @@ onMounted(() => fetchCombats());
 
 .xp-value {
   font-size: 0.72rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -1089,7 +1089,7 @@ onMounted(() => fetchCombats());
 }
 
 .col-record .sep {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin: 0 4px;
 }
 
@@ -1101,7 +1101,7 @@ onMounted(() => fetchCombats());
 .casino-stats,
 .metric-hl {
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .metric-hl {
@@ -1121,7 +1121,7 @@ onMounted(() => fetchCombats());
 }
 
 .muted {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .chaos {
@@ -1162,7 +1162,7 @@ onMounted(() => fetchCombats());
 /* Chevron */
 .chevron {
   font-size: 0.75rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .table-row.expanded .chevron {
@@ -1194,7 +1194,7 @@ onMounted(() => fetchCombats());
 .detail-block h4 {
   margin: 0 0 12px;
   font-size: 0.78rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
@@ -1214,7 +1214,7 @@ onMounted(() => fetchCombats());
 }
 
 .detail-label {
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .detail-row code {
@@ -1247,11 +1247,11 @@ onMounted(() => fetchCombats());
 .muted-text {
   margin: 0;
   padding: 12px;
-  background: color-mix(in srgb, var(--text-muted) 10%, transparent);
+  background: color-mix(in srgb, var(--text-secondary) 10%, transparent);
   border-radius: 8px;
   text-align: center;
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
 }
 
 .wallet-tip {

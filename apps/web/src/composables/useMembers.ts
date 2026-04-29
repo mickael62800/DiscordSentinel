@@ -5,6 +5,7 @@ import { useToast } from "./useToast";
 import { membersService } from "@/services/membersService";
 import { watchedUsersService } from "@/services/watchedUsersService";
 import { conductService } from "@/services/conductService";
+import { userActivityService, type UserActivity } from "@/services/userActivityService";
 
 const members = ref<Member[]>([]);
 const watchedUsers = ref<WatchedUser[]>([]);
@@ -23,6 +24,8 @@ const conductLoading = ref(false);
 
 const dossier = ref<UserDossier | null>(null);
 const dossierLoading = ref(false);
+
+const activityTimeline = ref<UserActivity[]>([]);
 
 export function useMembers() {
   const { selectedGuildId } = useGuildSelector();
@@ -131,11 +134,18 @@ export function useMembers() {
 
   async function fetchDossier(userId: string) {
     if (!selectedGuildId.value) return;
+    const guildId = selectedGuildId.value;
     dossierLoading.value = true;
     try {
-      dossier.value = await watchedUsersService.getDossier(selectedGuildId.value, userId);
+      const [d, activity] = await Promise.all([
+        watchedUsersService.getDossier(guildId, userId),
+        userActivityService.list(guildId, userId, { limit: 100 }).catch(() => []),
+      ]);
+      dossier.value = d;
+      activityTimeline.value = activity;
     } catch {
       dossier.value = null;
+      activityTimeline.value = [];
     } finally {
       dossierLoading.value = false;
     }
@@ -173,6 +183,7 @@ export function useMembers() {
     dossier.value = null;
     conductPoints.value = null;
     conductLog.value = [];
+    activityTimeline.value = [];
   }
 
   return {
@@ -180,6 +191,7 @@ export function useMembers() {
     selectedMember, loadingSummary,
     conductConfig, conductPoints, conductLog, conductLoading,
     dossier, dossierLoading,
+    activityTimeline,
     isWatched,
     fetchMembers, fetchConductConfig, selectMember, fetchConductDetail,
     adjustPoints, fetchDossier, addToWatch, removeFromWatch, resetMember, closeMember,

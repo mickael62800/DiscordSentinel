@@ -10,6 +10,8 @@ import AppInput from "../atoms/AppInput.vue";
 import AppSelect from "../atoms/AppSelect.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import BanModal from "../molecules/BanModal.vue";
+import CancelConductBanModal from "../molecules/CancelConductBanModal.vue";
+import { conductService } from "@/services/conductService";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppButton from "../atoms/AppButton.vue";
@@ -168,12 +170,37 @@ const infractionsColumns: TableColumn[] = [
   { key: "actions", label: "" },
 ];
 
+// Modale specifique pour annuler une proposition de ban "Points de conduite".
+// Permet de redonner des points avant suppression, sinon le worker
+// recreera la proposition. Cf sync_ban_proposals.
+const conductBanModalVisible = ref(false);
+const conductBanModalTarget = ref<Infraction | null>(null);
+
+function isConductProposal(row: Record<string, unknown>): boolean {
+  const source = row.source as string | undefined;
+  const actionType = String(row.infraction_type ?? "").toLowerCase();
+  const reason = String(row.reason ?? "");
+  return (
+    source === "detection" &&
+    actionType === "ban" &&
+    reason.startsWith("Points de conduite")
+  );
+}
+
 async function onDeleteInfraction(row: Record<string, unknown>) {
   const id = row.id as string;
   const source = (row.source as "detection" | "action" | undefined) ?? "detection";
   const actionType = String(row.infraction_type ?? "").toLowerCase();
   const isBan = source === "action" && actionType.startsWith("ban");
   const isMute = source === "action" && (actionType.startsWith("mute") || actionType === "timeout");
+
+  // Cas special : proposition de ban liee aux points de conduite. On ouvre
+  // une modale dediee qui permet de redonner des points avant suppression.
+  if (isConductProposal(row)) {
+    conductBanModalTarget.value = row as unknown as Infraction;
+    conductBanModalVisible.value = true;
+    return;
+  }
 
   let message: string;
   if (isBan) {
@@ -193,6 +220,32 @@ async function onDeleteInfraction(row: Record<string, unknown>) {
   } catch (e) {
     console.error("Erreur suppression infraction:", e);
     showError("Erreur lors de la suppression");
+  }
+}
+
+function closeConductBanModal() {
+  conductBanModalVisible.value = false;
+  conductBanModalTarget.value = null;
+}
+
+async function onConductBanModalConfirm(grant: number | null) {
+  const target = conductBanModalTarget.value;
+  if (!target) return;
+  try {
+    if (grant !== null && grant > 0) {
+      await conductService.adjustPoints(
+        target.server,
+        target.user_id,
+        grant,
+        "Annulation manuelle de la proposition de ban",
+      );
+    }
+    await deleteInfraction(target.id, "detection");
+    closeConductBanModal();
+  } catch (e) {
+    console.error("Erreur annulation proposition conduite:", e);
+    showError("Erreur lors de l'annulation");
+    closeConductBanModal();
   }
 }
 
@@ -711,6 +764,15 @@ async function handleActionSubmit() {
         @confirm="onBanConfirm"
       />
     </div>
+
+    <!-- Modale d annulation des propositions "Points de conduite" :
+         monte au top-level pour rester accessible depuis l onglet journal. -->
+    <CancelConductBanModal
+      :visible="conductBanModalVisible"
+      :target="conductBanModalTarget"
+      @close="closeConductBanModal"
+      @confirm="onConductBanModalConfirm"
+    />
 
     <!-- ============================================ -->
     <!-- MODALE "Nouvelle action"                     -->

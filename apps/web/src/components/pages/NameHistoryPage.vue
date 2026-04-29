@@ -101,14 +101,14 @@ function formatDate(iso: string): string {
   gap: 16px;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
 }
 .timeline li:last-child {
   border-bottom: none;
 }
 .time {
   font-size: 0.85rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   font-family: monospace;
 }
 .change {
@@ -117,12 +117,12 @@ function formatDate(iso: string): string {
   gap: 12px;
 }
 .old {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   text-decoration: line-through;
   font-size: 0.95rem;
 }
 .arrow {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
   font-size: 1.1rem;
 }
 .new {

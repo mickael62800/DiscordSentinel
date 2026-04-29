@@ -29,6 +29,7 @@ const {
   conductLoading,
   dossier,
   dossierLoading,
+  activityTimeline,
   isWatched,
   fetchMembers,
   fetchConductConfig,
@@ -211,6 +212,104 @@ function formatDuration(seconds: number): string {
 
 function rolesCount(roles: unknown): number {
   return Array.isArray(roles) ? roles.length : 0;
+}
+
+// ── Activity timeline (Surveillance tab) ────────────────
+const URL_RE = /https?:\/\/[^\s]+/i;
+
+const activityTypeFilter = ref<"all" | "text" | "vocal" | "other">("all");
+const activityDateFrom = ref<string>("");
+const activityDateTo = ref<string>("");
+
+const TEXT_EVENTS = ["message_sent", "message_edited", "message_deleted"];
+const VOCAL_EVENTS = ["voice_join", "voice_leave", "voice_move"];
+
+function eventCategory(t: string): "text" | "vocal" | "other" {
+  if (TEXT_EVENTS.includes(t)) return "text";
+  if (VOCAL_EVENTS.includes(t)) return "vocal";
+  return "other";
+}
+
+const filteredActivity = computed(() => {
+  const list = activityTimeline.value ?? [];
+  const fromTs = activityDateFrom.value ? new Date(activityDateFrom.value).getTime() : null;
+  const toTs = activityDateTo.value
+    ? new Date(activityDateTo.value).getTime() + 86400000 // inclusif fin de journee
+    : null;
+  return list.filter((e) => {
+    if (activityTypeFilter.value !== "all" && eventCategory(e.event_type) !== activityTypeFilter.value) {
+      return false;
+    }
+    const ts = new Date(e.created_at).getTime();
+    if (fromTs !== null && ts < fromTs) return false;
+    if (toTs !== null && ts >= toTs) return false;
+    return true;
+  });
+});
+
+function resetActivityFilters() {
+  activityTypeFilter.value = "all";
+  activityDateFrom.value = "";
+  activityDateTo.value = "";
+  activityPage.value = 1;
+}
+
+// Pagination
+const activityPage = ref(1);
+const activityPerPage = ref(25);
+const activityTotalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredActivity.value.length / activityPerPage.value)),
+);
+const activityPageRows = computed(() => {
+  const start = (activityPage.value - 1) * activityPerPage.value;
+  return filteredActivity.value.slice(start, start + activityPerPage.value);
+});
+
+// Reset a la page 1 si le filtrage change le total
+watch([activityTypeFilter, activityDateFrom, activityDateTo], () => {
+  activityPage.value = 1;
+});
+// Garde-fou si la page courante depasse le nouveau total
+watch(activityTotalPages, (n) => {
+  if (activityPage.value > n) activityPage.value = n;
+});
+
+function activityCount(type: string): number {
+  return (activityTimeline.value ?? []).filter((e) => e.event_type === type).length;
+}
+function activityLinksCount(): number {
+  return (activityTimeline.value ?? []).filter(
+    (e) => typeof e.content === "string" && URL_RE.test(e.content),
+  ).length;
+}
+function activityAttachmentsCount(): number {
+  return (activityTimeline.value ?? []).filter((e) => {
+    const m = e.metadata as Record<string, unknown> | null | undefined;
+    const att = m?.attachments;
+    return Array.isArray(att) && att.length > 0;
+  }).length;
+}
+function activityLabel(t: string): string {
+  return ({
+    message_sent: "Message",
+    message_edited: "Edite",
+    message_deleted: "Supprime",
+    voice_join: "Entree vocal",
+    voice_leave: "Sortie vocal",
+    voice_move: "Move vocal",
+    roles_changed: "Roles",
+    nickname_changed: "Pseudo",
+    avatar_changed: "Avatar",
+    member_join: "Arrivee",
+    member_leave: "Depart",
+  } as Record<string, string>)[t] ?? t;
+}
+function activityVariant(t: string): "default" | "warning" | "danger" | "info" | "success" {
+  if (t === "message_deleted") return "danger";
+  if (t === "message_edited" || t === "voice_leave" || t === "member_leave") return "warning";
+  if (t === "member_join" || t === "voice_join") return "success";
+  if (t.startsWith("voice_") || t === "message_sent") return "info";
+  return "default";
 }
 </script>
 
@@ -509,6 +608,80 @@ function rolesCount(roles: unknown): number {
                     </div>
                     <div class="detail-row-body">{{ evt.description }}</div>
                   </div>
+                </div>
+
+                <!-- Activite recente -->
+                <div v-if="activityTimeline && activityTimeline.length > 0" class="section">
+                  <h3>Activite recente ({{ filteredActivity.length }} / {{ activityTimeline.length }})</h3>
+
+                  <div class="activity-stats">
+                    <span><strong>{{ activityCount('message_sent') }}</strong> messages</span>
+                    <span><strong>{{ activityCount('voice_join') }}</strong> entrees vocal</span>
+                    <span><strong>{{ activityCount('voice_leave') }}</strong> sorties vocal</span>
+                    <span><strong>{{ activityCount('voice_move') }}</strong> moves</span>
+                    <span><strong>{{ activityCount('message_deleted') }}</strong> supprimes</span>
+                    <span><strong>{{ activityCount('message_edited') }}</strong> edites</span>
+                    <span><strong>{{ activityLinksCount() }}</strong> liens</span>
+                    <span><strong>{{ activityAttachmentsCount() }}</strong> pieces jointes</span>
+                  </div>
+
+                  <div class="activity-filters">
+                    <div class="activity-filter-group">
+                      <button
+                        v-for="t in (['all', 'text', 'vocal', 'other'] as const)"
+                        :key="t"
+                        type="button"
+                        :class="['activity-chip', { active: activityTypeFilter === t }]"
+                        @click="activityTypeFilter = t"
+                      >
+                        {{ t === 'all' ? 'Tout' : t === 'text' ? 'Texte' : t === 'vocal' ? 'Vocal' : 'Autre' }}
+                      </button>
+                    </div>
+                    <div class="activity-filter-group">
+                      <label class="activity-date-label">
+                        Du
+                        <input v-model="activityDateFrom" type="date" class="activity-date-input" />
+                      </label>
+                      <label class="activity-date-label">
+                        Au
+                        <input v-model="activityDateTo" type="date" class="activity-date-input" />
+                      </label>
+                      <button
+                        v-if="activityTypeFilter !== 'all' || activityDateFrom || activityDateTo"
+                        type="button"
+                        class="activity-reset"
+                        @click="resetActivityFilters"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+
+                  <div v-if="filteredActivity.length === 0" class="empty-small">
+                    Aucun evenement ne correspond aux filtres.
+                  </div>
+                  <div
+                    v-for="evt in activityPageRows"
+                    :key="evt.id"
+                    class="detail-row"
+                  >
+                    <div class="detail-row-header">
+                      <span class="detail-date">{{ fmt(evt.created_at) }}</span>
+                      <AppBadge :label="activityLabel(evt.event_type)" :variant="activityVariant(evt.event_type)" />
+                      <span v-if="evt.channel_name" class="activity-channel">#{{ evt.channel_name }}</span>
+                    </div>
+                    <div v-if="evt.content" class="detail-row-body">{{ evt.content }}</div>
+                  </div>
+
+                  <PaginationBar
+                    v-if="filteredActivity.length > 0"
+                    :current-page="activityPage"
+                    :total-pages="activityTotalPages"
+                    :total-items="filteredActivity.length"
+                    :per-page="activityPerPage"
+                    @update:current-page="activityPage = $event"
+                    @update:per-page="(n) => { activityPerPage = n; activityPage = 1; }"
+                  />
                 </div>
 
                 <!-- Notes -->
@@ -1003,4 +1176,104 @@ function rolesCount(roles: unknown): number {
 
 .placeholder-icon { font-size: 48px; margin-bottom: 12px; opacity: 0.5; }
 .detail-placeholder p { font-size: 14px; }
+
+.activity-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.activity-stats strong {
+  color: var(--text-primary);
+  font-weight: 700;
+  margin-right: 2px;
+}
+.activity-channel {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", monospace;
+  background: var(--bg-hover);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.activity-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.activity-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.activity-chip {
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.activity-chip:hover {
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+.activity-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+}
+
+.activity-date-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.activity-date-input {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 12px;
+}
+.activity-date-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.activity-reset {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.activity-reset:hover {
+  color: var(--danger);
+  border-color: var(--danger);
+}
 </style>

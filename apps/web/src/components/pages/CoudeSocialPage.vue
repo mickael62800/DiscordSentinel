@@ -187,14 +187,14 @@ function statusColor(s: string): string {
   display: flex;
   justify-content: space-between;
   padding: 4px 0;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
 }
 .kv:last-child {
   border-bottom: none;
 }
 .kv span:first-child {
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 .curse-card {
   display: flex;
@@ -212,7 +212,7 @@ function statusColor(s: string): string {
 .curse-header code {
   margin-left: auto;
   font-size: 0.8rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 .members-list,
 .vendetta-list {
@@ -225,12 +225,12 @@ function statusColor(s: string): string {
   grid-template-columns: 1fr 1fr auto;
   gap: 8px;
   padding: 6px 0;
-  border-bottom: 1px solid var(--border-color, #333);
+  border-bottom: 1px solid var(--border);
   font-size: 0.9rem;
   align-items: center;
 }
 .vendetta-list li {
-  background: var(--bg-input, #181818);
+  background: var(--bg-card);
   padding: 8px 12px;
   border-radius: 4px;
   margin-bottom: 8px;
@@ -238,6 +238,6 @@ function statusColor(s: string): string {
 h4 {
   margin: 12px 0 4px 0;
   font-size: 0.95rem;
-  color: var(--text-muted, #888);
+  color: var(--text-secondary);
 }
 </style>
