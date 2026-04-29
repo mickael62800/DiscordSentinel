@@ -145,7 +145,7 @@ pub struct RewardEntry {
     pub id: String,
     pub guild_id: String,
     pub level: i32,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub source: String,
 }
 
@@ -521,4 +521,5 @@ fn proto_user_stats_to_response(u: proto_stats::UserStats) -> UserStatsResponse 
 }
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
+use sentinel_api::domain::entities::system::discord_ids::RoleId;
 

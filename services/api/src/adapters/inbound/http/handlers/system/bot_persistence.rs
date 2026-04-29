@@ -22,6 +22,7 @@ use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 // ═══════════════════════════════════════════════════
 // Name History (Audit Bot)
@@ -266,7 +267,7 @@ pub async fn list_sponsorships(
 pub struct CreateTempRoleDto {
     pub guild_id: String,
     pub user_id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub expires_at: String,
 }
 
@@ -275,7 +276,7 @@ pub struct TempRoleRow {
     pub id: sqlx::types::Uuid,
     pub guild_id: String,
     pub user_id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub expires_at: chrono::DateTime<chrono::Utc>,
     pub created_at: chrono::DateTime<chrono::Utc>,
 }

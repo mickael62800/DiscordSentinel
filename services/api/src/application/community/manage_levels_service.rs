@@ -128,7 +128,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
             user_level,
             leveled_up,
             old_level: old_source_level,
-            reward_role_id,
+            reward_role_id: reward_role_id.map(Into::into),
             source: cmd.source,
         })
     }
@@ -161,7 +161,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
             id: uuid::Uuid::new_v4(),
             guild_id: guild_id.to_string(),
             level,
-            role_id: role_id.to_string(),
+            role_id: role_id.into(),
             source,
         };
         self.repo.upsert_reward(&reward).await?;

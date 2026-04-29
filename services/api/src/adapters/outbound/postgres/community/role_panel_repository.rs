@@ -8,6 +8,7 @@ use crate::domain::entities::community::role_panel::RolePanelDetail;
 use crate::domain::entities::community::role_panel::RolePanelEntry;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::role_panel_repository::RolePanelRepository;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 pub struct PgRolePanelRepository {
     pool: PgPool,
@@ -38,7 +39,7 @@ struct PanelRow {
 struct EntryRow {
     id: Uuid,
     panel_id: Uuid,
-    role_id: String,
+    role_id: RoleId,
     role_name: String,
     emoji: Option<String>,
     label: String,
@@ -50,7 +51,7 @@ struct EntryRow {
 struct AutoRoleRow {
     id: Uuid,
     guild_id: String,
-    role_id: String,
+    role_id: RoleId,
     role_name: String,
     delay_secs: i32,
     enabled: bool,

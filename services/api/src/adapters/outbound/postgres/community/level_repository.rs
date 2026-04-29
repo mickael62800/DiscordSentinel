@@ -8,6 +8,7 @@ use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::level_repository::LevelRepository;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 pub struct PgLevelRepository {
     pool: PgPool,
@@ -55,7 +56,7 @@ struct LevelRewardRow {
     id: Uuid,
     guild_id: String,
     level: i32,
-    role_id: String,
+    role_id: RoleId,
     source: String,
 }
 

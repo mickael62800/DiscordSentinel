@@ -8,6 +8,7 @@ use crate::ports::inbound::community::manage_role_panels::CreateAutoRoleCommand;
 use crate::ports::inbound::community::manage_role_panels::CreateRolePanelCommand;
 use crate::ports::inbound::community::manage_role_panels::CreateRolePanelEntryCommand;
 use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
+use crate::domain::entities::system::discord_ids::RoleId;
 #[derive(Debug, Deserialize)]
 pub struct CreateRolePanelDto {
     pub guild_id: String,
@@ -25,7 +26,7 @@ fn default_mode() -> String { "button".to_string() }
 
 #[derive(Debug, Deserialize)]
 pub struct CreateEntryDto {
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     pub emoji: Option<String>,
     #[serde(default)]
@@ -47,7 +48,7 @@ pub struct SetMessageIdDto {
 #[derive(Debug, Deserialize)]
 pub struct CreateAutoRoleDto {
     pub guild_id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     #[serde(default)]
     pub delay_secs: i32,
@@ -70,7 +71,7 @@ pub struct RolePanelDto {
 #[derive(Debug, Serialize)]
 pub struct RolePanelEntryDto {
     pub id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     pub emoji: Option<String>,
     pub label: String,
@@ -88,7 +89,7 @@ pub struct RolePanelDetailDto {
 pub struct AutoRoleDto {
     pub id: String,
     pub guild_id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     pub delay_secs: i32,
     pub enabled: bool,

@@ -156,7 +156,7 @@ fn role_panel_to_proto(p: RolePanel) -> proto::RolePanel {
 fn role_panel_entry_to_proto(e: RolePanelEntry) -> proto::RolePanelEntry {
     proto::RolePanelEntry {
         id: e.id.to_string(),
-        role_id: e.role_id,
+        role_id: e.role_id.into(),
         role_name: e.role_name,
         emoji: e.emoji,
         label: e.label,
@@ -174,7 +174,7 @@ fn role_panel_detail_to_proto(d: RolePanelDetail) -> proto::RolePanelDetail {
 
 fn auto_role_to_proto(r: AutoRole) -> proto::AutoRole {
     proto::AutoRole {
-        role_id: r.role_id,
+        role_id: r.role_id.into(),
         role_name: r.role_name,
         delay_secs: r.delay_secs,
         enabled: r.enabled,

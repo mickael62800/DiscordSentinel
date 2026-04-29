@@ -13,6 +13,7 @@ use crate::adapters::inbound::grpc::errors::sqlx_to_status;
 
 use sentinel_proto::community::v1 as proto;
 use sentinel_proto::community::v1::community_service_server::CommunityService;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 pub struct CommunityGrpc {
     pub pg_pool: sqlx::PgPool,
@@ -32,7 +33,7 @@ struct TempRoleRow {
     id: sqlx::types::Uuid,
     guild_id: String,
     user_id: String,
-    role_id: String,
+    role_id: RoleId,
     expires_at: DateTime<Utc>,
     created_at: DateTime<Utc>,
 }
@@ -132,7 +133,7 @@ impl CommunityService for CommunityGrpc {
                     id: r.id.to_string(),
                     guild_id: r.guild_id,
                     user_id: r.user_id,
-                    role_id: r.role_id,
+                    role_id: r.role_id.into(),
                     expires_at: r.expires_at.to_rfc3339(),
                     created_at: r.created_at.to_rfc3339(),
                 })

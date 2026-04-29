@@ -173,7 +173,7 @@ fn level_reward_to_proto(r: LevelReward) -> proto::LevelReward {
         id: r.id.to_string(),
         guild_id: r.guild_id,
         level: r.level,
-        role_id: r.role_id,
+        role_id: r.role_id.into(),
         source: xp_source_to_proto(r.source),
     }
 }

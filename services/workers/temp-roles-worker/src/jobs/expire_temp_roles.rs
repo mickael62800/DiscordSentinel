@@ -1,6 +1,7 @@
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+use sentinel_api::domain::entities::system::discord_ids::RoleId;
 
 /// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
 /// Doit rester synchronise avec `bots/shared/src/event_bus.rs`.
@@ -13,7 +14,7 @@ struct ExpiredRole {
     id: Uuid,
     guild_id: String,
     user_id: String,
-    role_id: String,
+    role_id: RoleId,
 }
 
 /// Phase 4 B — Scan + emission Redis des roles temporaires expires.

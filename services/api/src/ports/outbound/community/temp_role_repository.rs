@@ -4,13 +4,14 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TempRole {
     pub id: Uuid,
     pub guild_id: String,
     pub user_id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub expires_at: DateTime<Utc>,
     pub created_at: DateTime<Utc>,
 }

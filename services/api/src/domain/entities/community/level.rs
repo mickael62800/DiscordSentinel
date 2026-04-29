@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 /// Source d'XP : texte (messages) ou vocal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,7 +68,7 @@ pub struct LevelReward {
     pub id: Uuid,
     pub guild_id: String,
     pub level: i32,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub source: XpSource,
 }
 

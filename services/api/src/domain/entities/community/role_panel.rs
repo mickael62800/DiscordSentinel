@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 #[derive(Debug, Clone)]
 pub struct RolePanel {
@@ -21,7 +22,7 @@ pub struct RolePanel {
 pub struct RolePanelEntry {
     pub id: Uuid,
     pub panel_id: Uuid,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     pub emoji: Option<String>,
     pub label: String,
@@ -39,7 +40,7 @@ pub struct RolePanelDetail {
 pub struct AutoRole {
     pub id: Uuid,
     pub guild_id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     pub delay_secs: i32,
     pub enabled: bool,

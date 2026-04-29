@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use crate::ports::outbound::community::temp_role_repository::TempRole;
 use crate::ports::outbound::community::temp_role_repository::TempRoleRepository;
 use super::super::pg_err;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 pub struct PgTempRoleRepository { pool: PgPool }
 
@@ -26,7 +27,7 @@ impl TempRoleRepository for PgTempRoleRepository {
 
     async fn list_active(&self, guild_id: &str) -> Result<Vec<TempRole>, crate::domain::errors::DomainError> {
         #[derive(sqlx::FromRow)]
-        struct Row { id: uuid::Uuid, guild_id: String, user_id: String, role_id: String, expires_at: chrono::DateTime<chrono::Utc>, created_at: chrono::DateTime<chrono::Utc> }
+        struct Row { id: uuid::Uuid, guild_id: String, user_id: String, role_id: RoleId, expires_at: chrono::DateTime<chrono::Utc>, created_at: chrono::DateTime<chrono::Utc> }
 
         let rows: Vec<Row> = sqlx::query_as(
             "SELECT id, guild_id, user_id, role_id, expires_at, created_at \

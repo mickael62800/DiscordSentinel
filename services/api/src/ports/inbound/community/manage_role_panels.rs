@@ -4,6 +4,7 @@ use crate::domain::entities::community::role_panel::AutoRole;
 use crate::domain::entities::community::role_panel::RolePanel;
 use crate::domain::entities::community::role_panel::RolePanelDetail;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::RoleId;
 
 pub struct CreateRolePanelCommand {
     pub guild_id: String,
@@ -16,7 +17,7 @@ pub struct CreateRolePanelCommand {
 }
 
 pub struct CreateRolePanelEntryCommand {
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     pub emoji: Option<String>,
     pub label: String,
@@ -31,7 +32,7 @@ pub struct SetMessageIdCommand {
 
 pub struct CreateAutoRoleCommand {
     pub guild_id: String,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub role_name: String,
     pub delay_secs: i32,
 }

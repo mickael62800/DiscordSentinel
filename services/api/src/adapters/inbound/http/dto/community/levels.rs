@@ -6,6 +6,7 @@ use crate::domain::entities::community::level::LevelReward;
 use crate::domain::entities::community::level::UserLevel;
 use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
+use crate::domain::entities::system::discord_ids::RoleId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -49,7 +50,7 @@ fn default_source() -> String { "text".to_string() }
 pub struct SetRewardDto {
     pub guild_id: String,
     pub level: i32,
-    pub role_id: String,
+    pub role_id: RoleId,
     /// "text" ou "voice" (defaut: "text")
     #[serde(default = "default_source")]
     pub source: String,
@@ -102,7 +103,7 @@ pub struct LevelRewardDto {
     pub id: String,
     pub guild_id: String,
     pub level: i32,
-    pub role_id: String,
+    pub role_id: RoleId,
     pub source: String,
 }
 
