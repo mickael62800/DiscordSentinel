@@ -3,11 +3,12 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityEvent {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub severity: String,
     pub description: String,

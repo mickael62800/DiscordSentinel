@@ -14,6 +14,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::coalition_repository::CoalitionRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::GuildId;
 const TBL: &str = "coude_coalitions";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -30,7 +31,7 @@ impl PgCoalitionRepository {
 #[derive(sqlx::FromRow)]
 struct CoalitionRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     target_id: String,
     opened_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,

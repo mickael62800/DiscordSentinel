@@ -10,7 +10,7 @@ use sentinel_proto::moderation::v1 as proto_mod;
 /// Action de moderation envoyee au backend.
 #[derive(Debug, Serialize)]
 pub struct ModerationAction {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub moderator_id: String,
     pub moderator_name: String,
@@ -72,7 +72,7 @@ pub struct EvidenceEntry {
 pub struct ReviewQueueEntry {
     pub id: String,
     pub action_id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub added_by: String,
     pub added_by_name: String,
     pub reason: Option<String>,
@@ -105,7 +105,7 @@ pub struct ModStatsEntry {
 #[allow(dead_code)]
 pub struct SanctionReminder {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,
@@ -407,3 +407,4 @@ impl ApiClient {
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;

@@ -35,7 +35,7 @@ pub struct InventoryGrpc {
 
 pub(super) fn inventory_item_to_proto(i: InventoryItem) -> proto::InventoryItem {
     proto::InventoryItem {
-        guild_id: i.guild_id,
+        guild_id: i.guild_id.into(),
         user_id: i.user_id.into(),
         item_key: i.item_key,
         quantity: i.quantity,
@@ -45,7 +45,7 @@ pub(super) fn inventory_item_to_proto(i: InventoryItem) -> proto::InventoryItem 
 pub(super) fn prime_to_proto(p: Prime) -> proto::Prime {
     proto::Prime {
         id: p.id.to_string(),
-        guild_id: p.guild_id,
+        guild_id: p.guild_id.into(),
         target_id: p.target_id,
         target_name: p.target_name,
         placed_by_id: p.placed_by_id,
@@ -130,7 +130,7 @@ impl CoudeInventoryService for InventoryGrpc {
         let prime = self
             .uc
             .create_prime(NewCoudePrime {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 target_id: req.target_id,
                 target_name: req.target_name,
                 placed_by_id: req.placed_by_id,
@@ -373,7 +373,7 @@ mod tests;
 pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boost::StealBoost) -> proto::StealBoost {
     proto::StealBoost {
         id: b.id.to_string(),
-        guild_id: b.guild_id,
+        guild_id: b.guild_id.into(),
         user_id: b.user_id.into(),
         item_key: b.item_key,
         expires_at: b.expires_at.to_rfc3339(),
@@ -386,7 +386,7 @@ pub(super) fn steal_protection_to_proto(
 ) -> proto::StealProtection {
     proto::StealProtection {
         id: p.id.to_string(),
-        guild_id: p.guild_id,
+        guild_id: p.guild_id.into(),
         user_id: p.user_id.into(),
         item_key: p.item_key,
         expires_at: p.expires_at.to_rfc3339(),

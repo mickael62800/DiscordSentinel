@@ -118,7 +118,7 @@ impl RolePanelsService for RolePanelsGrpc {
             .into_iter()
             .map(|r| DiscordRole {
                 id: r.id,
-                guild_id: req.guild_id.clone(),
+                guild_id: req.guild_id.clone().into(),
                 name: r.name,
                 color: r.color,
                 position: r.position,
@@ -142,7 +142,7 @@ impl RolePanelsService for RolePanelsGrpc {
 fn role_panel_to_proto(p: RolePanel) -> proto::RolePanel {
     proto::RolePanel {
         id: p.id.to_string(),
-        guild_id: p.guild_id,
+        guild_id: p.guild_id.into(),
         channel_id: p.channel_id.into(),
         message_id: p.message_id,
         title: p.title,

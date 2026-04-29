@@ -6,6 +6,7 @@ use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgBotConfigRepository {
     pool: PgPool,
@@ -20,7 +21,7 @@ impl PgBotConfigRepository {
 #[derive(sqlx::FromRow)]
 struct ConfigRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     bot_name: String,
     config_key: String,
     config_value: String,

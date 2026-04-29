@@ -12,10 +12,11 @@ use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::system::discord_role::parse_discord_permissions_bitfield;
 use crate::domain::entities::system::discord_role::DiscordRole;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Serialize)]
 pub struct DiscordRoleDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub name: String,
     pub color: i32,
     pub position: i32,
@@ -137,7 +138,7 @@ pub async fn sync_roles(
         .into_iter()
         .map(|r| DiscordRole {
             id: r.id,
-            guild_id: guild_id.clone(),
+            guild_id: guild_id.clone().into(),
             name: r.name,
             color: r.color,
             position: r.position,

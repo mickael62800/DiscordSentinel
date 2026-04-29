@@ -9,11 +9,12 @@ use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct AddStrikeDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub reason: String,
     pub source: String,
@@ -40,7 +41,7 @@ pub struct SaveStrikeConfigDto {
 }
 
 impl SaveStrikeConfigDto {
-    pub fn into_command(self, guild_id: String) -> SaveStrikeConfigCommand {
+    pub fn into_command(self, guild_id: GuildId) -> SaveStrikeConfigCommand {
         SaveStrikeConfigCommand {
             guild_id,
             window_secs: self.window_secs,
@@ -81,7 +82,7 @@ impl From<StrikeThresholdDto> for StrikeThreshold {
 
 #[derive(Debug, Serialize)]
 pub struct StrikeConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub window_secs: i64,
     pub thresholds: Vec<StrikeThresholdDto>,
     pub enabled: bool,
@@ -101,7 +102,7 @@ impl From<StrikeConfig> for StrikeConfigDto {
 #[derive(Debug, Serialize)]
 pub struct UserStrikeDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub reason: String,
     pub source: String,
@@ -128,7 +129,7 @@ impl From<UserStrike> for UserStrikeDto {
 #[derive(Debug, Serialize)]
 pub struct StrikeResultDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub reason: String,
     pub source: String,

@@ -8,11 +8,12 @@ use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct RecordMessagesDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub count: u64,
@@ -20,7 +21,7 @@ pub struct RecordMessagesDto {
 
 #[derive(Debug, Deserialize)]
 pub struct RecordVoiceDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub seconds: u64,
@@ -39,7 +40,7 @@ pub struct LeaderboardQuery {
 
 #[derive(Debug, Serialize)]
 pub struct UserStatsDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub message_count: u64,
@@ -50,7 +51,7 @@ pub struct UserStatsDto {
 
 #[derive(Debug, Serialize)]
 pub struct GuildOverviewDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub total_messages: u64,
     pub total_voice_seconds: u64,
     pub total_voice_hours: f64,

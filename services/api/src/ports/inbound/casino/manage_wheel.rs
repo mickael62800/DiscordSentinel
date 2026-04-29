@@ -8,10 +8,11 @@ use crate::domain::entities::casino::wheel::WheelSpin;
 use crate::domain::entities::casino::wheel::WheelTopWinner;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct WheelSpinCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
 }

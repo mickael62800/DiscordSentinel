@@ -12,11 +12,12 @@ use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct CreateVoiceChannelDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub owner_id: String,
     pub owner_name: String,
     pub channel_id: ChannelId,
@@ -69,7 +70,7 @@ pub struct AddCoAdminDto {
 
 #[derive(Debug, Deserialize)]
 pub struct AddWhitelistDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub owner_id: String,
     pub target_id: String,
     pub target_name: String,
@@ -130,7 +131,7 @@ fn default_channel_name_template() -> String {
 #[derive(Debug, Serialize)]
 pub struct VoiceChannelResponseDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub owner_id: String,
     pub owner_name: String,
     pub channel_id: ChannelId,
@@ -183,7 +184,7 @@ pub struct BanResponseDto {
 pub struct InviteLinkResponseDto {
     pub id: String,
     pub channel_id: ChannelId,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub created_by: String,
     pub created_by_name: String,
     pub code: String,
@@ -291,7 +292,7 @@ impl From<VoiceChannelBan> for BanResponseDto {
 #[derive(Debug, Serialize)]
 pub struct ThemeResponseDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub name: String,
     pub emoji: Option<String>,
     pub channel_name_template: String,
@@ -332,7 +333,7 @@ impl From<VoiceChannelTheme> for ThemeResponseDto {
 impl From<CreateThemeDto> for CreateThemeCommand {
     fn from(dto: CreateThemeDto) -> Self {
         Self {
-            guild_id: String::new(), // set by handler from path
+            guild_id: String::new().into(), // set by handler from path
             name: dto.name,
             emoji: dto.emoji,
             channel_name_template: dto.channel_name_template,

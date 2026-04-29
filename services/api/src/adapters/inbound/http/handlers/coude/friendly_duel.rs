@@ -40,7 +40,7 @@ pub async fn resolve_friendly_duel(
     let out = state
         .resolve_friendly_duel_uc
         .resolve(FriendlyDuelInput {
-            guild_id,
+            guild_id: guild_id.into(),
             attacker_id: req.attacker_id,
             attacker_name: req.attacker_name,
             defender_id: req.defender_id,

@@ -36,7 +36,7 @@ mod tests;
 pub(super) fn combat_to_proto(c: Combat) -> proto::Combat {
     proto::Combat {
         id: c.id.to_string(),
-        guild_id: c.guild_id,
+        guild_id: c.guild_id.into(),
         channel_id: c.channel_id,
         attacker_id: c.attacker_id,
         attacker_name: c.attacker_name,
@@ -153,7 +153,7 @@ impl CoudeCombatsService for CombatsGrpc {
         let c = self
             .uc
             .create(NewCoudeCombat {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 channel_id: req.channel_id,
                 attacker_id: req.attacker_id,
                 attacker_name: req.attacker_name,
@@ -249,7 +249,7 @@ impl CoudeCombatsService for CombatsGrpc {
             .into_iter()
             .map(|c| proto::ResolvedBettingCombat {
                 combat_id: c.combat_id,
-                guild_id: c.guild_id,
+                guild_id: c.guild_id.into(),
                 channel_id: c.channel_id,
                 message_id: c.message_id,
                 result_message: c.result_message,
@@ -276,7 +276,7 @@ impl CoudeCombatsService for CombatsGrpc {
             .into_iter()
             .map(|c| proto::ExpiredCombat {
                 combat_id: c.combat_id,
-                guild_id: c.guild_id,
+                guild_id: c.guild_id.into(),
                 channel_id: c.channel_id.into(),
                 defender_id: c.defender_id,
                 defender_name: c.defender_name,

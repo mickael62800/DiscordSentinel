@@ -4,11 +4,12 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Wallet {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub coins: i64,
@@ -21,7 +22,7 @@ pub struct Wallet {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletTransaction {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub amount: i64,
     pub balance_after: i64,

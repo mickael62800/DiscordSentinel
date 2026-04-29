@@ -7,6 +7,7 @@ use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::outbound::system::cache::CachePort;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 const RULES_TTL: u64 = 300; // 5 minutes
 
@@ -79,7 +80,7 @@ impl RedisCache {
 #[derive(serde::Serialize, serde::Deserialize)]
 struct CachedRule {
     id: String,
-    guild_id: String,
+    guild_id: GuildId,
     flag_type: String,
     weight: f64,
     threshold_warn: f64,

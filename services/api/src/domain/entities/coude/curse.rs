@@ -14,12 +14,13 @@ use std::fmt;
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Une malediction posee (persistance + lecture).
 #[derive(Debug, Clone)]
 pub struct ActiveCurse {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub source_id: String,
     pub kind: CurseKind,

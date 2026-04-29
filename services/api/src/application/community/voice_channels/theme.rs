@@ -91,7 +91,7 @@ impl ManageVoiceChannelsService {
         let existing = self.repo.find_theme(id).await?
             .ok_or_else(|| DomainError::NotFound(format!("Theme introuvable : {theme_id}")))?;
 
-        if existing.guild_id != guild_id {
+        if existing.guild_id.as_str() != guild_id {
             return Err(DomainError::ValidationError("Ce theme n'appartient pas a ce serveur".to_string()));
         }
 

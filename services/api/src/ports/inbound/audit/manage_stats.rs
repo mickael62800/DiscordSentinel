@@ -7,16 +7,17 @@ use crate::domain::entities::audit::user_stats::UserStats;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct RecordMessagesCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub count: u64,
 }
 
 pub struct RecordVoiceCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub seconds: u64,

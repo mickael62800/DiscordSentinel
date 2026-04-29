@@ -6,6 +6,7 @@ use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::audit::watched_user_repository::WatchedUserRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgWatchedUserRepository {
     pool: PgPool,
@@ -21,7 +22,7 @@ impl PgWatchedUserRepository {
 struct WatchedUserRow {
     user_id: UserId,
     username: String,
-    guild_id: String,
+    guild_id: GuildId,
     guild_name: String,
     total_warns: i64,
     total_mutes: i64,

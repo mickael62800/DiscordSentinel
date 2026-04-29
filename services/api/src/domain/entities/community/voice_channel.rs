@@ -7,11 +7,12 @@ use uuid::Uuid;
 use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannel {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub owner_id: String,
     pub owner_name: String,
     pub channel_id: ChannelId,
@@ -44,7 +45,7 @@ pub struct VoiceChannelCoAdmin {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannelWhitelistEntry {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub owner_id: String,
     pub target_id: String,
     pub target_name: String,
@@ -67,7 +68,7 @@ pub struct VoiceChannelBan {
 pub struct VoiceChannelInviteLink {
     pub id: Uuid,
     pub voice_channel_id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub created_by: String,
     pub created_by_name: String,
@@ -82,7 +83,7 @@ pub struct VoiceChannelInviteLink {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannelTheme {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub name: String,
     pub emoji: Option<String>,
     pub channel_name_template: String,

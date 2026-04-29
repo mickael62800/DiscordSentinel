@@ -2,6 +2,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Inventaire ──
@@ -10,7 +11,7 @@ use crate::domain::entities::system::discord_ids::UserId;
 /// Une ligne d'inventaire d'un joueur (clé d'item + quantité).
 #[derive(Debug, Clone)]
 pub struct InventoryItem {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub item_key: String,
     pub quantity: i32,
@@ -23,7 +24,7 @@ pub struct InventoryItem {
 #[derive(Debug, Clone)]
 pub struct Prime {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub target_name: String,
     pub placed_by_id: String,
@@ -38,7 +39,7 @@ pub struct Prime {
 
 #[derive(Debug, Clone)]
 pub struct NewCoudePrime {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub target_name: String,
     pub placed_by_id: String,

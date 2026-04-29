@@ -19,6 +19,7 @@ use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::coude::curse::ActiveCurse;
 use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct CastCurseDto {
@@ -42,7 +43,7 @@ pub struct CastedCurseDto {
 #[derive(Debug, Serialize)]
 pub struct ActiveCurseDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub source_id: String,
     pub kind: String,

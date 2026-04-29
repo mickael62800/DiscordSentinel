@@ -25,6 +25,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -158,7 +159,7 @@ pub async fn log_action(
 
 #[derive(Debug, Deserialize)]
 pub struct ExecuteBanDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub reason: String,
     /// Phase 1 sync (cf. SYNC_DISCORD_WEB_DESIGN.md) : si fourni, l API
@@ -242,7 +243,7 @@ pub async fn execute_ban(
 
 #[derive(Debug, Deserialize)]
 pub struct ExecuteMuteDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub reason: String,
     /// Duree du timeout en secondes. Defaut : 1h. Max : 28 jours (clamp cote Discord).
@@ -312,7 +313,7 @@ pub async fn execute_mute(
 
 #[derive(Debug, Deserialize)]
 pub struct ExecuteUnbanDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
 }
 
@@ -519,7 +520,7 @@ pub async fn list_evidence(
 #[derive(Debug, serde::Deserialize)]
 pub struct AddReviewDto {
     pub action_id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub added_by: String,
     pub added_by_name: String,
     #[serde(default)]
@@ -530,7 +531,7 @@ pub struct AddReviewDto {
 pub struct ReviewQueueEntryDto {
     pub id: String,
     pub action_id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub added_by: String,
     pub added_by_name: String,
     pub reason: Option<String>,

@@ -8,6 +8,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::ApiClient;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Serialize)]
 pub struct CastCurseBody<'a> {
@@ -30,7 +31,7 @@ pub struct CastedCurseResp {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ActiveCurseResp {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub source_id: String,
     pub kind: String,

@@ -27,7 +27,7 @@ impl WelcomeService for WelcomeGrpc {
             .map_err(|e| Status::internal(format!("get welcome config: {e}")))?;
 
         Ok(Response::new(proto::WelcomeConfig {
-            guild_id: cfg.guild_id,
+            guild_id: cfg.guild_id.into(),
             welcome_enabled: cfg.welcome_enabled,
             welcome_channel_id: cfg.welcome_channel_id,
             welcome_message: cfg.welcome_message,

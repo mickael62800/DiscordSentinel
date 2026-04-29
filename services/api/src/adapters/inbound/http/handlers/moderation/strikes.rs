@@ -39,7 +39,7 @@ pub async fn save_config(
         require_role(ctx, Role::Admin)
             .map_err(|_| ApiError(DomainError::Forbidden("admin+ requis pour editer la config des strikes".into())))?;
     }
-    let command = dto.into_command(guild_id);
+    let command = dto.into_command(guild_id.into());
     let config = state.strikes_uc.save_config(command).await?;
     Ok(single_dto(config))
 }

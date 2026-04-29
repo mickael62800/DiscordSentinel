@@ -5,6 +5,7 @@ use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Use case "gérer les joueurs Coup de Coude".
 ///
@@ -20,7 +21,7 @@ pub trait ManageCoudePlayersUseCase: Send + Sync {
 
     async fn get_or_create(
         &self,
-        guild_id: String,
+        guild_id: GuildId,
         user_id: UserId,
         username: String,
     ) -> Result<Player, DomainError>;

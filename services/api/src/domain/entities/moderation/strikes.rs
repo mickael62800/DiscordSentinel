@@ -4,6 +4,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrikeThreshold {
@@ -14,7 +15,7 @@ pub struct StrikeThreshold {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrikeConfig {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub window_secs: i64,
     pub thresholds: Vec<StrikeThreshold>,
     pub enabled: bool,
@@ -26,7 +27,7 @@ impl StrikeConfig {
     pub fn default_for_guild(guild_id: &str) -> Self {
         let now = Utc::now();
         Self {
-            guild_id: guild_id.to_string(),
+            guild_id: guild_id.to_string().into(),
             window_secs: 3600,
             thresholds: vec![],
             enabled: true,
@@ -39,7 +40,7 @@ impl StrikeConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserStrike {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub reason: String,
     pub source: String,

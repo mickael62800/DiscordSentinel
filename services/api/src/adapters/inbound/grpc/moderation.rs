@@ -36,7 +36,7 @@ impl ModerationService for ModerationGrpc {
         let logged = self
             .moderation_uc
             .log_action_with_strike(LogModerationCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 channel_id: req.channel_id.into(),
                 moderator_id: req.moderator_id,
                 moderator_name: req.moderator_name,
@@ -76,7 +76,7 @@ impl ModerationService for ModerationGrpc {
 fn moderation_action_to_proto(a: ModerationAction) -> proto::ModerationAction {
     proto::ModerationAction {
         id: a.id.to_string(),
-        guild_id: a.guild_id,
+        guild_id: a.guild_id.into(),
         channel_id: a.channel_id.into(),
         moderator_id: a.moderator_id,
         moderator_name: a.moderator_name,

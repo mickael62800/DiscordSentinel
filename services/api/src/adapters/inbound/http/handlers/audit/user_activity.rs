@@ -9,10 +9,11 @@ use crate::adapters::inbound::http::helpers::ok_response;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::audit::user_activity::UserActivity;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateActivityDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub event_type: String,
     pub channel_id: Option<String>,

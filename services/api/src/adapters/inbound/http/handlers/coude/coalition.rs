@@ -11,6 +11,7 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::coude::coalition::ActiveCoalition;
 use crate::domain::entities::coude::coalition::COALITION_DURATION_HOURS;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Serialize)]
 pub struct CoalitionMemberDto {
     pub member_id: String,
@@ -21,7 +22,7 @@ pub struct CoalitionMemberDto {
 #[derive(Debug, Serialize)]
 pub struct ActiveCoalitionDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub opened_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,

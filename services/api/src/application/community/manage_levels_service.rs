@@ -159,7 +159,7 @@ impl ManageLevelsUseCase for ManageLevelsService {
     async fn set_reward(&self, guild_id: &str, level: i32, role_id: &str, source: XpSource) -> Result<LevelReward, DomainError> {
         let reward = LevelReward {
             id: uuid::Uuid::new_v4(),
-            guild_id: guild_id.to_string(),
+            guild_id: guild_id.to_string().into(),
             level,
             role_id: role_id.into(),
             source,

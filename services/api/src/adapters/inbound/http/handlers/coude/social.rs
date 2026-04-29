@@ -79,7 +79,7 @@ pub async fn log_daily_chaos(
     state
         .coude_social_uc
         .log_daily_chaos(NewDailyChaos {
-            guild_id,
+            guild_id: guild_id.into(),
             loser_id: dto.loser_id,
             loser_name: dto.loser_name,
             winner_id: dto.winner_id,

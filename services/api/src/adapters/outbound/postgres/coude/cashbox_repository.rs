@@ -15,6 +15,7 @@ use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 
 use super::super::pg_err_ctx;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 const TBL: &str = "cashbox";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -30,7 +31,7 @@ impl PgCashboxRepository {
 
 #[derive(sqlx::FromRow)]
 struct CashboxRow {
-    guild_id: String,
+    guild_id: GuildId,
     balance: i64,
     total_collected: i64,
     total_redistributed: i64,
@@ -56,7 +57,7 @@ impl From<CashboxRow> for Cashbox {
 #[derive(sqlx::FromRow)]
 struct RedistributionRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     total_amount: i64,
     winners_count: i32,
     created_at: DateTime<Utc>,

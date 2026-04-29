@@ -12,6 +12,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Cooldown entre deux tentatives de braquage (par joueur).
 pub const HEIST_COOLDOWN_DAYS: i64 = 7;
@@ -163,7 +164,7 @@ where
 #[derive(Debug, Clone)]
 pub struct HeistAttempt {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub success: bool,
     pub amount_stolen: i64,
@@ -175,7 +176,7 @@ pub struct HeistAttempt {
 /// Etat d'incarceration d'un joueur.
 #[derive(Debug, Clone)]
 pub struct PrisonState {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub released_at: DateTime<Utc>,
     pub reason: String,

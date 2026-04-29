@@ -13,6 +13,7 @@ use crate::domain::errors::DomainError;
 use super::super::pg_err;
 use crate::ports::outbound::coude::inventory_repository::InventoryRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgInventoryRepository {
     pool: PgPool,
@@ -27,7 +28,7 @@ impl PgInventoryRepository {
 
 #[derive(sqlx::FromRow)]
 struct InventoryRow {
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     item_key: String,
     quantity: i32,
@@ -47,7 +48,7 @@ impl From<InventoryRow> for InventoryItem {
 #[derive(sqlx::FromRow)]
 struct PrimeRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     target_id: String,
     target_name: String,
     placed_by_id: String,

@@ -3,10 +3,11 @@ use serde::Serialize;
 use crate::domain::entities::moderation::user_note::UserNote;
 use crate::ports::inbound::moderation::manage_notes::AddNoteCommand;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct AddNoteDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub author_id: String,
     pub author_name: String,
@@ -35,7 +36,7 @@ impl From<AddNoteDto> for AddNoteCommand {
 #[derive(Debug, Serialize)]
 pub struct UserNoteDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub author_id: String,
     pub author_name: String,

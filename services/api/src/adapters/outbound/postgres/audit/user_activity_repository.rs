@@ -7,6 +7,7 @@ use crate::domain::errors::DomainError;
 use super::super::pg_err;
 use crate::ports::outbound::audit::user_activity_repository::UserActivityRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgUserActivityRepository {
     pool: PgPool,
@@ -22,7 +23,7 @@ impl PgUserActivityRepository {
 #[derive(sqlx::FromRow)]
 struct ActivityRow {
     id: uuid::Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     event_type: String,
     channel_id: Option<String>,

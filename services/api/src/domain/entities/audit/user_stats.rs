@@ -5,11 +5,12 @@ use serde::Serialize;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserStats {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub message_count: u64,
@@ -19,7 +20,7 @@ pub struct UserStats {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GuildStatsOverview {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub total_messages: u64,
     pub total_voice_seconds: u64,
     pub active_members: u64,

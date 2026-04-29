@@ -5,9 +5,10 @@ use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct SaveConductConfigCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub max_points: i32,
     pub regen_amount: i32,
     pub regen_interval: String,
@@ -18,14 +19,14 @@ pub struct SaveConductConfigCommand {
 }
 
 pub struct DeductPointsCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub action: String,
 }
 
 pub struct AddPointsCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub amount: i32,
     pub reason: String,

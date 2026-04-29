@@ -4,9 +4,10 @@ use uuid::Uuid;
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct CreateRuleCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub flag_type: FlagType,
     pub weight: f64,
     pub threshold_warn: f64,

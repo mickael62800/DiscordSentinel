@@ -14,6 +14,7 @@ use crate::domain::errors::DomainError;
 use super::super::pg_err;
 use crate::ports::outbound::coude::social_repository::SocialRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgSocialRepository {
     pool: PgPool,
@@ -46,7 +47,7 @@ impl From<LeaderboardRow> for LeaderboardEntry {
 #[derive(sqlx::FromRow)]
 struct EventRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     event_type: String,
     active: bool,
     expires_at: DateTime<Utc>,

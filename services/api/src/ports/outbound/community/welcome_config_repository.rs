@@ -1,12 +1,13 @@
 use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Config welcome brute (1 row par guild). Les defaults sont appliques
 /// par le repository si la row n'existe pas.
 #[derive(Debug, Clone)]
 pub struct WelcomeConfigData {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub welcome_enabled: bool,
     pub welcome_channel_id: Option<String>,
     pub welcome_message: String,

@@ -7,9 +7,10 @@ use crate::domain::entities::community::role_panel::RolePanelDetail;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct CreateRolePanelCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub title: String,
     pub description: String,
@@ -33,7 +34,7 @@ pub struct SetMessageIdCommand {
 }
 
 pub struct CreateAutoRoleCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub role_id: RoleId,
     pub role_name: String,
     pub delay_secs: i32,

@@ -15,6 +15,7 @@ use sentinel_proto::community::v1 as proto;
 use sentinel_proto::community::v1::community_service_server::CommunityService;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct CommunityGrpc {
     pub pg_pool: sqlx::PgPool,
@@ -23,7 +24,7 @@ pub struct CommunityGrpc {
 #[derive(sqlx::FromRow)]
 struct SponsorshipRow {
     id: sqlx::types::Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     sponsor_id: String,
     sponsored_id: String,
     created_at: DateTime<Utc>,
@@ -32,7 +33,7 @@ struct SponsorshipRow {
 #[derive(sqlx::FromRow)]
 struct TempRoleRow {
     id: sqlx::types::Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     role_id: RoleId,
     expires_at: DateTime<Utc>,
@@ -79,7 +80,7 @@ impl CommunityService for CommunityGrpc {
                 .into_iter()
                 .map(|r| proto::Sponsorship {
                     id: r.id.to_string(),
-                    guild_id: r.guild_id,
+                    guild_id: r.guild_id.into(),
                     sponsor_id: r.sponsor_id,
                     sponsored_id: r.sponsored_id,
                     created_at: r.created_at.to_rfc3339(),
@@ -132,7 +133,7 @@ impl CommunityService for CommunityGrpc {
                 .into_iter()
                 .map(|r| proto::TempRole {
                     id: r.id.to_string(),
-                    guild_id: r.guild_id,
+                    guild_id: r.guild_id.into(),
                     user_id: r.user_id.into(),
                     role_id: r.role_id.into(),
                     expires_at: r.expires_at.to_rfc3339(),

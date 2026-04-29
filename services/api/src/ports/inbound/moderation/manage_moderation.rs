@@ -5,9 +5,10 @@ use crate::domain::entities::moderation::strikes::StrikeResult;
 use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct LogModerationCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub moderator_id: String,
     pub moderator_name: String,

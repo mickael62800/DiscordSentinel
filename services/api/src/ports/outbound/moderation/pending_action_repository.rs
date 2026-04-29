@@ -4,11 +4,12 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, serde::Serialize, sqlx::FromRow)]
 pub struct PendingAction {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,

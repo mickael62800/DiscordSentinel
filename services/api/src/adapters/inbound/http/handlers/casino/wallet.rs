@@ -15,6 +15,7 @@ use crate::domain::entities::casino::wallet::validate_transfer_distinct_users;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 // ── DTOs ──
 
@@ -27,7 +28,7 @@ pub struct CreditDebitDto {
 
 #[derive(Debug, Deserialize)]
 pub struct TransferDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub from_user_id: String,
     pub to_user_id: String,
     pub amount: i64,

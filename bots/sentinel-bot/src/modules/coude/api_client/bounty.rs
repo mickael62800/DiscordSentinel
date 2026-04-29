@@ -3,11 +3,12 @@
 use serde::{Deserialize, Serialize};
 
 use super::ApiClient;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct ActiveBountyResp {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub total_amount: i64,
     pub status: String,

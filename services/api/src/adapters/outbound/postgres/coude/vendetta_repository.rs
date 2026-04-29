@@ -12,6 +12,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::vendetta_repository::VendettaRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::GuildId;
 const TBL: &str = "coude_vendettas";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -28,7 +29,7 @@ impl PgVendettaRepository {
 #[derive(sqlx::FromRow)]
 struct Row {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     challenger_id: String,
     target_id: String,
     declared_at: DateTime<Utc>,

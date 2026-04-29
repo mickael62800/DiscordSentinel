@@ -29,7 +29,7 @@ pub struct StandingDto {
 
 #[derive(Debug, Serialize)]
 pub struct CurrentTournamentDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub week_start: DateTime<Utc>,
     pub week_end: DateTime<Utc>,
     pub prize_pool_estimated: i64,
@@ -39,7 +39,7 @@ pub struct CurrentTournamentDto {
 #[derive(Debug, Serialize)]
 pub struct PastTournamentDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub week_start: DateTime<Utc>,
     pub week_end: DateTime<Utc>,
     pub winner_user_id: Option<String>,
@@ -55,6 +55,7 @@ pub struct PastTournamentDto {
 use crate::domain::entities::coude::tournament::current_week_bounds;
 use crate::domain::entities::coude::tournament::estimate_tournament_prize_pool;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 /// GET /api/coude/{guild_id}/tournaments/current
 pub async fn get_current_tournament(
     State(state): State<AppState>,
@@ -117,7 +118,7 @@ pub async fn get_current_tournament(
     let prize_pool_estimated = estimate_tournament_prize_pool(cashbox);
 
     Ok(Json(CurrentTournamentDto {
-        guild_id,
+        guild_id: guild_id.into(),
         week_start,
         week_end,
         prize_pool_estimated,
@@ -162,7 +163,7 @@ pub async fn get_tournament_history(
             |(id, guild_id, week_start, week_end, winner_user_id, winner_username, winner_net_gain, prize_amount, status, resolved_at)| {
                 PastTournamentDto {
                     id: id.to_string(),
-                    guild_id,
+                    guild_id: guild_id.into(),
                     week_start,
                     week_end,
                     winner_user_id,

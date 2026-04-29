@@ -3,11 +3,12 @@ use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct RolePanel {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: Option<String>,
     pub title: String,
@@ -40,7 +41,7 @@ pub struct RolePanelDetail {
 #[derive(Debug, Clone)]
 pub struct AutoRole {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub role_id: RoleId,
     pub role_name: String,
     pub delay_secs: i32,

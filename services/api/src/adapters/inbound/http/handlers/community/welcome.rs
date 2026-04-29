@@ -7,10 +7,11 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::ports::inbound::community::manage_welcome_config::WelcomeConfigPatch;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Serialize)]
 pub struct WelcomeConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub welcome_enabled: bool,
     pub welcome_channel_id: Option<String>,
     pub welcome_message: String,

@@ -12,6 +12,7 @@ use uuid::Uuid;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Resultat d'un export : donnees serialisees + nombre de lignes.
 #[derive(Debug)]
@@ -66,7 +67,7 @@ impl ExecuteExportUseCase for ExportService {
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]
 struct InfractionRow {
-    id: Uuid, guild_id: String, channel_id: ChannelId, user_id: UserId,
+    id: Uuid, guild_id: GuildId, channel_id: ChannelId, user_id: UserId,
     username: String, message_id: String, content: String, score: f64,
     action: String, reason: String, duration: Option<i64>, created_at: DateTime<Utc>,
 }
@@ -90,7 +91,7 @@ async fn export_infractions(pool: &PgPool, guild_id: &str, format: &str, max_row
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]
 struct AuditLogRow {
-    id: Uuid, guild_id: String, event_type: String,
+    id: Uuid, guild_id: GuildId, event_type: String,
     actor_id: Option<String>, actor_name: Option<String>,
     target_id: Option<String>, target_name: Option<String>,
     channel_id: Option<String>, channel_name: Option<String>,
@@ -118,7 +119,7 @@ async fn export_audit_logs(pool: &PgPool, guild_id: &str, format: &str, max_rows
 
 #[derive(Debug, sqlx::FromRow, serde::Serialize)]
 struct ModerationActionRow {
-    id: Uuid, guild_id: String, moderator_id: String, moderator_name: String,
+    id: Uuid, guild_id: GuildId, moderator_id: String, moderator_name: String,
     target_id: String, target_name: String, action_type: String,
     reason: String, duration: Option<i64>, created_at: DateTime<Utc>,
 }

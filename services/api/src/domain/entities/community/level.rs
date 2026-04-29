@@ -3,6 +3,7 @@ use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Source d'XP : texte (messages) ou vocal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -34,7 +35,7 @@ impl XpSource {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct LevelConfig {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub xp_per_message: i32,
     pub xp_per_voice_minute: i32,
     pub xp_cooldown_secs: i32,
@@ -50,7 +51,7 @@ pub struct LevelConfig {
 #[allow(dead_code)]
 pub struct UserLevel {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub xp: i64,
@@ -67,7 +68,7 @@ pub struct UserLevel {
 #[derive(Debug, Clone)]
 pub struct LevelReward {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub level: i32,
     pub role_id: RoleId,
     pub source: XpSource,

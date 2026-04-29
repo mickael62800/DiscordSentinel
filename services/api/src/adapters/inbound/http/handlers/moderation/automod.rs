@@ -29,6 +29,7 @@ use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodRev
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Deserialize)]
 pub struct DetectionQuery {
     /// Defaut 50, max 200.
@@ -66,7 +67,7 @@ pub async fn list_detections(
 #[derive(Debug, Serialize)]
 pub struct AutomodReviewDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub user_id: UserId,
@@ -135,7 +136,7 @@ pub async fn list_reviews(
 
 #[derive(Debug, Deserialize)]
 pub struct CreateReviewBody {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub user_id: UserId,

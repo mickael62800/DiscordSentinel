@@ -8,6 +8,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::audit::stats_repository::StatsRepository;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgStatsRepository {
     pool: PgPool,
@@ -22,7 +23,7 @@ impl PgStatsRepository {
 #[derive(sqlx::FromRow)]
 struct StatsRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     username: String,
     message_count: i64,

@@ -556,7 +556,7 @@ async fn handle_ticket_closed_from_web(ctx: &Context, action_id: &str) {
     #[derive(serde::Deserialize)]
     struct Mapping {
         kind: String,
-        guild_id: String,
+        guild_id: GuildId,
         channel_id: ChannelId,
         message_id: String,
     }

@@ -2,10 +2,11 @@ use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateAuditLogDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub actor_id: Option<String>,
     pub actor_name: Option<String>,
@@ -34,7 +35,7 @@ pub struct AuditLogQueryParams {
 #[derive(Debug, Serialize)]
 pub struct AuditLogResponseDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub actor_id: Option<String>,
     pub actor_name: Option<String>,

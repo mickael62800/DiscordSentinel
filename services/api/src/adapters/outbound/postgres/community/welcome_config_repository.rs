@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use crate::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 pub struct PgWelcomeConfigRepository {
     pool: PgPool,
 }
@@ -16,7 +17,7 @@ impl PgWelcomeConfigRepository {
 
 #[derive(sqlx::FromRow)]
 struct Row {
-    guild_id: String,
+    guild_id: GuildId,
     welcome_enabled: bool,
     welcome_channel_id: Option<String>,
     welcome_message: String,
@@ -85,7 +86,7 @@ impl From<Row> for WelcomeConfigData {
 
 fn default_config(guild_id: &str) -> WelcomeConfigData {
     WelcomeConfigData {
-        guild_id: guild_id.to_string(),
+        guild_id: guild_id.to_string().into(),
         welcome_enabled: true,
         welcome_channel_id: None,
         welcome_message: "Bienvenue {user} sur **{server}** ! Tu es le **{count}e** membre.".into(),

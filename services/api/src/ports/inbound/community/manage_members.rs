@@ -4,9 +4,10 @@ use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::entities::community::guild_member::MemberSummary;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct SyncMembersCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub members: Vec<GuildMember>,
 }
 
@@ -15,7 +16,7 @@ pub struct RegisterMemberCommand {
 }
 
 pub struct UpdateMemberCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: Option<String>,
     pub display_name: Option<String>,

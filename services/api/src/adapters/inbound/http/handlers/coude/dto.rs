@@ -19,6 +19,7 @@ use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 // ══════════════════════════════════════════════════════════════════════
 // ── Player DTOs ──
 // ══════════════════════════════════════════════════════════════════════
@@ -68,7 +69,7 @@ impl From<&Player> for PlayerDto {
 
 #[derive(Debug, Serialize)]
 pub struct FullPlayerDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub coins: i64,
@@ -224,7 +225,7 @@ pub struct RandomPlayersQuery {
 #[derive(Debug, Serialize)]
 pub struct CombatDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub attacker_id: String,
     pub attacker_name: String,
     pub defender_id: String,
@@ -271,7 +272,7 @@ impl From<&Combat> for CombatDto {
 #[derive(Debug, Serialize)]
 pub struct FullCombatDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: Option<String>,
     pub attacker_id: String,
     pub attacker_name: String,
@@ -505,7 +506,7 @@ pub struct StealDto {
 
 #[derive(Debug, Serialize)]
 pub struct InventoryItemDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub item_key: String,
     pub quantity: i32,
@@ -535,7 +536,7 @@ pub struct UseItemDto {
 #[derive(Debug, Serialize)]
 pub struct PrimeDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub target_name: String,
     pub placed_by_id: String,
@@ -652,7 +653,7 @@ pub struct DailyChaosDto {
 #[derive(Debug, Serialize)]
 pub struct EventDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub active: bool,
     pub expires_at: String,
     pub created_at: String,

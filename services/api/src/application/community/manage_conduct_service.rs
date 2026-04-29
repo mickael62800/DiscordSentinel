@@ -73,7 +73,7 @@ impl ManageConductService {
         let now = Utc::now();
         let points = UserConductPoints {
             id: Uuid::new_v4(),
-            guild_id: guild_id.to_string(),
+            guild_id: guild_id.to_string().into(),
             user_id: user_id.to_string().into(),
             username: username.to_string(),
             points: max_points,

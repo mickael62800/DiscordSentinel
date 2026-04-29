@@ -11,9 +11,10 @@ use crate::ports::inbound::community::manage_role_panels::CreateRolePanelEntryCo
 use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Deserialize)]
 pub struct CreateRolePanelDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub title: String,
     #[serde(default)]
@@ -49,7 +50,7 @@ pub struct SetMessageIdDto {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateAutoRoleDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub role_id: RoleId,
     pub role_name: String,
     #[serde(default)]
@@ -59,7 +60,7 @@ pub struct CreateAutoRoleDto {
 #[derive(Debug, Serialize)]
 pub struct RolePanelDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: Option<String>,
     pub title: String,
@@ -90,7 +91,7 @@ pub struct RolePanelDetailDto {
 #[derive(Debug, Serialize)]
 pub struct AutoRoleDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub role_id: RoleId,
     pub role_name: String,
     pub delay_secs: i32,

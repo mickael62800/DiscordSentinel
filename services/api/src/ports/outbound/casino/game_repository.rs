@@ -3,11 +3,12 @@ use async_trait::async_trait;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct Game {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub game_name: String,
     pub created_by: String,
     pub created_at: String,
@@ -19,7 +20,7 @@ pub struct Game {
 #[derive(Debug, Clone)]
 pub struct GamePanel {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub category: Option<String>,

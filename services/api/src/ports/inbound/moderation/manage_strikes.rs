@@ -7,9 +7,10 @@ use crate::domain::entities::moderation::strikes::StrikeThreshold;
 use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct AddStrikeCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub reason: String,
     pub source: String,
@@ -17,7 +18,7 @@ pub struct AddStrikeCommand {
 }
 
 pub struct SaveStrikeConfigCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub window_secs: i64,
     pub thresholds: Vec<StrikeThreshold>,
     pub enabled: bool,

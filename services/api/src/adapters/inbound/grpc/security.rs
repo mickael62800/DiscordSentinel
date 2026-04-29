@@ -29,7 +29,7 @@ impl SecurityService for SecurityGrpc {
         let event = self
             .uc
             .report_event(ReportSecurityEventCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 event_type: req.event_type,
                 severity: req.severity,
                 description: req.description,
@@ -72,7 +72,7 @@ impl SecurityService for SecurityGrpc {
         let decision = self
             .uc
             .analyze_new_member(AnalyzeNewMemberCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 user_id: req.user_id.into(),
                 username: req.username,
                 has_avatar: req.has_avatar,
@@ -101,7 +101,7 @@ impl SecurityService for SecurityGrpc {
 fn security_event_to_proto(e: SecurityEvent) -> proto::SecurityEvent {
     proto::SecurityEvent {
         id: e.id.to_string(),
-        guild_id: e.guild_id,
+        guild_id: e.guild_id.into(),
         event_type: e.event_type,
         severity: e.severity,
         description: e.description,

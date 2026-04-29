@@ -16,11 +16,12 @@ use crate::domain::entities::audit::discord_action_message::DiscordActionMessage
 use crate::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Deserialize)]
 pub struct RegisterDto {
     pub action_id: Uuid,
     pub kind: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
 }
@@ -29,7 +30,7 @@ pub struct RegisterDto {
 pub struct DiscordActionMessageDto {
     pub action_id: Uuid,
     pub kind: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub posted_at: String,

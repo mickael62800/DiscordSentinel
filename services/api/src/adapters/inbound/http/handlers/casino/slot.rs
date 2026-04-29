@@ -142,7 +142,7 @@ pub async fn spin(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
 
     let cmd = SpinCommand {
-        guild_id,
+        guild_id: guild_id.into(),
         user_id: dto.user_id,
         username: dto.username,
         mise: dto.mise,
@@ -175,7 +175,7 @@ pub async fn daily(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
 
     let cmd = SpinCommand {
-        guild_id,
+        guild_id: guild_id.into(),
         user_id: dto.user_id,
         username: dto.username,
         mise: 0, // ignore : la mise daily vient de la config

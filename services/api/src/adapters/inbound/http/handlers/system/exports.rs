@@ -25,10 +25,11 @@ use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateExportJobDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub requested_by: String,
     /// "infractions" | "audit_logs" | "moderation_actions"
     pub job_type: String,
@@ -47,7 +48,7 @@ pub struct ExportJobCreatedDto {
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct ExportJobStatusDto {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub requested_by: String,
     pub job_type: String,
     pub format: String,

@@ -9,9 +9,10 @@ use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntr
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct CreateVoiceChannelCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub owner_id: String,
     pub owner_name: String,
     pub channel_id: ChannelId,
@@ -51,7 +52,7 @@ pub struct ManageCoAdminCommand {
 }
 
 pub struct ManageWhitelistCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub owner_id: String,
     pub target_id: String,
     pub target_name: String,
@@ -81,7 +82,7 @@ pub struct UseInviteLinkCommand {
 }
 
 pub struct CreateThemeCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub name: String,
     pub emoji: Option<String>,
     pub channel_name_template: String,

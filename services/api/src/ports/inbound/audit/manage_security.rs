@@ -4,9 +4,10 @@ use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::errors::DomainError;
 use crate::domain::services::audit::security_analyzer::JoinInfo;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct ReportSecurityEventCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub severity: String,
     pub description: String,
@@ -14,7 +15,7 @@ pub struct ReportSecurityEventCommand {
 }
 
 pub struct AnalyzeNewMemberCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub has_avatar: bool,

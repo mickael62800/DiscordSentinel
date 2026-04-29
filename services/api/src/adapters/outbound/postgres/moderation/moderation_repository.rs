@@ -8,13 +8,14 @@ use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Phase 2 helper : reconstruit une ModerationAction a partir d'une ligne
 /// audit_logs (event_type `mod_*`).
 #[derive(sqlx::FromRow)]
 struct AuditModRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     event_type: String,
     actor_id: Option<String>,
     actor_name: Option<String>,
@@ -90,7 +91,7 @@ impl PgModerationRepository {
 #[derive(sqlx::FromRow)]
 struct ActionRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     channel_id: ChannelId,
     moderator_id: String,
     moderator_name: String,

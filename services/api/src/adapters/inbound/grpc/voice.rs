@@ -47,7 +47,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         let channel = self
             .uc
             .create_channel(CreateVoiceChannelCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 owner_id: req.owner_id,
                 owner_name: req.owner_name,
                 channel_id: req.channel_id.into(),
@@ -166,7 +166,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         let req = request.into_inner();
         self.uc
             .add_to_whitelist(ManageWhitelistCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 owner_id: req.owner_id,
                 target_id: req.target_id,
                 target_name: req.target_name,
@@ -232,7 +232,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
 fn voice_theme_to_proto(t: crate::domain::entities::community::voice_channel::VoiceChannelTheme) -> proto::VoiceChannelTheme {
     proto::VoiceChannelTheme {
         id: t.id.to_string(),
-        guild_id: t.guild_id,
+        guild_id: t.guild_id.into(),
         name: t.name,
         emoji: t.emoji,
         channel_name_template: t.channel_name_template,
@@ -252,7 +252,7 @@ fn voice_theme_to_proto(t: crate::domain::entities::community::voice_channel::Vo
 fn voice_channel_to_proto(c: VoiceChannel) -> proto::VoiceChannel {
     proto::VoiceChannel {
         id: c.id.to_string(),
-        guild_id: c.guild_id,
+        guild_id: c.guild_id.into(),
         owner_id: c.owner_id,
         owner_name: c.owner_name,
         channel_id: c.channel_id.into(),

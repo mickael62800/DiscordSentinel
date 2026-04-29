@@ -11,6 +11,7 @@ use crate::ports::outbound::moderation::infraction_repository::InfractionReposit
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgInfractionRepository {
     pool: PgPool,
@@ -25,7 +26,7 @@ impl PgInfractionRepository {
 #[derive(sqlx::FromRow)]
 struct InfractionRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     channel_id: ChannelId,
     user_id: UserId,
     username: String,

@@ -143,7 +143,7 @@ fn row_to_entity(
     DiscordActionMessage {
         action_id: row.0,
         kind: row.1,
-        guild_id: row.2,
+        guild_id: row.2.into(),
         channel_id: row.3.into(),
         message_id: row.4.into(),
         posted_at: row.5,

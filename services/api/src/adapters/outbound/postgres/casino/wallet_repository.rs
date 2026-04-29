@@ -10,6 +10,7 @@ use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgWalletRepository {
     pool: PgPool,
@@ -24,7 +25,7 @@ impl PgWalletRepository {
 #[derive(sqlx::FromRow)]
 struct WalletRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     username: String,
     coins: i64,
@@ -53,7 +54,7 @@ impl From<WalletRow> for Wallet {
 #[derive(sqlx::FromRow)]
 struct WalletTransactionRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     amount: i64,
     balance_after: i64,

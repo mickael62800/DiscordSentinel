@@ -7,6 +7,7 @@ use crate::domain::entities::community::guild_member::GuildMember;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::member_repository::MemberRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgMemberRepository {
     pool: PgPool,
@@ -20,7 +21,7 @@ impl PgMemberRepository {
 
 #[derive(sqlx::FromRow)]
 struct MemberRow {
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     username: String,
     display_name: Option<String>,

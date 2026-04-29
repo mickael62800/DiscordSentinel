@@ -2,6 +2,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Niveau maximum atteignable par un joueur.
 pub const COUDE_MAX_LEVEL: i32 = 25;
@@ -31,7 +32,7 @@ pub fn title_for_level(level: i32) -> &'static str {
 /// utilisées par les handlers : économie, combats, casino, progression, HP, saison).
 #[derive(Debug, Clone)]
 pub struct Player {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub coins: i64,

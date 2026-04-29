@@ -6,9 +6,10 @@ use crate::domain::entities::community::level::UserLevel;
 use crate::domain::entities::community::level::XpSource;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct SaveLevelConfigCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub xp_per_message: i32,
     pub xp_per_voice_minute: i32,
     pub xp_cooldown_secs: i32,
@@ -19,7 +20,7 @@ pub struct SaveLevelConfigCommand {
 }
 
 pub struct AddXpCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub amount: i64,

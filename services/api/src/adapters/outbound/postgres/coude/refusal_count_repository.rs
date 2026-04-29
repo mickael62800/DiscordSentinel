@@ -66,7 +66,7 @@ impl RefusalCountRepository for PgRefusalCountRepository {
         .await
         .map_err(pg_err)?;
         Ok(row.map(|(g, r, f, c, t)| RefusalCount {
-            guild_id: g,
+            guild_id: g.into(),
             requester_id: r,
             refuser_id: f,
             count: c,

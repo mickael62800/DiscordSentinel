@@ -48,7 +48,7 @@ use sentinel_proto::stats::v1 as proto_stats;
 #[allow(dead_code)]
 pub struct Infraction {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub action: String,
@@ -73,7 +73,7 @@ pub struct StreakResponse {
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct UserStatsResponse {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub message_count: u64,
@@ -85,7 +85,7 @@ pub struct UserStatsResponse {
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct GuildOverviewResponse {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub total_messages: u64,
     pub total_voice_seconds: u64,
     pub total_voice_hours: f64,
@@ -143,7 +143,7 @@ pub struct AddXpResponse {
 #[allow(dead_code)]
 pub struct RewardEntry {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub level: i32,
     pub role_id: RoleId,
     pub source: String,
@@ -523,4 +523,5 @@ fn proto_user_stats_to_response(u: proto_stats::UserStats) -> UserStatsResponse 
 use sentinel_shared::grpc_client::grpc_err_to_string;
 use sentinel_api::domain::entities::system::discord_ids::RoleId;
 use sentinel_api::domain::entities::system::discord_ids::UserId;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 

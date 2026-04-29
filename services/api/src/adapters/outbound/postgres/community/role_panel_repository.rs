@@ -10,6 +10,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::role_panel_repository::RolePanelRepository;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgRolePanelRepository {
     pool: PgPool,
@@ -24,7 +25,7 @@ impl PgRolePanelRepository {
 #[derive(sqlx::FromRow)]
 struct PanelRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     channel_id: ChannelId,
     message_id: Option<String>,
     title: String,
@@ -51,7 +52,7 @@ struct EntryRow {
 #[derive(sqlx::FromRow)]
 struct AutoRoleRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     role_id: RoleId,
     role_name: String,
     delay_secs: i32,

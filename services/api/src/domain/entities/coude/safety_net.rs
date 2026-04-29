@@ -13,6 +13,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Seuil de declenchement (en coins). Si le wallet tombe sous ce
 /// montant, le filet s active.
@@ -32,7 +33,7 @@ pub const SAFETY_NET_BET_GAIN_MULTIPLIER: f64 = 1.5;
 #[derive(Debug, Clone)]
 pub struct ActiveSafetyNet {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub activated_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,

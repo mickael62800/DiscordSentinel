@@ -9,6 +9,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct ManageCoudePlayersService {
     repo: Arc<dyn PlayerRepository>,
@@ -35,7 +36,7 @@ impl ManageCoudePlayersService {
 impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
     async fn get_or_create(
         &self,
-        guild_id: String,
+        guild_id: GuildId,
         user_id: UserId,
         username: String,
     ) -> Result<Player, DomainError> {

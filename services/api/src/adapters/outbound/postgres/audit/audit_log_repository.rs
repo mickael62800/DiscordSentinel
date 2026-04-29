@@ -6,6 +6,7 @@ use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::audit::manage_audit_logs::AuditLogFilters;
 use crate::ports::outbound::audit::audit_log_repository::AuditLogRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgAuditLogRepository {
     pool: PgPool,
@@ -20,7 +21,7 @@ impl PgAuditLogRepository {
 #[derive(sqlx::FromRow)]
 struct AuditLogRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     event_type: String,
     actor_id: Option<String>,
     actor_name: Option<String>,

@@ -20,6 +20,7 @@ use async_trait::async_trait;
 
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Sortie retournee pour chaque combat resolu.
 /// Le worker l'utilise pour poster le resultat sur Discord (edit message ou
@@ -27,7 +28,7 @@ use crate::domain::errors::DomainError;
 #[derive(Debug, Clone)]
 pub struct ResolvedBettingCombatOutput {
     pub combat_id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: Option<String>,
     pub message_id: Option<String>,
     pub result_message: String,

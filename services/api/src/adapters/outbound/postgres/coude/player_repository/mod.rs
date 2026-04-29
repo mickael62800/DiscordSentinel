@@ -12,6 +12,7 @@ use crate::adapters::outbound::postgres::pg_err;
 use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgPlayerRepository {
     pool: PgPool,
@@ -43,7 +44,7 @@ const PLAYER_COLUMNS: &str = r#"
 
 #[derive(sqlx::FromRow)]
 struct PlayerRow {
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     username: String,
     coins: i64,

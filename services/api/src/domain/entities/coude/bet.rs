@@ -1,10 +1,11 @@
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Pari posé sur un combat Coup de Coude.
 #[derive(Debug, Clone)]
 pub struct Bet {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub combat_id: Uuid,
     pub bettor_id: String,
     pub bettor_name: String,
@@ -18,7 +19,7 @@ pub struct Bet {
 /// Données nécessaires pour placer un nouveau pari.
 #[derive(Debug, Clone)]
 pub struct NewCoudeBet {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub combat_id: Uuid,
     pub bettor_id: String,
     pub bettor_name: String,

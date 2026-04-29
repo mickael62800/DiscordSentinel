@@ -1,11 +1,12 @@
 use chrono::DateTime;
 use chrono::Utc;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Clone)]
 pub struct WatchedUser {
     pub user_id: UserId,
     pub username: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub guild_name: String,
     pub risk_level: String,
     pub total_warns: i64,

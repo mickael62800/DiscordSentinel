@@ -12,10 +12,11 @@ use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct PurgeByDaysDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub days: i32,
 }
 

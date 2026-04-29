@@ -9,10 +9,11 @@
 use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct FriendlyDuelInput {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub attacker_id: String,
     pub attacker_name: String,
     pub defender_id: String,

@@ -28,6 +28,7 @@ use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 
 use super::taunt_event_to_proto;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct SocialGrpc {
     pub uc: Arc<dyn ManageCoudeSocialUseCase>,
@@ -58,7 +59,7 @@ pub(super) fn leaderboard_entry_to_proto(e: LeaderboardEntry) -> proto::Leaderbo
 pub(super) fn event_to_proto(e: Event) -> proto::Event {
     proto::Event {
         id: e.id.to_string(),
-        guild_id: e.guild_id,
+        guild_id: e.guild_id.into(),
         active: e.active,
         expires_at: e.expires_at.to_rfc3339(),
         created_at: e.created_at.to_rfc3339(),
@@ -142,7 +143,7 @@ impl CoudeSocialService for SocialGrpc {
         let req = request.into_inner();
         self.uc
             .log_daily_chaos(NewDailyChaos {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 loser_id: req.loser_id,
                 loser_name: req.loser_name,
                 winner_id: req.winner_id,
@@ -251,7 +252,7 @@ impl CoudeSocialService for SocialGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::CashboxState {
-            guild_id: cb.guild_id,
+            guild_id: cb.guild_id.into(),
             balance: cb.balance,
             total_collected: cb.total_collected,
             total_redistributed: cb.total_redistributed,
@@ -277,7 +278,7 @@ impl CoudeSocialService for SocialGrpc {
                 winners: vec![],
                 guild_id,
             })),
-            Some(o) => Ok(Response::new(redistribution_to_proto(guild_id, o))),
+            Some(o) => Ok(Response::new(redistribution_to_proto(guild_id.into(), o))).into(),
         }
     }
 
@@ -293,7 +294,7 @@ impl CoudeSocialService for SocialGrpc {
             .map_err(domain_to_status)?;
         let redistributed = results
             .into_iter()
-            .map(|(guild_id, outcome)| redistribution_to_proto(guild_id, outcome))
+            .map(|(guild_id, outcome)| redistribution_to_proto(guild_id.into(), outcome))
             .collect();
         Ok(Response::new(proto::RedistributeDueResponse { redistributed }))
     }
@@ -352,7 +353,7 @@ impl CoudeSocialService for SocialGrpc {
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(proto::TauntsConfigState {
-            guild_id: cfg.guild_id,
+            guild_id: cfg.guild_id.into(),
             channel_id: cfg.channel_id,
             enabled: cfg.enabled,
         }))
@@ -484,7 +485,7 @@ impl CoudeSocialService for SocialGrpc {
 }
 
 pub(super) fn redistribution_to_proto(
-    guild_id: String,
+    guild_id: GuildId,
     outcome: crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome,
 ) -> proto::RedistributeCashboxResponse {
     proto::RedistributeCashboxResponse {
@@ -500,7 +501,7 @@ pub(super) fn redistribution_to_proto(
                 amount_won,
             })
             .collect(),
-        guild_id,
+        guild_id: guild_id.into(),
     }
 }
 

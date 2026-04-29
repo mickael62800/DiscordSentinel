@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_api::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 /// URL-encode un segment de path pour eviter qu'un nom de jeu avec `/` ou
 /// caracteres speciaux ne casse le routing ou ne permette une injection.
@@ -22,7 +23,7 @@ fn encode_segment(s: &str) -> String {
 #[allow(dead_code)]
 pub struct Game {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub game_name: String,
     pub created_by: String,
     #[serde(default)]
@@ -37,7 +38,7 @@ pub struct Game {
 #[allow(dead_code)]
 pub struct GamePanel {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     #[serde(default)]

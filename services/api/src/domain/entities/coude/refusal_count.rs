@@ -2,12 +2,13 @@
 
 use chrono::DateTime;
 use chrono::Utc;
+use crate::domain::entities::system::discord_ids::GuildId;
 /// Seuil au-dessus duquel le requester peut invoquer la dette d honneur.
 pub const HONOR_DEBT_THRESHOLD: i32 = 3;
 
 #[derive(Debug, Clone)]
 pub struct RefusalCount {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub requester_id: String,
     pub refuser_id: String,
     pub count: i32,

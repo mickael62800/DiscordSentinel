@@ -3,11 +3,12 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BotGuildConfig {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub bot_name: String,
     pub config_key: String,
     pub config_value: String,

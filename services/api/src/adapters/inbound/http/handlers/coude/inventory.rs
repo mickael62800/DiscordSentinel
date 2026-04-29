@@ -83,7 +83,7 @@ pub async fn create_prime(
     let prime = state
         .coude_inventory_uc
         .create_prime(NewCoudePrime {
-            guild_id,
+            guild_id: guild_id.into(),
             target_id: dto.target_id,
             target_name: dto.target_name,
             placed_by_id: dto.placed_by_id,

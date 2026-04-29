@@ -10,13 +10,14 @@ use async_trait::async_trait;
 
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Info minimale pour chaque combat expire (utilisee pour logging + eventuel
 /// post Discord a decider cote worker).
 #[derive(Debug, Clone)]
 pub struct ExpiredCombatOutput {
     pub combat_id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub defender_id: String,
     pub defender_name: String,

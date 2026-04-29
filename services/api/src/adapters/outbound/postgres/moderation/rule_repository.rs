@@ -6,6 +6,7 @@ use crate::domain::entities::system::rule::Rule;
 use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::outbound::moderation::rule_repository::RuleRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgRuleRepository {
     pool: PgPool,
@@ -20,7 +21,7 @@ impl PgRuleRepository {
 #[derive(sqlx::FromRow)]
 struct RuleRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     flag_type: String,
     weight: f64,
     threshold_warn: f64,

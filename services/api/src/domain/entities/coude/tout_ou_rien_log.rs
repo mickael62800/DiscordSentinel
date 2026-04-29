@@ -4,6 +4,7 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ToutOuRienLogOutcome {
@@ -30,7 +31,7 @@ impl ToutOuRienLogOutcome {
 #[derive(Debug, Clone)]
 pub struct ToutOuRienLogEntry {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     /// Mise = solde initial du joueur au moment du tirage.

@@ -5,6 +5,7 @@ use uuid::Uuid;
 use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::audit::security_event_repository::SecurityEventRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgSecurityEventRepository {
     pool: PgPool,
@@ -19,7 +20,7 @@ impl PgSecurityEventRepository {
 #[derive(sqlx::FromRow)]
 struct EventRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     event_type: String,
     severity: String,
     description: String,
@@ -95,7 +96,7 @@ impl SecurityEventRepository for PgSecurityEventRepository {
 #[derive(sqlx::FromRow)]
 struct AuditSecurityRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     event_type: String,
     details: serde_json::Value,
     created_at: chrono::DateTime<chrono::Utc>,

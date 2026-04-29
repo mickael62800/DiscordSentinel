@@ -50,7 +50,7 @@ pub async fn play_travaux(
     let res = state
         .play_travaux_uc
         .play(PlayTravauxCommand {
-            guild_id,
+            guild_id: guild_id.into(),
             user_id: dto.user_id,
             username: dto.username,
         })

@@ -2,6 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BotDefinitionDto {
     pub bot_name: String,
@@ -23,7 +24,7 @@ impl From<BotDefinition> for BotDefinitionDto {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BotGuildConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub bot_name: String,
     pub config_key: String,
     pub config_value: String,
@@ -42,7 +43,7 @@ impl From<BotGuildConfig> for BotGuildConfigDto {
 
 #[derive(Debug, Deserialize)]
 pub struct SetConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub bot_name: String,
     pub config_key: String,
     pub config_value: String,
@@ -50,7 +51,7 @@ pub struct SetConfigDto {
 
 #[derive(Debug, Deserialize)]
 pub struct DeleteConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub bot_name: String,
     pub config_key: String,
 }

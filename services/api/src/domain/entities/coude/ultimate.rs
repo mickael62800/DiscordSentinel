@@ -13,6 +13,7 @@ use chrono::DateTime;
 use chrono::Duration;
 use chrono::Utc;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 /// Niveau minimum pour utiliser une ultimate.
 pub const ULTIMATE_UNLOCK_LEVEL: i32 = 10;
 
@@ -78,7 +79,7 @@ pub fn ultimate_ready(level: i32, kind: UltimateKind, last_used_at: Option<DateT
 
 #[derive(Debug, Clone)]
 pub struct UltimateState {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub pending_kind: Option<UltimateKind>,
     pub last_used_at: Option<DateTime<Utc>>,

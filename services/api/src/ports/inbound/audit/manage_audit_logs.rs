@@ -2,9 +2,10 @@ use async_trait::async_trait;
 
 use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct CreateAuditLogCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub actor_id: Option<String>,
     pub actor_name: Option<String>,

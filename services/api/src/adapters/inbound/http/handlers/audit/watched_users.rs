@@ -16,6 +16,7 @@ use crate::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct WatchedUsersQueryParams {
@@ -50,7 +51,7 @@ pub async fn get_user_dossier(
 
 #[derive(Debug, Deserialize)]
 pub struct AddWatchDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     #[serde(default)]

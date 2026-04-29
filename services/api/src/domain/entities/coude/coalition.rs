@@ -7,6 +7,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub const COALITION_COST_PER_MEMBER: i64 = 500;
 pub const COALITION_MIN_MEMBERS: i32 = 3;
@@ -50,7 +51,7 @@ impl CoalitionStatus {
 #[derive(Debug, Clone)]
 pub struct ActiveCoalition {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub opened_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,

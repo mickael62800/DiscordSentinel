@@ -11,6 +11,7 @@ use crate::domain::entities::moderation::strikes::UserStrike;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgStrikeRepository {
     pool: PgPool,
@@ -25,7 +26,7 @@ impl PgStrikeRepository {
 #[derive(sqlx::FromRow)]
 struct StrikeRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     reason: String,
     source: String,
@@ -51,7 +52,7 @@ impl From<StrikeRow> for UserStrike {
 
 #[derive(sqlx::FromRow)]
 struct StrikeConfigRow {
-    guild_id: String,
+    guild_id: GuildId,
     window_secs: i64,
     thresholds: serde_json::Value,
     enabled: bool,

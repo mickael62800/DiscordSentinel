@@ -84,7 +84,7 @@ pub async fn add_points(
     let points = state
         .conduct_uc
         .add_points(AddPointsCommand {
-            guild_id: guild_id.clone(),
+            guild_id: guild_id.clone().into(),
             user_id: user_id.clone().into(),
             amount,
             reason,

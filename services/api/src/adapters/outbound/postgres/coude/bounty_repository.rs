@@ -12,6 +12,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::bounty_repository::BountyRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::GuildId;
 const TBL: &str = "coude_bounties";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -28,7 +29,7 @@ impl PgBountyRepository {
 #[derive(sqlx::FromRow)]
 struct Row {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     target_id: String,
     total_amount: i64,
     status: String,

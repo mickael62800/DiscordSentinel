@@ -70,7 +70,7 @@ pub async fn get_or_create_player(
 ) -> Result<Json<FullPlayerDto>, ApiError> {
     let player = state
         .coude_players_uc
-        .get_or_create(guild_id, dto.user_id, dto.username)
+        .get_or_create(guild_id.into(), dto.user_id, dto.username)
         .await?;
     Ok(Json(player.into()))
 }

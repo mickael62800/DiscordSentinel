@@ -8,11 +8,12 @@ use crate::ports::inbound::community::manage_levels::AddXpResult;
 use crate::ports::inbound::community::manage_levels::SaveLevelConfigCommand;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct SaveLevelConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     #[serde(default = "default_xp_per_message")]
     pub xp_per_message: i32,
     #[serde(default = "default_xp_per_voice_minute")]
@@ -36,7 +37,7 @@ fn default_enabled() -> bool { true }
 
 #[derive(Debug, Deserialize)]
 pub struct AddXpDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub amount: i64,
@@ -49,7 +50,7 @@ fn default_source() -> String { "text".to_string() }
 
 #[derive(Debug, Deserialize)]
 pub struct SetRewardDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub level: i32,
     pub role_id: RoleId,
     /// "text" ou "voice" (defaut: "text")
@@ -68,7 +69,7 @@ pub struct LevelLeaderboardParams {
 
 #[derive(Debug, Serialize)]
 pub struct LevelConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub xp_per_message: i32,
     pub xp_per_voice_minute: i32,
     pub xp_cooldown_secs: i32,
@@ -81,7 +82,7 @@ pub struct LevelConfigDto {
 #[derive(Debug, Serialize)]
 pub struct UserLevelDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub xp: i64,
@@ -102,7 +103,7 @@ pub struct UserLevelDto {
 #[derive(Debug, Serialize)]
 pub struct LevelRewardDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub level: i32,
     pub role_id: RoleId,
     pub source: String,

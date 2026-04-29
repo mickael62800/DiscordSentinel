@@ -36,7 +36,7 @@ pub enum PendingKind {
 #[derive(Clone)]
 pub struct RiskyPending {
     pub kind: PendingKind,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub target_id: String,
     pub target_name: String,

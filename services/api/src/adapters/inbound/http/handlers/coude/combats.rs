@@ -92,7 +92,7 @@ pub async fn create_combat(
     let combat = state
         .coude_combats_uc
         .create(NewCoudeCombat {
-            guild_id,
+            guild_id: guild_id.into(),
             channel_id: dto.channel_id,
             attacker_id: dto.attacker_id,
             attacker_name: dto.attacker_name,

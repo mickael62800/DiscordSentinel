@@ -4,12 +4,13 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct ReviewEntry {
     pub id: Uuid,
     pub action_id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub added_by: String,
     pub added_by_name: String,
     pub reason: Option<String>,

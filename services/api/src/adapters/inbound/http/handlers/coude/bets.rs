@@ -31,7 +31,7 @@ pub async fn place_bet(
     let outcome = state
         .coude_bets_uc
         .place(NewCoudeBet {
-            guild_id,
+            guild_id: guild_id.into(),
             combat_id,
             bettor_id: dto.bettor_id,
             bettor_name: dto.bettor_name,

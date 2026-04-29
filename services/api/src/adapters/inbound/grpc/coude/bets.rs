@@ -30,7 +30,7 @@ pub struct BetsGrpc {
 pub(super) fn bet_to_proto(b: Bet) -> proto::Bet {
     proto::Bet {
         id: b.id.to_string(),
-        guild_id: b.guild_id,
+        guild_id: b.guild_id.into(),
         combat_id: b.combat_id.to_string(),
         bettor_id: b.bettor_id,
         bettor_name: b.bettor_name,
@@ -88,7 +88,7 @@ impl CoudeBetsService for BetsGrpc {
         let outcome = self
             .uc
             .place(NewCoudeBet {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 combat_id,
                 bettor_id: req.bettor_id,
                 bettor_name: req.bettor_name,

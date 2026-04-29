@@ -101,7 +101,7 @@ impl WheelRepository for PgWheelRepository {
 
         Ok(rows.into_iter().map(|r| WheelSpin {
             id: r.0,
-            guild_id: r.1,
+            guild_id: r.1.into(),
             user_id: r.2.into(),
             username: r.3,
             case_key: r.4,

@@ -169,7 +169,7 @@ impl ManageStatsUseCase for ManageStatsService {
             let top_members: Vec<UserStats> = members.into_iter().take(10).collect();
 
             Ok(GuildStatsOverview {
-                guild_id: guild_id.to_string(),
+                guild_id: guild_id.to_string().into(),
                 total_messages,
                 total_voice_seconds,
                 active_members,

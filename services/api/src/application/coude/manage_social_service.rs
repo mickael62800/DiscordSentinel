@@ -169,7 +169,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         // 6. Log en DB.
         self.repo
             .log_daily_chaos(NewDailyChaos {
-                guild_id: guild_id.to_string(),
+                guild_id: guild_id.to_string().into(),
                 loser_id: victim.user_id.clone().into(),
                 loser_name: victim.username.clone(),
                 winner_id: winner.user_id.clone().into(),

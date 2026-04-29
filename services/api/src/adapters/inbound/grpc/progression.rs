@@ -40,7 +40,7 @@ impl ProgressionService for ProgressionGrpc {
         let result = self
             .levels_uc
             .add_xp(AddXpCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 user_id: req.user_id.into(),
                 username: req.username,
                 amount: req.amount,
@@ -149,7 +149,7 @@ fn user_level_to_proto(u: UserLevel) -> proto::UserLevel {
     let (xp_voice_current, xp_voice_needed) = xp_progress(u.xp_voice);
     proto::UserLevel {
         id: u.id.to_string(),
-        guild_id: u.guild_id,
+        guild_id: u.guild_id.into(),
         user_id: u.user_id.into(),
         username: u.username,
         xp: u.xp,
@@ -171,7 +171,7 @@ fn user_level_to_proto(u: UserLevel) -> proto::UserLevel {
 fn level_reward_to_proto(r: LevelReward) -> proto::LevelReward {
     proto::LevelReward {
         id: r.id.to_string(),
-        guild_id: r.guild_id,
+        guild_id: r.guild_id.into(),
         level: r.level,
         role_id: r.role_id.into(),
         source: xp_source_to_proto(r.source),

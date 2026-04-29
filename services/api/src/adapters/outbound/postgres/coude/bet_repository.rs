@@ -15,6 +15,7 @@ use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 
 use super::super::pg_err;
 use crate::ports::outbound::coude::bet_repository::BetRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Refund "neutre" dans une tx en cours : credite les coins sans toucher
 /// `total_earned` (l'argent revient, ce n'est pas un gain) et log la tx wallet.
@@ -85,7 +86,7 @@ impl PgBetRepository {
 #[derive(sqlx::FromRow)]
 struct BetRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     combat_id: Uuid,
     bettor_id: String,
     bettor_name: String,

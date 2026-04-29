@@ -36,7 +36,7 @@ impl SlotRepository for PgSlotRepository {
             .map_err(pg_err)?;
 
         Ok(row.map(|(gid, cp, lwb, lwa, lwam)| SlotJackpotPool {
-            guild_id: gid,
+            guild_id: gid.into(),
             current_pool: cp,
             last_won_by: lwb,
             last_won_at: lwa,
@@ -213,7 +213,7 @@ impl SlotRepository for PgSlotRepository {
 
         Ok(rows.into_iter().map(|r| SlotSpin {
             id: r.0,
-            guild_id: r.1,
+            guild_id: r.1.into(),
             user_id: r.2.into(),
             username: r.3,
             mise: r.4,

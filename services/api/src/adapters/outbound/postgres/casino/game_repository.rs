@@ -8,6 +8,7 @@ use crate::ports::outbound::casino::game_repository::GameRepository;
 use super::super::pg_err;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgGameRepository { pool: PgPool }
 
@@ -18,7 +19,7 @@ impl PgGameRepository {
 #[derive(sqlx::FromRow)]
 struct GameRow {
     id: String,
-    guild_id: String,
+    guild_id: GuildId,
     game_name: String,
     created_by: String,
     created_at: String,
@@ -45,7 +46,7 @@ impl From<GameRow> for Game {
 #[derive(sqlx::FromRow)]
 struct PanelRow {
     id: String,
-    guild_id: String,
+    guild_id: GuildId,
     channel_id: ChannelId,
     message_id: MessageId,
     category: Option<String>,

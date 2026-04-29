@@ -13,11 +13,12 @@ use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::coude::bounty::ActiveBounty;
 use crate::domain::entities::coude::bounty::BOUNTY_MIN_CONTRIBUTION;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Serialize)]
 pub struct ActiveBountyDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub total_amount: i64,
     pub status: String,

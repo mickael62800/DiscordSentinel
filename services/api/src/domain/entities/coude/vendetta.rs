@@ -12,6 +12,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Duree de la fenetre vendetta (heures, 7 jours).
 pub const VENDETTA_WINDOW_HOURS: i64 = 7 * 24;
@@ -52,7 +53,7 @@ impl VendettaStatus {
 #[derive(Debug, Clone)]
 pub struct ActiveVendetta {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub challenger_id: String,
     pub target_id: String,
     pub declared_at: DateTime<Utc>,

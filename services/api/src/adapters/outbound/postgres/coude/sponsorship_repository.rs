@@ -4,6 +4,7 @@ use sqlx::PgPool;
 use crate::ports::outbound::coude::sponsorship_repository::Sponsorship;
 use crate::ports::outbound::coude::sponsorship_repository::SponsorshipRepository;
 use super::super::pg_err;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgSponsorshipRepository { pool: PgPool }
 
@@ -25,7 +26,7 @@ impl SponsorshipRepository for PgSponsorshipRepository {
 
     async fn list(&self, guild_id: &str) -> Result<Vec<Sponsorship>, crate::domain::errors::DomainError> {
         #[derive(sqlx::FromRow)]
-        struct Row { id: uuid::Uuid, guild_id: String, sponsor_id: String, sponsored_id: String, created_at: chrono::DateTime<chrono::Utc> }
+        struct Row { id: uuid::Uuid, guild_id: GuildId, sponsor_id: String, sponsored_id: String, created_at: chrono::DateTime<chrono::Utc> }
 
         let rows: Vec<Row> = sqlx::query_as(
             "SELECT id, guild_id, sponsor_id, sponsored_id, created_at \

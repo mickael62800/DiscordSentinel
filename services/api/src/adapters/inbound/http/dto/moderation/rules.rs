@@ -3,10 +3,11 @@ use serde::Serialize;
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::enums::moderation::flag_type::FlagType;
 use crate::ports::inbound::moderation::manage_rules::CreateRuleCommand;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateRuleDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub flag_type: String,
     pub weight: f64,
     pub threshold_warn: f64,
@@ -24,7 +25,7 @@ fn default_true() -> bool {
 #[derive(Debug, Serialize)]
 pub struct RuleResponseDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub flag_type: String,
     pub weight: f64,
     pub threshold_warn: f64,

@@ -6,6 +6,7 @@ use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::system::log_entry::LogEntry;
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 // ── Stats DTO (format desktop) ──
 
 #[derive(Debug, Serialize)]
@@ -113,7 +114,7 @@ impl From<Infraction> for DashboardInfractionDto {
             id: inf.id.to_string(),
             user_id: inf.user_id,
             username: inf.username,
-            server: inf.guild_id,
+            server: inf.guild_id.into(),
             infraction_type: inf.action.as_str().to_string(),
             reason: inf.reason,
             created_at: inf.created_at.to_rfc3339(),
@@ -132,7 +133,7 @@ impl From<crate::domain::entities::moderation::moderation_action::ModerationActi
             id: action.id.to_string(),
             user_id: action.target_id.into(),
             username: action.target_name,
-            server: action.guild_id,
+            server: action.guild_id.into(),
             infraction_type: action.action_type,
             reason: action.reason,
             created_at: action.created_at.to_rfc3339(),
@@ -205,7 +206,7 @@ impl From<Rule> for DashboardRuleDto {
 
 #[derive(Debug, Serialize, serde::Deserialize)]
 pub struct GuildDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub name: String,
     pub icon: Option<String>,
     pub member_count: i32,
@@ -224,7 +225,7 @@ impl From<Guild> for GuildDto {
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterGuildDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub name: String,
     pub icon: Option<String>,
     pub member_count: Option<i32>,

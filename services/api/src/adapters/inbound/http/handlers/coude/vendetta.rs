@@ -10,6 +10,7 @@ use serde::Serialize;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::coude::vendetta::ActiveVendetta;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct DeclareVendettaDto {
@@ -25,7 +26,7 @@ pub struct DeclaredVendettaDto {
 #[derive(Debug, Serialize)]
 pub struct ActiveVendettaDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub challenger_id: String,
     pub target_id: String,
     pub declared_at: DateTime<Utc>,

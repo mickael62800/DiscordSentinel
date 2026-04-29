@@ -4,10 +4,11 @@ use crate::domain::entities::moderation::moderation_action::ModerationAction;
 use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
 use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct LogActionDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub moderator_id: String,
     pub moderator_name: String,
@@ -89,7 +90,7 @@ impl From<ModerationAction> for ModerationActionResponseDto {
 #[derive(Debug, Serialize)]
 pub struct BanEntryDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub target_name: String,
     pub moderator_name: String,

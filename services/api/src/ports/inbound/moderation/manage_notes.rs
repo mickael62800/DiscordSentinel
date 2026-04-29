@@ -3,9 +3,10 @@ use async_trait::async_trait;
 use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct AddNoteCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub author_id: String,
     pub author_name: String,

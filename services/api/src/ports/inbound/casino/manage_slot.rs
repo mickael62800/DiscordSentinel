@@ -22,10 +22,11 @@ use crate::domain::entities::casino::slot::SlotTopWinner;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct SpinCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     /// Mise demandee. Ignoree si is_daily=true (utilise daily_bonus_mise de la config).

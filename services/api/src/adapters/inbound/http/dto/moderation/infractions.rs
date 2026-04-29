@@ -4,6 +4,7 @@ use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct InfractionQueryParams {
@@ -16,7 +17,7 @@ pub struct InfractionQueryParams {
 #[derive(Debug, Serialize)]
 pub struct InfractionResponseDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub user_id: UserId,
     pub username: String,

@@ -13,6 +13,7 @@ use crate::domain::errors::DomainError;
 use super::super::pg_err;
 use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
 use crate::ports::outbound::coude::combat_repository::CombatRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 pub struct PgCombatRepository {
     pool: PgPool,
 }
@@ -34,7 +35,7 @@ const COMBAT_COLUMNS: &str = r#"
 #[derive(sqlx::FromRow)]
 struct CombatRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     channel_id: Option<String>,
     attacker_id: String,
     attacker_name: String,

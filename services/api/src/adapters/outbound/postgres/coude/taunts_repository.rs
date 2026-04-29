@@ -38,7 +38,7 @@ impl TauntsRepository for PgTauntsRepository {
         .await
         .map_err(pg_err)?;
         Ok(TauntsConfig {
-            guild_id: row.0,
+            guild_id: row.0.into(),
             channel_id: row.1,
             enabled: row.2,
             rename_enabled: row.3,

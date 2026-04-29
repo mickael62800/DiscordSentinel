@@ -5,12 +5,13 @@ use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::community::conduct::UserConductPoints;
 use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
 pub struct SaveConductConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     #[serde(default = "default_max_points")]
     pub max_points: i32,
     #[serde(default = "default_regen_amount")]
@@ -45,7 +46,7 @@ pub struct AddPointsDto {
 
 #[derive(Debug, Serialize)]
 pub struct ConductConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub max_points: i32,
     pub regen_amount: i32,
     pub regen_interval: String,
@@ -58,7 +59,7 @@ pub struct ConductConfigDto {
 #[derive(Debug, Serialize)]
 pub struct UserConductPointsDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub points: i32,

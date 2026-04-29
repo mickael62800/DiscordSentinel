@@ -1,6 +1,7 @@
 use super::api_client::AuditEvent;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
-pub fn simple(guild_id: String, event_type: &str) -> AuditEvent {
+pub fn simple(guild_id: GuildId, event_type: &str) -> AuditEvent {
     AuditEvent {
         guild_id,
         event_type: event_type.to_string(),

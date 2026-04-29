@@ -24,6 +24,7 @@ use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 // ═══════════════════════════════════════════════════
 // Name History (Audit Bot)
@@ -31,7 +32,7 @@ use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateNameHistoryDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub old_name: String,
     pub new_name: String,
@@ -40,7 +41,7 @@ pub struct CreateNameHistoryDto {
 #[derive(Debug, serde::Serialize)]
 pub struct NameHistoryEntryDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub old_name: String,
     pub new_name: String,
@@ -202,7 +203,7 @@ pub async fn update_ticket_sla(
 
 #[derive(Debug, Deserialize)]
 pub struct CreateSponsorshipDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub sponsor_id: String,
     pub sponsored_id: String,
 }
@@ -210,7 +211,7 @@ pub struct CreateSponsorshipDto {
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct SponsorshipRow {
     pub id: sqlx::types::Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub sponsor_id: String,
     pub sponsored_id: String,
     pub created_at: chrono::DateTime<chrono::Utc>,
@@ -266,7 +267,7 @@ pub async fn list_sponsorships(
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTempRoleDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub role_id: RoleId,
     pub expires_at: String,
@@ -275,7 +276,7 @@ pub struct CreateTempRoleDto {
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct TempRoleRow {
     pub id: sqlx::types::Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub role_id: RoleId,
     pub expires_at: chrono::DateTime<chrono::Utc>,
@@ -359,7 +360,7 @@ pub async fn delete_temp_role(
 
 #[derive(Debug, Deserialize)]
 pub struct CreatePendingActionDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,
@@ -373,7 +374,7 @@ pub struct CreatePendingActionDto {
 #[derive(Debug, serde::Serialize, sqlx::FromRow)]
 pub struct PendingActionRow {
     pub id: sqlx::types::Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,

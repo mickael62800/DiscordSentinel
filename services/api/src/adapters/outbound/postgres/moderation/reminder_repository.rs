@@ -7,6 +7,7 @@ use uuid::Uuid;
 use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::reminder_repository::ReminderRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgReminderRepository {
     pool: PgPool,
@@ -21,7 +22,7 @@ impl PgReminderRepository {
 #[derive(sqlx::FromRow)]
 struct ReminderRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     moderator_id: String,
     moderator_name: String,
     target_id: String,

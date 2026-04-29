@@ -2,6 +2,7 @@ use redis::AsyncCommands;
 use sqlx::PgPool;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 const BATCH_SIZE: i32 = 5;
 const REDIS_RESULT_TTL_SECS: u64 = 600;
@@ -9,7 +10,7 @@ const REDIS_RESULT_TTL_SECS: u64 = 600;
 #[derive(sqlx::FromRow)]
 struct AiJobRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     job_type: String,
     input_payload: serde_json::Value,
     retries: i32,

@@ -6,6 +6,7 @@ use uuid::Uuid;
 use crate::domain::entities::community::daily_activity::DailyActivity;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::daily_activity_repository::DailyActivityRepository;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgDailyActivityRepository {
     pool: PgPool,
@@ -20,7 +21,7 @@ impl PgDailyActivityRepository {
 #[derive(sqlx::FromRow)]
 struct DailyActivityRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     day: NaiveDate,
     messages: i64,
     voice_minutes: i64,

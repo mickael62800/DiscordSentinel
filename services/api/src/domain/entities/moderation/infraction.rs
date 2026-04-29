@@ -7,10 +7,11 @@ use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Clone)]
 pub struct Infraction {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub user_id: UserId,
     pub username: String,

@@ -12,6 +12,7 @@ use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
 
 use super::super::pg_err_ctx;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 const TBL: &str = "coude_safety_nets";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -28,7 +29,7 @@ impl PgSafetyNetRepository {
 #[derive(sqlx::FromRow)]
 struct Row {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     activated_at: DateTime<Utc>,
     expires_at: DateTime<Utc>,

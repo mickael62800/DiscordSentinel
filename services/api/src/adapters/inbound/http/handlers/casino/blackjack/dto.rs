@@ -6,13 +6,14 @@ use crate::domain::entities::casino::blackjack::BlackjackGame;
 use crate::domain::entities::casino::blackjack::Card;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 // ══════════════════════════════════════════════════════════════════════
 // ── Solo game DTOs ──
 // ══════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Deserialize)]
 pub struct StartGameDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub bet: i64,
@@ -38,7 +39,7 @@ impl From<&Card> for CardDto {
 #[derive(Debug, Serialize)]
 pub struct BlackjackGameDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub bet: i64,
@@ -117,7 +118,7 @@ pub fn to_dto(game: &BlackjackGame) -> BlackjackGameDto {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateTableDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub owner_id: String,
     pub owner_name: String,
@@ -126,7 +127,7 @@ pub struct CreateTableDto {
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct TableDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub owner_id: String,
     pub owner_name: String,

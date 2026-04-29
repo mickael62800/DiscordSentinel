@@ -24,6 +24,7 @@ use crate::adapters::outbound::discord_api::DiscordMember;
 use crate::ports::inbound::community::manage_members::RegisterMemberCommand;
 use crate::ports::inbound::community::manage_members::SyncMembersCommand;
 use crate::ports::inbound::community::manage_members::UpdateMemberCommand;
+use crate::domain::entities::system::discord_ids::GuildId;
 /// GET /api/guilds/{guild_id}/members — liste les membres Discord (cache 10min, fallback Discord API)
 pub async fn list_members(
     State(state): State<AppState>,
@@ -124,7 +125,7 @@ pub async fn update_member(
     Json(payload): Json<UpdateMemberPayload>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     state.members_uc.update_member(UpdateMemberCommand {
-        guild_id,
+        guild_id: guild_id.into(),
         user_id: user_id.into(),
         username: payload.username,
         display_name: payload.display_name,
@@ -136,7 +137,7 @@ pub async fn update_member(
 
 #[derive(Deserialize)]
 pub struct SyncMembersPayload {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub members: Vec<GuildMember>,
 }
 

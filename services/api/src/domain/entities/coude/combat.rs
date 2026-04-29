@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Combat 1v1 du mini-jeu Coup de Coude.
 ///
@@ -8,7 +9,7 @@ use uuid::Uuid;
 #[derive(Debug, Clone)]
 pub struct Combat {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: Option<String>,
     pub attacker_id: String,
     pub attacker_name: String,
@@ -42,7 +43,7 @@ impl Combat {
 /// Données nécessaires pour créer un nouveau combat.
 #[derive(Debug, Clone)]
 pub struct NewCoudeCombat {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: Option<String>,
     pub attacker_id: String,
     pub attacker_name: String,

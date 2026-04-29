@@ -8,6 +8,7 @@ use crate::domain::entities::casino::blackjack::BlackjackGame;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgBlackjackRepository {
     pool: PgPool,
@@ -22,7 +23,7 @@ impl PgBlackjackRepository {
 #[derive(sqlx::FromRow)]
 struct BlackjackRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     username: String,
     bet: i64,

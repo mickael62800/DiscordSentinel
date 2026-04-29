@@ -21,11 +21,12 @@ use sentinel_proto::export::v1::export_service_client::ExportServiceClient;
 use sentinel_proto::export::v1::ExecuteExportRequest;
 
 use crate::config::{MAX_ROWS_PER_EXPORT, PROCESSING_TIMEOUT_SECS};
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, sqlx::FromRow)]
 struct ClaimedJob {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     job_type: String,
     format: String,
     filters: serde_json::Value,

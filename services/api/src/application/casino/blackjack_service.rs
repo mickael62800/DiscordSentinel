@@ -12,6 +12,7 @@ use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::casino::blackjack_repository::BlackjackRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 /// Resultat d'une action de jeu : la partie mise a jour + la liste des
 /// `TauntEvent` declenches par les mutations wallet (faillite, jackpot).
 /// La couche transport (gRPC / HTTP) est responsable de propager ces
@@ -62,7 +63,7 @@ impl BlackjackService {
     /// `blackjack_payout` = multiplicateur du gain pour un blackjack naturel (defaut 1.5 → payout total = mise * 2.5).
     pub async fn start_game(
         &self,
-        guild_id: String,
+        guild_id: GuildId,
         user_id: UserId,
         username: String,
         bet: i64,

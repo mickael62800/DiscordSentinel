@@ -3,11 +3,12 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::domain::enums::moderation::flag_type::FlagType;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct Rule {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub flag_type: FlagType,
     pub weight: f64,
     pub threshold_warn: f64,
@@ -21,7 +22,7 @@ pub struct Rule {
 
 #[allow(dead_code)]
 impl Rule {
-    pub fn new(guild_id: String, flag_type: FlagType) -> Self {
+    pub fn new(guild_id: GuildId, flag_type: FlagType) -> Self {
         let now = Utc::now();
         Self {
             id: Uuid::new_v4(),

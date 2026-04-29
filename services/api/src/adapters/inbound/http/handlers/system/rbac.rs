@@ -22,6 +22,7 @@ use crate::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct GrantRoleDto {
@@ -39,7 +40,7 @@ pub struct UpdateRoleDto {
 #[derive(Debug, Serialize)]
 pub struct UserRoleDto {
     pub discord_user_id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub role: String,
     pub granted_at: String,
     pub granted_by: Option<String>,
@@ -58,7 +59,7 @@ pub struct GuildUserEntryDto {
 #[derive(Debug, Serialize)]
 pub struct MyRoleDto {
     pub discord_user_id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub role: String,
 }
 
@@ -113,7 +114,7 @@ pub async fn grant_role(
     match res {
         Ok(row) => Ok(Json(UserRoleDto {
             discord_user_id: user_id,
-            guild_id,
+            guild_id: guild_id.into(),
             role: role.as_str().to_string(),
             granted_at: row.granted_at.to_rfc3339(),
             granted_by: Some(ctx.discord_user_id),
@@ -304,7 +305,7 @@ pub async fn get_my_role(
 
     Ok(Json(MyRoleDto {
         discord_user_id: ctx.discord_user_id,
-        guild_id,
+        guild_id: guild_id.into(),
         role: role.as_str().to_string(),
     }))
 }

@@ -12,6 +12,7 @@ use crate::ports::outbound::coude::steal_protection_repository::StealProtectionR
 
 use super::super::pg_err_ctx;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 const TBL: &str = "steal_protection";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -28,7 +29,7 @@ impl PgStealProtectionRepository {
 #[derive(sqlx::FromRow)]
 struct ProtectionRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     item_key: String,
     expires_at: DateTime<Utc>,

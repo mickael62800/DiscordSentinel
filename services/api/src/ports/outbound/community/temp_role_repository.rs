@@ -6,11 +6,12 @@ use uuid::Uuid;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct TempRole {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub role_id: RoleId,
     pub expires_at: DateTime<Utc>,

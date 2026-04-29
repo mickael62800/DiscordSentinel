@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::ApiClient;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct CoalitionMemberResp {
@@ -14,7 +15,7 @@ pub struct CoalitionMemberResp {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ActiveCoalitionResp {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub opened_at: String,
     pub expires_at: String,

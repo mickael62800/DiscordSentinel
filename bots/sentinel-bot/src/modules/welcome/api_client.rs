@@ -12,11 +12,12 @@ use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
 use sentinel_proto::members::v1 as proto_members;
 use sentinel_proto::welcome::v1 as proto_welcome;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug)]
 #[allow(dead_code)]
 pub struct WelcomeConfig {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub welcome_enabled: bool,
     pub welcome_channel_id: Option<String>,
     pub welcome_message: String,

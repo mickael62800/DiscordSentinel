@@ -13,6 +13,7 @@ use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 use crate::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgVoiceChannelRepository {
     pool: PgPool,
@@ -27,7 +28,7 @@ impl PgVoiceChannelRepository {
 #[derive(sqlx::FromRow)]
 struct VoiceChannelRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     owner_id: String,
     owner_name: String,
     channel_id: ChannelId,
@@ -99,7 +100,7 @@ impl From<CoAdminRow> for VoiceChannelCoAdmin {
 #[derive(sqlx::FromRow)]
 struct WhitelistRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     owner_id: String,
     target_id: String,
     target_name: String,
@@ -150,7 +151,7 @@ impl From<BanRow> for VoiceChannelBan {
 struct InviteLinkRow {
     id: Uuid,
     voice_channel_id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     channel_id: ChannelId,
     created_by: String,
     created_by_name: String,
@@ -184,7 +185,7 @@ impl From<InviteLinkRow> for VoiceChannelInviteLink {
 #[derive(sqlx::FromRow)]
 struct ThemeRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     name: String,
     emoji: Option<String>,
     channel_name_template: String,

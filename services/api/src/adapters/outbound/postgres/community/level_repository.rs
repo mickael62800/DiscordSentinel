@@ -10,6 +10,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::level_repository::LevelRepository;
 use crate::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct PgLevelRepository {
     pool: PgPool,
@@ -23,7 +24,7 @@ impl PgLevelRepository {
 
 #[derive(sqlx::FromRow)]
 struct LevelConfigRow {
-    guild_id: String,
+    guild_id: GuildId,
     xp_per_message: i32,
     xp_per_voice_minute: i32,
     xp_cooldown_secs: i32,
@@ -38,7 +39,7 @@ struct LevelConfigRow {
 #[derive(sqlx::FromRow)]
 struct UserLevelRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     username: String,
     xp: i64,
@@ -55,7 +56,7 @@ struct UserLevelRow {
 #[derive(sqlx::FromRow)]
 struct LevelRewardRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     level: i32,
     role_id: RoleId,
     source: String,

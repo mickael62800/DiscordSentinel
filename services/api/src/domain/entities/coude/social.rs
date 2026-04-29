@@ -3,6 +3,7 @@ use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Daily chaos : regles metier ──
@@ -75,7 +76,7 @@ pub struct LeaderboardEntry {
 #[derive(Debug, Clone)]
 pub struct Event {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub active: bool,
     pub expires_at: DateTime<Utc>,
@@ -88,7 +89,7 @@ pub struct Event {
 
 #[derive(Debug, Clone)]
 pub struct NewDailyChaos {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub loser_id: String,
     pub loser_name: String,
     pub winner_id: String,

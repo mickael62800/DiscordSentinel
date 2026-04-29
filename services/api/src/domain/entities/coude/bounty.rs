@@ -7,6 +7,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Seuil de declenchement de la prime automatique.
 pub const BOUNTY_AUTO_OPEN_STREAK_THRESHOLD: i32 = 5;
@@ -45,7 +46,7 @@ impl BountyStatus {
 #[derive(Debug, Clone)]
 pub struct ActiveBounty {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub total_amount: i64,
     pub status: BountyStatus,

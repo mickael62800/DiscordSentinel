@@ -23,6 +23,7 @@ use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Serialize)]
 pub struct TauntEventDto {
@@ -59,7 +60,7 @@ pub struct EcoAmountDto {
 
 #[derive(Debug, Serialize)]
 pub struct TauntsConfigDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: Option<String>,
     pub enabled: bool,
     pub rename_enabled: bool,

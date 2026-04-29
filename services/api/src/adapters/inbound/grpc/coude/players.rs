@@ -33,7 +33,7 @@ impl CoudePlayerService for PlayerGrpc {
         let req = request.into_inner();
         let player = self
             .players_uc
-            .get_or_create(req.guild_id, req.user_id.into(), req.username)
+            .get_or_create(req.guild_id.into(), req.user_id.into(), req.username)
             .await
             .map_err(domain_to_status)?;
         Ok(Response::new(coude_player_to_proto(player)))
@@ -133,7 +133,7 @@ impl CoudePlayerService for PlayerGrpc {
 
 pub(super) fn coude_player_to_proto(p: Player) -> proto::Player {
     proto::Player {
-        guild_id: p.guild_id,
+        guild_id: p.guild_id.into(),
         user_id: p.user_id.into(),
         username: p.username,
         coins: p.coins,

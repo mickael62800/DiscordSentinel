@@ -22,7 +22,7 @@ use sentinel_proto::roles::v1 as proto;
 
 #[derive(Debug, Deserialize)]
 pub struct TempRoleApiEntry {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub role_id: RoleId,
     pub expires_at: String,
@@ -38,7 +38,7 @@ pub struct RolePanelDetail {
 #[allow(dead_code)]
 pub struct RolePanel {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: Option<String>,
     pub title: String,
@@ -359,3 +359,4 @@ use sentinel_shared::grpc_client::grpc_err_to_string;
 use sentinel_api::domain::entities::system::discord_ids::RoleId;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use sentinel_api::domain::entities::system::discord_ids::UserId;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;

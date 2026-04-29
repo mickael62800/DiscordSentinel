@@ -1,11 +1,12 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone)]
 pub struct AuditLog {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub actor_id: Option<String>,
     pub actor_name: Option<String>,

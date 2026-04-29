@@ -3,9 +3,10 @@ use uuid::Uuid;
 
 use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 pub struct CreateReminderCommand {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,

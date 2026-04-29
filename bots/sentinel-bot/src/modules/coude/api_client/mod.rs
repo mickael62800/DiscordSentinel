@@ -22,6 +22,7 @@ use sentinel_shared::grpc_client::SentinelGrpcClient;
 use sentinel_proto::coude::v1 as proto_coude;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use sentinel_api::domain::entities::system::discord_ids::UserId;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Response DTOs (preservation de la surface publique) ──
@@ -30,7 +31,7 @@ use sentinel_api::domain::entities::system::discord_ids::UserId;
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct Player {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub coins: i64,
@@ -71,7 +72,7 @@ pub struct Player {
 #[allow(dead_code)]
 pub struct Combat {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: Option<String>,
     pub attacker_id: String,
     pub attacker_name: String,
@@ -180,7 +181,7 @@ pub(super) fn taunt_event_from_proto(e: proto_coude::TauntEvent) -> TauntEvent {
 #[allow(dead_code)]
 pub struct WalletTransaction {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub amount: i64,
     pub balance_after: i64,
@@ -193,7 +194,7 @@ pub struct WalletTransaction {
 #[allow(dead_code)]
 pub struct Prime {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub target_id: String,
     pub target_name: String,
     pub placed_by_id: String,
@@ -209,7 +210,7 @@ pub struct Prime {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct InventoryItem {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub item_key: String,
     pub quantity: i32,
@@ -219,7 +220,7 @@ pub struct InventoryItem {
 #[allow(dead_code)]
 pub struct ServerEvent {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     #[serde(default)]
     pub event_type: String,
     pub active: bool,
@@ -297,7 +298,7 @@ pub struct CurrentSeason {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct Cashbox {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub balance: i64,
     pub total_collected: i64,
     pub total_redistributed: i64,

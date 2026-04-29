@@ -4,10 +4,11 @@ use uuid::Uuid;
 
 use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateReminderDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,
@@ -47,7 +48,7 @@ impl From<CreateReminderDto> for CreateReminderCommand {
 #[derive(Debug, Serialize)]
 pub struct SanctionReminderDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,

@@ -113,7 +113,7 @@ pub async fn spin(
     validation::validate_discord_id("user_id", &dto.user_id).map_err(ApiError)?;
 
     let cmd = WheelSpinCommand {
-        guild_id,
+        guild_id: guild_id.into(),
         user_id: dto.user_id,
         username: dto.username,
     };

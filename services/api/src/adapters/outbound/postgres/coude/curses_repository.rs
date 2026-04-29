@@ -12,6 +12,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::curses_repository::CursesRepository;
 
 use super::super::pg_err_ctx;
+use crate::domain::entities::system::discord_ids::GuildId;
 const TBL: &str = "coude_curses";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
@@ -28,7 +29,7 @@ impl PgCursesRepository {
 #[derive(sqlx::FromRow)]
 struct CurseRow {
     id: Uuid,
-    guild_id: String,
+    guild_id: GuildId,
     target_id: String,
     source_id: String,
     kind: String,

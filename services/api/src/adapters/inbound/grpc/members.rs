@@ -55,7 +55,7 @@ impl MembersService for MembersGrpc {
         let count = self
             .uc
             .sync_members(SyncMembersCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 members,
             })
             .await
@@ -107,7 +107,7 @@ impl MembersService for MembersGrpc {
         };
         self.uc
             .update_member(UpdateMemberCommand {
-                guild_id: req.guild_id,
+                guild_id: req.guild_id.into(),
                 user_id: req.user_id.into(),
                 username: req.username,
                 display_name: req.display_name,
@@ -124,7 +124,7 @@ fn member_to_proto(m: GuildMember) -> Result<proto::GuildMember, Status> {
     let roles_json = serde_json::to_string(&m.roles)
         .map_err(|e| Status::internal(format!("serialisation roles: {e}")))?;
     Ok(proto::GuildMember {
-        guild_id: m.guild_id,
+        guild_id: m.guild_id.into(),
         user_id: m.user_id.into(),
         username: m.username,
         display_name: m.display_name,
@@ -140,7 +140,7 @@ fn member_to_proto(m: GuildMember) -> Result<proto::GuildMember, Status> {
 fn proto_to_member(p: proto::GuildMember) -> Result<GuildMember, Status> {
     let roles = serde_json::from_str(&p.roles_json).unwrap_or(serde_json::Value::Array(vec![]));
     Ok(GuildMember {
-        guild_id: p.guild_id,
+        guild_id: p.guild_id.into(),
         user_id: p.user_id.into(),
         username: p.username,
         display_name: p.display_name,

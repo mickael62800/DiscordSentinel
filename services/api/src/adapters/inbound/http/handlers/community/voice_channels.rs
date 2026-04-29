@@ -71,10 +71,11 @@ use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelC
 use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 async fn log_voice_event(
     state: &AppState,
-    guild_id: String,
+    guild_id: GuildId,
     event_type: &str,
     channel_id: ChannelId,
     channel_name: Option<String>,
@@ -689,7 +690,7 @@ pub async fn create_theme(
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
     let mut cmd: CreateThemeCommand = dto.into();
-    cmd.guild_id = guild_id;
+    cmd.guild_id = guild_id.into();
 
     let theme = state.voice_channels_uc.create_theme(cmd).await?;
     Ok(single_dto(theme))
@@ -701,7 +702,7 @@ pub async fn update_theme(
     Json(dto): Json<CreateThemeDto>,
 ) -> Result<Json<ThemeResponseDto>, ApiError> {
     let mut cmd: CreateThemeCommand = dto.into();
-    cmd.guild_id = guild_id;
+    cmd.guild_id = guild_id.into();
 
     let theme = state.voice_channels_uc.update_theme(&theme_id, cmd).await?;
     Ok(single_dto(theme))

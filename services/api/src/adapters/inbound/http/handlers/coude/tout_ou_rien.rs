@@ -170,7 +170,7 @@ pub async fn play_tout_ou_rien(
     let res = state
         .play_tout_ou_rien_uc
         .play(PlayToutOuRienCommand {
-            guild_id,
+            guild_id: guild_id.into(),
             user_id: dto.user_id,
             username: dto.username,
         })

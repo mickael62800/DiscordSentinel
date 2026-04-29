@@ -2,10 +2,11 @@ use chrono::DateTime;
 use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
+use crate::domain::entities::system::discord_ids::GuildId;
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
 pub struct DiscordRole {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub name: String,
     pub color: i32,
     pub position: i32,

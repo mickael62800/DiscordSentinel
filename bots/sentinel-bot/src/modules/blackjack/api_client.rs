@@ -29,6 +29,7 @@ use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 use sentinel_proto::blackjack::v1 as proto;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use sentinel_api::domain::entities::system::discord_ids::UserId;
+use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 // ── Response DTOs (surface inchangee) ──
 
@@ -44,7 +45,7 @@ pub struct CardDto {
 #[allow(dead_code)]
 pub struct BlackjackGameDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub bet: i64,
@@ -63,7 +64,7 @@ pub struct BlackjackGameDto {
 #[allow(dead_code)]
 pub struct WalletDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub coins: i64,
@@ -75,7 +76,7 @@ pub struct WalletDto {
 #[allow(dead_code)]
 pub struct TableDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub owner_id: String,
     pub owner_name: String,
@@ -511,7 +512,7 @@ fn grpc_err_to_string(e: GrpcCallError) -> String {
 #[derive(Debug, Serialize)]
 #[allow(dead_code)]
 struct StartGamePayload {
-    guild_id: String,
+    guild_id: GuildId,
     user_id: UserId,
     username: String,
     bet: i64,

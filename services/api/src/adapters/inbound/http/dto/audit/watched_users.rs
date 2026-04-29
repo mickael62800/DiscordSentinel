@@ -8,12 +8,13 @@ use crate::adapters::inbound::http::dto::moderation::notes::UserNoteDto;
 use crate::domain::entities::audit::watched_user::WatchedUser;
 use crate::ports::inbound::audit::manage_watched_users::UserDossier;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Serialize)]
 pub struct WatchedUserResponseDto {
     pub user_id: UserId,
     pub username: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub guild_name: String,
     pub risk_level: String,
     pub total_warns: i64,

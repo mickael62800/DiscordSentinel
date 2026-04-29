@@ -21,6 +21,7 @@
 use rand::seq::SliceRandom;
 use rand::Rng;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Seuils auxquels on declenche un taunt. Toute nouvelle valeur de
 /// streak qui matche un seuil provoque un `TauntEvent`.
@@ -87,7 +88,7 @@ impl StreakKind {
 /// perdre le channel_id configure.
 #[derive(Debug, Clone)]
 pub struct TauntsConfig {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: Option<String>,
     pub enabled: bool,
     /// Si false, le nickname_suffix dans TauntEvent est vide → le worker/bot

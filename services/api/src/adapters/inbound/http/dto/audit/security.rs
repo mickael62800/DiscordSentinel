@@ -2,10 +2,11 @@ use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::ports::inbound::audit::manage_security::ReportSecurityEventCommand;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Deserialize)]
 pub struct ReportEventDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub severity: String,
     pub description: String,
@@ -16,7 +17,7 @@ pub struct ReportEventDto {
 #[derive(Debug, Serialize)]
 pub struct SecurityEventResponseDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub event_type: String,
     pub severity: String,
     pub description: String,

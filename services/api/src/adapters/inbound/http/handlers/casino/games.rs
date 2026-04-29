@@ -21,13 +21,14 @@ use crate::domain::entities::casino::game::MAX_EMOJI_IMAGE_BYTES;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 // ── DTOs ──
 
 #[derive(Debug, Serialize)]
 pub struct GameDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub game_name: String,
     pub created_by: String,
     pub created_at: String,
@@ -53,7 +54,7 @@ impl From<crate::ports::outbound::casino::game_repository::Game> for GameDto {
 
 #[derive(Debug, Deserialize)]
 pub struct CreateGameDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub game_name: String,
     pub created_by: String,
     #[serde(default)]
@@ -76,7 +77,7 @@ pub struct SetRoleIdDto {
 #[derive(Debug, Serialize)]
 pub struct GamePanelDto {
     pub id: String,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub category: Option<String>,

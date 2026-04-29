@@ -5,6 +5,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Card {
@@ -143,7 +144,7 @@ impl BlackjackConfig {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlackjackGame {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub bet: i64,

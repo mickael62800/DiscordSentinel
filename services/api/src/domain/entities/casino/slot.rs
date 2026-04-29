@@ -20,12 +20,13 @@ use rand::prelude::Distribution;
 use rand::RngCore;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::UserId;
+use crate::domain::entities::system::discord_ids::GuildId;
 
 /// Entree persistee dans `slot_spin_log` : trace d un spin.
 #[derive(Debug, Clone)]
 pub struct SlotSpin {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub user_id: UserId,
     pub username: String,
     pub mise: i64,
@@ -40,7 +41,7 @@ pub struct SlotSpin {
 /// Etat du pool jackpot pour une guild.
 #[derive(Debug, Clone)]
 pub struct SlotJackpotPool {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub current_pool: i64,
     pub last_won_by: Option<String>,
     pub last_won_at: Option<DateTime<Utc>>,
