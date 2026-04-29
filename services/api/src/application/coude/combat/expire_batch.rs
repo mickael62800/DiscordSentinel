@@ -6,7 +6,7 @@
 //! les use cases satellites (bets). Aucun SQL direct ici.
 
 #[cfg(test)]
-#[path = "tests/expire_combats_batch.rs"]
+#[path = "tests/expire_batch.rs"]
 mod tests;
 
 use std::sync::Arc;

@@ -1,4 +1,4 @@
-use crate::application::coude::roll_steal_service::RollStealService;
+use crate::application::coude::steal::roll::RollStealService;
 use crate::domain::entities::coude::steal::roll::STEAL_D20_MAX;
 use crate::domain::entities::coude::steal::roll::STEAL_D20_MIN;
 use crate::domain::entities::coude::steal::STEAL_PCT_ACTIVE_MAX_BP;

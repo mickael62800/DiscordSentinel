@@ -112,5 +112,5 @@ impl ManageCoudeStealProtectionsUseCase for ManageCoudeStealProtectionsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_steal_protections.rs"]
+#[path = "tests/manage_protections.rs"]
 mod tests;

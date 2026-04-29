@@ -14,7 +14,7 @@
 //! passe par les ports outbound. Le combat_engine est pur domain (pas d'IO).
 
 #[cfg(test)]
-#[path = "tests/resolve_betting_batch.rs"]
+#[path = "tests/resolve_batch.rs"]
 mod tests;
 
 use std::sync::Arc;

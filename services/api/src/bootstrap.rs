@@ -78,14 +78,14 @@ use crate::adapters::outbound::redis_cache::RedisCache;
 use crate::application::ai::analyze_image_service::AnalyzeImageService;
 use crate::application::ai::analyze_message_service::AnalyzeMessageService;
 use crate::application::casino::blackjack_service::BlackjackService;
-use crate::application::coude::expire_combats_batch_service::ExpireCombatsBatchService;
+use crate::application::coude::combat::expire_batch::ExpireCombatsBatchService;
 use crate::application::system::export_service::ExportService;
 use crate::application::audit::manage_audit_logs_service::ManageAuditLogsService;
 use crate::application::community::manage_conduct_service::ManageConductService;
-use crate::application::coude::manage_bets_service::ManageCoudeBetsService;
+use crate::application::coude::bet::manage::ManageCoudeBetsService;
 use crate::application::coude::manage_cashbox_service::ManageCoudeCashboxService;
 use crate::application::coude::manage_catalog_service::ManageCoudeCatalogService;
-use crate::application::coude::manage_combats_service::ManageCoudeCombatsService;
+use crate::application::coude::combat::manage::ManageCoudeCombatsService;
 use crate::application::coude::manage_curses_service::ManageCoudeCursesService;
 use crate::application::coude::manage_economy_service::ManageCoudeEconomyService;
 use crate::application::coude::manage_heist_service::ManageCoudeHeistService;
@@ -94,8 +94,8 @@ use crate::application::coude::manage_safety_net_service::ManageCoudeSafetyNetSe
 use crate::application::coude::manage_vendetta_service::ManageCoudeVendettaService;
 use crate::application::coude::manage_players_service::ManageCoudePlayersService;
 use crate::application::coude::manage_social_service::ManageCoudeSocialService;
-use crate::application::coude::manage_steal_boosts_service::ManageCoudeStealBoostsService;
-use crate::application::coude::manage_steal_protections_service::ManageCoudeStealProtectionsService;
+use crate::application::coude::steal::manage_boosts::ManageCoudeStealBoostsService;
+use crate::application::coude::steal::manage_protections::ManageCoudeStealProtectionsService;
 use crate::application::coude::manage_taunts_service::ManageCoudeTauntsService;
 use crate::application::casino::manage_wallet_service::ManageWalletService;
 use crate::application::moderation::manage_infractions_service::ManageInfractionsService;
@@ -114,9 +114,9 @@ use crate::application::community::voice_channels::ManageVoiceChannelsService;
 use crate::application::audit::manage_watched_users_service::ManageWatchedUsersService;
 use crate::application::coude::play_tout_ou_rien_service::PlayToutOuRienService;
 use crate::application::coude::play_travaux_service::PlayTravauxService;
-use crate::application::coude::resolve_betting_batch_service::ResolveBettingBatchService;
-use crate::application::coude::resolve_combat_now_service::ResolveCombatNowService;
-use crate::application::coude::roll_steal_service::RollStealService;
+use crate::application::coude::bet::resolve_batch::ResolveBettingBatchService;
+use crate::application::coude::combat::resolve_now::ResolveCombatNowService;
+use crate::application::coude::steal::roll::RollStealService;
 use crate::config::AppConfig;
 use crate::adapters::outbound::discord_api::DiscordApiService;
 use crate::adapters::outbound::inference_service::InferenceService;
@@ -682,7 +682,7 @@ pub async fn build_app_state(
             .with_ultimate_repo(coude_ultimate_repo.clone()),
         );
     let resolve_friendly_duel_uc: Arc<dyn crate::ports::inbound::coude::resolve_friendly_duel::ResolveFriendlyDuelUseCase> =
-        Arc::new(crate::application::coude::resolve_friendly_duel_service::ResolveFriendlyDuelService::new(
+        Arc::new(crate::application::coude::combat::resolve_friendly_duel::ResolveFriendlyDuelService::new(
             coude_player_repo.clone(),
             coude_players_uc.clone() as Arc<dyn crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase>,
             bot_config_repo.clone(),

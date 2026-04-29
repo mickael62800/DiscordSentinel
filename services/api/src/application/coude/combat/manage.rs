@@ -231,5 +231,5 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_combats.rs"]
+#[path = "tests/manage.rs"]
 mod tests;

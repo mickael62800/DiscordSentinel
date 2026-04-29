@@ -18,7 +18,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::coude::resolve_combat_now_service::ResolveCombatNowService;
+use crate::application::coude::combat::resolve_now::ResolveCombatNowService;
 use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::entities::coude::combat::CombatResolution;

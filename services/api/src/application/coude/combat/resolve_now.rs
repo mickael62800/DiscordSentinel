@@ -10,7 +10,7 @@
 //! retourne pret a l'emploi.
 
 #[cfg(test)]
-#[path = "tests/resolve_combat_now.rs"]
+#[path = "tests/resolve_now.rs"]
 mod tests;
 
 use std::sync::Arc;

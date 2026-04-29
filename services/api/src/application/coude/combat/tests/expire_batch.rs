@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::coude::expire_combats_batch_service::ExpireCombatsBatchService;
+use crate::application::coude::combat::expire_batch::ExpireCombatsBatchService;
 use crate::domain::entities::coude::cashbox::CashboxSource;
 use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::bet::Bet;

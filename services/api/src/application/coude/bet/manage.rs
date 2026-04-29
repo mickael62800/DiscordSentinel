@@ -142,5 +142,5 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_bets.rs"]
+#[path = "tests/manage.rs"]
 mod tests;

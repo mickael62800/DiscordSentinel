@@ -10,7 +10,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::application::coude::resolve_betting_batch_service::ResolveBettingBatchService;
+use crate::application::coude::bet::resolve_batch::ResolveBettingBatchService;
 use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::entities::coude::combat::CombatResolution;

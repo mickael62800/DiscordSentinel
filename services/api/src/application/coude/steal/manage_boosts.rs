@@ -115,5 +115,5 @@ impl ManageCoudeStealBoostsUseCase for ManageCoudeStealBoostsService {
 }
 
 #[cfg(test)]
-#[path = "tests/manage_steal_boosts.rs"]
+#[path = "tests/manage_boosts.rs"]
 mod tests;
