@@ -98,13 +98,7 @@ impl ManageCoudeCursesUseCase for ManageCoudeCursesService {
                 duration,
                 initial_uses,
             )
-            .await
-            .map_err(|e| {
-                // Si la curse a echoue apres le debit, on ne re-credite pas
-                // automatiquement — c est rare (race window minuscule), mais
-                // c est tracable via wallet_transactions.
-                e
-            })?;
+            .await?;
 
         Ok(CastedCurse {
             id,

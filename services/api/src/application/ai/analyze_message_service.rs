@@ -381,8 +381,8 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             if tcfg.enabled {
                 let entry = TensionEntry {
                     score: ia_score_individual,
-                    user_id: cmd.user_id.clone().into(),
-                    message_id: cmd.message_id.clone().into(),
+                    user_id: cmd.user_id.clone(),
+                    message_id: cmd.message_id.clone(),
                     timestamp_ms: chrono::Utc::now().timestamp_millis(),
                 };
                 let total = buffer.push_and_sum(
@@ -435,11 +435,11 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
         // 4. Persister l'infraction
         let infraction = Infraction {
             id: Uuid::new_v4(),
-            guild_id: cmd.guild_id.into(),
-            channel_id: cmd.channel_id.into(),
-            user_id: cmd.user_id.into(),
+            guild_id: cmd.guild_id,
+            channel_id: cmd.channel_id,
+            user_id: cmd.user_id,
             username: cmd.username,
-            message_id: cmd.message_id.into(),
+            message_id: cmd.message_id,
             content: cmd.content,
             flags: cmd.flags,
             score: result.score,

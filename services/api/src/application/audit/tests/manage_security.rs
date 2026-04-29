@@ -20,7 +20,7 @@ use crate::application::audit::manage_security_service::ManageSecurityService;
 use crate::domain::entities::audit::audit_log::AuditLog;
 use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
-use crate::domain::entities::moderation::action::action::ModerationAction;
+use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::entities::audit::watched_user::WatchedUser;

@@ -69,11 +69,10 @@ pub fn slugify_emoji_name(raw: &str) -> String {
             out.push(ch.to_ascii_lowercase());
         } else if ch == '_' {
             out.push('_');
-        } else if ch.is_whitespace() || ch == '-' || ch == '.' {
-            if !out.ends_with('_') {
+        } else if (ch.is_whitespace() || ch == '-' || ch == '.')
+            && !out.ends_with('_') {
                 out.push('_');
             }
-        }
     }
     let trimmed = out.trim_matches('_').to_string();
     let mut s = trimmed;

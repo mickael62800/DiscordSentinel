@@ -40,7 +40,7 @@ async fn seed_audit(
 async fn save_is_noop_phase4() {
     // save() est un no-op (Phase 4).
     let repo = PgModerationRepository::new(pool().await);
-    let action = sentinel_api::domain::entities::moderation::action::action::ModerationAction {
+    let action = sentinel_api::domain::entities::moderation::action::applied::ModerationAction {
         id: Uuid::new_v4(), guild_id: "g".into(), channel_id: "c".into(),
         moderator_id: "m".into(), moderator_name: "M".into(),
         target_id: "t".into(), target_name: "T".into(),

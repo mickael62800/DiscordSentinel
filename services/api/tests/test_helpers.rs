@@ -38,7 +38,7 @@ use sentinel_api::domain::entities::coude::steal::*;
 use sentinel_api::domain::entities::coude::steal::*;
 use sentinel_api::domain::entities::coude::taunt::*;
 use sentinel_api::domain::entities::moderation::infraction::*;
-use sentinel_api::domain::entities::moderation::action::action::*;
+use sentinel_api::domain::entities::moderation::action::applied::*;
 use sentinel_api::domain::entities::moderation::action::sanction_reminder::*;
 use sentinel_api::domain::entities::moderation::action::strikes::*;
 use sentinel_api::domain::entities::moderation::user_note::*;

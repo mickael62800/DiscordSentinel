@@ -22,7 +22,6 @@ use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 use crate::ports::outbound::community::conduct_repository::ConductRepository;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
-use crate::domain::entities::system::discord_ids::ChannelId;
 #[cfg(test)]
 #[path = "tests/manage_conduct.rs"]
 mod tests;

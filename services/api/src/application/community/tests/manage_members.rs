@@ -70,9 +70,9 @@ use crate::domain::entities::audit::dashboard_stats::DashboardStats;
 use crate::domain::entities::audit::user_stats::GuildStatsOverview;
 use crate::domain::entities::audit::user_stats::GuildVoiceStats;
 use crate::domain::entities::moderation::infraction::Infraction;
-use crate::domain::entities::moderation::action::action::ModerationAction;
+use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::entities::community::conduct::UserConductPoints;
-use crate::domain::entities::moderation::action::action::UserModerationHistory;
+use crate::domain::entities::moderation::action::applied::UserModerationHistory;
 use crate::domain::entities::audit::user_stats::UserStats;
 struct StubInfUc;
 #[async_trait]

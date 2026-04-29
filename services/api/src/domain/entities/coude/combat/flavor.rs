@@ -49,9 +49,6 @@ pub fn pick_flavor_line(
     if proba_roll >= FLAVOR_LINE_PROBABILITY {
         return None;
     }
-    if FLAVOR_LINES.is_empty() {
-        return None;
-    }
     let idx = rng.gen_range(0..FLAVOR_LINES.len());
     Some(
         FLAVOR_LINES[idx]

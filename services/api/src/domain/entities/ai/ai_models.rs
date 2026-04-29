@@ -15,7 +15,7 @@ pub fn is_valid_model_type(s: &str) -> bool {
 /// Retourne le chemin complet si aucun separateur. Accepte les chemins
 /// Windows et Unix.
 pub fn path_basename(path: &str) -> &str {
-    path.rsplit(|c| c == '/' || c == '\\').next().unwrap_or(path)
+    path.rsplit(['/', '\\']).next().unwrap_or(path)
 }
 
 /// Construit le nom d'affichage d'un modele pour l'UI admin :

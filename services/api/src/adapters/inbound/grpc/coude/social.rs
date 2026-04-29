@@ -278,7 +278,7 @@ impl CoudeSocialService for SocialGrpc {
                 winners: vec![],
                 guild_id,
             })),
-            Some(o) => Ok(Response::new(redistribution_to_proto(guild_id.into(), o))).into(),
+            Some(o) => Ok(Response::new(redistribution_to_proto(guild_id.into(), o))),
         }
     }
 

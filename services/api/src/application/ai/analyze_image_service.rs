@@ -217,11 +217,11 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
         // car le systeme actuel attend des DetectionFlags texte
         let infraction = Infraction {
             id: Uuid::new_v4(),
-            guild_id: cmd.guild_id.clone().into(),
-            channel_id: cmd.channel_id.into(),
-            user_id: cmd.user_id.clone().into(),
+            guild_id: cmd.guild_id.clone(),
+            channel_id: cmd.channel_id,
+            user_id: cmd.user_id.clone(),
             username: cmd.username.clone(),
-            message_id: cmd.message_id.into(),
+            message_id: cmd.message_id,
             content: format!("[Image: {}]", cmd.filename),
             flags,
             score: total_score,

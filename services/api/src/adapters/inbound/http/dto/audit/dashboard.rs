@@ -127,8 +127,8 @@ impl From<Infraction> for DashboardInfractionDto {
     }
 }
 
-impl From<crate::domain::entities::moderation::action::action::ModerationAction> for DashboardInfractionDto {
-    fn from(action: crate::domain::entities::moderation::action::action::ModerationAction) -> Self {
+impl From<crate::domain::entities::moderation::action::applied::ModerationAction> for DashboardInfractionDto {
+    fn from(action: crate::domain::entities::moderation::action::applied::ModerationAction) -> Self {
         Self {
             id: action.id.to_string(),
             user_id: action.target_id.into(),

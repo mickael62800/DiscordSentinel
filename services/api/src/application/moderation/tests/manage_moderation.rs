@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::application::moderation::manage_moderation_service::ManageModerationService;
 use crate::domain::entities::audit::audit_log::*;
 use crate::domain::entities::community::conduct::*;
-use crate::domain::entities::moderation::action::action::*;
+use crate::domain::entities::moderation::action::applied::*;
 use crate::domain::entities::moderation::action::strikes::*;
 use crate::domain::entities::system::rule::*;
 use crate::domain::errors::DomainError;

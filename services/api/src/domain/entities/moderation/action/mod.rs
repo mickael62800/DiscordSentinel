@@ -1,3 +1,3 @@
-pub mod action;
+pub mod applied;
 pub mod sanction_reminder;
 pub mod strikes;

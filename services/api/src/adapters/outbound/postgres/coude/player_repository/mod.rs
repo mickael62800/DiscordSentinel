@@ -8,7 +8,6 @@ use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 
-use crate::adapters::outbound::postgres::pg_err;
 use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::domain::entities::system::discord_ids::UserId;

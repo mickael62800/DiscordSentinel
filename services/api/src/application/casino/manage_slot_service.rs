@@ -126,7 +126,7 @@ impl ManageSlotService {
         if !cmd.is_daily && mise > 0 {
             let dm = self.wallet_uc
                 .debit_tx(&mut tx, &cmd.guild_id, &cmd.user_id, mise, "slot_bet",
-                    &format!("Mise slot-machine"))
+                    "Mise slot-machine")
                 .await?;
             taunt_mutations.push((cmd.user_id.clone(), dm));
         }

@@ -3,7 +3,7 @@ use sqlx::PgPool;
 use std::str::FromStr;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::action::action::ModerationAction;
+use crate::domain::entities::moderation::action::applied::ModerationAction;
 use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
