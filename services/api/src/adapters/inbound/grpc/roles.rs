@@ -84,7 +84,7 @@ impl RolePanelsService for RolePanelsGrpc {
         self.uc
             .set_message_id(SetMessageIdCommand {
                 panel_id: req.panel_id,
-                message_id: req.message_id,
+                message_id: req.message_id.into(),
             })
             .await
             .map_err(domain_to_status)?;

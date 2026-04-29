@@ -17,6 +17,7 @@ use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::player::XpProgress;
+use crate::domain::entities::system::discord_ids::MessageId;
 // ══════════════════════════════════════════════════════════════════════
 // ── Player DTOs ──
 // ══════════════════════════════════════════════════════════════════════
@@ -349,7 +350,7 @@ pub struct ResolveCombatDto {
 
 #[derive(Debug, Deserialize)]
 pub struct SetBettingDto {
-    pub message_id: String,
+    pub message_id: MessageId,
 }
 
 #[derive(Debug, Deserialize)]

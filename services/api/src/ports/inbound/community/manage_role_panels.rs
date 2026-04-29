@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 
+use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::community::role_panel::AutoRole;
 use crate::domain::entities::community::role_panel::RolePanel;
 use crate::domain::entities::community::role_panel::RolePanelDetail;
@@ -27,7 +28,7 @@ pub struct CreateRolePanelEntryCommand {
 
 pub struct SetMessageIdCommand {
     pub panel_id: String,
-    pub message_id: String,
+    pub message_id: MessageId,
 }
 
 pub struct CreateAutoRoleCommand {

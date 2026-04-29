@@ -1,5 +1,6 @@
 use serde::Deserialize;
 use serde::Serialize;
+use crate::domain::entities::system::discord_ids::MessageId;
 use crate::domain::entities::community::role_panel::AutoRole;
 use crate::domain::entities::community::role_panel::RolePanel;
 use crate::domain::entities::community::role_panel::RolePanelDetail;
@@ -42,7 +43,7 @@ fn default_style() -> String { "primary".to_string() }
 #[derive(Debug, Deserialize)]
 pub struct SetMessageIdDto {
     pub panel_id: String,
-    pub message_id: String,
+    pub message_id: MessageId,
 }
 
 #[derive(Debug, Deserialize)]

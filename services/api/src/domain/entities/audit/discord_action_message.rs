@@ -4,6 +4,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::MessageId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscordActionMessage {
@@ -11,7 +12,7 @@ pub struct DiscordActionMessage {
     pub kind: String,
     pub guild_id: String,
     pub channel_id: String,
-    pub message_id: String,
+    pub message_id: MessageId,
     pub posted_at: DateTime<Utc>,
     pub last_edited_at: Option<DateTime<Utc>>,
 }
@@ -22,7 +23,7 @@ pub struct NewDiscordActionMessage {
     pub kind: String,
     pub guild_id: String,
     pub channel_id: String,
-    pub message_id: String,
+    pub message_id: MessageId,
 }
 
 /// Conventions de `kind` reconnues — non exhaustif, le champ reste libre

@@ -44,7 +44,7 @@ pub struct ContextMessage {
 
 #[derive(Debug, Serialize)]
 pub struct MessageMetadata {
-    pub message_id: String,
+    pub message_id: MessageId,
     pub timestamp: String,
 }
 
@@ -140,3 +140,4 @@ fn proto_action_to_action(value: i32) -> Action {
 }
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
+use sentinel_api::domain::entities::system::discord_ids::MessageId;

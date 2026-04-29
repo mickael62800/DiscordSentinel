@@ -8,6 +8,7 @@ use crate::domain::enums::moderation::action::Action;
 use crate::domain::entities::moderation::detection_flags::DetectionFlags;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::domain::entities::system::discord_ids::MessageId;
 
 pub struct PgInfractionRepository {
     pool: PgPool,
@@ -26,7 +27,7 @@ struct InfractionRow {
     channel_id: String,
     user_id: String,
     username: String,
-    message_id: String,
+    message_id: MessageId,
     content: String,
     flags: serde_json::Value,
     score: f64,

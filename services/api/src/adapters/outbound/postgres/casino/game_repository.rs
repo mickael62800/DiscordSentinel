@@ -6,6 +6,7 @@ use crate::ports::outbound::casino::game_repository::Game;
 use crate::ports::outbound::casino::game_repository::GamePanel;
 use crate::ports::outbound::casino::game_repository::GameRepository;
 use super::super::pg_err;
+use crate::domain::entities::system::discord_ids::MessageId;
 
 pub struct PgGameRepository { pool: PgPool }
 
@@ -45,7 +46,7 @@ struct PanelRow {
     id: String,
     guild_id: String,
     channel_id: String,
-    message_id: String,
+    message_id: MessageId,
     category: Option<String>,
 }
 
