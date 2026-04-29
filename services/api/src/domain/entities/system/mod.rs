@@ -1,6 +1,7 @@
 pub mod analytics;
 pub mod bot_config;
 pub mod config_parsers;
+pub mod discord_ids;
 pub mod discord_role;
 pub mod guild;
 pub mod job_whitelists;
