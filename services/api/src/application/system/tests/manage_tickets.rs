@@ -326,7 +326,7 @@ async fn reply_ticket_invalid_uuid_returns_error() {
         author_name: "".into(),
         author_role: "".into(),
     }).await.unwrap_err();
-    assert!(matches!(err, DomainError::InvalidRule(_)));
+    assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
@@ -336,7 +336,7 @@ async fn assign_ticket_invalid_uuid_returns_error() {
         ticket_id: "bad".into(),
         assignee: "x".into(),
     }).await.unwrap_err();
-    assert!(matches!(err, DomainError::InvalidRule(_)));
+    assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
@@ -347,14 +347,14 @@ async fn update_ticket_channel_invalid_uuid_returns_error() {
         voice_channel_id: Some("v".into()),
         invited_user_id: None,
     }).await.unwrap_err();
-    assert!(matches!(err, DomainError::InvalidRule(_)));
+    assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
 async fn update_status_invalid_uuid_returns_error() {
     let (service, _) = make_service();
     let err = service.update_status("nope", "pending").await.unwrap_err();
-    assert!(matches!(err, DomainError::InvalidRule(_)));
+    assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 // ── list_tickets avec filtre author_id + priority + search ──

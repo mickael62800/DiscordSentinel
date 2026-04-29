@@ -47,13 +47,13 @@ impl ManageRulesUseCase for ManageRulesService {
 
     async fn create_or_update_rule(&self, cmd: CreateRuleCommand) -> Result<Rule, DomainError> {
         if cmd.weight < 0.0 {
-            return Err(DomainError::InvalidRule("Le poids ne peut pas être négatif".into()));
+            return Err(DomainError::ValidationError("Le poids ne peut pas être négatif".into()));
         }
         if cmd.threshold_warn >= cmd.threshold_delete
             || cmd.threshold_delete >= cmd.threshold_mute
             || cmd.threshold_mute >= cmd.threshold_ban
         {
-            return Err(DomainError::InvalidRule(
+            return Err(DomainError::ValidationError(
                 "Les seuils doivent être croissants : warn < delete < mute < ban".into(),
             ));
         }

@@ -1,53 +1,39 @@
 use thiserror::Error;
-use uuid::Uuid;
 
 #[derive(Debug, Error)]
 #[allow(dead_code)]
 pub enum DomainError {
-    // 404
-    #[error("Règle introuvable : {0}")]
-    RuleNotFound(Uuid),
-
-    #[error("Infraction introuvable : {0}")]
-    InfractionNotFound(Uuid),
-
-    #[error("Ticket introuvable : {0}")]
-    TicketNotFound(String),
-
+    /// 404 — ressource introuvable. Le message est libre, ex:
+    /// `format!("Regle {uuid}")`, `format!("Ticket {id}")`, etc.
     #[error("Ressource introuvable : {0}")]
     NotFound(String),
 
-    // 400
-    #[error("Règle invalide : {0}")]
-    InvalidRule(String),
-
-    // 422
-    #[error("Données invalides : {0}")]
+    /// 400 / 422 — donnees invalides (validation cote domain ou serde).
+    #[error("Donnees invalides : {0}")]
     ValidationError(String),
 
-    // 409
+    /// 409 — conflit (unique constraint, version stale, etc.).
     #[error("Conflit : {0}")]
     Conflict(String),
 
-    // 403
-    #[error("Accès refusé : {0}")]
+    /// 403 — acces refuse (RBAC, ownership, guild membership).
+    #[error("Acces refuse : {0}")]
     Forbidden(String),
 
-    // 429
+    /// 429 — rate limit depasse.
     #[error("Rate limited : {0}")]
     RateLimited(String),
 
-    // 504
+    /// 504 — timeout sur appel externe (Discord API, ONNX inference, etc.).
     #[error("Timeout : {0}")]
     Timeout(String),
 
-    // 500
+    /// 500 — erreur interne (sqlx, redis, runtime). Message technique pour debug.
     #[error("Erreur interne : {0}")]
     Internal(String),
 
-    // 501 — methode de port non implementee par cet adapter (mock partiel,
-    // implementation a venir). Remplace les anciens `unimplemented!()` qui
-    // paniquaient en runtime.
+    /// 501 — methode de port non implementee par cet adapter (mock partiel,
+    /// implementation a venir). Remplace les anciens `unimplemented!()`.
     #[error("Non implemente : {0}")]
     NotImplemented(String),
 }

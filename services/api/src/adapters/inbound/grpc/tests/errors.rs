@@ -5,19 +5,19 @@ use super::*;
 
     #[test]
     fn rule_not_found_maps_to_not_found() {
-        let s = domain_to_status(DomainError::RuleNotFound(Uuid::nil()));
+        let s = domain_to_status(DomainError::NotFound(format!("Regle {}", Uuid::nil())));
         assert_eq!(s.code(), Code::NotFound);
     }
 
     #[test]
     fn infraction_not_found_maps_to_not_found() {
-        let s = domain_to_status(DomainError::InfractionNotFound(Uuid::nil()));
+        let s = domain_to_status(DomainError::NotFound(format!("Infraction {}", Uuid::nil())));
         assert_eq!(s.code(), Code::NotFound);
     }
 
     #[test]
     fn ticket_not_found_maps_to_not_found() {
-        let s = domain_to_status(DomainError::TicketNotFound("t1".into()));
+        let s = domain_to_status(DomainError::NotFound(format!("Ticket t1")));
         assert_eq!(s.code(), Code::NotFound);
     }
 
@@ -30,7 +30,7 @@ use super::*;
 
     #[test]
     fn invalid_rule_maps_to_invalid_argument() {
-        let s = domain_to_status(DomainError::InvalidRule("bad regex".into()));
+        let s = domain_to_status(DomainError::ValidationError("bad regex".into()));
         assert_eq!(s.code(), Code::InvalidArgument);
     }
 

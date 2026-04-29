@@ -102,7 +102,7 @@ async fn create_rejects_negative_weight() {
     let mut cmd = valid_cmd();
     cmd.weight = -0.1;
     let err = svc.create_or_update_rule(cmd).await.unwrap_err();
-    assert!(matches!(err, DomainError::InvalidRule(_)));
+    assert!(matches!(err, DomainError::ValidationError(_)));
 }
 
 #[tokio::test]
@@ -119,7 +119,7 @@ async fn create_rejects_warn_gte_delete() {
     let mut cmd = valid_cmd();
     cmd.threshold_warn = 4.0;
     cmd.threshold_delete = 4.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::InvalidRule(_))));
+    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
 }
 
 #[tokio::test]
@@ -128,7 +128,7 @@ async fn create_rejects_delete_gte_mute() {
     let mut cmd = valid_cmd();
     cmd.threshold_delete = 6.0;
     cmd.threshold_mute = 6.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::InvalidRule(_))));
+    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
 }
 
 #[tokio::test]
@@ -137,7 +137,7 @@ async fn create_rejects_mute_gte_ban() {
     let mut cmd = valid_cmd();
     cmd.threshold_mute = 9.0;
     cmd.threshold_ban = 9.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::InvalidRule(_))));
+    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
 }
 
 #[tokio::test]
@@ -148,7 +148,7 @@ async fn create_rejects_inverted_thresholds() {
     cmd.threshold_delete = 8.0;
     cmd.threshold_mute = 6.0;
     cmd.threshold_ban = 4.0;
-    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::InvalidRule(_))));
+    assert!(matches!(svc.create_or_update_rule(cmd).await, Err(DomainError::ValidationError(_))));
 }
 
 // ── get_rules / get_all_rules ──

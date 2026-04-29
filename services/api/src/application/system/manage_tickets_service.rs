@@ -80,7 +80,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
         cached_json(&self.cache, &cache_key, TICKET_DETAIL_TTL, || async {
             let uuid = id
                 .parse::<Uuid>()
-                .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {id}")))?;
+                .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {id}")))?;
 
             let ticket = self
                 .ticket_repo
@@ -125,7 +125,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
         let ticket_id = cmd
             .ticket_id
             .parse::<Uuid>()
-            .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
+            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
 
         let message = TicketMessage {
             id: Uuid::new_v4(),
@@ -148,7 +148,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
     async fn close_ticket(&self, id: &str) -> Result<(), DomainError> {
         let uuid = id
             .parse::<Uuid>()
-            .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {id}")))?;
+            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {id}")))?;
 
         self.ticket_repo.update_status(uuid, "closed").await?;
         self.invalidate_tickets_cache().await;
@@ -159,7 +159,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
     async fn update_status(&self, id: &str, status: &str) -> Result<(), DomainError> {
         let uuid = id
             .parse::<Uuid>()
-            .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {id}")))?;
+            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {id}")))?;
 
         self.ticket_repo.update_status(uuid, status).await?;
         self.invalidate_tickets_cache().await;
@@ -171,7 +171,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
         let uuid = cmd
             .ticket_id
             .parse::<Uuid>()
-            .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
+            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
 
         self.ticket_repo.update_assignee(uuid, &cmd.assignee).await?;
         self.invalidate_tickets_cache().await;
@@ -183,7 +183,7 @@ impl ManageTicketsUseCase for ManageTicketsService {
         let uuid = cmd
             .ticket_id
             .parse::<Uuid>()
-            .map_err(|_| DomainError::InvalidRule(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
+            .map_err(|_| DomainError::ValidationError(format!("ID ticket invalide : {}", cmd.ticket_id)))?;
 
         if let Some(ref vc_id) = cmd.voice_channel_id {
             self.ticket_repo.update_voice_channel(uuid, Some(vc_id)).await?;

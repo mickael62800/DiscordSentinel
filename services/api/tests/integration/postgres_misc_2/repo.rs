@@ -309,14 +309,14 @@ async fn rule_toggle_updates_enabled() {
 async fn rule_toggle_unknown_returns_not_found() {
     let repo = PgRuleRepository::new(pool().await);
     let err = repo.toggle(Uuid::new_v4(), true).await.unwrap_err();
-    assert!(matches!(err, sentinel_api::domain::errors::DomainError::RuleNotFound(_)));
+    assert!(matches!(err, sentinel_api::domain::errors::DomainError::NotFound(_)));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn rule_delete_returns_not_found_on_unknown() {
     let repo = PgRuleRepository::new(pool().await);
     let err = repo.delete(Uuid::new_v4()).await.unwrap_err();
-    assert!(matches!(err, sentinel_api::domain::errors::DomainError::RuleNotFound(_)));
+    assert!(matches!(err, sentinel_api::domain::errors::DomainError::NotFound(_)));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

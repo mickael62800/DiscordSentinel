@@ -12,13 +12,7 @@ impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let (status, message) = match &self.0 {
             // 404
-            DomainError::RuleNotFound(_)
-            | DomainError::InfractionNotFound(_)
-            | DomainError::TicketNotFound(_)
-            | DomainError::NotFound(_) => (StatusCode::NOT_FOUND, self.0.to_string()),
-
-            // 400
-            DomainError::InvalidRule(_) => (StatusCode::BAD_REQUEST, self.0.to_string()),
+            DomainError::NotFound(_) => (StatusCode::NOT_FOUND, self.0.to_string()),
 
             // 422
             DomainError::ValidationError(_) => {

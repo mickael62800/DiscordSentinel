@@ -98,7 +98,7 @@ impl RuleRepository for PgRuleRepository {
         .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         if result.rows_affected() == 0 {
-            return Err(DomainError::RuleNotFound(id));
+            return Err(DomainError::NotFound(format!("Regle {}", id)));
         }
 
         Ok(())
@@ -146,7 +146,7 @@ impl RuleRepository for PgRuleRepository {
             .map_err(|e| DomainError::Internal(e.to_string()))?;
 
         if result.rows_affected() == 0 {
-            return Err(DomainError::RuleNotFound(id));
+            return Err(DomainError::NotFound(format!("Regle {}", id)));
         }
 
         Ok(())

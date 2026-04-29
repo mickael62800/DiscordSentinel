@@ -155,7 +155,7 @@ pub async fn update_status(
 ) -> Result<Json<serde_json::Value>, ApiError> {
     let status = match TicketStatus::from_str(&dto.status) {
         Some(s) => s,
-        None => return Err(DomainError::InvalidRule(format!(
+        None => return Err(DomainError::ValidationError(format!(
             "Statut invalide : {}. Valeurs acceptees : {:?}",
             dto.status, TicketStatus::VALID_VALUES
         )).into()),

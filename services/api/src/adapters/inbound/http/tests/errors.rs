@@ -20,25 +20,25 @@ async fn not_found_maps_to_404() {
 
 #[tokio::test]
 async fn rule_not_found_maps_to_404() {
-    let (status, _) = response_parts(ApiError(DomainError::RuleNotFound(uuid::Uuid::nil()))).await;
+    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!("Regle {}", uuid::Uuid::nil())))).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn infraction_not_found_maps_to_404() {
-    let (status, _) = response_parts(ApiError(DomainError::InfractionNotFound(uuid::Uuid::nil()))).await;
+    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!("Infraction {}", uuid::Uuid::nil())))).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn ticket_not_found_maps_to_404() {
-    let (status, _) = response_parts(ApiError(DomainError::TicketNotFound("t".into()))).await;
+    let (status, _) = response_parts(ApiError(DomainError::NotFound(format!("Ticket t")))).await;
     assert_eq!(status, StatusCode::NOT_FOUND);
 }
 
 #[tokio::test]
 async fn invalid_rule_maps_to_400() {
-    let (status, _) = response_parts(ApiError(DomainError::InvalidRule("x".into()))).await;
+    let (status, _) = response_parts(ApiError(DomainError::ValidationError("x".into()))).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
