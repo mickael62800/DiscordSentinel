@@ -21,20 +21,20 @@ use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::ports::outbound::coude::economy_repository::EconomyRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
 use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use sqlx::Postgres;
 use sqlx::Transaction;
-// ── Mock CoudeSocialRepository ──
+// ── Mock SocialRepository ──
 
 #[derive(Default)]
 struct MockSocialRepo {
@@ -49,7 +49,7 @@ struct MockSocialRepo {
 }
 
 #[async_trait]
-impl CoudeSocialRepository for MockSocialRepo {
+impl SocialRepository for MockSocialRepo {
     async fn get_cooldown(
         &self,
         _: &str,
@@ -103,7 +103,7 @@ impl CoudeSocialRepository for MockSocialRepo {
     }
 }
 
-// ── Mock CoudePlayerRepository (minimal — seul random_active est exerce) ──
+// ── Mock PlayerRepository (minimal — seul random_active est exerce) ──
 
 #[derive(Default)]
 struct MockPlayerRepo {
@@ -111,7 +111,7 @@ struct MockPlayerRepo {
 }
 
 #[async_trait]
-impl CoudePlayerRepository for MockPlayerRepo {
+impl PlayerRepository for MockPlayerRepo {
     async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { unimplemented!() }
     async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
     async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
@@ -143,7 +143,7 @@ impl CoudePlayerRepository for MockPlayerRepo {
     async fn regen_hp_tick(&self, _: f64, _: f64, _: f64, _: f64) -> Result<u64, DomainError> { Ok(0) }
 }
 
-// ── Mock CoudeEconomyRepository ──
+// ── Mock EconomyRepository ──
 
 #[derive(Default)]
 struct MockEconomyRepo {
@@ -151,7 +151,7 @@ struct MockEconomyRepo {
 }
 
 #[async_trait]
-impl CoudeEconomyRepository for MockEconomyRepo {
+impl EconomyRepository for MockEconomyRepo {
     async fn record_steal_stats(&self, g: &str, thief: &str, victim: &str, amount: i64) -> Result<(), DomainError> {
         self.steal_calls.lock().unwrap().push((g.into(), thief.into(), victim.into(), amount));
         Ok(())
@@ -232,7 +232,7 @@ fn make_player(user_id: &str, coins: i64) -> CoudePlayer {
         total_earned: 0, total_lost: 0, total_stolen: 0,
         cowardice_count: 0, chaos_events: 0, casino_wins: 0, casino_losses: 0,
         level: 1, xp: 0, stat_points: 0, atk: 0, def: 0,
-        class: Some(CoudeClass::Tank), title: None, class_changed_at: None,
+        class: Some(PlayerClass::Tank), title: None, class_changed_at: None,
         hp_current: 100, hp_max: 100, hp_last_regen: None, repos_last_used: None,
         season: 1, created_at: now, updated_at: now,
     }

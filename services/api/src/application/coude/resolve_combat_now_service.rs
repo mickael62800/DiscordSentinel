@@ -39,17 +39,17 @@ use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::bounty_repository::CoudeBountyRepository;
-use crate::ports::outbound::coude::coalition_repository::CoudeCoalitionRepository;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
-use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
-use crate::ports::outbound::coude::ultimate_repository::CoudeUltimateRepository;
-use crate::ports::outbound::coude::vendetta_repository::CoudeVendettaRepository;
+use crate::ports::outbound::coude::bounty_repository::BountyRepository;
+use crate::ports::outbound::coude::coalition_repository::CoalitionRepository;
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
+use crate::ports::outbound::coude::ultimate_repository::UltimateRepository;
+use crate::ports::outbound::coude::vendetta_repository::VendettaRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 pub struct ResolveCombatNowService {
-    combat_repo: Arc<dyn CoudeCombatRepository>,
+    combat_repo: Arc<dyn CombatRepository>,
     combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
     players_uc: Arc<dyn ManageCoudePlayersUseCase>,
     wallet_repo: Arc<dyn WalletRepository>,
@@ -58,18 +58,18 @@ pub struct ResolveCombatNowService {
     social_uc: Arc<dyn ManageCoudeSocialUseCase>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
-    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
-    safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
-    vendetta_repo: Option<Arc<dyn CoudeVendettaRepository>>,
-    player_repo: Option<Arc<dyn CoudePlayerRepository>>,
-    bounty_repo: Option<Arc<dyn CoudeBountyRepository>>,
-    coalition_repo: Option<Arc<dyn CoudeCoalitionRepository>>,
-    ultimate_repo: Option<Arc<dyn CoudeUltimateRepository>>,
+    curses_repo: Option<Arc<dyn CursesRepository>>,
+    safety_net_repo: Option<Arc<dyn SafetyNetRepository>>,
+    vendetta_repo: Option<Arc<dyn VendettaRepository>>,
+    player_repo: Option<Arc<dyn PlayerRepository>>,
+    bounty_repo: Option<Arc<dyn BountyRepository>>,
+    coalition_repo: Option<Arc<dyn CoalitionRepository>>,
+    ultimate_repo: Option<Arc<dyn UltimateRepository>>,
 }
 
 impl ResolveCombatNowService {
     pub fn new(
-        combat_repo: Arc<dyn CoudeCombatRepository>,
+        combat_repo: Arc<dyn CombatRepository>,
         combats_uc: Arc<dyn ManageCoudeCombatsUseCase>,
         players_uc: Arc<dyn ManageCoudePlayersUseCase>,
         wallet_repo: Arc<dyn WalletRepository>,
@@ -100,13 +100,13 @@ impl ResolveCombatNowService {
     }
 
     /// Branche le repo coalition (cf. COUPE_AMELIORATIONS 5.3).
-    pub fn with_coalition_repo(mut self, repo: Arc<dyn CoudeCoalitionRepository>) -> Self {
+    pub fn with_coalition_repo(mut self, repo: Arc<dyn CoalitionRepository>) -> Self {
         self.coalition_repo = Some(repo);
         self
     }
 
     /// Branche le repo ultimate (cf. COUPE_AMELIORATIONS 3.1).
-    pub fn with_ultimate_repo(mut self, repo: Arc<dyn CoudeUltimateRepository>) -> Self {
+    pub fn with_ultimate_repo(mut self, repo: Arc<dyn UltimateRepository>) -> Self {
         self.ultimate_repo = Some(repo);
         self
     }
@@ -114,21 +114,21 @@ impl ResolveCombatNowService {
     /// Branche le repo player (cf. COUPE_AMELIORATIONS 5.3) pour
     /// detecter quand un winner casse une streak >= 5 du loser et
     /// declencher la "Prime collective" (regicide bonus 1000c).
-    pub fn with_player_repo(mut self, repo: Arc<dyn CoudePlayerRepository>) -> Self {
+    pub fn with_player_repo(mut self, repo: Arc<dyn PlayerRepository>) -> Self {
         self.player_repo = Some(repo);
         self
     }
 
     /// Branche le repo bounty (cf. COUPE_AMELIORATIONS 5.3) pour gerer
     /// les primes collectives auto-ouvertes / claimees lors des combats.
-    pub fn with_bounty_repo(mut self, repo: Arc<dyn CoudeBountyRepository>) -> Self {
+    pub fn with_bounty_repo(mut self, repo: Arc<dyn BountyRepository>) -> Self {
         self.bounty_repo = Some(repo);
         self
     }
 
     /// Branche le repo des maledictions pour activer Banana
     /// (cf. COUPE_AMELIORATIONS 5.1) sur les d20 du combat.
-    pub fn with_curses_repo(mut self, repo: Arc<dyn CoudeCursesRepository>) -> Self {
+    pub fn with_curses_repo(mut self, repo: Arc<dyn CursesRepository>) -> Self {
         self.curses_repo = Some(repo);
         self
     }
@@ -136,7 +136,7 @@ impl ResolveCombatNowService {
     /// Branche le repo du filet de securite (cf. COUPE_AMELIORATIONS 4.4)
     /// pour reduire les pertes du perdant et activer le filet quand son
     /// solde tombe sous le seuil.
-    pub fn with_safety_net_repo(mut self, repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
+    pub fn with_safety_net_repo(mut self, repo: Arc<dyn SafetyNetRepository>) -> Self {
         self.safety_net_repo = Some(repo);
         self
     }
@@ -145,7 +145,7 @@ impl ResolveCombatNowService {
     /// detecter les revanches en cours et appliquer le bonus +100% au
     /// gain du challenger qui gagne sa revanche, ou marquer la vendetta
     /// comme perdue dans le cas inverse.
-    pub fn with_vendetta_repo(mut self, repo: Arc<dyn CoudeVendettaRepository>) -> Self {
+    pub fn with_vendetta_repo(mut self, repo: Arc<dyn VendettaRepository>) -> Self {
         self.vendetta_repo = Some(repo);
         self
     }
@@ -161,7 +161,7 @@ impl ResolveCombatNowService {
             Ok(Some(w)) => w.coins,
             _ => return,
         };
-        let settings = crate::application::coude::guild_settings::CoudeGuildSettings::load(
+        let settings = crate::application::coude::guild_settings::GuildSettings::load(
             self.bot_config_repo.as_ref(),
             guild_id,
         )
@@ -292,7 +292,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
         let balance = load_balance_params(self.bot_config_repo.as_ref(), &combat.guild_id).await;
         // Settings pour les features 4.1 / 3.3 / 4.4 (config par-guild,
         // cf. migration 170).
-        let settings = crate::application::coude::guild_settings::CoudeGuildSettings::load(
+        let settings = crate::application::coude::guild_settings::GuildSettings::load(
             self.bot_config_repo.as_ref(),
             &combat.guild_id,
         )

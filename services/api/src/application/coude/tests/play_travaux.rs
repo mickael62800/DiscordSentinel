@@ -10,37 +10,37 @@ use crate::application::coude::play_travaux_service::PlayTravauxService;
 use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
 use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::heist::CoudeHeistAttempt;
+use crate::domain::entities::coude::heist::HeistAttempt;
 use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
 use crate::domain::entities::coude::player::CoudePlayer;
-use crate::domain::entities::coude::heist::CoudePrisonState;
+use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::entities::coude::travaux::TRAVAUX_COOLDOWN_KEY;
 use crate::domain::entities::coude::travaux::TRAVAUX_COOLDOWN_SECS;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
 use crate::ports::inbound::coude::play_travaux::PlayTravauxCommand;
 use crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase;
-use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::ports::outbound::coude::heist_repository::HeistRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
 // ── Mocks ───────────────────────────────────────────────────────────
 
 struct MockHeistRepo {
-    prison: Mutex<Option<CoudePrisonState>>,
+    prison: Mutex<Option<PrisonState>>,
 }
 
 #[async_trait]
-impl CoudeHeistRepository for MockHeistRepo {
-    async fn last_attempt(&self, _: &str, _: &str) -> Result<Option<CoudeHeistAttempt>, DomainError> { Ok(None) }
-    async fn record_attempt(&self, _: &str, _: &str, _: bool, _: i64, _: i32, _: &[String]) -> Result<CoudeHeistAttempt, DomainError> { unimplemented!() }
-    async fn get_prison(&self, _: &str, _: &str) -> Result<Option<CoudePrisonState>, DomainError> {
+impl HeistRepository for MockHeistRepo {
+    async fn last_attempt(&self, _: &str, _: &str) -> Result<Option<HeistAttempt>, DomainError> { Ok(None) }
+    async fn record_attempt(&self, _: &str, _: &str, _: bool, _: i64, _: i32, _: &[String]) -> Result<HeistAttempt, DomainError> { unimplemented!() }
+    async fn get_prison(&self, _: &str, _: &str) -> Result<Option<PrisonState>, DomainError> {
         Ok(self.prison.lock().unwrap().clone())
     }
     async fn send_to_prison(&self, _: &str, _: &str, _: DateTime<Utc>, _: &str) -> Result<(), DomainError> { Ok(()) }
@@ -51,7 +51,7 @@ struct MockPlayerRepo {
 }
 
 #[async_trait]
-impl CoudePlayerRepository for MockPlayerRepo {
+impl PlayerRepository for MockPlayerRepo {
     async fn get_or_create(&self, g: &str, u: &str, name: &str) -> Result<CoudePlayer, DomainError> {
         let now = Utc::now();
         Ok(CoudePlayer {
@@ -60,7 +60,7 @@ impl CoudePlayerRepository for MockPlayerRepo {
             total_earned: 0, total_lost: 0, total_stolen: 0,
             cowardice_count: 0, chaos_events: 0, casino_wins: 0, casino_losses: 0,
             level: 1, xp: 0, stat_points: 0, atk: 0, def: 0,
-            class: Some(CoudeClass::Tank), title: None, class_changed_at: None,
+            class: Some(PlayerClass::Tank), title: None, class_changed_at: None,
             hp_current: 100, hp_max: 100, hp_last_regen: None, repos_last_used: None,
             season: 1, created_at: now, updated_at: now,
         })
@@ -102,7 +102,7 @@ struct MockSocialRepo {
 }
 
 #[async_trait]
-impl CoudeSocialRepository for MockSocialRepo {
+impl SocialRepository for MockSocialRepo {
     async fn get_cooldown(&self, _: &str, _: &str, _: &str) -> Result<Option<DateTime<Utc>>, DomainError> {
         Ok(*self.cooldown.lock().unwrap())
     }
@@ -147,7 +147,7 @@ struct Harness {
 
 fn build(in_prison: bool, cooldown_active: bool) -> Harness {
     let prison = if in_prison {
-        Some(CoudePrisonState {
+        Some(PrisonState {
             guild_id: "g1".into(),
             user_id: "u1".into(),
             released_at: Utc::now() + Duration::hours(2),
@@ -198,7 +198,7 @@ async fn play_rejects_when_not_in_prison() {
 #[tokio::test]
 async fn play_rejects_when_prison_expired() {
     // Released_at dans le passe -> is_active = false.
-    let prison = CoudePrisonState {
+    let prison = PrisonState {
         guild_id: "g1".into(),
         user_id: "u1".into(),
         released_at: Utc::now() - Duration::hours(1),

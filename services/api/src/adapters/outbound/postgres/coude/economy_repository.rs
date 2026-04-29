@@ -4,14 +4,14 @@ use sqlx::PgPool;
 use crate::domain::errors::DomainError;
 
 use super::super::pg_err;
-use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
+use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 
 
-pub struct PgCoudeEconomyRepository {
+pub struct PgEconomyRepository {
     pool: PgPool,
 }
 
-impl PgCoudeEconomyRepository {
+impl PgEconomyRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -19,7 +19,7 @@ impl PgCoudeEconomyRepository {
 
 
 #[async_trait]
-impl CoudeEconomyRepository for PgCoudeEconomyRepository {
+impl EconomyRepository for PgEconomyRepository {
     // NOTE migration wallet unifie : la methode `transfer` a ete supprimee.
     // Toute la logique SQL (SELECT FOR UPDATE + UPDATE debit/credit + log
     // wallet_transactions) est centralisee dans `PgWalletRepository::transfer`

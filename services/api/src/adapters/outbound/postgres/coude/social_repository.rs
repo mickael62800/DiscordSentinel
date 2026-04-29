@@ -12,13 +12,13 @@ use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::errors::DomainError;
 
 use super::super::pg_err;
-use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
 
-pub struct PgCoudeSocialRepository {
+pub struct PgSocialRepository {
     pool: PgPool,
 }
 
-impl PgCoudeSocialRepository {
+impl PgSocialRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -67,7 +67,7 @@ impl From<EventRow> for CoudeEvent {
 }
 
 #[async_trait]
-impl CoudeSocialRepository for PgCoudeSocialRepository {
+impl SocialRepository for PgSocialRepository {
     // ── Cooldowns ──
 
     async fn get_cooldown(

@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::coude::guild_settings::CoudeGuildSettings;
+use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::inventory::CoudeInsurance;
 use crate::domain::entities::coude::inventory::CoudeInventoryItem;
 use crate::domain::entities::coude::inventory::CoudePrime;
@@ -11,14 +11,14 @@ use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::inventory_repository::CoudeInventoryRepository;
+use crate::ports::outbound::coude::inventory_repository::InventoryRepository;
 pub struct ManageCoudeInventoryService {
-    repo: Arc<dyn CoudeInventoryRepository>,
+    repo: Arc<dyn InventoryRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeInventoryService {
-    pub fn new(repo: Arc<dyn CoudeInventoryRepository>) -> Self {
+    pub fn new(repo: Arc<dyn InventoryRepository>) -> Self {
         Self { repo, bot_config_repo: None }
     }
 
@@ -125,7 +125,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         // Cf. COUPE_AMELIORATIONS 3.2 palier niveau 5 (configurable via
         // `assurance_extra_slot_level`, default 5).
         let unlock_level = match &self.bot_config_repo {
-            Some(repo) => CoudeGuildSettings::load(&**repo, guild_id)
+            Some(repo) => GuildSettings::load(&**repo, guild_id)
                 .await
                 .get_i32("assurance_extra_slot_level", 5),
             None => 5,
@@ -157,7 +157,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
             rng.gen_range(1..=100) <= scam_rate_pct.min(100)
         };
         let unlock_level = match &self.bot_config_repo {
-            Some(repo) => CoudeGuildSettings::load(&**repo, guild_id)
+            Some(repo) => GuildSettings::load(&**repo, guild_id)
                 .await
                 .get_i32("assurance_extra_slot_level", 5),
             None => 5,

@@ -2,9 +2,9 @@
 //! de paris. Implementation du use case `ResolveBettingBatchUseCase`.
 //!
 //! Cette couche application :
-//!   - appelle le port outbound `CoudeCombatRepository` pour claim atomique
-//!   - charge les joueurs via `CoudePlayerRepository`
-//!   - charge les events via `CoudeSocialRepository`
+//!   - appelle le port outbound `CombatRepository` pour claim atomique
+//!   - charge les joueurs via `PlayerRepository`
+//!   - charge les events via `SocialRepository`
 //!   - appelle le domain service `coude_combat_engine::resolve_combat` (pur)
 //!   - applique les effets via les repos/use cases existants (wallet, stats,
 //!     HP, assurance, paris)
@@ -23,7 +23,7 @@ use async_trait::async_trait;
 use tracing::warn;
 
 use crate::domain::entities::coude::combat_resolution_rules::apply_insurance_to_loss;
-use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::combat::CoudeCombat;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude::coude_combat_engine as engine;
@@ -36,8 +36,8 @@ use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Delai de paris par defaut (5 min), override par guild via bot_guild_config.
 const DEFAULT_BET_DELAY_SECS: i64 = 300;
@@ -45,8 +45,8 @@ const DEFAULT_BET_DELAY_SECS: i64 = 300;
 const STUCK_THRESHOLD_SECS: i64 = 120;
 
 pub struct ResolveBettingBatchService {
-    combat_repo: Arc<dyn CoudeCombatRepository>,
-    player_repo: Arc<dyn CoudePlayerRepository>,
+    combat_repo: Arc<dyn CombatRepository>,
+    player_repo: Arc<dyn PlayerRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
     bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
@@ -57,8 +57,8 @@ pub struct ResolveBettingBatchService {
 
 impl ResolveBettingBatchService {
     pub fn new(
-        combat_repo: Arc<dyn CoudeCombatRepository>,
-        player_repo: Arc<dyn CoudePlayerRepository>,
+        combat_repo: Arc<dyn CombatRepository>,
+        player_repo: Arc<dyn PlayerRepository>,
         wallet_repo: Arc<dyn WalletRepository>,
         bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
@@ -79,7 +79,7 @@ impl ResolveBettingBatchService {
     }
 
     /// Charge les parametres de balance de la guild ou default.
-    async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
+    async fn load_balance(&self, guild_id: &str) -> BalanceParams {
         crate::application::coude::guild_settings::load_balance_params(
             &*self.bot_config_repo,
             guild_id,

@@ -16,7 +16,7 @@ fn player(user_id: &str, class: &str, level: i32) -> Player {
 fn resolve_produit_toujours_un_result_coherent() {
     let atk = player("111", "bourrin", 5);
     let def = player("222", "agile", 5);
-    let result = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+    let result = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
     assert!(result.total_rounds >= 0);
     assert!(result.coins_won >= 0);
     assert!(result.coins_lost_by_loser >= 0);
@@ -28,7 +28,7 @@ fn resolve_produit_toujours_un_result_coherent() {
 fn explosion_retourne_draw_avec_loss_50_pct() {
     let atk = player("111", "bourrin", 5);
     let def = player("222", "fourbe", 5);
-    let result = resolve_combat(&atk, &def, 100, 100, 200, None, Some("explosion"), &[], &CoudeBalanceParams::default());
+    let result = resolve_combat(&atk, &def, 100, 100, 200, None, Some("explosion"), &[], &BalanceParams::default());
     assert!(result.winner_id.is_none());
     assert!(result.loser_id.is_none());
     assert_eq!(result.coins_lost_by_loser, 100);
@@ -41,7 +41,7 @@ fn tank_vs_tank_ne_bloque_pas_a_1_dmg() {
     let def = player("222", "tank", 5);
     let mut any_round_above_1 = false;
     for _ in 0..20 {
-        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         for round in &r.rounds {
             if round.attacker_damage > 1 || round.defender_damage > 1 {
                 any_round_above_1 = true;
@@ -58,7 +58,7 @@ fn draw_path_pas_de_winner() {
     let atk = player("111", "bourrin", 5);
     let def = player("222", "bourrin", 5);
     for _ in 0..100 {
-        let r = resolve_combat(&atk, &def, 10, 10, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 10, 10, 50, None, None, &[], &BalanceParams::default());
         if r.winner_id.is_none() {
             assert!(r.loser_id.is_none());
             return;
@@ -114,8 +114,8 @@ fn rage_buffs_attacker_atk() {
     let mut sum_with_rage = 0i32;
     let mut sum_without = 0i32;
     for _ in 0..20 {
-        let r1 = resolve_combat(&atk, &def, 100, 100, 50, Some("rage"), None, &[], &CoudeBalanceParams::default());
-        let r2 = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r1 = resolve_combat(&atk, &def, 100, 100, 50, Some("rage"), None, &[], &BalanceParams::default());
+        let r2 = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         sum_with_rage += r1.rounds.iter().map(|r| r.attacker_damage).sum::<i32>();
         sum_without += r2.rounds.iter().map(|r| r.attacker_damage).sum::<i32>();
     }
@@ -131,7 +131,7 @@ fn poison_damages_defender_each_round() {
     // par poison (5/round, au moins 2 rounds).
     let atk = player("a", "bourrin", 5);
     let def = player("d", "tank", 5);
-    let result = resolve_combat(&atk, &def, 100, 100, 50, Some("poison"), None, &[], &CoudeBalanceParams::default());
+    let result = resolve_combat(&atk, &def, 100, 100, 50, Some("poison"), None, &[], &BalanceParams::default());
     // Au moins 1 round de poison applique.
     assert!(result.total_rounds >= 1);
 }
@@ -144,7 +144,7 @@ fn bouclier_produces_valid_combat() {
     // noye dans le RNG), donc on evite un test statistique instable.
     let atk = player("a", "bourrin", 5);
     let def = player("d", "bourrin", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("bouclier"), &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("bouclier"), &[], &BalanceParams::default());
     assert!(!r.rounds.is_empty());
     assert!(r.attacker_hp_final >= 0);
     assert!(r.defender_hp_final >= 0);
@@ -159,8 +159,8 @@ fn happy_hour_doubles_coins_won() {
     let event = Event { event_type: "happy_hour".to_string() };
     let mut any_doubled = false;
     for _ in 0..30 {
-        let r_normal = resolve_combat(&atk, &def, 100, 1, 100, None, None, &[], &CoudeBalanceParams::default());
-        let r_happy = resolve_combat(&atk, &def, 100, 1, 100, None, None, std::slice::from_ref(&event), &CoudeBalanceParams::default());
+        let r_normal = resolve_combat(&atk, &def, 100, 1, 100, None, None, &[], &BalanceParams::default());
+        let r_happy = resolve_combat(&atk, &def, 100, 1, 100, None, None, std::slice::from_ref(&event), &BalanceParams::default());
         // Ne marche que si les deux combats ont le meme gagnant (attacker).
         if r_normal.winner_id.is_some() && r_happy.winner_id.is_some()
             && r_happy.coins_won > r_normal.coins_won
@@ -181,7 +181,7 @@ fn cowardice_reduces_winnings() {
     let def = player("d", "bourrin", 1);
     // Trouver un combat ou atk gagne.
     for _ in 0..30 {
-        let r = resolve_combat(&atk, &def, 100, 1, 1000, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 1, 1000, None, None, &[], &BalanceParams::default());
         if r.winner_id.as_deref() == Some("a") {
             // cowardice 5 → penalty 0.8 sur coins_won.
             // Le test doit au moins verifier qu'on reste ≤ mise*1.15 (max avec bonus stats).
@@ -200,7 +200,7 @@ fn level_gap_triggers_handicap_text_in_output() {
     let def = player("d", "bourrin", 1); // gap 14 > 3, atk est stronger
     // Dans 30 runs, au moins un combat doit mentionner "Handicap matchmaking".
     for _ in 0..30 {
-        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         if r.message.contains("Handicap matchmaking") {
             return;
         }
@@ -217,7 +217,7 @@ fn giant_killer_flag_set_when_underdog_wins() {
     let def = player("d", "bourrin", 10);
     // Chercher sur 50 runs un cas ou atk gagne → is_giant_killer = true.
     for _ in 0..50 {
-        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         if r.winner_id.as_deref() == Some("a") {
             assert!(r.is_giant_killer, "underdog qui gagne doit etre giant_killer");
             assert!(r.message.contains("GIANT KILLER"));
@@ -227,15 +227,15 @@ fn giant_killer_flag_set_when_underdog_wins() {
     // Si l'underdog ne gagne pas, test noop.
 }
 
-// ── CoudeBalanceParams custom ──
+// ── BalanceParams custom ──
 
 #[test]
 fn custom_rage_bonus_increases_with_higher_value() {
     let atk = player("a", "bourrin", 5);
     let def = player("d", "tank", 5);
-    let mut low_params = CoudeBalanceParams::default();
+    let mut low_params = BalanceParams::default();
     low_params.rage_atk_bonus_pct = 10;
-    let mut high_params = CoudeBalanceParams::default();
+    let mut high_params = BalanceParams::default();
     high_params.rage_atk_bonus_pct = 100;
 
     let mut sum_low = 0i32;
@@ -258,7 +258,7 @@ fn bourrin_class_revealed_when_berserker_activates() {
     let def = player("d", "tank", 5);
     // HP bas pour forcer le seuil 30% assez tot.
     for _ in 0..30 {
-        let r = resolve_combat(&atk, &def, 20, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 20, 100, 50, None, None, &[], &BalanceParams::default());
         if r.attacker_class_revealed.as_deref() == Some("bourrin") {
             return;
         }
@@ -270,7 +270,7 @@ fn explosion_reveals_no_classes() {
     // Combat explosion → pas de rounds → pas de class_revealed.
     let atk = player("a", "bourrin", 5);
     let def = player("d", "fourbe", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 200, None, Some("explosion"), &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 200, None, Some("explosion"), &[], &BalanceParams::default());
     assert!(r.attacker_class_revealed.is_none());
     assert!(r.defender_class_revealed.is_none());
     assert!(r.rounds.is_empty());
@@ -282,7 +282,7 @@ fn explosion_reveals_no_classes() {
 fn defender_rage_runs_without_panic() {
     let atk = player("a", "bourrin", 5);
     let def = player("d", "bourrin", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("rage"), &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("rage"), &[], &BalanceParams::default());
     assert!(!r.rounds.is_empty());
 }
 
@@ -290,7 +290,7 @@ fn defender_rage_runs_without_panic() {
 fn defender_coup_traitre_runs() {
     let atk = player("a", "bourrin", 5);
     let def = player("d", "bourrin", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("coup_traitre"), &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("coup_traitre"), &[], &BalanceParams::default());
     assert!(!r.rounds.is_empty());
 }
 
@@ -298,7 +298,7 @@ fn defender_coup_traitre_runs() {
 fn attacker_coup_traitre_runs() {
     let atk = player("a", "bourrin", 5);
     let def = player("d", "bourrin", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 50, Some("coup_traitre"), None, &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 50, Some("coup_traitre"), None, &[], &BalanceParams::default());
     assert!(!r.rounds.is_empty());
 }
 
@@ -306,7 +306,7 @@ fn attacker_coup_traitre_runs() {
 fn attacker_bouclier_runs() {
     let atk = player("a", "bourrin", 5);
     let def = player("d", "bourrin", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 50, Some("bouclier"), None, &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 50, Some("bouclier"), None, &[], &BalanceParams::default());
     assert!(!r.rounds.is_empty());
 }
 
@@ -314,7 +314,7 @@ fn attacker_bouclier_runs() {
 fn both_double_coup_runs() {
     let atk = player("a", "bourrin", 5);
     let def = player("d", "bourrin", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 50, Some("double_coup"), Some("double_coup"), &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 50, Some("double_coup"), Some("double_coup"), &[], &BalanceParams::default());
     assert!(!r.rounds.is_empty());
 }
 
@@ -325,7 +325,7 @@ fn agile_as_attacker_can_dodge() {
     let def = player("d", "bourrin", 5);
     let mut any_dodge_msg = false;
     for _ in 0..100 {
-        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         if r.rounds.iter().any(|rd| rd.message.contains("esquive")) {
             any_dodge_msg = true;
             break;
@@ -341,7 +341,7 @@ fn fourbe_defender_vampirisme_branch() {
     let def = player("d", "fourbe", 5);
     let mut revealed = false;
     for _ in 0..50 {
-        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         if r.defender_class_revealed.as_deref() == Some("fourbe") {
             revealed = true;
             break;
@@ -357,7 +357,7 @@ fn fourbe_attacker_vampirisme_branch() {
     let def = player("d", "bourrin", 5);
     let mut revealed = false;
     for _ in 0..50 {
-        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         if r.attacker_class_revealed.as_deref() == Some("fourbe") {
             revealed = true;
             break;
@@ -373,7 +373,7 @@ fn agile_as_defender_can_dodge_attacker() {
     let def = player("d", "agile", 10);
     let mut any_def_dodge = false;
     for _ in 0..200 {
-        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default());
         // Pattern du message : "{def_name} esquive le coup"
         if r.rounds.iter().any(|rd| {
             rd.message.contains(&format!("<@{}>", "d")) && rd.message.contains("esquive")
@@ -390,7 +390,7 @@ fn defender_poison_applies_to_attacker_hp() {
     // Le defenseur a du poison → attaquant prend poison_damage_per_round HP chaque round.
     let atk = player("a", "tank", 5);
     let def = player("d", "bourrin", 5);
-    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("poison"), &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 100, 100, 50, None, Some("poison"), &[], &BalanceParams::default());
     // Au moins un round doit mentionner le poison subi par l'attaquant.
     let any_poison_hit_atk = r.rounds.iter().any(|rd| {
         rd.message.contains(&format!("<@{}>", "a")) && rd.message.contains("poison")
@@ -411,7 +411,7 @@ fn small_combat_limited_to_3_rounds() {
         user_id: "d".into(), class: Some("bourrin".into()), level: 1,
         atk: 0, def: 0, cowardice_count: 0, hp_current: Some(116),
     };
-    let r = resolve_combat(&atk, &def, 116, 116, 50, None, None, &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 116, 116, 50, None, None, &[], &BalanceParams::default());
     assert!(r.total_rounds <= 3, "petit combat cap a 3 rounds, obtenu {}", r.total_rounds);
 }
 
@@ -422,7 +422,7 @@ fn mise_zero_produces_minimum_one_coin_won() {
     let def = player("d", "bourrin", 1);
     let mut any_min_1 = false;
     for _ in 0..30 {
-        let r = resolve_combat(&atk, &def, 100, 1, 0, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 1, 0, None, None, &[], &BalanceParams::default());
         if r.winner_id.is_some() && r.coins_won == 1 {
             any_min_1 = true;
             break;
@@ -439,7 +439,7 @@ fn fourbe_winner_gets_steal_bonus_message() {
     let def = player("d", "bourrin", 1);
     let mut found = false;
     for _ in 0..30 {
-        let r = resolve_combat(&atk, &def, 100, 1, 1000, None, None, &[], &CoudeBalanceParams::default());
+        let r = resolve_combat(&atk, &def, 100, 1, 1000, None, None, &[], &BalanceParams::default());
         if r.winner_id.as_deref() == Some("a") && r.message.contains("Bonus fourbe") {
             found = true;
             break;
@@ -452,7 +452,7 @@ fn fourbe_winner_gets_steal_bonus_message() {
 fn large_combat_max_7_rounds() {
     let atk = player("a", "tank", 10);
     let def = player("d", "tank", 10);
-    let r = resolve_combat(&atk, &def, 200, 200, 50, None, None, &[], &CoudeBalanceParams::default());
+    let r = resolve_combat(&atk, &def, 200, 200, 50, None, None, &[], &BalanceParams::default());
     assert!(r.total_rounds <= 7);
 }
 
@@ -465,11 +465,11 @@ fn tank_def_bonus_increases_tank_hp_max() {
     let atk_tank = player("111", "tank", 5);
     let def = player("222", "bourrin", 5);
     let neutral = resolve_combat_with_curses(
-        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses::default(),
     );
     let boosted = resolve_combat_with_curses(
-        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses { tank_def_bonus_pct: Some(20.0), ..Default::default() },
     );
     assert!(
@@ -484,11 +484,11 @@ fn tank_def_bonus_does_not_affect_non_tank() {
     let atk_bourrin = player("111", "bourrin", 5);
     let def = player("222", "bourrin", 5);
     let neutral = resolve_combat_with_curses(
-        &atk_bourrin, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk_bourrin, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses::default(),
     );
     let with_tank_season = resolve_combat_with_curses(
-        &atk_bourrin, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk_bourrin, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses { tank_def_bonus_pct: Some(20.0), ..Default::default() },
     );
     assert_eq!(
@@ -502,11 +502,11 @@ fn tank_def_bonus_none_is_neutral() {
     let atk_tank = player("111", "tank", 5);
     let def = player("222", "bourrin", 5);
     let none_explicit = resolve_combat_with_curses(
-        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses { tank_def_bonus_pct: None, ..Default::default() },
     );
     let default = resolve_combat_with_curses(
-        &atk_tank, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk_tank, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses::default(),
     );
     assert_eq!(none_explicit.attacker_hp_max, default.attacker_hp_max);
@@ -521,7 +521,7 @@ fn riposte_first_round_does_not_panic() {
     let atk = player("111", "bourrin", 5);
     let def = player("222", "agile", 25);
     let r = resolve_combat_with_curses(
-        &atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses { defender_riposte_first_round: true, ..Default::default() },
     );
     // Le combat doit produire un resultat coherent.
@@ -536,7 +536,7 @@ fn riposte_first_round_does_not_break_combat() {
     let def = player("222", "tank", 25);
     for _ in 0..30 {
         let r = resolve_combat_with_curses(
-            &atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+            &atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
             CombatCurses { defender_riposte_first_round: true, ..Default::default() },
         );
         assert!(r.total_rounds >= 0);
@@ -551,7 +551,7 @@ fn riposte_default_false_preserves_existing_behavior() {
     let atk = player("111", "bourrin", 5);
     let def = player("222", "agile", 5);
     let r = resolve_combat_with_curses(
-        &atk, &def, 100, 100, 50, None, None, &[], &CoudeBalanceParams::default(),
+        &atk, &def, 100, 100, 50, None, None, &[], &BalanceParams::default(),
         CombatCurses::default(),
     );
     assert!(!r.message.contains("Riposte fulgurante"));

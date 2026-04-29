@@ -15,7 +15,7 @@ use tower::ServiceExt;
 
 use sentinel_api::domain::enums::system::role::Role;
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
+use sentinel_api::domain::entities::coude::taunt::TauntsConfig;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
@@ -29,7 +29,7 @@ struct MockTaunts {
     emit_on_trigger: Mutex<bool>,
     last_jackpot_amount: Mutex<i64>,
     opt_outs_list: Mutex<Vec<String>>,
-    config: Mutex<CoudeTauntsConfig>,
+    config: Mutex<TauntsConfig>,
 }
 
 impl MockTaunts {
@@ -43,7 +43,7 @@ impl MockTaunts {
             emit_on_trigger: Mutex::new(false),
             last_jackpot_amount: Mutex::new(0),
             opt_outs_list: Mutex::new(vec![]),
-            config: Mutex::new(CoudeTauntsConfig {
+            config: Mutex::new(TauntsConfig {
                 guild_id: "999".into(),
                 channel_id: Some("chan-1".into()),
                 enabled: true,
@@ -93,7 +93,7 @@ impl ManageCoudeTauntsUseCase for MockTaunts {
         Ok(if *self.emit_on_trigger.lock().unwrap() { Some(Self::sample_event()) } else { None })
     }
 
-    async fn get_config(&self, _: &str) -> Result<CoudeTauntsConfig, DomainError> {
+    async fn get_config(&self, _: &str) -> Result<TauntsConfig, DomainError> {
         Ok(self.config.lock().unwrap().clone())
     }
     async fn set_channel(&self, g: &str, c: Option<&str>) -> Result<(), DomainError> {

@@ -21,22 +21,22 @@ use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase;
 use crate::ports::inbound::coude::play_tout_ou_rien::ToutOuRienResolution;
 use crate::ports::inbound::coude::play_tout_ou_rien::MIN_BALANCE_FOR_PLAY;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
-use crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
+use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
 pub struct PlayToutOuRienService {
-    player_repo: Arc<dyn CoudePlayerRepository>,
+    player_repo: Arc<dyn PlayerRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
-    social_repo: Arc<dyn CoudeSocialRepository>,
-    log_repo: Arc<dyn CoudeToutOuRienRepository>,
+    social_repo: Arc<dyn SocialRepository>,
+    log_repo: Arc<dyn ToutOuRienRepository>,
 }
 
 impl PlayToutOuRienService {
     pub fn new(
-        player_repo: Arc<dyn CoudePlayerRepository>,
+        player_repo: Arc<dyn PlayerRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
-        social_repo: Arc<dyn CoudeSocialRepository>,
-        log_repo: Arc<dyn CoudeToutOuRienRepository>,
+        social_repo: Arc<dyn SocialRepository>,
+        log_repo: Arc<dyn ToutOuRienRepository>,
     ) -> Self {
         Self { player_repo, wallet_uc, social_repo, log_repo }
     }

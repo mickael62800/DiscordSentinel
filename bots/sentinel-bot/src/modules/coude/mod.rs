@@ -30,7 +30,7 @@ use sentinel_shared::discord_helpers::{
 use sentinel_shared::heartbeat::ApiClientKey;
 
 use api_client::ApiClient;
-use guild_config::CoudeConfig;
+use guild_config::Config;
 
 // ── TypeMapKeys ──
 
@@ -53,10 +53,10 @@ pub use prison_check::{check_and_reply_if_in_prison, check_component_in_prison};
 // ── Helpers ──
 
 /// Charge la config guild Coude depuis l'API (avec cache Redis cote API, TTL 15min).
-pub async fn load_guild_config(ctx: &Context, guild_id: &str) -> CoudeConfig {
+pub async fn load_guild_config(ctx: &Context, guild_id: &str) -> Config {
     let data = ctx.data.read().await;
     let api = data.get::<ApiClientKey>().expect("ApiClientKey non initialise");
-    CoudeConfig::load(api, guild_id).await
+    Config::load(api, guild_id).await
 }
 
 // ── Init TypeMapKeys ──

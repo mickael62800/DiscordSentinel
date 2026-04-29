@@ -1,11 +1,11 @@
-//! Tests d'integration postgres pour PgCoudeInventoryRepository.
+//! Tests d'integration postgres pour PgInventoryRepository.
 
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::inventory_repository::PgCoudeInventoryRepository;
+use sentinel_api::adapters::outbound::postgres::coude::inventory_repository::PgInventoryRepository;
 use sentinel_api::domain::entities::coude::inventory::NewCoudePrime;
-use sentinel_api::ports::outbound::coude::inventory_repository::CoudeInventoryRepository;
+use sentinel_api::ports::outbound::coude::inventory_repository::InventoryRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -29,13 +29,13 @@ async fn seed_player(p: &PgPool, g: &str, u: &str) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_inventory_empty() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     assert!(repo.list_inventory(&fresh_id(), &fresh_id()).await.unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_item_creates_and_increments() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.add_item(&g, &u, "potion").await.unwrap();
     repo.add_item(&g, &u, "potion").await.unwrap();
@@ -47,7 +47,7 @@ async fn add_item_creates_and_increments() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn has_item_true_when_quantity_positive() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     assert!(!repo.has_item(&g, &u, "sword").await.unwrap());
     repo.add_item(&g, &u, "sword").await.unwrap();
@@ -56,7 +56,7 @@ async fn has_item_true_when_quantity_positive() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn use_item_decrements_and_false_when_absent() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     assert!(!repo.use_item(&g, &u, "potion").await.unwrap());
     repo.add_item(&g, &u, "potion").await.unwrap();
@@ -71,7 +71,7 @@ async fn use_item_decrements_and_false_when_absent() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn prime_create_and_list_active() {
     let p = pool().await;
-    let repo = PgCoudeInventoryRepository::new(p.clone());
+    let repo = PgInventoryRepository::new(p.clone());
     let g = fresh_id();
     let target = fresh_id();
     let placer = fresh_id();
@@ -91,7 +91,7 @@ async fn prime_create_and_list_active() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn prime_claim_returns_total() {
     let p = pool().await;
-    let repo = PgCoudeInventoryRepository::new(p.clone());
+    let repo = PgInventoryRepository::new(p.clone());
     let g = fresh_id();
     let target = fresh_id();
     let placer = fresh_id();
@@ -119,7 +119,7 @@ async fn prime_claim_returns_total() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn insurance_buy_and_get_active() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     assert!(repo.buy_insurance(&g, &u, false, 7200).await.unwrap());
     let got = repo.get_active_insurance(&g, &u).await.unwrap().unwrap();
@@ -128,7 +128,7 @@ async fn insurance_buy_and_get_active() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn insurance_buy_false_when_active_exists() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     assert!(repo.buy_insurance(&g, &u, true, 3600).await.unwrap());
     // 2e achat tandis que 1re active → false
@@ -137,7 +137,7 @@ async fn insurance_buy_false_when_active_exists() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn insurance_duration_zero_falls_back_to_1h() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     // duration_seconds <= 0 → fallback 1h.
     assert!(repo.buy_insurance(&g, &u, false, 0).await.unwrap());
@@ -148,7 +148,7 @@ async fn insurance_duration_zero_falls_back_to_1h() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn insurance_expire_manually() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.buy_insurance(&g, &u, true, 3600).await.unwrap();
     let ins = repo.get_active_insurance(&g, &u).await.unwrap().unwrap();
@@ -160,6 +160,6 @@ async fn insurance_expire_manually() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn insurance_get_active_none_when_absent() {
-    let repo = PgCoudeInventoryRepository::new(pool().await);
+    let repo = PgInventoryRepository::new(pool().await);
     assert!(repo.get_active_insurance(&fresh_id(), &fresh_id()).await.unwrap().is_none());
 }

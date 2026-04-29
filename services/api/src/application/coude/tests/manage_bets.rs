@@ -7,7 +7,7 @@ use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
-use crate::ports::outbound::coude::bet_repository::CoudeBetRepository;
+use crate::ports::outbound::coude::bet_repository::BetRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 use uuid::Uuid;
@@ -32,7 +32,7 @@ impl MockBetRepo {
 }
 
 #[async_trait]
-impl CoudeBetRepository for MockBetRepo {
+impl BetRepository for MockBetRepo {
     async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
         Ok(self.bets.lock().unwrap().clone())
     }

@@ -7,7 +7,7 @@ use crate::domain::entities::coude::refusal_count::RefusalCount;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeRefusalCountRepository: Send + Sync {
+pub trait RefusalCountRepository: Send + Sync {
     /// Incremente le compteur (UPSERT). Retourne le nouveau count.
     async fn increment(
         &self,

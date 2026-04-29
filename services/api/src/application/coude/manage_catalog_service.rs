@@ -12,7 +12,7 @@ use crate::domain::services::coude::coude_combat_engine::progression;
 use crate::domain::services::coude::coude_combat_engine::shop;
 use crate::ports::inbound::coude::manage_catalog::AntiTheftItemInfo;
 use crate::ports::inbound::coude::manage_catalog::ClassInfo;
-use crate::ports::inbound::coude::manage_catalog::CoudeCatalog;
+use crate::ports::inbound::coude::manage_catalog::Catalog;
 use crate::ports::inbound::coude::manage_catalog::LevelEntry;
 use crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase;
 use crate::ports::inbound::coude::manage_catalog::MatchmakingBucket;
@@ -33,7 +33,7 @@ impl Default for ManageCoudeCatalogService {
 
 #[async_trait]
 impl ManageCoudeCatalogUseCase for ManageCoudeCatalogService {
-    async fn get_catalog(&self) -> Result<CoudeCatalog, DomainError> {
+    async fn get_catalog(&self) -> Result<Catalog, DomainError> {
         // ── Classes (depuis le domain) ──
         let classes_data: Vec<ClassInfo> = [
             &classes::CLASS_BOURRIN,
@@ -106,7 +106,7 @@ impl ManageCoudeCatalogUseCase for ManageCoudeCatalogService {
             })
             .collect();
 
-        Ok(CoudeCatalog {
+        Ok(Catalog {
             classes: classes_data,
             shop_items,
             level_table,

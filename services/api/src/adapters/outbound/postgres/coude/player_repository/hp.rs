@@ -3,9 +3,9 @@
 use crate::domain::errors::DomainError;
 
 use super::super::super::pg_err;
-use super::PgCoudePlayerRepository;
+use super::PgPlayerRepository;
 pub(super) async fn update_hp(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     hp_current: i32,
@@ -27,7 +27,7 @@ pub(super) async fn update_hp(
 }
 
 pub(super) async fn full_heal(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<(), DomainError> {
@@ -48,7 +48,7 @@ pub(super) async fn full_heal(
 }
 
 pub(super) async fn regen_hp_tick(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     rate_0_25: f64,
     rate_25_50: f64,
     rate_50_75: f64,

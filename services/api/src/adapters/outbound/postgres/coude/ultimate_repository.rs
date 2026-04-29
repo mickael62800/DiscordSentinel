@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeUltimateRepository`.
+//! Impl Postgres de `UltimateRepository`.
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -8,24 +8,24 @@ use sqlx::PgPool;
 use crate::domain::entities::coude::ultimate::UltimateKind;
 use crate::domain::entities::coude::ultimate::UltimateState;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::ultimate_repository::CoudeUltimateRepository;
+use crate::ports::outbound::coude::ultimate_repository::UltimateRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_ultimate_states";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeUltimateRepository {
+pub struct PgUltimateRepository {
     pool: PgPool,
 }
 
-impl PgCoudeUltimateRepository {
+impl PgUltimateRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl CoudeUltimateRepository for PgCoudeUltimateRepository {
+impl UltimateRepository for PgUltimateRepository {
     async fn activate(
         &self,
         guild_id: &str,

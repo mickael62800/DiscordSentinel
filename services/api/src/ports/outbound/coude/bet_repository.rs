@@ -23,7 +23,7 @@ use crate::domain::errors::DomainError;
 /// collectes apres `tx.commit()` via `post_commit_taunts` et retournes au
 /// service qui les propage dans ses DTOs.
 #[async_trait]
-pub trait CoudeBetRepository: Send + Sync {
+pub trait BetRepository: Send + Sync {
     /// Liste tous les paris d'un combat donné.
     async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError>;
 

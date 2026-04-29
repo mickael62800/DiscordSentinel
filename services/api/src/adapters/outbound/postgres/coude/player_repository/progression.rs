@@ -1,7 +1,7 @@
 //! Methodes de progression : class, XP, stat points, reset stats.
 //!
 //! Sous-module du repository Postgres coude_players. Les fonctions
-//! prennent `&PgCoudePlayerRepository` en argument ; le trait impl
+//! prennent `&PgPlayerRepository` en argument ; le trait impl
 //! dans `mod.rs` delegate ici.
 
 use crate::adapters::outbound::postgres::casino::wallet_tx_log::log_wallet_tx;
@@ -14,11 +14,11 @@ use crate::domain::entities::coude::player::COUDE_MAX_LEVEL;
 use crate::domain::errors::DomainError;
 
 use super::super::super::pg_err;
-use super::PgCoudePlayerRepository;
+use super::PgPlayerRepository;
 use super::PlayerRow;
 use super::PLAYER_COLUMNS;
 pub(super) async fn update_class(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     class: &str,
@@ -39,7 +39,7 @@ pub(super) async fn update_class(
     }
 
 pub(super) async fn add_xp(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     amount: i64,
@@ -103,7 +103,7 @@ pub(super) async fn add_xp(
     }
 
 pub(super) async fn spend_stat_point(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     stat: CombatStat,
@@ -138,7 +138,7 @@ pub(super) async fn spend_stat_point(
     }
 
 pub(super) async fn reset_stats(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     cost: i64,

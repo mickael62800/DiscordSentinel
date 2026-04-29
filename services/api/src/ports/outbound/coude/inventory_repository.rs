@@ -10,7 +10,7 @@ use crate::domain::errors::DomainError;
 /// Repository consolidé pour les 3 "stocks" persistants d'un joueur Coup de Coude :
 /// son inventaire d'items, les primes placées sur lui et ses assurances actives.
 #[async_trait]
-pub trait CoudeInventoryRepository: Send + Sync {
+pub trait InventoryRepository: Send + Sync {
     // ── Items ──
 
     async fn list_inventory(

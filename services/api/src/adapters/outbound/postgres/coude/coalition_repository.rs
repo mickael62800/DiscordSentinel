@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeCoalitionRepository`.
+//! Impl Postgres de `CoalitionRepository`.
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -11,17 +11,17 @@ use crate::domain::entities::coude::coalition::CoalitionMember;
 use crate::domain::entities::coude::coalition::CoalitionStatus;
 use crate::domain::entities::coude::coalition::COALITION_MIN_MEMBERS;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::coalition_repository::CoudeCoalitionRepository;
+use crate::ports::outbound::coude::coalition_repository::CoalitionRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_coalitions";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeCoalitionRepository {
+pub struct PgCoalitionRepository {
     pool: PgPool,
 }
 
-impl PgCoudeCoalitionRepository {
+impl PgCoalitionRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -84,7 +84,7 @@ async fn load_coalition(
 }
 
 #[async_trait]
-impl CoudeCoalitionRepository for PgCoudeCoalitionRepository {
+impl CoalitionRepository for PgCoalitionRepository {
     async fn create_with_first_member(
         &self,
         guild_id: &str,

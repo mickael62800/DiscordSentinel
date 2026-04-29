@@ -15,7 +15,7 @@ struct MockRepo {
 }
 
 #[async_trait]
-impl CoudeVendettaRepository for MockRepo {
+impl VendettaRepository for MockRepo {
     async fn declare(
         &self,
         guild_id: &str,

@@ -1,10 +1,10 @@
-//! Tests d'integration postgres pour PgCoudeEconomyRepository.
+//! Tests d'integration postgres pour PgEconomyRepository.
 
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::economy_repository::PgCoudeEconomyRepository;
-use sentinel_api::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
+use sentinel_api::adapters::outbound::postgres::coude::economy_repository::PgEconomyRepository;
+use sentinel_api::ports::outbound::coude::economy_repository::EconomyRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -27,7 +27,7 @@ async fn seed_wallet(p: &PgPool, guild: &str, user: &str, coins: i64) {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_coins_returns_balance() {
     let p = pool().await;
-    let repo = PgCoudeEconomyRepository::new(p.clone());
+    let repo = PgEconomyRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     seed_wallet(&p, &g, &u, 250).await;
     assert_eq!(repo.get_coins(&g, &u).await.unwrap(), 250);
@@ -35,7 +35,7 @@ async fn get_coins_returns_balance() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_coins_not_found_when_no_wallet() {
-    let repo = PgCoudeEconomyRepository::new(pool().await);
+    let repo = PgEconomyRepository::new(pool().await);
     let err = repo.get_coins(&fresh_id(), &fresh_id()).await;
     assert!(err.is_err());
 }
@@ -43,7 +43,7 @@ async fn get_coins_not_found_when_no_wallet() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_steal_stats_updates_both_players() {
     let p = pool().await;
-    let repo = PgCoudeEconomyRepository::new(p.clone());
+    let repo = PgEconomyRepository::new(p.clone());
     let g = fresh_id();
     let thief = fresh_id(); let victim = fresh_id();
     seed_player(&p, &g, &thief).await;
@@ -64,7 +64,7 @@ async fn record_steal_stats_updates_both_players() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_steal_fail_stats_increments_total_lost() {
     let p = pool().await;
-    let repo = PgCoudeEconomyRepository::new(p.clone());
+    let repo = PgEconomyRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     seed_player(&p, &g, &u).await;
     repo.record_steal_fail_stats(&g, &u, 50).await.unwrap();
@@ -77,7 +77,7 @@ async fn record_steal_fail_stats_increments_total_lost() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_casino_win_stats() {
     let p = pool().await;
-    let repo = PgCoudeEconomyRepository::new(p.clone());
+    let repo = PgEconomyRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     seed_player(&p, &g, &u).await;
     repo.record_casino_win_stats(&g, &u, 200).await.unwrap();
@@ -91,7 +91,7 @@ async fn record_casino_win_stats() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_casino_loss_stats() {
     let p = pool().await;
-    let repo = PgCoudeEconomyRepository::new(p.clone());
+    let repo = PgEconomyRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     seed_player(&p, &g, &u).await;
     repo.record_casino_loss_stats(&g, &u, 75).await.unwrap();
@@ -105,7 +105,7 @@ async fn record_casino_loss_stats() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_casino_faillite_returns_total_lost() {
     let p = pool().await;
-    let repo = PgCoudeEconomyRepository::new(p.clone());
+    let repo = PgEconomyRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     seed_player(&p, &g, &u).await;
     repo.record_casino_loss_stats(&g, &u, 100).await.unwrap();
@@ -115,14 +115,14 @@ async fn record_casino_faillite_returns_total_lost() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn count_casino_today_zero_for_fresh_user() {
-    let repo = PgCoudeEconomyRepository::new(pool().await);
+    let repo = PgEconomyRepository::new(pool().await);
     assert_eq!(repo.count_casino_today(&fresh_id(), &fresh_id()).await.unwrap(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn sum_casino_gains_today_aggregates_positives() {
     let p = pool().await;
-    let repo = PgCoudeEconomyRepository::new(p.clone());
+    let repo = PgEconomyRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     seed_player(&p, &g, &u).await;
     repo.record_casino_win_stats(&g, &u, 100).await.unwrap();
@@ -133,6 +133,6 @@ async fn sum_casino_gains_today_aggregates_positives() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn count_steal_today_zero_for_fresh_user() {
-    let repo = PgCoudeEconomyRepository::new(pool().await);
+    let repo = PgEconomyRepository::new(pool().await);
     assert_eq!(repo.count_steal_today(&fresh_id(), &fresh_id()).await.unwrap(), 0);
 }

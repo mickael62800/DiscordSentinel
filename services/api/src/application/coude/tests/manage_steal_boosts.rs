@@ -10,7 +10,7 @@ struct MockRepo {
 }
 
 #[async_trait]
-impl CoudeStealBoostRepository for MockRepo {
+impl StealBoostRepository for MockRepo {
     async fn list_active(&self, _guild_id: &str, _user_id: &str) -> Result<Vec<CoudeStealBoost>, DomainError> {
         Ok(self.actives.clone())
     }

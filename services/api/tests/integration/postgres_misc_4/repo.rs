@@ -7,15 +7,15 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::casino::blackjack_table_repository::PgBlackjackTableRepository;
-use sentinel_api::adapters::outbound::postgres::coude::heist_repository::PgCoudeHeistRepository;
-use sentinel_api::adapters::outbound::postgres::coude::steal_boost_repository::PgCoudeStealBoostRepository;
-use sentinel_api::adapters::outbound::postgres::coude::steal_protection_repository::PgCoudeStealProtectionRepository;
+use sentinel_api::adapters::outbound::postgres::coude::heist_repository::PgHeistRepository;
+use sentinel_api::adapters::outbound::postgres::coude::steal_boost_repository::PgStealBoostRepository;
+use sentinel_api::adapters::outbound::postgres::coude::steal_protection_repository::PgStealProtectionRepository;
 use sentinel_api::adapters::outbound::postgres::system::guild_repository::PgGuildRepository;
 use sentinel_api::domain::entities::system::guild::Guild;
 use sentinel_api::ports::outbound::casino::blackjack_table_repository::BlackjackTableRepository;
-use sentinel_api::ports::outbound::coude::heist_repository::CoudeHeistRepository;
-use sentinel_api::ports::outbound::coude::steal_boost_repository::CoudeStealBoostRepository;
-use sentinel_api::ports::outbound::coude::steal_protection_repository::CoudeStealProtectionRepository;
+use sentinel_api::ports::outbound::coude::heist_repository::HeistRepository;
+use sentinel_api::ports::outbound::coude::steal_boost_repository::StealBoostRepository;
+use sentinel_api::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 use sentinel_api::ports::outbound::system::guild_repository::GuildRepository;
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -84,13 +84,13 @@ async fn guild_find_all_includes_inserted() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_last_attempt_none_when_absent() {
-    let repo = PgCoudeHeistRepository::new(pool().await);
+    let repo = PgHeistRepository::new(pool().await);
     assert!(repo.last_attempt(&fresh_id(), &fresh_id()).await.unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_record_attempt_and_last() {
-    let repo = PgCoudeHeistRepository::new(pool().await);
+    let repo = PgHeistRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     let tools = vec!["crowbar".to_string(), "mask".to_string()];
     let a = repo.record_attempt(&g, &u, true, 500, 65, &tools).await.unwrap();
@@ -104,7 +104,7 @@ async fn heist_record_attempt_and_last() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_prison_lifecycle() {
-    let repo = PgCoudeHeistRepository::new(pool().await);
+    let repo = PgHeistRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     assert!(repo.get_prison(&g, &u).await.unwrap().is_none());
 
@@ -117,7 +117,7 @@ async fn heist_prison_lifecycle() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn heist_send_to_prison_is_upsert() {
-    let repo = PgCoudeHeistRepository::new(pool().await);
+    let repo = PgHeistRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     let t1 = Utc::now() + Duration::hours(1);
     let t2 = Utc::now() + Duration::hours(10);
@@ -133,13 +133,13 @@ async fn heist_send_to_prison_is_upsert() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn protection_list_active_empty() {
-    let repo = PgCoudeStealProtectionRepository::new(pool().await);
+    let repo = PgStealProtectionRepository::new(pool().await);
     assert!(repo.list_active(&fresh_id(), &fresh_id()).await.unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn protection_upsert_adds_days() {
-    let repo = PgCoudeStealProtectionRepository::new(pool().await);
+    let repo = PgStealProtectionRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     let first = repo.upsert(&g, &u, "alarm", 3).await.unwrap();
     let protection = repo.list_active(&g, &u).await.unwrap();
@@ -156,13 +156,13 @@ async fn protection_upsert_adds_days() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn boost_list_active_empty() {
-    let repo = PgCoudeStealBoostRepository::new(pool().await);
+    let repo = PgStealBoostRepository::new(pool().await);
     assert!(repo.list_active(&fresh_id(), &fresh_id()).await.unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn boost_upsert_and_list() {
-    let repo = PgCoudeStealBoostRepository::new(pool().await);
+    let repo = PgStealBoostRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.upsert(&g, &u, "lockpick", 7).await.unwrap();
     let boosts = repo.list_active(&g, &u).await.unwrap();
@@ -172,7 +172,7 @@ async fn boost_upsert_and_list() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn boost_purge_expired_does_not_panic() {
-    let repo = PgCoudeStealBoostRepository::new(pool().await);
+    let repo = PgStealBoostRepository::new(pool().await);
     let _ = repo.purge_expired().await.unwrap();
 }
 

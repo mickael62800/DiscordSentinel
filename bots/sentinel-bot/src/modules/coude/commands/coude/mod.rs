@@ -274,7 +274,7 @@ async fn build_preconfirm_payload(
     target: &serenity::model::user::User,
     mise: i64,
     special: Option<&str>,
-    config: &crate::modules::coude::guild_config::CoudeConfig,
+    config: &crate::modules::coude::guild_config::Config,
 ) -> Result<(CreateEmbed, CreateActionRow), String> {
     let data = ctx.data.read().await;
     let api = data.get::<GameApiKey>().unwrap();

@@ -7,7 +7,7 @@ use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeStealProtectionRepository: Send + Sync {
+pub trait StealProtectionRepository: Send + Sync {
     /// Liste les protections actives d'un joueur (expires_at > NOW).
     async fn list_active(
         &self,

@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeRefusalCountRepository`.
+//! Impl Postgres de `RefusalCountRepository`.
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -7,24 +7,24 @@ use sqlx::PgPool;
 
 use crate::domain::entities::coude::refusal_count::RefusalCount;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::refusal_count_repository::CoudeRefusalCountRepository;
+use crate::ports::outbound::coude::refusal_count_repository::RefusalCountRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_refusal_counts";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeRefusalCountRepository {
+pub struct PgRefusalCountRepository {
     pool: PgPool,
 }
 
-impl PgCoudeRefusalCountRepository {
+impl PgRefusalCountRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl CoudeRefusalCountRepository for PgCoudeRefusalCountRepository {
+impl RefusalCountRepository for PgRefusalCountRepository {
     async fn increment(
         &self,
         guild_id: &str,

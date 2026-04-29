@@ -21,27 +21,27 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase;
 use crate::ports::inbound::coude::expire_combats_batch::ExpiredCombatOutput;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
-use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// 24h par defaut, override par guild via bot_guild_config.
 const DEFAULT_EXPIRY_HOURS: i64 = 24;
 
 pub struct ExpireCombatsBatchService {
-    combat_repo: Arc<dyn CoudeCombatRepository>,
-    player_repo: Arc<dyn CoudePlayerRepository>,
+    combat_repo: Arc<dyn CombatRepository>,
+    player_repo: Arc<dyn PlayerRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
-    cashbox_repo: Arc<dyn CoudeCashboxRepository>,
+    cashbox_repo: Arc<dyn CashboxRepository>,
     bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
 }
 
 impl ExpireCombatsBatchService {
     pub fn new(
-        combat_repo: Arc<dyn CoudeCombatRepository>,
-        player_repo: Arc<dyn CoudePlayerRepository>,
+        combat_repo: Arc<dyn CombatRepository>,
+        player_repo: Arc<dyn PlayerRepository>,
         wallet_repo: Arc<dyn WalletRepository>,
-        cashbox_repo: Arc<dyn CoudeCashboxRepository>,
+        cashbox_repo: Arc<dyn CashboxRepository>,
         bets_uc: Arc<dyn ManageCoudeBetsUseCase>,
     ) -> Self {
         Self { combat_repo, player_repo, wallet_repo, cashbox_repo, bets_uc }

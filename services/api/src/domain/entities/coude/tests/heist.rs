@@ -155,11 +155,11 @@ fn all_tools_reach_exactly_max_chance() {
     assert_eq!(compute_success_chance(all), 55);
 }
 
-// ── CoudePrisonState::is_active ──
+// ── PrisonState::is_active ──
 
 #[test]
 fn prison_state_is_active_true_when_released_at_future() {
-    let state = CoudePrisonState {
+    let state = PrisonState {
         guild_id: "g".into(),
         user_id: "u".into(),
         released_at: chrono::Utc::now() + chrono::Duration::hours(1),
@@ -171,7 +171,7 @@ fn prison_state_is_active_true_when_released_at_future() {
 
 #[test]
 fn prison_state_is_active_false_when_released_at_past() {
-    let state = CoudePrisonState {
+    let state = PrisonState {
         guild_id: "g".into(),
         user_id: "u".into(),
         released_at: chrono::Utc::now() - chrono::Duration::hours(1),

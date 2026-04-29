@@ -36,7 +36,7 @@ fn reduce_loss_with_net_halves() {
 
 #[test]
 fn reduce_loss_with_custom_multiplier_uses_round() {
-    // Verifie le comportement parametrable utilise par CoudeGuildSettings
+    // Verifie le comportement parametrable utilise par GuildSettings
     // (cf. migration 170 — safety_net_loss_percent).
     assert_eq!(reduce_loss_with_multiplier(10, true, 0.7), 7);
     assert_eq!(reduce_loss_with_multiplier(10, true, 0.75), 8); // 7.5 -> 8

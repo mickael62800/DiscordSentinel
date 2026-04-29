@@ -1,6 +1,6 @@
 //! Port narrow lecture-seule sur les combats Coup de Coude.
 //!
-//! Extrait depuis `CoudeCombatRepository` (P0 #2 de l'audit architecture)
+//! Extrait depuis `CombatRepository` (P0 #2 de l'audit architecture)
 //! pour permettre aux use cases qui ne font QUE lire un combat (ex.
 //! `ManageCoudeBetsService` -> `place`/`resolve`/`refund`) de declarer une
 //! dependance minimale, plutot que :

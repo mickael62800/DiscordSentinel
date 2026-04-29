@@ -12,9 +12,9 @@
 use crate::domain::errors::DomainError;
 
 use super::super::super::pg_err;
-use super::PgCoudePlayerRepository;
+use super::PgPlayerRepository;
 pub(super) async fn record_win(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     earned: i64,
@@ -34,7 +34,7 @@ pub(super) async fn record_win(
 }
 
 pub(super) async fn record_loss(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     lost: i64,
@@ -52,7 +52,7 @@ pub(super) async fn record_loss(
 }
 
 pub(super) async fn record_draw(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     lost: i64,
@@ -67,7 +67,7 @@ pub(super) async fn record_draw(
 }
 
 pub(super) async fn increment_cowardice(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Option<i32>, DomainError> {
@@ -86,7 +86,7 @@ pub(super) async fn increment_cowardice(
 }
 
 pub(super) async fn increment_chaos(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<bool, DomainError> {

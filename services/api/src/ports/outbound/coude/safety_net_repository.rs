@@ -7,7 +7,7 @@ use crate::domain::entities::coude::safety_net::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeSafetyNetRepository: Send + Sync {
+pub trait SafetyNetRepository: Send + Sync {
     /// Insere un nouveau filet pour duration_hours. Retourne l UUID.
     async fn activate(
         &self,

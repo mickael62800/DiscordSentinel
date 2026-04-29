@@ -26,7 +26,7 @@ pub async fn prestige_player(
     Path((guild_id, user_id)): Path<(String, String)>,
 ) -> Result<Json<PrestigeOutcomeDto>, ApiError> {
     // Cf. migration 170 : seuils configurables par-guild.
-    let settings = crate::application::coude::guild_settings::CoudeGuildSettings::load(
+    let settings = crate::application::coude::guild_settings::GuildSettings::load(
         state.bot_config_repo.as_ref(),
         &guild_id,
     )

@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeSafetyNetRepository` (cf. COUPE_AMELIORATIONS 4.4).
+//! Impl Postgres de `SafetyNetRepository` (cf. COUPE_AMELIORATIONS 4.4).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -8,17 +8,17 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::safety_net::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
+use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_safety_nets";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeSafetyNetRepository {
+pub struct PgSafetyNetRepository {
     pool: PgPool,
 }
 
-impl PgCoudeSafetyNetRepository {
+impl PgSafetyNetRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -46,7 +46,7 @@ impl From<Row> for ActiveSafetyNet {
 }
 
 #[async_trait]
-impl CoudeSafetyNetRepository for PgCoudeSafetyNetRepository {
+impl SafetyNetRepository for PgSafetyNetRepository {
     async fn activate(
         &self,
         guild_id: &str,

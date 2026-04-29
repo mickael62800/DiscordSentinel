@@ -1,7 +1,7 @@
 use super::*;
 
-fn cfg_with_channel() -> CoudeTauntsConfig {
-    CoudeTauntsConfig {
+fn cfg_with_channel() -> TauntsConfig {
+    TauntsConfig {
         guild_id: "g1".into(),
         channel_id: Some("123".into()),
         enabled: true,

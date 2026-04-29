@@ -17,7 +17,7 @@ struct MockCursesRepo {
 }
 
 #[async_trait]
-impl CoudeCursesRepository for MockCursesRepo {
+impl CursesRepository for MockCursesRepo {
     async fn cast(
         &self,
         guild_id: &str,

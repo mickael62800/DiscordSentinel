@@ -9,7 +9,7 @@ use crate::domain::errors::DomainError;
 /// repo (transaction + `FOR UPDATE`). Les validations métier restent côté
 /// service.
 #[async_trait]
-pub trait CoudeEconomyRepository: Send + Sync {
+pub trait EconomyRepository: Send + Sync {
     // ── Transferts entre joueurs ──
     //
     // NOTE migration wallet unifie : `transfer` a ete retire de ce repo.

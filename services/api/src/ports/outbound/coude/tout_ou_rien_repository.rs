@@ -8,7 +8,7 @@ use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeToutOuRienRepository: Send + Sync {
+pub trait ToutOuRienRepository: Send + Sync {
     /// Loggue une tentative.
     async fn record(
         &self,

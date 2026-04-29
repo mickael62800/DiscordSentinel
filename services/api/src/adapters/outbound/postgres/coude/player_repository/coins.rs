@@ -12,9 +12,9 @@
 use crate::domain::errors::DomainError;
 
 use super::super::super::pg_err;
-use super::PgCoudePlayerRepository;
+use super::PgPlayerRepository;
 pub(super) async fn record_coins_earned(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     amount: i64,
@@ -29,7 +29,7 @@ pub(super) async fn record_coins_earned(
 }
 
 pub(super) async fn record_coins_lost(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     amount: i64,

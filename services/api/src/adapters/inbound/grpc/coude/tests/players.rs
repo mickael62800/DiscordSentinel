@@ -10,7 +10,7 @@ use crate::domain::entities::coude::player::CoudePlayer;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
@@ -37,7 +37,7 @@ fn make_player() -> CoudePlayer {
         total_earned: 0, total_lost: 0, total_stolen: 0,
         cowardice_count: 0, chaos_events: 0, casino_wins: 0, casino_losses: 0,
         level: 1, xp: 0, stat_points: 0, atk: 0, def: 0,
-        class: Some(CoudeClass::Tank), title: None, class_changed_at: None,
+        class: Some(PlayerClass::Tank), title: None, class_changed_at: None,
         hp_current: 100, hp_max: 100, hp_last_regen: None, repos_last_used: None,
         season: 1, created_at: now, updated_at: now,
     }

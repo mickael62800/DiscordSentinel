@@ -1,19 +1,19 @@
-//! Methodes de lecture du `CoudePlayerRepository` : get/list/random.
+//! Methodes de lecture du `PlayerRepository` : get/list/random.
 //!
 //! Sous-module du repository Postgres coude_players (refactor 2026-04
 //! du god-object 834 LOC). Chaque methode est une free function qui
-//! prend `&PgCoudePlayerRepository` en argument, appelee par la thin
+//! prend `&PgPlayerRepository` en argument, appelee par la thin
 //! trait impl dans `mod.rs`.
 
 use crate::domain::entities::coude::player::CoudePlayer;
 use crate::domain::errors::DomainError;
 
 use super::super::super::pg_err;
-use super::PgCoudePlayerRepository;
+use super::PgPlayerRepository;
 use super::PlayerRow;
 use super::PLAYER_COLUMNS;
 pub(super) async fn get_or_create(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
     username: &str,
@@ -65,7 +65,7 @@ pub(super) async fn get_or_create(
 }
 
 pub(super) async fn get(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Option<CoudePlayer>, DomainError> {
@@ -83,7 +83,7 @@ pub(super) async fn get(
 }
 
 pub(super) async fn list(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     limit: i64,
 ) -> Result<Vec<CoudePlayer>, DomainError> {
@@ -110,7 +110,7 @@ pub(super) async fn list(
 }
 
 pub(super) async fn random_active(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     count: i64,
     min_coins: i64,
@@ -135,7 +135,7 @@ pub(super) async fn random_active(
 }
 
 pub(super) async fn list_guild_ids(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
 ) -> Result<Vec<String>, DomainError> {
     let rows: Vec<(String,)> = sqlx::query_as("SELECT DISTINCT guild_id FROM coude_players")
         .fetch_all(&repo.pool)

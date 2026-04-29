@@ -1,12 +1,12 @@
-//! Tests d'integration postgres pour PgCoudeCombatRepository.
+//! Tests d'integration postgres pour PgCombatRepository.
 
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::combat_repository::PgCoudeCombatRepository;
+use sentinel_api::adapters::outbound::postgres::coude::combat_repository::PgCombatRepository;
 use sentinel_api::domain::entities::coude::combat::CombatResolution;
 use sentinel_api::domain::entities::coude::combat::NewCoudeCombat;
-use sentinel_api::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use sentinel_api::ports::outbound::coude::combat_repository::CombatRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -37,7 +37,7 @@ fn sample_new_combat(g: &str, att: &str, def: &str) -> NewCoudeCombat {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn create_and_get() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -51,14 +51,14 @@ async fn create_and_get() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_none_when_absent() {
-    let repo = PgCoudeCombatRepository::new(pool().await);
+    let repo = PgCombatRepository::new(pool().await);
     assert!(repo.get(Uuid::new_v4()).await.unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_scoped_and_filter_status() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -81,7 +81,7 @@ async fn list_scoped_and_filter_status() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_pending_for_attacker_and_defender() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -96,7 +96,7 @@ async fn get_pending_for_attacker_and_defender() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_expired_pending_empty() {
-    let repo = PgCoudeCombatRepository::new(pool().await);
+    let repo = PgCombatRepository::new(pool().await);
     let _ = repo.list_expired_pending().await.unwrap();
 }
 
@@ -105,7 +105,7 @@ async fn list_expired_pending_empty() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn set_betting_transitions_from_pending() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -120,7 +120,7 @@ async fn set_betting_transitions_from_pending() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn set_betting_false_if_already_betting() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -133,7 +133,7 @@ async fn set_betting_false_if_already_betting() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn resolve_marks_done_and_persists_resolution() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -158,7 +158,7 @@ async fn resolve_marks_done_and_persists_resolution() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn resolve_false_if_not_active() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -177,7 +177,7 @@ async fn resolve_false_if_not_active() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn expire_from_any_status() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -191,7 +191,7 @@ async fn expire_from_any_status() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn cancel_pending_only_when_pending() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -205,7 +205,7 @@ async fn cancel_pending_only_when_pending() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn set_defender_special_updates_field() {
     let p = pool().await;
-    let repo = PgCoudeCombatRepository::new(p.clone());
+    let repo = PgCombatRepository::new(p.clone());
     let g = fresh_id();
     let att = fresh_id(); let def = fresh_id();
     seed_player(&p, &g, &att).await;
@@ -220,7 +220,7 @@ async fn set_defender_special_updates_field() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn claim_due_betting_returns_empty_when_no_due() {
-    let repo = PgCoudeCombatRepository::new(pool().await);
+    let repo = PgCombatRepository::new(pool().await);
     let got = repo.claim_due_betting_combats(300).await.unwrap();
     // Peut etre vide (pas de combats dus dans la DB).
     let _ = got;
@@ -228,18 +228,18 @@ async fn claim_due_betting_returns_empty_when_no_due() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn claim_stuck_resolving_does_not_panic() {
-    let repo = PgCoudeCombatRepository::new(pool().await);
+    let repo = PgCombatRepository::new(pool().await);
     let _ = repo.claim_stuck_resolving_combats(120).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn claim_expired_pending_returns_list() {
-    let repo = PgCoudeCombatRepository::new(pool().await);
+    let repo = PgCombatRepository::new(pool().await);
     let _ = repo.claim_expired_pending_combats(24).await.unwrap();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_betting_for_participant_none_when_not_in_betting() {
-    let repo = PgCoudeCombatRepository::new(pool().await);
+    let repo = PgCombatRepository::new(pool().await);
     assert!(repo.get_betting_for_participant(&fresh_id(), &fresh_id()).await.unwrap().is_none());
 }

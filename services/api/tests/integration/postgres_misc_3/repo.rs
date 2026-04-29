@@ -5,13 +5,13 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::taunts_repository::PgCoudeTauntsRepository;
+use sentinel_api::adapters::outbound::postgres::coude::taunts_repository::PgTauntsRepository;
 use sentinel_api::adapters::outbound::postgres::community::role_panel_repository::PgRolePanelRepository;
 use sentinel_api::adapters::outbound::postgres::community::welcome_config_repository::PgWelcomeConfigRepository;
 use sentinel_api::domain::entities::community::role_panel::AutoRole;
 use sentinel_api::domain::entities::community::role_panel::RolePanel;
 use sentinel_api::domain::entities::community::role_panel::RolePanelEntry;
-use sentinel_api::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
+use sentinel_api::ports::outbound::coude::taunts_repository::TauntsRepository;
 use sentinel_api::ports::outbound::community::role_panel_repository::RolePanelRepository;
 use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigData;
 use sentinel_api::ports::outbound::community::welcome_config_repository::WelcomeConfigRepository;
@@ -234,7 +234,7 @@ async fn welcome_save_is_upsert() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn taunts_get_or_init_creates_default_row() {
-    let repo = PgCoudeTauntsRepository::new(pool().await);
+    let repo = PgTauntsRepository::new(pool().await);
     let g = fresh_id();
     let cfg = repo.get_or_init_config(&g).await.unwrap();
     assert_eq!(cfg.guild_id, g);
@@ -244,7 +244,7 @@ async fn taunts_get_or_init_creates_default_row() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn taunts_set_channel_and_get() {
-    let repo = PgCoudeTauntsRepository::new(pool().await);
+    let repo = PgTauntsRepository::new(pool().await);
     let g = fresh_id();
     repo.set_channel(&g, Some("chan-42")).await.unwrap();
     let cfg = repo.get_or_init_config(&g).await.unwrap();
@@ -257,7 +257,7 @@ async fn taunts_set_channel_and_get() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn taunts_set_enabled_toggle() {
-    let repo = PgCoudeTauntsRepository::new(pool().await);
+    let repo = PgTauntsRepository::new(pool().await);
     let g = fresh_id();
     repo.get_or_init_config(&g).await.unwrap();
     repo.set_enabled(&g, false).await.unwrap();
@@ -267,7 +267,7 @@ async fn taunts_set_enabled_toggle() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn taunts_set_rename_and_messages_independent() {
-    let repo = PgCoudeTauntsRepository::new(pool().await);
+    let repo = PgTauntsRepository::new(pool().await);
     let g = fresh_id();
     repo.get_or_init_config(&g).await.unwrap();
     repo.set_rename_enabled(&g, false).await.unwrap();
@@ -281,7 +281,7 @@ async fn taunts_set_rename_and_messages_independent() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn taunts_opt_out_flow() {
-    let repo = PgCoudeTauntsRepository::new(pool().await);
+    let repo = PgTauntsRepository::new(pool().await);
     let g = fresh_id();
     let u = fresh_id();
     assert!(!repo.is_opted_out(&g, &u).await.unwrap());

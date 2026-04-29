@@ -13,7 +13,7 @@ struct MockRepo {
 }
 
 #[async_trait]
-impl CoudeSafetyNetRepository for MockRepo {
+impl SafetyNetRepository for MockRepo {
     async fn activate(
         &self,
         guild_id: &str,

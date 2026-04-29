@@ -3,7 +3,7 @@ use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::combat::CoudeCombat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 use uuid::Uuid;
@@ -61,7 +61,7 @@ fn sample_combat() -> CoudeCombat {
 }
 
 #[async_trait]
-impl CoudeCombatRepository for MockRepo {
+impl CombatRepository for MockRepo {
     async fn list(&self, _: &str, _: Option<&str>, limit: i64) -> Result<Vec<CoudeCombat>, DomainError> {
         *self.list_limit_received.lock().unwrap() = Some(limit);
         Ok(vec![])
@@ -326,7 +326,7 @@ async fn expire_not_found_when_repo_returns_false() {
     #[derive(Default)]
     struct FalseExpireRepo;
     #[async_trait]
-    impl CoudeCombatRepository for FalseExpireRepo {
+    impl CombatRepository for FalseExpireRepo {
         async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
         async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
         async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
@@ -391,7 +391,7 @@ async fn cancel_continues_even_if_mark_bets_lost_fails() {
     #[derive(Default)]
     struct BetsFailRepo;
     #[async_trait]
-    impl CoudeCombatRepository for BetsFailRepo {
+    impl CombatRepository for BetsFailRepo {
         async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
         async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
         async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }

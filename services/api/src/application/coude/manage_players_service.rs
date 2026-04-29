@@ -7,14 +7,14 @@ use crate::domain::entities::coude::player::CoudePlayer;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 
 pub struct ManageCoudePlayersService {
-    repo: Arc<dyn CoudePlayerRepository>,
+    repo: Arc<dyn PlayerRepository>,
 }
 
 impl ManageCoudePlayersService {
-    pub fn new(repo: Arc<dyn CoudePlayerRepository>) -> Self {
+    pub fn new(repo: Arc<dyn PlayerRepository>) -> Self {
         Self { repo }
     }
 

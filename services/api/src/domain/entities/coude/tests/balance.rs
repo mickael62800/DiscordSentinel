@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 #[test]
 fn defaults_match_expectations() {
-    let d = CoudeBalanceParams::default();
+    let d = BalanceParams::default();
     assert_eq!(d.surprise_min_hp_pct, 40);
     assert!(d.surprise_allow_defender_counter);
     assert_eq!(d.steal_max_active_boosts, 3);
@@ -23,7 +23,7 @@ fn from_config_parses_overrides() {
     cfg.insert("rage_atk_bonus_pct".to_string(), "60".to_string());
     cfg.insert("double_coup_mode".to_string(), "max".to_string());
     cfg.insert("surprise_allow_defender_counter".to_string(), "false".to_string());
-    let p = CoudeBalanceParams::from_config(&cfg);
+    let p = BalanceParams::from_config(&cfg);
     assert_eq!(p.rage_atk_bonus_pct, 60);
     assert_eq!(p.double_coup_mode, DoubleCoupMode::Max);
     assert!(!p.surprise_allow_defender_counter);
@@ -34,7 +34,7 @@ fn from_config_parses_overrides() {
 fn from_config_ignores_invalid_values() {
     let mut cfg = HashMap::new();
     cfg.insert("rage_atk_bonus_pct".to_string(), "not_a_number".to_string());
-    let p = CoudeBalanceParams::from_config(&cfg);
+    let p = BalanceParams::from_config(&cfg);
     assert_eq!(p.rage_atk_bonus_pct, 40);
 }
 
@@ -65,7 +65,7 @@ fn from_config_parse_bool_all_truthy_values() {
     for v in truthy {
         let mut cfg = HashMap::new();
         cfg.insert("surprise_allow_defender_counter".into(), v.into());
-        let p = CoudeBalanceParams::from_config(&cfg);
+        let p = BalanceParams::from_config(&cfg);
         assert!(p.surprise_allow_defender_counter, "'{}' doit etre truthy", v);
     }
 }
@@ -75,7 +75,7 @@ fn from_config_parse_bool_falsy_and_invalid() {
     for v in ["0", "false", "no", "off", "wibble", ""] {
         let mut cfg = HashMap::new();
         cfg.insert("surprise_allow_defender_counter".into(), v.into());
-        let p = CoudeBalanceParams::from_config(&cfg);
+        let p = BalanceParams::from_config(&cfg);
         assert!(!p.surprise_allow_defender_counter, "'{}' doit etre falsy", v);
     }
 }

@@ -3,7 +3,7 @@ use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::entities::coude::player::CoudePlayer;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use chrono::Utc;
 use std::sync::Mutex as StdMutex;
 
@@ -61,7 +61,7 @@ fn sample_player() -> CoudePlayer {
 }
 
 #[async_trait]
-impl CoudePlayerRepository for MockRepo {
+impl PlayerRepository for MockRepo {
     async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> {
         Ok(sample_player())
     }
@@ -255,7 +255,7 @@ async fn record_coins_earned_ok_with_positive() {
 #[derive(Default)]
 struct FalseRepo;
 #[async_trait]
-impl CoudePlayerRepository for FalseRepo {
+impl PlayerRepository for FalseRepo {
     async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { Ok(sample_player()) }
     async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
     async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }

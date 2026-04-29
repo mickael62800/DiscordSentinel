@@ -1,27 +1,27 @@
-//! Impl Postgres de `CoudeFlavorTemplatesRepository` (Phase 3 #9 audit).
+//! Impl Postgres de `FlavorTemplatesRepository` (Phase 3 #9 audit).
 
 use async_trait::async_trait;
 use sqlx::PgPool;
 
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::flavor_templates_repository::CoudeFlavorTemplatesRepository;
+use crate::ports::outbound::coude::flavor_templates_repository::FlavorTemplatesRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_flavor_templates";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeFlavorTemplatesRepository {
+pub struct PgFlavorTemplatesRepository {
     pool: PgPool,
 }
 
-impl PgCoudeFlavorTemplatesRepository {
+impl PgFlavorTemplatesRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl CoudeFlavorTemplatesRepository for PgCoudeFlavorTemplatesRepository {
+impl FlavorTemplatesRepository for PgFlavorTemplatesRepository {
     async fn random_by_key(
         &self,
         key: &str,

@@ -62,7 +62,7 @@ pub struct AntiTheftItemInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct CoudeCatalog {
+pub struct Catalog {
     pub classes: Vec<ClassInfo>,
     pub shop_items: Vec<ShopItemInfo>,
     pub level_table: Vec<LevelEntry>,
@@ -77,5 +77,5 @@ pub struct CoudeCatalog {
 
 #[async_trait]
 pub trait ManageCoudeCatalogUseCase: Send + Sync {
-    async fn get_catalog(&self) -> Result<CoudeCatalog, DomainError>;
+    async fn get_catalog(&self) -> Result<Catalog, DomainError>;
 }

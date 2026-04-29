@@ -7,7 +7,7 @@ use crate::domain::entities::coude::vendetta::ActiveVendetta;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeVendettaRepository: Send + Sync {
+pub trait VendettaRepository: Send + Sync {
     /// Declare une nouvelle vendetta. Retourne l UUID.
     async fn declare(
         &self,

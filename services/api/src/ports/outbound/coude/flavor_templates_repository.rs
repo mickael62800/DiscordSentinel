@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeFlavorTemplatesRepository: Send + Sync {
+pub trait FlavorTemplatesRepository: Send + Sync {
     /// Tire un template aleatoire pour `(key, locale)`. Renvoie `None` si
     /// aucun template ne matche (le bot fallback sur ses arrays locales).
     /// Le tirage est pondere par le champ `weight` cote DB.

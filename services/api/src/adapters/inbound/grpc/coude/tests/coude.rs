@@ -19,7 +19,7 @@ use super::*;
     use crate::domain::entities::coude::social::LeaderboardCategory;
     use crate::domain::entities::coude::bet::RefundSummary;
     use crate::domain::entities::coude::player::XpProgress;
-    use crate::domain::enums::coude::coude_class::CoudeClass;
+    use crate::domain::enums::coude::coude_class::PlayerClass;
 
     fn ts() -> chrono::DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 1, 15, 12, 30, 0).unwrap()
@@ -60,7 +60,7 @@ use super::*;
             stat_points: 3,
             atk: 8,
             def: 6,
-            class: Some(CoudeClass::Tank),
+            class: Some(PlayerClass::Tank),
             title: Some("Champion".into()),
             class_changed_at: None,
             hp_current: 80,
@@ -86,7 +86,7 @@ use super::*;
         assert_eq!(pr.hp_current, 80);
         assert_eq!(pr.hp_max, 100);
         assert_eq!(pr.season, 2);
-        assert_eq!(pr.class.as_deref(), Some(CoudeClass::Tank.as_str()));
+        assert_eq!(pr.class.as_deref(), Some(PlayerClass::Tank.as_str()));
         assert_eq!(pr.title.as_deref(), Some("Champion"));
         assert_eq!(pr.created_at, ts().to_rfc3339());
     }

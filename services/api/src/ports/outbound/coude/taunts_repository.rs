@@ -2,13 +2,13 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeTauntsRepository: Send + Sync {
+pub trait TauntsRepository: Send + Sync {
     /// Retourne la config (cree une row vide si absente) avec enabled=true.
-    async fn get_or_init_config(&self, guild_id: &str) -> Result<CoudeTauntsConfig, DomainError>;
+    async fn get_or_init_config(&self, guild_id: &str) -> Result<TauntsConfig, DomainError>;
 
     /// Met a jour le channel_id (None = desactive sans perdre la row).
     async fn set_channel(

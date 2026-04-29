@@ -17,7 +17,7 @@ use tracing::{info, warn};
 
 use sentinel_shared::heartbeat::ApiClientKey;
 
-use crate::modules::coude::guild_config::CoudeConfig;
+use crate::modules::coude::guild_config::Config;
 
 /// Spawn le consumer durable. Appele une seule fois au `ready`.
 pub fn spawn(ctx: Context) {
@@ -92,7 +92,7 @@ async fn handle_event(ctx: &Context, payload_json: &str) {
             }
         };
         drop(data_read);
-        CoudeConfig::load(&api, guild_id).await
+        Config::load(&api, guild_id).await
     };
 
     let channel_id_str = match config.channel_tournament() {

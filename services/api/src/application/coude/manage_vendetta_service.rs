@@ -9,14 +9,14 @@ use crate::domain::entities::coude::vendetta::ActiveVendetta;
 use crate::domain::entities::coude::vendetta::VENDETTA_WINDOW_HOURS;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_vendetta::ManageCoudeVendettaUseCase;
-use crate::ports::outbound::coude::vendetta_repository::CoudeVendettaRepository;
+use crate::ports::outbound::coude::vendetta_repository::VendettaRepository;
 
 pub struct ManageCoudeVendettaService {
-    repo: Arc<dyn CoudeVendettaRepository>,
+    repo: Arc<dyn VendettaRepository>,
 }
 
 impl ManageCoudeVendettaService {
-    pub fn new(repo: Arc<dyn CoudeVendettaRepository>) -> Self {
+    pub fn new(repo: Arc<dyn VendettaRepository>) -> Self {
         Self { repo }
     }
 }

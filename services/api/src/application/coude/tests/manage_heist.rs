@@ -18,12 +18,12 @@ use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
-use crate::domain::entities::coude::heist::CoudeHeistAttempt;
+use crate::domain::entities::coude::cashbox::Cashbox;
+use crate::domain::entities::coude::heist::HeistAttempt;
 use crate::domain::entities::coude::inventory::CoudeInsurance;
 use crate::domain::entities::coude::inventory::CoudeInventoryItem;
 use crate::domain::entities::coude::inventory::CoudePrime;
-use crate::domain::entities::coude::heist::CoudePrisonState;
+use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
@@ -31,29 +31,29 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
-use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
+use crate::ports::outbound::coude::heist_repository::HeistRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 // ── MockHeistRepo ──
 
 #[derive(Default)]
 struct MockHeistRepo {
-    last_attempt: Mutex<Option<CoudeHeistAttempt>>,
-    prison: Mutex<Option<CoudePrisonState>>,
+    last_attempt: Mutex<Option<HeistAttempt>>,
+    prison: Mutex<Option<PrisonState>>,
     record_calls: Mutex<Vec<(String, String, bool, i64, i32)>>,
     prison_calls: Mutex<Vec<(String, String, String)>>,
 }
 
 #[async_trait]
-impl CoudeHeistRepository for MockHeistRepo {
-    async fn last_attempt(&self, _: &str, _: &str) -> Result<Option<CoudeHeistAttempt>, DomainError> {
+impl HeistRepository for MockHeistRepo {
+    async fn last_attempt(&self, _: &str, _: &str) -> Result<Option<HeistAttempt>, DomainError> {
         Ok(self.last_attempt.lock().unwrap().clone())
     }
     async fn record_attempt(
         &self, g: &str, u: &str, success: bool, amount_stolen: i64, chance: i32, _: &[String],
-    ) -> Result<CoudeHeistAttempt, DomainError> {
+    ) -> Result<HeistAttempt, DomainError> {
         self.record_calls.lock().unwrap().push((g.into(), u.into(), success, amount_stolen, chance));
-        Ok(CoudeHeistAttempt {
+        Ok(HeistAttempt {
             id: Uuid::new_v4(),
             guild_id: g.into(), user_id: u.into(),
             success, amount_stolen, chance_percent: chance,
@@ -61,7 +61,7 @@ impl CoudeHeistRepository for MockHeistRepo {
             attempted_at: Utc::now(),
         })
     }
-    async fn get_prison(&self, _: &str, _: &str) -> Result<Option<CoudePrisonState>, DomainError> {
+    async fn get_prison(&self, _: &str, _: &str) -> Result<Option<PrisonState>, DomainError> {
         Ok(self.prison.lock().unwrap().clone())
     }
     async fn send_to_prison(
@@ -86,9 +86,9 @@ impl Default for MockCashboxRepo {
 }
 
 #[async_trait]
-impl CoudeCashboxRepository for MockCashboxRepo {
-    async fn get_or_create(&self, g: &str) -> Result<CoudeCashbox, DomainError> {
-        Ok(CoudeCashbox {
+impl CashboxRepository for MockCashboxRepo {
+    async fn get_or_create(&self, g: &str) -> Result<Cashbox, DomainError> {
+        Ok(Cashbox {
             guild_id: g.into(),
             balance: *self.balance.lock().unwrap(),
             total_collected: 0, total_redistributed: 0,
@@ -228,7 +228,7 @@ async fn cooldown_ready_when_never_attempted() {
 #[tokio::test]
 async fn cooldown_not_ready_when_recent_attempt() {
     let (h, c, i, w, b) = default_service_parts();
-    *h.last_attempt.lock().unwrap() = Some(CoudeHeistAttempt {
+    *h.last_attempt.lock().unwrap() = Some(HeistAttempt {
         id: Uuid::new_v4(),
         guild_id: "g".into(), user_id: "u".into(),
         success: true, amount_stolen: 1000, chance_percent: 50,
@@ -245,7 +245,7 @@ async fn cooldown_not_ready_when_recent_attempt() {
 #[tokio::test]
 async fn cooldown_ready_when_old_attempt() {
     let (h, c, i, w, b) = default_service_parts();
-    *h.last_attempt.lock().unwrap() = Some(CoudeHeistAttempt {
+    *h.last_attempt.lock().unwrap() = Some(HeistAttempt {
         id: Uuid::new_v4(),
         guild_id: "g".into(), user_id: "u".into(),
         success: false, amount_stolen: 0, chance_percent: 30,
@@ -275,7 +275,7 @@ async fn prison_status_not_in_prison_by_default() {
 #[tokio::test]
 async fn prison_status_active_when_released_at_in_future() {
     let (h, c, i, w, b) = default_service_parts();
-    *h.prison.lock().unwrap() = Some(CoudePrisonState {
+    *h.prison.lock().unwrap() = Some(PrisonState {
         guild_id: "g".into(), user_id: "u".into(),
         released_at: Utc::now() + ChronoDuration::hours(10),
         reason: "heist_failed".into(),
@@ -290,7 +290,7 @@ async fn prison_status_active_when_released_at_in_future() {
 #[tokio::test]
 async fn prison_status_released_when_released_at_past() {
     let (h, c, i, w, b) = default_service_parts();
-    *h.prison.lock().unwrap() = Some(CoudePrisonState {
+    *h.prison.lock().unwrap() = Some(PrisonState {
         guild_id: "g".into(), user_id: "u".into(),
         released_at: Utc::now() - ChronoDuration::hours(1), // passe
         reason: "heist_failed".into(),
@@ -309,7 +309,7 @@ async fn prison_status_released_when_released_at_past() {
 #[tokio::test]
 async fn attempt_heist_forbidden_when_in_prison() {
     let (h, c, i, w, b) = default_service_parts();
-    *h.prison.lock().unwrap() = Some(CoudePrisonState {
+    *h.prison.lock().unwrap() = Some(PrisonState {
         guild_id: "g".into(), user_id: "u".into(),
         released_at: Utc::now() + ChronoDuration::hours(10),
         reason: "heist_failed".into(),
@@ -324,7 +324,7 @@ async fn attempt_heist_forbidden_when_in_prison() {
 #[tokio::test]
 async fn attempt_heist_forbidden_when_cooldown_active() {
     let (h, c, i, w, b) = default_service_parts();
-    *h.last_attempt.lock().unwrap() = Some(CoudeHeistAttempt {
+    *h.last_attempt.lock().unwrap() = Some(HeistAttempt {
         id: Uuid::new_v4(),
         guild_id: "g".into(), user_id: "u".into(),
         success: true, amount_stolen: 500, chance_percent: 50,

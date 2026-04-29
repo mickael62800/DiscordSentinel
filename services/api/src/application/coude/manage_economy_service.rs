@@ -12,15 +12,15 @@ use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 use crate::ports::inbound::coude::manage_economy::StealOutcome;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
-use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
+use crate::ports::outbound::coude::economy_repository::EconomyRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Service "economie Coup de Coude".
 ///
 /// # Migration wallet unifie (PoC `/donner`)
 ///
-/// La methode `transfer` ne passe plus par `CoudeEconomyRepository` : elle
+/// La methode `transfer` ne passe plus par `EconomyRepository` : elle
 /// delegue a `ManageWalletUseCase::transfer` (qui centralise le SQL
 /// atomique + la detection faillite/jackpot) puis appelle
 /// `ManageCoudeTauntsUseCase::on_generous_donor` pour le taunt specifique
@@ -33,17 +33,17 @@ use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// le repo economy : elles seront migrees progressivement sur le meme
 /// pattern.
 pub struct ManageCoudeEconomyService {
-    repo: Arc<dyn CoudeEconomyRepository>,
+    repo: Arc<dyn EconomyRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
     taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     wallet_repo: Option<Arc<dyn WalletRepository>>,
-    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
-    player_repo: Option<Arc<dyn CoudePlayerRepository>>,
+    curses_repo: Option<Arc<dyn CursesRepository>>,
+    player_repo: Option<Arc<dyn PlayerRepository>>,
 }
 
 impl ManageCoudeEconomyService {
     pub fn new(
-        repo: Arc<dyn CoudeEconomyRepository>,
+        repo: Arc<dyn EconomyRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
         taunts_uc: Arc<dyn ManageCoudeTauntsUseCase>,
     ) -> Self {
@@ -63,7 +63,7 @@ impl ManageCoudeEconomyService {
     pub fn with_leaky_wallet_support(
         mut self,
         wallet_repo: Arc<dyn WalletRepository>,
-        curses_repo: Arc<dyn CoudeCursesRepository>,
+        curses_repo: Arc<dyn CursesRepository>,
     ) -> Self {
         self.wallet_repo = Some(wallet_repo);
         self.curses_repo = Some(curses_repo);
@@ -73,7 +73,7 @@ impl ManageCoudeEconomyService {
     /// Branche le repo player pour appliquer le multiplicateur de
     /// "Saison du Vol" (cf. COUPE_AMELIORATIONS 6.3) : gains x1.5
     /// pour le voleur, paye depuis le neant (server-paid bonus).
-    pub fn with_player_repo(mut self, player_repo: Arc<dyn CoudePlayerRepository>) -> Self {
+    pub fn with_player_repo(mut self, player_repo: Arc<dyn PlayerRepository>) -> Self {
         self.player_repo = Some(player_repo);
         self
     }

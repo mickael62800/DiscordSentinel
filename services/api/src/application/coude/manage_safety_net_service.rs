@@ -4,19 +4,19 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::coude::guild_settings::CoudeGuildSettings;
+use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::safety_net::ActiveSafetyNet;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_safety_net::ManageCoudeSafetyNetUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
+use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
 pub struct ManageCoudeSafetyNetService {
-    repo: Arc<dyn CoudeSafetyNetRepository>,
+    repo: Arc<dyn SafetyNetRepository>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeSafetyNetService {
-    pub fn new(repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
+    pub fn new(repo: Arc<dyn SafetyNetRepository>) -> Self {
         Self { repo, bot_config_repo: None }
     }
 
@@ -36,7 +36,7 @@ impl ManageCoudeSafetyNetUseCase for ManageCoudeSafetyNetService {
     ) -> Result<Option<ActiveSafetyNet>, DomainError> {
         let (trigger, duration) = match &self.bot_config_repo {
             Some(repo) => {
-                let s = CoudeGuildSettings::load(&**repo, guild_id).await;
+                let s = GuildSettings::load(&**repo, guild_id).await;
                 (
                     s.get_i64("safety_net_trigger_coins", 50),
                     s.get_i64("safety_net_duration_hours", 72),

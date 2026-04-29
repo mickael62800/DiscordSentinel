@@ -8,7 +8,7 @@ use crate::domain::errors::DomainError;
 
 /// Repository d'accès aux combats Coup de Coude.
 #[async_trait]
-pub trait CoudeCombatRepository: Send + Sync {
+pub trait CombatRepository: Send + Sync {
     // ── Lecture ──
 
     /// Liste les combats d'un guild, optionnellement filtrés par status.
@@ -112,7 +112,7 @@ pub trait CoudeCombatRepository: Send + Sync {
     /// des paris.
     ///
     /// Note : cette méthode touche `coude_bets` mais reste ici pour éviter une
-    /// dépendance circulaire avec le futur `CoudeBetRepository`. Sera déplacée
+    /// dépendance circulaire avec le futur `BetRepository`. Sera déplacée
     /// quand le slice "Bets" sera extrait.
     async fn mark_unresolved_bets_lost(&self, combat_id: Uuid) -> Result<(), DomainError>;
 
@@ -127,7 +127,7 @@ pub trait CoudeCombatRepository: Send + Sync {
         _guild_id: &str,
     ) -> Result<Vec<(String, u64)>, DomainError> {
         Err(DomainError::NotImplemented(
-            "CoudeCombatRepository::purge_guild_subsystem".into(),
+            "CombatRepository::purge_guild_subsystem".into(),
         ))
     }
 
@@ -143,7 +143,7 @@ pub trait CoudeCombatRepository: Send + Sync {
         _user_id: &str,
     ) -> Result<i64, DomainError> {
         Err(DomainError::NotImplemented(
-            "CoudeCombatRepository::count_defeats_today".into(),
+            "CombatRepository::count_defeats_today".into(),
         ))
     }
 }

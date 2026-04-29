@@ -11,16 +11,16 @@ use crate::domain::entities::coude::taunt::build_taunt_event_single;
 use crate::domain::entities::coude::taunt::crossed_threshold;
 use crate::domain::entities::system::config_parsers::parse_bool_config;
 use crate::domain::entities::system::config_parsers::parse_i64_config;
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::entities::coude::taunt::StreakKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::taunts_repository::TauntsRepository;
 const ECO_BOT_NAME: &str = "coude-bot";
 const CFG_BANKRUPTCY_ENABLED: &str = "bankruptcy_taunt_enabled";
 const CFG_JACKPOT_THRESHOLD: &str = "jackpot_threshold";
@@ -29,16 +29,16 @@ const DEFAULT_JACKPOT_THRESHOLD: i64 = 10_000;
 const DEFAULT_DONOR_THRESHOLD: i64 = 1_000;
 
 pub struct ManageCoudeTauntsService {
-    taunts_repo: Arc<dyn CoudeTauntsRepository>,
-    player_repo: Arc<dyn CoudePlayerRepository>,
+    taunts_repo: Arc<dyn TauntsRepository>,
+    player_repo: Arc<dyn PlayerRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
-    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
+    curses_repo: Option<Arc<dyn CursesRepository>>,
 }
 
 impl ManageCoudeTauntsService {
     pub fn new(
-        taunts_repo: Arc<dyn CoudeTauntsRepository>,
-        player_repo: Arc<dyn CoudePlayerRepository>,
+        taunts_repo: Arc<dyn TauntsRepository>,
+        player_repo: Arc<dyn PlayerRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
         Self {
@@ -52,7 +52,7 @@ impl ManageCoudeTauntsService {
     /// Branche le repo des maledictions pour activer Insomnia
     /// (cf. COUPE_AMELIORATIONS 5.1) : la cible voit ses paliers de
     /// taunts de defaite atteints +50% plus vite (streak effectif x1.5).
-    pub fn with_curses_repo(mut self, repo: Arc<dyn CoudeCursesRepository>) -> Self {
+    pub fn with_curses_repo(mut self, repo: Arc<dyn CursesRepository>) -> Self {
         self.curses_repo = Some(repo);
         self
     }
@@ -130,7 +130,7 @@ impl ManageCoudeTauntsService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<(Option<CoudeTauntsConfig>, bool), DomainError> {
+    ) -> Result<(Option<TauntsConfig>, bool), DomainError> {
         let config = self.taunts_repo.get_or_init_config(guild_id).await?;
         if !config.enabled || config.channel_id.is_none() {
             return Ok((None, false));
@@ -288,7 +288,7 @@ impl ManageCoudeTauntsUseCase for ManageCoudeTauntsService {
             .await
     }
 
-    async fn get_config(&self, guild_id: &str) -> Result<CoudeTauntsConfig, DomainError> {
+    async fn get_config(&self, guild_id: &str) -> Result<TauntsConfig, DomainError> {
         self.taunts_repo.get_or_init_config(guild_id).await
     }
 

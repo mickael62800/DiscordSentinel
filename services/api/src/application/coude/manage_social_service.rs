@@ -24,25 +24,25 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::ports::outbound::coude::economy_repository::EconomyRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
 // DAILY_CHAOS_MAX / DEFAULT_CHAOS_PERCENT / MIN_COINS_ELIGIBLE vivent
 // dans domain/entities/coude_social.rs (regles metier reutilisables).
 
 pub struct ManageCoudeSocialService {
-    repo: Arc<dyn CoudeSocialRepository>,
-    player_repo: Arc<dyn CoudePlayerRepository>,
-    economy_repo: Arc<dyn CoudeEconomyRepository>,
+    repo: Arc<dyn SocialRepository>,
+    player_repo: Arc<dyn PlayerRepository>,
+    economy_repo: Arc<dyn EconomyRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
 }
 
 impl ManageCoudeSocialService {
     pub fn new(
-        repo: Arc<dyn CoudeSocialRepository>,
-        player_repo: Arc<dyn CoudePlayerRepository>,
-        economy_repo: Arc<dyn CoudeEconomyRepository>,
+        repo: Arc<dyn SocialRepository>,
+        player_repo: Arc<dyn PlayerRepository>,
+        economy_repo: Arc<dyn EconomyRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
     ) -> Self {

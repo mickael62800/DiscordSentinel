@@ -11,7 +11,7 @@ use crate::domain::errors::DomainError;
 /// Repository pour les fonctionnalités "sociales" Coup de Coude :
 /// cooldowns, classements, événements serveur, daily chaos, saisons.
 #[async_trait]
-pub trait CoudeSocialRepository: Send + Sync {
+pub trait SocialRepository: Send + Sync {
     // ── Cooldowns ──
 
     /// Retourne la date d'expiration du cooldown actif (`> NOW()`), ou `None`

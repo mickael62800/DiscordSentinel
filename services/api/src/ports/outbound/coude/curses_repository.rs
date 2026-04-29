@@ -8,7 +8,7 @@ use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeCursesRepository: Send + Sync {
+pub trait CursesRepository: Send + Sync {
     /// Cree une nouvelle malediction. Retourne l UUID genere.
     /// Le contrainte unique partial assure qu une seule curse non levee
     /// peut exister par (guild, target) — l appelant doit verifier

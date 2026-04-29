@@ -27,26 +27,26 @@ use crate::adapters::outbound::postgres::casino::blackjack_repository::PgBlackja
 use crate::adapters::outbound::postgres::casino::blackjack_table_repository::PgBlackjackTableRepository;
 use crate::adapters::outbound::postgres::system::bot_config_repository::PgBotConfigRepository;
 use crate::adapters::outbound::postgres::community::conduct_repository::PgConductRepository;
-use crate::adapters::outbound::postgres::coude::bet_repository::PgCoudeBetRepository;
-use crate::adapters::outbound::postgres::coude::cashbox_repository::PgCoudeCashboxRepository;
-use crate::adapters::outbound::postgres::coude::combat_repository::PgCoudeCombatRepository;
-use crate::adapters::outbound::postgres::coude::bounty_repository::PgCoudeBountyRepository;
-use crate::adapters::outbound::postgres::coude::coalition_repository::PgCoudeCoalitionRepository;
-use crate::adapters::outbound::postgres::coude::curses_repository::PgCoudeCursesRepository;
-use crate::adapters::outbound::postgres::coude::economy_repository::PgCoudeEconomyRepository;
-use crate::adapters::outbound::postgres::coude::flavor_templates_repository::PgCoudeFlavorTemplatesRepository;
-use crate::adapters::outbound::postgres::coude::heist_repository::PgCoudeHeistRepository;
-use crate::adapters::outbound::postgres::coude::inventory_repository::PgCoudeInventoryRepository;
-use crate::adapters::outbound::postgres::coude::refusal_count_repository::PgCoudeRefusalCountRepository;
-use crate::adapters::outbound::postgres::coude::safety_net_repository::PgCoudeSafetyNetRepository;
-use crate::adapters::outbound::postgres::coude::tout_ou_rien_repository::PgCoudeToutOuRienRepository;
-use crate::adapters::outbound::postgres::coude::ultimate_repository::PgCoudeUltimateRepository;
-use crate::adapters::outbound::postgres::coude::vendetta_repository::PgCoudeVendettaRepository;
-use crate::adapters::outbound::postgres::coude::player_repository::PgCoudePlayerRepository;
-use crate::adapters::outbound::postgres::coude::social_repository::PgCoudeSocialRepository;
-use crate::adapters::outbound::postgres::coude::steal_boost_repository::PgCoudeStealBoostRepository;
-use crate::adapters::outbound::postgres::coude::steal_protection_repository::PgCoudeStealProtectionRepository;
-use crate::adapters::outbound::postgres::coude::taunts_repository::PgCoudeTauntsRepository;
+use crate::adapters::outbound::postgres::coude::bet_repository::PgBetRepository;
+use crate::adapters::outbound::postgres::coude::cashbox_repository::PgCashboxRepository;
+use crate::adapters::outbound::postgres::coude::combat_repository::PgCombatRepository;
+use crate::adapters::outbound::postgres::coude::bounty_repository::PgBountyRepository;
+use crate::adapters::outbound::postgres::coude::coalition_repository::PgCoalitionRepository;
+use crate::adapters::outbound::postgres::coude::curses_repository::PgCursesRepository;
+use crate::adapters::outbound::postgres::coude::economy_repository::PgEconomyRepository;
+use crate::adapters::outbound::postgres::coude::flavor_templates_repository::PgFlavorTemplatesRepository;
+use crate::adapters::outbound::postgres::coude::heist_repository::PgHeistRepository;
+use crate::adapters::outbound::postgres::coude::inventory_repository::PgInventoryRepository;
+use crate::adapters::outbound::postgres::coude::refusal_count_repository::PgRefusalCountRepository;
+use crate::adapters::outbound::postgres::coude::safety_net_repository::PgSafetyNetRepository;
+use crate::adapters::outbound::postgres::coude::tout_ou_rien_repository::PgToutOuRienRepository;
+use crate::adapters::outbound::postgres::coude::ultimate_repository::PgUltimateRepository;
+use crate::adapters::outbound::postgres::coude::vendetta_repository::PgVendettaRepository;
+use crate::adapters::outbound::postgres::coude::player_repository::PgPlayerRepository;
+use crate::adapters::outbound::postgres::coude::social_repository::PgSocialRepository;
+use crate::adapters::outbound::postgres::coude::steal_boost_repository::PgStealBoostRepository;
+use crate::adapters::outbound::postgres::coude::steal_protection_repository::PgStealProtectionRepository;
+use crate::adapters::outbound::postgres::coude::taunts_repository::PgTauntsRepository;
 use crate::adapters::outbound::postgres::community::daily_activity_repository::PgDailyActivityRepository;
 use crate::adapters::outbound::postgres::community::discord_role_repository::PgDiscordRoleRepository;
 use crate::adapters::outbound::postgres::moderation::evidence_repository::PgEvidenceRepository;
@@ -390,9 +390,9 @@ pub async fn build_app_state(
     let blackjack_repo = Arc::new(PgBlackjackRepository::new(pg_pool.clone()));
     // `blackjack_svc` est instancie plus bas, apres la construction de
     // `wallet_uc` (dependance de la migration #4).
-    let coude_player_repo = Arc::new(PgCoudePlayerRepository::new(pg_pool.clone()));
+    let coude_player_repo = Arc::new(PgPlayerRepository::new(pg_pool.clone()));
     let coude_players_uc = Arc::new(ManageCoudePlayersService::new(coude_player_repo.clone()));
-    let coude_combat_repo = Arc::new(PgCoudeCombatRepository::new(pg_pool.clone()));
+    let coude_combat_repo = Arc::new(PgCombatRepository::new(pg_pool.clone()));
     let coude_combats_uc: Arc<dyn crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase> =
         Arc::new(
             ManageCoudeCombatsService::new(coude_combat_repo.clone()).with_surprise_gate(
@@ -404,26 +404,26 @@ pub async fn build_app_state(
     // `coude_bet_repo` est construit plus bas, apres `wallet_uc`
     // (Migration #7 : le repo delegue les mutations user_wallets au
     // service wallet unifie pour la detection faillite/jackpot).
-    let coude_economy_repo = Arc::new(PgCoudeEconomyRepository::new(pg_pool.clone()));
+    let coude_economy_repo = Arc::new(PgEconomyRepository::new(pg_pool.clone()));
 
     // Phase 9 Part D — railleries (cree en amont : utilise par le wallet UC
     // unifie, les services de resolution de combat, et l'economy UC pour
     // les taunts "don genereux").
-    let coude_taunts_repo: Arc<dyn crate::ports::outbound::coude::taunts_repository::CoudeTauntsRepository> =
-        Arc::new(PgCoudeTauntsRepository::new(pg_pool.clone()));
+    let coude_taunts_repo: Arc<dyn crate::ports::outbound::coude::taunts_repository::TauntsRepository> =
+        Arc::new(PgTauntsRepository::new(pg_pool.clone()));
 
     // Maledictions — repo cree tot pour pouvoir le brancher dans taunts
     // (effet Insomnia) et wheel (effet Heartbreak).
-    let coude_curses_repo: Arc<dyn crate::ports::outbound::coude::curses_repository::CoudeCursesRepository> =
-        Arc::new(PgCoudeCursesRepository::new(pg_pool.clone()));
+    let coude_curses_repo: Arc<dyn crate::ports::outbound::coude::curses_repository::CursesRepository> =
+        Arc::new(PgCursesRepository::new(pg_pool.clone()));
 
     // Filet de securite et vendetta — repos crees tot pour pouvoir les
     // brancher dans bets (boost x1.5 paris gagnants) et combat
     // (bonus +100% revanche). Re-utilises plus bas pour creer les UC.
-    let coude_safety_net_repo: Arc<dyn crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository> =
-        Arc::new(PgCoudeSafetyNetRepository::new(pg_pool.clone()));
-    let coude_vendetta_repo: Arc<dyn crate::ports::outbound::coude::vendetta_repository::CoudeVendettaRepository> =
-        Arc::new(PgCoudeVendettaRepository::new(pg_pool.clone()));
+    let coude_safety_net_repo: Arc<dyn crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository> =
+        Arc::new(PgSafetyNetRepository::new(pg_pool.clone()));
+    let coude_vendetta_repo: Arc<dyn crate::ports::outbound::coude::vendetta_repository::VendettaRepository> =
+        Arc::new(PgVendettaRepository::new(pg_pool.clone()));
 
     let coude_taunts_uc: Arc<dyn crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase> = Arc::new(
         ManageCoudeTauntsService::new(
@@ -445,12 +445,12 @@ pub async fn build_app_state(
 
     // Migration #7 : bet repo instantie apres wallet_uc pour pouvoir
     // deleguer les mutations user_wallets via credit_tx/debit_tx.
-    let coude_bet_repo = Arc::new(PgCoudeBetRepository::new(
+    let coude_bet_repo = Arc::new(PgBetRepository::new(
         pg_pool.clone(),
         wallet_uc.clone(),
     ));
     // Bets ne depend que d'une lecture de combat — on injecte le narrow port
-    // `CombatQueryRepository` (impl par `PgCoudeCombatRepository`) plutot que
+    // `CombatQueryRepository` (impl par `PgCombatRepository`) plutot que
     // le use case complet `ManageCoudeCombatsUseCase`. Cf. P0 #2 audit.
     let combat_query_repo: Arc<dyn crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository> =
         coude_combat_repo.clone();
@@ -501,13 +501,13 @@ pub async fn build_app_state(
         .with_leaky_wallet_support(wallet_repo.clone(), coude_curses_repo.clone())
         .with_player_repo(coude_player_repo.clone()),
     );
-    let coude_inventory_repo = Arc::new(PgCoudeInventoryRepository::new(pg_pool.clone()));
+    let coude_inventory_repo = Arc::new(PgInventoryRepository::new(pg_pool.clone()));
     let coude_inventory_uc = Arc::new(
         ManageCoudeInventoryService::new(coude_inventory_repo)
             .with_bot_config_repo(bot_config_repo.clone()),
     );
-    let coude_social_repo: Arc<dyn crate::ports::outbound::coude::social_repository::CoudeSocialRepository> =
-        Arc::new(PgCoudeSocialRepository::new(pg_pool.clone()));
+    let coude_social_repo: Arc<dyn crate::ports::outbound::coude::social_repository::SocialRepository> =
+        Arc::new(PgSocialRepository::new(pg_pool.clone()));
     let coude_social_uc = Arc::new(ManageCoudeSocialService::new(
         coude_social_repo.clone(),
         coude_player_repo.clone(),
@@ -517,8 +517,8 @@ pub async fn build_app_state(
     ));
 
     // Phase 10 — braquage (depend de cashbox_repo, inventory_uc, wallet_repo).
-    let coude_heist_repo: Arc<dyn crate::ports::outbound::coude::heist_repository::CoudeHeistRepository> =
-        Arc::new(PgCoudeHeistRepository::new(pg_pool.clone()));
+    let coude_heist_repo: Arc<dyn crate::ports::outbound::coude::heist_repository::HeistRepository> =
+        Arc::new(PgHeistRepository::new(pg_pool.clone()));
 
     // Phase 2 refacto : use case dedie qui orchestre la resolution batch des
     // combats betting. Remplacera coude-worker/src/jobs/resolve_betting.rs
@@ -534,8 +534,8 @@ pub async fn build_app_state(
             coude_taunts_uc.clone(),
             bot_config_repo.clone(),
         ));
-    let coude_cashbox_repo: Arc<dyn crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository> =
-        Arc::new(PgCoudeCashboxRepository::new(pg_pool.clone()));
+    let coude_cashbox_repo: Arc<dyn crate::ports::outbound::coude::cashbox_repository::CashboxRepository> =
+        Arc::new(PgCashboxRepository::new(pg_pool.clone()));
     let expire_combats_batch_uc: Arc<dyn crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase> =
         Arc::new(ExpireCombatsBatchService::new(
             coude_combat_repo.clone(),
@@ -581,8 +581,8 @@ pub async fn build_app_state(
         Arc::new(ManageCoudeVendettaService::new(coude_vendetta_repo.clone()));
 
     // Memorial des clodos / tout-ou-rien log (cf. COUPE_AMELIORATIONS 6.1).
-    let coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository> =
-        Arc::new(PgCoudeToutOuRienRepository::new(pg_pool.clone()));
+    let coude_tout_ou_rien_repo: Arc<dyn crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository> =
+        Arc::new(PgToutOuRienRepository::new(pg_pool.clone()));
 
     // Phase 2 #1 audit : RNG /tout-ou-rien migre cote API.
     let play_tout_ou_rien_uc: Arc<
@@ -609,8 +609,8 @@ pub async fn build_app_state(
 
     // Phase 3 #9 audit : catalogue de templates flavor (steal/heist/prank).
     let coude_flavor_templates_repo: Arc<
-        dyn crate::ports::outbound::coude::flavor_templates_repository::CoudeFlavorTemplatesRepository,
-    > = Arc::new(PgCoudeFlavorTemplatesRepository::new(pg_pool.clone()));
+        dyn crate::ports::outbound::coude::flavor_templates_repository::FlavorTemplatesRepository,
+    > = Arc::new(PgFlavorTemplatesRepository::new(pg_pool.clone()));
 
     // Sync Discord <-> Web (Phase 1 — cf. SYNC_DISCORD_WEB_DESIGN.md).
     // Repo outbound + use case inbound : on injecte uniquement le use
@@ -630,31 +630,31 @@ pub async fn build_app_state(
     ));
 
     // Primes collectives (cf. COUPE_AMELIORATIONS 5.3).
-    let coude_bounty_repo: Arc<dyn crate::ports::outbound::coude::bounty_repository::CoudeBountyRepository> =
-        Arc::new(PgCoudeBountyRepository::new(pg_pool.clone()));
+    let coude_bounty_repo: Arc<dyn crate::ports::outbound::coude::bounty_repository::BountyRepository> =
+        Arc::new(PgBountyRepository::new(pg_pool.clone()));
 
     // Compteurs de refus / dette d honneur (cf. COUPE_AMELIORATIONS 5.3).
-    let coude_refusal_count_repo: Arc<dyn crate::ports::outbound::coude::refusal_count_repository::CoudeRefusalCountRepository> =
-        Arc::new(PgCoudeRefusalCountRepository::new(pg_pool.clone()));
+    let coude_refusal_count_repo: Arc<dyn crate::ports::outbound::coude::refusal_count_repository::RefusalCountRepository> =
+        Arc::new(PgRefusalCountRepository::new(pg_pool.clone()));
 
     // Coalitions (cf. COUPE_AMELIORATIONS 5.3).
-    let coude_coalition_repo: Arc<dyn crate::ports::outbound::coude::coalition_repository::CoudeCoalitionRepository> =
-        Arc::new(PgCoudeCoalitionRepository::new(pg_pool.clone()));
+    let coude_coalition_repo: Arc<dyn crate::ports::outbound::coude::coalition_repository::CoalitionRepository> =
+        Arc::new(PgCoalitionRepository::new(pg_pool.clone()));
 
     // Ultimates par classe (cf. COUPE_AMELIORATIONS 3.1).
-    let coude_ultimate_repo: Arc<dyn crate::ports::outbound::coude::ultimate_repository::CoudeUltimateRepository> =
-        Arc::new(PgCoudeUltimateRepository::new(pg_pool.clone()));
+    let coude_ultimate_repo: Arc<dyn crate::ports::outbound::coude::ultimate_repository::UltimateRepository> =
+        Arc::new(PgUltimateRepository::new(pg_pool.clone()));
 
     let coude_steal_protection_repo: Arc<
-        dyn crate::ports::outbound::coude::steal_protection_repository::CoudeStealProtectionRepository,
-    > = Arc::new(PgCoudeStealProtectionRepository::new(pg_pool.clone()));
+        dyn crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository,
+    > = Arc::new(PgStealProtectionRepository::new(pg_pool.clone()));
     let coude_steal_protections_uc: Arc<
         dyn crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase,
     > = Arc::new(ManageCoudeStealProtectionsService::new(
         coude_steal_protection_repo,
     ));
-    let coude_steal_boost_repo: Arc<dyn crate::ports::outbound::coude::steal_boost_repository::CoudeStealBoostRepository> =
-        Arc::new(PgCoudeStealBoostRepository::new(pg_pool.clone()));
+    let coude_steal_boost_repo: Arc<dyn crate::ports::outbound::coude::steal_boost_repository::StealBoostRepository> =
+        Arc::new(PgStealBoostRepository::new(pg_pool.clone()));
     let coude_steal_boosts_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase> =
         Arc::new(
             ManageCoudeStealBoostsService::new(coude_steal_boost_repo)

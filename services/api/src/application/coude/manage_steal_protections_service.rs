@@ -14,14 +14,14 @@ use crate::domain::entities::coude::steal_protection::STEAL_PROTECTION_ITEMS;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase;
 use crate::ports::inbound::coude::manage_steal_protections::StealProtectionTrigger;
-use crate::ports::outbound::coude::steal_protection_repository::CoudeStealProtectionRepository;
+use crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 
 pub struct ManageCoudeStealProtectionsService {
-    repo: Arc<dyn CoudeStealProtectionRepository>,
+    repo: Arc<dyn StealProtectionRepository>,
 }
 
 impl ManageCoudeStealProtectionsService {
-    pub fn new(repo: Arc<dyn CoudeStealProtectionRepository>) -> Self {
+    pub fn new(repo: Arc<dyn StealProtectionRepository>) -> Self {
         Self { repo }
     }
 }

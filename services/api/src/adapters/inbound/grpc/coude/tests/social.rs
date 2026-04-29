@@ -7,11 +7,11 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
 use crate::domain::entities::coude::social::CoudeEvent;
 use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
 use crate::domain::entities::coude::heist::HeistOutcome;
 use crate::domain::entities::coude::social::LeaderboardCategory;
@@ -20,7 +20,7 @@ use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_catalog::AntiTheftItemInfo;
 use crate::ports::inbound::coude::manage_catalog::ClassInfo;
-use crate::ports::inbound::coude::manage_catalog::CoudeCatalog;
+use crate::ports::inbound::coude::manage_catalog::Catalog;
 use crate::ports::inbound::coude::manage_catalog::LevelEntry;
 use crate::ports::inbound::coude::manage_catalog::MatchmakingBucket;
 use crate::ports::inbound::coude::manage_catalog::ShopItemInfo;
@@ -81,13 +81,13 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
 
 #[derive(Default)]
 struct MockCatalogUc {
-    catalog: Mutex<Option<CoudeCatalog>>,
+    catalog: Mutex<Option<Catalog>>,
 }
 
 #[async_trait]
 impl ManageCoudeCatalogUseCase for MockCatalogUc {
-    async fn get_catalog(&self) -> Result<CoudeCatalog, DomainError> {
-        Ok(self.catalog.lock().unwrap().clone().unwrap_or(CoudeCatalog {
+    async fn get_catalog(&self) -> Result<Catalog, DomainError> {
+        Ok(self.catalog.lock().unwrap().clone().unwrap_or(Catalog {
             classes: vec![],
             shop_items: vec![],
             level_table: vec![],
@@ -102,7 +102,7 @@ impl ManageCoudeCatalogUseCase for MockCatalogUc {
 
 #[derive(Default)]
 struct MockCashboxUc {
-    cashbox: Mutex<Option<CoudeCashbox>>,
+    cashbox: Mutex<Option<Cashbox>>,
     redistribute_return: Mutex<Option<RedistributionOutcome>>,
     due_return: Mutex<Vec<(String, RedistributionOutcome)>>,
     deposit_calls: Mutex<Vec<(String, i64, CashboxSource)>>,
@@ -110,8 +110,8 @@ struct MockCashboxUc {
 
 #[async_trait]
 impl ManageCoudeCashboxUseCase for MockCashboxUc {
-    async fn get_cashbox(&self, g: &str) -> Result<CoudeCashbox, DomainError> {
-        Ok(self.cashbox.lock().unwrap().clone().unwrap_or(CoudeCashbox {
+    async fn get_cashbox(&self, g: &str) -> Result<Cashbox, DomainError> {
+        Ok(self.cashbox.lock().unwrap().clone().unwrap_or(Cashbox {
             guild_id: g.into(),
             balance: 0,
             total_collected: 0,
@@ -143,7 +143,7 @@ impl ManageCoudeCashboxUseCase for MockCashboxUc {
 struct MockTauntsUc {
     steal_victim_return: Mutex<Option<TauntEvent>>,
     defended_calls: Mutex<Vec<(String, String)>>,
-    config: Mutex<Option<CoudeTauntsConfig>>,
+    config: Mutex<Option<TauntsConfig>>,
     set_channel_calls: Mutex<Vec<(String, Option<String>)>>,
     set_enabled_calls: Mutex<Vec<(String, bool)>>,
     set_opt_out_calls: Mutex<Vec<(String, String, bool)>>,
@@ -167,8 +167,8 @@ impl ManageCoudeTauntsUseCase for MockTauntsUc {
     async fn on_bankruptcy(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
     async fn on_jackpot(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
     async fn on_generous_donor(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { unimplemented!() }
-    async fn get_config(&self, g: &str) -> Result<CoudeTauntsConfig, DomainError> {
-        Ok(self.config.lock().unwrap().clone().unwrap_or(CoudeTauntsConfig {
+    async fn get_config(&self, g: &str) -> Result<TauntsConfig, DomainError> {
+        Ok(self.config.lock().unwrap().clone().unwrap_or(TauntsConfig {
             guild_id: g.into(),
             channel_id: None,
             enabled: true,
@@ -383,7 +383,7 @@ async fn current_season_maps() {
 #[tokio::test]
 async fn get_catalog_maps_all_collections() {
     let (s, c, cb, t, h) = defaults();
-    *c.catalog.lock().unwrap() = Some(CoudeCatalog {
+    *c.catalog.lock().unwrap() = Some(Catalog {
         classes: vec![ClassInfo {
             name: "Guerrier".into(), emoji: "x".into(), base_atk: 10, base_def: 5,
             atk_growth: 2, def_growth: 1, dodge_chance: 0.1, steal_bonus: 0.2,
@@ -420,7 +420,7 @@ async fn get_catalog_maps_all_collections() {
 #[tokio::test]
 async fn get_cashbox_maps() {
     let (s, c, cb, t, h) = defaults();
-    *cb.cashbox.lock().unwrap() = Some(CoudeCashbox {
+    *cb.cashbox.lock().unwrap() = Some(Cashbox {
         guild_id: "g".into(), balance: 500, total_collected: 1000, total_redistributed: 500,
         last_redistribution_at: None, created_at: Utc::now(), updated_at: Utc::now(),
     });
@@ -569,7 +569,7 @@ async fn track_steal_defended_delegates() {
 #[tokio::test]
 async fn get_taunts_config_maps() {
     let (s, c, cb, t, h) = defaults();
-    *t.config.lock().unwrap() = Some(CoudeTauntsConfig {
+    *t.config.lock().unwrap() = Some(TauntsConfig {
         guild_id: "g".into(), channel_id: Some("c".into()),
         enabled: true, rename_enabled: true, messages_enabled: true,
     });

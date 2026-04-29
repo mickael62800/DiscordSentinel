@@ -9,8 +9,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 
-use crate::application::coude::guild_settings::CoudeGuildSettings;
-use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::application::coude::guild_settings::GuildSettings;
+use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude::coude_combat_engine::combat::resolve_combat;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;
@@ -19,19 +19,19 @@ use crate::ports::inbound::coude::resolve_friendly_duel::FriendlyDuelOutput;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::inbound::coude::resolve_friendly_duel::ResolveFriendlyDuelUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 const DEFAULT_FRIENDLY_WINNER_XP: i64 = 20;
 const DEFAULT_FRIENDLY_LOSER_XP: i64 = 5;
 
 pub struct ResolveFriendlyDuelService {
-    pub player_repo: Arc<dyn CoudePlayerRepository>,
+    pub player_repo: Arc<dyn PlayerRepository>,
     pub players_uc: Arc<dyn ManageCoudePlayersUseCase>,
     pub bot_config_repo: Arc<dyn BotConfigRepository>,
 }
 
 impl ResolveFriendlyDuelService {
     pub fn new(
-        player_repo: Arc<dyn CoudePlayerRepository>,
+        player_repo: Arc<dyn PlayerRepository>,
         players_uc: Arc<dyn ManageCoudePlayersUseCase>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
     ) -> Self {
@@ -76,7 +76,7 @@ impl ResolveFriendlyDuelUseCase for ResolveFriendlyDuelService {
             hp_current: Some(defender.hp_current),
         };
 
-        let params = CoudeBalanceParams::default();
+        let params = BalanceParams::default();
         let result = resolve_combat(
             &attacker_lite,
             &defender_lite,
@@ -89,7 +89,7 @@ impl ResolveFriendlyDuelUseCase for ResolveFriendlyDuelService {
             &params,
         );
 
-        let settings = CoudeGuildSettings::load(&*self.bot_config_repo, &input.guild_id).await;
+        let settings = GuildSettings::load(&*self.bot_config_repo, &input.guild_id).await;
         let cfg_winner_xp = settings.get_i64("friendly_winner_xp", DEFAULT_FRIENDLY_WINNER_XP);
         let cfg_loser_xp = settings.get_i64("friendly_loser_xp", DEFAULT_FRIENDLY_LOSER_XP);
 

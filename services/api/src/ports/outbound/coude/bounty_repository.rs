@@ -7,7 +7,7 @@ use crate::domain::entities::coude::bounty::ActiveBounty;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeBountyRepository: Send + Sync {
+pub trait BountyRepository: Send + Sync {
     /// Cree une nouvelle prime ouverte avec un montant initial. Echoue
     /// avec Conflict si une prime ouverte existe deja sur cette cible.
     async fn open(

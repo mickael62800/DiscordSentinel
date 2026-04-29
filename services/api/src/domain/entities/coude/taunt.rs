@@ -85,7 +85,7 @@ impl StreakKind {
 /// disabled ou non configuree). `enabled` permet de couper global sans
 /// perdre le channel_id configure.
 #[derive(Debug, Clone)]
-pub struct CoudeTauntsConfig {
+pub struct TauntsConfig {
     pub guild_id: String,
     pub channel_id: Option<String>,
     pub enabled: bool,
@@ -433,7 +433,7 @@ pub fn crossed_threshold(new_streak: i32) -> Option<i32> {
 ///   - aucun channel n'est configure / feature disabled
 ///   - le joueur a opt-out
 pub fn build_taunt_event(
-    config: &CoudeTauntsConfig,
+    config: &TauntsConfig,
     target_user_id: &str,
     kind: StreakKind,
     new_streak: i32,
@@ -494,7 +494,7 @@ pub fn build_taunt_event(
 /// Version one-shot pour les kinds sans palier (naturel 21, faillite,
 /// jackpot, don). Pas de check de streak, juste config + opt-out.
 pub fn build_taunt_event_single(
-    config: &CoudeTauntsConfig,
+    config: &TauntsConfig,
     target_user_id: &str,
     kind: StreakKind,
     user_opted_out: bool,
@@ -508,7 +508,7 @@ pub fn build_taunt_event_single(
 /// Pour les tests : force une selection deterministe (first message).
 #[cfg(test)]
 pub fn build_taunt_event_deterministic(
-    config: &CoudeTauntsConfig,
+    config: &TauntsConfig,
     target_user_id: &str,
     kind: StreakKind,
     new_streak: i32,

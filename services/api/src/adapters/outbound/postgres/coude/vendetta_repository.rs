@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeVendettaRepository` (cf. COUPE_AMELIORATIONS 5.3).
+//! Impl Postgres de `VendettaRepository` (cf. COUPE_AMELIORATIONS 5.3).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -9,17 +9,17 @@ use uuid::Uuid;
 use crate::domain::entities::coude::vendetta::ActiveVendetta;
 use crate::domain::entities::coude::vendetta::VendettaStatus;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::vendetta_repository::CoudeVendettaRepository;
+use crate::ports::outbound::coude::vendetta_repository::VendettaRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_vendettas";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeVendettaRepository {
+pub struct PgVendettaRepository {
     pool: PgPool,
 }
 
-impl PgCoudeVendettaRepository {
+impl PgVendettaRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -57,7 +57,7 @@ impl TryFrom<Row> for ActiveVendetta {
 }
 
 #[async_trait]
-impl CoudeVendettaRepository for PgCoudeVendettaRepository {
+impl VendettaRepository for PgVendettaRepository {
     async fn declare(
         &self,
         guild_id: &str,

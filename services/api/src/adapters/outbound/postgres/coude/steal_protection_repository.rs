@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeStealProtectionRepository` (Phase 9 Part B).
+//! Impl Postgres de `StealProtectionRepository` (Phase 9 Part B).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -8,17 +8,17 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::steal_protection_repository::CoudeStealProtectionRepository;
+use crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "steal_protection";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeStealProtectionRepository {
+pub struct PgStealProtectionRepository {
     pool: PgPool,
 }
 
-impl PgCoudeStealProtectionRepository {
+impl PgStealProtectionRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -48,7 +48,7 @@ impl From<ProtectionRow> for CoudeStealProtection {
 }
 
 #[async_trait]
-impl CoudeStealProtectionRepository for PgCoudeStealProtectionRepository {
+impl StealProtectionRepository for PgStealProtectionRepository {
     async fn list_active(
         &self,
         guild_id: &str,

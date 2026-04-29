@@ -10,12 +10,12 @@
 
 use std::collections::HashMap;
 
-use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::balance::BalanceParams;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 const BOT_NAME: &str = "coude-bot";
 
-/// Charge les `CoudeBalanceParams` d'une guild depuis le `BotConfigRepository`.
+/// Charge les `BalanceParams` d'une guild depuis le `BotConfigRepository`.
 ///
 /// API P0 #3 audit : centralise la duplication qui existait dans
 /// `manage_coude_combats_service`, `manage_coude_heist_service`,
@@ -26,25 +26,25 @@ const BOT_NAME: &str = "coude-bot";
 pub async fn load_balance_params(
     repo: &dyn BotConfigRepository,
     guild_id: &str,
-) -> CoudeBalanceParams {
+) -> BalanceParams {
     match repo.get_config(guild_id, BOT_NAME).await {
         Ok(entries) => {
             let map: HashMap<String, String> = entries
                 .into_iter()
                 .map(|e| (e.config_key, e.config_value))
                 .collect();
-            CoudeBalanceParams::from_config(&map)
+            BalanceParams::from_config(&map)
         }
-        Err(_) => CoudeBalanceParams::default(),
+        Err(_) => BalanceParams::default(),
     }
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct CoudeGuildSettings {
+pub struct GuildSettings {
     raw: HashMap<String, String>,
 }
 
-impl CoudeGuildSettings {
+impl GuildSettings {
     pub async fn load(repo: &dyn BotConfigRepository, guild_id: &str) -> Self {
         match repo.get_config(guild_id, BOT_NAME).await {
             Ok(entries) => Self {

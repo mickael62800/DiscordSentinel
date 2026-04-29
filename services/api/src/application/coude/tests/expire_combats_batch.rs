@@ -12,7 +12,7 @@ use crate::application::coude::expire_combats_batch_service::ExpireCombatsBatchS
 use crate::domain::entities::coude::cashbox::CashboxSource;
 use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::bet::CoudeBet;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::combat::CoudeCombat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::entities::coude::bet::RefundSummary;
@@ -24,9 +24,9 @@ use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
 use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
 use crate::domain::entities::coude::bet::NewCoudeBet;
-use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 // ── MockCombatRepo (seul claim_expired_pending_combats est exerce) ──
 
@@ -36,7 +36,7 @@ struct MockCombatRepo {
 }
 
 #[async_trait]
-impl CoudeCombatRepository for MockCombatRepo {
+impl CombatRepository for MockCombatRepo {
     async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
     async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
     async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
@@ -66,7 +66,7 @@ struct MockPlayerRepo {
 }
 
 #[async_trait]
-impl CoudePlayerRepository for MockPlayerRepo {
+impl PlayerRepository for MockPlayerRepo {
     async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<crate::domain::entities::coude::player::CoudePlayer, DomainError> { unimplemented!() }
     async fn get(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(None) }
     async fn list(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(vec![]) }
@@ -143,9 +143,9 @@ struct MockCashboxRepo {
 }
 
 #[async_trait]
-impl CoudeCashboxRepository for MockCashboxRepo {
-    async fn get_or_create(&self, g: &str) -> Result<CoudeCashbox, DomainError> {
-        Ok(CoudeCashbox {
+impl CashboxRepository for MockCashboxRepo {
+    async fn get_or_create(&self, g: &str) -> Result<Cashbox, DomainError> {
+        Ok(Cashbox {
             guild_id: g.into(), balance: 0, total_collected: 0, total_redistributed: 0,
             last_redistribution_at: None, created_at: Utc::now(), updated_at: Utc::now(),
         })

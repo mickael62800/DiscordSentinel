@@ -10,7 +10,7 @@ use crate::domain::errors::DomainError;
 /// Toutes les opérations qui touchent la table `coude_players` doivent passer
 /// par ce port — les handlers HTTP ne doivent jamais écrire de SQL en direct.
 #[async_trait]
-pub trait CoudePlayerRepository: Send + Sync {
+pub trait PlayerRepository: Send + Sync {
     // ── CRUD ──
 
     /// Récupère un joueur ; le crée si absent. Si l'on a déjà un row, met à jour

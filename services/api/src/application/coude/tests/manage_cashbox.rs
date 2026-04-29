@@ -8,12 +8,12 @@ use uuid::Uuid;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase;
-use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 #[derive(Default)]
 struct MockCashboxRepo {
@@ -27,9 +27,9 @@ struct MockCashboxRepo {
 }
 
 #[async_trait]
-impl CoudeCashboxRepository for MockCashboxRepo {
-    async fn get_or_create(&self, g: &str) -> Result<CoudeCashbox, DomainError> {
-        Ok(CoudeCashbox {
+impl CashboxRepository for MockCashboxRepo {
+    async fn get_or_create(&self, g: &str) -> Result<Cashbox, DomainError> {
+        Ok(Cashbox {
             guild_id: g.into(), balance: 0, total_collected: 0, total_redistributed: 0,
             last_redistribution_at: None, created_at: Utc::now(), updated_at: Utc::now(),
         })

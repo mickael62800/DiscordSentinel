@@ -1,32 +1,32 @@
-//! Impl Postgres de `CoudeTauntsRepository` (Phase 9 Part D).
+//! Impl Postgres de `TauntsRepository` (Phase 9 Part D).
 
 use async_trait::async_trait;
 use sqlx::PgPool;
 
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
+use crate::ports::outbound::coude::taunts_repository::TauntsRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "taunts";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeTauntsRepository {
+pub struct PgTauntsRepository {
     pool: PgPool,
 }
 
-impl PgCoudeTauntsRepository {
+impl PgTauntsRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 }
 
 #[async_trait]
-impl CoudeTauntsRepository for PgCoudeTauntsRepository {
+impl TauntsRepository for PgTauntsRepository {
     async fn get_or_init_config(
         &self,
         guild_id: &str,
-    ) -> Result<CoudeTauntsConfig, DomainError> {
+    ) -> Result<TauntsConfig, DomainError> {
         let row: (String, Option<String>, bool, bool, bool) = sqlx::query_as(
             r#"INSERT INTO coude_taunts_config (guild_id)
                VALUES ($1)
@@ -37,7 +37,7 @@ impl CoudeTauntsRepository for PgCoudeTauntsRepository {
         .fetch_one(&self.pool)
         .await
         .map_err(pg_err)?;
-        Ok(CoudeTauntsConfig {
+        Ok(TauntsConfig {
             guild_id: row.0,
             channel_id: row.1,
             enabled: row.2,

@@ -11,7 +11,7 @@ use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
-// `cost_per_member` migre dans `CoudeConfig::coalition_cost_per_member`
+// `cost_per_member` migre dans `Config::coalition_cost_per_member`
 // (Phase 1 leftovers audit). Default preserve : 500c.
 const MIN_MEMBERS: usize = 3;
 

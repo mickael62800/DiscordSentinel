@@ -8,20 +8,20 @@ use serde::Serialize;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
 #[sqlx(type_name = "coude_class", rename_all = "lowercase")]
-pub enum CoudeClass {
+pub enum PlayerClass {
     Bourrin,
     Agile,
     Fourbe,
     Tank,
 }
 
-impl CoudeClass {
+impl PlayerClass {
     pub fn as_str(&self) -> &'static str {
         match self {
-            CoudeClass::Bourrin => "bourrin",
-            CoudeClass::Agile => "agile",
-            CoudeClass::Fourbe => "fourbe",
-            CoudeClass::Tank => "tank",
+            PlayerClass::Bourrin => "bourrin",
+            PlayerClass::Agile => "agile",
+            PlayerClass::Fourbe => "fourbe",
+            PlayerClass::Tank => "tank",
         }
     }
 

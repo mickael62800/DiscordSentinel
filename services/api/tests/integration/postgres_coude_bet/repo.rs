@@ -1,4 +1,4 @@
-//! Tests d'integration postgres pour PgCoudeBetRepository.
+//! Tests d'integration postgres pour PgBetRepository.
 //! Instantie une vraie chaine ManageWalletService (avec stub taunts) pour
 //! tester l'atomicite des mutations wallet + coude_bets.
 
@@ -8,16 +8,16 @@ use async_trait::async_trait;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::bet_repository::PgCoudeBetRepository;
+use sentinel_api::adapters::outbound::postgres::coude::bet_repository::PgBetRepository;
 use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
 use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
 use sentinel_api::domain::entities::coude::bet::calculate_bet_resolution;
-use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
+use sentinel_api::domain::entities::coude::taunt::TauntsConfig;
 use sentinel_api::domain::entities::coude::bet::NewCoudeBet;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
-use sentinel_api::ports::outbound::coude::bet_repository::CoudeBetRepository;
+use sentinel_api::ports::outbound::coude::bet_repository::BetRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -43,8 +43,8 @@ impl ManageCoudeTauntsUseCase for StubTauntsUc {
     async fn on_bankruptcy(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
     async fn on_jackpot(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
     async fn on_generous_donor(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn get_config(&self, g: &str) -> Result<CoudeTauntsConfig, DomainError> {
-        Ok(CoudeTauntsConfig {
+    async fn get_config(&self, g: &str) -> Result<TauntsConfig, DomainError> {
+        Ok(TauntsConfig {
             guild_id: g.into(), channel_id: None,
             enabled: false, rename_enabled: false, messages_enabled: false,
         })
@@ -58,10 +58,10 @@ impl ManageCoudeTauntsUseCase for StubTauntsUc {
     async fn list_opt_outs(&self, _: &str) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
 }
 
-fn make_repo(p: PgPool) -> PgCoudeBetRepository {
+fn make_repo(p: PgPool) -> PgBetRepository {
     let wallet_repo = Arc::new(PgWalletRepository::new(p.clone()));
     let wallet_uc = Arc::new(ManageWalletService::new(wallet_repo, Arc::new(StubTauntsUc)));
-    PgCoudeBetRepository::new(p, wallet_uc)
+    PgBetRepository::new(p, wallet_uc)
 }
 
 async fn seed_wallet(p: &PgPool, g: &str, u: &str, coins: i64) {

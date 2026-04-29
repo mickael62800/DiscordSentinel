@@ -32,7 +32,7 @@ use crate::domain::entities::coude::inventory::CoudeInventoryItem;
 use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
 use crate::domain::entities::coude::player::CoudePlayer;
 use crate::domain::entities::coude::inventory::CoudePrime;
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::bet::NewCoudeBet;
@@ -45,7 +45,7 @@ use crate::domain::entities::casino::wallet::Wallet;
 use crate::domain::entities::casino::wallet::WalletTransaction;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
 use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
@@ -56,7 +56,7 @@ use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 use chrono::DateTime;
 
@@ -70,7 +70,7 @@ struct MockCombatRepo {
 }
 
 #[async_trait]
-impl CoudeCombatRepository for MockCombatRepo {
+impl CombatRepository for MockCombatRepo {
     async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
     async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
     async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
@@ -338,8 +338,8 @@ impl ManageCoudeTauntsUseCase for MockTauntsUc {
     async fn on_bankruptcy(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
     async fn on_jackpot(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
     async fn on_generous_donor(&self, _: &str, _: &str, _: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn get_config(&self, g: &str) -> Result<CoudeTauntsConfig, DomainError> {
-        Ok(CoudeTauntsConfig { guild_id: g.into(), channel_id: None, enabled: true, rename_enabled: true, messages_enabled: true })
+    async fn get_config(&self, g: &str) -> Result<TauntsConfig, DomainError> {
+        Ok(TauntsConfig { guild_id: g.into(), channel_id: None, enabled: true, rename_enabled: true, messages_enabled: true })
     }
     async fn set_channel(&self, _: &str, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
     async fn set_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }
@@ -377,7 +377,7 @@ fn make_player(user_id: &str, level: i32, hp: i32) -> CoudePlayer {
         total_earned: 0, total_lost: 0, total_stolen: 0,
         cowardice_count: 0, chaos_events: 0, casino_wins: 0, casino_losses: 0,
         level, xp: 0, stat_points: 0, atk: 0, def: 0,
-        class: Some(CoudeClass::Tank), title: None, class_changed_at: None,
+        class: Some(PlayerClass::Tank), title: None, class_changed_at: None,
         hp_current: hp, hp_max: 100, hp_last_regen: None, repos_last_used: None,
         season: 1, created_at: now, updated_at: now,
     }
@@ -454,7 +454,7 @@ async fn resolve_now_refuses_surprise_when_defender_has_explosion() {
     *players_uc.defender.lock().unwrap() = Some(make_player("def", 10, 100));
     *inventory_uc.has_explosion.lock().unwrap() = true;
 
-    // surprise_allow_defender_counter est true par default dans CoudeBalanceParams.
+    // surprise_allow_defender_counter est true par default dans BalanceParams.
     let err = svc.resolve_now(Uuid::new_v4()).await.unwrap_err();
     assert!(matches!(err, DomainError::Conflict(_)));
     assert!(format!("{err:?}").contains("surprise_defender_can_counter"));

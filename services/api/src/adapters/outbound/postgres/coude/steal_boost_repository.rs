@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeStealBoostRepository` (Phase 9 Part C).
+//! Impl Postgres de `StealBoostRepository` (Phase 9 Part C).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -8,17 +8,17 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::steal_boost_repository::CoudeStealBoostRepository;
+use crate::ports::outbound::coude::steal_boost_repository::StealBoostRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "steal_boost";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeStealBoostRepository {
+pub struct PgStealBoostRepository {
     pool: PgPool,
 }
 
-impl PgCoudeStealBoostRepository {
+impl PgStealBoostRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -48,7 +48,7 @@ impl From<BoostRow> for CoudeStealBoost {
 }
 
 #[async_trait]
-impl CoudeStealBoostRepository for PgCoudeStealBoostRepository {
+impl StealBoostRepository for PgStealBoostRepository {
     async fn list_active(
         &self,
         guild_id: &str,

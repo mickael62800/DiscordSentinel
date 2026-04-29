@@ -19,7 +19,7 @@ use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
 use crate::domain::entities::coude::tout_ou_rien::ToutOuRienOutcome;
 use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
 use crate::domain::entities::coude::player::XpProgress;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
@@ -27,9 +27,9 @@ use crate::ports::inbound::casino::manage_wallet::WalletMutation;
 use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienCommand;
 use crate::ports::inbound::coude::play_tout_ou_rien::PlayToutOuRienUseCase;
 use crate::ports::inbound::coude::play_tout_ou_rien::MIN_BALANCE_FOR_PLAY;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
-use crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
+use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
 // ── Mocks (minimal — seules les methodes utilisees sont implementees) ─
 
 struct MockPlayerRepo {
@@ -37,7 +37,7 @@ struct MockPlayerRepo {
 }
 
 #[async_trait]
-impl CoudePlayerRepository for MockPlayerRepo {
+impl PlayerRepository for MockPlayerRepo {
     async fn get_or_create(&self, g: &str, u: &str, name: &str) -> Result<CoudePlayer, DomainError> {
         let now = Utc::now();
         Ok(CoudePlayer {
@@ -50,7 +50,7 @@ impl CoudePlayerRepository for MockPlayerRepo {
             cowardice_count: 0, chaos_events: 0,
             casino_wins: 0, casino_losses: 0,
             level: 1, xp: 0, stat_points: 0, atk: 0, def: 0,
-            class: Some(CoudeClass::Tank), title: None, class_changed_at: None,
+            class: Some(PlayerClass::Tank), title: None, class_changed_at: None,
             hp_current: 100, hp_max: 100, hp_last_regen: None, repos_last_used: None,
             season: 1, created_at: now, updated_at: now,
         })
@@ -89,7 +89,7 @@ struct MockSocialRepo {
 }
 
 #[async_trait]
-impl CoudeSocialRepository for MockSocialRepo {
+impl SocialRepository for MockSocialRepo {
     async fn get_cooldown(&self, _: &str, _: &str, _: &str) -> Result<Option<DateTime<Utc>>, DomainError> {
         Ok(*self.cooldown.lock().unwrap())
     }
@@ -133,7 +133,7 @@ struct MockLogRepo {
 }
 
 #[async_trait]
-impl CoudeToutOuRienRepository for MockLogRepo {
+impl ToutOuRienRepository for MockLogRepo {
     async fn record(&self, g: &str, u: &str, _name: &str, mise: i64, outcome: ToutOuRienLogOutcome, delta: i64) -> Result<(), DomainError> {
         self.records.lock().unwrap().push((g.into(), u.into(), mise, outcome, delta));
         Ok(())

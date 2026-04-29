@@ -4,20 +4,20 @@ use async_trait::async_trait;
 
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::entities::coude::player::CoudePlayer;
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::taunts_repository::CoudeTauntsRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::taunts_repository::TauntsRepository;
 // ══════════════════════════════════════════════════════════
 // Mocks
 // ══════════════════════════════════════════════════════════
 
 struct MockTauntsRepo {
-    config: Mutex<CoudeTauntsConfig>,
+    config: Mutex<TauntsConfig>,
     opted_out: Mutex<bool>,
     opt_out_calls: Mutex<Vec<(String, bool)>>,
     set_channel_calls: Mutex<Vec<Option<String>>>,
@@ -28,8 +28,8 @@ struct MockTauntsRepo {
 }
 
 impl MockTauntsRepo {
-    fn default_config() -> CoudeTauntsConfig {
-        CoudeTauntsConfig {
+    fn default_config() -> TauntsConfig {
+        TauntsConfig {
             guild_id: "g".into(),
             channel_id: Some("chan-1".into()),
             enabled: true,
@@ -49,15 +49,15 @@ impl MockTauntsRepo {
             opt_outs_list: Mutex::new(vec![]),
         }
     }
-    fn with_config(self, f: impl FnOnce(&mut CoudeTauntsConfig)) -> Self {
+    fn with_config(self, f: impl FnOnce(&mut TauntsConfig)) -> Self {
         f(&mut *self.config.lock().unwrap());
         self
     }
 }
 
 #[async_trait]
-impl CoudeTauntsRepository for MockTauntsRepo {
-    async fn get_or_init_config(&self, _: &str) -> Result<CoudeTauntsConfig, DomainError> {
+impl TauntsRepository for MockTauntsRepo {
+    async fn get_or_init_config(&self, _: &str) -> Result<TauntsConfig, DomainError> {
         Ok(self.config.lock().unwrap().clone())
     }
     async fn set_channel(&self, _: &str, c: Option<&str>) -> Result<(), DomainError> {
@@ -97,7 +97,7 @@ struct MockPlayerRepo {
 }
 
 #[async_trait]
-impl CoudePlayerRepository for MockPlayerRepo {
+impl PlayerRepository for MockPlayerRepo {
     async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { unimplemented!() }
     async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { unimplemented!() }
     async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { unimplemented!() }

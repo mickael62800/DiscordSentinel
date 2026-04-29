@@ -1,11 +1,11 @@
-//! Tests d'integration postgres pour PgCoudeCashboxRepository.
+//! Tests d'integration postgres pour PgCashboxRepository.
 
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::cashbox_repository::PgCoudeCashboxRepository;
+use sentinel_api::adapters::outbound::postgres::coude::cashbox_repository::PgCashboxRepository;
 use sentinel_api::domain::entities::coude::cashbox::CashboxSource;
-use sentinel_api::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use sentinel_api::ports::outbound::coude::cashbox_repository::CashboxRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -18,7 +18,7 @@ fn fresh_id() -> String {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_or_create_initializes_balance_zero() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     let cb = repo.get_or_create(&g).await.unwrap();
     assert_eq!(cb.guild_id, g);
@@ -29,7 +29,7 @@ async fn get_or_create_initializes_balance_zero() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn deposit_increases_balance_and_total_collected() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     repo.deposit(&g, 100, CashboxSource::ShopPurchase).await.unwrap();
     repo.deposit(&g, 200, CashboxSource::BetCommission).await.unwrap();
@@ -40,7 +40,7 @@ async fn deposit_increases_balance_and_total_collected() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn deposit_creates_cashbox_if_absent() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     // deposit sans get_or_create prealable.
     repo.deposit(&g, 50, CashboxSource::DonationTax).await.unwrap();
@@ -50,7 +50,7 @@ async fn deposit_creates_cashbox_if_absent() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn withdraw_clamps_to_balance() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     repo.deposit(&g, 100, CashboxSource::ShopPurchase).await.unwrap();
     // Demande 300 -> clamp a 100 disponible
@@ -64,7 +64,7 @@ async fn withdraw_clamps_to_balance() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn withdraw_partial_amount() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     repo.deposit(&g, 500, CashboxSource::ShopPurchase).await.unwrap();
     let actual = repo.withdraw(&g, 200).await.unwrap();
@@ -74,7 +74,7 @@ async fn withdraw_partial_amount() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn claim_all_for_redistribution_empties_cashbox() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     repo.deposit(&g, 750, CashboxSource::BetCommission).await.unwrap();
     let claimed = repo.claim_all_for_redistribution(&g).await.unwrap();
@@ -84,14 +84,14 @@ async fn claim_all_for_redistribution_empties_cashbox() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn claim_all_empty_cashbox_returns_zero() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     assert_eq!(repo.claim_all_for_redistribution(&g).await.unwrap(), 0);
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_redistribution_persists_entries() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     let g = fresh_id();
     let entries = vec![
         ("u1".to_string(), "Alice".to_string(), 100),
@@ -112,12 +112,12 @@ async fn record_redistribution_persists_entries() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_redistributions_empty_when_none() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     assert!(repo.list_redistributions(&fresh_id(), 10).await.unwrap().is_empty());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_active_players_empty_when_no_combat() {
-    let repo = PgCoudeCashboxRepository::new(pool().await);
+    let repo = PgCashboxRepository::new(pool().await);
     assert!(repo.list_active_players(&fresh_id(), 7).await.unwrap().is_empty());
 }

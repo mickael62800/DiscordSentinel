@@ -23,7 +23,7 @@ use rand::Rng;
 use tracing::info;
 
 use crate::domain::entities::coude::heist::compute_success_chance;
-use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::heist::HeistOutcome;
 use crate::domain::entities::coude::heist::HEIST_GAIN_MAX_PERCENT;
 use crate::domain::entities::coude::heist::HEIST_GAIN_MIN_PERCENT;
@@ -34,23 +34,23 @@ use crate::ports::inbound::coude::manage_heist::ManageCoudeHeistUseCase;
 use crate::ports::inbound::coude::manage_heist::PrisonStatusInfo;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
-use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
+use crate::ports::outbound::coude::heist_repository::HeistRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 pub struct ManageCoudeHeistService {
-    heist_repo: Arc<dyn CoudeHeistRepository>,
-    cashbox_repo: Arc<dyn CoudeCashboxRepository>,
+    heist_repo: Arc<dyn HeistRepository>,
+    cashbox_repo: Arc<dyn CashboxRepository>,
     inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
     wallet_repo: Arc<dyn WalletRepository>,
     bot_config_repo: Arc<dyn BotConfigRepository>,
-    player_repo: Option<Arc<dyn CoudePlayerRepository>>,
+    player_repo: Option<Arc<dyn PlayerRepository>>,
 }
 
 impl ManageCoudeHeistService {
     pub fn new(
-        heist_repo: Arc<dyn CoudeHeistRepository>,
-        cashbox_repo: Arc<dyn CoudeCashboxRepository>,
+        heist_repo: Arc<dyn HeistRepository>,
+        cashbox_repo: Arc<dyn CashboxRepository>,
         inventory_uc: Arc<dyn ManageCoudeInventoryUseCase>,
         wallet_repo: Arc<dyn WalletRepository>,
         bot_config_repo: Arc<dyn BotConfigRepository>,
@@ -68,7 +68,7 @@ impl ManageCoudeHeistService {
     /// Branche le repo player (cf. COUPE_AMELIORATIONS 6.3) pour
     /// appliquer le multiplicateur de cooldown de la "Saison du
     /// Braquage".
-    pub fn with_player_repo(mut self, repo: Arc<dyn CoudePlayerRepository>) -> Self {
+    pub fn with_player_repo(mut self, repo: Arc<dyn PlayerRepository>) -> Self {
         self.player_repo = Some(repo);
         self
     }
@@ -86,7 +86,7 @@ impl ManageCoudeHeistService {
         crate::domain::entities::coude::season_theme::apply_season_braquage_cooldown(player.season, base_cooldown_days)
     }
 
-    async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
+    async fn load_balance(&self, guild_id: &str) -> BalanceParams {
         crate::application::coude::guild_settings::load_balance_params(
             &*self.bot_config_repo,
             guild_id,
@@ -158,7 +158,7 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             ));
         }
 
-        // 2. Check cooldown configurable (default 7 jours, cf. CoudeBalanceParams).
+        // 2. Check cooldown configurable (default 7 jours, cf. BalanceParams).
         //    Le multiplicateur de "Saison du Braquage" est applique dans
         //    get_cooldown_status (cf. COUPE_AMELIORATIONS 6.3).
         let params_early = self.load_balance(guild_id).await;
@@ -260,7 +260,7 @@ impl ManageCoudeHeistUseCase for ManageCoudeHeistService {
             // recourre donc a un hack temporaire : on fait un claim_all
             // puis on re-deposit la difference. C'est atomique cote DB
             // mais moche. Alternative propre : ajouter une methode
-            // withdraw au CoudeCashboxRepository. Faisons-le.
+            // withdraw au CashboxRepository. Faisons-le.
             self.cashbox_repo
                 .withdraw(guild_id, amount_stolen)
                 .await?;

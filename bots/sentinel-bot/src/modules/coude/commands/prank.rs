@@ -18,7 +18,7 @@ use sentinel_shared::discord_helpers::{reply_ephemeral, require_guild_id, reply_
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
-// Couts migres dans `CoudeConfig` (Phase 1 leftovers audit) :
+// Couts migres dans `Config` (Phase 1 leftovers audit) :
 //   prank_braquage_cost / prank_scoop_cost / prank_appel_cost.
 // Defaults preserves : 100c / 200c / 50c.
 //
@@ -149,7 +149,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 async fn execute_braquage(
     ctx: &Context,
     command: &CommandInteraction,
-    config: &crate::modules::coude::guild_config::CoudeConfig,
+    config: &crate::modules::coude::guild_config::Config,
 ) {
     let guild_id = command
         .guild_id
@@ -200,7 +200,7 @@ async fn execute_braquage(
 async fn execute_scoop(
     ctx: &Context,
     command: &CommandInteraction,
-    config: &crate::modules::coude::guild_config::CoudeConfig,
+    config: &crate::modules::coude::guild_config::Config,
     target: &serenity::model::user::User,
 ) {
     // Tirage cote API (catalogue `prank_scoop`).

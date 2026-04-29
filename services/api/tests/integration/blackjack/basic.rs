@@ -9,7 +9,7 @@ use sentinel_api::adapters::outbound::postgres::casino::blackjack_repository::Pg
 use sentinel_api::adapters::outbound::postgres::casino::wallet_repository::PgWalletRepository;
 use sentinel_api::application::casino::blackjack_service::BlackjackService;
 use sentinel_api::application::casino::manage_wallet_service::ManageWalletService;
-use sentinel_api::domain::entities::coude::taunt::CoudeTauntsConfig;
+use sentinel_api::domain::entities::coude::taunt::TauntsConfig;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
@@ -41,7 +41,7 @@ impl ManageCoudeTauntsUseCase for NoopTauntsUc {
     async fn on_bj_natural(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
     async fn on_bj_hand_won(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
     async fn on_bj_hand_bust(&self, _: &str, _: &str) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn get_config(&self, _: &str) -> Result<CoudeTauntsConfig, DomainError> { unimplemented!() }
+    async fn get_config(&self, _: &str) -> Result<TauntsConfig, DomainError> { unimplemented!() }
     async fn set_channel(&self, _: &str, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
     async fn set_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }
     async fn set_rename_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }

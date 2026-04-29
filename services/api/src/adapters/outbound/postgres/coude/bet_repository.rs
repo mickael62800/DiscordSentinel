@@ -14,7 +14,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 
 use super::super::pg_err;
-use crate::ports::outbound::coude::bet_repository::CoudeBetRepository;
+use crate::ports::outbound::coude::bet_repository::BetRepository;
 
 /// Refund "neutre" dans une tx en cours : credite les coins sans toucher
 /// `total_earned` (l'argent revient, ce n'est pas un gain) et log la tx wallet.
@@ -71,12 +71,12 @@ async fn bump_player_earned_in_tx(
     Ok(())
 }
 
-pub struct PgCoudeBetRepository {
+pub struct PgBetRepository {
     pool: PgPool,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
 }
 
-impl PgCoudeBetRepository {
+impl PgBetRepository {
     pub fn new(pool: PgPool, wallet_uc: Arc<dyn ManageWalletUseCase>) -> Self {
         Self { pool, wallet_uc }
     }
@@ -113,7 +113,7 @@ impl From<BetRow> for CoudeBet {
 
 
 #[async_trait]
-impl CoudeBetRepository for PgCoudeBetRepository {
+impl BetRepository for PgBetRepository {
     async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
         let rows: Vec<BetRow> = sqlx::query_as(
             r#"SELECT id, guild_id, combat_id, bettor_id, bettor_name, backed_id, amount, won, payout

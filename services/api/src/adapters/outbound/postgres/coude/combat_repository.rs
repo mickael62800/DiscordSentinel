@@ -12,12 +12,12 @@ use crate::domain::errors::DomainError;
 
 use super::super::pg_err;
 use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
-pub struct PgCoudeCombatRepository {
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
+pub struct PgCombatRepository {
     pool: PgPool,
 }
 
-impl PgCoudeCombatRepository {
+impl PgCombatRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -86,7 +86,7 @@ impl From<CombatRow> for CoudeCombat {
 
 
 #[async_trait]
-impl CoudeCombatRepository for PgCoudeCombatRepository {
+impl CombatRepository for PgCombatRepository {
     async fn list(
         &self,
         guild_id: &str,
@@ -484,9 +484,9 @@ impl CoudeCombatRepository for PgCoudeCombatRepository {
 }
 
 #[async_trait]
-impl CombatQueryRepository for PgCoudeCombatRepository {
+impl CombatQueryRepository for PgCombatRepository {
     async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError> {
-        match CoudeCombatRepository::get(self, id).await? {
+        match CombatRepository::get(self, id).await? {
             Some(c) => Ok(c),
             None => Err(DomainError::NotFound("Combat introuvable".into())),
         }

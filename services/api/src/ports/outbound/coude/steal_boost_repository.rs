@@ -7,7 +7,7 @@ use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeStealBoostRepository: Send + Sync {
+pub trait StealBoostRepository: Send + Sync {
     async fn list_active(
         &self,
         guild_id: &str,

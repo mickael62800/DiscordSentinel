@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use sqlx::Postgres;
 use sqlx::Transaction;
 use crate::application::coude::manage_economy_service::ManageCoudeEconomyService;
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::taunt::StreakKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
@@ -13,7 +13,7 @@ use crate::ports::inbound::coude::manage_taunts::ManageCoudeTauntsUseCase;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use crate::ports::inbound::casino::manage_wallet::WalletMutation;
-use crate::ports::outbound::coude::economy_repository::CoudeEconomyRepository;
+use crate::ports::outbound::coude::economy_repository::EconomyRepository;
 
 struct MockEconomyRepo {
     coins: Mutex<std::collections::HashMap<String, i64>>,
@@ -39,7 +39,7 @@ impl MockEconomyRepo {
     }
 }
 #[async_trait]
-impl CoudeEconomyRepository for MockEconomyRepo {
+impl EconomyRepository for MockEconomyRepo {
     async fn record_steal_stats(&self, g: &str, thief: &str, victim: &str, amount: i64) -> Result<(), DomainError> {
         self.stats_calls.lock().unwrap().push((g.into(), thief.into(), victim.into(), amount));
         Ok(())
@@ -155,8 +155,8 @@ impl ManageCoudeTauntsUseCase for MockTauntsUc {
             Ok(None)
         }
     }
-    async fn get_config(&self, _: &str) -> Result<CoudeTauntsConfig, DomainError> {
-        Ok(CoudeTauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false, rename_enabled: true, messages_enabled: true })
+    async fn get_config(&self, _: &str) -> Result<TauntsConfig, DomainError> {
+        Ok(TauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false, rename_enabled: true, messages_enabled: true })
     }
     async fn set_channel(&self, _: &str, _: Option<&str>) -> Result<(), DomainError> { Ok(()) }
     async fn set_enabled(&self, _: &str, _: bool) -> Result<(), DomainError> { Ok(()) }

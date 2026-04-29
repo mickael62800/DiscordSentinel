@@ -15,7 +15,7 @@ struct MockRepo {
 }
 
 #[async_trait]
-impl CoudeInventoryRepository for MockRepo {
+impl InventoryRepository for MockRepo {
     async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> { Ok(vec![]) }
     async fn add_item(&self, g: &str, u: &str, k: &str) -> Result<(), DomainError> {
         self.items_added.lock().unwrap().push((g.into(), u.into(), k.into()));
@@ -116,7 +116,7 @@ async fn expire_insurance_not_found_returns_error() {
     #[derive(Default)]
     struct FailExpireRepo;
     #[async_trait]
-    impl CoudeInventoryRepository for FailExpireRepo {
+    impl InventoryRepository for FailExpireRepo {
         async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> { Ok(vec![]) }
         async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
         async fn use_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
@@ -150,7 +150,7 @@ struct RichMockRepo {
     expire_calls: StdMutex<Vec<Uuid>>,
 }
 #[async_trait]
-impl CoudeInventoryRepository for RichMockRepo {
+impl InventoryRepository for RichMockRepo {
     async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> {
         Ok(self.inventory.lock().unwrap().clone())
     }

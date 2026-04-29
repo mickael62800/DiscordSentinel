@@ -38,7 +38,7 @@ impl DoubleCoupMode {
 /// Parametres mecaniques du jeu Coup de Coude, charges depuis
 /// `bot_guild_config` pour une guild donnee.
 #[derive(Debug, Clone, Copy)]
-pub struct CoudeBalanceParams {
+pub struct BalanceParams {
     /// PV min (%) attaquant requis pour utiliser Surprise. 0 = desactive.
     pub surprise_min_hp_pct: u64,
     /// Defenseur peut repondre avec Explosion a une Surprise.
@@ -70,7 +70,7 @@ pub struct CoudeBalanceParams {
     pub heist_prison_hours: u64,
 }
 
-impl Default for CoudeBalanceParams {
+impl Default for BalanceParams {
     fn default() -> Self {
         Self {
             surprise_min_hp_pct: 40,
@@ -91,7 +91,7 @@ impl Default for CoudeBalanceParams {
     }
 }
 
-impl CoudeBalanceParams {
+impl BalanceParams {
     /// Construit les parametres depuis une map cle→valeur (typiquement
     /// la config guild chargee depuis `bot_guild_config`). Toute cle
     /// manquante ou invalide retombe sur le default.

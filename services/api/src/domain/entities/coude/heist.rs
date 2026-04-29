@@ -160,7 +160,7 @@ where
 
 /// Une tentative de braquage enregistree (log pour cooldown + historique).
 #[derive(Debug, Clone)]
-pub struct CoudeHeistAttempt {
+pub struct HeistAttempt {
     pub id: Uuid,
     pub guild_id: String,
     pub user_id: String,
@@ -173,7 +173,7 @@ pub struct CoudeHeistAttempt {
 
 /// Etat d'incarceration d'un joueur.
 #[derive(Debug, Clone)]
-pub struct CoudePrisonState {
+pub struct PrisonState {
     pub guild_id: String,
     pub user_id: String,
     pub released_at: DateTime<Utc>,
@@ -181,7 +181,7 @@ pub struct CoudePrisonState {
     pub created_at: DateTime<Utc>,
 }
 
-impl CoudePrisonState {
+impl PrisonState {
     /// `true` si le joueur est actuellement en prison (released_at > now).
     pub fn is_active(&self) -> bool {
         self.released_at > Utc::now()

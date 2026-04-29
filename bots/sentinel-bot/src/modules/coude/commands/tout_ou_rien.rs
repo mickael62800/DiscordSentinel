@@ -21,7 +21,7 @@ use crate::modules::coude::api_client::PlayToutOuRienResp;
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
-// Duree migree dans `CoudeConfig::tout_ou_rien_animation_secs` (default 10).
+// Duree migree dans `Config::tout_ou_rien_animation_secs` (default 10).
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("tout-ou-rien")

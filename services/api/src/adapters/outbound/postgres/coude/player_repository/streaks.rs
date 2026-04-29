@@ -3,9 +3,9 @@
 use crate::domain::errors::DomainError;
 
 use super::super::super::pg_err;
-use super::PgCoudePlayerRepository;
+use super::PgPlayerRepository;
 pub(super) async fn touch_win_streak(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Option<i32>, DomainError> {
@@ -26,7 +26,7 @@ pub(super) async fn touch_win_streak(
 }
 
 pub(super) async fn touch_loss_streak(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Option<i32>, DomainError> {
@@ -47,7 +47,7 @@ pub(super) async fn touch_loss_streak(
 }
 
 pub(super) async fn reset_combat_streaks(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<(), DomainError> {
@@ -67,7 +67,7 @@ pub(super) async fn reset_combat_streaks(
 }
 
 pub(super) async fn touch_steal_victim_streak(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Option<i32>, DomainError> {
@@ -87,7 +87,7 @@ pub(super) async fn touch_steal_victim_streak(
 }
 
 pub(super) async fn reset_steal_victim_streak(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<(), DomainError> {
@@ -107,7 +107,7 @@ pub(super) async fn reset_steal_victim_streak(
 // ── Blackjack streaks (migration 139) ──
 
 pub(super) async fn touch_bj_win_streak(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Option<i32>, DomainError> {
@@ -128,7 +128,7 @@ pub(super) async fn touch_bj_win_streak(
 }
 
 pub(super) async fn touch_bj_bust_streak(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<Option<i32>, DomainError> {
@@ -149,7 +149,7 @@ pub(super) async fn touch_bj_bust_streak(
 }
 
 pub(super) async fn reset_bj_bust_streak(
-    repo: &PgCoudePlayerRepository,
+    repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
 ) -> Result<(), DomainError> {

@@ -27,11 +27,11 @@ use uuid::Uuid;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase;
 use crate::ports::inbound::coude::manage_cashbox::RedistributionOutcome;
-use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 /// Nombre max de gagnants par redistribution. Au-dela, on ne cape pas
 /// strictement : on met la valeur en env var lors de l'init ou on cape ici.
@@ -47,13 +47,13 @@ const MAX_WINNERS: usize = 20;
 const ACTIVE_WINDOW_DAYS: i64 = 7;
 
 pub struct ManageCoudeCashboxService {
-    repo: Arc<dyn CoudeCashboxRepository>,
+    repo: Arc<dyn CashboxRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
 }
 
 impl ManageCoudeCashboxService {
     pub fn new(
-        repo: Arc<dyn CoudeCashboxRepository>,
+        repo: Arc<dyn CashboxRepository>,
         wallet_repo: Arc<dyn WalletRepository>,
     ) -> Self {
         Self { repo, wallet_repo }
@@ -98,7 +98,7 @@ impl ManageCoudeCashboxService {
 
 #[async_trait]
 impl ManageCoudeCashboxUseCase for ManageCoudeCashboxService {
-    async fn get_cashbox(&self, guild_id: &str) -> Result<CoudeCashbox, DomainError> {
+    async fn get_cashbox(&self, guild_id: &str) -> Result<Cashbox, DomainError> {
         self.repo.get_or_create(guild_id).await
     }
 

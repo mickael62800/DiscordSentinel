@@ -7,24 +7,24 @@ use crate::domain::entities::coude::combat_validation::check_min_hp_pct;
 use crate::domain::entities::coude::combat_validation::check_surprise_hp_pct;
 use crate::domain::entities::coude::combat_validation::validate_new_combat;
 use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::combat::CoudeCombat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
-use crate::ports::outbound::coude::combat_repository::CoudeCombatRepository;
+use crate::ports::outbound::coude::combat_repository::CombatRepository;
 pub struct ManageCoudeCombatsService {
-    repo: Arc<dyn CoudeCombatRepository>,
+    repo: Arc<dyn CombatRepository>,
     /// Optionnel : requis pour appliquer le gate `surprise_min_hp_percent`.
     players_uc: Option<Arc<dyn ManageCoudePlayersUseCase>>,
-    /// Optionnel : requis pour lire `CoudeBalanceParams` depuis la config guild.
+    /// Optionnel : requis pour lire `BalanceParams` depuis la config guild.
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeCombatsService {
-    pub fn new(repo: Arc<dyn CoudeCombatRepository>) -> Self {
+    pub fn new(repo: Arc<dyn CombatRepository>) -> Self {
         Self {
             repo,
             players_uc: None,
@@ -45,9 +45,9 @@ impl ManageCoudeCombatsService {
         self
     }
 
-    async fn load_balance(&self, guild_id: &str) -> CoudeBalanceParams {
+    async fn load_balance(&self, guild_id: &str) -> BalanceParams {
         let Some(repo) = self.bot_config_repo.as_ref() else {
-            return CoudeBalanceParams::default();
+            return BalanceParams::default();
         };
         crate::application::coude::guild_settings::load_balance_params(&**repo, guild_id).await
     }

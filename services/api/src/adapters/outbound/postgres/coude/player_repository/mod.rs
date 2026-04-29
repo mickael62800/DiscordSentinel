@@ -9,14 +9,14 @@ use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 
 use crate::adapters::outbound::postgres::pg_err;
-use crate::domain::enums::coude::coude_class::CoudeClass;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use crate::domain::enums::coude::coude_class::PlayerClass;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
 
-pub struct PgCoudePlayerRepository {
+pub struct PgPlayerRepository {
     pool: PgPool,
 }
 
-impl PgCoudePlayerRepository {
+impl PgPlayerRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -61,7 +61,7 @@ struct PlayerRow {
     stat_points: i32,
     atk: i32,
     def: i32,
-    class: Option<CoudeClass>,
+    class: Option<PlayerClass>,
     title: Option<String>,
     hp_current: i32,
     hp_max: i32,
@@ -118,7 +118,7 @@ mod read;
 mod streaks;
 
 #[async_trait]
-impl CoudePlayerRepository for PgCoudePlayerRepository {
+impl PlayerRepository for PgPlayerRepository {
     async fn get_or_create(
         &self,
         guild_id: &str,

@@ -19,7 +19,7 @@ pub struct ClassUltimate {
     pub cooldown_days: i64,
 }
 
-// `ULTIMATE_UNLOCK_LEVEL` migre dans `CoudeConfig::ultimate_unlock_level`
+// `ULTIMATE_UNLOCK_LEVEL` migre dans `Config::ultimate_unlock_level`
 // (Phase 1 leftovers audit). Default 10.
 
 pub const CLASS_ULTIMATES: &[ClassUltimate] = &[
@@ -70,7 +70,7 @@ pub fn ultimate_for_class(class_key: &str) -> Option<&'static ClassUltimate> {
 /// "🔄 Echange de carcasses (debloque) / cooldown N jours".
 ///
 /// `unlock_level` est passe par le caller (recupere via
-/// `CoudeConfig::ultimate_unlock_level`) pour permettre de surcharger
+/// `Config::ultimate_unlock_level`) pour permettre de surcharger
 /// le seuil par guild. Default historique = `ULTIMATE_UNLOCK_LEVEL`.
 pub fn format_ultimate_for_class(class_key: &str, level: i32, unlock_level: i32) -> String {
     let Some(u) = ultimate_for_class(class_key) else {

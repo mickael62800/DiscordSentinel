@@ -7,7 +7,7 @@
 
 use async_trait::async_trait;
 
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
 
@@ -110,7 +110,7 @@ pub trait ManageCoudeTauntsUseCase: Send + Sync {
 
     // ── Config (exposee par les RPCs d'admin) ──
 
-    async fn get_config(&self, guild_id: &str) -> Result<CoudeTauntsConfig, DomainError>;
+    async fn get_config(&self, guild_id: &str) -> Result<TauntsConfig, DomainError>;
 
     async fn set_channel(
         &self,

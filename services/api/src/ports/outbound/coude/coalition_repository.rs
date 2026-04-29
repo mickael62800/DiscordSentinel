@@ -7,7 +7,7 @@ use crate::domain::entities::coude::coalition::ActiveCoalition;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeCoalitionRepository: Send + Sync {
+pub trait CoalitionRepository: Send + Sync {
     /// Cree une coalition + ajoute le 1er membre. Echec Conflict si une
     /// coalition active/forming existe deja.
     async fn create_with_first_member(

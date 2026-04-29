@@ -1,7 +1,7 @@
 //! Tick de regen passive des HP.
 //!
 //! Phase 4 refacto : thin. La logique SQL vit dans l'API
-//! (`CoudePlayerRepository::regen_hp_tick` + RPC `HpRegenTick`).
+//! (`PlayerRepository::regen_hp_tick` + RPC `HpRegenTick`).
 //! Le worker ne fait que lire les taux depuis l'env et appeler le RPC.
 
 use sqlx::PgPool;

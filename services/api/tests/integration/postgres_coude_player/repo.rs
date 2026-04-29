@@ -1,12 +1,12 @@
-//! Tests d'integration postgres pour PgCoudePlayerRepository.
+//! Tests d'integration postgres pour PgPlayerRepository.
 //! Couvre les submodules mod, read, progression, combat_stats, streaks, hp.
 
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::player_repository::PgCoudePlayerRepository;
+use sentinel_api::adapters::outbound::postgres::coude::player_repository::PgPlayerRepository;
 use sentinel_api::domain::entities::coude::player::CombatStat;
-use sentinel_api::ports::outbound::coude::player_repository::CoudePlayerRepository;
+use sentinel_api::ports::outbound::coude::player_repository::PlayerRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -21,7 +21,7 @@ fn fresh_id() -> String {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_or_create_creates_new_player() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     let p = repo.get_or_create(&g, &u, "Alice").await.unwrap();
     assert_eq!(p.guild_id, g);
@@ -32,7 +32,7 @@ async fn get_or_create_creates_new_player() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_or_create_updates_username_on_rename() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "OldName").await.unwrap();
     let p = repo.get_or_create(&g, &u, "NewName").await.unwrap();
@@ -41,7 +41,7 @@ async fn get_or_create_updates_username_on_rename() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_returns_some_when_exists() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     let got = repo.get(&g, &u).await.unwrap().unwrap();
@@ -50,7 +50,7 @@ async fn get_returns_some_when_exists() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_returns_none_when_absent() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     assert!(repo.get(&fresh_id(), &fresh_id()).await.unwrap().is_none());
 }
 
@@ -60,7 +60,7 @@ async fn list_scoped_to_guild() {
     // rafraichir manuellement apres des inserts pour que les donnees soient
     // visibles.
     let p = pool().await;
-    let repo = PgCoudePlayerRepository::new(p.clone());
+    let repo = PgPlayerRepository::new(p.clone());
     let g = fresh_id();
     for _ in 0..3 {
         repo.get_or_create(&g, &fresh_id(), "X").await.unwrap();
@@ -73,7 +73,7 @@ async fn list_scoped_to_guild() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_guild_ids_returns_distinct() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g1 = fresh_id(); let g2 = fresh_id();
     repo.get_or_create(&g1, &fresh_id(), "A").await.unwrap();
     repo.get_or_create(&g2, &fresh_id(), "B").await.unwrap();
@@ -85,7 +85,7 @@ async fn list_guild_ids_returns_distinct() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn random_active_requires_min_coins() {
     let p = pool().await;
-    let repo = PgCoudePlayerRepository::new(p.clone());
+    let repo = PgPlayerRepository::new(p.clone());
     let g = fresh_id();
     let rich_user = fresh_id();
     let poor_user = fresh_id();
@@ -111,7 +111,7 @@ async fn random_active_requires_min_coins() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn update_class_sets_class_and_changed_at() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     assert!(repo.update_class(&g, &u, "bourrin").await.unwrap());
@@ -121,7 +121,7 @@ async fn update_class_sets_class_and_changed_at() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_xp_increments_xp_and_levels_up() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     let progress = repo.add_xp(&g, &u, 200).await.unwrap().unwrap();
@@ -131,14 +131,14 @@ async fn add_xp_increments_xp_and_levels_up() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_xp_none_for_unknown_player() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     assert!(repo.add_xp(&fresh_id(), &fresh_id(), 100).await.unwrap().is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn spend_stat_point_requires_points_available() {
     let p = pool().await;
-    let repo = PgCoudePlayerRepository::new(p.clone());
+    let repo = PgPlayerRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     // Default stat_points = 0 → doit retourner None.
@@ -154,7 +154,7 @@ async fn spend_stat_point_requires_points_available() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn spend_stat_point_def_also_increases_hp_max() {
     let p = pool().await;
-    let repo = PgCoudePlayerRepository::new(p.clone());
+    let repo = PgPlayerRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     sqlx::query("UPDATE coude_players SET stat_points = 5 WHERE guild_id = $1 AND user_id = $2")
@@ -171,7 +171,7 @@ async fn spend_stat_point_def_also_increases_hp_max() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn add_xp_no_level_up_when_amount_too_small() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     let progress = repo.add_xp(&g, &u, 5).await.unwrap().unwrap();
@@ -182,7 +182,7 @@ async fn add_xp_no_level_up_when_amount_too_small() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn update_class_unknown_player_returns_false() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let ok = repo.update_class(&fresh_id(), &fresh_id(), "tank").await.unwrap();
     assert!(!ok);
 }
@@ -191,7 +191,7 @@ async fn update_class_unknown_player_returns_false() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_win_increments_wins_and_earnings() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     assert!(repo.record_win(&g, &u, 100, 50).await.unwrap());
@@ -203,7 +203,7 @@ async fn record_win_increments_wins_and_earnings() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_loss_and_draw() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     repo.record_loss(&g, &u, 30).await.unwrap();
@@ -216,7 +216,7 @@ async fn record_loss_and_draw() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn increment_cowardice_returns_new_count() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     assert_eq!(repo.increment_cowardice(&g, &u).await.unwrap(), Some(1));
@@ -225,7 +225,7 @@ async fn increment_cowardice_returns_new_count() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn increment_chaos_returns_bool() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     assert!(repo.increment_chaos(&g, &u).await.unwrap());
@@ -237,7 +237,7 @@ async fn increment_chaos_returns_bool() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn touch_win_streak_increments() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     assert_eq!(repo.touch_win_streak(&g, &u).await.unwrap(), Some(1));
@@ -246,7 +246,7 @@ async fn touch_win_streak_increments() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn touch_loss_streak_resets_win() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     repo.touch_win_streak(&g, &u).await.unwrap();
@@ -258,7 +258,7 @@ async fn touch_loss_streak_resets_win() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn reset_combat_streaks_sets_both_to_zero() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     repo.touch_win_streak(&g, &u).await.unwrap();
@@ -269,7 +269,7 @@ async fn reset_combat_streaks_sets_both_to_zero() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn steal_victim_streak_touch_and_reset() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     assert_eq!(repo.touch_steal_victim_streak(&g, &u).await.unwrap(), Some(1));
@@ -279,7 +279,7 @@ async fn steal_victim_streak_touch_and_reset() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn bj_streaks_win_resets_bust_and_vice_versa() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     assert_eq!(repo.touch_bj_win_streak(&g, &u).await.unwrap(), Some(1));
@@ -295,7 +295,7 @@ async fn bj_streaks_win_resets_bust_and_vice_versa() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn record_coins_earned_and_lost_update_stats() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     repo.record_coins_earned(&g, &u, 500).await.unwrap();
@@ -309,7 +309,7 @@ async fn record_coins_earned_and_lost_update_stats() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn update_hp_sets_current_and_max() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     repo.update_hp(&g, &u, 42, 150).await.unwrap();
@@ -320,7 +320,7 @@ async fn update_hp_sets_current_and_max() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn full_heal_sets_hp_current_to_hp_max() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.get_or_create(&g, &u, "A").await.unwrap();
     repo.update_hp(&g, &u, 10, 100).await.unwrap();
@@ -332,7 +332,7 @@ async fn full_heal_sets_hp_current_to_hp_max() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn regen_hp_tick_does_not_panic() {
-    let repo = PgCoudePlayerRepository::new(pool().await);
+    let repo = PgPlayerRepository::new(pool().await);
     // Pas d'assertion metier complexe : juste verifier que la query tourne
     // sans erreur sur des joueurs existants (le worker appelle cette methode
     // periodiquement).

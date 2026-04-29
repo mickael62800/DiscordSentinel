@@ -10,7 +10,7 @@ use crate::domain::entities::coude::combat::*;
 use crate::domain::entities::coude::inventory::*;
 use crate::domain::entities::coude::player::*;
 use crate::domain::entities::coude::social::*;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use chrono::Utc;
 use uuid::Uuid;
 
@@ -23,7 +23,7 @@ fn sample_player() -> CoudePlayer {
         total_earned: 2000, total_lost: 500, total_stolen: 100,
         cowardice_count: 1, chaos_events: 3, casino_wins: 10, casino_losses: 5,
         level: 8, xp: 1500, stat_points: 2, atk: 5, def: 3,
-        class: Some(CoudeClass::Tank), title: Some("Guerrier".into()), class_changed_at: None,
+        class: Some(PlayerClass::Tank), title: Some("Guerrier".into()), class_changed_at: None,
         hp_current: 80, hp_max: 100, hp_last_regen: None, repos_last_used: None,
         season: 2, created_at: now, updated_at: now,
     }

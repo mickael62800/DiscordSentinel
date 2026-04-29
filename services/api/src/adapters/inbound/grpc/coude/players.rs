@@ -15,7 +15,7 @@ use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerService;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::domain::entities::coude::player::CoudePlayer;
 use crate::domain::entities::coude::player::XpProgress;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 
@@ -58,7 +58,7 @@ impl CoudePlayerService for CoudePlayerGrpc {
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
         // On valide la classe pour eviter d'envoyer une string invalide en BDD.
-        if CoudeClass::from_str_lossy(&req.class).is_none() {
+        if PlayerClass::from_str_lossy(&req.class).is_none() {
             return Err(Status::invalid_argument(format!(
                 "Classe '{}' inconnue",
                 req.class

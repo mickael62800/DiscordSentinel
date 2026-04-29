@@ -1,6 +1,6 @@
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::enums::coude::coude_class::CoudeClass;
+use crate::domain::enums::coude::coude_class::PlayerClass;
 
 /// Niveau maximum atteignable par un joueur.
 pub const COUDE_MAX_LEVEL: i32 = 25;
@@ -52,7 +52,7 @@ pub struct CoudePlayer {
     pub stat_points: i32,
     pub atk: i32,
     pub def: i32,
-    pub class: Option<CoudeClass>,
+    pub class: Option<PlayerClass>,
     pub title: Option<String>,
     pub class_changed_at: Option<DateTime<Utc>>,
     // ── HP ──

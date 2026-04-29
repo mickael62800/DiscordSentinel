@@ -11,7 +11,7 @@ use uuid::Uuid;
 
 /// Etat de la caisse d'une guild.
 #[derive(Debug, Clone)]
-pub struct CoudeCashbox {
+pub struct Cashbox {
     pub guild_id: String,
     pub balance: i64,
     pub total_collected: i64,

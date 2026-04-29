@@ -49,7 +49,20 @@
       "Bash(git stash *)",
       "Bash(git fetch *)",
       "Bash(docker exec *)",
-      "Bash(git status *)"
+      "Bash(git status *)",
+      "PowerShell(git status; Write-Output \"---\"; \\(git ls-files apps/ai-trainer | Measure-Object\\).Count)",
+      "PowerShell($env:Path += \";C:\\\\Program Files\\\\Git\\\\cmd\"; git status; Write-Output \"---TRACKED---\"; \\(git ls-files apps/ai-trainer | Measure-Object\\).Count)",
+      "PowerShell(gh *)",
+      "PowerShell(Test-Path *)",
+      "PowerShell(Test-Path apps\\\\ai-trainer\\\\node_modules; Test-Path ..\\\\ai-trainer; \\(Get-ChildItem apps\\\\ai-trainer -Force | Measure-Object\\).Count)",
+      "PowerShell(Move-Item *)",
+      "PowerShell(git *)",
+      "PowerShell(winget install *)",
+      "PowerShell(Get-ChildItem *)",
+      "PowerShell(gh auth *)",
+      "PowerShell(gh repo *)",
+      "PowerShell(git push *)",
+      "PowerShell(git remote *)"
     ]
   }
 }

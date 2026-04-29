@@ -5,7 +5,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 use crate::application::casino::manage_wallet_service::ManageWalletService;
-use crate::domain::entities::coude::taunt::CoudeTauntsConfig;
+use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::taunt::StreakKind;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::casino::wallet::Wallet;
@@ -151,8 +151,8 @@ impl ManageCoudeTauntsUseCase for MockTaunts {
         }
     }
     async fn on_generous_donor(&self, _g: &str, _u: &str, _a: i64) -> Result<Option<TauntEvent>, DomainError> { Ok(None) }
-    async fn get_config(&self, _g: &str) -> Result<CoudeTauntsConfig, DomainError> {
-        Ok(CoudeTauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false, rename_enabled: true, messages_enabled: true })
+    async fn get_config(&self, _g: &str) -> Result<TauntsConfig, DomainError> {
+        Ok(TauntsConfig { guild_id: "g".into(), channel_id: None, enabled: false, rename_enabled: true, messages_enabled: true })
     }
     async fn set_channel(&self, _g: &str, _c: Option<&str>) -> Result<(), DomainError> { Ok(()) }
     async fn set_enabled(&self, _g: &str, _e: bool) -> Result<(), DomainError> { Ok(()) }

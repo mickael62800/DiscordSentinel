@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::errors::DomainError;
 
 /// Resultat d'une redistribution (pour le retour RPC / page web).
@@ -23,7 +23,7 @@ pub struct RedistributionOutcome {
 #[async_trait]
 pub trait ManageCoudeCashboxUseCase: Send + Sync {
     /// Etat courant de la caisse.
-    async fn get_cashbox(&self, guild_id: &str) -> Result<CoudeCashbox, DomainError>;
+    async fn get_cashbox(&self, guild_id: &str) -> Result<Cashbox, DomainError>;
 
     /// Deposit d'un montant dans la caisse (appele par tous les flux qui
     /// retirent des coins de l'economie).

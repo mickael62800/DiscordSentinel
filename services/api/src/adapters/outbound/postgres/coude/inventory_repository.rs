@@ -11,13 +11,13 @@ use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 
 use super::super::pg_err;
-use crate::ports::outbound::coude::inventory_repository::CoudeInventoryRepository;
+use crate::ports::outbound::coude::inventory_repository::InventoryRepository;
 
-pub struct PgCoudeInventoryRepository {
+pub struct PgInventoryRepository {
     pool: PgPool,
 }
 
-impl PgCoudeInventoryRepository {
+impl PgInventoryRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -96,7 +96,7 @@ impl From<InsuranceRow> for CoudeInsurance {
 }
 
 #[async_trait]
-impl CoudeInventoryRepository for PgCoudeInventoryRepository {
+impl InventoryRepository for PgInventoryRepository {
     // ── Items ──
 
     async fn list_inventory(

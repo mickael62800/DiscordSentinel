@@ -1,13 +1,13 @@
-//! Tests d'integration postgres pour PgCoudeSocialRepository.
+//! Tests d'integration postgres pour PgSocialRepository.
 
 use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use sentinel_api::adapters::outbound::postgres::coude::social_repository::PgCoudeSocialRepository;
+use sentinel_api::adapters::outbound::postgres::coude::social_repository::PgSocialRepository;
 use sentinel_api::domain::entities::coude::social::LeaderboardCategory;
 use sentinel_api::domain::entities::coude::social::NewDailyChaos;
-use sentinel_api::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use sentinel_api::ports::outbound::coude::social_repository::SocialRepository;
 
 async fn pool() -> PgPool {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_|
@@ -22,14 +22,14 @@ fn fresh_id() -> String {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_cooldown_none_when_absent() {
-    let repo = PgCoudeSocialRepository::new(pool().await);
+    let repo = PgSocialRepository::new(pool().await);
     let got = repo.get_cooldown(&fresh_id(), &fresh_id(), "steal").await.unwrap();
     assert!(got.is_none());
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn set_and_get_cooldown_roundtrip() {
-    let repo = PgCoudeSocialRepository::new(pool().await);
+    let repo = PgSocialRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.set_cooldown(&g, &u, "steal", 3600).await.unwrap();
     let got = repo.get_cooldown(&g, &u, "steal").await.unwrap().unwrap();
@@ -40,7 +40,7 @@ async fn set_and_get_cooldown_roundtrip() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn set_cooldown_upserts_on_conflict() {
-    let repo = PgCoudeSocialRepository::new(pool().await);
+    let repo = PgSocialRepository::new(pool().await);
     let g = fresh_id(); let u = fresh_id();
     repo.set_cooldown(&g, &u, "steal", 60).await.unwrap();
     repo.set_cooldown(&g, &u, "steal", 7200).await.unwrap();
@@ -52,7 +52,7 @@ async fn set_cooldown_upserts_on_conflict() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn expired_cooldown_returns_none() {
     let p = pool().await;
-    let repo = PgCoudeSocialRepository::new(p.clone());
+    let repo = PgSocialRepository::new(p.clone());
     let g = fresh_id(); let u = fresh_id();
     // Seed direct : cooldown deja expire.
     sqlx::query(
@@ -66,7 +66,7 @@ async fn expired_cooldown_returns_none() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn leaderboard_empty_for_fresh_guild() {
-    let repo = PgCoudeSocialRepository::new(pool().await);
+    let repo = PgSocialRepository::new(pool().await);
     let got = repo.leaderboard(&fresh_id(), LeaderboardCategory::Richest, 10).await.unwrap();
     assert!(got.is_empty());
 }
@@ -76,7 +76,7 @@ async fn leaderboard_empty_for_fresh_guild() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn list_active_events_returns_only_active_and_not_expired() {
     let p = pool().await;
-    let repo = PgCoudeSocialRepository::new(p.clone());
+    let repo = PgSocialRepository::new(p.clone());
     let g = fresh_id();
     // Un event actif non expire, un inactif, un expire.
     sqlx::query(
@@ -101,7 +101,7 @@ async fn list_active_events_returns_only_active_and_not_expired() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn log_daily_chaos_and_count() {
-    let repo = PgCoudeSocialRepository::new(pool().await);
+    let repo = PgSocialRepository::new(pool().await);
     let g = fresh_id();
     assert_eq!(repo.count_daily_chaos_today(&g).await.unwrap(), 0);
     repo.log_daily_chaos(NewDailyChaos {
@@ -124,7 +124,7 @@ async fn log_daily_chaos_and_count() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn get_or_bootstrap_current_season_creates_first_season() {
-    let repo = PgCoudeSocialRepository::new(pool().await);
+    let repo = PgSocialRepository::new(pool().await);
     let g = fresh_id();
     let season = repo.get_or_bootstrap_current_season(&g).await.unwrap();
     assert!(season.season_number >= 1);

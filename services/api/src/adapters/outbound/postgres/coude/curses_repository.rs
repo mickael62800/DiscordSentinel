@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeCursesRepository` (cf. COUPE_AMELIORATIONS 5.1).
+//! Impl Postgres de `CursesRepository` (cf. COUPE_AMELIORATIONS 5.1).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -9,17 +9,17 @@ use uuid::Uuid;
 use crate::domain::entities::coude::curse::ActiveCurse;
 use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_curses";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeCursesRepository {
+pub struct PgCursesRepository {
     pool: PgPool,
 }
 
-impl PgCoudeCursesRepository {
+impl PgCursesRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -61,7 +61,7 @@ impl TryFrom<CurseRow> for ActiveCurse {
 }
 
 #[async_trait]
-impl CoudeCursesRepository for PgCoudeCursesRepository {
+impl CursesRepository for PgCursesRepository {
     async fn cast(
         &self,
         guild_id: &str,

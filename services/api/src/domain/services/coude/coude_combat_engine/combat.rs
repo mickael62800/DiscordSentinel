@@ -6,7 +6,7 @@ use super::classes;
 use super::progression;
 use super::PlayerLite as Player;
 use super::ServerEventLite as ServerEvent;
-use crate::domain::entities::coude::balance::CoudeBalanceParams;
+use crate::domain::entities::coude::balance::BalanceParams;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Flavor text ──
@@ -326,7 +326,7 @@ pub fn resolve_combat(
     special: Option<&str>,
     defender_special: Option<&str>,
     active_events: &[ServerEvent],
-    params: &CoudeBalanceParams,
+    params: &BalanceParams,
 ) -> CombatResult {
     resolve_combat_with_curses(
         attacker, defender, attacker_current_hp, defender_current_hp, mise, special,
@@ -343,7 +343,7 @@ pub fn resolve_combat_with_curses(
     special: Option<&str>,
     defender_special: Option<&str>,
     active_events: &[ServerEvent],
-    params: &CoudeBalanceParams,
+    params: &BalanceParams,
     curses: CombatCurses,
 ) -> CombatResult {
     // Pre-calcul des coefficients a partir des % config.
@@ -1100,7 +1100,7 @@ fn build_items_summary(
     def_name: &str,
     atk_special: Option<&str>,
     def_special: Option<&str>,
-    params: &CoudeBalanceParams,
+    params: &BalanceParams,
 ) -> String {
     let fmt = |who: &str, sp: &str| -> Option<String> {
         match sp {

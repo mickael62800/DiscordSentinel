@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeCashboxRepository`.
+//! Impl Postgres de `CashboxRepository`.
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -9,19 +9,19 @@ use uuid::Uuid;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::cashbox_repository::CoudeCashboxRepository;
+use crate::ports::outbound::coude::cashbox_repository::CashboxRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "cashbox";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeCashboxRepository {
+pub struct PgCashboxRepository {
     pool: PgPool,
 }
 
-impl PgCoudeCashboxRepository {
+impl PgCashboxRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -38,7 +38,7 @@ struct CashboxRow {
     updated_at: DateTime<Utc>,
 }
 
-impl From<CashboxRow> for CoudeCashbox {
+impl From<CashboxRow> for Cashbox {
     fn from(r: CashboxRow) -> Self {
         Self {
             guild_id: r.guild_id,
@@ -97,8 +97,8 @@ impl From<EntryRow> for CashboxRedistributionEntry {
 }
 
 #[async_trait]
-impl CoudeCashboxRepository for PgCoudeCashboxRepository {
-    async fn get_or_create(&self, guild_id: &str) -> Result<CoudeCashbox, DomainError> {
+impl CashboxRepository for PgCashboxRepository {
+    async fn get_or_create(&self, guild_id: &str) -> Result<Cashbox, DomainError> {
         let row: CashboxRow = sqlx::query_as(
             r#"INSERT INTO coude_cashbox (guild_id)
                VALUES ($1)

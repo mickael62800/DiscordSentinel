@@ -6,13 +6,13 @@ use uuid::Uuid;
 use crate::domain::entities::coude::cashbox::CashboxRedistribution;
 use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
-use crate::domain::entities::coude::cashbox::CoudeCashbox;
+use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeCashboxRepository: Send + Sync {
+pub trait CashboxRepository: Send + Sync {
     /// Recupere (ou cree sur demande) l'etat de la caisse d'une guild.
-    async fn get_or_create(&self, guild_id: &str) -> Result<CoudeCashbox, DomainError>;
+    async fn get_or_create(&self, guild_id: &str) -> Result<Cashbox, DomainError>;
 
     /// Ajoute des coins a la caisse. Atomic : cree la row si elle n'existe
     /// pas, sinon increment. Met a jour `total_collected` historique.

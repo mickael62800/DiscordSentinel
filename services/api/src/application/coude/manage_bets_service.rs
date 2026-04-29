@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::application::coude::guild_settings::CoudeGuildSettings;
+use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::bet::calculate_bet_resolution;
 use crate::domain::entities::coude::safety_net::boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier;
 use crate::domain::entities::coude::bet::CoudeBet;
@@ -15,18 +15,18 @@ use crate::ports::inbound::coude::manage_bets::PlaceBetOutcome;
 use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
 use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 use crate::ports::outbound::coude::combat_query_repository::CombatQueryRepository;
-use crate::ports::outbound::coude::bet_repository::CoudeBetRepository;
-use crate::ports::outbound::coude::safety_net_repository::CoudeSafetyNetRepository;
+use crate::ports::outbound::coude::bet_repository::BetRepository;
+use crate::ports::outbound::coude::safety_net_repository::SafetyNetRepository;
 pub struct ManageCoudeBetsService {
-    bet_repo: Arc<dyn CoudeBetRepository>,
+    bet_repo: Arc<dyn BetRepository>,
     combat_query: Arc<dyn CombatQueryRepository>,
-    safety_net_repo: Option<Arc<dyn CoudeSafetyNetRepository>>,
+    safety_net_repo: Option<Arc<dyn SafetyNetRepository>>,
     bot_config_repo: Option<Arc<dyn BotConfigRepository>>,
 }
 
 impl ManageCoudeBetsService {
     pub fn new(
-        bet_repo: Arc<dyn CoudeBetRepository>,
+        bet_repo: Arc<dyn BetRepository>,
         combat_query: Arc<dyn CombatQueryRepository>,
     ) -> Self {
         Self { bet_repo, combat_query, safety_net_repo: None, bot_config_repo: None }
@@ -35,7 +35,7 @@ impl ManageCoudeBetsService {
     /// Branche le repo du filet de securite (cf. COUPE_AMELIORATIONS 4.4)
     /// pour booster les paris gagnants des joueurs en phase de
     /// recuperation (multiplicateur configurable, default x1.5).
-    pub fn with_safety_net_repo(mut self, repo: Arc<dyn CoudeSafetyNetRepository>) -> Self {
+    pub fn with_safety_net_repo(mut self, repo: Arc<dyn SafetyNetRepository>) -> Self {
         self.safety_net_repo = Some(repo);
         self
     }
@@ -103,7 +103,7 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
         // N requetes (ok pour 5-50 paris par combat).
         if self.safety_net_repo.is_some() {
             let mult = match &self.bot_config_repo {
-                Some(repo) => CoudeGuildSettings::load(&**repo, &combat.guild_id)
+                Some(repo) => GuildSettings::load(&**repo, &combat.guild_id)
                     .await
                     .get_percent_ratio("safety_net_bet_gain_percent", 150),
                 None => 1.5,

@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeHeistRepository` (Phase 10).
+//! Impl Postgres de `HeistRepository` (Phase 10).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -6,20 +6,20 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::heist::CoudeHeistAttempt;
-use crate::domain::entities::coude::heist::CoudePrisonState;
+use crate::domain::entities::coude::heist::HeistAttempt;
+use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
+use crate::ports::outbound::coude::heist_repository::HeistRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "heist";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeHeistRepository {
+pub struct PgHeistRepository {
     pool: PgPool,
 }
 
-impl PgCoudeHeistRepository {
+impl PgHeistRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -37,7 +37,7 @@ struct HeistRow {
     attempted_at: DateTime<Utc>,
 }
 
-impl From<HeistRow> for CoudeHeistAttempt {
+impl From<HeistRow> for HeistAttempt {
     fn from(r: HeistRow) -> Self {
         Self {
             id: r.id,
@@ -61,7 +61,7 @@ struct PrisonRow {
     created_at: DateTime<Utc>,
 }
 
-impl From<PrisonRow> for CoudePrisonState {
+impl From<PrisonRow> for PrisonState {
     fn from(r: PrisonRow) -> Self {
         Self {
             guild_id: r.guild_id,
@@ -74,12 +74,12 @@ impl From<PrisonRow> for CoudePrisonState {
 }
 
 #[async_trait]
-impl CoudeHeistRepository for PgCoudeHeistRepository {
+impl HeistRepository for PgHeistRepository {
     async fn last_attempt(
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeHeistAttempt>, DomainError> {
+    ) -> Result<Option<HeistAttempt>, DomainError> {
         let row: Option<HeistRow> = sqlx::query_as(
             r#"SELECT id, guild_id, user_id, success, amount_stolen, chance_percent,
                       tools_used, attempted_at
@@ -104,7 +104,7 @@ impl CoudeHeistRepository for PgCoudeHeistRepository {
         amount_stolen: i64,
         chance_percent: i32,
         tools_used: &[String],
-    ) -> Result<CoudeHeistAttempt, DomainError> {
+    ) -> Result<HeistAttempt, DomainError> {
         let row: HeistRow = sqlx::query_as(
             r#"INSERT INTO coude_heist_attempts
                  (guild_id, user_id, success, amount_stolen, chance_percent, tools_used)
@@ -128,7 +128,7 @@ impl CoudeHeistRepository for PgCoudeHeistRepository {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudePrisonState>, DomainError> {
+    ) -> Result<Option<PrisonState>, DomainError> {
         let row: Option<PrisonRow> = sqlx::query_as(
             r#"SELECT guild_id, user_id, released_at, reason, created_at
                FROM coude_prison

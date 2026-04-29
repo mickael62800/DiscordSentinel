@@ -8,11 +8,11 @@ use sentinel_shared::discord_helpers::{reply_api_err, require_guild_id};
 use crate::modules::coude::load_guild_config;
 use crate::modules::coude::GameApiKey;
 
-use crate::modules::coude::guild_config::CoudeConfig;
+use crate::modules::coude::guild_config::Config;
 
 /// Calcule le temps (en minutes) necessaire pour passer de `hp_current` a
 /// `hp_max` avec la regen degressive. Taux lus depuis la config guild.
-fn estimate_minutes_to_full(mut hp_current: i32, hp_max: i32, config: &CoudeConfig) -> i32 {
+fn estimate_minutes_to_full(mut hp_current: i32, hp_max: i32, config: &Config) -> i32 {
     if hp_current >= hp_max || hp_max <= 0 {
         return 0;
     }

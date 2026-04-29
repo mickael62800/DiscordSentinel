@@ -12,19 +12,19 @@ use crate::domain::entities::coude::curse::CurseKind;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_curses::CastedCurse;
 use crate::ports::inbound::coude::manage_curses::ManageCoudeCursesUseCase;
-use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 const CAST_SOURCE: &str = "curse_cast";
 const LIFT_SOURCE: &str = "curse_lift";
 
 pub struct ManageCoudeCursesService {
-    curses_repo: Arc<dyn CoudeCursesRepository>,
+    curses_repo: Arc<dyn CursesRepository>,
     wallet_repo: Arc<dyn WalletRepository>,
 }
 
 impl ManageCoudeCursesService {
     pub fn new(
-        curses_repo: Arc<dyn CoudeCursesRepository>,
+        curses_repo: Arc<dyn CursesRepository>,
         wallet_repo: Arc<dyn WalletRepository>,
     ) -> Self {
         Self {

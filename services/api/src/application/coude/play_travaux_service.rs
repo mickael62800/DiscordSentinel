@@ -22,22 +22,22 @@ use crate::ports::inbound::coude::play_travaux::PlayTravauxCommand;
 use crate::ports::inbound::coude::play_travaux::PlayTravauxUseCase;
 use crate::ports::inbound::coude::play_travaux::TravauxResolution;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
-use crate::ports::outbound::coude::heist_repository::CoudeHeistRepository;
-use crate::ports::outbound::coude::player_repository::CoudePlayerRepository;
-use crate::ports::outbound::coude::social_repository::CoudeSocialRepository;
+use crate::ports::outbound::coude::heist_repository::HeistRepository;
+use crate::ports::outbound::coude::player_repository::PlayerRepository;
+use crate::ports::outbound::coude::social_repository::SocialRepository;
 pub struct PlayTravauxService {
-    heist_repo: Arc<dyn CoudeHeistRepository>,
-    player_repo: Arc<dyn CoudePlayerRepository>,
+    heist_repo: Arc<dyn HeistRepository>,
+    player_repo: Arc<dyn PlayerRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
-    social_repo: Arc<dyn CoudeSocialRepository>,
+    social_repo: Arc<dyn SocialRepository>,
 }
 
 impl PlayTravauxService {
     pub fn new(
-        heist_repo: Arc<dyn CoudeHeistRepository>,
-        player_repo: Arc<dyn CoudePlayerRepository>,
+        heist_repo: Arc<dyn HeistRepository>,
+        player_repo: Arc<dyn PlayerRepository>,
         wallet_uc: Arc<dyn ManageWalletUseCase>,
-        social_repo: Arc<dyn CoudeSocialRepository>,
+        social_repo: Arc<dyn SocialRepository>,
     ) -> Self {
         Self { heist_repo, player_repo, wallet_uc, social_repo }
     }

@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeBountyRepository` (cf. COUPE_AMELIORATIONS 5.3).
+//! Impl Postgres de `BountyRepository` (cf. COUPE_AMELIORATIONS 5.3).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -9,17 +9,17 @@ use uuid::Uuid;
 use crate::domain::entities::coude::bounty::ActiveBounty;
 use crate::domain::entities::coude::bounty::BountyStatus;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::bounty_repository::CoudeBountyRepository;
+use crate::ports::outbound::coude::bounty_repository::BountyRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_bounties";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeBountyRepository {
+pub struct PgBountyRepository {
     pool: PgPool,
 }
 
-impl PgCoudeBountyRepository {
+impl PgBountyRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -57,7 +57,7 @@ impl TryFrom<Row> for ActiveBounty {
 }
 
 #[async_trait]
-impl CoudeBountyRepository for PgCoudeBountyRepository {
+impl BountyRepository for PgBountyRepository {
     async fn open(
         &self,
         guild_id: &str,

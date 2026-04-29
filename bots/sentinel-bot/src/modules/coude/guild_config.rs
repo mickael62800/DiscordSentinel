@@ -37,11 +37,11 @@ impl DoubleCoupMode {
 
 /// Configuration du jeu Coup de Coude pour une guild.
 /// Toutes les valeurs ont un defaut raisonnable.
-pub struct CoudeConfig {
+pub struct Config {
     raw: HashMap<String, String>,
 }
 
-impl CoudeConfig {
+impl Config {
     /// Charge la config guild depuis l'API.
     pub async fn load(api: &BaseApiClient, guild_id: &str) -> Self {
         let raw = match api.get_guild_config_for(guild_id, crate::modules::coude::MODULE_BOT_NAME).await {
@@ -471,12 +471,12 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    fn make_config(entries: &[(&str, &str)]) -> CoudeConfig {
+    fn make_config(entries: &[(&str, &str)]) -> Config {
         let raw: HashMap<String, String> = entries
             .iter()
             .map(|(k, v)| (k.to_string(), v.to_string()))
             .collect();
-        CoudeConfig { raw }
+        Config { raw }
     }
 
     #[test]

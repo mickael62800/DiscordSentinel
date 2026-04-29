@@ -7,7 +7,7 @@ struct MockRepo {
 }
 
 #[async_trait]
-impl CoudeStealProtectionRepository for MockRepo {
+impl StealProtectionRepository for MockRepo {
     async fn list_active(
         &self,
         _guild_id: &str,

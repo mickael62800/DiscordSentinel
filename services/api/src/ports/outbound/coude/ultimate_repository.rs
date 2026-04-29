@@ -7,7 +7,7 @@ use crate::domain::entities::coude::ultimate::UltimateState;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
-pub trait CoudeUltimateRepository: Send + Sync {
+pub trait UltimateRepository: Send + Sync {
     /// Active une ultimate (UPSERT). Met `pending_kind` + `last_used_at`
     /// + `activated_at` a NOW.
     async fn activate(

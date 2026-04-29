@@ -1,4 +1,4 @@
-//! Impl Postgres de `CoudeToutOuRienRepository` (cf. COUPE_AMELIORATIONS 6.1).
+//! Impl Postgres de `ToutOuRienRepository` (cf. COUPE_AMELIORATIONS 6.1).
 
 use async_trait::async_trait;
 use chrono::DateTime;
@@ -10,17 +10,17 @@ use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogEntry;
 use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienLogOutcome;
 use crate::domain::entities::coude::tout_ou_rien_log::ToutOuRienUserStats;
 use crate::domain::errors::DomainError;
-use crate::ports::outbound::coude::tout_ou_rien_repository::CoudeToutOuRienRepository;
+use crate::ports::outbound::coude::tout_ou_rien_repository::ToutOuRienRepository;
 
 use super::super::pg_err_ctx;
 const TBL: &str = "coude_tout_ou_rien_log";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 
-pub struct PgCoudeToutOuRienRepository {
+pub struct PgToutOuRienRepository {
     pool: PgPool,
 }
 
-impl PgCoudeToutOuRienRepository {
+impl PgToutOuRienRepository {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
     }
@@ -57,7 +57,7 @@ impl TryFrom<Row> for ToutOuRienLogEntry {
 }
 
 #[async_trait]
-impl CoudeToutOuRienRepository for PgCoudeToutOuRienRepository {
+impl ToutOuRienRepository for PgToutOuRienRepository {
     async fn record(
         &self,
         guild_id: &str,

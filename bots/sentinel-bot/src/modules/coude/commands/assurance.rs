@@ -11,7 +11,7 @@ use crate::modules::coude::load_guild_config;
 /// Tiers d'abonnement d'assurance.
 ///
 /// Phase 1 leftovers audit : durees + multipliers migres dans
-/// `CoudeConfig` (`assurance_tier_{day,week,month}_{secs,mult}`). Les
+/// `Config` (`assurance_tier_{day,week,month}_{secs,mult}`). Les
 /// labels et la liste des cles restent statiques (UI Discord).
 struct InsuranceTier {
     key: &'static str,
@@ -20,7 +20,7 @@ struct InsuranceTier {
     multiplier: i64,
 }
 
-fn build_tiers(cfg: &crate::modules::coude::guild_config::CoudeConfig) -> [InsuranceTier; 3] {
+fn build_tiers(cfg: &crate::modules::coude::guild_config::Config) -> [InsuranceTier; 3] {
     [
         InsuranceTier {
             key: "day",

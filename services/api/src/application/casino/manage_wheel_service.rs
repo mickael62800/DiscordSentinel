@@ -27,12 +27,12 @@ use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::casino::manage_wheel::ManageWheelUseCase;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinCommand;
 use crate::ports::inbound::casino::manage_wheel::WheelSpinResult;
-use crate::ports::outbound::coude::curses_repository::CoudeCursesRepository;
+use crate::ports::outbound::coude::curses_repository::CursesRepository;
 use crate::ports::outbound::casino::wheel_repository::WheelRepository;
 pub struct ManageWheelService {
     repo: Arc<dyn WheelRepository>,
     wallet_uc: Arc<dyn ManageWalletUseCase>,
-    curses_repo: Option<Arc<dyn CoudeCursesRepository>>,
+    curses_repo: Option<Arc<dyn CursesRepository>>,
     pg_pool: sqlx::PgPool,
 }
 
@@ -49,7 +49,7 @@ impl ManageWheelService {
     /// (cf. COUPE_AMELIORATIONS 5.1) : le spinner maudit ne peut pas
     /// tomber sur la licorne. Optionnel pour preserver les call-sites
     /// de test et eviter une regression silencieuse.
-    pub fn with_curses_repo(mut self, repo: Arc<dyn CoudeCursesRepository>) -> Self {
+    pub fn with_curses_repo(mut self, repo: Arc<dyn CursesRepository>) -> Self {
         self.curses_repo = Some(repo);
         self
     }
