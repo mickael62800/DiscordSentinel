@@ -105,7 +105,7 @@ impl ManageModerationUseCase for ManageModerationService {
             actor_name: Some(action.moderator_name.clone()),
             target_id: Some(action.target_id.clone()),
             target_name: Some(action.target_name.clone()),
-            channel_id: Some(action.channel_id.clone()),
+            channel_id: Some(action.channel_id.clone().into()),
             channel_name: None,
             details,
         };

@@ -10,6 +10,7 @@ use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntr
 use crate::ports::inbound::community::manage_voice_channels::CreateInviteLinkCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateThemeCommand;
 use crate::ports::inbound::community::manage_voice_channels::CreateVoiceChannelCommand;
+use crate::domain::entities::system::discord_ids::ChannelId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -17,7 +18,7 @@ pub struct CreateVoiceChannelDto {
     pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -131,7 +132,7 @@ pub struct VoiceChannelResponseDto {
     pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -180,7 +181,7 @@ pub struct BanResponseDto {
 #[derive(Debug, Serialize)]
 pub struct InviteLinkResponseDto {
     pub id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub guild_id: String,
     pub created_by: String,
     pub created_by_name: String,
@@ -368,7 +369,7 @@ impl From<VoiceChannelInviteLink> for InviteLinkResponseDto {
 impl From<CreateInviteLinkDto> for CreateInviteLinkCommand {
     fn from(dto: CreateInviteLinkDto) -> Self {
         Self {
-            channel_id: String::new(), // set by handler from path
+            channel_id: String::new().into(), // set by handler from path
             created_by: dto.created_by,
             created_by_name: dto.created_by_name,
             duration_secs: dto.duration_secs,

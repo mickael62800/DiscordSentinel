@@ -143,7 +143,7 @@ fn role_panel_to_proto(p: RolePanel) -> proto::RolePanel {
     proto::RolePanel {
         id: p.id.to_string(),
         guild_id: p.guild_id,
-        channel_id: p.channel_id,
+        channel_id: p.channel_id.into(),
         message_id: p.message_id,
         title: p.title,
         description: p.description,

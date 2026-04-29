@@ -5,6 +5,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceChannel {
@@ -12,7 +13,7 @@ pub struct VoiceChannel {
     pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -66,7 +67,7 @@ pub struct VoiceChannelInviteLink {
     pub id: Uuid,
     pub voice_channel_id: Uuid,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub created_by: String,
     pub created_by_name: String,
     pub code: String,

@@ -277,7 +277,7 @@ impl CoudeCombatsService for CombatsGrpc {
             .map(|c| proto::ExpiredCombat {
                 combat_id: c.combat_id,
                 guild_id: c.guild_id,
-                channel_id: c.channel_id,
+                channel_id: c.channel_id.into(),
                 defender_id: c.defender_id,
                 defender_name: c.defender_name,
                 penalty: c.penalty,

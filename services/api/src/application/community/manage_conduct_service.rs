@@ -22,6 +22,7 @@ use crate::ports::inbound::community::manage_conduct::ManageConductUseCase;
 use crate::ports::inbound::community::manage_conduct::SaveConductConfigCommand;
 use crate::ports::outbound::community::conduct_repository::ConductRepository;
 use crate::ports::outbound::moderation::infraction_repository::InfractionRepository;
+use crate::domain::entities::system::discord_ids::ChannelId;
 #[cfg(test)]
 #[path = "tests/manage_conduct.rs"]
 mod tests;
@@ -181,7 +182,7 @@ impl ManageConductUseCase for ManageConductService {
             let infraction = Infraction {
                 id: Uuid::new_v4(),
                 guild_id: cmd.guild_id.clone(),
-                channel_id: "system:conduct".to_string(),
+                channel_id: "system:conduct".to_string().into(),
                 user_id: cmd.user_id.clone(),
                 username: cmd.username.clone(),
                 message_id: "system:zero-points".into(),
@@ -344,7 +345,7 @@ impl ManageConductUseCase for ManageConductService {
             let infraction = Infraction {
                 id: Uuid::new_v4(),
                 guild_id: user.guild_id.clone(),
-                channel_id: String::new(),
+                channel_id: String::new().into(),
                 user_id: user.user_id.clone(),
                 username: user.username.clone(),
                 message_id: String::new().into(),

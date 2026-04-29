@@ -135,7 +135,7 @@ impl ExpireCombatsBatchUseCase for ExpireCombatsBatchService {
             out.push(ExpiredCombatOutput {
                 combat_id: combat.id.to_string(),
                 guild_id: combat.guild_id.clone(),
-                channel_id: combat.channel_id.clone().unwrap_or_default(),
+                channel_id: combat.channel_id.clone().unwrap_or_default().into(),
                 defender_id: combat.defender_id.clone(),
                 defender_name: combat.defender_name.clone(),
                 penalty,

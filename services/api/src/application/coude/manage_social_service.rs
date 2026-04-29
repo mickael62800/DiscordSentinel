@@ -194,7 +194,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
             winner_id: winner.user_id.clone(),
             winner_name: winner.username.clone(),
             amount: actual,
-            channel_id,
+            channel_id: channel_id.into(),
             taunt_events: taunts,
         }))
     }

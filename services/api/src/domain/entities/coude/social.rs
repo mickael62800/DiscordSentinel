@@ -1,6 +1,7 @@
 use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Daily chaos : regles metier ──
@@ -106,7 +107,7 @@ pub struct DailyChaosOutcome {
     pub winner_id: String,
     pub winner_name: String,
     pub amount: i64,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub taunt_events: Vec<crate::domain::entities::coude::taunt::TauntEvent>,
 }
 

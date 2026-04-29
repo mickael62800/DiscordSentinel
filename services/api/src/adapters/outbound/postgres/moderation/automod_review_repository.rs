@@ -10,6 +10,7 @@ use crate::domain::entities::moderation::automod_review::NewAutomodReview;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 const TBL: &str = "automod_reviews";
 fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
@@ -18,7 +19,7 @@ fn pg_err(e: sqlx::Error) -> DomainError { pg_err_ctx(TBL, e) }
 struct Row {
     id: Uuid,
     guild_id: String,
-    channel_id: String,
+    channel_id: ChannelId,
     message_id: MessageId,
     user_id: String,
     user_name: String,

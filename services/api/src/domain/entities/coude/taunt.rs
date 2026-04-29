@@ -20,6 +20,7 @@
 
 use rand::seq::SliceRandom;
 use rand::Rng;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 /// Seuils auxquels on declenche un taunt. Toute nouvelle valeur de
 /// streak qui matche un seuil provoque un `TauntEvent`.
@@ -103,7 +104,7 @@ pub struct TauntsConfig {
 #[derive(Debug, Clone)]
 pub struct TauntEvent {
     /// Salon Discord ou poster le message (ID brut, le bot fait le cast).
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     /// Joueur cible du taunt (pour mention + rename).
     pub target_user_id: String,
     /// Message moqueur deja compose avec mention du joueur.
@@ -482,7 +483,7 @@ pub fn build_taunt_event(
     }
 
     Some(TauntEvent {
-        channel_id,
+        channel_id: channel_id.into(),
         target_user_id: target_user_id.to_string(),
         message,
         nickname_suffix,

@@ -144,7 +144,7 @@ fn row_to_entity(
         action_id: row.0,
         kind: row.1,
         guild_id: row.2,
-        channel_id: row.3,
+        channel_id: row.3.into(),
         message_id: row.4.into(),
         posted_at: row.5,
         last_edited_at: row.6,

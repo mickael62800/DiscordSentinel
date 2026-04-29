@@ -3,11 +3,12 @@ use serde::Serialize;
 use crate::domain::entities::moderation::moderation_action::ModerationAction;
 use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
 use crate::ports::inbound::moderation::manage_moderation::LogModerationCommand;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Deserialize)]
 pub struct LogActionDto {
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,

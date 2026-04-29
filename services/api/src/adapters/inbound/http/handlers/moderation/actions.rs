@@ -23,6 +23,7 @@ use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Deserialize)]
 pub struct BansQuery {
@@ -196,7 +197,7 @@ pub async fn execute_ban(
 
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
-        channel_id: String::new(),
+        channel_id: String::new().into(),
         moderator_id: "desktop".into(),
         moderator_name: "Desktop App".into(),
         target_id: dto.user_id.clone(),
@@ -280,7 +281,7 @@ pub async fn execute_mute(
     let target_name = dto.target_name.unwrap_or_else(|| dto.user_id.clone());
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id.clone(),
-        channel_id: String::new(),
+        channel_id: String::new().into(),
         moderator_id: "web-panel".into(),
         moderator_name: "Web Admin".into(),
         target_id: dto.user_id.clone(),
@@ -343,7 +344,7 @@ pub async fn execute_unban(
 
     let command = crate::ports::inbound::moderation::manage_moderation::LogModerationCommand {
         guild_id: dto.guild_id,
-        channel_id: String::new(),
+        channel_id: String::new().into(),
         moderator_id: "desktop".into(),
         moderator_name: "Desktop App".into(),
         target_id: target_id.clone(),

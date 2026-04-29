@@ -22,10 +22,11 @@ use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Serialize)]
 pub struct TauntEventDto {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub target_user_id: String,
     pub message: String,
     pub nickname_suffix: String,

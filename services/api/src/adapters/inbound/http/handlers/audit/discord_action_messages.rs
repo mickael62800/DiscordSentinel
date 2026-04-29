@@ -15,12 +15,13 @@ use crate::adapters::inbound::http::state::AppState;
 use crate::domain::entities::audit::discord_action_message::DiscordActionMessage;
 use crate::domain::entities::audit::discord_action_message::NewDiscordActionMessage;
 use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 #[derive(Debug, Deserialize)]
 pub struct RegisterDto {
     pub action_id: Uuid,
     pub kind: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
 }
 
@@ -29,7 +30,7 @@ pub struct DiscordActionMessageDto {
     pub action_id: Uuid,
     pub kind: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub posted_at: String,
     pub last_edited_at: Option<String>,

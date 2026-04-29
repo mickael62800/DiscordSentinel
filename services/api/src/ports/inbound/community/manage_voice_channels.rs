@@ -7,12 +7,13 @@ use crate::domain::entities::community::voice_channel::VoiceChannelInviteLink;
 use crate::domain::entities::community::voice_channel::VoiceChannelTheme;
 use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntry;
 use crate::domain::errors::DomainError;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 pub struct CreateVoiceChannelCommand {
     pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -25,7 +26,7 @@ pub struct CreateVoiceChannelCommand {
 }
 
 pub struct UpdateVoiceChannelCommand {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub visibility: Option<String>,
     pub locked: Option<bool>,
     pub queue_enabled: Option<bool>,
@@ -37,13 +38,13 @@ pub struct UpdateVoiceChannelCommand {
 }
 
 pub struct TransferOwnershipCommand {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub new_owner_id: String,
     pub new_owner_name: String,
 }
 
 pub struct ManageCoAdminCommand {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub user_id: String,
     pub user_name: String,
 }
@@ -56,7 +57,7 @@ pub struct ManageWhitelistCommand {
 }
 
 pub struct BanFromChannelCommand {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub user_id: String,
     pub user_name: String,
     pub banned_by: String,
@@ -65,7 +66,7 @@ pub struct BanFromChannelCommand {
 }
 
 pub struct CreateInviteLinkCommand {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub created_by: String,
     pub created_by_name: String,
     pub duration_secs: Option<i64>,

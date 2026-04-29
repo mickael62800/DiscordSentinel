@@ -25,7 +25,7 @@ pub(super) fn taunt_event_to_proto(
     e: crate::domain::entities::coude::taunt::TauntEvent,
 ) -> proto::TauntEvent {
     proto::TauntEvent {
-        channel_id: e.channel_id,
+        channel_id: e.channel_id.into(),
         target_user_id: e.target_user_id,
         message: e.message,
         nickname_suffix: e.nickname_suffix,

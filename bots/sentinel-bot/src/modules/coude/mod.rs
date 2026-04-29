@@ -313,7 +313,7 @@ async fn handle_combat_redis_event(ctx: &Context, payload: &str) {
     #[derive(serde::Deserialize)]
     struct Mapping {
         kind: String,
-        channel_id: String,
+        channel_id: ChannelId,
         message_id: String,
     }
     let mappings: Vec<Mapping> = match api

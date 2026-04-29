@@ -557,7 +557,7 @@ async fn handle_ticket_closed_from_web(ctx: &Context, action_id: &str) {
     struct Mapping {
         kind: String,
         guild_id: String,
-        channel_id: String,
+        channel_id: ChannelId,
         message_id: String,
     }
     let mappings: Vec<Mapping> = match api

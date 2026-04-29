@@ -2,12 +2,13 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Clone)]
 pub struct RolePanel {
     pub id: Uuid,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: Option<String>,
     pub title: String,
     pub description: String,

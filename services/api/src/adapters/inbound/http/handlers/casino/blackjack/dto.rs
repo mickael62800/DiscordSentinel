@@ -4,6 +4,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::casino::blackjack::BlackjackGame;
 use crate::domain::entities::casino::blackjack::Card;
+use crate::domain::entities::system::discord_ids::ChannelId;
 // ══════════════════════════════════════════════════════════════════════
 // ── Solo game DTOs ──
 // ══════════════════════════════════════════════════════════════════════
@@ -116,7 +117,7 @@ pub fn to_dto(game: &BlackjackGame) -> BlackjackGameDto {
 #[derive(Debug, Deserialize)]
 pub struct CreateTableDto {
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub owner_id: String,
     pub owner_name: String,
 }
@@ -125,7 +126,7 @@ pub struct CreateTableDto {
 pub struct TableDto {
     pub id: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub owner_id: String,
     pub owner_name: String,
     pub status: String,

@@ -6,6 +6,7 @@ use crate::domain::entities::audit::user_stats::UserStats;
 use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::ports::inbound::audit::manage_stats::RecordMessagesCommand;
 use crate::ports::inbound::audit::manage_stats::RecordVoiceCommand;
+use crate::domain::entities::system::discord_ids::ChannelId;
 // ── Request DTOs ──
 
 #[derive(Debug, Deserialize)]
@@ -23,7 +24,7 @@ pub struct RecordVoiceDto {
     pub username: String,
     pub seconds: u64,
     #[serde(default)]
-    pub channel_id: String,
+    pub channel_id: Option<ChannelId>,
     #[serde(default)]
     pub channel_name: String,
 }
@@ -70,7 +71,7 @@ pub struct VoiceStatsQuery {
 
 #[derive(Debug, Serialize)]
 pub struct VoiceSessionStatsDto {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub channel_name: String,
     pub is_temporary: bool,
     pub total_sessions: i64,
@@ -146,7 +147,7 @@ impl From<RecordVoiceDto> for RecordVoiceCommand {
             user_id: dto.user_id,
             username: dto.username,
             seconds: dto.seconds,
-            channel_id: dto.channel_id,
+            channel_id: dto.channel_id.unwrap_or_else(|| String::new().into()),
             channel_name: dto.channel_name,
         }
     }

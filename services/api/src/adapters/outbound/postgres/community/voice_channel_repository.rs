@@ -11,6 +11,7 @@ use crate::domain::entities::community::voice_channel::VoiceChannelWhitelistEntr
 use crate::domain::errors::DomainError;
 use crate::domain::enums::community::voice_channel_kind::VoiceChannelKind;
 use crate::ports::outbound::community::voice_channel_repository::VoiceChannelRepository;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 pub struct PgVoiceChannelRepository {
     pool: PgPool,
@@ -28,7 +29,7 @@ struct VoiceChannelRow {
     guild_id: String,
     owner_id: String,
     owner_name: String,
-    channel_id: String,
+    channel_id: ChannelId,
     text_channel_id: Option<String>,
     members_channel_id: Option<String>,
     queue_channel_id: Option<String>,
@@ -149,7 +150,7 @@ struct InviteLinkRow {
     id: Uuid,
     voice_channel_id: Uuid,
     guild_id: String,
-    channel_id: String,
+    channel_id: ChannelId,
     created_by: String,
     created_by_name: String,
     code: String,

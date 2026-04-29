@@ -3,6 +3,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_api::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 /// URL-encode un segment de path pour eviter qu'un nom de jeu avec `/` ou
 /// caracteres speciaux ne casse le routing ou ne permette une injection.
@@ -37,7 +38,7 @@ pub struct Game {
 pub struct GamePanel {
     pub id: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     #[serde(default)]
     pub category: Option<String>,

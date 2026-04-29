@@ -10,10 +10,11 @@ use crate::ports::inbound::community::manage_role_panels::CreateRolePanelCommand
 use crate::ports::inbound::community::manage_role_panels::CreateRolePanelEntryCommand;
 use crate::ports::inbound::community::manage_role_panels::SetMessageIdCommand;
 use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 #[derive(Debug, Deserialize)]
 pub struct CreateRolePanelDto {
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub title: String,
     #[serde(default)]
     pub description: String,
@@ -59,7 +60,7 @@ pub struct CreateAutoRoleDto {
 pub struct RolePanelDto {
     pub id: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: Option<String>,
     pub title: String,
     pub description: String,

@@ -559,7 +559,7 @@ async fn edit_review_card_from_web(
     #[derive(serde::Deserialize)]
     struct Mapping {
         kind: String,
-        channel_id: String,
+        channel_id: ChannelId,
         message_id: String,
     }
     let mappings: Vec<Mapping> = match api

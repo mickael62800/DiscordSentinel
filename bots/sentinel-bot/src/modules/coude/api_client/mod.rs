@@ -20,6 +20,7 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::grpc_client::SentinelGrpcClient;
 
 use sentinel_proto::coude::v1 as proto_coude;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 // ══════════════════════════════════════════════════════════════════════
 // ── Response DTOs (preservation de la surface publique) ──
@@ -126,7 +127,7 @@ pub struct ResolvedCombatEmbedField {
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
 pub struct TauntEvent {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub target_user_id: String,
     pub message: String,
     pub nickname_suffix: String,

@@ -228,7 +228,7 @@ fn blackjack_game_to_proto(g: BlackjackGame) -> proto::BlackjackGame {
 
 fn taunt_to_proto(t: TauntEvent) -> proto::TauntEvent {
     proto::TauntEvent {
-        channel_id: t.channel_id,
+        channel_id: t.channel_id.into(),
         target_user_id: t.target_user_id,
         message: t.message,
         nickname_suffix: t.nickname_suffix,

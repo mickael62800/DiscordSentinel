@@ -27,6 +27,7 @@ use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::grpc_client::{GrpcCallError, SentinelGrpcClient};
 
 use sentinel_proto::blackjack::v1 as proto;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 // ── Response DTOs (surface inchangee) ──
 
@@ -74,7 +75,7 @@ pub struct WalletDto {
 pub struct TableDto {
     pub id: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub owner_id: String,
     pub owner_name: String,
     pub status: String,
@@ -85,7 +86,7 @@ pub struct TableDto {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TauntEvent {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub target_user_id: String,
     pub message: String,
     pub nickname_suffix: String,

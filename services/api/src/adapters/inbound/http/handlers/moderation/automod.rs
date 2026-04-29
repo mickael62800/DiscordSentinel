@@ -27,6 +27,7 @@ use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_infractions::InfractionFilters;
 use crate::ports::inbound::moderation::manage_automod_reviews::ResolveAutomodReviewCommand;
 use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 #[derive(Debug, Deserialize)]
 pub struct DetectionQuery {
     /// Defaut 50, max 200.
@@ -65,7 +66,7 @@ pub async fn list_detections(
 pub struct AutomodReviewDto {
     pub id: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub user_id: String,
     pub user_name: String,
@@ -134,7 +135,7 @@ pub async fn list_reviews(
 #[derive(Debug, Deserialize)]
 pub struct CreateReviewBody {
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub user_id: String,
     pub user_name: String,

@@ -11,7 +11,7 @@ use sentinel_proto::moderation::v1 as proto_mod;
 #[derive(Debug, Serialize)]
 pub struct ModerationAction {
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,
@@ -406,3 +406,4 @@ impl ApiClient {
 }
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
+use crate::domain::entities::system::discord_ids::ChannelId;

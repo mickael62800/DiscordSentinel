@@ -7,6 +7,7 @@ use crate::domain::entities::moderation::moderation_action::ModerationAction;
 use crate::domain::errors::DomainError;
 use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
 use crate::ports::outbound::moderation::moderation_repository::ModerationRepository;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 /// Phase 2 helper : reconstruit une ModerationAction a partir d'une ligne
 /// audit_logs (event_type `mod_*`).
@@ -59,7 +60,7 @@ impl From<AuditModRow> for ModerationAction {
         Self {
             id,
             guild_id: row.guild_id,
-            channel_id: row.channel_id.unwrap_or_default(),
+            channel_id: row.channel_id.unwrap_or_default().into(),
             moderator_id: row.actor_id.unwrap_or_default(),
             moderator_name: row.actor_name.unwrap_or_default(),
             target_id: row.target_id.unwrap_or_default(),
@@ -90,7 +91,7 @@ impl PgModerationRepository {
 struct ActionRow {
     id: Uuid,
     guild_id: String,
-    channel_id: String,
+    channel_id: ChannelId,
     moderator_id: String,
     moderator_name: String,
     target_id: String,

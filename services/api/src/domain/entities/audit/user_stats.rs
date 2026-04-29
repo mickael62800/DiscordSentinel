@@ -3,6 +3,7 @@ use chrono::Utc;
 use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserStats {
@@ -30,7 +31,7 @@ pub struct GuildStatsOverview {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VoiceSessionStats {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub channel_name: String,
     pub is_temporary: bool,
     pub total_sessions: i64,

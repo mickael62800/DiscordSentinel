@@ -39,7 +39,7 @@ pub struct RolePanelDetail {
 pub struct RolePanel {
     pub id: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: Option<String>,
     pub title: String,
     pub description: String,
@@ -334,7 +334,7 @@ fn proto_detail_to_dto(d: proto::RolePanelDetail) -> RolePanelDetail {
         panel: d.panel.map(proto_panel_to_dto).unwrap_or(RolePanel {
             id: String::new(),
             guild_id: String::new(),
-            channel_id: String::new(),
+            channel_id: ChannelId::new(),
             message_id: None,
             title: String::new(),
             description: String::new(),
@@ -357,3 +357,4 @@ fn proto_auto_role_to_dto(r: proto::AutoRole) -> AutoRole {
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
 use sentinel_api::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::ChannelId;

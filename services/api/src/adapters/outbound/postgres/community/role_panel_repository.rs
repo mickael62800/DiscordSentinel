@@ -9,6 +9,7 @@ use crate::domain::entities::community::role_panel::RolePanelEntry;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::community::role_panel_repository::RolePanelRepository;
 use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 pub struct PgRolePanelRepository {
     pool: PgPool,
@@ -24,7 +25,7 @@ impl PgRolePanelRepository {
 struct PanelRow {
     id: Uuid,
     guild_id: String,
-    channel_id: String,
+    channel_id: ChannelId,
     message_id: Option<String>,
     title: String,
     description: String,

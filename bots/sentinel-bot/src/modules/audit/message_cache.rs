@@ -1,5 +1,6 @@
 use dashmap::DashMap;
 use serenity::model::id::{GuildId, MessageId};
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 /// Message cache pour retrouver le contenu des messages supprimes.
 #[derive(Clone, Debug)]
@@ -8,7 +9,7 @@ pub struct CachedMessage {
     pub author_id: String,
     pub author_name: String,
     pub content: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
 }
 
 /// Cache LRU simplifie pour les messages par guild.

@@ -6,10 +6,11 @@ use crate::domain::entities::community::role_panel::RolePanel;
 use crate::domain::entities::community::role_panel::RolePanelDetail;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::RoleId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 pub struct CreateRolePanelCommand {
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub title: String,
     pub description: String,
     pub mode: String,

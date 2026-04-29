@@ -1638,7 +1638,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
                                 }
                             } else {
                                 taunt_events.push(crate::domain::entities::coude::taunt::TauntEvent {
-                                    channel_id: combat.guild_id.clone(),
+                                    channel_id: combat.guild_id.clone().into(),
                                     target_user_id: winner_id.clone(),
                                     message: format!(
                                         "\u{1f48e} Une **prime collective de {}c** vient de s ouvrir sur la tete de <@{}> ! Tout le monde peut contribuer via `/contribuer-prime` jusqu a ce qu il soit battu.",

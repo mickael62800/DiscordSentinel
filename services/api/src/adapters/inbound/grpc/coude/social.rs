@@ -468,7 +468,7 @@ impl CoudeSocialService for SocialGrpc {
                 winner_id: o.winner_id,
                 winner_name: o.winner_name,
                 amount: o.amount,
-                channel_id: o.channel_id,
+                channel_id: o.channel_id.into(),
                 taunt_events: o
                     .taunt_events
                     .into_iter()

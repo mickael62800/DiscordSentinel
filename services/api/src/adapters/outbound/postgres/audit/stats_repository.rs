@@ -6,6 +6,7 @@ use crate::domain::entities::audit::user_stats::UserStats;
 use crate::domain::entities::audit::user_stats::VoiceSessionStats;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::audit::stats_repository::StatsRepository;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 pub struct PgStatsRepository {
     pool: PgPool,
@@ -202,7 +203,7 @@ impl StatsRepository for PgStatsRepository {
 
         #[derive(sqlx::FromRow)]
         struct Row {
-            channel_id: String,
+            channel_id: ChannelId,
             channel_name: String,
             is_temporary: bool,
             total_sessions: i64,

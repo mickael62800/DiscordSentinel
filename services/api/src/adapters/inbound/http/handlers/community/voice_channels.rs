@@ -70,12 +70,13 @@ use crate::ports::inbound::community::manage_voice_channels::TransferOwnershipCo
 use crate::ports::inbound::community::manage_voice_channels::UpdateVoiceChannelCommand;
 use crate::ports::inbound::community::manage_voice_channels::UseInviteLinkCommand;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 async fn log_voice_event(
     state: &AppState,
     guild_id: String,
     event_type: &str,
-    channel_id: String,
+    channel_id: ChannelId,
     channel_name: Option<String>,
     actor_id: Option<String>,
     actor_name: Option<String>,
@@ -88,7 +89,7 @@ async fn log_voice_event(
         actor_name,
         target_id: None,
         target_name: None,
-        channel_id: Some(channel_id),
+        channel_id: Some(channel_id.into()),
         channel_name,
         details,
     };
@@ -324,7 +325,7 @@ pub async fn close_channel(
             &state,
             d.channel.guild_id.clone(),
             "voice_channel_closed",
-            channel_id.clone(),
+            channel_id.clone().into(),
             Some(d.channel.channel_name.clone()),
             None,
             None,
@@ -384,7 +385,7 @@ pub async fn update_channel(
     state
         .voice_channels_uc
         .update_channel(UpdateVoiceChannelCommand {
-            channel_id: channel_id.clone(),
+            channel_id: channel_id.clone().into(),
             visibility: dto.visibility,
             locked: dto.locked,
             queue_enabled: dto.queue_enabled,
@@ -402,7 +403,7 @@ pub async fn update_channel(
             &state,
             detail.channel.guild_id.clone(),
             "voice_channel_updated",
-            channel_id.clone(),
+            channel_id.clone().into(),
             Some(detail.channel.channel_name.clone()),
             None,
             None,
@@ -444,7 +445,7 @@ pub async fn transfer_ownership(
     state
         .voice_channels_uc
         .transfer_ownership(TransferOwnershipCommand {
-            channel_id: channel_id.clone(),
+            channel_id: channel_id.clone().into(),
             new_owner_id: dto.new_owner_id,
             new_owner_name: dto.new_owner_name,
         })
@@ -474,7 +475,7 @@ pub async fn add_co_admin(
     state
         .voice_channels_uc
         .add_co_admin(ManageCoAdminCommand {
-            channel_id,
+            channel_id: channel_id.into(),
             user_id: dto.user_id,
             user_name: dto.user_name,
         })
@@ -560,7 +561,7 @@ pub async fn ban_from_channel(
     state
         .voice_channels_uc
         .ban_from_channel(BanFromChannelCommand {
-            channel_id,
+            channel_id: channel_id.into(),
             user_id: dto.user_id,
             user_name: dto.user_name,
             banned_by: dto.banned_by,
@@ -610,7 +611,7 @@ pub async fn create_invite_link(
     Json(dto): Json<CreateInviteLinkDto>,
 ) -> Result<Json<InviteLinkResponseDto>, ApiError> {
     let cmd = CreateInviteLinkCommand {
-        channel_id: channel_id.clone(),
+        channel_id: channel_id.clone().into(),
         created_by: dto.created_by,
         created_by_name: dto.created_by_name,
         duration_secs: dto.duration_secs,

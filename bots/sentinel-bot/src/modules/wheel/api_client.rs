@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use sentinel_shared::api_client::BaseApiClient;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Serialize)]
 pub struct WheelSpinRequest {
@@ -11,7 +12,7 @@ pub struct WheelSpinRequest {
 #[derive(Debug, Clone, Deserialize)]
 #[allow(dead_code)]
 pub struct TauntEventDto {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub target_user_id: String,
     pub message: String,
     pub nickname_suffix: String,

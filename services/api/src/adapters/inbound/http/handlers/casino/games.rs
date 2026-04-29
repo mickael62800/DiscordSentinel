@@ -20,6 +20,7 @@ use crate::domain::entities::casino::game::DEFAULT_GAME_ROLE_COLOR;
 use crate::domain::entities::casino::game::MAX_EMOJI_IMAGE_BYTES;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 // ── DTOs ──
 
@@ -76,7 +77,7 @@ pub struct SetRoleIdDto {
 pub struct GamePanelDto {
     pub id: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub category: Option<String>,
 }
@@ -95,7 +96,7 @@ impl From<crate::ports::outbound::casino::game_repository::GamePanel> for GamePa
 
 #[derive(Debug, Deserialize)]
 pub struct SavePanelDto {
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     #[serde(default)]
     pub category: Option<String>,

@@ -5,13 +5,14 @@ use chrono::DateTime;
 use chrono::Utc;
 use uuid::Uuid;
 use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DiscordActionMessage {
     pub action_id: Uuid,
     pub kind: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
     pub posted_at: DateTime<Utc>,
     pub last_edited_at: Option<DateTime<Utc>>,
@@ -22,7 +23,7 @@ pub struct NewDiscordActionMessage {
     pub action_id: Uuid,
     pub kind: String,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub message_id: MessageId,
 }
 

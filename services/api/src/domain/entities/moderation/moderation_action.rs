@@ -5,12 +5,13 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::domain::enums::moderation::moderation_gravity::ModerationGravity;
+use crate::domain::entities::system::discord_ids::ChannelId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModerationAction {
     pub id: Uuid,
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,

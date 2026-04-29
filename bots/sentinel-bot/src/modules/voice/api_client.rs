@@ -21,7 +21,7 @@ pub struct CreateVoiceChannelRequest {
     pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -82,7 +82,7 @@ pub struct BanFromChannelRequest {
 #[derive(Debug, Serialize)]
 pub struct LogModerationActionRequest {
     pub guild_id: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,
@@ -101,7 +101,7 @@ pub struct VoiceChannelResponse {
     pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: String,
+    pub channel_id: ChannelId,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -460,3 +460,4 @@ fn proto_to_response(c: proto::VoiceChannel) -> VoiceChannelResponse {
 }
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
+use crate::domain::entities::system::discord_ids::ChannelId;

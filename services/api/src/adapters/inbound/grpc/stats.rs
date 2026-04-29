@@ -64,7 +64,7 @@ impl StatsService for StatsGrpc {
                 user_id: req.user_id,
                 username: req.username,
                 seconds: req.seconds,
-                channel_id: req.channel_id,
+                channel_id: req.channel_id.into(),
                 channel_name: req.channel_name,
             })
             .await

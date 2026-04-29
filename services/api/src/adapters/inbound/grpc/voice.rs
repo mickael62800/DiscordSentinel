@@ -50,7 +50,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
                 guild_id: req.guild_id,
                 owner_id: req.owner_id,
                 owner_name: req.owner_name,
-                channel_id: req.channel_id,
+                channel_id: req.channel_id.into(),
                 text_channel_id: req.text_channel_id,
                 members_channel_id: req.members_channel_id,
                 queue_channel_id: req.queue_channel_id,
@@ -84,7 +84,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         let req = request.into_inner();
         self.uc
             .update_channel(UpdateVoiceChannelCommand {
-                channel_id: req.channel_id,
+                channel_id: req.channel_id.into(),
                 visibility: req.visibility,
                 locked: req.locked,
                 queue_enabled: req.queue_enabled,
@@ -134,7 +134,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         let req = request.into_inner();
         self.uc
             .transfer_ownership(TransferOwnershipCommand {
-                channel_id: req.channel_id,
+                channel_id: req.channel_id.into(),
                 new_owner_id: req.new_owner_id,
                 new_owner_name: req.new_owner_name,
             })
@@ -150,7 +150,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         let req = request.into_inner();
         self.uc
             .add_co_admin(ManageCoAdminCommand {
-                channel_id: req.channel_id,
+                channel_id: req.channel_id.into(),
                 user_id: req.user_id,
                 user_name: req.user_name,
             })
@@ -183,7 +183,7 @@ impl VoiceChannelsService for VoiceChannelsGrpc {
         let req = request.into_inner();
         self.uc
             .ban_from_channel(BanFromChannelCommand {
-                channel_id: req.channel_id,
+                channel_id: req.channel_id.into(),
                 user_id: req.user_id,
                 user_name: req.user_name,
                 banned_by: req.banned_by,
@@ -255,7 +255,7 @@ fn voice_channel_to_proto(c: VoiceChannel) -> proto::VoiceChannel {
         guild_id: c.guild_id,
         owner_id: c.owner_id,
         owner_name: c.owner_name,
-        channel_id: c.channel_id,
+        channel_id: c.channel_id.into(),
         text_channel_id: c.text_channel_id,
         members_channel_id: c.members_channel_id,
         queue_channel_id: c.queue_channel_id,
