@@ -18,11 +18,12 @@ use uuid::Uuid;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
+use crate::domain::entities::system::discord_ids::GuildId;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateAiJobDto {
-    pub guild_id: String,
+    pub guild_id: GuildId,
     /// "analyze_text" ou "analyze_image"
     pub job_type: String,
     pub input_payload: serde_json::Value,
@@ -37,7 +38,7 @@ pub struct AiJobCreatedDto {
 #[derive(Debug, Serialize, sqlx::FromRow)]
 pub struct AiJobStatusDto {
     pub id: Uuid,
-    pub guild_id: String,
+    pub guild_id: GuildId,
     pub job_type: String,
     pub status: String,
     pub input_payload: serde_json::Value,

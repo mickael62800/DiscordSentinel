@@ -1,14 +1,18 @@
 use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::ai::image_analysis::ImageAnalysis;
+use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::UserId;
 
 #[derive(Debug, Deserialize)]
 pub struct AnalyzeImageRequestDto {
-    pub guild_id: String,
-    pub channel_id: String,
-    pub user_id: String,
+    pub guild_id: GuildId,
+    pub channel_id: ChannelId,
+    pub user_id: UserId,
     pub username: String,
-    pub message_id: String,
+    pub message_id: MessageId,
     /// Image encodee en base64
     pub image_data: String,
     pub content_type: String,

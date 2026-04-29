@@ -2,14 +2,18 @@ use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::ai::message_analysis::MessageAnalysis;
 use crate::domain::entities::moderation::detection_flags::DetectionFlags;
+use crate::domain::entities::system::discord_ids::ChannelId;
+use crate::domain::entities::system::discord_ids::GuildId;
+use crate::domain::entities::system::discord_ids::MessageId;
+use crate::domain::entities::system::discord_ids::UserId;
 use crate::ports::inbound::ai::analyze_message::AnalyzeMessageCommand;
 
 /// DTO de la requête reçue depuis le bot automod.
 #[derive(Debug, Deserialize)]
 pub struct AnalyzeRequestDto {
-    pub guild_id: String,
-    pub channel_id: String,
-    pub user_id: String,
+    pub guild_id: GuildId,
+    pub channel_id: ChannelId,
+    pub user_id: UserId,
     pub username: String,
     pub content: String,
     pub flags: DetectionFlags,
@@ -20,7 +24,7 @@ pub struct AnalyzeRequestDto {
 
 #[derive(Debug, Deserialize)]
 pub struct MetadataDto {
-    pub message_id: String,
+    pub message_id: MessageId,
     pub timestamp: String,
 }
 

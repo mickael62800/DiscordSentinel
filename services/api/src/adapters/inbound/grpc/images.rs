@@ -30,11 +30,11 @@ impl ImagesService for ImagesGrpc {
         let analysis = self
             .uc
             .analyze_image(AnalyzeImageCommand {
-                guild_id: req.guild_id,
-                channel_id: req.channel_id,
-                user_id: req.user_id,
+                guild_id: req.guild_id.into(),
+                channel_id: req.channel_id.into(),
+                user_id: req.user_id.into(),
                 username: req.username,
-                message_id: req.message_id,
+                message_id: req.message_id.into(),
                 image_bytes: req.image_data,
                 content_type: req.content_type,
                 filename: req.filename,

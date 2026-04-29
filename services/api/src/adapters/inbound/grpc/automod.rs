@@ -55,13 +55,13 @@ impl AutomodService for AutomodGrpc {
         let analysis = self
             .uc
             .analyze(AnalyzeMessageCommand {
-                guild_id: req.guild_id,
-                channel_id: req.channel_id,
-                user_id: req.user_id,
+                guild_id: req.guild_id.into(),
+                channel_id: req.channel_id.into(),
+                user_id: req.user_id.into(),
                 username: req.username,
                 content: req.content,
                 flags,
-                message_id: req.message_id,
+                message_id: req.message_id.into(),
                 timestamp: req.timestamp,
                 context_messages,
             })
