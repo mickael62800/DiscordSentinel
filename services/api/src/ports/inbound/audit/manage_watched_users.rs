@@ -2,7 +2,7 @@ use async_trait::async_trait;
 
 use crate::domain::entities::community::conduct::ConductPointsLog;
 use crate::domain::entities::moderation::infraction::Infraction;
-use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::moderation::action::action::ModerationAction;
 use crate::domain::entities::audit::security_event::SecurityEvent;
 use crate::domain::entities::moderation::user_note::UserNote;
 use crate::domain::entities::audit::watched_user::WatchedUser;

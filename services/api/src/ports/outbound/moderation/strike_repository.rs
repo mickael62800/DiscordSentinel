@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::moderation::strikes::StrikeConfig;
-use crate::domain::entities::moderation::strikes::UserStrike;
+use crate::domain::entities::moderation::action::strikes::StrikeConfig;
+use crate::domain::entities::moderation::action::strikes::UserStrike;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

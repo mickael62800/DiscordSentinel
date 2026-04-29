@@ -5,8 +5,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use super::super::pg_err_ctx;
-use crate::domain::entities::moderation::automod_review::AutomodReview;
-use crate::domain::entities::moderation::automod_review::NewAutomodReview;
+use crate::domain::entities::moderation::review::automod::AutomodReview;
+use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository;
 use crate::domain::entities::system::discord_ids::MessageId;

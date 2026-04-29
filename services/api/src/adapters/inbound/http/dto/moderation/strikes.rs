@@ -2,10 +2,10 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::strikes::StrikeConfig;
-use crate::domain::entities::moderation::strikes::StrikeResult;
-use crate::domain::entities::moderation::strikes::StrikeThreshold;
-use crate::domain::entities::moderation::strikes::UserStrike;
+use crate::domain::entities::moderation::action::strikes::StrikeConfig;
+use crate::domain::entities::moderation::action::strikes::StrikeResult;
+use crate::domain::entities::moderation::action::strikes::StrikeThreshold;
+use crate::domain::entities::moderation::action::strikes::UserStrike;
 use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::moderation::manage_strikes::SaveStrikeConfigCommand;
 use crate::domain::entities::system::discord_ids::UserId;

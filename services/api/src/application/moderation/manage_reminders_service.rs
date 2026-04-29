@@ -5,7 +5,7 @@ use chrono::Duration;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
+use crate::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use crate::ports::inbound::moderation::manage_reminders::ManageRemindersUseCase;

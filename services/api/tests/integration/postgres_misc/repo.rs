@@ -12,7 +12,7 @@ use sentinel_api::adapters::outbound::postgres::moderation::notes_repository::Pg
 use sentinel_api::adapters::outbound::postgres::moderation::reminder_repository::PgReminderRepository;
 use sentinel_api::adapters::outbound::postgres::audit::security_event_repository::PgSecurityEventRepository;
 use sentinel_api::domain::entities::audit::audit_log::AuditLog;
-use sentinel_api::domain::entities::moderation::sanction_reminder::SanctionReminder;
+use sentinel_api::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
 use sentinel_api::domain::entities::audit::security_event::SecurityEvent;
 use sentinel_api::domain::entities::moderation::user_note::UserNote;
 use sentinel_api::ports::inbound::audit::manage_audit_logs::AuditLogFilters;

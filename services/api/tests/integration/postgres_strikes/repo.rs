@@ -7,9 +7,9 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use sentinel_api::adapters::outbound::postgres::moderation::strike_repository::PgStrikeRepository;
-use sentinel_api::domain::entities::moderation::strikes::StrikeConfig;
-use sentinel_api::domain::entities::moderation::strikes::StrikeThreshold;
-use sentinel_api::domain::entities::moderation::strikes::UserStrike;
+use sentinel_api::domain::entities::moderation::action::strikes::StrikeConfig;
+use sentinel_api::domain::entities::moderation::action::strikes::StrikeThreshold;
+use sentinel_api::domain::entities::moderation::action::strikes::UserStrike;
 use sentinel_api::ports::outbound::moderation::strike_repository::StrikeRepository;
 
 async fn pool() -> PgPool {

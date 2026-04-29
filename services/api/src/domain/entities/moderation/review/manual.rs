@@ -41,5 +41,5 @@ pub fn is_valid_review_status(status: &str) -> bool {
 }
 
 #[cfg(test)]
-#[path = "tests/moderation_review.rs"]
+#[path = "tests/manual.rs"]
 mod tests;

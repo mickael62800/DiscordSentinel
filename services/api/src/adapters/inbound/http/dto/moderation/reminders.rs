@@ -2,7 +2,7 @@ use serde::Deserialize;
 use serde::Serialize;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
+use crate::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
 use crate::ports::inbound::moderation::manage_reminders::CreateReminderCommand;
 use crate::domain::entities::system::discord_ids::GuildId;
 

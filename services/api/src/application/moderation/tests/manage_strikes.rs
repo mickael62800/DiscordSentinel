@@ -12,7 +12,7 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::application::moderation::manage_strikes_service::ManageStrikesService;
-use crate::domain::entities::moderation::strikes::*;
+use crate::domain::entities::moderation::action::strikes::*;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_strikes::*;
 use crate::ports::outbound::moderation::strike_repository::StrikeRepository;

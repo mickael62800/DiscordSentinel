@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::sanction_reminder::SanctionReminder;
+use crate::domain::entities::moderation::action::sanction_reminder::SanctionReminder;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::reminder_repository::ReminderRepository;
 use crate::domain::entities::system::discord_ids::GuildId;

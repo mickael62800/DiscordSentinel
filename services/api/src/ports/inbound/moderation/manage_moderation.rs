@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
-use crate::domain::entities::moderation::moderation_action::ModerationAction;
-use crate::domain::entities::moderation::strikes::StrikeResult;
-use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
+use crate::domain::entities::moderation::action::action::ModerationAction;
+use crate::domain::entities::moderation::action::strikes::StrikeResult;
+use crate::domain::entities::moderation::action::action::UserModerationHistory;
 use crate::domain::errors::DomainError;
 use crate::domain::entities::system::discord_ids::ChannelId;
 use crate::domain::entities::system::discord_ids::GuildId;

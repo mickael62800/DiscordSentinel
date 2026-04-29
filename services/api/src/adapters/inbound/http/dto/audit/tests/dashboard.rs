@@ -3,7 +3,7 @@ use crate::domain::entities::audit::dashboard_stats::DashboardStats;
 use crate::domain::entities::system::guild::Guild;
 use crate::domain::entities::moderation::infraction::Infraction;
 use crate::domain::entities::system::log_entry::LogEntry;
-use crate::domain::entities::moderation::moderation_action::ModerationAction;
+use crate::domain::entities::moderation::action::action::ModerationAction;
 use crate::domain::entities::system::rule::Rule;
 use crate::domain::enums::moderation::action::Action;
 use crate::domain::entities::moderation::detection_flags::DetectionFlags;

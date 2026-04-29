@@ -1,9 +1,6 @@
-pub mod automod_review;
-pub mod infraction;
-pub mod moderation_action;
-pub mod moderation_review;
-pub mod purge;
-pub mod sanction_reminder;
-pub mod strikes;
-pub mod user_note;
+pub mod action;
 pub mod detection_flags;
+pub mod infraction;
+pub mod purge;
+pub mod review;
+pub mod user_note;

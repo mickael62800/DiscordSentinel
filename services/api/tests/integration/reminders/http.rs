@@ -16,7 +16,7 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::moderation::sanction_reminder::*;
+use sentinel_api::domain::entities::moderation::action::sanction_reminder::*;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::moderation::manage_reminders::*;
 

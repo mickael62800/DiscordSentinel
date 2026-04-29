@@ -7,8 +7,8 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::automod_review::AutomodReview;
-use crate::domain::entities::moderation::automod_review::NewAutomodReview;
+use crate::domain::entities::moderation::review::automod::AutomodReview;
+use crate::domain::entities::moderation::review::automod::NewAutomodReview;
 use crate::domain::errors::DomainError;
 
 #[derive(Debug, Clone)]

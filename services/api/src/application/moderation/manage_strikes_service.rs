@@ -5,9 +5,9 @@ use chrono::Duration;
 use chrono::Utc;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::strikes::StrikeConfig;
-use crate::domain::entities::moderation::strikes::StrikeResult;
-use crate::domain::entities::moderation::strikes::UserStrike;
+use crate::domain::entities::moderation::action::strikes::StrikeConfig;
+use crate::domain::entities::moderation::action::strikes::StrikeResult;
+use crate::domain::entities::moderation::action::strikes::UserStrike;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::moderation::manage_strikes::ManageStrikesUseCase;

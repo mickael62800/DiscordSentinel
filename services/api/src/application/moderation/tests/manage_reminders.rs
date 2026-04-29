@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 
 use crate::application::moderation::manage_reminders_service::ManageRemindersService;
-use crate::domain::entities::moderation::sanction_reminder::*;
+use crate::domain::entities::moderation::action::sanction_reminder::*;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_reminders::*;
 use crate::ports::outbound::moderation::reminder_repository::ReminderRepository;

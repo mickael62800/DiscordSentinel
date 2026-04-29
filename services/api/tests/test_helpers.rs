@@ -38,9 +38,9 @@ use sentinel_api::domain::entities::coude::steal::*;
 use sentinel_api::domain::entities::coude::steal::*;
 use sentinel_api::domain::entities::coude::taunt::*;
 use sentinel_api::domain::entities::moderation::infraction::*;
-use sentinel_api::domain::entities::moderation::moderation_action::*;
-use sentinel_api::domain::entities::moderation::sanction_reminder::*;
-use sentinel_api::domain::entities::moderation::strikes::*;
+use sentinel_api::domain::entities::moderation::action::action::*;
+use sentinel_api::domain::entities::moderation::action::sanction_reminder::*;
+use sentinel_api::domain::entities::moderation::action::strikes::*;
 use sentinel_api::domain::entities::moderation::user_note::*;
 use sentinel_api::domain::entities::system::*;
 use sentinel_api::domain::entities::system::bot_config::*;
@@ -737,11 +737,11 @@ pub struct StubWelcomeConfigRepo;
 
 pub struct StubAutomodReviewRepo;
 #[async_trait] impl sentinel_api::ports::outbound::moderation::automod_review_repository::AutomodReviewRepository for StubAutomodReviewRepo {
-    async fn create(&self, _: sentinel_api::domain::entities::moderation::automod_review::NewAutomodReview) -> Result<sentinel_api::domain::entities::moderation::automod_review::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
-    async fn get(&self, _: Uuid) -> Result<Option<sentinel_api::domain::entities::moderation::automod_review::AutomodReview>, DomainError> { Ok(None) }
-    async fn list_pending(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::moderation::automod_review::AutomodReview>, DomainError> { Ok(vec![]) }
-    async fn list_recent(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::moderation::automod_review::AutomodReview>, DomainError> { Ok(vec![]) }
-    async fn resolve(&self, _: Uuid, _: &str, _: &str, _: &str, _: &str) -> Result<sentinel_api::domain::entities::moderation::automod_review::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn create(&self, _: sentinel_api::domain::entities::moderation::review::automod::NewAutomodReview) -> Result<sentinel_api::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
+    async fn get(&self, _: Uuid) -> Result<Option<sentinel_api::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(None) }
+    async fn list_pending(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }
+    async fn list_recent(&self, _: &str, _: i64) -> Result<Vec<sentinel_api::domain::entities::moderation::review::automod::AutomodReview>, DomainError> { Ok(vec![]) }
+    async fn resolve(&self, _: Uuid, _: &str, _: &str, _: &str, _: &str) -> Result<sentinel_api::domain::entities::moderation::review::automod::AutomodReview, DomainError> { Err(DomainError::Internal("stub".into())) }
 }
 
 pub struct StubDiscordActionMessageRepo;

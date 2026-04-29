@@ -5,9 +5,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::strikes::StrikeConfig;
-use crate::domain::entities::moderation::strikes::StrikeThreshold;
-use crate::domain::entities::moderation::strikes::UserStrike;
+use crate::domain::entities::moderation::action::strikes::StrikeConfig;
+use crate::domain::entities::moderation::action::strikes::StrikeThreshold;
+use crate::domain::entities::moderation::action::strikes::UserStrike;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::moderation::strike_repository::StrikeRepository;
 use crate::domain::entities::system::discord_ids::UserId;

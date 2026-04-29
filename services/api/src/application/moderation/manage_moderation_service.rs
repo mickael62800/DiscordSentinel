@@ -3,8 +3,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::moderation::moderation_action::ModerationAction;
-use crate::domain::entities::moderation::moderation_action::UserModerationHistory;
+use crate::domain::entities::moderation::action::action::ModerationAction;
+use crate::domain::entities::moderation::action::action::UserModerationHistory;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::moderation::manage_strikes::AddStrikeCommand;
 use crate::ports::inbound::audit::manage_audit_logs::CreateAuditLogCommand;

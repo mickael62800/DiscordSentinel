@@ -109,11 +109,11 @@ fn build_state(evidence: Arc<MockEvidenceRepo>, review: Arc<MockReviewRepo>) -> 
 /// Construit un state avec un MockDiscordApi + mock moderation UC pour
 /// couvrir le code apres discord_api.ban_user().await? dans execute_ban/mute/unban.
 fn build_state_with_discord_mock() -> AppState {
-    use sentinel_api::domain::entities::moderation::moderation_action::ModerationAction;
+    use sentinel_api::domain::entities::moderation::action::action::ModerationAction;
     use sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity;
     use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
     use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
-    use sentinel_api::domain::entities::moderation::moderation_action::UserModerationHistory;
+    use sentinel_api::domain::entities::moderation::action::action::UserModerationHistory;
     use chrono::Utc;
     use async_trait::async_trait;
 
@@ -773,11 +773,11 @@ async fn seed_rbac(pool: &sqlx::PgPool, user_id: &str, guild_id: &str, role: &st
 }
 
 fn build_state_full_mocks() -> AppState {
-    use sentinel_api::domain::entities::moderation::moderation_action::ModerationAction;
+    use sentinel_api::domain::entities::moderation::action::action::ModerationAction;
     use sentinel_api::domain::enums::moderation::moderation_gravity::ModerationGravity;
     use sentinel_api::ports::inbound::moderation::manage_moderation::LogModerationCommand;
     use sentinel_api::ports::inbound::moderation::manage_moderation::ManageModerationUseCase;
-    use sentinel_api::domain::entities::moderation::moderation_action::UserModerationHistory;
+    use sentinel_api::domain::entities::moderation::action::action::UserModerationHistory;
     use chrono::Utc;
     use async_trait::async_trait;
 
