@@ -61,5 +61,5 @@ pub fn pick_flavor_line(
 }
 
 #[cfg(test)]
-#[path = "tests/combat_flavor.rs"]
+#[path = "tests/flavor.rs"]
 mod tests;

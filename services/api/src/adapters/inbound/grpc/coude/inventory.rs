@@ -370,7 +370,7 @@ impl CoudeInventoryService for InventoryGrpc {
 #[path = "tests/inventory.rs"]
 mod tests;
 
-pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boost::StealBoost) -> proto::StealBoost {
+pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal::boost::StealBoost) -> proto::StealBoost {
     proto::StealBoost {
         id: b.id.to_string(),
         guild_id: b.guild_id.into(),
@@ -382,7 +382,7 @@ pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boos
 }
 
 pub(super) fn steal_protection_to_proto(
-    p: crate::domain::entities::coude::steal_protection::StealProtection,
+    p: crate::domain::entities::coude::steal::protection::StealProtection,
 ) -> proto::StealProtection {
     proto::StealProtection {
         id: p.id.to_string(),
@@ -396,8 +396,8 @@ pub(super) fn steal_protection_to_proto(
 
 pub(super) fn proto_steal_duration_to_domain(
     v: i32,
-) -> Option<crate::domain::entities::coude::steal_protection::StealProtectionDuration> {
-    use crate::domain::entities::coude::steal_protection::StealProtectionDuration as D;
+) -> Option<crate::domain::entities::coude::steal::protection::StealProtectionDuration> {
+    use crate::domain::entities::coude::steal::protection::StealProtectionDuration as D;
     use proto::StealProtectionDurationKind as P;
     match P::try_from(v).ok()? {
         P::StealProtectionDurationUnspecified => None,

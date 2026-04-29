@@ -22,7 +22,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::warn;
 
-use crate::domain::entities::coude::combat_resolution_rules::apply_insurance_to_loss;
+use crate::domain::entities::coude::combat::resolution_rules::apply_insurance_to_loss;
 use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::combat::Combat;
 use crate::domain::errors::DomainError;

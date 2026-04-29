@@ -8,9 +8,9 @@
 use async_trait::async_trait;
 use rand::Rng;
 
-use crate::domain::entities::coude::steal_roll::steal_pct_range_bp;
-use crate::domain::entities::coude::steal_roll::STEAL_D20_MAX;
-use crate::domain::entities::coude::steal_roll::STEAL_D20_MIN;
+use crate::domain::entities::coude::steal::roll::steal_pct_range_bp;
+use crate::domain::entities::coude::steal::roll::STEAL_D20_MAX;
+use crate::domain::entities::coude::steal::roll::STEAL_D20_MIN;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::roll_steal::RollStealCommand;
 use crate::ports::inbound::coude::roll_steal::RollStealUseCase;

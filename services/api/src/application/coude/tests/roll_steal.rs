@@ -1,10 +1,10 @@
 use crate::application::coude::roll_steal_service::RollStealService;
-use crate::domain::entities::coude::steal_roll::STEAL_D20_MAX;
-use crate::domain::entities::coude::steal_roll::STEAL_D20_MIN;
-use crate::domain::entities::coude::steal_roll::STEAL_PCT_ACTIVE_MAX_BP;
-use crate::domain::entities::coude::steal_roll::STEAL_PCT_ACTIVE_MIN_BP;
-use crate::domain::entities::coude::steal_roll::STEAL_PCT_AFK_MAX_BP;
-use crate::domain::entities::coude::steal_roll::STEAL_PCT_AFK_MIN_BP;
+use crate::domain::entities::coude::steal::roll::STEAL_D20_MAX;
+use crate::domain::entities::coude::steal::roll::STEAL_D20_MIN;
+use crate::domain::entities::coude::steal::STEAL_PCT_ACTIVE_MAX_BP;
+use crate::domain::entities::coude::steal::STEAL_PCT_ACTIVE_MIN_BP;
+use crate::domain::entities::coude::steal::STEAL_PCT_AFK_MAX_BP;
+use crate::domain::entities::coude::steal::STEAL_PCT_AFK_MIN_BP;
 use crate::ports::inbound::coude::roll_steal::RollStealCommand;
 use crate::ports::inbound::coude::roll_steal::RollStealUseCase;
 #[tokio::test]

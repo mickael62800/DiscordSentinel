@@ -91,5 +91,5 @@ pub fn detect_outcome_flags(
 }
 
 #[cfg(test)]
-#[path = "tests/combat_outcome_flags.rs"]
+#[path = "tests/outcome_flags.rs"]
 mod tests;

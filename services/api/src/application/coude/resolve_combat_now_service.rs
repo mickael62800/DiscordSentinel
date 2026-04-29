@@ -19,12 +19,12 @@ use async_trait::async_trait;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::combat_resolution_rules::apply_insurance_to_loss;
-use crate::domain::entities::coude::combat_resolution_rules::compute_combat_xp;
-use crate::domain::entities::coude::combat_outcome_flags::detect_outcome_flags;
-use crate::domain::entities::coude::combat_resolution_rules::format_bet_payout_lines;
-use crate::domain::entities::coude::combat_outcome_flags::CombatOutcomeFlags;
-use crate::domain::entities::coude::combat_outcome_flags::COMEBACK_HP_PCT_MAX;
+use crate::domain::entities::coude::combat::resolution_rules::apply_insurance_to_loss;
+use crate::domain::entities::coude::combat::resolution_rules::compute_combat_xp;
+use crate::domain::entities::coude::combat::outcome_flags::detect_outcome_flags;
+use crate::domain::entities::coude::combat::resolution_rules::format_bet_payout_lines;
+use crate::domain::entities::coude::combat::outcome_flags::CombatOutcomeFlags;
+use crate::domain::entities::coude::combat::outcome_flags::COMEBACK_HP_PCT_MAX;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude::coude_combat_engine as engine;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;

@@ -6,7 +6,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::steal_protection::StealProtection;
+use crate::domain::entities::coude::steal::protection::StealProtection;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 

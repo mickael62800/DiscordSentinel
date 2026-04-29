@@ -774,7 +774,7 @@ pub fn resolve_combat_with_curses(
         // Commentaires de combat debiles (cf. COUPE_AMELIORATIONS 2.2) —
         // ~20% par round, aucune incidence mecanique, juste de l ambiance.
         {
-            use crate::domain::entities::coude::combat_flavor::pick_flavor_line;
+            use crate::domain::entities::coude::combat::flavor::pick_flavor_line;
             let proba: f64 = rng.gen_range(0.0..1.0);
             if let Some(line) = pick_flavor_line(&mut rng, proba, &atk_name, &def_name) {
                 round_msg.push_str(&format!("\n_\u{1f3ad} {}_\n", line));

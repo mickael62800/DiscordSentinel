@@ -478,7 +478,7 @@ use super::*;
 
     #[test]
     fn steal_boost_to_proto_mapping() {
-        use crate::domain::entities::coude::steal_boost::StealBoost;
+        use crate::domain::entities::coude::steal::boost::StealBoost;
         let id = Uuid::new_v4();
         let b = StealBoost {
             id,
@@ -497,7 +497,7 @@ use super::*;
 
     #[test]
     fn steal_protection_to_proto_mapping() {
-        use crate::domain::entities::coude::steal_protection::StealProtection;
+        use crate::domain::entities::coude::steal::protection::StealProtection;
         let id = Uuid::new_v4();
         let p = StealProtection {
             id,
@@ -515,7 +515,7 @@ use super::*;
 
     #[test]
     fn proto_steal_duration_to_domain_all_variants() {
-        use crate::domain::entities::coude::steal_protection::StealProtectionDuration as D;
+        use crate::domain::entities::coude::steal::protection::StealProtectionDuration as D;
         assert_eq!(
             inventory::proto_steal_duration_to_domain(proto::StealProtectionDurationKind::StealProtectionDurationOneDay as i32),
             Some(D::OneDay)

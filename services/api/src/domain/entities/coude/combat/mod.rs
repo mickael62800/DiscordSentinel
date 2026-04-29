@@ -65,6 +65,11 @@ pub struct CombatResolution {
     pub coins_transferred: i64,
 }
 
+pub mod flavor;
+pub mod outcome_flags;
+pub mod resolution_rules;
+pub mod validation;
+
 #[cfg(test)]
-#[path = "tests/combat.rs"]
+#[path = "tests/mod_tests.rs"]
 mod tests;

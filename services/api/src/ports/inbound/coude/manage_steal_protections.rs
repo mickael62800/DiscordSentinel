@@ -8,8 +8,8 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal_protection::StealProtection;
-use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
+use crate::domain::entities::coude::steal::protection::StealProtection;
+use crate::domain::entities::coude::steal::protection::StealProtectionDuration;
 use crate::domain::errors::DomainError;
 
 /// Resultat d'une tentative de blocage d'un vol : indique quel item

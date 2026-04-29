@@ -3,8 +3,8 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal_boost::StealBoost;
-use crate::domain::entities::coude::steal_boost::StealBoostDuration;
+use crate::domain::entities::coude::steal::boost::StealBoost;
+use crate::domain::entities::coude::steal::boost::StealBoostDuration;
 use crate::domain::errors::DomainError;
 
 #[async_trait]

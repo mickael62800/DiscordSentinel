@@ -6,7 +6,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::steal_boost::StealBoost;
+use crate::domain::entities::coude::steal::boost::StealBoost;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::steal_boost_repository::StealBoostRepository;
 

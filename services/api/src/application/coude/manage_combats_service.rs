@@ -3,9 +3,9 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::combat_validation::check_min_hp_pct;
-use crate::domain::entities::coude::combat_validation::check_surprise_hp_pct;
-use crate::domain::entities::coude::combat_validation::validate_new_combat;
+use crate::domain::entities::coude::combat::validation::check_min_hp_pct;
+use crate::domain::entities::coude::combat::validation::check_surprise_hp_pct;
+use crate::domain::entities::coude::combat::validation::validate_new_combat;
 use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::balance::BalanceParams;
 use crate::domain::entities::coude::combat::Combat;
