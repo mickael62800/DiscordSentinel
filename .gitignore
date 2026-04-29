@@ -1,9 +1,6 @@
 # Rust
 **/target/
 **/*.rs.bk
-Cargo.lock
-!services/api/Cargo.lock
-!bots/*/Cargo.lock
 
 # Node
 **/node_modules/
