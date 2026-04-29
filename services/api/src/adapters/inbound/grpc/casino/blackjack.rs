@@ -197,7 +197,7 @@ fn game_is_over(status: &str) -> bool {
     )
 }
 
-use super::parse_uuid;
+use crate::adapters::inbound::grpc::parse_uuid;
 
 fn card_to_proto(c: &Card) -> proto::Card {
     proto::Card {

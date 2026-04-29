@@ -151,7 +151,7 @@ impl TicketsService for TicketsGrpc {
         request: Request<proto::UpdatePriorityRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        let id = super::parse_uuid(&req.id)?;
+        let id = crate::adapters::inbound::grpc::parse_uuid(&req.id)?;
         self.tickets_uc
             .update_priority(id, &req.priority)
             .await
@@ -164,7 +164,7 @@ impl TicketsService for TicketsGrpc {
         request: Request<proto::UpdateSlaRequest>,
     ) -> Result<Response<proto::Empty>, Status> {
         let req = request.into_inner();
-        let id = super::parse_uuid(&req.id)?;
+        let id = crate::adapters::inbound::grpc::parse_uuid(&req.id)?;
         self.tickets_uc
             .update_sla(
                 id,

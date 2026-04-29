@@ -182,7 +182,7 @@ async fn temp_role_unique_constraint() {
 
 mod community_grpc {
     use super::*;
-    use sentinel_api::adapters::inbound::grpc::community::CommunityGrpc;
+    use sentinel_api::adapters::inbound::grpc::community::sponsorships::CommunityGrpc;
     use sentinel_proto::community::v1 as proto;
     use sentinel_proto::community::v1::community_service_server::CommunityService;
     use tonic::Request;

@@ -7,23 +7,15 @@
 //!
 //! Conversion d'erreurs : `DomainError` -> `tonic::Status` (cf. `errors`).
 
-pub mod automod;
-pub mod blackjack;
+pub mod ai;
+pub mod audit;
+pub mod casino;
 pub mod community;
 pub mod coude;
-pub mod export;
 pub mod errors;
-pub mod images;
-pub mod members;
 pub mod moderation;
-pub mod progression;
-pub mod roles;
-pub mod security;
 pub mod server;
-pub mod stats;
-pub mod tickets;
-pub mod voice;
-pub mod welcome;
+pub mod system;
 
 /// Parse un UUID depuis une string proto. Retourne `Status::invalid_argument` si invalide.
 pub(crate) fn parse_uuid(s: &str) -> Result<uuid::Uuid, tonic::Status> {
