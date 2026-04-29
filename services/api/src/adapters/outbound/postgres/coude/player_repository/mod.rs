@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 
@@ -73,7 +73,7 @@ struct PlayerRow {
     updated_at: DateTime<Utc>,
 }
 
-impl From<PlayerRow> for CoudePlayer {
+impl From<PlayerRow> for Player {
     fn from(r: PlayerRow) -> Self {
         Self {
             guild_id: r.guild_id,
@@ -124,7 +124,7 @@ impl PlayerRepository for PgPlayerRepository {
         guild_id: &str,
         user_id: &str,
         username: &str,
-    ) -> Result<CoudePlayer, DomainError> {
+    ) -> Result<Player, DomainError> {
         read::get_or_create(self, guild_id, user_id, username).await
     }
 
@@ -132,11 +132,11 @@ impl PlayerRepository for PgPlayerRepository {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudePlayer>, DomainError> {
+    ) -> Result<Option<Player>, DomainError> {
         read::get(self, guild_id, user_id).await
     }
 
-    async fn list(&self, guild_id: &str, limit: i64) -> Result<Vec<CoudePlayer>, DomainError> {
+    async fn list(&self, guild_id: &str, limit: i64) -> Result<Vec<Player>, DomainError> {
         read::list(self, guild_id, limit).await
     }
 
@@ -145,7 +145,7 @@ impl PlayerRepository for PgPlayerRepository {
         guild_id: &str,
         count: i64,
         min_coins: i64,
-    ) -> Result<Vec<CoudePlayer>, DomainError> {
+    ) -> Result<Vec<Player>, DomainError> {
         read::random_active(self, guild_id, count, min_coins).await
     }
 
@@ -176,7 +176,7 @@ impl PlayerRepository for PgPlayerRepository {
         guild_id: &str,
         user_id: &str,
         stat: CombatStat,
-    ) -> Result<Option<CoudePlayer>, DomainError> {
+    ) -> Result<Option<Player>, DomainError> {
         progression::spend_stat_point(self, guild_id, user_id, stat).await
     }
 
@@ -185,7 +185,7 @@ impl PlayerRepository for PgPlayerRepository {
         guild_id: &str,
         user_id: &str,
         cost: i64,
-    ) -> Result<Option<CoudePlayer>, DomainError> {
+    ) -> Result<Option<Player>, DomainError> {
         progression::reset_stats(self, guild_id, user_id, cost).await
     }
 

@@ -56,8 +56,8 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
     }
 }
 
-fn grpc(uc: Arc<MockEconomyUc>) -> CoudeEconomyGrpc {
-    CoudeEconomyGrpc { uc }
+fn grpc(uc: Arc<MockEconomyUc>) -> EconomyGrpc {
+    EconomyGrpc { uc }
 }
 
 // ── transfer ──

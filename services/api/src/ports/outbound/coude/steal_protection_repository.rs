@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::steal_protection::StealProtection;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -13,7 +13,7 @@ pub trait StealProtectionRepository: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealProtection>, DomainError>;
+    ) -> Result<Vec<StealProtection>, DomainError>;
 
     /// Souscrit ou etend un abonnement. Si une protection active existe
     /// deja pour ce couple (guild, user, item_key), on etend `expires_at`

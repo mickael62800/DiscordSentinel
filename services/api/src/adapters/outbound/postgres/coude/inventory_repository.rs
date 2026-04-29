@@ -4,9 +4,9 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 
@@ -32,7 +32,7 @@ struct InventoryRow {
     quantity: i32,
 }
 
-impl From<InventoryRow> for CoudeInventoryItem {
+impl From<InventoryRow> for InventoryItem {
     fn from(r: InventoryRow) -> Self {
         Self {
             guild_id: r.guild_id,
@@ -59,7 +59,7 @@ struct PrimeRow {
     created_at: DateTime<Utc>,
 }
 
-impl From<PrimeRow> for CoudePrime {
+impl From<PrimeRow> for Prime {
     fn from(r: PrimeRow) -> Self {
         Self {
             id: r.id,
@@ -85,7 +85,7 @@ struct InsuranceRow {
     expires_at: DateTime<Utc>,
 }
 
-impl From<InsuranceRow> for CoudeInsurance {
+impl From<InsuranceRow> for Insurance {
     fn from(r: InsuranceRow) -> Self {
         Self {
             id: r.id,
@@ -103,7 +103,7 @@ impl InventoryRepository for PgInventoryRepository {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeInventoryItem>, DomainError> {
+    ) -> Result<Vec<InventoryItem>, DomainError> {
         let rows: Vec<InventoryRow> = sqlx::query_as(
             "SELECT guild_id, user_id, item_key, quantity FROM coude_inventory
              WHERE guild_id = $1 AND user_id = $2 AND quantity > 0",
@@ -177,7 +177,7 @@ impl InventoryRepository for PgInventoryRepository {
 
     // ── Primes ──
 
-    async fn create_prime(&self, new: NewCoudePrime) -> Result<CoudePrime, DomainError> {
+    async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError> {
         let row: PrimeRow = sqlx::query_as(
             r#"INSERT INTO coude_primes
                  (guild_id, target_id, target_name, placed_by_id, placed_by_name, amount)
@@ -201,7 +201,7 @@ impl InventoryRepository for PgInventoryRepository {
         &self,
         guild_id: &str,
         target_id: &str,
-    ) -> Result<Vec<CoudePrime>, DomainError> {
+    ) -> Result<Vec<Prime>, DomainError> {
         let rows: Vec<PrimeRow> = sqlx::query_as(
             r#"SELECT id, guild_id, target_id, target_name, placed_by_id, placed_by_name,
                       amount, claimed, claimed_by_id, claimed_by_name, claimed_at, created_at
@@ -315,7 +315,7 @@ impl InventoryRepository for PgInventoryRepository {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeInsurance>, DomainError> {
+    ) -> Result<Option<Insurance>, DomainError> {
         let row: Option<InsuranceRow> = sqlx::query_as(
             r#"SELECT id, is_scam, expires_at
                FROM coude_insurances

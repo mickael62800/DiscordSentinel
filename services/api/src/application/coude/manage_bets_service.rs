@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::application::coude::guild_settings::GuildSettings;
 use crate::domain::entities::coude::bet::calculate_bet_resolution;
 use crate::domain::entities::coude::safety_net::boost_bet_gain_with_multiplier as safety_net_boost_bet_gain_with_multiplier;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::errors::DomainError;
@@ -78,7 +78,7 @@ impl ManageCoudeBetsUseCase for ManageCoudeBetsService {
         Ok(PlaceBetOutcome { taunt_events })
     }
 
-    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
+    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<Bet>, DomainError> {
         self.bet_repo.list_for_combat(combat_id).await
     }
 

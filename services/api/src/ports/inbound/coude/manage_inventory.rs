@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 
@@ -15,7 +15,7 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeInventoryItem>, DomainError>;
+    ) -> Result<Vec<InventoryItem>, DomainError>;
 
     async fn add_item(
         &self,
@@ -40,13 +40,13 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
     ) -> Result<bool, DomainError>;
 
     // ── Primes ──
-    async fn create_prime(&self, new: NewCoudePrime) -> Result<CoudePrime, DomainError>;
+    async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError>;
 
     async fn list_active_primes(
         &self,
         guild_id: &str,
         target_id: &str,
-    ) -> Result<Vec<CoudePrime>, DomainError>;
+    ) -> Result<Vec<Prime>, DomainError>;
 
     async fn claim_primes(
         &self,
@@ -105,7 +105,7 @@ pub trait ManageCoudeInventoryUseCase: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeInsurance>, DomainError>;
+    ) -> Result<Option<Insurance>, DomainError>;
 
     async fn expire_insurance(&self, insurance_id: Uuid) -> Result<(), DomainError>;
 }

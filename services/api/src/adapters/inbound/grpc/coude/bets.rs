@@ -15,7 +15,7 @@ use sentinel_proto::coude::v1::coude_bets_service_server::CoudeBetsService;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::domain::entities::coude::bet::BetPayout;
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
@@ -23,12 +23,12 @@ use crate::ports::inbound::coude::manage_bets::ManageCoudeBetsUseCase;
 
 use super::parse_uuid;
 use super::taunt_event_to_proto;
-pub struct CoudeBetsGrpc {
+pub struct BetsGrpc {
     pub uc: Arc<dyn ManageCoudeBetsUseCase>,
 }
 
-pub(super) fn bet_to_proto(b: CoudeBet) -> proto::CoudeBet {
-    proto::CoudeBet {
+pub(super) fn bet_to_proto(b: Bet) -> proto::Bet {
+    proto::Bet {
         id: b.id.to_string(),
         guild_id: b.guild_id,
         combat_id: b.combat_id.to_string(),
@@ -78,7 +78,7 @@ pub(super) fn refund_summary_to_proto(s: RefundSummary) -> proto::RefundSummary 
 }
 
 #[tonic::async_trait]
-impl CoudeBetsService for CoudeBetsGrpc {
+impl CoudeBetsService for BetsGrpc {
     async fn place(
         &self,
         request: Request<proto::PlaceBetRequest>,

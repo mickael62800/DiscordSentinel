@@ -24,7 +24,7 @@ use tracing::warn;
 
 use crate::domain::entities::coude::combat_resolution_rules::apply_insurance_to_loss;
 use crate::domain::entities::coude::balance::BalanceParams;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::errors::DomainError;
 use crate::domain::services::coude::coude_combat_engine as engine;
 use crate::domain::services::coude::coude_combat_engine::PlayerLite;
@@ -112,7 +112,7 @@ impl ResolveBettingBatchService {
     /// Resout un combat unique et applique tous les effets de bord.
     async fn resolve_one(
         &self,
-        combat: &CoudeCombat,
+        combat: &Combat,
     ) -> Result<ResolvedBettingCombatOutput, DomainError> {
         let attacker = self.load_player(&combat.guild_id, &combat.attacker_id).await?;
         let defender = self.load_player(&combat.guild_id, &combat.defender_id).await?;

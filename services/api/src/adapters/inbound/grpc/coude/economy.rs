@@ -15,12 +15,12 @@ use crate::adapters::inbound::grpc::coude::taunt_event_to_proto;
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::ports::inbound::coude::manage_economy::ManageCoudeEconomyUseCase;
 
-pub struct CoudeEconomyGrpc {
+pub struct EconomyGrpc {
     pub uc: Arc<dyn ManageCoudeEconomyUseCase>,
 }
 
 #[tonic::async_trait]
-impl CoudeEconomyService for CoudeEconomyGrpc {
+impl CoudeEconomyService for EconomyGrpc {
     async fn transfer(
         &self,
         request: Request<proto::TransferRequest>,

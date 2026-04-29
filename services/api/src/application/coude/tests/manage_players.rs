@@ -1,6 +1,6 @@
 use super::*;
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 use crate::ports::outbound::coude::player_repository::PlayerRepository;
@@ -14,7 +14,7 @@ struct MockRepo {
     list_limit: StdMutex<Option<i64>>,
     update_class_returns: StdMutex<bool>,
     reset_stats_returns_some: StdMutex<bool>,
-    player: StdMutex<Option<CoudePlayer>>,
+    player: StdMutex<Option<Player>>,
 }
 
 impl MockRepo {
@@ -25,9 +25,9 @@ impl MockRepo {
     }
 }
 
-fn sample_player() -> CoudePlayer {
+fn sample_player() -> Player {
     let now = Utc::now();
-    CoudePlayer {
+    Player {
         guild_id: "g".into(),
         user_id: "u".into(),
         username: "alice".into(),
@@ -62,17 +62,17 @@ fn sample_player() -> CoudePlayer {
 
 #[async_trait]
 impl PlayerRepository for MockRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> {
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> {
         Ok(sample_player())
     }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> {
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> {
         Ok(self.player.lock().unwrap().clone())
     }
-    async fn list(&self, _: &str, limit: i64) -> Result<Vec<CoudePlayer>, DomainError> {
+    async fn list(&self, _: &str, limit: i64) -> Result<Vec<Player>, DomainError> {
         *self.list_limit.lock().unwrap() = Some(limit);
         Ok(vec![])
     }
-    async fn random_active(&self, _: &str, count: i64, min_coins: i64) -> Result<Vec<CoudePlayer>, DomainError> {
+    async fn random_active(&self, _: &str, count: i64, min_coins: i64) -> Result<Vec<Player>, DomainError> {
         *self.random_count.lock().unwrap() = Some(count);
         *self.random_min_coins.lock().unwrap() = Some(min_coins);
         Ok(vec![])
@@ -82,8 +82,8 @@ impl PlayerRepository for MockRepo {
         Ok(*self.update_class_returns.lock().unwrap())
     }
     async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<CoudePlayer>, DomainError> {
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> {
         if *self.reset_stats_returns_some.lock().unwrap() {
             Ok(Some(sample_player()))
         } else {
@@ -256,15 +256,15 @@ async fn record_coins_earned_ok_with_positive() {
 struct FalseRepo;
 #[async_trait]
 impl PlayerRepository for FalseRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { Ok(sample_player()) }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> { Ok(sample_player()) }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
     async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> { Ok(None) }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
     async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(false) }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(false) }

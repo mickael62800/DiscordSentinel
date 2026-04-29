@@ -2,8 +2,8 @@ use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::errors::DomainError;
@@ -39,11 +39,11 @@ pub trait SocialRepository: Send + Sync {
         guild_id: &str,
         category: LeaderboardCategory,
         limit: i64,
-    ) -> Result<Vec<CoudeLeaderboardEntry>, DomainError>;
+    ) -> Result<Vec<LeaderboardEntry>, DomainError>;
 
     // ── Événements ──
 
-    async fn list_active_events(&self, guild_id: &str) -> Result<Vec<CoudeEvent>, DomainError>;
+    async fn list_active_events(&self, guild_id: &str) -> Result<Vec<Event>, DomainError>;
 
     // ── Daily chaos ──
 

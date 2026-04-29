@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
+use crate::domain::entities::coude::steal_boost::StealBoost;
 use crate::domain::entities::coude::steal_boost::StealBoostDuration;
 use crate::domain::errors::DomainError;
 
@@ -13,7 +13,7 @@ pub trait ManageCoudeStealBoostsUseCase: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealBoost>, DomainError>;
+    ) -> Result<Vec<StealBoost>, DomainError>;
 
     async fn price_for(
         &self,

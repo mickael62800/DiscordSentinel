@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 /// Une ligne d'inventaire d'un joueur (clé d'item + quantité).
 #[derive(Debug, Clone)]
-pub struct CoudeInventoryItem {
+pub struct InventoryItem {
     pub guild_id: String,
     pub user_id: String,
     pub item_key: String,
@@ -20,7 +20,7 @@ pub struct CoudeInventoryItem {
 // ══════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub struct CoudePrime {
+pub struct Prime {
     pub id: Uuid,
     pub guild_id: String,
     pub target_id: String,
@@ -52,7 +52,7 @@ pub struct NewCoudePrime {
 /// Projection légère : les handlers n'exposent que ce qui est strictement
 /// nécessaire côté bot (id + is_scam + expires_at).
 #[derive(Debug, Clone)]
-pub struct CoudeInsurance {
+pub struct Insurance {
     pub id: Uuid,
     pub is_scam: bool,
     pub expires_at: DateTime<Utc>,

@@ -6,11 +6,11 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
-use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
-use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
+use crate::domain::entities::coude::steal_boost::StealBoost;
+use crate::domain::entities::coude::steal_protection::StealProtection;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::entities::coude::steal_boost::StealBoostDuration;
 use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
@@ -24,22 +24,22 @@ use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 
 #[derive(Default)]
 struct MockInventoryUc {
-    inventory: Mutex<Vec<CoudeInventoryItem>>,
+    inventory: Mutex<Vec<InventoryItem>>,
     add_calls: Mutex<Vec<(String, String, String)>>,
     use_calls: Mutex<Vec<(String, String, String)>>,
     use_return: Mutex<bool>,
     has_return: Mutex<bool>,
     create_prime_calls: Mutex<Vec<NewCoudePrime>>,
-    active_primes: Mutex<Vec<CoudePrime>>,
+    active_primes: Mutex<Vec<Prime>>,
     claim_return: Mutex<i64>,
     buy_insurance_return: Mutex<bool>,
-    active_insurance: Mutex<Option<CoudeInsurance>>,
+    active_insurance: Mutex<Option<Insurance>>,
     expire_calls: Mutex<Vec<Uuid>>,
 }
 
 #[async_trait]
 impl ManageCoudeInventoryUseCase for MockInventoryUc {
-    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> {
+    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> {
         Ok(self.inventory.lock().unwrap().clone())
     }
     async fn add_item(&self, g: &str, u: &str, k: &str) -> Result<(), DomainError> {
@@ -53,8 +53,8 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
         Ok(*self.has_return.lock().unwrap())
     }
-    async fn create_prime(&self, new: NewCoudePrime) -> Result<CoudePrime, DomainError> {
-        let p = CoudePrime {
+    async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError> {
+        let p = Prime {
             id: Uuid::new_v4(),
             guild_id: new.guild_id.clone(),
             target_id: new.target_id.clone(),
@@ -71,7 +71,7 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
         self.create_prime_calls.lock().unwrap().push(new);
         Ok(p)
     }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> {
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> {
         Ok(self.active_primes.lock().unwrap().clone())
     }
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
@@ -80,7 +80,7 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> {
         Ok(*self.buy_insurance_return.lock().unwrap())
     }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> {
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> {
         Ok(self.active_insurance.lock().unwrap().clone())
     }
     async fn expire_insurance(&self, id: Uuid) -> Result<(), DomainError> {
@@ -91,7 +91,7 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
 
 #[derive(Default)]
 struct MockProtectionsUc {
-    list_return: Mutex<Vec<CoudeStealProtection>>,
+    list_return: Mutex<Vec<StealProtection>>,
     price_return: Mutex<i64>,
     subscribe_return: Mutex<Option<DateTime<Utc>>>,
     trigger_return: Mutex<Option<StealProtectionTrigger>>,
@@ -101,7 +101,7 @@ struct MockProtectionsUc {
 
 #[async_trait]
 impl ManageCoudeStealProtectionsUseCase for MockProtectionsUc {
-    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<CoudeStealProtection>, DomainError> {
+    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<StealProtection>, DomainError> {
         Ok(self.list_return.lock().unwrap().clone())
     }
     async fn price_for(&self, item: &str, d: StealProtectionDuration) -> Result<i64, DomainError> {
@@ -119,7 +119,7 @@ impl ManageCoudeStealProtectionsUseCase for MockProtectionsUc {
 
 #[derive(Default)]
 struct MockBoostsUc {
-    list_return: Mutex<Vec<CoudeStealBoost>>,
+    list_return: Mutex<Vec<StealBoost>>,
     price_return: Mutex<i64>,
     subscribe_return: Mutex<Option<DateTime<Utc>>>,
     total_return: Mutex<i32>,
@@ -127,7 +127,7 @@ struct MockBoostsUc {
 
 #[async_trait]
 impl ManageCoudeStealBoostsUseCase for MockBoostsUc {
-    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<CoudeStealBoost>, DomainError> {
+    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<StealBoost>, DomainError> {
         Ok(self.list_return.lock().unwrap().clone())
     }
     async fn price_for(&self, _: &str, _: StealBoostDuration) -> Result<i64, DomainError> {
@@ -145,15 +145,15 @@ fn grpc(
     uc: Arc<MockInventoryUc>,
     p: Arc<MockProtectionsUc>,
     b: Arc<MockBoostsUc>,
-) -> CoudeInventoryGrpc {
-    CoudeInventoryGrpc {
+) -> InventoryGrpc {
+    InventoryGrpc {
         uc,
         steal_protections_uc: p,
         steal_boosts_uc: b,
     }
 }
 
-fn default_grpc() -> CoudeInventoryGrpc {
+fn default_grpc() -> InventoryGrpc {
     grpc(
         Arc::new(MockInventoryUc::default()),
         Arc::new(MockProtectionsUc::default()),
@@ -175,7 +175,7 @@ async fn list_inventory_empty() {
 #[tokio::test]
 async fn list_inventory_returns_items() {
     let uc = Arc::new(MockInventoryUc::default());
-    uc.inventory.lock().unwrap().push(CoudeInventoryItem {
+    uc.inventory.lock().unwrap().push(InventoryItem {
         guild_id: "g".into(), user_id: "u".into(),
         item_key: "potion".into(), quantity: 5,
     });
@@ -323,7 +323,7 @@ async fn get_active_insurance_none_when_absent() {
 #[tokio::test]
 async fn get_active_insurance_some_when_present() {
     let uc = Arc::new(MockInventoryUc::default());
-    *uc.active_insurance.lock().unwrap() = Some(CoudeInsurance {
+    *uc.active_insurance.lock().unwrap() = Some(Insurance {
         id: Uuid::new_v4(),
         is_scam: true,
         expires_at: Utc::now() + chrono::Duration::hours(1),

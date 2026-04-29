@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::bet::BetPayoutOutcome;
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::coude::taunt::TauntEvent;
@@ -95,7 +95,7 @@ struct BetRow {
     payout: Option<i64>,
 }
 
-impl From<BetRow> for CoudeBet {
+impl From<BetRow> for Bet {
     fn from(r: BetRow) -> Self {
         Self {
             id: r.id,
@@ -114,7 +114,7 @@ impl From<BetRow> for CoudeBet {
 
 #[async_trait]
 impl BetRepository for PgBetRepository {
-    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
+    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<Bet>, DomainError> {
         let rows: Vec<BetRow> = sqlx::query_as(
             r#"SELECT id, guild_id, combat_id, bettor_id, bettor_name, backed_id, amount, won, payout
                FROM coude_bets

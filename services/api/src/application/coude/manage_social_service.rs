@@ -12,8 +12,8 @@ use tracing::info;
 use crate::domain::entities::coude::social::clamp_leaderboard_limit;
 use crate::domain::entities::coude::social::daily_chaos_amount;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::NewDailyChaos;
@@ -83,12 +83,12 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         guild_id: &str,
         category: LeaderboardCategory,
         limit: i64,
-    ) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> {
+    ) -> Result<Vec<LeaderboardEntry>, DomainError> {
         let limit = clamp_leaderboard_limit(limit);
         self.repo.leaderboard(guild_id, category, limit).await
     }
 
-    async fn list_active_events(&self, guild_id: &str) -> Result<Vec<CoudeEvent>, DomainError> {
+    async fn list_active_events(&self, guild_id: &str) -> Result<Vec<Event>, DomainError> {
         self.repo.list_active_events(guild_id).await
     }
 

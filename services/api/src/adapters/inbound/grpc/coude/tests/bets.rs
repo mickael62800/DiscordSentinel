@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::bet::BetPayout;
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::errors::DomainError;
@@ -16,7 +16,7 @@ use crate::ports::inbound::coude::manage_bets::ResolveBetsOutcome;
 #[derive(Default)]
 struct MockBetsUc {
     placed: Mutex<Vec<NewCoudeBet>>,
-    list_returns: Mutex<Vec<CoudeBet>>,
+    list_returns: Mutex<Vec<Bet>>,
     resolve_calls: Mutex<Vec<(Uuid, Option<String>)>>,
     refund_calls: Mutex<Vec<Uuid>>,
 }
@@ -27,7 +27,7 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
         self.placed.lock().unwrap().push(new);
         Ok(PlaceBetOutcome { taunt_events: vec![] })
     }
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> {
         Ok(self.list_returns.lock().unwrap().clone())
     }
     async fn resolve(&self, id: Uuid, winner: Option<String>) -> Result<ResolveBetsOutcome, DomainError> {
@@ -51,8 +51,8 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
     }
 }
 
-fn grpc(uc: Arc<MockBetsUc>) -> CoudeBetsGrpc {
-    CoudeBetsGrpc { uc }
+fn grpc(uc: Arc<MockBetsUc>) -> BetsGrpc {
+    BetsGrpc { uc }
 }
 
 // ── place ──
@@ -96,7 +96,7 @@ async fn place_invalid_uuid_returns_invalid_argument() {
 #[tokio::test]
 async fn list_for_combat_returns_bets_from_uc() {
     let uc = Arc::new(MockBetsUc::default());
-    uc.list_returns.lock().unwrap().push(CoudeBet {
+    uc.list_returns.lock().unwrap().push(Bet {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         combat_id: Uuid::new_v4(),

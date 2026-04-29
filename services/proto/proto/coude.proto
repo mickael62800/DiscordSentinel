@@ -13,8 +13,8 @@ package sentinel.coude.v1;
 // ══════════════════════════════════════════════════════════════════════
 
 service CoudePlayerService {
-  rpc GetOrCreatePlayer(GetOrCreatePlayerRequest) returns (CoudePlayer);
-  rpc GetPlayer(GetPlayerRequest) returns (CoudePlayer);
+  rpc GetOrCreatePlayer(GetOrCreatePlayerRequest) returns (Player);
+  rpc GetPlayer(GetPlayerRequest) returns (Player);
   rpc UpdatePlayerClass(UpdatePlayerClassRequest) returns (Empty);
   rpc AddXp(AddXpRequest) returns (XpProgress);
   rpc AdjustCoins(AdjustCoinsRequest) returns (Empty);
@@ -72,7 +72,7 @@ message UpdateHpRequest {
   int32 hp_max = 4;
 }
 
-message CoudePlayer {
+message Player {
   string guild_id = 1;
   string user_id = 2;
   string username = 3;
@@ -120,12 +120,12 @@ message XpProgress {
 
 service CoudeCombatsService {
   rpc List(ListCombatsRequest) returns (CombatList);
-  rpc Get(GetCombatRequest) returns (CoudeCombat);
+  rpc Get(GetCombatRequest) returns (Combat);
   rpc GetPendingForAttacker(GetPendingForAttackerRequest) returns (MaybeCombat);
   rpc GetPendingForDefender(GetPendingForDefenderRequest) returns (MaybeCombat);
   rpc ListExpiredPending(Empty) returns (CombatList);
   rpc GetBettingForParticipant(GetBettingForParticipantRequest) returns (MaybeCombat);
-  rpc Create(CreateCombatRequest) returns (CoudeCombat);
+  rpc Create(CreateCombatRequest) returns (Combat);
   rpc Cancel(CancelCombatRequest) returns (Empty);
   rpc Resolve(ResolveCombatRequest) returns (Empty);
   rpc SetBetting(SetBettingRequest) returns (SetBettingResponse);
@@ -206,7 +206,7 @@ message ResolvedBettingBatch {
   repeated ResolvedBettingCombat combats = 1;
 }
 
-message CoudeCombat {
+message Combat {
   string id = 1;
   string guild_id = 2;
   optional string channel_id = 3;
@@ -231,11 +231,11 @@ message CoudeCombat {
 }
 
 message CombatList {
-  repeated CoudeCombat combats = 1;
+  repeated Combat combats = 1;
 }
 
 message MaybeCombat {
-  optional CoudeCombat combat = 1;
+  optional Combat combat = 1;
 }
 
 message ListCombatsRequest {
@@ -318,7 +318,7 @@ service CoudeBetsService {
   rpc Refund(RefundBetsRequest) returns (RefundSummary);
 }
 
-message CoudeBet {
+message Bet {
   string id = 1;
   string guild_id = 2;
   string combat_id = 3;
@@ -331,7 +331,7 @@ message CoudeBet {
 }
 
 message BetList {
-  repeated CoudeBet bets = 1;
+  repeated Bet bets = 1;
 }
 
 message PlaceBetRequest {
@@ -500,7 +500,7 @@ service CoudeInventoryService {
   rpc HasItem(HasItemRequest) returns (BoolValue);
 
   // Primes
-  rpc CreatePrime(CreatePrimeRequest) returns (CoudePrime);
+  rpc CreatePrime(CreatePrimeRequest) returns (Prime);
   rpc ListActivePrimes(ListActivePrimesRequest) returns (PrimeList);
   rpc ClaimPrimes(ClaimPrimesRequest) returns (Int64Value);
 
@@ -524,7 +524,7 @@ service CoudeInventoryService {
 
 message BoolValue { bool value = 1; }
 
-message CoudeInventoryItem {
+message InventoryItem {
   string guild_id = 1;
   string user_id = 2;
   string item_key = 3;
@@ -532,7 +532,7 @@ message CoudeInventoryItem {
 }
 
 message InventoryList {
-  repeated CoudeInventoryItem items = 1;
+  repeated InventoryItem items = 1;
 }
 
 message AddItemRequest {
@@ -557,7 +557,7 @@ message HasItemRequest {
   string item_key = 3;
 }
 
-message CoudePrime {
+message Prime {
   string id = 1;
   string guild_id = 2;
   string target_id = 3;
@@ -573,7 +573,7 @@ message CoudePrime {
 }
 
 message PrimeList {
-  repeated CoudePrime primes = 1;
+  repeated Prime primes = 1;
 }
 
 message CreatePrimeRequest {
@@ -597,14 +597,14 @@ message ClaimPrimesRequest {
   string claimer_name = 4;
 }
 
-message CoudeInsurance {
+message Insurance {
   string id = 1;
   bool is_scam = 2;
   string expires_at = 3;
 }
 
 message MaybeInsurance {
-  optional CoudeInsurance insurance = 1;
+  optional Insurance insurance = 1;
 }
 
 message BuyInsuranceRequest {
@@ -634,7 +634,7 @@ enum StealProtectionDurationKind {
   STEAL_PROTECTION_DURATION_SEVEN_DAYS = 4;
 }
 
-message CoudeStealProtection {
+message StealProtection {
   string id = 1;
   string guild_id = 2;
   string user_id = 3;
@@ -644,7 +644,7 @@ message CoudeStealProtection {
 }
 
 message StealProtectionList {
-  repeated CoudeStealProtection protections = 1;
+  repeated StealProtection protections = 1;
 }
 
 message PriceStealProtectionRequest {
@@ -677,7 +677,7 @@ message MaybeStealProtectionTrigger {
 
 // ── Phase 9 Part C : boost voleur ──
 
-message CoudeStealBoost {
+message StealBoost {
   string id = 1;
   string guild_id = 2;
   string user_id = 3;
@@ -687,7 +687,7 @@ message CoudeStealBoost {
 }
 
 message StealBoostList {
-  repeated CoudeStealBoost boosts = 1;
+  repeated StealBoost boosts = 1;
 }
 
 message PriceStealBoostRequest {
@@ -721,9 +721,9 @@ service CoudeSocialService {
   rpc CurrentSeason(CurrentSeasonRequest) returns (CoudeCurrentSeason);
   // Phase 8 : retourne toutes les donnees statiques Coude (classes, shop,
   // progression, matchmaking). Le bot appelle au boot et cache en memoire.
-  rpc GetCatalog(Empty) returns (CoudeCatalogResponse);
+  rpc GetCatalog(Empty) returns (CatalogResponse);
   // Phase 9 : caisse communautaire (retour "cagnotte").
-  rpc GetCashbox(GetCashboxRequest) returns (CoudeCashboxState);
+  rpc GetCashbox(GetCashboxRequest) returns (CashboxState);
   rpc RedistributeCashbox(GetCashboxRequest) returns (RedistributeCashboxResponse);
   rpc DepositCashbox(DepositCashboxRequest) returns (Empty);
   // Worker hebdo : redistribue toutes les caisses eligibles (> N jours
@@ -770,7 +770,7 @@ message GetCashboxRequest {
   string guild_id = 1;
 }
 
-message CoudeCashboxState {
+message CashboxState {
   string guild_id = 1;
   int64 balance = 2;
   int64 total_collected = 3;
@@ -821,7 +821,7 @@ message RedistributeDueResponse {
   repeated RedistributeCashboxResponse redistributed = 1;
 }
 
-message CoudeCatalogResponse {
+message CatalogResponse {
   repeated ClassInfo classes = 1;
   repeated ShopItemInfo shop_items = 2;
   repeated LevelEntry level_table = 3;
@@ -908,21 +908,21 @@ message LeaderboardRequest {
   int64 limit = 3;
 }
 
-message CoudeLeaderboardEntry {
+message LeaderboardEntry {
   string user_id = 1;
   string username = 2;
   int64 value = 3;
 }
 
 message LeaderboardList {
-  repeated CoudeLeaderboardEntry entries = 1;
+  repeated LeaderboardEntry entries = 1;
 }
 
 message ListActiveEventsRequest {
   string guild_id = 1;
 }
 
-message CoudeEvent {
+message Event {
   string id = 1;
   string guild_id = 2;
   bool active = 3;
@@ -931,7 +931,7 @@ message CoudeEvent {
 }
 
 message EventList {
-  repeated CoudeEvent events = 1;
+  repeated Event events = 1;
 }
 
 message LogDailyChaosRequest {

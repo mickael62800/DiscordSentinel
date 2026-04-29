@@ -19,8 +19,8 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::entities::coude::social::CoudeCurrentSeason;
-use sentinel_api::domain::entities::coude::social::CoudeEvent;
-use sentinel_api::domain::entities::coude::social::CoudeLeaderboardEntry;
+use sentinel_api::domain::entities::coude::social::Event;
+use sentinel_api::domain::entities::coude::social::LeaderboardEntry;
 use sentinel_api::domain::entities::coude::social::DailyChaosOutcome;
 use sentinel_api::domain::entities::coude::social::LeaderboardCategory;
 use sentinel_api::domain::entities::coude::social::NewDailyChaos;
@@ -49,15 +49,15 @@ impl ManageCoudeSocialUseCase for MockSocial {
         Ok(())
     }
     async fn leaderboard(&self, g: &str, cat: LeaderboardCategory, limit: i64)
-        -> Result<Vec<CoudeLeaderboardEntry>, DomainError>
+        -> Result<Vec<LeaderboardEntry>, DomainError>
     {
         self.leaderboard_calls.lock().unwrap().push((g.into(), cat, limit));
         Ok(vec![
-            CoudeLeaderboardEntry { user_id: "1".into(), username: "Alice".into(), value: 1000 },
-            CoudeLeaderboardEntry { user_id: "2".into(), username: "Bob".into(), value: 500 },
+            LeaderboardEntry { user_id: "1".into(), username: "Alice".into(), value: 1000 },
+            LeaderboardEntry { user_id: "2".into(), username: "Bob".into(), value: 500 },
         ])
     }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> {
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> {
         Ok(vec![])
     }
     async fn log_daily_chaos(&self, c: NewDailyChaos) -> Result<(), DomainError> {

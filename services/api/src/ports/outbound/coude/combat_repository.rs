@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 
@@ -19,23 +19,23 @@ pub trait CombatRepository: Send + Sync {
         guild_id: &str,
         status: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError>;
+    ) -> Result<Vec<Combat>, DomainError>;
 
-    async fn get(&self, id: Uuid) -> Result<Option<CoudeCombat>, DomainError>;
+    async fn get(&self, id: Uuid) -> Result<Option<Combat>, DomainError>;
 
     async fn get_pending_for_attacker(
         &self,
         guild_id: &str,
         attacker_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError>;
+    ) -> Result<Option<Combat>, DomainError>;
 
     async fn get_pending_for_defender(
         &self,
         guild_id: &str,
         defender_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError>;
+    ) -> Result<Option<Combat>, DomainError>;
 
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError>;
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError>;
 
     /// Phase 2 refacto : reclame atomiquement les combats en phase `betting`
     /// dont le delai de paris est ecoule, en les passant a `resolving`.
@@ -47,7 +47,7 @@ pub trait CombatRepository: Send + Sync {
     async fn claim_due_betting_combats(
         &self,
         default_delay_secs: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError>;
+    ) -> Result<Vec<Combat>, DomainError>;
 
     /// Phase 2 refacto : reclame les combats bloques en `resolving` depuis
     /// plus de `stuck_threshold_secs` (typiquement 120s). Ces combats ont
@@ -56,7 +56,7 @@ pub trait CombatRepository: Send + Sync {
     async fn claim_stuck_resolving_combats(
         &self,
         stuck_threshold_secs: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError>;
+    ) -> Result<Vec<Combat>, DomainError>;
 
     /// Phase 4 : claim atomique des combats pending dont le delai d'expiration
     /// est ecoule. Passe status a 'expired' en une seule requete avec
@@ -65,7 +65,7 @@ pub trait CombatRepository: Send + Sync {
     async fn claim_expired_pending_combats(
         &self,
         default_expiry_hours: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError>;
+    ) -> Result<Vec<Combat>, DomainError>;
 
     /// Récupère le combat actuellement en phase de paris auquel `user_id`
     /// participe (en tant qu'attaquant OU défenseur). Utilisé par le flow
@@ -74,11 +74,11 @@ pub trait CombatRepository: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError>;
+    ) -> Result<Option<Combat>, DomainError>;
 
     // ── Écriture ──
 
-    async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError>;
+    async fn create(&self, new: NewCoudeCombat) -> Result<Combat, DomainError>;
 
     /// Tente de résoudre un combat. Retourne `false` si le combat n'est pas dans
     /// un état actif (`pending`/`accepted`/`betting`) — c'est-à-dire si une autre

@@ -9,8 +9,8 @@ use uuid::Uuid;
 use crate::domain::entities::coude::cashbox::CashboxSource;
 use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
 use crate::domain::entities::coude::heist::HeistOutcome;
@@ -39,8 +39,8 @@ struct MockSocialUc {
     check_cooldown_return: Mutex<Option<chrono::DateTime<Utc>>>,
     set_cooldown_calls: Mutex<Vec<(String, String, String, i64)>>,
     leaderboard_calls: Mutex<Vec<(String, LeaderboardCategory, i64)>>,
-    leaderboard_return: Mutex<Vec<CoudeLeaderboardEntry>>,
-    events_return: Mutex<Vec<CoudeEvent>>,
+    leaderboard_return: Mutex<Vec<LeaderboardEntry>>,
+    events_return: Mutex<Vec<Event>>,
     log_chaos_calls: Mutex<Vec<NewDailyChaos>>,
     chaos_return: Mutex<Option<DailyChaosOutcome>>,
     season_return: Mutex<Option<CoudeCurrentSeason>>,
@@ -55,11 +55,11 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
         self.set_cooldown_calls.lock().unwrap().push((g.into(), u.into(), a.into(), d));
         Ok(())
     }
-    async fn leaderboard(&self, g: &str, c: LeaderboardCategory, l: i64) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> {
+    async fn leaderboard(&self, g: &str, c: LeaderboardCategory, l: i64) -> Result<Vec<LeaderboardEntry>, DomainError> {
         self.leaderboard_calls.lock().unwrap().push((g.into(), c, l));
         Ok(self.leaderboard_return.lock().unwrap().clone())
     }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> {
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> {
         Ok(self.events_return.lock().unwrap().clone())
     }
     async fn log_daily_chaos(&self, c: NewDailyChaos) -> Result<(), DomainError> {
@@ -224,8 +224,8 @@ impl ManageCoudeHeistUseCase for MockHeistUc {
 fn mk(
     s: Arc<MockSocialUc>, c: Arc<MockCatalogUc>, cb: Arc<MockCashboxUc>,
     t: Arc<MockTauntsUc>, h: Arc<MockHeistUc>,
-) -> CoudeSocialGrpc {
-    CoudeSocialGrpc { uc: s, catalog_uc: c, cashbox_uc: cb, taunts_uc: t, heist_uc: h }
+) -> SocialGrpc {
+    SocialGrpc { uc: s, catalog_uc: c, cashbox_uc: cb, taunts_uc: t, heist_uc: h }
 }
 
 fn defaults() -> (Arc<MockSocialUc>, Arc<MockCatalogUc>, Arc<MockCashboxUc>, Arc<MockTauntsUc>, Arc<MockHeistUc>) {
@@ -313,7 +313,7 @@ async fn leaderboard_caps_limit_at_100() {
 #[tokio::test]
 async fn leaderboard_maps_entries() {
     let (s, c, cb, t, h) = defaults();
-    s.leaderboard_return.lock().unwrap().push(CoudeLeaderboardEntry {
+    s.leaderboard_return.lock().unwrap().push(LeaderboardEntry {
         user_id: "u1".into(), username: "Alice".into(), value: 42,
     });
     let g = mk(s, c, cb, t, h);
@@ -331,7 +331,7 @@ async fn leaderboard_maps_entries() {
 #[tokio::test]
 async fn list_active_events_maps() {
     let (s, c, cb, t, h) = defaults();
-    s.events_return.lock().unwrap().push(CoudeEvent {
+    s.events_return.lock().unwrap().push(Event {
         id: Uuid::new_v4(), guild_id: "g".into(), event_type: "x".into(),
         active: true, expires_at: Utc::now(), created_at: Utc::now(),
     });

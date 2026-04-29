@@ -4,7 +4,7 @@
 use super::*;
 use crate::domain::entities::coude::bet::BetPayout;
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
 use crate::domain::entities::coude::combat::*;
 use crate::domain::entities::coude::inventory::*;
@@ -14,9 +14,9 @@ use crate::domain::enums::coude::coude_class::PlayerClass;
 use chrono::Utc;
 use uuid::Uuid;
 
-fn sample_player() -> CoudePlayer {
+fn sample_player() -> Player {
     let now = Utc::now();
-    CoudePlayer {
+    Player {
         guild_id: "g".into(), user_id: "u1".into(), username: "alice".into(),
         coins: 500,
         total_wins: 5, total_losses: 2, total_draws: 1,
@@ -147,7 +147,7 @@ fn update_hp_dto_deserializes() {
 fn combat_dto_from_domain() {
     let id = Uuid::new_v4();
     let now = Utc::now();
-    let c = CoudeCombat {
+    let c = Combat {
         id, guild_id: "g".into(),
         channel_id: Some("c1".into()),
         attacker_id: "a".into(), attacker_name: "A".into(),
@@ -185,7 +185,7 @@ fn create_combat_dto_deserializes() {
 fn bet_dto_from_domain() {
     let id = Uuid::new_v4();
     let cid = Uuid::new_v4();
-    let b = CoudeBet {
+    let b = Bet {
         id,
         guild_id: "g".into(),
         combat_id: cid,
@@ -237,7 +237,7 @@ fn transfer_coins_dto_deserializes() {
 
 #[test]
 fn inventory_item_dto_from_domain() {
-    let item = CoudeInventoryItem {
+    let item = InventoryItem {
         guild_id: "g".into(),
         user_id: "u".into(),
         item_key: "potion".into(),
@@ -260,7 +260,7 @@ fn add_item_dto_deserializes() {
 fn event_dto_from_domain() {
     let id = Uuid::new_v4();
     let now = Utc::now();
-    let e = CoudeEvent {
+    let e = Event {
         id, guild_id: "g".into(),
         event_type: "happy_hour".into(),
         active: true,
@@ -313,9 +313,9 @@ fn full_player_dto_preserves_none_optional_dates() {
 
 // ── FullCombatDto ──
 
-fn sample_combat() -> CoudeCombat {
+fn sample_combat() -> Combat {
     let now = Utc::now();
-    CoudeCombat {
+    Combat {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         channel_id: Some("c1".into()),
@@ -347,7 +347,7 @@ fn full_combat_dto_from_domain_maps_all_fields() {
 #[test]
 fn prime_dto_from_domain_maps_all_fields() {
     let now = Utc::now();
-    let p = CoudePrime {
+    let p = Prime {
         id: Uuid::new_v4(), guild_id: "g".into(),
         target_id: "t".into(), target_name: "T".into(),
         placed_by_id: "p".into(), placed_by_name: "P".into(),
@@ -365,7 +365,7 @@ fn prime_dto_from_domain_maps_all_fields() {
 #[test]
 fn prime_dto_claimed_carries_metadata() {
     let now = Utc::now();
-    let p = CoudePrime {
+    let p = Prime {
         id: Uuid::new_v4(), guild_id: "g".into(),
         target_id: "t".into(), target_name: "T".into(),
         placed_by_id: "p".into(), placed_by_name: "P".into(),
@@ -386,7 +386,7 @@ fn prime_dto_claimed_carries_metadata() {
 #[test]
 fn insurance_dto_from_domain() {
     let now = Utc::now();
-    let i = CoudeInsurance {
+    let i = Insurance {
         id: Uuid::new_v4(),
         is_scam: true,
         expires_at: now,
@@ -417,7 +417,7 @@ fn add_xp_response_from_xp_progress() {
 
 #[test]
 fn leaderboard_entry_from_domain() {
-    let e = CoudeLeaderboardEntry {
+    let e = LeaderboardEntry {
         user_id: "u".into(), username: "Alice".into(), value: 12345,
     };
     let dto: LeaderboardEntry = e.into();

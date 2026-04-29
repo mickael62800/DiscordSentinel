@@ -29,7 +29,7 @@ pub fn title_for_level(level: i32) -> &'static str {
 /// Mappe directement la table `coude_players` (avec toutes les colonnes
 /// utilisées par les handlers : économie, combats, casino, progression, HP, saison).
 #[derive(Debug, Clone)]
-pub struct CoudePlayer {
+pub struct Player {
     pub guild_id: String,
     pub user_id: String,
     pub username: String,

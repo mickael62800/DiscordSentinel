@@ -2,8 +2,8 @@ use super::*;
 use chrono::Utc;
 use uuid::Uuid;
 
-fn combat(status: &str) -> CoudeCombat {
-    CoudeCombat {
+fn combat(status: &str) -> Combat {
+    Combat {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         channel_id: None,
@@ -30,10 +30,10 @@ fn combat(status: &str) -> CoudeCombat {
 
 #[test]
 fn active_statuses_contains_expected_values() {
-    assert!(CoudeCombat::ACTIVE_STATUSES.contains(&"pending"));
-    assert!(CoudeCombat::ACTIVE_STATUSES.contains(&"accepted"));
-    assert!(CoudeCombat::ACTIVE_STATUSES.contains(&"betting"));
-    assert_eq!(CoudeCombat::ACTIVE_STATUSES.len(), 3);
+    assert!(Combat::ACTIVE_STATUSES.contains(&"pending"));
+    assert!(Combat::ACTIVE_STATUSES.contains(&"accepted"));
+    assert!(Combat::ACTIVE_STATUSES.contains(&"betting"));
+    assert_eq!(Combat::ACTIVE_STATUSES.len(), 3);
 }
 
 #[test]

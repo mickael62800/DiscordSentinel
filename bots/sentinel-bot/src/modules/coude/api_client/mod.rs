@@ -430,7 +430,7 @@ impl ApiClient {
 // ── Helpers proto -> DTO ──
 // ══════════════════════════════════════════════════════════════════════
 
-fn proto_player_to_dto(p: proto_coude::CoudePlayer) -> Player {
+fn proto_player_to_dto(p: proto_coude::Player) -> Player {
     Player {
         guild_id: p.guild_id,
         user_id: p.user_id,
@@ -466,7 +466,7 @@ fn proto_player_to_dto(p: proto_coude::CoudePlayer) -> Player {
     }
 }
 
-fn proto_combat_to_dto(c: proto_coude::CoudeCombat) -> Combat {
+fn proto_combat_to_dto(c: proto_coude::Combat) -> Combat {
     Combat {
         id: c.id,
         guild_id: c.guild_id,
@@ -492,7 +492,7 @@ fn proto_combat_to_dto(c: proto_coude::CoudeCombat) -> Combat {
     }
 }
 
-fn proto_prime_to_dto(p: proto_coude::CoudePrime) -> Prime {
+fn proto_prime_to_dto(p: proto_coude::Prime) -> Prime {
     Prime {
         id: p.id,
         guild_id: p.guild_id,

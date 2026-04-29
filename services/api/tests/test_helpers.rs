@@ -424,8 +424,8 @@ pub struct StubCoudeSocial;
 impl manage_social::ManageCoudeSocialUseCase for StubCoudeSocial {
     async fn check_cooldown(&self, _: &str, _: &str, _: &str) -> Result<Option<chrono::DateTime<chrono::Utc>>, DomainError> { unimplemented!() }
     async fn set_cooldown(&self, _: &str, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
-    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> { unimplemented!() }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> { unimplemented!() }
+    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<LeaderboardEntry>, DomainError> { unimplemented!() }
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> { unimplemented!() }
     async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> { unimplemented!() }
     async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> { unimplemented!() }
     async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<DailyChaosOutcome>, DomainError> { unimplemented!() }
@@ -434,15 +434,15 @@ impl manage_social::ManageCoudeSocialUseCase for StubCoudeSocial {
 pub struct StubCoudeInventory;
 #[async_trait]
 impl manage_inventory::ManageCoudeInventoryUseCase for StubCoudeInventory {
-    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> { unimplemented!() }
+    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> { unimplemented!() }
     async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn use_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { unimplemented!() }
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { unimplemented!() }
-    async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { unimplemented!() }
+    async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> { unimplemented!() }
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> { unimplemented!() }
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { unimplemented!() }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> { unimplemented!() }
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> { unimplemented!() }
     async fn expire_insurance(&self, _: Uuid) -> Result<(), DomainError> { unimplemented!() }
 }
 
@@ -464,7 +464,7 @@ pub struct StubCoudeBets;
 #[async_trait]
 impl ManageCoudeBetsUseCase for StubCoudeBets {
     async fn place(&self, _: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> { unimplemented!() }
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> { unimplemented!() }
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> { unimplemented!() }
     async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<ResolveBetsOutcome, DomainError> { unimplemented!() }
     async fn refund(&self, _: Uuid) -> Result<RefundSummary, DomainError> { unimplemented!() }
 }
@@ -472,13 +472,13 @@ impl ManageCoudeBetsUseCase for StubCoudeBets {
 pub struct StubCoudeCombats;
 #[async_trait]
 impl manage_combats::ManageCoudeCombatsUseCase for StubCoudeCombats {
-    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn get(&self, _: Uuid) -> Result<CoudeCombat, DomainError> { unimplemented!() }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn create(&self, _: NewCoudeCombat) -> Result<CoudeCombat, DomainError> { unimplemented!() }
+    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> { unimplemented!() }
+    async fn get(&self, _: Uuid) -> Result<Combat, DomainError> { unimplemented!() }
+    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { unimplemented!() }
+    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { unimplemented!() }
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { unimplemented!() }
+    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { unimplemented!() }
+    async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> { unimplemented!() }
     async fn cancel(&self, _: Uuid) -> Result<(), DomainError> { unimplemented!() }
     async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<(), DomainError> { unimplemented!() }
     async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { unimplemented!() }
@@ -489,15 +489,15 @@ impl manage_combats::ManageCoudeCombatsUseCase for StubCoudeCombats {
 pub struct StubCoudePlayers;
 #[async_trait]
 impl manage_players::ManageCoudePlayersUseCase for StubCoudePlayers {
-    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn list(&self, _: &str) -> Result<Vec<CoudePlayer>, DomainError> { unimplemented!() }
-    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { unimplemented!() }
+    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<Player, DomainError> { unimplemented!() }
+    async fn get(&self, _: &str, _: &str) -> Result<Player, DomainError> { unimplemented!() }
+    async fn list(&self, _: &str) -> Result<Vec<Player>, DomainError> { unimplemented!() }
+    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { unimplemented!() }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { unimplemented!() }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<XpProgress, DomainError> { unimplemented!() }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<CoudePlayer, DomainError> { unimplemented!() }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Player, DomainError> { unimplemented!() }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> { unimplemented!() }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
@@ -583,7 +583,7 @@ pub struct StubCoudeCashbox;
 
 pub struct StubCoudeStealProtections;
 #[async_trait] impl manage_steal_protections::ManageCoudeStealProtectionsUseCase for StubCoudeStealProtections {
-    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<CoudeStealProtection>, DomainError> { unimplemented!() }
+    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<StealProtection>, DomainError> { unimplemented!() }
     async fn price_for(&self, _: &str, _: StealProtectionDuration) -> Result<i64, DomainError> { unimplemented!() }
     async fn subscribe(&self, _: &str, _: &str, _: &str, _: StealProtectionDuration) -> Result<chrono::DateTime<chrono::Utc>, DomainError> { unimplemented!() }
     async fn try_trigger(&self, _: &str, _: &str) -> Result<Option<StealProtectionTrigger>, DomainError> { unimplemented!() }
@@ -591,7 +591,7 @@ pub struct StubCoudeStealProtections;
 
 pub struct StubCoudeStealBoosts;
 #[async_trait] impl manage_steal_boosts::ManageCoudeStealBoostsUseCase for StubCoudeStealBoosts {
-    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<CoudeStealBoost>, DomainError> { unimplemented!() }
+    async fn list_active(&self, _: &str, _: &str) -> Result<Vec<StealBoost>, DomainError> { unimplemented!() }
     async fn price_for(&self, _: &str, _: StealBoostDuration) -> Result<i64, DomainError> { unimplemented!() }
     async fn subscribe(&self, _: &str, _: &str, _: &str, _: StealBoostDuration) -> Result<chrono::DateTime<chrono::Utc>, DomainError> { unimplemented!() }
     async fn total_bonus(&self, _: &str, _: &str) -> Result<i32, DomainError> { unimplemented!() }

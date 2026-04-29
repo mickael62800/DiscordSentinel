@@ -5,7 +5,7 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::entities::coude::purge::COUDE_PURGE_TABLES;
 use crate::domain::errors::DomainError;
@@ -56,7 +56,7 @@ struct CombatRow {
     resolved_at: Option<DateTime<Utc>>,
 }
 
-impl From<CombatRow> for CoudeCombat {
+impl From<CombatRow> for Combat {
     fn from(r: CombatRow) -> Self {
         Self {
             id: r.id,
@@ -92,7 +92,7 @@ impl CombatRepository for PgCombatRepository {
         guild_id: &str,
         status: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError> {
+    ) -> Result<Vec<Combat>, DomainError> {
         // On lit directement les colonnes gelees a la creation du combat.
         // Pas de JOIN sur coude_players : le fallback COALESCE causait la
         // disparition des noms lorsque la ligne player etait absente ou
@@ -131,7 +131,7 @@ impl CombatRepository for PgCombatRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn get(&self, id: Uuid) -> Result<Option<CoudeCombat>, DomainError> {
+    async fn get(&self, id: Uuid) -> Result<Option<Combat>, DomainError> {
         let sql = format!(
             "SELECT {cols} FROM coude_combats WHERE id = $1",
             cols = COMBAT_COLUMNS
@@ -148,7 +148,7 @@ impl CombatRepository for PgCombatRepository {
         &self,
         guild_id: &str,
         attacker_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError> {
+    ) -> Result<Option<Combat>, DomainError> {
         let sql = format!(
             r#"SELECT {cols}
                FROM coude_combats
@@ -170,7 +170,7 @@ impl CombatRepository for PgCombatRepository {
         &self,
         guild_id: &str,
         defender_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError> {
+    ) -> Result<Option<Combat>, DomainError> {
         let sql = format!(
             r#"SELECT {cols}
                FROM coude_combats
@@ -192,7 +192,7 @@ impl CombatRepository for PgCombatRepository {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError> {
+    ) -> Result<Option<Combat>, DomainError> {
         let sql = format!(
             r#"SELECT {cols}
                FROM coude_combats
@@ -212,7 +212,7 @@ impl CombatRepository for PgCombatRepository {
         Ok(row.map(Into::into))
     }
 
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> {
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
         let sql = format!(
             r#"SELECT {cols}
                FROM coude_combats
@@ -229,7 +229,7 @@ impl CombatRepository for PgCombatRepository {
     async fn claim_due_betting_combats(
         &self,
         default_delay_secs: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError> {
+    ) -> Result<Vec<Combat>, DomainError> {
         // Phase 2 : SQL deplacee depuis coude-worker/src/jobs/resolve_betting.rs.
         // Le delai par guild est lu depuis bot_guild_config (bot_name =
         // 'coude-worker', config_key = 'bet_delay_secs'), avec fallback sur
@@ -265,7 +265,7 @@ impl CombatRepository for PgCombatRepository {
     async fn claim_expired_pending_combats(
         &self,
         default_expiry_hours: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError> {
+    ) -> Result<Vec<Combat>, DomainError> {
         // Phase 4 : SQL migree depuis coude-worker/src/jobs/expire_combats.rs.
         // Delai par guild lu depuis bot_guild_config (coude-worker /
         // combat_expiry_hours), fallback sur default_expiry_hours (24h).
@@ -299,7 +299,7 @@ impl CombatRepository for PgCombatRepository {
     async fn claim_stuck_resolving_combats(
         &self,
         stuck_threshold_secs: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError> {
+    ) -> Result<Vec<Combat>, DomainError> {
         // Phase 2 : SQL deplacee depuis coude-worker/src/jobs/resolve_betting.rs.
         // Touche accepted_at a NOW() pour empecher qu'un tick ulterieur
         // reprenne le combat avant que le tick courant ait termine.
@@ -322,7 +322,7 @@ impl CombatRepository for PgCombatRepository {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
+    async fn create(&self, new: NewCoudeCombat) -> Result<Combat, DomainError> {
         let sql = format!(
             r#"INSERT INTO coude_combats
                  (guild_id, channel_id, attacker_id, attacker_name, defender_id, defender_name, mise, special_attack)
@@ -485,7 +485,7 @@ impl CombatRepository for PgCombatRepository {
 
 #[async_trait]
 impl CombatQueryRepository for PgCombatRepository {
-    async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError> {
+    async fn get(&self, id: Uuid) -> Result<Combat, DomainError> {
         match CombatRepository::get(self, id).await? {
             Some(c) => Ok(c),
             None => Err(DomainError::NotFound("Combat introuvable".into())),

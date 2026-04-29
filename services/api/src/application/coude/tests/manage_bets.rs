@@ -1,7 +1,7 @@
 use super::*;
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::bet::Bet;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::coude::taunt::TauntEvent;
@@ -14,7 +14,7 @@ use uuid::Uuid;
 
 struct MockBetRepo {
     placed: StdMutex<Vec<NewCoudeBet>>,
-    bets: StdMutex<Vec<CoudeBet>>,
+    bets: StdMutex<Vec<Bet>>,
     apply_calls: StdMutex<Vec<(String, BetResolutionPlan)>>,
     refund_summary: StdMutex<RefundSummary>,
     refund_calls: StdMutex<Vec<(String, Uuid)>>,
@@ -33,7 +33,7 @@ impl MockBetRepo {
 
 #[async_trait]
 impl BetRepository for MockBetRepo {
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> {
         Ok(self.bets.lock().unwrap().clone())
     }
     async fn place(&self, new: NewCoudeBet) -> Result<Vec<TauntEvent>, DomainError> {
@@ -68,11 +68,11 @@ impl MockCombatQuery {
 
 #[async_trait]
 impl CombatQueryRepository for MockCombatQuery {
-    async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError> {
+    async fn get(&self, id: Uuid) -> Result<Combat, DomainError> {
         if self.should_fail {
             return Err(DomainError::NotFound("combat introuvable".into()));
         }
-        Ok(CoudeCombat {
+        Ok(Combat {
             id,
             guild_id: "g".into(),
             channel_id: None,
@@ -193,7 +193,7 @@ async fn resolve_empty_bets_returns_empty_plan() {
 #[tokio::test]
 async fn list_for_combat_delegates_repo() {
     let (svc, repo) = make_svc("betting");
-    repo.bets.lock().unwrap().push(CoudeBet {
+    repo.bets.lock().unwrap().push(Bet {
         id: Uuid::new_v4(), guild_id: "g".into(), combat_id: Uuid::new_v4(),
         bettor_id: "u1".into(), bettor_name: "U1".into(),
         backed_id: "att".into(), amount: 100,
@@ -222,7 +222,7 @@ async fn resolve_with_bets_invokes_apply_resolution() {
     let (svc, repo) = make_svc("betting");
     let combat_id = Uuid::new_v4();
     // Un pari sur l'attaquant pour qu'un payout soit calcule.
-    repo.bets.lock().unwrap().push(CoudeBet {
+    repo.bets.lock().unwrap().push(Bet {
         id: Uuid::new_v4(), guild_id: "g".into(), combat_id,
         bettor_id: "u1".into(), bettor_name: "U1".into(),
         backed_id: "att".into(), amount: 100,

@@ -4,7 +4,7 @@
 //! + formatage des résultats de paris.
 
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::inventory::CoudeInsurance;
+use crate::domain::entities::coude::inventory::Insurance;
 /// Résultat de l'ajustement d'une perte par une assurance.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InsuranceAdjustment {
@@ -38,7 +38,7 @@ pub struct InsuranceAdjustment {
 pub fn apply_insurance_to_loss(
     coins_lost: i64,
     loser_balance: i64,
-    insurance: Option<&CoudeInsurance>,
+    insurance: Option<&Insurance>,
     loser_id: &str,
 ) -> InsuranceAdjustment {
     let clamped = coins_lost.min(loser_balance).max(0);
@@ -169,8 +169,8 @@ mod tests {
     use chrono::Utc;
     use uuid::Uuid;
 
-    fn make_insurance(is_scam: bool) -> CoudeInsurance {
-        CoudeInsurance {
+    fn make_insurance(is_scam: bool) -> Insurance {
+        Insurance {
             id: Uuid::new_v4(),
             is_scam,
             expires_at: Utc::now() + chrono::Duration::days(1),

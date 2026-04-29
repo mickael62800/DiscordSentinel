@@ -8,7 +8,7 @@ use chrono::Utc;
 use crate::domain::entities::coude::steal_boost::find_boost_item;
 use crate::domain::entities::coude::steal_boost::sum_roll_bonus_for_active_keys;
 use crate::domain::entities::coude::balance::BalanceParams;
-use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
+use crate::domain::entities::coude::steal_boost::StealBoost;
 use crate::domain::entities::coude::steal_boost::StealBoostDuration;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase;
@@ -52,7 +52,7 @@ impl ManageCoudeStealBoostsUseCase for ManageCoudeStealBoostsService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealBoost>, DomainError> {
+    ) -> Result<Vec<StealBoost>, DomainError> {
         self.repo.list_active(guild_id, user_id).await
     }
 

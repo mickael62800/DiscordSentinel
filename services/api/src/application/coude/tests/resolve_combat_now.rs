@@ -23,15 +23,15 @@ use crate::domain::entities::system::bot_config::BotDefinition;
 use crate::domain::entities::system::bot_config::BotGuildConfig;
 use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::bet::CoudeBet;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::bet::Bet;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
-use crate::domain::entities::coude::player::CoudePlayer;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::player::Player;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
 use crate::domain::entities::coude::social::LeaderboardCategory;
@@ -71,16 +71,16 @@ struct MockCombatRepo {
 
 #[async_trait]
 impl CombatRepository for MockCombatRepo {
-    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn create(&self, _: NewCoudeCombat) -> Result<CoudeCombat, DomainError> { unimplemented!() }
+    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> { unimplemented!() }
     async fn resolve(&self, id: Uuid, r: CombatResolution) -> Result<bool, DomainError> {
         self.resolve_calls.lock().unwrap().push((id, r));
         Ok(true)
@@ -94,7 +94,7 @@ impl CombatRepository for MockCombatRepo {
 }
 
 struct MockCombatsUc {
-    combat: Mutex<Option<CoudeCombat>>,
+    combat: Mutex<Option<Combat>>,
     should_fail: bool,
 }
 
@@ -104,18 +104,18 @@ impl Default for MockCombatsUc {
 
 #[async_trait]
 impl ManageCoudeCombatsUseCase for MockCombatsUc {
-    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn get(&self, _: Uuid) -> Result<CoudeCombat, DomainError> {
+    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn get(&self, _: Uuid) -> Result<Combat, DomainError> {
         if self.should_fail {
             return Err(DomainError::NotFound("combat introuvable".into()));
         }
         Ok(self.combat.lock().unwrap().clone().unwrap())
     }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn create(&self, _: NewCoudeCombat) -> Result<CoudeCombat, DomainError> { unimplemented!() }
+    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> { unimplemented!() }
     async fn cancel(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
     async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<(), DomainError> { Ok(()) }
     async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
@@ -125,8 +125,8 @@ impl ManageCoudeCombatsUseCase for MockCombatsUc {
 
 #[derive(Default)]
 struct MockPlayersUc {
-    attacker: Mutex<Option<CoudePlayer>>,
-    defender: Mutex<Option<CoudePlayer>>,
+    attacker: Mutex<Option<Player>>,
+    defender: Mutex<Option<Player>>,
     update_hp_calls: Mutex<Vec<(String, String, i32, i32)>>,
     record_win_calls: Mutex<Vec<(String, String, i64, i64)>>,
     record_loss_calls: Mutex<Vec<(String, String, i64)>>,
@@ -138,24 +138,24 @@ struct MockPlayersUc {
 
 #[async_trait]
 impl ManageCoudePlayersUseCase for MockPlayersUc {
-    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, user_id: &str) -> Result<CoudePlayer, DomainError> {
+    async fn get_or_create(&self, _: String, _: String, _: String) -> Result<Player, DomainError> { unimplemented!() }
+    async fn get(&self, _: &str, user_id: &str) -> Result<Player, DomainError> {
         let att = self.attacker.lock().unwrap().clone();
         let def = self.defender.lock().unwrap().clone();
         if let Some(a) = &att { if a.user_id == user_id { return Ok(a.clone()); } }
         if let Some(d) = &def { if d.user_id == user_id { return Ok(d.clone()); } }
         Err(DomainError::NotFound(format!("player {user_id} introuvable")))
     }
-    async fn list(&self, _: &str) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn list(&self, _: &str) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn add_xp(&self, g: &str, u: &str, a: i64) -> Result<XpProgress, DomainError> {
         self.add_xp_calls.lock().unwrap().push((g.into(), u.into(), a));
         Ok(XpProgress { new_xp: a, new_level: 1, leveled_up: false, stat_points_gained: 0 })
     }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<CoudePlayer, DomainError> { unimplemented!() }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Player, DomainError> { unimplemented!() }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> { unimplemented!() }
     async fn record_win(&self, g: &str, u: &str, earned: i64, stolen: i64) -> Result<(), DomainError> {
         self.record_win_calls.lock().unwrap().push((g.into(), u.into(), earned, stolen));
         Ok(())
@@ -250,7 +250,7 @@ struct MockBetsUc;
 #[async_trait]
 impl ManageCoudeBetsUseCase for MockBetsUc {
     async fn place(&self, _: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> { unimplemented!() }
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> { Ok(vec![]) }
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> { Ok(vec![]) }
     async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<ResolveBetsOutcome, DomainError> {
         Ok(ResolveBetsOutcome {
             plan: crate::domain::entities::coude::bet::BetResolutionPlan { payouts: vec![], fighter_bonus: None },
@@ -265,26 +265,26 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
 #[derive(Default)]
 struct MockInventoryUc {
     has_explosion: Mutex<bool>,
-    active_insurance: Mutex<Option<CoudeInsurance>>,
+    active_insurance: Mutex<Option<Insurance>>,
     prime_amount: Mutex<i64>,
     expire_insurance_calls: Mutex<Vec<Uuid>>,
 }
 
 #[async_trait]
 impl ManageCoudeInventoryUseCase for MockInventoryUc {
-    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> { Ok(vec![]) }
+    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> { Ok(vec![]) }
     async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn use_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn has_item(&self, _: &str, _: &str, item: &str) -> Result<bool, DomainError> {
         Ok(item == "explosion" && *self.has_explosion.lock().unwrap())
     }
-    async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { Ok(vec![]) }
+    async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> { unimplemented!() }
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> { Ok(vec![]) }
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> {
         Ok(*self.prime_amount.lock().unwrap())
     }
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> {
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> {
         Ok(self.active_insurance.lock().unwrap().clone())
     }
     async fn expire_insurance(&self, id: Uuid) -> Result<(), DomainError> {
@@ -300,8 +300,8 @@ struct MockSocialUc;
 impl ManageCoudeSocialUseCase for MockSocialUc {
     async fn check_cooldown(&self, _: &str, _: &str, _: &str) -> Result<Option<DateTime<Utc>>, DomainError> { Ok(None) }
     async fn set_cooldown(&self, _: &str, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
-    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> { Ok(vec![]) }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> { Ok(vec![]) }
+    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<LeaderboardEntry>, DomainError> { Ok(vec![]) }
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> { Ok(vec![]) }
     async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> { Ok(()) }
     async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<DailyChaosOutcome>, DomainError> { Ok(None) }
     async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
@@ -366,9 +366,9 @@ impl BotConfigRepository for MockBotConfig {
 // Helpers
 // ══════════════════════════════════════════════════════════════════════
 
-fn make_player(user_id: &str, level: i32, hp: i32) -> CoudePlayer {
+fn make_player(user_id: &str, level: i32, hp: i32) -> Player {
     let now = Utc::now();
-    CoudePlayer {
+    Player {
         guild_id: "g".into(),
         user_id: user_id.into(),
         username: format!("user_{user_id}"),
@@ -383,8 +383,8 @@ fn make_player(user_id: &str, level: i32, hp: i32) -> CoudePlayer {
     }
 }
 
-fn make_combat(attacker_id: &str, defender_id: &str, mise: i64) -> CoudeCombat {
-    CoudeCombat {
+fn make_combat(attacker_id: &str, defender_id: &str, mise: i64) -> Combat {
+    Combat {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         channel_id: Some("c1".into()),

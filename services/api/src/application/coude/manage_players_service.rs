@@ -3,7 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
@@ -22,7 +22,7 @@ impl ManageCoudePlayersService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<CoudePlayer, DomainError> {
+    ) -> Result<Player, DomainError> {
         self.repo
             .get(guild_id, user_id)
             .await?
@@ -37,15 +37,15 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         guild_id: String,
         user_id: String,
         username: String,
-    ) -> Result<CoudePlayer, DomainError> {
+    ) -> Result<Player, DomainError> {
         self.repo.get_or_create(&guild_id, &user_id, &username).await
     }
 
-    async fn get(&self, guild_id: &str, user_id: &str) -> Result<CoudePlayer, DomainError> {
+    async fn get(&self, guild_id: &str, user_id: &str) -> Result<Player, DomainError> {
         self.require_player(guild_id, user_id).await
     }
 
-    async fn list(&self, guild_id: &str) -> Result<Vec<CoudePlayer>, DomainError> {
+    async fn list(&self, guild_id: &str) -> Result<Vec<Player>, DomainError> {
         // 200 = la limite historique du handler legacy.
         self.repo.list(guild_id, 200).await
     }
@@ -54,7 +54,7 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         &self,
         guild_id: &str,
         count: i64,
-    ) -> Result<Vec<CoudePlayer>, DomainError> {
+    ) -> Result<Vec<Player>, DomainError> {
         let count = count.clamp(1, 50);
         // 50 coins minimum = comportement historique (filtre les comptes "vides").
         self.repo.random_active(guild_id, count, 50).await
@@ -97,7 +97,7 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         guild_id: &str,
         user_id: &str,
         stat: CombatStat,
-    ) -> Result<CoudePlayer, DomainError> {
+    ) -> Result<Player, DomainError> {
         self.repo
             .spend_stat_point(guild_id, user_id, stat)
             .await?
@@ -113,7 +113,7 @@ impl ManageCoudePlayersUseCase for ManageCoudePlayersService {
         guild_id: &str,
         user_id: &str,
         cost: i64,
-    ) -> Result<CoudePlayer, DomainError> {
+    ) -> Result<Player, DomainError> {
         if cost < 0 {
             return Err(DomainError::ValidationError(
                 "Le cout ne peut pas etre negatif".into(),

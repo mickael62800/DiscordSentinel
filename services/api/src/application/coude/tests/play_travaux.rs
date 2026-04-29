@@ -9,10 +9,10 @@ use sqlx::Transaction;
 use crate::application::coude::play_travaux_service::PlayTravauxService;
 use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::heist::HeistAttempt;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::NewDailyChaos;
@@ -52,9 +52,9 @@ struct MockPlayerRepo {
 
 #[async_trait]
 impl PlayerRepository for MockPlayerRepo {
-    async fn get_or_create(&self, g: &str, u: &str, name: &str) -> Result<CoudePlayer, DomainError> {
+    async fn get_or_create(&self, g: &str, u: &str, name: &str) -> Result<Player, DomainError> {
         let now = Utc::now();
-        Ok(CoudePlayer {
+        Ok(Player {
             guild_id: g.into(), user_id: u.into(), username: name.into(),
             coins: 0, total_wins: 0, total_losses: 0, total_draws: 0,
             total_earned: 0, total_lost: 0, total_stolen: 0,
@@ -65,17 +65,17 @@ impl PlayerRepository for MockPlayerRepo {
             season: 1, created_at: now, updated_at: now,
         })
     }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn add_xp(&self, g: &str, u: &str, a: i64) -> Result<Option<XpProgress>, DomainError> {
         self.xp_calls.lock().unwrap().push((g.into(), u.into(), a));
         Ok(None)
     }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> { Ok(None) }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
     async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(true) }
@@ -110,8 +110,8 @@ impl SocialRepository for MockSocialRepo {
         self.set_calls.lock().unwrap().push((g.into(), u.into(), a.into(), d));
         Ok(())
     }
-    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> { Ok(vec![]) }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> { Ok(vec![]) }
+    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<LeaderboardEntry>, DomainError> { Ok(vec![]) }
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> { Ok(vec![]) }
     async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> { Ok(()) }
     async fn count_daily_chaos_today(&self, _: &str) -> Result<i64, DomainError> { Ok(0) }
     async fn get_or_bootstrap_current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {

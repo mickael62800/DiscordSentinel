@@ -1,9 +1,9 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 
@@ -17,7 +17,7 @@ pub trait InventoryRepository: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeInventoryItem>, DomainError>;
+    ) -> Result<Vec<InventoryItem>, DomainError>;
 
     /// Upsert : +1 à la quantité existante, ou crée la ligne avec quantity=1.
     async fn add_item(
@@ -44,13 +44,13 @@ pub trait InventoryRepository: Send + Sync {
 
     // ── Primes ──
 
-    async fn create_prime(&self, new: NewCoudePrime) -> Result<CoudePrime, DomainError>;
+    async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError>;
 
     async fn list_active_primes(
         &self,
         guild_id: &str,
         target_id: &str,
-    ) -> Result<Vec<CoudePrime>, DomainError>;
+    ) -> Result<Vec<Prime>, DomainError>;
 
     /// Marque toutes les primes non claimées sur `target_id` comme claimées par
     /// `claimer_id` et retourne le montant total encaissé.
@@ -94,7 +94,7 @@ pub trait InventoryRepository: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeInsurance>, DomainError>;
+    ) -> Result<Option<Insurance>, DomainError>;
 
     /// Désactive une assurance par ID. Retourne `false` si non trouvée.
     async fn expire_insurance(&self, insurance_id: Uuid) -> Result<bool, DomainError>;

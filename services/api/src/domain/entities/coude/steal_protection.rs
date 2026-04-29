@@ -10,7 +10,7 @@ use chrono::Utc;
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]
-pub struct CoudeStealProtection {
+pub struct StealProtection {
     pub id: Uuid,
     pub guild_id: String,
     pub user_id: String,

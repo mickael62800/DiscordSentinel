@@ -60,7 +60,7 @@ impl LeaderboardCategory {
 
 /// Entrée d'un classement. `value` = critère du classement (coins, level, etc.)
 #[derive(Debug, Clone)]
-pub struct CoudeLeaderboardEntry {
+pub struct LeaderboardEntry {
     pub user_id: String,
     pub username: String,
     pub value: i64,
@@ -71,7 +71,7 @@ pub struct CoudeLeaderboardEntry {
 // ══════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]
-pub struct CoudeEvent {
+pub struct Event {
     pub id: Uuid,
     pub guild_id: String,
     pub event_type: String,

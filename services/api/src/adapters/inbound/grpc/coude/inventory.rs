@@ -19,22 +19,22 @@ use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_inventory_service_server::CoudeInventoryService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 
 use super::parse_uuid;
 
-pub struct CoudeInventoryGrpc {
+pub struct InventoryGrpc {
     pub uc: Arc<dyn ManageCoudeInventoryUseCase>,
     pub steal_protections_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_protections::ManageCoudeStealProtectionsUseCase>,
     pub steal_boosts_uc: Arc<dyn crate::ports::inbound::coude::manage_steal_boosts::ManageCoudeStealBoostsUseCase>,
 }
 
-pub(super) fn inventory_item_to_proto(i: CoudeInventoryItem) -> proto::CoudeInventoryItem {
-    proto::CoudeInventoryItem {
+pub(super) fn inventory_item_to_proto(i: InventoryItem) -> proto::InventoryItem {
+    proto::InventoryItem {
         guild_id: i.guild_id,
         user_id: i.user_id,
         item_key: i.item_key,
@@ -42,8 +42,8 @@ pub(super) fn inventory_item_to_proto(i: CoudeInventoryItem) -> proto::CoudeInve
     }
 }
 
-pub(super) fn prime_to_proto(p: CoudePrime) -> proto::CoudePrime {
-    proto::CoudePrime {
+pub(super) fn prime_to_proto(p: Prime) -> proto::Prime {
+    proto::Prime {
         id: p.id.to_string(),
         guild_id: p.guild_id,
         target_id: p.target_id,
@@ -59,8 +59,8 @@ pub(super) fn prime_to_proto(p: CoudePrime) -> proto::CoudePrime {
     }
 }
 
-pub(super) fn insurance_to_proto(i: CoudeInsurance) -> proto::CoudeInsurance {
-    proto::CoudeInsurance {
+pub(super) fn insurance_to_proto(i: Insurance) -> proto::Insurance {
+    proto::Insurance {
         id: i.id.to_string(),
         is_scam: i.is_scam,
         expires_at: i.expires_at.to_rfc3339(),
@@ -68,7 +68,7 @@ pub(super) fn insurance_to_proto(i: CoudeInsurance) -> proto::CoudeInsurance {
 }
 
 #[tonic::async_trait]
-impl CoudeInventoryService for CoudeInventoryGrpc {
+impl CoudeInventoryService for InventoryGrpc {
     async fn list_inventory(
         &self,
         request: Request<proto::UserInGuildRequest>,
@@ -125,7 +125,7 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
     async fn create_prime(
         &self,
         request: Request<proto::CreatePrimeRequest>,
-    ) -> Result<Response<proto::CoudePrime>, Status> {
+    ) -> Result<Response<proto::Prime>, Status> {
         let req = request.into_inner();
         let prime = self
             .uc
@@ -370,8 +370,8 @@ impl CoudeInventoryService for CoudeInventoryGrpc {
 #[path = "tests/inventory.rs"]
 mod tests;
 
-pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boost::CoudeStealBoost) -> proto::CoudeStealBoost {
-    proto::CoudeStealBoost {
+pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boost::StealBoost) -> proto::StealBoost {
+    proto::StealBoost {
         id: b.id.to_string(),
         guild_id: b.guild_id,
         user_id: b.user_id,
@@ -382,9 +382,9 @@ pub(super) fn steal_boost_to_proto(b: crate::domain::entities::coude::steal_boos
 }
 
 pub(super) fn steal_protection_to_proto(
-    p: crate::domain::entities::coude::steal_protection::CoudeStealProtection,
-) -> proto::CoudeStealProtection {
-    proto::CoudeStealProtection {
+    p: crate::domain::entities::coude::steal_protection::StealProtection,
+) -> proto::StealProtection {
+    proto::StealProtection {
         id: p.id.to_string(),
         guild_id: p.guild_id,
         user_id: p.user_id,

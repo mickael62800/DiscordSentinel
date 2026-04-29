@@ -6,7 +6,7 @@ use uuid::Uuid;
 ///
 /// Cycle de vie : `pending` → `accepted` → `betting` → `resolved`/`expired`/`refused`.
 #[derive(Debug, Clone)]
-pub struct CoudeCombat {
+pub struct Combat {
     pub id: Uuid,
     pub guild_id: String,
     pub channel_id: Option<String>,
@@ -30,7 +30,7 @@ pub struct CoudeCombat {
     pub resolved_at: Option<DateTime<Utc>>,
 }
 
-impl CoudeCombat {
+impl Combat {
     /// Statuts qui correspondent à un combat encore "vivant" (résoluble).
     pub const ACTIVE_STATUSES: &'static [&'static str] = &["pending", "accepted", "betting"];
 

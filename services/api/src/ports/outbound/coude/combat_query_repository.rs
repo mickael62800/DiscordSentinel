@@ -15,11 +15,11 @@
 use async_trait::async_trait;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
 pub trait CombatQueryRepository: Send + Sync {
     /// Charge un combat par son id. `NotFound` si absent.
-    async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError>;
+    async fn get(&self, id: Uuid) -> Result<Combat, DomainError>;
 }

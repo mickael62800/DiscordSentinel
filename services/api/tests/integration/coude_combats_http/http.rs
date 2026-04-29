@@ -18,13 +18,13 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::entities::coude::combat::CombatResolution;
-use sentinel_api::domain::entities::coude::combat::CoudeCombat;
+use sentinel_api::domain::entities::coude::combat::Combat;
 use sentinel_api::domain::entities::coude::combat::NewCoudeCombat;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 
-fn sample_combat(id: Uuid, guild: &str, status: &str) -> CoudeCombat {
-    CoudeCombat {
+fn sample_combat(id: Uuid, guild: &str, status: &str) -> Combat {
+    Combat {
         id, guild_id: guild.into(),
         channel_id: Some("chan".into()),
         attacker_id: "a1".into(), attacker_name: "Att".into(),
@@ -48,31 +48,31 @@ struct MockCombats {
     betting_set: Mutex<Vec<(Uuid, String)>>,
     expired: Mutex<Vec<Uuid>>,
     defender_specials: Mutex<Vec<(Uuid, String)>>,
-    canned_get: Mutex<Option<CoudeCombat>>,
+    canned_get: Mutex<Option<Combat>>,
     set_betting_result: Mutex<bool>,
 }
 
 #[async_trait]
 impl ManageCoudeCombatsUseCase for MockCombats {
-    async fn list(&self, g: &str, status: Option<&str>, limit: i64) -> Result<Vec<CoudeCombat>, DomainError> {
+    async fn list(&self, g: &str, status: Option<&str>, limit: i64) -> Result<Vec<Combat>, DomainError> {
         self.list_calls.lock().unwrap().push((g.into(), status.map(String::from), limit));
         Ok(vec![sample_combat(Uuid::new_v4(), g, "pending")])
     }
-    async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError> {
+    async fn get(&self, id: Uuid) -> Result<Combat, DomainError> {
         Ok(self.canned_get.lock().unwrap().clone()
             .unwrap_or_else(|| sample_combat(id, "999", "resolved")))
     }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> {
+    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
         Ok(None)
     }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> {
+    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
         Ok(Some(sample_combat(Uuid::new_v4(), "999", "pending")))
     }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> {
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
         Ok(None)
     }
-    async fn create(&self, n: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
+    async fn create(&self, n: NewCoudeCombat) -> Result<Combat, DomainError> {
         let c = sample_combat(Uuid::new_v4(), &n.guild_id, "pending");
         self.created.lock().unwrap().push(n);
         Ok(c)

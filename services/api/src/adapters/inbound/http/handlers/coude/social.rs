@@ -11,7 +11,7 @@ use super::dto::CurrentSeasonDto;
 use super::dto::DailyChaosDto;
 use super::dto::DurationDto;
 use super::dto::EventDto;
-use super::dto::LeaderboardEntry;
+use super::dto::LeaderboardEntryDto;
 use super::dto::LeaderboardQueryParams;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
@@ -54,7 +54,7 @@ pub async fn leaderboard(
     State(state): State<AppState>,
     Path((guild_id, category)): Path<(String, String)>,
     Query(params): Query<LeaderboardQueryParams>,
-) -> Result<Json<Vec<LeaderboardEntry>>, ApiError> {
+) -> Result<Json<Vec<LeaderboardEntryDto>>, ApiError> {
     let cat = LeaderboardCategory::parse(&category).ok_or_else(|| {
         ApiError::from(DomainError::ValidationError(format!(
             "Categorie invalide: {}. Valeurs acceptees: richest, thieves, cowards, chaos, level",
@@ -65,7 +65,7 @@ pub async fn leaderboard(
         .coude_social_uc
         .leaderboard(&guild_id, cat, params.limit.unwrap_or(crate::domain::entities::coude::limits::DEFAULT_COUDE_SOCIAL_LEADERBOARD_LIMIT))
         .await?;
-    Ok(Json(entries.into_iter().map(LeaderboardEntry::from).collect()))
+    Ok(Json(entries.into_iter().map(LeaderboardEntryDto::from).collect()))
 }
 
 // ── Daily chaos ──

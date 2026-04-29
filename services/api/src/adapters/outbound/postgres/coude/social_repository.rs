@@ -5,8 +5,8 @@ use sqlx::PgPool;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::errors::DomainError;
@@ -32,7 +32,7 @@ struct LeaderboardRow {
     value: i64,
 }
 
-impl From<LeaderboardRow> for CoudeLeaderboardEntry {
+impl From<LeaderboardRow> for LeaderboardEntry {
     fn from(r: LeaderboardRow) -> Self {
         Self {
             user_id: r.user_id,
@@ -53,7 +53,7 @@ struct EventRow {
     created_at: DateTime<Utc>,
 }
 
-impl From<EventRow> for CoudeEvent {
+impl From<EventRow> for Event {
     fn from(r: EventRow) -> Self {
         Self {
             id: r.id,
@@ -119,7 +119,7 @@ impl SocialRepository for PgSocialRepository {
         guild_id: &str,
         category: LeaderboardCategory,
         limit: i64,
-    ) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> {
+    ) -> Result<Vec<LeaderboardEntry>, DomainError> {
         // Un SELECT par catégorie — l'enum garantit que rien d'autre ne passe
         // (pas d'interpolation de strings arbitraires).
         let sql = match category {
@@ -166,7 +166,7 @@ impl SocialRepository for PgSocialRepository {
 
     // ── Événements ──
 
-    async fn list_active_events(&self, guild_id: &str) -> Result<Vec<CoudeEvent>, DomainError> {
+    async fn list_active_events(&self, guild_id: &str) -> Result<Vec<Event>, DomainError> {
         let rows: Vec<EventRow> = sqlx::query_as(
             r#"SELECT id, guild_id, event_type, active, expires_at, started_at
                FROM coude_events

@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::coude::taunt::TauntEvent;
@@ -25,7 +25,7 @@ use crate::domain::errors::DomainError;
 #[async_trait]
 pub trait BetRepository: Send + Sync {
     /// Liste tous les paris d'un combat donné.
-    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError>;
+    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<Bet>, DomainError>;
 
     /// Place un pari de manière atomique :
     /// 1. `SELECT ... FOR UPDATE` sur le combat pour verrouiller son statut.

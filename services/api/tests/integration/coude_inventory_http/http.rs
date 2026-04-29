@@ -17,9 +17,9 @@ use tower::ServiceExt;
 use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::coude::inventory::CoudeInsurance;
-use sentinel_api::domain::entities::coude::inventory::CoudeInventoryItem;
-use sentinel_api::domain::entities::coude::inventory::CoudePrime;
+use sentinel_api::domain::entities::coude::inventory::Insurance;
+use sentinel_api::domain::entities::coude::inventory::InventoryItem;
+use sentinel_api::domain::entities::coude::inventory::Prime;
 use sentinel_api::domain::entities::coude::inventory::NewCoudePrime;
 use sentinel_api::domain::errors::DomainError;
 use sentinel_api::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
@@ -49,8 +49,8 @@ impl MockInventory {
 
 #[async_trait]
 impl ManageCoudeInventoryUseCase for MockInventory {
-    async fn list_inventory(&self, g: &str, u: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> {
-        Ok(vec![CoudeInventoryItem {
+    async fn list_inventory(&self, g: &str, u: &str) -> Result<Vec<InventoryItem>, DomainError> {
+        Ok(vec![InventoryItem {
             guild_id: g.into(), user_id: u.into(),
             item_key: "potion".into(), quantity: 3,
         }])
@@ -66,8 +66,8 @@ impl ManageCoudeInventoryUseCase for MockInventory {
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
         Ok(*self.has_item_flag.lock().unwrap())
     }
-    async fn create_prime(&self, n: NewCoudePrime) -> Result<CoudePrime, DomainError> {
-        let p = CoudePrime {
+    async fn create_prime(&self, n: NewCoudePrime) -> Result<Prime, DomainError> {
+        let p = Prime {
             id: Uuid::new_v4(),
             guild_id: n.guild_id.clone(),
             target_id: n.target_id.clone(),
@@ -84,7 +84,7 @@ impl ManageCoudeInventoryUseCase for MockInventory {
         self.primes_created.lock().unwrap().push(n);
         Ok(p)
     }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> {
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> {
         Ok(vec![])
     }
     async fn claim_primes(&self, g: &str, t: &str, c: &str, n: &str) -> Result<i64, DomainError> {
@@ -96,9 +96,9 @@ impl ManageCoudeInventoryUseCase for MockInventory {
         *self.insurance_bought.lock().unwrap() = r;
         Ok(r)
     }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> {
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> {
         if *self.insurance_active.lock().unwrap() {
-            Ok(Some(CoudeInsurance {
+            Ok(Some(Insurance {
                 id: Uuid::new_v4(),
                 is_scam: true,
                 expires_at: Utc.with_ymd_and_hms(2026, 12, 31, 23, 59, 59).unwrap(),

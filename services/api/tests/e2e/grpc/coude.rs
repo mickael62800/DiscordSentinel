@@ -29,23 +29,23 @@ use tonic::transport::Endpoint;
 use tonic::transport::Server;
 use uuid::Uuid;
 
-use sentinel_api::adapters::inbound::grpc::coude::bets::CoudeBetsGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::combats::CoudeCombatsGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::economy::CoudeEconomyGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::inventory::CoudeInventoryGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::players::CoudePlayerGrpc;
-use sentinel_api::adapters::inbound::grpc::coude::social::CoudeSocialGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::bets::BetsGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::combats::CombatsGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::economy::EconomyGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::inventory::InventoryGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::players::PlayerGrpc;
+use sentinel_api::adapters::inbound::grpc::coude::social::SocialGrpc;
 use sentinel_api::domain::entities::coude::combat::CombatResolution;
 use sentinel_api::domain::entities::coude::player::CombatStat;
-use sentinel_api::domain::entities::coude::bet::CoudeBet;
-use sentinel_api::domain::entities::coude::combat::CoudeCombat;
+use sentinel_api::domain::entities::coude::bet::Bet;
+use sentinel_api::domain::entities::coude::combat::Combat;
 use sentinel_api::domain::entities::coude::social::CoudeCurrentSeason;
-use sentinel_api::domain::entities::coude::social::CoudeEvent;
-use sentinel_api::domain::entities::coude::inventory::CoudeInsurance;
-use sentinel_api::domain::entities::coude::inventory::CoudeInventoryItem;
-use sentinel_api::domain::entities::coude::social::CoudeLeaderboardEntry;
-use sentinel_api::domain::entities::coude::player::CoudePlayer;
-use sentinel_api::domain::entities::coude::inventory::CoudePrime;
+use sentinel_api::domain::entities::coude::social::Event;
+use sentinel_api::domain::entities::coude::inventory::Insurance;
+use sentinel_api::domain::entities::coude::inventory::InventoryItem;
+use sentinel_api::domain::entities::coude::social::LeaderboardEntry;
+use sentinel_api::domain::entities::coude::player::Player;
+use sentinel_api::domain::entities::coude::inventory::Prime;
 use sentinel_api::domain::entities::coude::social::LeaderboardCategory;
 use sentinel_api::domain::entities::coude::bet::NewCoudeBet;
 use sentinel_api::domain::entities::coude::combat::NewCoudeCombat;
@@ -85,8 +85,8 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
         guild_id: String,
         user_id: String,
         username: String,
-    ) -> Result<CoudePlayer, DomainError> {
-        Ok(CoudePlayer {
+    ) -> Result<Player, DomainError> {
+        Ok(Player {
             guild_id,
             user_id,
             username,
@@ -105,11 +105,11 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
         })
     }
 
-    async fn get(&self, guild_id: &str, user_id: &str) -> Result<CoudePlayer, DomainError> {
+    async fn get(&self, guild_id: &str, user_id: &str) -> Result<Player, DomainError> {
         if user_id == "missing" {
             return Err(DomainError::NotFound("joueur introuvable".into()));
         }
-        Ok(CoudePlayer {
+        Ok(Player {
             guild_id: guild_id.into(),
             user_id: user_id.into(),
             username: "Existing".into(),
@@ -143,12 +143,12 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
     }
 
     // Methodes non utilisees dans ces tests — panic explicite si appelees.
-    async fn list(&self, _: &str) -> Result<Vec<CoudePlayer>, DomainError> { unimplemented!() }
-    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { unimplemented!() }
+    async fn list(&self, _: &str) -> Result<Vec<Player>, DomainError> { unimplemented!() }
+    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { unimplemented!() }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { unimplemented!() }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<CoudePlayer, DomainError> { unimplemented!() }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Player, DomainError> { unimplemented!() }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> { unimplemented!() }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
     async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
@@ -169,7 +169,7 @@ async fn start_server() -> (String, oneshot::Sender<()>) {
     let url = format!("http://{addr}");
 
     let (tx, rx) = oneshot::channel::<()>();
-    let svc = CoudePlayerGrpc {
+    let svc = PlayerGrpc {
         players_uc: Arc::new(MockPlayersUc),
         wallet_uc: Arc::new(test_helpers::StubWalletUc),
     };
@@ -352,8 +352,8 @@ struct MockCombatsUc;
 
 #[async_trait]
 impl ManageCoudeCombatsUseCase for MockCombatsUc {
-    async fn list(&self, guild_id: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> {
-        Ok(vec![CoudeCombat {
+    async fn list(&self, guild_id: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> {
+        Ok(vec![Combat {
             id: Uuid::nil(),
             guild_id: guild_id.into(),
             channel_id: Some("c".into()),
@@ -366,8 +366,8 @@ impl ManageCoudeCombatsUseCase for MockCombatsUc {
             created_at: ts(), accepted_at: None, resolved_at: None,
         }])
     }
-    async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
-        Ok(CoudeCombat {
+    async fn create(&self, new: NewCoudeCombat) -> Result<Combat, DomainError> {
+        Ok(Combat {
             id: Uuid::new_v4(),
             guild_id: new.guild_id, channel_id: new.channel_id,
             attacker_id: new.attacker_id, attacker_name: new.attacker_name,
@@ -379,11 +379,11 @@ impl ManageCoudeCombatsUseCase for MockCombatsUc {
             created_at: ts(), accepted_at: None, resolved_at: None,
         })
     }
-    async fn get(&self, _: Uuid) -> Result<CoudeCombat, DomainError> { unimplemented!() }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { unimplemented!() }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { unimplemented!() }
+    async fn get(&self, _: Uuid) -> Result<Combat, DomainError> { unimplemented!() }
+    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { unimplemented!() }
+    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { unimplemented!() }
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { unimplemented!() }
+    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { unimplemented!() }
     async fn cancel(&self, _: Uuid) -> Result<(), DomainError> { unimplemented!() }
     async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<(), DomainError> { unimplemented!() }
     async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { unimplemented!() }
@@ -393,7 +393,7 @@ impl ManageCoudeCombatsUseCase for MockCombatsUc {
 
 #[tokio::test]
 async fn coude_combats_list_and_create_round_trip() {
-    let svc = CoudeCombatsServiceServer::new(CoudeCombatsGrpc { uc: Arc::new(MockCombatsUc), resolve_batch_uc: Arc::new(test_helpers::StubResolveBettingBatch), expire_batch_uc: Arc::new(test_helpers::StubExpireCombatsBatch), resolve_now_uc: Arc::new(test_helpers::StubResolveCombatNow) });
+    let svc = CoudeCombatsServiceServer::new(CombatsGrpc { uc: Arc::new(MockCombatsUc), resolve_batch_uc: Arc::new(test_helpers::StubResolveBettingBatch), expire_batch_uc: Arc::new(test_helpers::StubExpireCombatsBatch), resolve_now_uc: Arc::new(test_helpers::StubResolveCombatNow) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeCombatsServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();
@@ -422,8 +422,8 @@ struct MockBetsUc;
 
 #[async_trait]
 impl ManageCoudeBetsUseCase for MockBetsUc {
-    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
-        Ok(vec![CoudeBet {
+    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<Bet>, DomainError> {
+        Ok(vec![Bet {
             id: Uuid::from_u128(1), guild_id: "g".into(), combat_id,
             bettor_id: "u".into(), bettor_name: "Joe".into(),
             backed_id: "a".into(), amount: 100, won: None, payout: None,
@@ -447,7 +447,7 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
 
 #[tokio::test]
 async fn coude_bets_list_for_combat_round_trip() {
-    let svc = CoudeBetsServiceServer::new(CoudeBetsGrpc { uc: Arc::new(MockBetsUc) });
+    let svc = CoudeBetsServiceServer::new(BetsGrpc { uc: Arc::new(MockBetsUc) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeBetsServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();
@@ -493,7 +493,7 @@ impl ManageCoudeEconomyUseCase for MockEconomyUc {
 
 #[tokio::test]
 async fn coude_economy_transfer_and_count_round_trip() {
-    let svc = CoudeEconomyServiceServer::new(CoudeEconomyGrpc { uc: Arc::new(MockEconomyUc) });
+    let svc = CoudeEconomyServiceServer::new(EconomyGrpc { uc: Arc::new(MockEconomyUc) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeEconomyServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();
@@ -524,10 +524,10 @@ struct MockInventoryUc;
 
 #[async_trait]
 impl ManageCoudeInventoryUseCase for MockInventoryUc {
-    async fn list_inventory(&self, guild_id: &str, user_id: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> {
+    async fn list_inventory(&self, guild_id: &str, user_id: &str) -> Result<Vec<InventoryItem>, DomainError> {
         Ok(vec![
-            CoudeInventoryItem { guild_id: guild_id.into(), user_id: user_id.into(), item_key: "potion".into(), quantity: 3 },
-            CoudeInventoryItem { guild_id: guild_id.into(), user_id: user_id.into(), item_key: "shield".into(), quantity: 1 },
+            InventoryItem { guild_id: guild_id.into(), user_id: user_id.into(), item_key: "potion".into(), quantity: 3 },
+            InventoryItem { guild_id: guild_id.into(), user_id: user_id.into(), item_key: "shield".into(), quantity: 1 },
         ])
     }
     async fn has_item(&self, _: &str, _: &str, item_key: &str) -> Result<bool, DomainError> {
@@ -535,17 +535,17 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
     }
     async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { unimplemented!() }
     async fn use_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { unimplemented!() }
-    async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { unimplemented!() }
+    async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> { unimplemented!() }
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> { unimplemented!() }
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { unimplemented!() }
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { unimplemented!() }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> { unimplemented!() }
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> { unimplemented!() }
     async fn expire_insurance(&self, _: Uuid) -> Result<(), DomainError> { unimplemented!() }
 }
 
 #[tokio::test]
 async fn coude_inventory_list_and_has_item_round_trip() {
-    let svc = CoudeInventoryServiceServer::new(CoudeInventoryGrpc { uc: Arc::new(MockInventoryUc), steal_protections_uc: Arc::new(test_helpers::StubCoudeStealProtections), steal_boosts_uc: Arc::new(test_helpers::StubCoudeStealBoosts) });
+    let svc = CoudeInventoryServiceServer::new(InventoryGrpc { uc: Arc::new(MockInventoryUc), steal_protections_uc: Arc::new(test_helpers::StubCoudeStealProtections), steal_boosts_uc: Arc::new(test_helpers::StubCoudeStealBoosts) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeInventoryServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();
@@ -576,8 +576,8 @@ struct MockSocialUc;
 
 #[async_trait]
 impl ManageCoudeSocialUseCase for MockSocialUc {
-    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, limit: i64) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> {
-        Ok((0..limit.min(3)).map(|i| CoudeLeaderboardEntry {
+    async fn leaderboard(&self, _: &str, _: LeaderboardCategory, limit: i64) -> Result<Vec<LeaderboardEntry>, DomainError> {
+        Ok((0..limit.min(3)).map(|i| LeaderboardEntry {
             user_id: format!("u{i}"),
             username: format!("Player{i}"),
             value: 1000 - i * 100,
@@ -594,13 +594,13 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
     }
     async fn check_cooldown(&self, _: &str, _: &str, _: &str) -> Result<Option<DateTime<Utc>>, DomainError> { unimplemented!() }
     async fn set_cooldown(&self, _: &str, _: &str, _: &str, _: i64) -> Result<(), DomainError> { unimplemented!() }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> { unimplemented!() }
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> { unimplemented!() }
     async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> { unimplemented!() }
 }
 
 #[tokio::test]
 async fn coude_social_leaderboard_and_season_round_trip() {
-    let svc = CoudeSocialServiceServer::new(CoudeSocialGrpc { uc: Arc::new(MockSocialUc), cashbox_uc: Arc::new(test_helpers::StubCoudeCashbox), catalog_uc: Arc::new(test_helpers::StubCoudeCatalog), heist_uc: Arc::new(test_helpers::StubCoudeHeist), taunts_uc: Arc::new(test_helpers::StubCoudeTaunts) });
+    let svc = CoudeSocialServiceServer::new(SocialGrpc { uc: Arc::new(MockSocialUc), cashbox_uc: Arc::new(test_helpers::StubCoudeCashbox), catalog_uc: Arc::new(test_helpers::StubCoudeCatalog), heist_uc: Arc::new(test_helpers::StubCoudeHeist), taunts_uc: Arc::new(test_helpers::StubCoudeTaunts) });
     let (url, shutdown) = spawn_one_service!(svc);
     let mut client = CoudeSocialServiceClient::connect(Endpoint::from_shared(url).unwrap())
         .await.unwrap();

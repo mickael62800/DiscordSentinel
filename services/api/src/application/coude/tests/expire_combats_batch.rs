@@ -11,9 +11,9 @@ use uuid::Uuid;
 use crate::application::coude::expire_combats_batch_service::ExpireCombatsBatchService;
 use crate::domain::entities::coude::cashbox::CashboxSource;
 use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::cashbox::Cashbox;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::casino::wallet::Wallet;
@@ -32,23 +32,23 @@ use crate::ports::outbound::casino::wallet_repository::WalletRepository;
 
 #[derive(Default)]
 struct MockCombatRepo {
-    expired: Mutex<Vec<CoudeCombat>>,
+    expired: Mutex<Vec<Combat>>,
 }
 
 #[async_trait]
 impl CombatRepository for MockCombatRepo {
-    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn get(&self, _: Uuid) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<CoudeCombat>, DomainError> { Ok(vec![]) }
-    async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<CoudeCombat>, DomainError> {
+    async fn list(&self, _: &str, _: Option<&str>, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn get(&self, _: Uuid) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn claim_due_betting_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn claim_stuck_resolving_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> { Ok(vec![]) }
+    async fn claim_expired_pending_combats(&self, _: i64) -> Result<Vec<Combat>, DomainError> {
         Ok(self.expired.lock().unwrap().clone())
     }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> { Ok(None) }
-    async fn create(&self, _: NewCoudeCombat) -> Result<CoudeCombat, DomainError> { unimplemented!() }
+    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> { Ok(None) }
+    async fn create(&self, _: NewCoudeCombat) -> Result<Combat, DomainError> { unimplemented!() }
     async fn resolve(&self, _: Uuid, _: CombatResolution) -> Result<bool, DomainError> { Ok(true) }
     async fn set_betting(&self, _: Uuid, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn expire(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
@@ -67,15 +67,15 @@ struct MockPlayerRepo {
 
 #[async_trait]
 impl PlayerRepository for MockPlayerRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<crate::domain::entities::coude::player::CoudePlayer, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<crate::domain::entities::coude::player::Player, DomainError> { unimplemented!() }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> { Ok(None) }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<crate::domain::entities::coude::player::Player>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<crate::domain::entities::coude::player::Player>, DomainError> { Ok(vec![]) }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::coude::player::XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: crate::domain::entities::coude::player::CombatStat) -> Result<Option<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::coude::player::CoudePlayer>, DomainError> { Ok(None) }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: crate::domain::entities::coude::player::CombatStat) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> { Ok(None) }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<crate::domain::entities::coude::player::Player>, DomainError> { Ok(None) }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
     async fn record_coins_lost(&self, g: &str, u: &str, amount: i64) -> Result<bool, DomainError> {
         self.record_lost_calls.lock().unwrap().push((g.into(), u.into(), amount));
@@ -173,7 +173,7 @@ struct MockBetsUc {
 #[async_trait]
 impl ManageCoudeBetsUseCase for MockBetsUc {
     async fn place(&self, _: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError> { unimplemented!() }
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> { Ok(vec![]) }
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> { Ok(vec![]) }
     async fn resolve(&self, _: Uuid, _: Option<String>) -> Result<ResolveBetsOutcome, DomainError> { unimplemented!() }
     async fn refund(&self, combat_id: Uuid) -> Result<RefundSummary, DomainError> {
         self.refund_calls.lock().unwrap().push(combat_id);
@@ -183,8 +183,8 @@ impl ManageCoudeBetsUseCase for MockBetsUc {
 
 // ── Helpers ──
 
-fn make_combat(guild: &str, defender: &str, mise: i64) -> CoudeCombat {
-    CoudeCombat {
+fn make_combat(guild: &str, defender: &str, mise: i64) -> Combat {
+    Combat {
         id: Uuid::new_v4(),
         guild_id: guild.into(),
         channel_id: Some("c1".into()),

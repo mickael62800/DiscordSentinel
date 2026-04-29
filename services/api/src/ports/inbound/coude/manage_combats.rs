@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 
@@ -19,34 +19,34 @@ pub trait ManageCoudeCombatsUseCase: Send + Sync {
         guild_id: &str,
         status: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError>;
+    ) -> Result<Vec<Combat>, DomainError>;
 
-    async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError>;
+    async fn get(&self, id: Uuid) -> Result<Combat, DomainError>;
 
     async fn get_pending_for_attacker(
         &self,
         guild_id: &str,
         attacker_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError>;
+    ) -> Result<Option<Combat>, DomainError>;
 
     async fn get_pending_for_defender(
         &self,
         guild_id: &str,
         defender_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError>;
+    ) -> Result<Option<Combat>, DomainError>;
 
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError>;
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError>;
 
     /// Combat en phase de paris auquel `user_id` participe (attaquant ou défenseur).
     async fn get_betting_for_participant(
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError>;
+    ) -> Result<Option<Combat>, DomainError>;
 
     // ── Cycle de vie ──
 
-    async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError>;
+    async fn create(&self, new: NewCoudeCombat) -> Result<Combat, DomainError>;
 
     /// Annule un combat en `pending` et marque ses paris non résolus comme perdus.
     /// Erreur 404 si le combat n'existe pas ou est déjà résolu.

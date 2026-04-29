@@ -16,7 +16,7 @@ use uuid::Uuid;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::entities::coude::bet::BetResolutionPlan;
-use sentinel_api::domain::entities::coude::bet::CoudeBet;
+use sentinel_api::domain::entities::coude::bet::Bet;
 use sentinel_api::domain::entities::coude::bet::NewCoudeBet;
 use sentinel_api::domain::entities::coude::bet::RefundSummary;
 use sentinel_api::domain::errors::DomainError;
@@ -40,7 +40,7 @@ impl ManageCoudeBetsUseCase for MockBets {
         self.placed.lock().unwrap().push(n);
         Ok(PlaceBetOutcome { taunt_events: vec![] })
     }
-    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<CoudeBet>, DomainError> {
+    async fn list_for_combat(&self, _: Uuid) -> Result<Vec<Bet>, DomainError> {
         Ok(vec![])
     }
     async fn resolve(

@@ -4,9 +4,9 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::application::coude::guild_settings::GuildSettings;
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
@@ -34,7 +34,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeInventoryItem>, DomainError> {
+    ) -> Result<Vec<InventoryItem>, DomainError> {
         self.repo.list_inventory(guild_id, user_id).await
     }
 
@@ -68,7 +68,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         self.repo.has_item(guild_id, user_id, item_key).await
     }
 
-    async fn create_prime(&self, new: NewCoudePrime) -> Result<CoudePrime, DomainError> {
+    async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError> {
         if new.amount <= 0 {
             return Err(DomainError::ValidationError(
                 "Le montant d'une prime doit etre positif".into(),
@@ -86,7 +86,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         &self,
         guild_id: &str,
         target_id: &str,
-    ) -> Result<Vec<CoudePrime>, DomainError> {
+    ) -> Result<Vec<Prime>, DomainError> {
         self.repo.list_active_primes(guild_id, target_id).await
     }
 
@@ -180,7 +180,7 @@ impl ManageCoudeInventoryUseCase for ManageCoudeInventoryService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeInsurance>, DomainError> {
+    ) -> Result<Option<Insurance>, DomainError> {
         self.repo.get_active_insurance(guild_id, user_id).await
     }
 

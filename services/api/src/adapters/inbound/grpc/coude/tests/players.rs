@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
@@ -21,16 +21,16 @@ use sqlx::Transaction;
 
 #[derive(Default)]
 struct MockPlayersUc {
-    player: Mutex<Option<CoudePlayer>>,
+    player: Mutex<Option<Player>>,
     class_calls: Mutex<Vec<(String, String, String)>>,
     add_xp_calls: Mutex<Vec<(String, String, i64)>>,
     update_hp_calls: Mutex<Vec<(String, String, i32, i32)>>,
     regen_return: Mutex<u64>,
 }
 
-fn make_player() -> CoudePlayer {
+fn make_player() -> Player {
     let now = Utc::now();
-    CoudePlayer {
+    Player {
         guild_id: "g".into(), user_id: "u".into(), username: "Alice".into(),
         coins: 100,
         total_wins: 0, total_losses: 0, total_draws: 0,
@@ -45,19 +45,19 @@ fn make_player() -> CoudePlayer {
 
 #[async_trait]
 impl ManageCoudePlayersUseCase for MockPlayersUc {
-    async fn get_or_create(&self, g: String, u: String, name: String) -> Result<CoudePlayer, DomainError> {
+    async fn get_or_create(&self, g: String, u: String, name: String) -> Result<Player, DomainError> {
         let mut p = make_player();
         p.guild_id = g;
         p.user_id = u;
         p.username = name;
         Ok(p)
     }
-    async fn get(&self, _: &str, _: &str) -> Result<CoudePlayer, DomainError> {
+    async fn get(&self, _: &str, _: &str) -> Result<Player, DomainError> {
         self.player.lock().unwrap().clone()
             .ok_or_else(|| DomainError::NotFound("joueur".into()))
     }
-    async fn list(&self, _: &str) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
+    async fn list(&self, _: &str) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
     async fn update_class(&self, g: &str, u: &str, class: &str) -> Result<(), DomainError> {
         self.class_calls.lock().unwrap().push((g.into(), u.into(), class.into()));
@@ -67,8 +67,8 @@ impl ManageCoudePlayersUseCase for MockPlayersUc {
         self.add_xp_calls.lock().unwrap().push((g.into(), u.into(), a));
         Ok(XpProgress { new_xp: a, new_level: 2, leveled_up: true, stat_points_gained: 1 })
     }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<CoudePlayer, DomainError> { unimplemented!() }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Player, DomainError> { unimplemented!() }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Player, DomainError> { unimplemented!() }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<(), DomainError> { Ok(()) }
     async fn record_loss(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
     async fn record_draw(&self, _: &str, _: &str, _: i64) -> Result<(), DomainError> { Ok(()) }
@@ -109,8 +109,8 @@ impl ManageWalletUseCase for MockWalletUc {
     async fn post_commit_taunts(&self, _: &str, _: &str, _: &TxWalletMutation) -> Vec<TauntEvent> { vec![] }
 }
 
-fn grpc(players: Arc<MockPlayersUc>, wallet: Arc<MockWalletUc>) -> CoudePlayerGrpc {
-    CoudePlayerGrpc { players_uc: players, wallet_uc: wallet }
+fn grpc(players: Arc<MockPlayersUc>, wallet: Arc<MockWalletUc>) -> PlayerGrpc {
+    PlayerGrpc { players_uc: players, wallet_uc: wallet }
 }
 
 // ── Tests ──

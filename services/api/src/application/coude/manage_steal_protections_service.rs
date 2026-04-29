@@ -8,7 +8,7 @@ use chrono::Utc;
 use rand::Rng;
 
 use crate::domain::entities::coude::steal_protection::find_protection_item;
-use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::steal_protection::StealProtection;
 use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
 use crate::domain::entities::coude::steal_protection::STEAL_PROTECTION_ITEMS;
 use crate::domain::errors::DomainError;
@@ -32,7 +32,7 @@ impl ManageCoudeStealProtectionsUseCase for ManageCoudeStealProtectionsService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealProtection>, DomainError> {
+    ) -> Result<Vec<StealProtection>, DomainError> {
         self.repo.list_active(guild_id, user_id).await
     }
 

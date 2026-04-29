@@ -6,16 +6,16 @@ use super::*;
 
     use crate::domain::entities::coude::bet::BetPayout;
     use crate::domain::entities::coude::bet::BetResolutionPlan;
-    use crate::domain::entities::coude::bet::CoudeBet;
-    use crate::domain::entities::coude::combat::CoudeCombat;
+    use crate::domain::entities::coude::bet::Bet;
+    use crate::domain::entities::coude::combat::Combat;
     use crate::domain::entities::coude::social::CoudeCurrentSeason;
-    use crate::domain::entities::coude::social::CoudeEvent;
+    use crate::domain::entities::coude::social::Event;
     use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
-    use crate::domain::entities::coude::inventory::CoudeInsurance;
-    use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-    use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
-    use crate::domain::entities::coude::player::CoudePlayer;
-    use crate::domain::entities::coude::inventory::CoudePrime;
+    use crate::domain::entities::coude::inventory::Insurance;
+    use crate::domain::entities::coude::inventory::InventoryItem;
+    use crate::domain::entities::coude::social::LeaderboardEntry;
+    use crate::domain::entities::coude::player::Player;
+    use crate::domain::entities::coude::inventory::Prime;
     use crate::domain::entities::coude::social::LeaderboardCategory;
     use crate::domain::entities::coude::bet::RefundSummary;
     use crate::domain::entities::coude::player::XpProgress;
@@ -40,7 +40,7 @@ use super::*;
 
     #[test]
     fn coude_player_to_proto_full_mapping() {
-        let p = CoudePlayer {
+        let p = Player {
             guild_id: "g1".into(),
             user_id: "u1".into(),
             username: "alice".into(),
@@ -93,7 +93,7 @@ use super::*;
 
     #[test]
     fn coude_player_to_proto_optional_class_none() {
-        let p = CoudePlayer {
+        let p = Player {
             guild_id: "g".into(), user_id: "u".into(), username: "x".into(),
             coins: 0, total_wins: 0, total_losses: 0, total_draws: 0,
             total_earned: 0, total_lost: 0, total_stolen: 0,
@@ -121,7 +121,7 @@ use super::*;
     #[test]
     fn combat_to_proto_full_mapping() {
         let id = Uuid::new_v4();
-        let c = CoudeCombat {
+        let c = Combat {
             id,
             guild_id: "g1".into(),
             channel_id: Some("c1".into()),
@@ -158,7 +158,7 @@ use super::*;
     #[test]
     fn bet_to_proto_mapping() {
         let bid = Uuid::from_u128(42);
-        let b = CoudeBet {
+        let b = Bet {
             id: bid,
             guild_id: "g".into(),
             combat_id: Uuid::nil(),
@@ -256,7 +256,7 @@ use super::*;
 
     #[test]
     fn inventory_item_to_proto_mapping() {
-        let i = CoudeInventoryItem {
+        let i = InventoryItem {
             guild_id: "g".into(), user_id: "u".into(),
             item_key: "potion".into(), quantity: 5,
         };
@@ -267,7 +267,7 @@ use super::*;
 
     #[test]
     fn prime_to_proto_unclaimed() {
-        let p = CoudePrime {
+        let p = Prime {
             id: Uuid::new_v4(),
             guild_id: "g".into(),
             target_id: "t".into(), target_name: "T".into(),
@@ -285,7 +285,7 @@ use super::*;
     #[test]
     fn insurance_to_proto_mapping() {
         let id = Uuid::new_v4();
-        let i = CoudeInsurance { id, is_scam: true, expires_at: ts() };
+        let i = Insurance { id, is_scam: true, expires_at: ts() };
         let pr = inventory::insurance_to_proto(i);
         assert_eq!(pr.id, id.to_string());
         assert!(pr.is_scam);
@@ -337,7 +337,7 @@ use super::*;
 
     #[test]
     fn leaderboard_entry_to_proto_mapping() {
-        let e = CoudeLeaderboardEntry {
+        let e = LeaderboardEntry {
             user_id: "u".into(), username: "Top".into(), value: 9999,
         };
         let pr = social::leaderboard_entry_to_proto(e);
@@ -384,7 +384,7 @@ use super::*;
     #[test]
     fn event_to_proto_mapping() {
         let id = Uuid::new_v4();
-        let e = CoudeEvent {
+        let e = Event {
             id, guild_id: "g".into(), event_type: "happy_hour".into(), active: true,
             expires_at: ts(), created_at: ts(),
         };
@@ -478,9 +478,9 @@ use super::*;
 
     #[test]
     fn steal_boost_to_proto_mapping() {
-        use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
+        use crate::domain::entities::coude::steal_boost::StealBoost;
         let id = Uuid::new_v4();
-        let b = CoudeStealBoost {
+        let b = StealBoost {
             id,
             guild_id: "g".into(),
             user_id: "u".into(),
@@ -497,9 +497,9 @@ use super::*;
 
     #[test]
     fn steal_protection_to_proto_mapping() {
-        use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+        use crate::domain::entities::coude::steal_protection::StealProtection;
         let id = Uuid::new_v4();
-        let p = CoudeStealProtection {
+        let p = StealProtection {
             id,
             guild_id: "g".into(),
             user_id: "u".into(),

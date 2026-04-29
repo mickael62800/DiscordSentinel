@@ -2,7 +2,7 @@ use uuid::Uuid;
 
 /// Pari posé sur un combat Coup de Coude.
 #[derive(Debug, Clone)]
-pub struct CoudeBet {
+pub struct Bet {
     pub id: Uuid,
     pub guild_id: String,
     pub combat_id: Uuid,
@@ -92,7 +92,7 @@ pub struct BetResolutionPlan {
 /// - `winner_id: None` (égalité / pas de vainqueur) : tous les parieurs sont remboursés
 ///   de leur mise initiale, aucun bonus combattant.
 pub fn calculate_bet_resolution(
-    bets: &[CoudeBet],
+    bets: &[Bet],
     winner_id: Option<&str>,
     attacker_id: &str,
     defender_id: &str,

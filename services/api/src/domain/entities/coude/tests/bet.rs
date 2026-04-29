@@ -1,10 +1,10 @@
 use super::*;
 use uuid::Uuid;
 
-fn bet(id: i64, bettor: &str, backed: &str, amount: i64) -> CoudeBet {
+fn bet(id: i64, bettor: &str, backed: &str, amount: i64) -> Bet {
     // Mapper id i64 -> Uuid deterministe pour les tests legacy.
     let id = Uuid::from_u128(id as u128);
-    CoudeBet {
+    Bet {
         id,
         guild_id: "g".into(),
         combat_id: Uuid::nil(),
@@ -74,7 +74,7 @@ fn invariant_no_coin_creation() {
     let mut rng = rand::thread_rng();
     for iter in 0..500 {
         let n: usize = rng.gen_range(1..=10);
-        let bets: Vec<CoudeBet> = (0..n)
+        let bets: Vec<Bet> = (0..n)
             .map(|i| {
                 let backed = if rng.gen_bool(0.5) { "A" } else { "B" };
                 let amount: i64 = rng.gen_range(1..=100_000);
@@ -110,7 +110,7 @@ fn draw_always_refunds_exact_amount() {
     let mut rng = rand::thread_rng();
     for _ in 0..100 {
         let n: usize = rng.gen_range(1..=20);
-        let bets: Vec<CoudeBet> = (0..n)
+        let bets: Vec<Bet> = (0..n)
             .map(|i| bet(i as i64, &format!("u{i}"), "A", rng.gen_range(1..=1_000_000)))
             .collect();
         let plan = calculate_bet_resolution(&bets, None, "A", "B");
@@ -177,7 +177,7 @@ fn rounding_loss_bounded_by_winner_count() {
     // Cas avec rounding : 3 parts de 100 sur pot de 100 ne divise pas exactement.
     // 100*0.85 = 85, part = 100/100 * 85 = 85. OK.
     // Cas plus interessant : 7 parieurs
-    let bets: Vec<CoudeBet> = (0..7)
+    let bets: Vec<Bet> = (0..7)
         .map(|i| bet(i, &format!("u{i}"), "A", 100))
         .collect();
     let plan = calculate_bet_resolution(&bets, Some("A"), "A", "B");

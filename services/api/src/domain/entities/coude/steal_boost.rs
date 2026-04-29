@@ -11,7 +11,7 @@ use uuid::Uuid;
 use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
 
 #[derive(Debug, Clone)]
-pub struct CoudeStealBoost {
+pub struct StealBoost {
     pub id: Uuid,
     pub guild_id: String,
     pub user_id: String,

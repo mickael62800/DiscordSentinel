@@ -5,7 +5,7 @@
 //! prend `&PgPlayerRepository` en argument, appelee par la thin
 //! trait impl dans `mod.rs`.
 
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::errors::DomainError;
 
 use super::super::super::pg_err;
@@ -17,7 +17,7 @@ pub(super) async fn get_or_create(
     guild_id: &str,
     user_id: &str,
     username: &str,
-) -> Result<CoudePlayer, DomainError> {
+) -> Result<Player, DomainError> {
     // 1. Creer/mettre a jour le joueur coude
     sqlx::query(
         r#"INSERT INTO coude_players (guild_id, user_id, username)
@@ -68,7 +68,7 @@ pub(super) async fn get(
     repo: &PgPlayerRepository,
     guild_id: &str,
     user_id: &str,
-) -> Result<Option<CoudePlayer>, DomainError> {
+) -> Result<Option<Player>, DomainError> {
     let sql = format!(
         "SELECT {cols} FROM coude_players cp WHERE cp.guild_id = $1 AND cp.user_id = $2",
         cols = PLAYER_COLUMNS
@@ -86,7 +86,7 @@ pub(super) async fn list(
     repo: &PgPlayerRepository,
     guild_id: &str,
     limit: i64,
-) -> Result<Vec<CoudePlayer>, DomainError> {
+) -> Result<Vec<Player>, DomainError> {
     // Phase 2 A.2 — Lit depuis la vue materialisee `mv_coude_leaderboard`
     // refreshee toutes les 5 min par le cache-worker. La MV contient toutes
     // les colonnes de coude_players + un `rank` precalcule, donc on garde
@@ -114,7 +114,7 @@ pub(super) async fn random_active(
     guild_id: &str,
     count: i64,
     min_coins: i64,
-) -> Result<Vec<CoudePlayer>, DomainError> {
+) -> Result<Vec<Player>, DomainError> {
     let sql = format!(
         r#"SELECT {cols}
            FROM coude_players cp

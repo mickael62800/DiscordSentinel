@@ -13,9 +13,9 @@ use uuid::Uuid;
 use crate::application::coude::manage_social_service::ManageCoudeSocialService;
 use crate::domain::entities::coude::player::CombatStat;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::domain::entities::coude::taunt::TauntEvent;
@@ -40,9 +40,9 @@ use sqlx::Transaction;
 struct MockSocialRepo {
     cooldown_returns: Mutex<Option<DateTime<Utc>>>,
     set_cooldown_calls: Mutex<Vec<(String, String, String, i64)>>,
-    leaderboard_returns: Mutex<Vec<CoudeLeaderboardEntry>>,
+    leaderboard_returns: Mutex<Vec<LeaderboardEntry>>,
     leaderboard_limit_calls: Mutex<Vec<i64>>,
-    active_events: Mutex<Vec<CoudeEvent>>,
+    active_events: Mutex<Vec<Event>>,
     daily_chaos_count: Mutex<i64>,
     daily_chaos_logs: Mutex<Vec<NewDailyChaos>>,
     season: Mutex<Option<CoudeCurrentSeason>>,
@@ -76,11 +76,11 @@ impl SocialRepository for MockSocialRepo {
         _: &str,
         _: LeaderboardCategory,
         limit: i64,
-    ) -> Result<Vec<CoudeLeaderboardEntry>, DomainError> {
+    ) -> Result<Vec<LeaderboardEntry>, DomainError> {
         self.leaderboard_limit_calls.lock().unwrap().push(limit);
         Ok(self.leaderboard_returns.lock().unwrap().clone())
     }
-    async fn list_active_events(&self, _: &str) -> Result<Vec<CoudeEvent>, DomainError> {
+    async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> {
         Ok(self.active_events.lock().unwrap().clone())
     }
     async fn log_daily_chaos(&self, chaos: NewDailyChaos) -> Result<(), DomainError> {
@@ -107,22 +107,22 @@ impl SocialRepository for MockSocialRepo {
 
 #[derive(Default)]
 struct MockPlayerRepo {
-    random_returns: Mutex<Vec<CoudePlayer>>,
+    random_returns: Mutex<Vec<Player>>,
 }
 
 #[async_trait]
 impl PlayerRepository for MockPlayerRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { Ok(vec![]) }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<CoudePlayer>, DomainError> {
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> { unimplemented!() }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { Ok(vec![]) }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<Player>, DomainError> {
         Ok(self.random_returns.lock().unwrap().clone())
     }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { Ok(vec![]) }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { Ok(None) }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<CoudePlayer>, DomainError> { Ok(None) }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { Ok(None) }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> { Ok(None) }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
     async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { Ok(true) }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { Ok(true) }
@@ -221,9 +221,9 @@ impl ManageWalletUseCase for MockWalletUc {
 
 // ── Helpers ──
 
-fn make_player(user_id: &str, coins: i64) -> CoudePlayer {
+fn make_player(user_id: &str, coins: i64) -> Player {
     let now = Utc::now();
-    CoudePlayer {
+    Player {
         guild_id: "g".into(),
         user_id: user_id.into(),
         username: format!("user_{user_id}"),
@@ -493,7 +493,7 @@ async fn trigger_daily_chaos_custom_percent_config() {
 #[tokio::test]
 async fn list_active_events_returns_repo_value() {
     let social = Arc::new(MockSocialRepo::default());
-    social.active_events.lock().unwrap().push(CoudeEvent {
+    social.active_events.lock().unwrap().push(Event {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         event_type: "happy_hour".into(),

@@ -8,7 +8,7 @@ use crate::adapters::outbound::postgres::casino::wallet_tx_log::log_wallet_tx;
 use crate::domain::entities::coude::player::title_for_level as coude_title_for_level;
 use crate::domain::entities::coude::player::xp_for_level as coude_xp_for_level;
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::entities::coude::player::COUDE_MAX_LEVEL;
 use crate::domain::errors::DomainError;
@@ -107,7 +107,7 @@ pub(super) async fn spend_stat_point(
     guild_id: &str,
     user_id: &str,
     stat: CombatStat,
-    ) -> Result<Option<CoudePlayer>, DomainError> {
+    ) -> Result<Option<Player>, DomainError> {
     // `stat.column()` retourne uniquement "atk" ou "def" — sûr à interpoler.
     // L'UPDATE a besoin de l'alias `cp` parce que PLAYER_COLUMNS reference
     // `cp.guild_id` / `cp.user_id` dans la sous-requete wallet — sans
@@ -142,7 +142,7 @@ pub(super) async fn reset_stats(
     guild_id: &str,
     user_id: &str,
     cost: i64,
-    ) -> Result<Option<CoudePlayer>, DomainError> {
+    ) -> Result<Option<Player>, DomainError> {
     let mut tx = repo.pool.begin().await.map_err(pg_err)?;
 
     // Verifier que le wallet a assez de coins pour payer le reset (lock).

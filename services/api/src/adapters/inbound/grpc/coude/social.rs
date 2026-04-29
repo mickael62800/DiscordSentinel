@@ -21,15 +21,15 @@ use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
+use crate::domain::entities::coude::social::Event;
+use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::LeaderboardCategory;
 use crate::domain::entities::coude::social::NewDailyChaos;
 use crate::ports::inbound::coude::manage_social::ManageCoudeSocialUseCase;
 
 use super::taunt_event_to_proto;
 
-pub struct CoudeSocialGrpc {
+pub struct SocialGrpc {
     pub uc: Arc<dyn ManageCoudeSocialUseCase>,
     pub catalog_uc: Arc<dyn crate::ports::inbound::coude::manage_catalog::ManageCoudeCatalogUseCase>,
     pub cashbox_uc: Arc<dyn crate::ports::inbound::coude::manage_cashbox::ManageCoudeCashboxUseCase>,
@@ -47,16 +47,16 @@ pub(super) fn proto_to_leaderboard_category(v: i32) -> LeaderboardCategory {
     }
 }
 
-pub(super) fn leaderboard_entry_to_proto(e: CoudeLeaderboardEntry) -> proto::CoudeLeaderboardEntry {
-    proto::CoudeLeaderboardEntry {
+pub(super) fn leaderboard_entry_to_proto(e: LeaderboardEntry) -> proto::LeaderboardEntry {
+    proto::LeaderboardEntry {
         user_id: e.user_id,
         username: e.username,
         value: e.value,
     }
 }
 
-pub(super) fn event_to_proto(e: CoudeEvent) -> proto::CoudeEvent {
-    proto::CoudeEvent {
+pub(super) fn event_to_proto(e: Event) -> proto::Event {
+    proto::Event {
         id: e.id.to_string(),
         guild_id: e.guild_id,
         active: e.active,
@@ -75,7 +75,7 @@ pub(super) fn current_season_to_proto(s: CoudeCurrentSeason) -> proto::CoudeCurr
 }
 
 #[tonic::async_trait]
-impl CoudeSocialService for CoudeSocialGrpc {
+impl CoudeSocialService for SocialGrpc {
     async fn check_cooldown(
         &self,
         request: Request<proto::CheckCooldownRequest>,
@@ -169,13 +169,13 @@ impl CoudeSocialService for CoudeSocialGrpc {
     async fn get_catalog(
         &self,
         _request: Request<proto::Empty>,
-    ) -> Result<Response<proto::CoudeCatalogResponse>, Status> {
+    ) -> Result<Response<proto::CatalogResponse>, Status> {
         let cat = self
             .catalog_uc
             .get_catalog()
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(proto::CoudeCatalogResponse {
+        Ok(Response::new(proto::CatalogResponse {
             classes: cat
                 .classes
                 .into_iter()
@@ -243,14 +243,14 @@ impl CoudeSocialService for CoudeSocialGrpc {
     async fn get_cashbox(
         &self,
         request: Request<proto::GetCashboxRequest>,
-    ) -> Result<Response<proto::CoudeCashboxState>, Status> {
+    ) -> Result<Response<proto::CashboxState>, Status> {
         let guild_id = request.into_inner().guild_id;
         let cb = self
             .cashbox_uc
             .get_cashbox(&guild_id)
             .await
             .map_err(domain_to_status)?;
-        Ok(Response::new(proto::CoudeCashboxState {
+        Ok(Response::new(proto::CashboxState {
             guild_id: cb.guild_id,
             balance: cb.balance,
             total_collected: cb.total_collected,

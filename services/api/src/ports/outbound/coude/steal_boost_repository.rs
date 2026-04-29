@@ -3,7 +3,7 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
+use crate::domain::entities::coude::steal_boost::StealBoost;
 use crate::domain::errors::DomainError;
 
 #[async_trait]
@@ -12,7 +12,7 @@ pub trait StealBoostRepository: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealBoost>, DomainError>;
+    ) -> Result<Vec<StealBoost>, DomainError>;
 
     async fn upsert(
         &self,

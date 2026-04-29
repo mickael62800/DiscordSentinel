@@ -8,7 +8,7 @@ use crate::domain::entities::coude::combat_validation::check_surprise_hp_pct;
 use crate::domain::entities::coude::combat_validation::validate_new_combat;
 use crate::domain::entities::coude::combat::CombatResolution;
 use crate::domain::entities::coude::balance::BalanceParams;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::errors::DomainError;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
@@ -60,14 +60,14 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         guild_id: &str,
         status: Option<&str>,
         limit: i64,
-    ) -> Result<Vec<CoudeCombat>, DomainError> {
+    ) -> Result<Vec<Combat>, DomainError> {
         let limit = limit.clamp(1, 200);
         // "all" est traité côté repo via Option::None.
         let status_filter = status.filter(|s| *s != "all");
         self.repo.list(guild_id, status_filter, limit).await
     }
 
-    async fn get(&self, id: Uuid) -> Result<CoudeCombat, DomainError> {
+    async fn get(&self, id: Uuid) -> Result<Combat, DomainError> {
         self.repo
             .get(id)
             .await?
@@ -78,7 +78,7 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         &self,
         guild_id: &str,
         attacker_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError> {
+    ) -> Result<Option<Combat>, DomainError> {
         self.repo.get_pending_for_attacker(guild_id, attacker_id).await
     }
 
@@ -86,11 +86,11 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         &self,
         guild_id: &str,
         defender_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError> {
+    ) -> Result<Option<Combat>, DomainError> {
         self.repo.get_pending_for_defender(guild_id, defender_id).await
     }
 
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> {
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
         self.repo.list_expired_pending().await
     }
 
@@ -98,13 +98,13 @@ impl ManageCoudeCombatsUseCase for ManageCoudeCombatsService {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudeCombat>, DomainError> {
+    ) -> Result<Option<Combat>, DomainError> {
         self.repo
             .get_betting_for_participant(guild_id, user_id)
             .await
     }
 
-    async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
+    async fn create(&self, new: NewCoudeCombat) -> Result<Combat, DomainError> {
         // 1. Validations pures (mise positive, pas de self-duel) — domain.
         validate_new_combat(&new)?;
 

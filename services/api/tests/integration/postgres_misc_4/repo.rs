@@ -128,7 +128,7 @@ async fn heist_send_to_prison_is_upsert() {
 }
 
 // ══════════════════════════════════════════════════════════
-// CoudeStealProtection
+// StealProtection
 // ══════════════════════════════════════════════════════════
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -151,7 +151,7 @@ async fn protection_upsert_adds_days() {
 }
 
 // ══════════════════════════════════════════════════════════
-// CoudeStealBoost
+// StealBoost
 // ══════════════════════════════════════════════════════════
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

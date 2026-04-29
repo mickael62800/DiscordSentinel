@@ -6,7 +6,7 @@ use std::sync::Mutex;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::domain::entities::coude::taunt::TauntEvent;
 use crate::domain::errors::DomainError;
@@ -18,8 +18,8 @@ use crate::ports::inbound::coude::expire_combats_batch::ExpiredCombatOutput;
 use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowOutput;
 use crate::ports::inbound::coude::resolve_combat_now::ResolveCombatNowUseCase;
 use crate::ports::inbound::coude::resolve_combat_now::ResolvedCombatEmbedField;
-fn sample_combat() -> CoudeCombat {
-    CoudeCombat {
+fn sample_combat() -> Combat {
+    Combat {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         channel_id: Some("c".into()),
@@ -37,13 +37,13 @@ fn sample_combat() -> CoudeCombat {
 
 #[derive(Default)]
 struct MockCombatsUc {
-    list_return: Mutex<Vec<CoudeCombat>>,
+    list_return: Mutex<Vec<Combat>>,
     list_calls: Mutex<Vec<(String, Option<String>, i64)>>,
-    get_return: Mutex<Option<CoudeCombat>>,
-    pending_attacker: Mutex<Option<CoudeCombat>>,
-    pending_defender: Mutex<Option<CoudeCombat>>,
-    expired_pending: Mutex<Vec<CoudeCombat>>,
-    betting_participant: Mutex<Option<CoudeCombat>>,
+    get_return: Mutex<Option<Combat>>,
+    pending_attacker: Mutex<Option<Combat>>,
+    pending_defender: Mutex<Option<Combat>>,
+    expired_pending: Mutex<Vec<Combat>>,
+    betting_participant: Mutex<Option<Combat>>,
     create_calls: Mutex<Vec<NewCoudeCombat>>,
     cancel_calls: Mutex<Vec<Uuid>>,
     resolve_calls: Mutex<Vec<(Uuid, CombatResolution)>>,
@@ -55,27 +55,27 @@ struct MockCombatsUc {
 
 #[async_trait]
 impl ManageCoudeCombatsUseCase for MockCombatsUc {
-    async fn list(&self, g: &str, s: Option<&str>, l: i64) -> Result<Vec<CoudeCombat>, DomainError> {
+    async fn list(&self, g: &str, s: Option<&str>, l: i64) -> Result<Vec<Combat>, DomainError> {
         self.list_calls.lock().unwrap().push((g.into(), s.map(String::from), l));
         Ok(self.list_return.lock().unwrap().clone())
     }
-    async fn get(&self, _: Uuid) -> Result<CoudeCombat, DomainError> {
+    async fn get(&self, _: Uuid) -> Result<Combat, DomainError> {
         self.get_return.lock().unwrap().clone()
             .ok_or_else(|| DomainError::NotFound("combat".into()))
     }
-    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> {
+    async fn get_pending_for_attacker(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
         Ok(self.pending_attacker.lock().unwrap().clone())
     }
-    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> {
+    async fn get_pending_for_defender(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
         Ok(self.pending_defender.lock().unwrap().clone())
     }
-    async fn list_expired_pending(&self) -> Result<Vec<CoudeCombat>, DomainError> {
+    async fn list_expired_pending(&self) -> Result<Vec<Combat>, DomainError> {
         Ok(self.expired_pending.lock().unwrap().clone())
     }
-    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<CoudeCombat>, DomainError> {
+    async fn get_betting_for_participant(&self, _: &str, _: &str) -> Result<Option<Combat>, DomainError> {
         Ok(self.betting_participant.lock().unwrap().clone())
     }
-    async fn create(&self, new: NewCoudeCombat) -> Result<CoudeCombat, DomainError> {
+    async fn create(&self, new: NewCoudeCombat) -> Result<Combat, DomainError> {
         self.create_calls.lock().unwrap().push(new);
         Ok(sample_combat())
     }
@@ -151,8 +151,8 @@ impl ResolveCombatNowUseCase for MockResolveNow {
     }
 }
 
-fn grpc(uc: Arc<MockCombatsUc>) -> CoudeCombatsGrpc {
-    CoudeCombatsGrpc {
+fn grpc(uc: Arc<MockCombatsUc>) -> CombatsGrpc {
+    CombatsGrpc {
         uc,
         resolve_batch_uc: Arc::new(MockResolveBatch::default()),
         expire_batch_uc: Arc::new(MockExpireBatch::default()),
@@ -165,8 +165,8 @@ fn grpc_full(
     rb: Arc<MockResolveBatch>,
     eb: Arc<MockExpireBatch>,
     rn: Arc<MockResolveNow>,
-) -> CoudeCombatsGrpc {
-    CoudeCombatsGrpc { uc, resolve_batch_uc: rb, expire_batch_uc: eb, resolve_now_uc: rn }
+) -> CombatsGrpc {
+    CombatsGrpc { uc, resolve_batch_uc: rb, expire_batch_uc: eb, resolve_now_uc: rn }
 }
 
 // ── list ──

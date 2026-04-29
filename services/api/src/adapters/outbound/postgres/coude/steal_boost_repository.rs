@@ -6,7 +6,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::steal_boost::CoudeStealBoost;
+use crate::domain::entities::coude::steal_boost::StealBoost;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::steal_boost_repository::StealBoostRepository;
 
@@ -34,7 +34,7 @@ struct BoostRow {
     created_at: DateTime<Utc>,
 }
 
-impl From<BoostRow> for CoudeStealBoost {
+impl From<BoostRow> for StealBoost {
     fn from(r: BoostRow) -> Self {
         Self {
             id: r.id,
@@ -53,7 +53,7 @@ impl StealBoostRepository for PgStealBoostRepository {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealBoost>, DomainError> {
+    ) -> Result<Vec<StealBoost>, DomainError> {
         let rows: Vec<BoostRow> = sqlx::query_as(
             r#"SELECT id, guild_id, user_id, item_key, expires_at, created_at
                FROM coude_steal_boosts

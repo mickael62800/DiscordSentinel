@@ -8,7 +8,7 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::steal_protection::StealProtection;
 use crate::domain::entities::coude::steal_protection::StealProtectionDuration;
 use crate::domain::errors::DomainError;
 
@@ -30,7 +30,7 @@ pub trait ManageCoudeStealProtectionsUseCase: Send + Sync {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealProtection>, DomainError>;
+    ) -> Result<Vec<StealProtection>, DomainError>;
 
     /// Calcule le prix total d'un abonnement pour l'item + la duree
     /// donnes. Retourne une erreur si l'item n'existe pas dans le

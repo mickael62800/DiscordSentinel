@@ -6,7 +6,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::steal_protection::CoudeStealProtection;
+use crate::domain::entities::coude::steal_protection::StealProtection;
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::coude::steal_protection_repository::StealProtectionRepository;
 
@@ -34,7 +34,7 @@ struct ProtectionRow {
     created_at: DateTime<Utc>,
 }
 
-impl From<ProtectionRow> for CoudeStealProtection {
+impl From<ProtectionRow> for StealProtection {
     fn from(r: ProtectionRow) -> Self {
         Self {
             id: r.id,
@@ -53,7 +53,7 @@ impl StealProtectionRepository for PgStealProtectionRepository {
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Vec<CoudeStealProtection>, DomainError> {
+    ) -> Result<Vec<StealProtection>, DomainError> {
         let rows: Vec<ProtectionRow> = sqlx::query_as(
             r#"SELECT id, guild_id, user_id, item_key, expires_at, created_at
                FROM coude_steal_protections

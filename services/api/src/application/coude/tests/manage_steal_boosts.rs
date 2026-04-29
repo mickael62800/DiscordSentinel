@@ -6,12 +6,12 @@ use chrono::Duration as ChronoDuration;
 use uuid::Uuid;
 
 struct MockRepo {
-    actives: Vec<CoudeStealBoost>,
+    actives: Vec<StealBoost>,
 }
 
 #[async_trait]
 impl StealBoostRepository for MockRepo {
-    async fn list_active(&self, _guild_id: &str, _user_id: &str) -> Result<Vec<CoudeStealBoost>, DomainError> {
+    async fn list_active(&self, _guild_id: &str, _user_id: &str) -> Result<Vec<StealBoost>, DomainError> {
         Ok(self.actives.clone())
     }
     async fn upsert(&self, _guild_id: &str, _user_id: &str, _item_key: &str, days_to_add: i64) -> Result<DateTime<Utc>, DomainError> {
@@ -20,8 +20,8 @@ impl StealBoostRepository for MockRepo {
     async fn purge_expired(&self) -> Result<u64, DomainError> { Ok(0) }
 }
 
-fn mk_boost(item_key: &str) -> CoudeStealBoost {
-    CoudeStealBoost {
+fn mk_boost(item_key: &str) -> StealBoost {
+    StealBoost {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         user_id: "u".into(),

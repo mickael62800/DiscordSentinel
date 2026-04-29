@@ -2,7 +2,7 @@ use async_trait::async_trait;
 use uuid::Uuid;
 
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
+use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::bet::NewCoudeBet;
 use crate::domain::entities::coude::bet::RefundSummary;
 use crate::domain::entities::coude::taunt::TauntEvent;
@@ -33,7 +33,7 @@ pub trait ManageCoudeBetsUseCase: Send + Sync {
     /// Retourne la liste des `TauntEvent` declenches (faillite parieur).
     async fn place(&self, new: NewCoudeBet) -> Result<PlaceBetOutcome, DomainError>;
 
-    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<CoudeBet>, DomainError>;
+    async fn list_for_combat(&self, combat_id: Uuid) -> Result<Vec<Bet>, DomainError>;
 
     /// Résout les paris d'un combat résolu. `winner_id = None` = égalité (remboursement).
     /// Calcule le plan pari-mutuel côté domaine puis l'applique via le repo.

@@ -3,7 +3,7 @@ use std::sync::Mutex;
 use async_trait::async_trait;
 
 use crate::domain::entities::system::bot_config::BotGuildConfig;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::taunt::TauntsConfig;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::entities::coude::player::CombatStat;
@@ -98,15 +98,15 @@ struct MockPlayerRepo {
 
 #[async_trait]
 impl PlayerRepository for MockPlayerRepo {
-    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<CoudePlayer, DomainError> { unimplemented!() }
-    async fn get(&self, _: &str, _: &str) -> Result<Option<CoudePlayer>, DomainError> { unimplemented!() }
-    async fn list(&self, _: &str, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { unimplemented!() }
-    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<CoudePlayer>, DomainError> { unimplemented!() }
+    async fn get_or_create(&self, _: &str, _: &str, _: &str) -> Result<Player, DomainError> { unimplemented!() }
+    async fn get(&self, _: &str, _: &str) -> Result<Option<Player>, DomainError> { unimplemented!() }
+    async fn list(&self, _: &str, _: i64) -> Result<Vec<Player>, DomainError> { unimplemented!() }
+    async fn random_active(&self, _: &str, _: i64, _: i64) -> Result<Vec<Player>, DomainError> { unimplemented!() }
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError> { unimplemented!() }
     async fn update_class(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { unimplemented!() }
     async fn add_xp(&self, _: &str, _: &str, _: i64) -> Result<Option<XpProgress>, DomainError> { unimplemented!() }
-    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<CoudePlayer>, DomainError> { unimplemented!() }
-    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<CoudePlayer>, DomainError> { unimplemented!() }
+    async fn spend_stat_point(&self, _: &str, _: &str, _: CombatStat) -> Result<Option<Player>, DomainError> { unimplemented!() }
+    async fn reset_stats(&self, _: &str, _: &str, _: i64) -> Result<Option<Player>, DomainError> { unimplemented!() }
     async fn record_coins_earned(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { unimplemented!() }
     async fn record_coins_lost(&self, _: &str, _: &str, _: i64) -> Result<bool, DomainError> { unimplemented!() }
     async fn record_win(&self, _: &str, _: &str, _: i64, _: i64) -> Result<bool, DomainError> { unimplemented!() }

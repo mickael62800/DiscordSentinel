@@ -13,23 +13,23 @@ use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_player_service_server::CoudePlayerService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::enums::coude::coude_class::PlayerClass;
 use crate::ports::inbound::casino::manage_wallet::ManageWalletUseCase;
 use crate::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 
-pub struct CoudePlayerGrpc {
+pub struct PlayerGrpc {
     pub players_uc: Arc<dyn ManageCoudePlayersUseCase>,
     pub wallet_uc: Arc<dyn ManageWalletUseCase>,
 }
 
 #[tonic::async_trait]
-impl CoudePlayerService for CoudePlayerGrpc {
+impl CoudePlayerService for PlayerGrpc {
     async fn get_or_create_player(
         &self,
         request: Request<proto::GetOrCreatePlayerRequest>,
-    ) -> Result<Response<proto::CoudePlayer>, Status> {
+    ) -> Result<Response<proto::Player>, Status> {
         let req = request.into_inner();
         let player = self
             .players_uc
@@ -42,7 +42,7 @@ impl CoudePlayerService for CoudePlayerGrpc {
     async fn get_player(
         &self,
         request: Request<proto::GetPlayerRequest>,
-    ) -> Result<Response<proto::CoudePlayer>, Status> {
+    ) -> Result<Response<proto::Player>, Status> {
         let req = request.into_inner();
         let player = self
             .players_uc
@@ -131,8 +131,8 @@ impl CoudePlayerService for CoudePlayerGrpc {
     }
 }
 
-pub(super) fn coude_player_to_proto(p: CoudePlayer) -> proto::CoudePlayer {
-    proto::CoudePlayer {
+pub(super) fn coude_player_to_proto(p: Player) -> proto::Player {
+    proto::Player {
         guild_id: p.guild_id,
         user_id: p.user_id,
         username: p.username,

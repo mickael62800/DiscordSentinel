@@ -16,13 +16,13 @@ use sentinel_proto::coude::v1::coude_combats_service_server::CoudeCombatsService
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
 use crate::domain::entities::coude::combat::CombatResolution;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::combat::NewCoudeCombat;
 use crate::ports::inbound::coude::manage_combats::ManageCoudeCombatsUseCase;
 
 use super::parse_uuid;
 use super::taunt_event_to_proto;
-pub struct CoudeCombatsGrpc {
+pub struct CombatsGrpc {
     pub uc: Arc<dyn ManageCoudeCombatsUseCase>,
     pub resolve_batch_uc: Arc<dyn crate::ports::inbound::coude::resolve_betting_batch::ResolveBettingBatchUseCase>,
     pub expire_batch_uc: Arc<dyn crate::ports::inbound::coude::expire_combats_batch::ExpireCombatsBatchUseCase>,
@@ -33,8 +33,8 @@ pub struct CoudeCombatsGrpc {
 #[path = "tests/combats.rs"]
 mod tests;
 
-pub(super) fn combat_to_proto(c: CoudeCombat) -> proto::CoudeCombat {
-    proto::CoudeCombat {
+pub(super) fn combat_to_proto(c: Combat) -> proto::Combat {
+    proto::Combat {
         id: c.id.to_string(),
         guild_id: c.guild_id,
         channel_id: c.channel_id,
@@ -60,7 +60,7 @@ pub(super) fn combat_to_proto(c: CoudeCombat) -> proto::CoudeCombat {
 }
 
 #[tonic::async_trait]
-impl CoudeCombatsService for CoudeCombatsGrpc {
+impl CoudeCombatsService for CombatsGrpc {
     async fn list(
         &self,
         request: Request<proto::ListCombatsRequest>,
@@ -80,7 +80,7 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
     async fn get(
         &self,
         request: Request<proto::GetCombatRequest>,
-    ) -> Result<Response<proto::CoudeCombat>, Status> {
+    ) -> Result<Response<proto::Combat>, Status> {
         let id = parse_uuid(&request.into_inner().id)?;
         let c = self.uc.get(id).await.map_err(domain_to_status)?;
         Ok(Response::new(combat_to_proto(c)))
@@ -148,7 +148,7 @@ impl CoudeCombatsService for CoudeCombatsGrpc {
     async fn create(
         &self,
         request: Request<proto::CreateCombatRequest>,
-    ) -> Result<Response<proto::CoudeCombat>, Status> {
+    ) -> Result<Response<proto::Combat>, Status> {
         let req = request.into_inner();
         let c = self
             .uc

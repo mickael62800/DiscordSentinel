@@ -6,16 +6,16 @@
 use serde::Deserialize;
 use serde::Serialize;
 use crate::domain::entities::coude::bet::BetResolutionPlan;
-use crate::domain::entities::coude::bet::CoudeBet;
-use crate::domain::entities::coude::combat::CoudeCombat;
+use crate::domain::entities::coude::bet::Bet;
+use crate::domain::entities::coude::combat::Combat;
 use crate::domain::entities::coude::social::CoudeCurrentSeason;
-use crate::domain::entities::coude::social::CoudeEvent;
+use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::social::CoudeLeaderboardEntry;
-use crate::domain::entities::coude::player::CoudePlayer;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::social::LeaderboardEntry;
+use crate::domain::entities::coude::player::Player;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::player::XpProgress;
 // ══════════════════════════════════════════════════════════════════════
 // ── Player DTOs ──
@@ -41,8 +41,8 @@ pub struct PlayerDto {
     pub title: Option<String>,
 }
 
-impl From<&CoudePlayer> for PlayerDto {
-    fn from(p: &CoudePlayer) -> Self {
+impl From<&Player> for PlayerDto {
+    fn from(p: &Player) -> Self {
         Self {
             user_id: p.user_id.clone(),
             username: p.username.clone(),
@@ -97,8 +97,8 @@ pub struct FullPlayerDto {
     pub updated_at: String,
 }
 
-impl From<CoudePlayer> for FullPlayerDto {
-    fn from(p: CoudePlayer) -> Self {
+impl From<Player> for FullPlayerDto {
+    fn from(p: Player) -> Self {
         Self {
             guild_id: p.guild_id,
             user_id: p.user_id,
@@ -241,8 +241,8 @@ pub struct CombatDto {
     pub resolved_at: Option<String>,
 }
 
-impl From<&CoudeCombat> for CombatDto {
-    fn from(c: &CoudeCombat) -> Self {
+impl From<&Combat> for CombatDto {
+    fn from(c: &Combat) -> Self {
         Self {
             id: c.id.to_string(),
             guild_id: c.guild_id.clone(),
@@ -291,8 +291,8 @@ pub struct FullCombatDto {
     pub resolved_at: Option<String>,
 }
 
-impl From<CoudeCombat> for FullCombatDto {
-    fn from(c: CoudeCombat) -> Self {
+impl From<Combat> for FullCombatDto {
+    fn from(c: Combat) -> Self {
         Self {
             id: c.id.to_string(),
             guild_id: c.guild_id,
@@ -371,8 +371,8 @@ pub struct BetDto {
     pub amount: i64,
 }
 
-impl From<&CoudeBet> for BetDto {
-    fn from(b: &CoudeBet) -> Self {
+impl From<&Bet> for BetDto {
+    fn from(b: &Bet) -> Self {
         Self {
             id: b.id.to_string(),
             combat_id: b.combat_id.to_string(),
@@ -509,8 +509,8 @@ pub struct InventoryItemDto {
     pub quantity: i32,
 }
 
-impl From<CoudeInventoryItem> for InventoryItemDto {
-    fn from(i: CoudeInventoryItem) -> Self {
+impl From<InventoryItem> for InventoryItemDto {
+    fn from(i: InventoryItem) -> Self {
         Self {
             guild_id: i.guild_id,
             user_id: i.user_id,
@@ -546,8 +546,8 @@ pub struct PrimeDto {
     pub created_at: String,
 }
 
-impl From<CoudePrime> for PrimeDto {
-    fn from(p: CoudePrime) -> Self {
+impl From<Prime> for PrimeDto {
+    fn from(p: Prime) -> Self {
         Self {
             id: p.id.to_string(),
             guild_id: p.guild_id,
@@ -588,8 +588,8 @@ pub struct InsuranceDto {
     pub expires_at: String,
 }
 
-impl From<CoudeInsurance> for InsuranceDto {
-    fn from(i: CoudeInsurance) -> Self {
+impl From<Insurance> for InsuranceDto {
+    fn from(i: Insurance) -> Self {
         Self {
             id: i.id.to_string(),
             is_scam: i.is_scam,
@@ -612,14 +612,14 @@ pub struct BuyInsuranceDto {
 // ══════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Serialize)]
-pub struct LeaderboardEntry {
+pub struct LeaderboardEntryDto {
     pub user_id: String,
     pub username: String,
     pub value: i64,
 }
 
-impl From<CoudeLeaderboardEntry> for LeaderboardEntry {
-    fn from(e: CoudeLeaderboardEntry) -> Self {
+impl From<LeaderboardEntry> for LeaderboardEntryDto {
+    fn from(e: LeaderboardEntry) -> Self {
         Self {
             user_id: e.user_id,
             username: e.username,
@@ -656,8 +656,8 @@ pub struct EventDto {
     pub created_at: String,
 }
 
-impl From<CoudeEvent> for EventDto {
-    fn from(e: CoudeEvent) -> Self {
+impl From<Event> for EventDto {
+    fn from(e: Event) -> Self {
         Self {
             id: e.id.to_string(),
             guild_id: e.guild_id,

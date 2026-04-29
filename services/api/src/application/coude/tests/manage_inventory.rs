@@ -1,7 +1,7 @@
 use super::*;
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::ports::inbound::coude::manage_inventory::ManageCoudeInventoryUseCase;
 use chrono::Utc as ChronoUtc;
@@ -10,21 +10,21 @@ use uuid::Uuid;
 
 #[derive(Default)]
 struct MockRepo {
-    primes: StdMutex<Vec<CoudePrime>>,
+    primes: StdMutex<Vec<Prime>>,
     items_added: StdMutex<Vec<(String, String, String)>>,
 }
 
 #[async_trait]
 impl InventoryRepository for MockRepo {
-    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> { Ok(vec![]) }
+    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> { Ok(vec![]) }
     async fn add_item(&self, g: &str, u: &str, k: &str) -> Result<(), DomainError> {
         self.items_added.lock().unwrap().push((g.into(), u.into(), k.into()));
         Ok(())
     }
     async fn use_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(true) }
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn create_prime(&self, new: NewCoudePrime) -> Result<CoudePrime, DomainError> {
-        let prime = CoudePrime {
+    async fn create_prime(&self, new: NewCoudePrime) -> Result<Prime, DomainError> {
+        let prime = Prime {
             id: Uuid::new_v4(),
             guild_id: new.guild_id,
             target_id: new.target_id,
@@ -41,10 +41,10 @@ impl InventoryRepository for MockRepo {
         self.primes.lock().unwrap().push(prime.clone());
         Ok(prime)
     }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { Ok(vec![]) }
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> { Ok(vec![]) }
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> { Ok(None) }
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> { Ok(None) }
     async fn expire_insurance(&self, _: Uuid) -> Result<bool, DomainError> { Ok(true) }
 }
 
@@ -117,15 +117,15 @@ async fn expire_insurance_not_found_returns_error() {
     struct FailExpireRepo;
     #[async_trait]
     impl InventoryRepository for FailExpireRepo {
-        async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> { Ok(vec![]) }
+        async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> { Ok(vec![]) }
         async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
         async fn use_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
         async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
-        async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
-        async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { Ok(vec![]) }
+        async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> { unimplemented!() }
+        async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> { Ok(vec![]) }
         async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
         async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { Ok(true) }
-        async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> { Ok(None) }
+        async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> { Ok(None) }
         async fn expire_insurance(&self, _: Uuid) -> Result<bool, DomainError> { Ok(false) }
     }
     let svc = ManageCoudeInventoryService::new(Arc::new(FailExpireRepo));
@@ -137,9 +137,9 @@ async fn expire_insurance_not_found_returns_error() {
 
 #[derive(Default)]
 struct RichMockRepo {
-    inventory: StdMutex<Vec<CoudeInventoryItem>>,
-    primes: StdMutex<Vec<CoudePrime>>,
-    insurance: StdMutex<Option<CoudeInsurance>>,
+    inventory: StdMutex<Vec<InventoryItem>>,
+    primes: StdMutex<Vec<Prime>>,
+    insurance: StdMutex<Option<Insurance>>,
     use_item_return: StdMutex<bool>,
     has_item_return: StdMutex<bool>,
     claim_amount: StdMutex<i64>,
@@ -151,7 +151,7 @@ struct RichMockRepo {
 }
 #[async_trait]
 impl InventoryRepository for RichMockRepo {
-    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> {
+    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> {
         Ok(self.inventory.lock().unwrap().clone())
     }
     async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
@@ -162,8 +162,8 @@ impl InventoryRepository for RichMockRepo {
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> {
         Ok(*self.has_item_return.lock().unwrap())
     }
-    async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> {
+    async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> { unimplemented!() }
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> {
         Ok(self.primes.lock().unwrap().clone())
     }
     async fn claim_primes(&self, g: &str, t: &str, c: &str, n: &str) -> Result<i64, DomainError> {
@@ -174,7 +174,7 @@ impl InventoryRepository for RichMockRepo {
         self.buy_calls.lock().unwrap().push((g.into(), u.into(), s, d));
         Ok(*self.buy_insurance_return.lock().unwrap())
     }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> {
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> {
         Ok(self.insurance.lock().unwrap().clone())
     }
     async fn expire_insurance(&self, id: Uuid) -> Result<bool, DomainError> {
@@ -186,7 +186,7 @@ impl InventoryRepository for RichMockRepo {
 #[tokio::test]
 async fn list_inventory_returns_repo_value() {
     let repo = Arc::new(RichMockRepo::default());
-    repo.inventory.lock().unwrap().push(CoudeInventoryItem {
+    repo.inventory.lock().unwrap().push(InventoryItem {
         guild_id: "g".into(), user_id: "u".into(),
         item_key: "potion".into(), quantity: 3,
     });
@@ -216,7 +216,7 @@ async fn has_item_returns_repo_bool() {
 #[tokio::test]
 async fn list_active_primes_returns_repo_value() {
     let repo = Arc::new(RichMockRepo::default());
-    repo.primes.lock().unwrap().push(CoudePrime {
+    repo.primes.lock().unwrap().push(Prime {
         id: Uuid::new_v4(),
         guild_id: "g".into(), target_id: "v".into(), target_name: "V".into(),
         placed_by_id: "p".into(), placed_by_name: "P".into(),

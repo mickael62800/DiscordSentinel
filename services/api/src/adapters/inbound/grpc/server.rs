@@ -46,12 +46,12 @@ use sentinel_proto::welcome::v1::welcome_service_server::WelcomeServiceServer;
 use crate::adapters::inbound::grpc::automod::AutomodGrpc;
 use crate::adapters::inbound::grpc::blackjack::BlackjackGrpc;
 use crate::adapters::inbound::grpc::community::CommunityGrpc;
-use crate::adapters::inbound::grpc::coude::bets::CoudeBetsGrpc;
-use crate::adapters::inbound::grpc::coude::combats::CoudeCombatsGrpc;
-use crate::adapters::inbound::grpc::coude::economy::CoudeEconomyGrpc;
-use crate::adapters::inbound::grpc::coude::inventory::CoudeInventoryGrpc;
-use crate::adapters::inbound::grpc::coude::players::CoudePlayerGrpc;
-use crate::adapters::inbound::grpc::coude::social::CoudeSocialGrpc;
+use crate::adapters::inbound::grpc::coude::bets::BetsGrpc;
+use crate::adapters::inbound::grpc::coude::combats::CombatsGrpc;
+use crate::adapters::inbound::grpc::coude::economy::EconomyGrpc;
+use crate::adapters::inbound::grpc::coude::inventory::InventoryGrpc;
+use crate::adapters::inbound::grpc::coude::players::PlayerGrpc;
+use crate::adapters::inbound::grpc::coude::social::SocialGrpc;
 use crate::adapters::inbound::grpc::images::ImagesGrpc;
 use crate::adapters::inbound::grpc::members::MembersGrpc;
 use crate::adapters::inbound::grpc::moderation::ModerationGrpc;
@@ -90,29 +90,29 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         table_repo: state.blackjack_table_repo.clone(),
         broadcaster: state.broadcaster.clone(),
     };
-    let coude = CoudePlayerGrpc {
+    let coude = PlayerGrpc {
         players_uc: state.coude_players_uc.clone(),
         wallet_uc: state.wallet_uc.clone(),
     };
     // Phase 7A.opt F.1 — 5 services coude supplementaires.
-    let coude_combats = CoudeCombatsGrpc {
+    let coude_combats = CombatsGrpc {
         uc: state.coude_combats_uc.clone(),
         resolve_batch_uc: state.resolve_betting_batch_uc.clone(),
         expire_batch_uc: state.expire_combats_batch_uc.clone(),
         resolve_now_uc: state.resolve_combat_now_uc.clone(),
     };
-    let coude_bets = CoudeBetsGrpc {
+    let coude_bets = BetsGrpc {
         uc: state.coude_bets_uc.clone(),
     };
-    let coude_economy = CoudeEconomyGrpc {
+    let coude_economy = EconomyGrpc {
         uc: state.coude_economy_uc.clone(),
     };
-    let coude_inventory = CoudeInventoryGrpc {
+    let coude_inventory = InventoryGrpc {
         uc: state.coude_inventory_uc.clone(),
         steal_protections_uc: state.coude_steal_protections_uc.clone(),
         steal_boosts_uc: state.coude_steal_boosts_uc.clone(),
     };
-    let coude_social = CoudeSocialGrpc {
+    let coude_social = SocialGrpc {
         uc: state.coude_social_uc.clone(),
         catalog_uc: state.coude_catalog_uc.clone(),
         taunts_uc: state.coude_taunts_uc.clone(),
@@ -202,22 +202,22 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .set_serving::<BlackjackServiceServer<BlackjackGrpc>>()
         .await;
     health_reporter
-        .set_serving::<CoudePlayerServiceServer<CoudePlayerGrpc>>()
+        .set_serving::<CoudePlayerServiceServer<PlayerGrpc>>()
         .await;
     health_reporter
-        .set_serving::<CoudeCombatsServiceServer<CoudeCombatsGrpc>>()
+        .set_serving::<CoudeCombatsServiceServer<CombatsGrpc>>()
         .await;
     health_reporter
-        .set_serving::<CoudeBetsServiceServer<CoudeBetsGrpc>>()
+        .set_serving::<CoudeBetsServiceServer<BetsGrpc>>()
         .await;
     health_reporter
-        .set_serving::<CoudeEconomyServiceServer<CoudeEconomyGrpc>>()
+        .set_serving::<CoudeEconomyServiceServer<EconomyGrpc>>()
         .await;
     health_reporter
-        .set_serving::<CoudeInventoryServiceServer<CoudeInventoryGrpc>>()
+        .set_serving::<CoudeInventoryServiceServer<InventoryGrpc>>()
         .await;
     health_reporter
-        .set_serving::<CoudeSocialServiceServer<CoudeSocialGrpc>>()
+        .set_serving::<CoudeSocialServiceServer<SocialGrpc>>()
         .await;
     health_reporter
         .set_serving::<RolePanelsServiceServer<RolePanelsGrpc>>()

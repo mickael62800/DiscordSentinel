@@ -3,7 +3,7 @@ use chrono::Duration as ChronoDuration;
 use uuid::Uuid;
 
 struct MockRepo {
-    actives: Vec<CoudeStealProtection>,
+    actives: Vec<StealProtection>,
 }
 
 #[async_trait]
@@ -12,7 +12,7 @@ impl StealProtectionRepository for MockRepo {
         &self,
         _guild_id: &str,
         _user_id: &str,
-    ) -> Result<Vec<CoudeStealProtection>, DomainError> {
+    ) -> Result<Vec<StealProtection>, DomainError> {
         Ok(self.actives.clone())
     }
 
@@ -31,8 +31,8 @@ impl StealProtectionRepository for MockRepo {
     }
 }
 
-fn mk_protection(item_key: &str) -> CoudeStealProtection {
-    CoudeStealProtection {
+fn mk_protection(item_key: &str) -> StealProtection {
+    StealProtection {
         id: Uuid::new_v4(),
         guild_id: "g".into(),
         user_id: "u".into(),

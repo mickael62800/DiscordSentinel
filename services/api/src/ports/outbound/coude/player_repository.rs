@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::player::CoudePlayer;
+use crate::domain::entities::coude::player::Player;
 use crate::domain::entities::coude::player::XpProgress;
 use crate::domain::errors::DomainError;
 
@@ -20,22 +20,22 @@ pub trait PlayerRepository: Send + Sync {
         guild_id: &str,
         user_id: &str,
         username: &str,
-    ) -> Result<CoudePlayer, DomainError>;
+    ) -> Result<Player, DomainError>;
 
     async fn get(
         &self,
         guild_id: &str,
         user_id: &str,
-    ) -> Result<Option<CoudePlayer>, DomainError>;
+    ) -> Result<Option<Player>, DomainError>;
 
-    async fn list(&self, guild_id: &str, limit: i64) -> Result<Vec<CoudePlayer>, DomainError>;
+    async fn list(&self, guild_id: &str, limit: i64) -> Result<Vec<Player>, DomainError>;
 
     async fn random_active(
         &self,
         guild_id: &str,
         count: i64,
         min_coins: i64,
-    ) -> Result<Vec<CoudePlayer>, DomainError>;
+    ) -> Result<Vec<Player>, DomainError>;
 
     async fn list_guild_ids(&self) -> Result<Vec<String>, DomainError>;
 
@@ -68,7 +68,7 @@ pub trait PlayerRepository: Send + Sync {
         guild_id: &str,
         user_id: &str,
         stat: CombatStat,
-    ) -> Result<Option<CoudePlayer>, DomainError>;
+    ) -> Result<Option<Player>, DomainError>;
 
     /// Reset atomique : restitue les points dépensés en ATK/DEF dans `stat_points`,
     /// remet ATK/DEF à 0, déduit `cost` coins. Retourne le joueur mis à jour
@@ -78,7 +78,7 @@ pub trait PlayerRepository: Send + Sync {
         guild_id: &str,
         user_id: &str,
         cost: i64,
-    ) -> Result<Option<CoudePlayer>, DomainError>;
+    ) -> Result<Option<Player>, DomainError>;
 
     // ── Économie / coins (stats-only depuis migration wallet finale) ──
     //

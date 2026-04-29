@@ -20,9 +20,9 @@ use crate::domain::entities::coude::cashbox::CashboxRedistributionEntry;
 use crate::domain::entities::coude::cashbox::CashboxSource;
 use crate::domain::entities::coude::cashbox::Cashbox;
 use crate::domain::entities::coude::heist::HeistAttempt;
-use crate::domain::entities::coude::inventory::CoudeInsurance;
-use crate::domain::entities::coude::inventory::CoudeInventoryItem;
-use crate::domain::entities::coude::inventory::CoudePrime;
+use crate::domain::entities::coude::inventory::Insurance;
+use crate::domain::entities::coude::inventory::InventoryItem;
+use crate::domain::entities::coude::inventory::Prime;
 use crate::domain::entities::coude::heist::PrisonState;
 use crate::domain::entities::coude::inventory::NewCoudePrime;
 use crate::domain::entities::casino::wallet::Wallet;
@@ -116,13 +116,13 @@ impl CashboxRepository for MockCashboxRepo {
 
 #[derive(Default)]
 struct MockInventoryUc {
-    inventory: Mutex<Vec<CoudeInventoryItem>>,
+    inventory: Mutex<Vec<InventoryItem>>,
     use_calls: Mutex<Vec<(String, String, String)>>,
 }
 
 #[async_trait]
 impl ManageCoudeInventoryUseCase for MockInventoryUc {
-    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<CoudeInventoryItem>, DomainError> {
+    async fn list_inventory(&self, _: &str, _: &str) -> Result<Vec<InventoryItem>, DomainError> {
         Ok(self.inventory.lock().unwrap().clone())
     }
     async fn add_item(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
@@ -131,11 +131,11 @@ impl ManageCoudeInventoryUseCase for MockInventoryUc {
         Ok(true)
     }
     async fn has_item(&self, _: &str, _: &str, _: &str) -> Result<bool, DomainError> { Ok(false) }
-    async fn create_prime(&self, _: NewCoudePrime) -> Result<CoudePrime, DomainError> { unimplemented!() }
-    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<CoudePrime>, DomainError> { Ok(vec![]) }
+    async fn create_prime(&self, _: NewCoudePrime) -> Result<Prime, DomainError> { unimplemented!() }
+    async fn list_active_primes(&self, _: &str, _: &str) -> Result<Vec<Prime>, DomainError> { Ok(vec![]) }
     async fn claim_primes(&self, _: &str, _: &str, _: &str, _: &str) -> Result<i64, DomainError> { Ok(0) }
     async fn buy_insurance(&self, _: &str, _: &str, _: bool, _: i64) -> Result<bool, DomainError> { Ok(true) }
-    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<CoudeInsurance>, DomainError> { Ok(None) }
+    async fn get_active_insurance(&self, _: &str, _: &str) -> Result<Option<Insurance>, DomainError> { Ok(None) }
     async fn expire_insurance(&self, _: Uuid) -> Result<(), DomainError> { Ok(()) }
 }
 
@@ -397,7 +397,7 @@ async fn attempt_heist_success_withdraws_and_credits() {
     let (h, c, i, w, b) = default_service_parts();
     use crate::domain::entities::coude::heist::HEIST_TOOLS;
     for tool in HEIST_TOOLS {
-        i.inventory.lock().unwrap().push(CoudeInventoryItem {
+        i.inventory.lock().unwrap().push(InventoryItem {
             guild_id: "g".into(), user_id: "u".into(),
             item_key: tool.key.to_string(), quantity: 10,
         });
@@ -435,11 +435,11 @@ async fn attempt_heist_filters_unknown_items_from_tools() {
     // etre ignores (pas envoyes a compute_success_chance).
     let (h, c, i, w, b) = default_service_parts();
     i.inventory.lock().unwrap().extend(vec![
-        CoudeInventoryItem {
+        InventoryItem {
             guild_id: "g".into(), user_id: "u".into(),
             item_key: "potion".into(), quantity: 5, // pas un outil braquage
         },
-        CoudeInventoryItem {
+        InventoryItem {
             guild_id: "g".into(), user_id: "u".into(),
             item_key: "not_an_item".into(), quantity: 1,
         },
@@ -452,7 +452,7 @@ async fn attempt_heist_filters_unknown_items_from_tools() {
 #[tokio::test]
 async fn attempt_heist_skips_zero_quantity_items() {
     let (h, c, i, w, b) = default_service_parts();
-    i.inventory.lock().unwrap().push(CoudeInventoryItem {
+    i.inventory.lock().unwrap().push(InventoryItem {
         guild_id: "g".into(), user_id: "u".into(),
         item_key: "potion".into(), quantity: 0,
     });

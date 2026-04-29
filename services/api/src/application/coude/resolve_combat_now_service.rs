@@ -1757,7 +1757,7 @@ impl ResolveCombatNowUseCase for ResolveCombatNowService {
 /// passes en bas HP, puis appelle `detect_outcome_flags`.
 fn compute_outcome_flags_from_result(
     result: &crate::domain::services::coude::coude_combat_engine::combat::CombatResult,
-    combat: &crate::domain::entities::coude::combat::CoudeCombat,
+    combat: &crate::domain::entities::coude::combat::Combat,
 ) -> CombatOutcomeFlags {
     let Some(winner_id) = result.winner_id.as_ref() else {
         // Match nul : pas de "winner" -> seul potentiel flag = zero_pointe

@@ -17,7 +17,7 @@ use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
 use sentinel_api::domain::entities::coude::player::CombatStat;
-use sentinel_api::domain::entities::coude::player::CoudePlayer;
+use sentinel_api::domain::entities::coude::player::Player;
 use sentinel_api::domain::entities::coude::taunt::TauntEvent;
 use sentinel_api::domain::entities::coude::player::XpProgress;
 use sentinel_api::domain::errors::DomainError;
@@ -26,8 +26,8 @@ use sentinel_api::ports::inbound::casino::manage_wallet::TxWalletMutation;
 use sentinel_api::ports::inbound::casino::manage_wallet::WalletMutation;
 use sentinel_api::ports::inbound::coude::manage_players::ManageCoudePlayersUseCase;
 
-fn sample_player(guild: &str, user: &str) -> CoudePlayer {
-    CoudePlayer {
+fn sample_player(guild: &str, user: &str) -> Player {
+    Player {
         guild_id: guild.into(), user_id: user.into(), username: "Alice".into(),
         coins: 500,
         total_wins: 2, total_losses: 1, total_draws: 0,
@@ -69,20 +69,20 @@ struct MockPlayers {
 
 #[async_trait]
 impl ManageCoudePlayersUseCase for MockPlayers {
-    async fn get_or_create(&self, g: String, u: String, n: String) -> Result<CoudePlayer, DomainError> {
+    async fn get_or_create(&self, g: String, u: String, n: String) -> Result<Player, DomainError> {
         self.created.lock().unwrap().push((g.clone(), u.clone(), n));
         Ok(sample_player(&g, &u))
     }
-    async fn get(&self, g: &str, u: &str) -> Result<CoudePlayer, DomainError> {
+    async fn get(&self, g: &str, u: &str) -> Result<Player, DomainError> {
         if *self.fail_get.lock().unwrap() {
             return Err(DomainError::NotFound("joueur".into()));
         }
         Ok(sample_player(g, u))
     }
-    async fn list(&self, g: &str) -> Result<Vec<CoudePlayer>, DomainError> {
+    async fn list(&self, g: &str) -> Result<Vec<Player>, DomainError> {
         Ok(vec![sample_player(g, "u1")])
     }
-    async fn random_active(&self, g: &str, count: i64) -> Result<Vec<CoudePlayer>, DomainError> {
+    async fn random_active(&self, g: &str, count: i64) -> Result<Vec<Player>, DomainError> {
         *self.random_count_received.lock().unwrap() = count;
         Ok((0..count).map(|i| sample_player(g, &format!("u{i}"))).collect())
     }
@@ -97,11 +97,11 @@ impl ManageCoudePlayersUseCase for MockPlayers {
         self.xp_added.lock().unwrap().push((g.into(), u.into(), amt));
         Ok(XpProgress { new_xp: 170, new_level: 4, leveled_up: true, stat_points_gained: 1 })
     }
-    async fn spend_stat_point(&self, g: &str, u: &str, s: CombatStat) -> Result<CoudePlayer, DomainError> {
+    async fn spend_stat_point(&self, g: &str, u: &str, s: CombatStat) -> Result<Player, DomainError> {
         self.stat_spends.lock().unwrap().push((g.into(), u.into(), s));
         Ok(sample_player(g, u))
     }
-    async fn reset_stats(&self, g: &str, u: &str, cost: i64) -> Result<CoudePlayer, DomainError> {
+    async fn reset_stats(&self, g: &str, u: &str, cost: i64) -> Result<Player, DomainError> {
         self.reset_stats.lock().unwrap().push((g.into(), u.into(), cost));
         Ok(sample_player(g, u))
     }
