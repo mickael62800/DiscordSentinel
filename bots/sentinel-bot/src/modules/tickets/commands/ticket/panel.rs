@@ -290,15 +290,13 @@ pub async fn handle_modal_submit(ctx: &Context, modal: &ModalInteraction) {
                 });
             }
         }
-    } else {
-        if let Some(mod_role_str) = guild_config.get("moderator_role_id") {
-            if let Ok(role_id) = mod_role_str.parse::<u64>() {
-                all_overwrites.push(PermissionOverwrite {
-                    allow: Permissions::empty(),
-                    deny: Permissions::VIEW_CHANNEL,
-                    kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
-                });
-            }
+    } else if let Some(mod_role_str) = guild_config.get("moderator_role_id") {
+        if let Ok(role_id) = mod_role_str.parse::<u64>() {
+            all_overwrites.push(PermissionOverwrite {
+                allow: Permissions::empty(),
+                deny: Permissions::VIEW_CHANNEL,
+                kind: PermissionOverwriteType::Role(serenity::model::id::RoleId::new(role_id)),
+            });
         }
     }
 

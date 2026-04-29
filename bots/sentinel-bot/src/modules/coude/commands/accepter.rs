@@ -173,6 +173,7 @@ pub async fn handle(ctx: &Context, component: &ComponentInteraction) {
 /// refuse l'auto-resolve parce que le defenseur possede un item de contre
 /// (Explosion) et que la regle `surprise_allow_defender_counter` est active.
 /// Dans ce dernier cas, l'appelant doit basculer sur le flow de defi normal.
+#[allow(clippy::large_enum_variant)]
 pub enum ResolveOutcome {
     Resolved(CreateEmbed),
     DefenderCanCounter,

@@ -16,10 +16,13 @@ use sentinel_shared::api_client::BaseApiClient;
 /// Conventions de `kind` partagees avec le domain API
 /// (services/api/src/domain/entities/discord_action_message.rs::kinds).
 pub mod kinds {
+    #[allow(dead_code)]
     pub const BAN_PROPOSAL: &str = "ban_proposal";
     pub const TICKET: &str = "ticket";
+    #[allow(dead_code)]
     pub const ROLES_PANEL: &str = "roles_panel";
     pub const COMBAT_CHALLENGE: &str = "combat_challenge";
+    #[allow(dead_code)]
     pub const REVIEW_REQUEST: &str = "review_request";
     pub const AUTOMOD_REVIEW: &str = "automod_review";
     pub const BLACKJACK_TABLE: &str = "blackjack_table";
@@ -63,12 +66,14 @@ pub async fn register_action_message(
 /// Exemples :
 /// - `ban_proposal:cancel:{uuid}`
 /// - `ticket:close:{uuid}`
+#[allow(dead_code)]
 pub fn build_action_custom_id(namespace: &str, verb: &str, action_id: Uuid) -> String {
     format!("{namespace}:{verb}:{action_id}")
 }
 
 /// Parse un custom_id au format `{namespace}:{verb}:{action_id}`.
 /// Retourne `(verb, action_id)` si le namespace correspond, sinon None.
+#[allow(dead_code)]
 pub fn parse_action_custom_id(
     custom_id: &str,
     expected_namespace: &str,

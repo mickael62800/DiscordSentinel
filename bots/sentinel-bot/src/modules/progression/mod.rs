@@ -535,7 +535,6 @@ pub async fn on_voice_state_update(ctx: &Context, old: Option<VoiceState>, new: 
                                         let lg = result.user.level;
                                         drop(data);
                                         check_and_assign_all_roles(ctx, guild_id, user_id, lt, lv, lg).await;
-                                        return;
                                     }
                                 }
                                 Err(e) => {

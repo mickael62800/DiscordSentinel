@@ -445,7 +445,7 @@ pub(super) async fn handle_review_button(ctx: &Context, component: &serenity::mo
             }
             let mute_min = mute_duration_secs / 60;
             let status_text = if mute_applied { "applique" } else { "ECHOUE (voir logs)" };
-            let embed = danger_embed(&format!("Mute {} par un moderateur", status_text))
+            let embed = danger_embed(format!("Mute {} par un moderateur", status_text))
                 .color(colors.mute)
                 .field("Duree", format!("{} minutes", mute_min), true)
                 .field("Valide par", moderator_name, true);

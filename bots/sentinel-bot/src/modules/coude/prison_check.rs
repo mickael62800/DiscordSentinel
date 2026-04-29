@@ -60,7 +60,7 @@ pub async fn check_and_reply_if_in_prison(
     let cmd_name = command.data.name.as_str();
 
     // Not in the blocked list = always allowed.
-    if !BLOCKED_IN_PRISON.iter().any(|c| *c == cmd_name) {
+    if !BLOCKED_IN_PRISON.contains(&cmd_name) {
         return false;
     }
 
@@ -182,7 +182,7 @@ pub fn is_button_blocked(custom_id: &str) -> bool {
 /// Helper testable : retourne true si la commande est bloquee en prison.
 #[allow(dead_code)]
 pub fn is_command_blocked(cmd_name: &str) -> bool {
-    BLOCKED_IN_PRISON.iter().any(|c| *c == cmd_name)
+    BLOCKED_IN_PRISON.contains(&cmd_name)
 }
 
 #[cfg(test)]

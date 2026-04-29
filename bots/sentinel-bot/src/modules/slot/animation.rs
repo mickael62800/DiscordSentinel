@@ -21,6 +21,7 @@ pub fn frame_symbols(final_symbols: &[String; 3], frame_idx: usize) -> [String; 
         SPINNING_PLACEHOLDER.to_string(),
     ];
     let revealed = frame_idx.min(3);
+    #[allow(clippy::manual_memcpy)]
     for i in 0..revealed {
         out[i] = final_symbols[i].clone();
     }
