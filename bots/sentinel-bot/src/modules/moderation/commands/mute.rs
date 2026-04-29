@@ -12,6 +12,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 use super::risk_check::{
     self, PendingKind, RiskyPending, RiskyPendingKey, CANCEL_PREFIX, CONFIRM_PREFIX,
 };
@@ -77,7 +78,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
     {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
     };
 
     let reason_raw = options.iter().find(|o| o.name == "reason")
@@ -90,21 +91,21 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
     if guild_id.member(&ctx.http, target.id).await.is_err() {
-        reply_text(ctx, command, "Membre introuvable sur le serveur.").await;
+        edit_response_text(ctx, command, "Membre introuvable sur le serveur.").await;
         return;
     }
 
     if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
-        reply_text(ctx, command, &super::immunity_message(role_id, "Mute")).await;
+        edit_response_text(ctx, command, &super::immunity_message(role_id, "Mute")).await;
         return;
     }
 
@@ -270,7 +271,7 @@ pub async fn execute_mute(
         Ok(m) => m,
         Err(_) => {
             if let Some(cmd) = command {
-                reply_text(ctx, cmd, "Membre introuvable sur le serveur.").await;
+                edit_response_text(ctx, cmd, "Membre introuvable sur le serveur.").await;
             }
             return;
         }
@@ -291,7 +292,7 @@ pub async fn execute_mute(
     {
         error!(error = %e, "Impossible de mute l'utilisateur");
         if let Some(cmd) = command {
-            reply_text(ctx, cmd, &format!("Erreur Discord : {e}")).await;
+            edit_response_text(ctx, cmd, &format!("Erreur Discord : {e}")).await;
         }
         return;
     }
@@ -384,17 +385,17 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let mut member = match guild_id.member(&ctx.http, target_id).await {
         Ok(m) => m,
-        Err(_) => { reply_text(ctx, command, "Membre introuvable.").await; return; }
+        Err(_) => { edit_response_text(ctx, command, "Membre introuvable.").await; return; }
     };
 
     if let Err(e) = member.enable_communication(&ctx.http).await {
         error!(error = %e, "Impossible de unmute");
-        reply_text(ctx, command, &format!("Erreur : {e}")).await;
+        edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         return;
     }
 
@@ -443,13 +444,4 @@ pub async fn handle_unmute(ctx: &Context, command: &CommandInteraction) {
     }
 
     super::log_to_channel(ctx, &guild_id.to_string(), unmute_embed).await;
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command.edit_response(
-        &ctx.http,
-        serenity::builder::EditInteractionResponse::new().content(content),
-    ).await {
-        warn!(error = %e, "Failed to send reply text");
-    }
 }

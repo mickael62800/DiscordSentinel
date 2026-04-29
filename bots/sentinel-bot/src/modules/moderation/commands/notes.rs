@@ -7,6 +7,7 @@ use tracing::{error, info, warn};
 use sentinel_shared::embeds::success_embed;
 
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("note")
@@ -55,12 +56,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
     let data = ctx.data.read().await;
@@ -103,18 +104,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Err(e) => {
             error!(error = %e, "Erreur ajout note");
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         }
-    }
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(content).ephemeral(true),
-        ),
-    ).await {
-        warn!(error = %e, "Failed to send reply text");
     }
 }

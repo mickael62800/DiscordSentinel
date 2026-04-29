@@ -7,6 +7,7 @@ use tracing::{error, warn};
 use sentinel_shared::embeds::{info_embed, success_embed};
 
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("evidence")
@@ -78,7 +79,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let (sub_name, sub_opts) = match sub {
         Some(s) => s,
         None => {
-            reply_text(ctx, command, "Sous-commande manquante.").await;
+            edit_response_text(ctx, command, "Sous-commande manquante.").await;
             return;
         }
     };
@@ -86,7 +87,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     match sub_name {
         "add" => handle_add(ctx, command, sub_opts).await,
         "list" => handle_list(ctx, command, sub_opts).await,
-        _ => reply_text(ctx, command, "Sous-commande inconnue.").await,
+        _ => edit_response_text(ctx, command, "Sous-commande inconnue.").await,
     }
 }
 
@@ -120,7 +121,7 @@ async fn handle_add(
         });
 
     if action_id.is_empty() || url.is_empty() {
-        reply_text(ctx, command, "action_id et url requis.").await;
+        edit_response_text(ctx, command, "action_id et url requis.").await;
         return;
     }
 
@@ -160,7 +161,7 @@ async fn handle_add(
         }
         Err(e) => {
             error!(error = %e, "Erreur ajout evidence");
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         }
     }
 }
@@ -180,7 +181,7 @@ async fn handle_list(
         .unwrap_or("");
 
     if action_id.is_empty() {
-        reply_text(ctx, command, "action_id requis.").await;
+        edit_response_text(ctx, command, "action_id requis.").await;
         return;
     }
 
@@ -193,7 +194,7 @@ async fn handle_list(
     let evidences = match api.list_evidence(action_id).await {
         Ok(v) => v,
         Err(e) => {
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
@@ -243,17 +244,6 @@ fn short_id(full: &str) -> String {
     full.chars().take(8).collect()
 }
 
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .edit_response(
-            &ctx.http,
-            serenity::builder::EditInteractionResponse::new().content(content),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send evidence error");
-    }
-}
 
 #[cfg(test)]
 mod tests {

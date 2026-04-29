@@ -7,6 +7,7 @@ use tracing::{error, warn};
 use sentinel_shared::embeds::{info_embed, action_emoji};
 
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("history")
@@ -23,12 +24,12 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
     {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
     };
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = target_id.to_user(&ctx.http).await.ok();
@@ -73,18 +74,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Err(e) => {
             error!(error = %e, "Erreur recuperation historique");
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         }
-    }
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command.create_response(
-        &ctx.http,
-        CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new().content(content).ephemeral(true),
-        ),
-    ).await {
-        warn!(error = %e, "Failed to send reply text");
     }
 }

@@ -8,6 +8,7 @@ use sentinel_shared::embeds::info_embed;
 
 use super::api_client::UserHistory;
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("compare")
@@ -44,7 +45,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             _ => None,
         }) {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Parametre 'user1' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Parametre 'user1' manquant.").await; return; }
     };
     let user2_id = match command
         .data
@@ -56,18 +57,18 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
             _ => None,
         }) {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Parametre 'user2' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Parametre 'user2' manquant.").await; return; }
     };
 
     if user1_id == user2_id {
-        reply_text(ctx, command, "Les deux utilisateurs doivent etre differents.").await;
+        edit_response_text(ctx, command, "Les deux utilisateurs doivent etre differents.").await;
         return;
     }
 
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
-            reply_text(ctx, command, "Commande serveur uniquement.").await;
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
@@ -98,7 +99,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Ok(h) => h,
         Err(e) => {
             error!(error = %e, user = %name1, "Erreur recuperation historique user1");
-            reply_text(ctx, command, &format!("Erreur historique {name1} : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur historique {name1} : {e}")).await;
             return;
         }
     };
@@ -106,7 +107,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Ok(h) => h,
         Err(e) => {
             error!(error = %e, user = %name2, "Erreur recuperation historique user2");
-            reply_text(ctx, command, &format!("Erreur historique {name2} : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur historique {name2} : {e}")).await;
             return;
         }
     };
@@ -164,18 +165,6 @@ fn format_history_block(h: &UserHistory) -> String {
         h.total_bans,
         h.total_warns + h.total_mutes + h.total_bans
     )
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .edit_response(
-            &ctx.http,
-            serenity::builder::EditInteractionResponse::new().content(content),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send compare error");
-    }
 }
 
 #[cfg(test)]

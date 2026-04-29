@@ -7,6 +7,7 @@ use tracing::{error, warn};
 use sentinel_shared::embeds::{info_embed, success_embed};
 
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("review")
@@ -81,7 +82,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let (sub_name, sub_opts) = match sub {
         Some(s) => s,
         None => {
-            reply_text(ctx, command, "Sous-commande manquante.").await;
+            edit_response_text(ctx, command, "Sous-commande manquante.").await;
             return;
         }
     };
@@ -90,7 +91,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         "add" => handle_add(ctx, command, sub_opts).await,
         "list" => handle_list(ctx, command).await,
         "resolve" => handle_resolve(ctx, command, sub_opts).await,
-        _ => reply_text(ctx, command, "Sous-commande inconnue.").await,
+        _ => edit_response_text(ctx, command, "Sous-commande inconnue.").await,
     }
 }
 
@@ -118,13 +119,13 @@ async fn handle_add(
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
-            reply_text(ctx, command, "Commande serveur uniquement.").await;
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
 
     if action_id.is_empty() {
-        reply_text(ctx, command, "action_id requis.").await;
+        edit_response_text(ctx, command, "action_id requis.").await;
         return;
     }
 
@@ -167,7 +168,7 @@ async fn handle_add(
         }
         Err(e) => {
             error!(error = %e, "Erreur ajout review");
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         }
     }
 }
@@ -176,7 +177,7 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
-            reply_text(ctx, command, "Commande serveur uniquement.").await;
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
@@ -190,7 +191,7 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
     let reviews = match api.list_pending_reviews(&guild_id.to_string()).await {
         Ok(v) => v,
         Err(e) => {
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
@@ -269,7 +270,7 @@ async fn handle_resolve(
         });
 
     if review_id.is_empty() || status.is_empty() {
-        reply_text(ctx, command, "review_id et status requis.").await;
+        edit_response_text(ctx, command, "review_id et status requis.").await;
         return;
     }
 
@@ -318,20 +319,6 @@ async fn handle_resolve(
 
 fn short_id(full: &str) -> String {
     full.chars().take(8).collect()
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().content(content).ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send review error");
-    }
 }
 
 #[cfg(test)]

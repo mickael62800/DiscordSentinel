@@ -12,6 +12,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 use super::risk_check::{
     self, PendingKind, RiskyPending, RiskyPendingKey, CANCEL_PREFIX, CONFIRM_PREFIX,
 };
@@ -77,7 +78,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
     {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
     };
 
     let reason_raw = options.iter().find(|o| o.name == "reason")
@@ -90,16 +91,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
     if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
-        reply_text(ctx, command, &super::immunity_message(role_id, "Ban")).await;
+        edit_response_text(ctx, command, &super::immunity_message(role_id, "Ban")).await;
         return;
     }
 
@@ -284,7 +285,7 @@ pub async fn execute_ban(
     {
         error!(error = %e, "Impossible de bannir");
         if let Some(cmd) = command {
-            reply_text(ctx, cmd, &format!("Erreur Discord : {e}")).await;
+            edit_response_text(ctx, cmd, &format!("Erreur Discord : {e}")).await;
         }
         return;
     }
@@ -358,19 +359,19 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
 
     let user_id: u64 = match user_id_str.parse() {
         Ok(id) => id,
-        Err(_) => { reply_text(ctx, command, "ID utilisateur invalide.").await; return; }
+        Err(_) => { edit_response_text(ctx, command, "ID utilisateur invalide.").await; return; }
     };
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target_uid = serenity::model::id::UserId::new(user_id);
 
     if let Err(e) = guild_id.unban(&ctx.http, target_uid).await {
         error!(error = %e, "Impossible de debannir");
-        reply_text(ctx, command, &format!("Erreur : {e}")).await;
+        edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         return;
     }
 
@@ -417,13 +418,4 @@ pub async fn handle_unban(ctx: &Context, command: &CommandInteraction) {
     }
 
     super::log_to_channel(ctx, &guild_id.to_string(), unban_embed).await;
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command.edit_response(
-        &ctx.http,
-        serenity::builder::EditInteractionResponse::new().content(content),
-    ).await {
-        warn!(error = %e, "Failed to send reply text");
-    }
 }

@@ -10,6 +10,7 @@ use sentinel_shared::heartbeat::ApiClientKey;
 
 use super::ModerationApiKey;
 use super::reason_templates::{self, ReasonTemplate};
+use sentinel_shared::discord_helpers::edit_response_text;
 
 const CONFIG_KEY: &str = "reason_templates";
 const BOT_NAME: &str = "moderation-bot";
@@ -76,7 +77,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let (sub_name, sub_opts) = match sub {
         Some(s) => s,
         None => {
-            reply_text(ctx, command, "Sous-commande manquante.").await;
+            edit_response_text(ctx, command, "Sous-commande manquante.").await;
             return;
         }
     };
@@ -85,7 +86,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         "list" => handle_list(ctx, command).await,
         "add" => handle_add(ctx, command, sub_opts).await,
         "remove" => handle_remove(ctx, command, sub_opts).await,
-        _ => reply_text(ctx, command, "Sous-commande inconnue.").await,
+        _ => edit_response_text(ctx, command, "Sous-commande inconnue.").await,
     }
 }
 
@@ -93,7 +94,7 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id.to_string(),
         None => {
-            reply_text(ctx, command, "Commande serveur uniquement.").await;
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
@@ -101,7 +102,7 @@ async fn handle_list(ctx: &Context, command: &CommandInteraction) {
     let templates = match load_templates(ctx, &guild_id).await {
         Ok(t) => t,
         Err(e) => {
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
@@ -158,22 +159,22 @@ async fn handle_add(
         .trim();
 
     if label.is_empty() || reason.is_empty() {
-        reply_text(ctx, command, "label et reason requis (non vides).").await;
+        edit_response_text(ctx, command, "label et reason requis (non vides).").await;
         return;
     }
     if label.contains('|') || label.contains('\n') {
-        reply_text(ctx, command, "Le label ne peut pas contenir `|` ni de saut de ligne.").await;
+        edit_response_text(ctx, command, "Le label ne peut pas contenir `|` ni de saut de ligne.").await;
         return;
     }
     if reason.contains('\n') {
-        reply_text(ctx, command, "La raison ne peut pas contenir de saut de ligne.").await;
+        edit_response_text(ctx, command, "La raison ne peut pas contenir de saut de ligne.").await;
         return;
     }
 
     let guild_id = match command.guild_id {
         Some(id) => id.to_string(),
         None => {
-            reply_text(ctx, command, "Commande serveur uniquement.").await;
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
@@ -181,13 +182,13 @@ async fn handle_add(
     let mut templates = match load_templates(ctx, &guild_id).await {
         Ok(t) => t,
         Err(e) => {
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
 
     if templates.iter().any(|t| t.label.eq_ignore_ascii_case(label)) {
-        reply_text(ctx, command, "Un template avec ce label existe deja. Utilisez `/template remove` d'abord.").await;
+        edit_response_text(ctx, command, "Un template avec ce label existe deja. Utilisez `/template remove` d'abord.").await;
         return;
     }
 
@@ -197,7 +198,7 @@ async fn handle_add(
     });
 
     if let Err(e) = save_templates(ctx, &guild_id, &templates).await {
-        reply_text(ctx, command, &format!("Erreur : {e}")).await;
+        edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         return;
     }
 
@@ -235,14 +236,14 @@ async fn handle_remove(
         .trim();
 
     if label.is_empty() {
-        reply_text(ctx, command, "label requis.").await;
+        edit_response_text(ctx, command, "label requis.").await;
         return;
     }
 
     let guild_id = match command.guild_id {
         Some(id) => id.to_string(),
         None => {
-            reply_text(ctx, command, "Commande serveur uniquement.").await;
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
@@ -250,7 +251,7 @@ async fn handle_remove(
     let mut templates = match load_templates(ctx, &guild_id).await {
         Ok(t) => t,
         Err(e) => {
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
@@ -260,12 +261,12 @@ async fn handle_remove(
     let removed = before - templates.len();
 
     if removed == 0 {
-        reply_text(ctx, command, &format!("Aucun template trouve avec le label `{label}`.")).await;
+        edit_response_text(ctx, command, &format!("Aucun template trouve avec le label `{label}`.")).await;
         return;
     }
 
     if let Err(e) = save_templates(ctx, &guild_id, &templates).await {
-        reply_text(ctx, command, &format!("Erreur : {e}")).await;
+        edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         return;
     }
 
@@ -321,20 +322,6 @@ fn serialize_templates(templates: &[ReasonTemplate]) -> String {
         .map(|t| format!("{}|{}", t.label, t.reason))
         .collect::<Vec<_>>()
         .join("\n")
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new().content(content).ephemeral(true),
-            ),
-        )
-        .await
-    {
-        error!(error = %e, "Failed to send template error");
-    }
 }
 
 #[cfg(test)]

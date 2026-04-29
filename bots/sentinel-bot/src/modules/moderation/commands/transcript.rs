@@ -5,6 +5,7 @@ use serenity::all::{
     CreateInteractionResponseFollowup, CreateInteractionResponseMessage, GetMessages,
 };
 use tracing::{error, warn};
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("transcript")
@@ -34,7 +35,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let channel_id = match channel_id {
         Some(id) => id,
         None => {
-            reply_text(ctx, command, "Salon requis.").await;
+            edit_response_text(ctx, command, "Salon requis.").await;
             return;
         }
     };
@@ -148,22 +149,6 @@ fn format_message(msg: &serenity::model::channel::Message) -> String {
 
 fn count_lines_hint(bytes: usize) -> usize {
     (bytes / 80).saturating_sub(4).max(1)
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send transcript reply");
-    }
 }
 
 #[cfg(test)]

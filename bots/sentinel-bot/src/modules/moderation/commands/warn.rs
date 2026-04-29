@@ -10,6 +10,7 @@ use sentinel_shared::embeds::{sentinel_embed, gravity_color, gravity_emoji, dang
 
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("warn")
@@ -62,7 +63,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         .and_then(|o| match &o.value { CommandDataOptionValue::User(id) => Some(*id), _ => None })
     {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Parametre 'user' manquant.").await; return; }
+        None => { edit_response_text(ctx, command, "Parametre 'user' manquant.").await; return; }
     };
 
     let gravity = options.iter().find(|o| o.name == "gravity")
@@ -76,16 +77,16 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
 
     let guild_id = match command.guild_id {
         Some(id) => id,
-        None => { reply_text(ctx, command, "Commande serveur uniquement.").await; return; }
+        None => { edit_response_text(ctx, command, "Commande serveur uniquement.").await; return; }
     };
 
     let target = match target_id.to_user(&ctx.http).await {
         Ok(u) => u,
-        Err(_) => { reply_text(ctx, command, "Utilisateur introuvable.").await; return; }
+        Err(_) => { edit_response_text(ctx, command, "Utilisateur introuvable.").await; return; }
     };
 
     if let Some(role_id) = super::find_immune_role(ctx, guild_id, target.id).await {
-        reply_text(ctx, command, &super::immunity_message(role_id, "Warn")).await;
+        edit_response_text(ctx, command, &super::immunity_message(role_id, "Warn")).await;
         return;
     }
 
@@ -211,16 +212,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         }
         Err(e) => {
             error!(error = %e, "Erreur log warn");
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
         }
-    }
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command.edit_response(
-        &ctx.http,
-        serenity::builder::EditInteractionResponse::new().content(content),
-    ).await {
-        warn!(error = %e, "Failed to send reply text");
     }
 }

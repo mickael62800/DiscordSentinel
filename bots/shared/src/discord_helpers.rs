@@ -75,6 +75,20 @@ pub async fn followup_ephemeral_embed(ctx: &Context, command: &CommandInteractio
     }
 }
 
+/// Edit la reponse texte apres un defer (ex: defer + traitement long, puis reply texte).
+/// Pattern courant dans les commandes de moderation apres un `defer_with_confirmation`.
+pub async fn edit_response_text(ctx: &Context, command: &CommandInteraction, content: &str) {
+    if let Err(e) = command
+        .edit_response(
+            &ctx.http,
+            serenity::builder::EditInteractionResponse::new().content(content),
+        )
+        .await
+    {
+        warn!(error = %e, command = %command.data.name, "Echec edit response texte");
+    }
+}
+
 /// Reponse ephemere texte a une slash command.
 pub async fn reply_ephemeral(ctx: &Context, command: &CommandInteraction, content: &str) {
     if let Err(e) = command

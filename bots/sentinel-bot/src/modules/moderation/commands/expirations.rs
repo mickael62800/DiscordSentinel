@@ -8,6 +8,7 @@ use tracing::{error, warn};
 use sentinel_shared::embeds::info_embed;
 
 use super::ModerationApiKey;
+use sentinel_shared::discord_helpers::edit_response_text;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("expirations")
@@ -19,7 +20,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
     let guild_id = match command.guild_id {
         Some(id) => id,
         None => {
-            reply_text(ctx, command, "Commande serveur uniquement.").await;
+            edit_response_text(ctx, command, "Commande serveur uniquement.").await;
             return;
         }
     };
@@ -37,7 +38,7 @@ pub async fn handle(ctx: &Context, command: &CommandInteraction) {
         Ok(r) => r,
         Err(e) => {
             error!(error = %e, "Erreur recuperation reminders");
-            reply_text(ctx, command, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, command, &format!("Erreur : {e}")).await;
             return;
         }
     };
@@ -117,22 +118,6 @@ fn format_duration(d: chrono::Duration) -> String {
         format!("{}h {}min", hours, minutes)
     } else {
         format!("{} min", minutes.max(1))
-    }
-}
-
-async fn reply_text(ctx: &Context, command: &CommandInteraction, content: &str) {
-    if let Err(e) = command
-        .create_response(
-            &ctx.http,
-            CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .content(content)
-                    .ephemeral(true),
-            ),
-        )
-        .await
-    {
-        warn!(error = %e, "Failed to send expirations error");
     }
 }
 
