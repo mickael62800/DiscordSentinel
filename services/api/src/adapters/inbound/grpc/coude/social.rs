@@ -20,7 +20,7 @@ use sentinel_proto::coude::v1 as proto;
 use sentinel_proto::coude::v1::coude_social_service_server::CoudeSocialService;
 
 use crate::adapters::inbound::grpc::errors::domain_to_status;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::LeaderboardCategory;
@@ -65,8 +65,8 @@ pub(super) fn event_to_proto(e: Event) -> proto::Event {
     }
 }
 
-pub(super) fn current_season_to_proto(s: CoudeCurrentSeason) -> proto::CoudeCurrentSeason {
-    proto::CoudeCurrentSeason {
+pub(super) fn current_season_to_proto(s: Season) -> proto::Season {
+    proto::Season {
         season_number: s.season_number,
         started_at: s.started_at.to_rfc3339(),
         ends_at: s.ends_at.to_rfc3339(),
@@ -157,7 +157,7 @@ impl CoudeSocialService for SocialGrpc {
     async fn current_season(
         &self,
         request: Request<proto::CurrentSeasonRequest>,
-    ) -> Result<Response<proto::CoudeCurrentSeason>, Status> {
+    ) -> Result<Response<proto::Season>, Status> {
         let s = self
             .uc
             .current_season(&request.into_inner().guild_id)

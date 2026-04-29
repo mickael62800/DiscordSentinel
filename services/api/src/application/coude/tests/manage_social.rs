@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 use crate::application::coude::manage_social_service::ManageCoudeSocialService;
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::player::Player;
@@ -45,7 +45,7 @@ struct MockSocialRepo {
     active_events: Mutex<Vec<Event>>,
     daily_chaos_count: Mutex<i64>,
     daily_chaos_logs: Mutex<Vec<NewDailyChaos>>,
-    season: Mutex<Option<CoudeCurrentSeason>>,
+    season: Mutex<Option<Season>>,
 }
 
 #[async_trait]
@@ -93,8 +93,8 @@ impl SocialRepository for MockSocialRepo {
     async fn get_or_bootstrap_current_season(
         &self,
         _guild_id: &str,
-    ) -> Result<CoudeCurrentSeason, DomainError> {
-        Ok(self.season.lock().unwrap().clone().unwrap_or(CoudeCurrentSeason {
+    ) -> Result<Season, DomainError> {
+        Ok(self.season.lock().unwrap().clone().unwrap_or(Season {
             season_number: 1,
             started_at: Utc::now(),
             ends_at: Utc::now(),
@@ -537,7 +537,7 @@ async fn log_daily_chaos_delegates_to_repo() {
 #[tokio::test]
 async fn current_season_delegates_to_repo() {
     let social = Arc::new(MockSocialRepo::default());
-    *social.season.lock().unwrap() = Some(CoudeCurrentSeason {
+    *social.season.lock().unwrap() = Some(Season {
         season_number: 7,
         started_at: Utc::now(),
         ends_at: Utc::now(),

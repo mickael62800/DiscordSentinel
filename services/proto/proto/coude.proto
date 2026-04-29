@@ -718,7 +718,7 @@ service CoudeSocialService {
   rpc Leaderboard(LeaderboardRequest) returns (LeaderboardList);
   rpc ListActiveEvents(ListActiveEventsRequest) returns (EventList);
   rpc LogDailyChaos(LogDailyChaosRequest) returns (Empty);
-  rpc CurrentSeason(CurrentSeasonRequest) returns (CoudeCurrentSeason);
+  rpc CurrentSeason(CurrentSeasonRequest) returns (Season);
   // Phase 8 : retourne toutes les donnees statiques Coude (classes, shop,
   // progression, matchmaking). Le bot appelle au boot et cache en memoire.
   rpc GetCatalog(Empty) returns (CatalogResponse);
@@ -947,7 +947,7 @@ message CurrentSeasonRequest {
   string guild_id = 1;
 }
 
-message CoudeCurrentSeason {
+message Season {
   int32 season_number = 1;
   string started_at = 2;
   string ends_at = 3;

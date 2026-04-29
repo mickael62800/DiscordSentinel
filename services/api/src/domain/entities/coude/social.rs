@@ -117,7 +117,7 @@ pub struct DailyChaosOutcome {
 /// État d'une saison telle qu'exposée au bot (numéro, fenêtre temporelle,
 /// jours restants). Durée standard : 90 jours depuis `started_at`.
 #[derive(Debug, Clone)]
-pub struct CoudeCurrentSeason {
+pub struct Season {
     pub season_number: i32,
     pub started_at: DateTime<Utc>,
     pub ends_at: DateTime<Utc>,

@@ -8,7 +8,7 @@ use sqlx::Postgres;
 use sqlx::Transaction;
 use crate::application::coude::play_travaux_service::PlayTravauxService;
 use crate::domain::entities::coude::player::CombatStat;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::heist::HeistAttempt;
 use crate::domain::entities::coude::social::LeaderboardEntry;
@@ -114,8 +114,8 @@ impl SocialRepository for MockSocialRepo {
     async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> { Ok(vec![]) }
     async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> { Ok(()) }
     async fn count_daily_chaos_today(&self, _: &str) -> Result<i64, DomainError> { Ok(0) }
-    async fn get_or_bootstrap_current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
-        Ok(CoudeCurrentSeason { season_number: 1, started_at: Utc::now(), ends_at: Utc::now(), days_remaining: 30 })
+    async fn get_or_bootstrap_current_season(&self, _: &str) -> Result<Season, DomainError> {
+        Ok(Season { season_number: 1, started_at: Utc::now(), ends_at: Utc::now(), days_remaining: 30 })
     }
 }
 

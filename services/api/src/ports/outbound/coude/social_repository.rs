@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::LeaderboardCategory;
@@ -59,5 +59,5 @@ pub trait SocialRepository: Send + Sync {
     async fn get_or_bootstrap_current_season(
         &self,
         guild_id: &str,
-    ) -> Result<CoudeCurrentSeason, DomainError>;
+    ) -> Result<Season, DomainError>;
 }

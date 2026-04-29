@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use chrono::DateTime;
 use chrono::Utc;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
@@ -49,5 +49,5 @@ pub trait ManageCoudeSocialUseCase: Send + Sync {
         guild_id: &str,
     ) -> Result<Option<DailyChaosOutcome>, DomainError>;
 
-    async fn current_season(&self, guild_id: &str) -> Result<CoudeCurrentSeason, DomainError>;
+    async fn current_season(&self, guild_id: &str) -> Result<Season, DomainError>;
 }

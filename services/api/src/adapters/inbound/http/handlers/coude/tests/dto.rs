@@ -277,7 +277,7 @@ fn event_dto_from_domain() {
 #[test]
 fn current_season_dto_from_domain() {
     let now = Utc::now();
-    let s = CoudeCurrentSeason {
+    let s = Season {
         season_number: 3,
         started_at: now, ends_at: now,
         days_remaining: 15,

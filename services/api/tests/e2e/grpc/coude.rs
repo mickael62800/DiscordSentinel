@@ -39,7 +39,7 @@ use sentinel_api::domain::entities::coude::combat::CombatResolution;
 use sentinel_api::domain::entities::coude::player::CombatStat;
 use sentinel_api::domain::entities::coude::bet::Bet;
 use sentinel_api::domain::entities::coude::combat::Combat;
-use sentinel_api::domain::entities::coude::social::CoudeCurrentSeason;
+use sentinel_api::domain::entities::coude::social::Season;
 use sentinel_api::domain::entities::coude::social::Event;
 use sentinel_api::domain::entities::coude::inventory::Insurance;
 use sentinel_api::domain::entities::coude::inventory::InventoryItem;
@@ -584,8 +584,8 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
         }).collect())
     }
     async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<sentinel_api::domain::entities::coude::social::DailyChaosOutcome>, DomainError> { Ok(None) }
-    async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
-        Ok(CoudeCurrentSeason {
+    async fn current_season(&self, _: &str) -> Result<Season, DomainError> {
+        Ok(Season {
             season_number: 5,
             started_at: ts(),
             ends_at: ts(),

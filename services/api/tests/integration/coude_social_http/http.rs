@@ -18,7 +18,7 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use sentinel_api::adapters::inbound::http::router;
-use sentinel_api::domain::entities::coude::social::CoudeCurrentSeason;
+use sentinel_api::domain::entities::coude::social::Season;
 use sentinel_api::domain::entities::coude::social::Event;
 use sentinel_api::domain::entities::coude::social::LeaderboardEntry;
 use sentinel_api::domain::entities::coude::social::DailyChaosOutcome;
@@ -64,9 +64,9 @@ impl ManageCoudeSocialUseCase for MockSocial {
         self.chaos_logged.lock().unwrap().push(c);
         Ok(())
     }
-    async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
+    async fn current_season(&self, _: &str) -> Result<Season, DomainError> {
         let started = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).unwrap();
-        Ok(CoudeCurrentSeason {
+        Ok(Season {
             season_number: 3,
             started_at: started,
             ends_at: started + Duration::days(90),

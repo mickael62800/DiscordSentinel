@@ -8,7 +8,7 @@ use serde::Serialize;
 use crate::domain::entities::coude::bet::BetResolutionPlan;
 use crate::domain::entities::coude::bet::Bet;
 use crate::domain::entities::coude::combat::Combat;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
 use crate::domain::entities::coude::inventory::Insurance;
@@ -676,8 +676,8 @@ pub struct CurrentSeasonDto {
     pub days_remaining: i64,
 }
 
-impl From<CoudeCurrentSeason> for CurrentSeasonDto {
-    fn from(s: CoudeCurrentSeason) -> Self {
+impl From<Season> for CurrentSeasonDto {
+    fn from(s: Season) -> Self {
         Self {
             season_number: s.season_number,
             started_at: s.started_at.to_rfc3339(),

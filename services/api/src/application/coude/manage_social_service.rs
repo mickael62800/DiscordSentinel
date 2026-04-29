@@ -11,7 +11,7 @@ use tracing::info;
 
 use crate::domain::entities::coude::social::clamp_leaderboard_limit;
 use crate::domain::entities::coude::social::daily_chaos_amount;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::DailyChaosOutcome;
@@ -199,7 +199,7 @@ impl ManageCoudeSocialUseCase for ManageCoudeSocialService {
         }))
     }
 
-    async fn current_season(&self, guild_id: &str) -> Result<CoudeCurrentSeason, DomainError> {
+    async fn current_season(&self, guild_id: &str) -> Result<Season, DomainError> {
         self.repo.get_or_bootstrap_current_season(guild_id).await
     }
 }

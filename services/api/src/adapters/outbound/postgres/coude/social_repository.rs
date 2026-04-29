@@ -4,7 +4,7 @@ use chrono::Utc;
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::social::LeaderboardCategory;
@@ -215,7 +215,7 @@ impl SocialRepository for PgSocialRepository {
     async fn get_or_bootstrap_current_season(
         &self,
         guild_id: &str,
-    ) -> Result<CoudeCurrentSeason, DomainError> {
+    ) -> Result<Season, DomainError> {
         // 1. Tenter de récupérer la saison active (ended_at IS NULL).
         let existing: Option<(i32, DateTime<Utc>)> = sqlx::query_as(
             r#"SELECT season_number, started_at
@@ -255,7 +255,7 @@ impl SocialRepository for PgSocialRepository {
         let ends_at = started_at + chrono::Duration::days(90);
         let days_remaining = (ends_at - Utc::now()).num_days().max(0);
 
-        Ok(CoudeCurrentSeason {
+        Ok(Season {
             season_number,
             started_at,
             ends_at,

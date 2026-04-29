@@ -8,7 +8,7 @@ use uuid::Uuid;
 
 use crate::domain::entities::coude::cashbox::CashboxSource;
 use crate::domain::entities::coude::cashbox::Cashbox;
-use crate::domain::entities::coude::social::CoudeCurrentSeason;
+use crate::domain::entities::coude::social::Season;
 use crate::domain::entities::coude::social::Event;
 use crate::domain::entities::coude::social::LeaderboardEntry;
 use crate::domain::entities::coude::taunt::TauntsConfig;
@@ -43,7 +43,7 @@ struct MockSocialUc {
     events_return: Mutex<Vec<Event>>,
     log_chaos_calls: Mutex<Vec<NewDailyChaos>>,
     chaos_return: Mutex<Option<DailyChaosOutcome>>,
-    season_return: Mutex<Option<CoudeCurrentSeason>>,
+    season_return: Mutex<Option<Season>>,
 }
 
 #[async_trait]
@@ -69,8 +69,8 @@ impl ManageCoudeSocialUseCase for MockSocialUc {
     async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<DailyChaosOutcome>, DomainError> {
         Ok(self.chaos_return.lock().unwrap().clone())
     }
-    async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> {
-        Ok(self.season_return.lock().unwrap().clone().unwrap_or(CoudeCurrentSeason {
+    async fn current_season(&self, _: &str) -> Result<Season, DomainError> {
+        Ok(self.season_return.lock().unwrap().clone().unwrap_or(Season {
             season_number: 1,
             started_at: Utc::now(),
             ends_at: Utc::now(),
@@ -366,7 +366,7 @@ async fn log_daily_chaos_delegates_fields() {
 #[tokio::test]
 async fn current_season_maps() {
     let (s, c, cb, t, h) = defaults();
-    *s.season_return.lock().unwrap() = Some(CoudeCurrentSeason {
+    *s.season_return.lock().unwrap() = Some(Season {
         season_number: 3, started_at: Utc::now(), ends_at: Utc::now(), days_remaining: 42,
     });
     let g = mk(s, c, cb, t, h);

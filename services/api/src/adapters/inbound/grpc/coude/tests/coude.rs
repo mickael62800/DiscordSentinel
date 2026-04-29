@@ -8,7 +8,7 @@ use super::*;
     use crate::domain::entities::coude::bet::BetResolutionPlan;
     use crate::domain::entities::coude::bet::Bet;
     use crate::domain::entities::coude::combat::Combat;
-    use crate::domain::entities::coude::social::CoudeCurrentSeason;
+    use crate::domain::entities::coude::social::Season;
     use crate::domain::entities::coude::social::Event;
     use crate::domain::entities::coude::bet::FighterBetBonus as CoudeFighterBetBonus;
     use crate::domain::entities::coude::inventory::Insurance;
@@ -327,7 +327,7 @@ use super::*;
 
     #[test]
     fn current_season_to_proto_mapping() {
-        let s = CoudeCurrentSeason {
+        let s = Season {
             season_number: 3, started_at: ts(), ends_at: ts(), days_remaining: 42,
         };
         let pr = social::current_season_to_proto(s);

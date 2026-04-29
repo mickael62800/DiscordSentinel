@@ -427,7 +427,7 @@ impl manage_social::ManageCoudeSocialUseCase for StubCoudeSocial {
     async fn leaderboard(&self, _: &str, _: LeaderboardCategory, _: i64) -> Result<Vec<LeaderboardEntry>, DomainError> { unimplemented!() }
     async fn list_active_events(&self, _: &str) -> Result<Vec<Event>, DomainError> { unimplemented!() }
     async fn log_daily_chaos(&self, _: NewDailyChaos) -> Result<(), DomainError> { unimplemented!() }
-    async fn current_season(&self, _: &str) -> Result<CoudeCurrentSeason, DomainError> { unimplemented!() }
+    async fn current_season(&self, _: &str) -> Result<Season, DomainError> { unimplemented!() }
     async fn trigger_daily_chaos(&self, _: &str) -> Result<Option<DailyChaosOutcome>, DomainError> { unimplemented!() }
 }
 
