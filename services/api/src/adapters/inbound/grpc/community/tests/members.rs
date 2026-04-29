@@ -70,7 +70,6 @@ use super::*;
             guild_id: "g".into(),
             user_id: "u".into(),
             username: "x".into(),
-            display_name: None,
             avatar: None,
             roles_json: "not a json".into(),
             joined_at: None,

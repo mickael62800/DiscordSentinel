@@ -221,6 +221,7 @@ impl AnalyzeImageUseCase for AnalyzeImageService {
             channel_id: cmd.channel_id,
             user_id: cmd.user_id.clone(),
             username: cmd.username.clone(),
+            display_name: None,
             message_id: cmd.message_id,
             content: format!("[Image: {}]", cmd.filename),
             flags,

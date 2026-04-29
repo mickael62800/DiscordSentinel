@@ -19,6 +19,7 @@ fn moderation_inner() -> Router<AppState> {
         .route("/execute-mute", post(handlers::moderation::actions::execute_mute))
         .route("/history/{guild_id}/{user_id}", get(handlers::moderation::actions::get_history))
         .route("/modstats/{guild_id}", get(handlers::moderation::actions::get_modstats))
+        .route("/modstats/{guild_id}/trend", get(handlers::moderation::actions::get_modstats_trend))
         .route("/evidence", post(handlers::moderation::actions::add_evidence))
         .route("/evidence/{action_id}", get(handlers::moderation::actions::list_evidence))
         .route("/review", post(handlers::moderation::actions::add_review))

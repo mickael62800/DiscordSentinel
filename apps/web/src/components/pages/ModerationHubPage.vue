@@ -31,6 +31,12 @@ const { confirm } = useConfirm();
 // --- Tabs ---
 const activeTab = ref<"journal" | "bans">("journal");
 
+/** Bascule vers le journal pre-filtre sur les bans (acces depuis le tab Bannis actifs). */
+function openBanJournal() {
+  journalType.value = "ban";
+  activeTab.value = "journal";
+}
+
 // --- Journal : donnees + filtres ---
 const {
   infractions,
@@ -99,6 +105,17 @@ const filteredInfractions = computed<Infraction[]>(() => {
   if (hideDetections.value) {
     rows = rows.filter((i) => !isDetection(i.infraction_type));
   }
+
+  // Masque les bans appliques (permanent ou temp) : ils sont deja visibles
+  // dans l'onglet "Bannis actifs". On garde uniquement les propositions de
+  // ban (source=detection), car le mod doit pouvoir les appliquer ici.
+  rows = rows.filter((i) => {
+    const isBan = i.infraction_type === "ban_permanent"
+      || i.infraction_type === "ban_temp"
+      || i.infraction_type === "ban";
+    const isApplied = (i.source ?? "detection") === "action";
+    return !(isBan && isApplied);
+  });
 
   // Filtre texte
   const q = journalSearch.value.trim().toLowerCase();
@@ -343,9 +360,7 @@ const banModalVisible = ref(false);
 const banModalTarget = ref<Infraction | null>(null);
 
 const {
-  filteredProposals,
   filteredConfirmed,
-  totalProposals,
   totalConfirmed,
   loading: bansLoading,
   banning,
@@ -356,10 +371,6 @@ const {
 } = useBans();
 useRealtimeRefresh(["infraction_new", "moderation_action"], fetchBans);
 
-function openBanModal(proposal: Infraction) {
-  banModalTarget.value = proposal;
-  banModalVisible.value = true;
-}
 function closeBanModal() {
   banModalVisible.value = false;
   banModalTarget.value = null;
@@ -485,7 +496,7 @@ async function handleActionSubmit() {
         :class="['hub-tab', { active: activeTab === 'bans' }]"
         @click="activeTab = 'bans'"
       >
-        Bannissements
+        Bannis actifs
       </button>
     </div>
 
@@ -527,8 +538,11 @@ async function handleActionSubmit() {
 
         <div class="toolbar-right">
           <label class="toggle-filter">
-            <input v-model="hideDetections" type="checkbox" />
-            <span>Masquer les detections AutoMod</span>
+            <span>Masquer les détections AutoMod</span>
+            <span class="switch">
+              <input v-model="hideDetections" type="checkbox" />
+              <span class="slider" aria-hidden="true"></span>
+            </span>
           </label>
           <button
             v-if="hasActiveFilters"
@@ -576,7 +590,10 @@ async function handleActionSubmit() {
       >
         <template #cell-username="{ row }">
           <div class="user-cell">
-            <span class="username">{{ (row as Record<string, unknown>).username }}</span>
+            <strong v-if="(row as Record<string, unknown>).display_name" class="display-name">
+              {{ (row as Record<string, unknown>).display_name }}
+            </strong>
+            <span class="username">@{{ (row as Record<string, unknown>).username }}</span>
             <span class="user-id">{{ (row as Record<string, unknown>).user_id }}</span>
           </div>
         </template>
@@ -642,116 +659,79 @@ async function handleActionSubmit() {
     </div>
 
     <!-- ============================================ -->
-    <!-- BANNISSEMENTS (inchange)                     -->
+    <!-- BANNIS ACTIFS — etat courant Discord uniquement                -->
     <!-- ============================================ -->
     <div v-if="activeTab === 'bans'" class="tab-content">
-      <div class="filters">
+      <div class="bans-toolbar">
         <input
           v-model="bansSearchQuery"
           type="text"
           placeholder="Rechercher par nom, ID ou raison..."
           class="search-input"
         />
+        <button
+          type="button"
+          class="link-to-journal"
+          title="Voir l'historique complet des bans (incluant les anciens unbans)"
+          @click="openBanJournal"
+        >
+          Voir l'historique →
+        </button>
       </div>
 
       <p v-if="unbanError" class="ban-error">{{ unbanError }}</p>
 
       <LoadingState v-if="bansLoading" />
 
-      <div v-else class="bans-columns">
-        <div class="bans-column">
-          <div class="column-header">
-            <h2>Bannis</h2>
-            <span class="count-badge">{{ totalConfirmed }}</span>
-          </div>
-
-          <div class="ban-list">
-            <div v-for="ban in filteredConfirmed" :key="ban.id" class="card ban-card confirmed">
-              <div class="ban-user">
-                <div class="user-avatar-placeholder confirmed-avatar">{{ ban.target_name.charAt(0).toUpperCase() }}</div>
-                <div class="user-info">
-                  <span class="username">{{ ban.target_name }}</span>
-                  <span class="user-id">{{ ban.target_id }}</span>
-                </div>
-              </div>
-              <div class="ban-details">
-                <div class="detail-row">
-                  <span class="detail-label">Raison</span>
-                  <span class="reason">{{ ban.reason }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Banni par</span>
-                  <AppBadge :label="ban.moderator_name" variant="info" />
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Type</span>
-                  <AppBadge
-                    :label="ban.action_type === 'ban_permanent' ? 'Permanent' : 'Temporaire'"
-                    :variant="ban.action_type === 'ban_permanent' ? 'danger' : 'warning'"
-                  />
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Date</span>
-                  <span class="mono">{{ fmt(ban.created_at) }}</span>
-                </div>
-              </div>
-              <div class="ban-actions">
-                <button
-                  class="unban-btn"
-                  :disabled="banning"
-                  @click="handleUnban(ban)"
-                >
-                  {{ banning ? 'Debannissement...' : 'Debannir' }}
-                </button>
-              </div>
-            </div>
-
-            <EmptyState v-if="filteredConfirmed.length === 0" :message="bansSearchQuery ? 'Aucun compte banni correspondant' : 'Aucun compte banni'" />
-          </div>
+      <div v-else class="bans-list-single">
+        <div class="column-header">
+          <h2>Bannis actifs</h2>
+          <span class="count-badge">{{ totalConfirmed }}</span>
         </div>
 
-        <div class="bans-column">
-          <div class="column-header">
-            <h2>A bannir</h2>
-            <span class="count-badge proposal">{{ totalProposals }}</span>
-          </div>
-
-          <div class="ban-list">
-            <div v-for="proposal in filteredProposals" :key="proposal.id" class="card ban-card proposal">
-              <div class="ban-user">
-                <div class="user-avatar-placeholder proposal-avatar">{{ proposal.username.charAt(0).toUpperCase() }}</div>
-                <div class="user-info">
-                  <span class="username">{{ proposal.username }}</span>
-                  <span class="user-id">{{ proposal.user_id }}</span>
-                </div>
-              </div>
-              <div class="ban-details">
-                <div class="detail-row">
-                  <span class="detail-label">Raison</span>
-                  <span class="reason">{{ proposal.reason }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Detecte par</span>
-                  <AppBadge label="Automod" variant="warning" />
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">Date</span>
-                  <span class="mono">{{ fmt(proposal.created_at) }}</span>
-                </div>
-              </div>
-              <div class="ban-actions">
-                <button
-                  class="ban-btn"
-                  :disabled="banning"
-                  @click="openBanModal(proposal)"
-                >
-                  {{ banning ? 'Bannissement...' : 'Bannir' }}
-                </button>
+        <div class="ban-list">
+          <div v-for="ban in filteredConfirmed" :key="ban.id" class="card ban-card confirmed">
+            <div class="ban-user">
+              <div class="user-avatar-placeholder confirmed-avatar">{{ (ban.target_display_name || ban.target_name).charAt(0).toUpperCase() }}</div>
+              <div class="user-info">
+                <strong v-if="ban.target_display_name" class="display-name">{{ ban.target_display_name }}</strong>
+                <span class="username">@{{ ban.target_name }}</span>
+                <span class="user-id">{{ ban.target_id }}</span>
               </div>
             </div>
-
-            <EmptyState v-if="filteredProposals.length === 0" :message="bansSearchQuery ? 'Aucune proposition correspondante' : 'Aucune proposition'" />
+            <div class="ban-details">
+              <div class="detail-row">
+                <span class="detail-label">Raison</span>
+                <span class="reason">{{ ban.reason }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Banni par</span>
+                <AppBadge :label="ban.moderator_name" variant="info" />
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Type</span>
+                <AppBadge
+                  :label="ban.action_type === 'ban_permanent' ? 'Permanent' : 'Temporaire'"
+                  :variant="ban.action_type === 'ban_permanent' ? 'danger' : 'warning'"
+                />
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Date</span>
+                <span class="mono">{{ fmt(ban.created_at) }}</span>
+              </div>
+            </div>
+            <div class="ban-actions">
+              <button
+                class="unban-btn"
+                :disabled="banning"
+                @click="handleUnban(ban)"
+              >
+                {{ banning ? 'Debannissement...' : 'Debannir' }}
+              </button>
+            </div>
           </div>
+
+          <EmptyState v-if="filteredConfirmed.length === 0" :message="bansSearchQuery ? 'Aucun compte banni correspondant' : 'Aucun compte banni'" />
         </div>
       </div>
 
@@ -883,46 +863,107 @@ async function handleActionSubmit() {
 
 <style scoped>
 .moderation-hub h1 {
-  margin-bottom: 24px;
+  margin-bottom: 18px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  /* Gradient shimmer cohérent avec /stats et /modstats. */
+  background: linear-gradient(
+    90deg,
+    var(--text-primary) 0%,
+    color-mix(in srgb, var(--accent) 60%, var(--text-primary)) 50%,
+    var(--text-primary) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: mod-title-shimmer 10s linear infinite;
+  letter-spacing: 0.3px;
+}
+@keyframes mod-title-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
 
-/* ---- Tab bar ---- */
+/* ---- Tab bar polished ---- */
 .hub-tabs {
   display: flex;
-  gap: 0;
-  border-bottom: 2px solid var(--border);
+  gap: 4px;
+  position: relative;
   margin-bottom: 24px;
+  padding: 4px;
+  background-color: color-mix(in srgb, var(--bg-card) 80%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: fit-content;
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.18),
+    0 1px 0 color-mix(in srgb, white 6%, transparent);
 }
 
 .hub-tab {
-  padding: 10px 24px;
+  position: relative;
+  padding: 8px 22px;
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
+  border-radius: 8px;
   color: var(--text-secondary);
   font-weight: 600;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: color var(--transition-fast), border-color var(--transition-fast);
+  transition: color 0.2s ease,
+    background 0.25s ease,
+    box-shadow 0.25s ease;
 }
 
-.hub-tab:hover {
+.hub-tab::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 4px;
+  width: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--accent);
+  transform: translateX(-50%);
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.hub-tab:hover:not(.active) {
   color: var(--text-primary);
+  background-color: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.hub-tab:hover:not(.active)::after {
+  width: 50%;
 }
 
 .hub-tab.active {
-  color: var(--accent);
-  border-bottom-color: var(--accent);
+  color: white;
+  background: linear-gradient(135deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 75%, var(--accent-alt, #a855f7)));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 35%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, black 15%, transparent),
+    0 2px 10px color-mix(in srgb, var(--accent) 35%, transparent);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.12);
+}
+
+.hub-tab:active {
+  transform: scale(0.96);
+  transition-duration: 0.08s;
 }
 
 .tab-content {
-  animation: fadeIn 0.15s ease;
+  animation: fadeSlideIn 0.3s ease-out;
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ---- Journal toolbar + filters ---- */
@@ -992,56 +1033,148 @@ async function handleActionSubmit() {
 .toggle-filter {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
   user-select: none;
+  transition: color 0.2s ease;
 }
-
-.toggle-filter input[type="checkbox"] {
-  accent-color: var(--accent);
-  cursor: pointer;
-}
-
 .toggle-filter:hover {
   color: var(--text-primary);
 }
 
+/* ── Switch (slider) — remplace l'ancienne checkbox ──── */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.switch input {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 2;
+}
+.switch .slider {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--bg-card) 80%, transparent);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: background-color 0.25s ease, border-color 0.25s ease;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18);
+}
+.switch .slider::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, white, #d8d8e0);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.25s ease;
+}
+.switch input:checked + .slider {
+  background: linear-gradient(135deg,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 75%, var(--accent-alt, #a855f7)));
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 30%, transparent),
+    0 0 8px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.switch input:checked + .slider::before {
+  transform: translateX(16px);
+}
+.switch input:focus-visible + .slider {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.switch input:active + .slider::before {
+  width: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch .slider,
+  .switch .slider::before { transition: none; }
+}
+
 .reset-btn {
-  background: transparent;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, white 4%, var(--bg-card)),
+      var(--bg-card));
   color: var(--text-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 7px 14px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color 0.2s ease,
+    background 0.25s ease,
+    border-color 0.2s ease,
+    box-shadow 0.25s ease;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
 }
 
 .reset-btn:hover {
-  color: var(--text-primary);
-  border-color: var(--accent);
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 10%, var(--bg-card)),
+    color-mix(in srgb, var(--accent) 6%, var(--bg-card)));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 10%, transparent),
+    0 4px 12px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.reset-btn:active {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
 }
 
 .purge-btn {
-  background: transparent;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--danger) 6%, var(--bg-card)),
+      var(--bg-card));
   color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 60%, var(--border));
+  border-radius: 8px;
   padding: 7px 14px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color 0.2s ease,
+    background 0.25s ease,
+    border-color 0.2s ease,
+    box-shadow 0.25s ease;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
 }
 
 .purge-btn:hover:not(:disabled) {
-  background: var(--danger);
   color: white;
+  border-color: var(--danger);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--danger) 90%, white),
+    var(--danger));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 25%, transparent),
+    0 4px 14px color-mix(in srgb, var(--danger) 35%, transparent);
 }
-
+.purge-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
+}
 .purge-btn:disabled {
   opacity: 0.4;
   cursor: not-allowed;
@@ -1118,21 +1251,38 @@ async function handleActionSubmit() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: transparent;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, #57f287 8%, var(--bg-card)),
+      var(--bg-card));
   color: #57f287;
-  border: 1px solid #57f287;
-  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, #57f287 60%, var(--border));
+  border-radius: 8px;
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color 0.2s ease,
+    background 0.25s ease,
+    border-color 0.2s ease,
+    box-shadow 0.25s ease;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
 }
 
 .apply-btn:hover:not(:disabled) {
-  background-color: #57f287;
   color: #0a0a0a;
+  border-color: #57f287;
+  background: linear-gradient(180deg,
+    color-mix(in srgb, #57f287 95%, white),
+    #57f287);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 35%, transparent),
+    0 4px 14px color-mix(in srgb, #57f287 40%, transparent);
+}
+.apply-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
 }
 
 .apply-btn:disabled {
@@ -1150,21 +1300,38 @@ async function handleActionSubmit() {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background-color: transparent;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--danger) 6%, var(--bg-card)),
+      var(--bg-card));
   color: var(--danger);
-  border: 1px solid var(--danger);
-  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 60%, var(--border));
+  border-radius: 8px;
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition: color 0.2s ease,
+    background 0.25s ease,
+    border-color 0.2s ease,
+    box-shadow 0.25s ease;
   white-space: nowrap;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
 }
 
 .cancel-btn:hover:not(:disabled) {
-  background-color: var(--danger);
   color: white;
+  border-color: var(--danger);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--danger) 90%, white),
+    var(--danger));
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 25%, transparent),
+    0 4px 14px color-mix(in srgb, var(--danger) 40%, transparent);
+}
+.cancel-btn:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: 0.08s;
 }
 
 .cancel-btn:disabled {
@@ -1205,15 +1372,41 @@ async function handleActionSubmit() {
   opacity: 0.6;
 }
 
-.bans-columns {
+.bans-list-single {
+  width: 100%;
+}
+.bans-list-single .ban-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-  align-items: start;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
 }
 
-@media (max-width: 900px) {
-  .bans-columns { grid-template-columns: 1fr; }
+.bans-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.bans-toolbar .search-input {
+  flex: 1;
+  min-width: 240px;
+}
+.link-to-journal {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--transition-fast), background-color var(--transition-fast);
+  white-space: nowrap;
+}
+.link-to-journal:hover {
+  color: var(--accent);
+  background-color: var(--bg-hover);
 }
 
 .column-header {
@@ -1250,12 +1443,44 @@ async function handleActionSubmit() {
 
 /* .ban-card herite de .card (bg/border/radius/padding). Seules les variantes
    confirmed/proposal ajoutent une bordure gauche coloree pour distinguer. */
+.ban-card {
+  /* Stagger entrance + hover lift cosy. */
+  opacity: 0;
+  animation: ban-card-enter 0.4s ease-out forwards;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.25s ease,
+    box-shadow 0.3s ease;
+}
+.ban-card:nth-child(1)  { animation-delay: 0.04s; }
+.ban-card:nth-child(2)  { animation-delay: 0.08s; }
+.ban-card:nth-child(3)  { animation-delay: 0.12s; }
+.ban-card:nth-child(4)  { animation-delay: 0.16s; }
+.ban-card:nth-child(5)  { animation-delay: 0.20s; }
+.ban-card:nth-child(6)  { animation-delay: 0.24s; }
+.ban-card:nth-child(7)  { animation-delay: 0.28s; }
+.ban-card:nth-child(8)  { animation-delay: 0.32s; }
+.ban-card:nth-child(n+9) { animation-delay: 0.36s; }
+
+@keyframes ban-card-enter {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
 .ban-card.confirmed {
   border-left: 3px solid var(--danger);
+}
+.ban-card.confirmed:hover {
+  transform: translateY(-2px);
+  border-left-color: var(--danger);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--danger) 14%, transparent);
 }
 
 .ban-card.proposal {
   border-left: 3px solid var(--warning);
+}
+.ban-card.proposal:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--warning, #f59e0b) 14%, transparent);
 }
 
 .ban-user {
@@ -1291,6 +1516,21 @@ async function handleActionSubmit() {
   flex-direction: column;
   gap: 2px;
   min-width: 0;
+}
+
+.display-name {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.display-name + .username {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .username {
@@ -1562,5 +1802,28 @@ async function handleActionSubmit() {
   font-size: 11px;
   color: var(--text-secondary);
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .moderation-hub h1 {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: var(--text-primary);
+    color: var(--text-primary);
+  }
+  .hub-tab,
+  .hub-tab:active,
+  .reset-btn:active,
+  .purge-btn:active,
+  .apply-btn:active,
+  .cancel-btn:active { transform: none; }
+  .hub-tab::after { transition: none !important; }
+  .tab-content { animation: none; }
+  .ban-card {
+    animation: none !important;
+    opacity: 1;
+    transform: none !important;
+  }
+  .ban-card:hover { transform: none; }
 }
 </style>

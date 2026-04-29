@@ -332,14 +332,28 @@ const membersChartData = computed(() => ({
 }
 
 .section-title {
+  position: relative;
   font-size: 14px;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin: 0 0 14px 2px;
-  padding-bottom: 8px;
+  margin: 0 0 16px 0;
+  padding: 0 0 8px 14px;
   border-bottom: 1px solid var(--border);
+}
+/* Petite barre verticale accent à gauche du titre — touche cosy. */
+.section-title::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to bottom,
+    var(--accent),
+    color-mix(in srgb, var(--accent) 50%, var(--accent-alt, #a855f7)));
 }
 
 .charts-grid {
@@ -347,7 +361,7 @@ const membersChartData = computed(() => ({
   /* 3 colonnes sur ecrans larges, 2 colonnes au milieu, 1 sur mobile.
      minmax(0, 1fr) empeche les cells de deborder leur largeur. */
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 24px;
+  gap: 20px;
 }
 
 @media (max-width: 1300px) {
@@ -365,6 +379,38 @@ const membersChartData = computed(() => ({
 .chart-card {
   padding: var(--space-xl); /* override .card : plus d'espace pour les graphes */
   min-width: 0; /* empeche l'expansion due au contenu */
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  /* Stagger entrance + transition cosy au hover. */
+  opacity: 0;
+  animation: chart-card-enter 0.5s ease-out forwards;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.25s ease,
+    box-shadow 0.3s ease;
+}
+
+.chart-card:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+/* Stagger : 9 cartes apparaissent en cascade. */
+.chart-card:nth-child(1) { animation-delay: 0.05s; }
+.chart-card:nth-child(2) { animation-delay: 0.10s; }
+.chart-card:nth-child(3) { animation-delay: 0.15s; }
+.chart-card:nth-child(4) { animation-delay: 0.20s; }
+.chart-card:nth-child(5) { animation-delay: 0.25s; }
+.chart-card:nth-child(6) { animation-delay: 0.30s; }
+.chart-card:nth-child(7) { animation-delay: 0.35s; }
+.chart-card:nth-child(8) { animation-delay: 0.40s; }
+.chart-card:nth-child(n+9) { animation-delay: 0.45s; }
+
+@keyframes chart-card-enter {
+  0%   { opacity: 0; transform: translateY(10px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 .chart-card--wide { grid-column: 1 / -1; }
@@ -438,5 +484,14 @@ const membersChartData = computed(() => ({
   color: var(--text-secondary);
   padding: 40px;
   text-align: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chart-card {
+    animation: none !important;
+    opacity: 1;
+    transform: none !important;
+  }
+  .chart-card:hover { transform: none; }
 }
 </style>

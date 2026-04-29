@@ -17,6 +17,10 @@ pub struct ModerationAction {
     pub moderator_name: String,
     pub target_id: String,
     pub target_name: String,
+    /// Pseudo serveur (nickname) actuel de la cible si elle est encore dans
+    /// la guild. Lu via LEFT JOIN guild_members.display_name. Optionnel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_display_name: Option<String>,
     pub action_type: String,
     pub reason: String,
     pub gravity: Option<ModerationGravity>,

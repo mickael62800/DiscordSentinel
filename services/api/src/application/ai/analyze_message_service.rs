@@ -439,6 +439,7 @@ impl AnalyzeMessageUseCase for AnalyzeMessageService {
             channel_id: cmd.channel_id,
             user_id: cmd.user_id,
             username: cmd.username,
+            display_name: None,
             message_id: cmd.message_id,
             content: cmd.content,
             flags: cmd.flags,

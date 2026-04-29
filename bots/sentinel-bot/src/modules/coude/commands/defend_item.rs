@@ -1,13 +1,27 @@
 use serenity::all::{
     ComponentInteraction, Context, CreateActionRow, CreateInteractionResponse,
     CreateInteractionResponseMessage, CreateSelectMenu, CreateSelectMenuKind,
-    CreateSelectMenuOption,
+    CreateSelectMenuOption, EditInteractionResponse,
 };
 
 use sentinel_shared::discord_helpers::component_reply_ephemeral as reply_ephemeral;
 
 use crate::modules::coude::catalog::CatalogCacheKey;
 use crate::modules::coude::GameApiKey;
+
+/// Apres `Defer`, l'interaction est deja acquittee : on ne peut plus
+/// `create_response`. On edite la reponse defer pour afficher l'erreur.
+async fn edit_response_text(ctx: &Context, component: &ComponentInteraction, content: &str) {
+    if let Err(e) = component
+        .edit_response(
+            &ctx.http,
+            EditInteractionResponse::new().content(content).components(vec![]),
+        )
+        .await
+    {
+        tracing::warn!(error = %e, "Echec edit_response Discord");
+    }
+}
 
 pub const DEFEND_PREFIX: &str = "coude_defend:";
 pub const DEFEND_SELECT_PREFIX: &str = "coude_defend_select:";
@@ -181,11 +195,11 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
     let combat_record = match api.get_combat(combat_id_str).await {
         Ok(Some(c)) => c,
         Ok(None) => {
-            reply_ephemeral(ctx, component, "Combat introuvable.").await;
+            edit_response_text(ctx, component, "Combat introuvable.").await;
             return;
         }
         Err(e) => {
-            reply_ephemeral(ctx, component, &format!("Erreur API : {e}")).await;
+            edit_response_text(ctx, component, &format!("Erreur API : {e}")).await;
             return;
         }
     };
@@ -193,18 +207,18 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
     // Garde cross-guild
     if let Some(gid) = component.guild_id {
         if gid.to_string() != combat_record.guild_id {
-            reply_ephemeral(ctx, component, "Ce combat n'appartient pas a cette guild.").await;
+            edit_response_text(ctx, component, "Ce combat n'appartient pas a cette guild.").await;
             return;
         }
     }
 
     if component.user.id.to_string() != combat_record.defender_id {
-        reply_ephemeral(ctx, component, "Seul le defenseur peut faire ca !").await;
+        edit_response_text(ctx, component, "Seul le defenseur peut faire ca !").await;
         return;
     }
 
     if combat_record.status != "pending" {
-        reply_ephemeral(ctx, component, "Ce combat n'est plus en attente.").await;
+        edit_response_text(ctx, component, "Ce combat n'est plus en attente.").await;
         return;
     }
 
@@ -218,7 +232,7 @@ pub async fn handle_defend_select(ctx: &Context, component: &ComponentInteractio
             )
             .await
         {
-            reply_ephemeral(ctx, component, &format!("Erreur : {e}")).await;
+            edit_response_text(ctx, component, &format!("Erreur : {e}")).await;
             return;
         }
 

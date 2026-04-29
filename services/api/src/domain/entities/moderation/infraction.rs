@@ -15,6 +15,10 @@ pub struct Infraction {
     pub channel_id: ChannelId,
     pub user_id: UserId,
     pub username: String,
+    /// Pseudo serveur (nickname) si l user en a un. Lu via LEFT JOIN
+    /// `guild_members.display_name`. Optionnel : null si l user n'est plus
+    /// dans la guild ou n'a pas de nickname.
+    pub display_name: Option<String>,
     pub message_id: MessageId,
     pub content: String,
     pub flags: DetectionFlags,

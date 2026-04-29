@@ -21,6 +21,9 @@ pub struct InfractionResponseDto {
     pub channel_id: ChannelId,
     pub user_id: UserId,
     pub username: String,
+    /// Pseudo serveur (nickname) si l'user en a un. Null sinon.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
     pub message_id: MessageId,
     pub content: String,
     pub score: f64,
@@ -38,6 +41,7 @@ impl From<Infraction> for InfractionResponseDto {
             channel_id: inf.channel_id,
             user_id: inf.user_id,
             username: inf.username,
+            display_name: inf.display_name,
             message_id: inf.message_id,
             content: inf.content,
             score: inf.score,

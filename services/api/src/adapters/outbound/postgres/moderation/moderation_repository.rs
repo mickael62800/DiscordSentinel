@@ -21,6 +21,10 @@ struct AuditModRow {
     actor_name: Option<String>,
     target_id: Option<String>,
     target_name: Option<String>,
+    /// Lu uniquement par les queries qui font le LEFT JOIN guild_members.
+    /// Default = None pour les autres queries (l'aliasing est explicite cote SQL).
+    #[sqlx(default)]
+    target_display_name: Option<String>,
     channel_id: Option<String>,
     details: serde_json::Value,
     created_at: chrono::DateTime<chrono::Utc>,
@@ -66,6 +70,7 @@ impl From<AuditModRow> for ModerationAction {
             moderator_name: row.actor_name.unwrap_or_default(),
             target_id: row.target_id.unwrap_or_default(),
             target_name: row.target_name.unwrap_or_default(),
+            target_display_name: row.target_display_name,
             action_type,
             reason,
             gravity,
@@ -114,6 +119,7 @@ impl From<ActionRow> for ModerationAction {
             moderator_name: row.moderator_name,
             target_id: row.target_id,
             target_name: row.target_name,
+            target_display_name: None,
             action_type: row.action_type,
             reason: row.reason,
             gravity: row.gravity,
@@ -168,10 +174,15 @@ impl ModerationRepository for PgModerationRepository {
         // Phase 2 : lecture depuis audit_logs.
         // Pour chaque (guild_id, target_id), on prend la derniere action ban*/unban
         // et on ne garde que celles dont l'event_type final commence par 'mod_ban'.
+        // LEFT JOIN guild_members pour enrichir avec le pseudo serveur
+        // (target_display_name) — affiche dans la liste "Bannis actifs" cote web.
         let rows = match guild_id {
             Some(gid) => {
                 sqlx::query_as::<_, AuditModRow>(
-                    "SELECT id, guild_id, event_type, actor_id, actor_name, target_id, target_name, channel_id, details, created_at FROM ( \
+                    "SELECT latest.id, latest.guild_id, latest.event_type, latest.actor_id, latest.actor_name, \
+                            latest.target_id, latest.target_name, gm.display_name AS target_display_name, \
+                            latest.channel_id, latest.details, latest.created_at \
+                     FROM ( \
                         SELECT DISTINCT ON (guild_id, target_id) \
                             id, guild_id, event_type, actor_id, actor_name, target_id, target_name, channel_id, details, created_at \
                         FROM audit_logs \
@@ -180,8 +191,10 @@ impl ModerationRepository for PgModerationRepository {
                           AND (event_type LIKE 'mod_ban%' OR event_type = 'mod_unban') \
                         ORDER BY guild_id, target_id, created_at DESC \
                      ) latest \
-                     WHERE event_type LIKE 'mod_ban%' \
-                     ORDER BY created_at DESC \
+                     LEFT JOIN guild_members gm \
+                         ON gm.guild_id = latest.guild_id AND gm.user_id = latest.target_id \
+                     WHERE latest.event_type LIKE 'mod_ban%' \
+                     ORDER BY latest.created_at DESC \
                      LIMIT $2 OFFSET $3",
                 )
                 .bind(gid)
@@ -192,7 +205,10 @@ impl ModerationRepository for PgModerationRepository {
             }
             None => {
                 sqlx::query_as::<_, AuditModRow>(
-                    "SELECT id, guild_id, event_type, actor_id, actor_name, target_id, target_name, channel_id, details, created_at FROM ( \
+                    "SELECT latest.id, latest.guild_id, latest.event_type, latest.actor_id, latest.actor_name, \
+                            latest.target_id, latest.target_name, gm.display_name AS target_display_name, \
+                            latest.channel_id, latest.details, latest.created_at \
+                     FROM ( \
                         SELECT DISTINCT ON (guild_id, target_id) \
                             id, guild_id, event_type, actor_id, actor_name, target_id, target_name, channel_id, details, created_at \
                         FROM audit_logs \
@@ -200,8 +216,10 @@ impl ModerationRepository for PgModerationRepository {
                           AND (event_type LIKE 'mod_ban%' OR event_type = 'mod_unban') \
                         ORDER BY guild_id, target_id, created_at DESC \
                      ) latest \
-                     WHERE event_type LIKE 'mod_ban%' \
-                     ORDER BY created_at DESC \
+                     LEFT JOIN guild_members gm \
+                         ON gm.guild_id = latest.guild_id AND gm.user_id = latest.target_id \
+                     WHERE latest.event_type LIKE 'mod_ban%' \
+                     ORDER BY latest.created_at DESC \
                      LIMIT $1 OFFSET $2",
                 )
                 .bind(limit)

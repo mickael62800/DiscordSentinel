@@ -74,6 +74,7 @@ impl ManageModerationUseCase for ManageModerationService {
             moderator_name: cmd.moderator_name,
             target_id: cmd.target_id.clone(),
             target_name: cmd.target_name,
+            target_display_name: None,
             action_type: cmd.action_type,
             reason: truncated_reason,
             gravity: cmd.gravity.as_deref().and_then(crate::domain::enums::moderation::moderation_gravity::ModerationGravity::from_str_lossy),

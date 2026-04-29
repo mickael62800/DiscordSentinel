@@ -36,7 +36,9 @@ onMounted(() => {
 
 <template>
   <header class="topbar">
+    <div class="topbar-gloss" aria-hidden="true"></div>
     <button class="brand" type="button" title="Accueil" @click="goHome">
+      <span class="brand-halo" aria-hidden="true"></span>
       <img src="/logo.png" alt="Sentinel" class="logo-icon" />
       <span class="logo-text">Sentinel</span>
     </button>
@@ -90,26 +92,112 @@ onMounted(() => {
 <style scoped>
 .topbar {
   position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 10px 20px;
-  background-color: var(--bg-secondary);
-  border-bottom: 1px solid var(--border);
+  /* Mesh gradient discret en background : 2 radial-gradients qui ajoutent
+     de la couleur au bg-secondary sans le surcharger. */
+  background:
+    radial-gradient(ellipse at 0% 50%,
+      color-mix(in srgb, var(--accent) 10%, transparent) 0%,
+      transparent 40%),
+    radial-gradient(ellipse at 100% 50%,
+      color-mix(in srgb, var(--accent-alt, #a855f7) 8%, transparent) 0%,
+      transparent 40%),
+    var(--bg-secondary);
+  border-bottom: 1px solid transparent;
   user-select: none;
   flex-shrink: 0;
 }
 
+/* Bordure inferieure : ligne en gradient lumineux qui remplace le
+   border-bottom plat, avec un legere pulsation au centre. */
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--accent) 50%, var(--border)) 20%,
+    color-mix(in srgb, var(--accent) 80%, var(--border)) 50%,
+    color-mix(in srgb, var(--accent-alt, #a855f7) 50%, var(--border)) 80%,
+    transparent 100%
+  );
+  pointer-events: none;
+}
+
+/* Gloss periodique : un balayage discret toutes les 14s sur la topbar. */
+.topbar-gloss {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 25%;
+  height: 200%;
+  background: linear-gradient(
+    115deg,
+    transparent 0%,
+    color-mix(in srgb, white 0%, transparent) 40%,
+    color-mix(in srgb, white 12%, transparent) 50%,
+    color-mix(in srgb, white 0%, transparent) 60%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: topbar-gloss-loop 14s ease-out 1s infinite;
+  z-index: 0;
+}
+@keyframes topbar-gloss-loop {
+  0%   { left: -50%; }
+  10%  { left: 150%; }
+  100% { left: 150%; }
+}
+
 .brand {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   background: none;
-  padding: 4px 6px;
-  border-radius: 8px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--border));
+  z-index: 1;
+  transition: background-color 0.2s ease,
+    border-color 0.25s ease,
+    transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.25s ease;
 }
 .brand:hover {
-  background-color: var(--bg-hover);
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 70%, var(--border));
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--accent) 25%, transparent);
+  transform: scale(1.03);
+}
+
+/* Halo discret derriere le bouton brand : pulse leger pour signaler
+   l'identite "vivante" de l'app. */
+.brand-halo {
+  position: absolute;
+  inset: -4px;
+  border-radius: 12px;
+  background: radial-gradient(circle at 18px 50%,
+    color-mix(in srgb, var(--accent) 40%, transparent) 0%,
+    transparent 60%);
+  opacity: 0.55;
+  filter: blur(6px);
+  pointer-events: none;
+  z-index: -1;
+  animation: brand-halo-pulse 4s ease-in-out infinite;
+}
+@keyframes brand-halo-pulse {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.75; }
 }
 
 .logo-icon {
@@ -117,17 +205,43 @@ onMounted(() => {
   height: 32px;
   border-radius: 8px;
   object-fit: contain;
+  filter: drop-shadow(0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent));
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.brand:hover .logo-icon {
+  transform: rotate(-6deg) scale(1.05);
 }
 
 .logo-text {
   font-size: 16px;
   font-weight: 700;
-  color: var(--text-primary);
+  /* Gradient text avec shimmer leger : moins agressif que le hero. */
+  background: linear-gradient(
+    90deg,
+    var(--text-primary) 0%,
+    color-mix(in srgb, var(--accent) 70%, var(--text-primary)) 50%,
+    var(--text-primary) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: brand-shimmer 8s linear infinite;
+  letter-spacing: 0.3px;
+}
+@keyframes brand-shimmer {
+  0%   { background-position: 200% center; }
+  100% { background-position: -200% center; }
 }
 
 .spacer {
   flex: 1;
 }
+
+.guild-selector { position: relative; z-index: 1; }
+.status-indicator { position: relative; z-index: 1; }
+.user-block { position: relative; z-index: 1; }
 
 .guild-select {
   padding: 7px 28px 7px 10px;
@@ -169,10 +283,13 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 1;
 }
 .bell-btn:hover {
-  background-color: var(--bg-hover);
-  color: var(--text-primary);
+  background-color: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  transform: scale(1.08);
 }
 .bell-btn svg {
   width: 18px;
@@ -265,5 +382,19 @@ onMounted(() => {
   .topbar {
     padding: 10px 12px;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-gloss { display: none; }
+  .brand-halo { animation: none; opacity: 0.5; }
+  .logo-text {
+    animation: none;
+    background: none;
+    -webkit-text-fill-color: var(--text-primary);
+    color: var(--text-primary);
+  }
+  .brand,
+  .brand:hover,
+  .bell-btn:hover { transform: none; }
 }
 </style>

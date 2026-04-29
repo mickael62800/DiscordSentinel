@@ -47,8 +47,19 @@ export const reviewService = {
   },
 };
 
+export interface ModstatsTrendDay {
+  day: string;
+  warns: number;
+  mutes: number;
+  bans: number;
+  kicks: number;
+}
+
 export const modstatsService = {
-  list(guildId: string): Promise<ModStatsEntry[]> {
-    return httpGet(`/api/moderation/modstats/${guildId}`);
+  list(guildId: string, days = 30): Promise<ModStatsEntry[]> {
+    return httpGet(`/api/moderation/modstats/${guildId}?days=${days}`);
+  },
+  trend(guildId: string, days = 30): Promise<ModstatsTrendDay[]> {
+    return httpGet(`/api/moderation/modstats/${guildId}/trend?days=${days}`);
   },
 };

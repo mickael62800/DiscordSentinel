@@ -110,6 +110,8 @@ export interface Infraction {
   id: string;
   user_id: string;
   username: string;
+  /** Pseudo serveur (nickname) si configure, sinon null. */
+  display_name?: string | null;
   server: string;
   infraction_type: string;
   action?: string;
@@ -133,6 +135,8 @@ export interface ConfirmedBan {
   guild_id: string;
   target_id: string;
   target_name: string;
+  /** Pseudo serveur (nickname) actuel, si l'user etait dans la guild. */
+  target_display_name?: string | null;
   moderator_name: string;
   action_type: string;
   reason: string;

@@ -30,6 +30,9 @@ struct InfractionRow {
     channel_id: ChannelId,
     user_id: UserId,
     username: String,
+    /// Alias `display_name` issu du LEFT JOIN guild_members. None si l'user
+    /// n'est plus / pas dans la guild, ou n'a pas configure de nickname.
+    display_name: Option<String>,
     message_id: MessageId,
     content: String,
     flags: serde_json::Value,
@@ -48,6 +51,7 @@ impl From<InfractionRow> for Infraction {
             channel_id: row.channel_id,
             user_id: row.user_id,
             username: row.username,
+            display_name: row.display_name,
             message_id: row.message_id,
             content: row.content,
             flags: serde_json::from_value(row.flags).unwrap_or(DetectionFlags {
@@ -66,6 +70,15 @@ impl From<InfractionRow> for Infraction {
         }
     }
 }
+
+/// SELECT enrichi : ajoute `gm.display_name AS display_name` via LEFT JOIN
+/// `guild_members`. Utilise dans toutes les queries qui retournent une
+/// `Infraction` au front.
+const INFRACTION_SELECT: &str = "SELECT i.id, i.guild_id, i.channel_id, i.user_id, i.username, \
+    gm.display_name AS display_name, i.message_id, i.content, i.flags, i.score, \
+    i.action, i.reason, i.duration, i.created_at \
+    FROM infractions i \
+    LEFT JOIN guild_members gm ON gm.guild_id = i.guild_id AND gm.user_id = i.user_id";
 
 #[async_trait]
 impl InfractionRepository for PgInfractionRepository {
@@ -104,19 +117,19 @@ impl InfractionRepository for PgInfractionRepository {
         guild_id: &str,
         filters: &InfractionFilters,
     ) -> Result<Vec<Infraction>, DomainError> {
-        let mut query = String::from("SELECT * FROM infractions WHERE guild_id = $1");
+        let mut query = format!("{INFRACTION_SELECT} WHERE i.guild_id = $1");
         let mut param_idx = 2u32;
 
         if filters.user_id.is_some() {
-            query.push_str(&format!(" AND user_id = ${}", param_idx));
+            query.push_str(&format!(" AND i.user_id = ${}", param_idx));
             param_idx += 1;
         }
         if filters.action.is_some() {
-            query.push_str(&format!(" AND action = ${}", param_idx));
+            query.push_str(&format!(" AND i.action = ${}", param_idx));
             param_idx += 1;
         }
 
-        query.push_str(&format!(" ORDER BY created_at DESC LIMIT ${} OFFSET ${}", param_idx, param_idx + 1));
+        query.push_str(&format!(" ORDER BY i.created_at DESC LIMIT ${} OFFSET ${}", param_idx, param_idx + 1));
 
         let mut q = sqlx::query_as::<_, InfractionRow>(&query).bind(guild_id);
 
@@ -138,9 +151,8 @@ impl InfractionRepository for PgInfractionRepository {
     }
 
     async fn find_all(&self, limit: i64, offset: i64) -> Result<Vec<Infraction>, DomainError> {
-        let rows = sqlx::query_as::<_, InfractionRow>(
-            "SELECT * FROM infractions ORDER BY created_at DESC LIMIT $1 OFFSET $2",
-        )
+        let sql = format!("{INFRACTION_SELECT} ORDER BY i.created_at DESC LIMIT $1 OFFSET $2");
+        let rows = sqlx::query_as::<_, InfractionRow>(&sql)
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.pool)
@@ -165,7 +177,8 @@ impl InfractionRepository for PgInfractionRepository {
         let uuid = Uuid::parse_str(id)
             .map_err(|_| DomainError::NotFound(format!("ID invalide: {id}")))?;
 
-        let row = sqlx::query_as::<_, InfractionRow>("SELECT * FROM infractions WHERE id = $1")
+        let sql = format!("{INFRACTION_SELECT} WHERE i.id = $1");
+        let row = sqlx::query_as::<_, InfractionRow>(&sql)
             .bind(uuid)
             .fetch_optional(&self.pool)
             .await

@@ -30,9 +30,14 @@ async fn try_trigger_protection(
     api: &ApiClient,
     guild_id: &str,
     target_id: &str,
-) -> Option<(String, String)> {
+) -> Option<(String, String, u32, u32)> {
     match api.try_trigger_steal_protection(guild_id, target_id).await {
-        Ok(Some(trigger)) => Some((trigger.item_key, trigger.item_name)),
+        Ok(Some(trigger)) => Some((
+            trigger.item_key,
+            trigger.item_name,
+            trigger.rolled_value,
+            trigger.block_chance_percent,
+        )),
         Ok(None) => None,
         Err(e) => {
             tracing::warn!(error = %e, "Echec try_trigger_steal_protection API");
@@ -436,11 +441,18 @@ async fn resolve_steal_attempt(
         // Le voleur a gagne le roll — mais une protection active peut
         // encore bloquer le vol (Phase 9 Part B : abonnements temps-base,
         // plus de consommation d'item).
-        if let Some((_key, name)) = try_trigger_protection(api, guild_id, target_id).await {
+        if let Some((_key, name, rolled, chance)) = try_trigger_protection(api, guild_id, target_id).await {
             // Phase 9 Part D : blocage reussi → reset le victim streak.
             if let Err(e) = api.track_steal_defended(guild_id, target_id).await {
                 tracing::warn!(error = %e, "Echec track_steal_defended");
             }
+
+            // Ligne explicite : le voleur AVAIT gagne le roll des des, mais
+            // la protection a bloque grace au tirage % (rolled <= chance).
+            let protection_detail = format!(
+                "\n\u{1f3b2} Le voleur avait gagne le combat ({} > {}), mais la protection a fait un jet de **{}/100** (seuil **{}%**) → \u{2705} bloque !",
+                thief_total, target_total, rolled, chance
+            );
 
             let block_msg = format!(
                 "\u{1f6e1}\u{fe0f} <@{}> etait protege par **{}** qui a bloque la tentative de vol de <@{}> !",
@@ -462,7 +474,7 @@ async fn resolve_steal_attempt(
             }
             let embed = CreateEmbed::new()
                 .title("\u{1f6e1}\u{fe0f} Vol bloque !")
-                .description(format!("{}{}{}", block_msg, roll_detail, xp_line))
+                .description(format!("{}{}{}{}", block_msg, roll_detail, protection_detail, xp_line))
                 .color(0x3498DB)
                 .footer(CreateEmbedFooter::new(sentinel_shared::branding::COUDE_TAGLINE_SHORT))
                 .timestamp(serenity::model::Timestamp::now());
@@ -709,16 +721,32 @@ pub async fn handle_defend(ctx: &Context, component: &ComponentInteraction) {
     // Apres Acknowledge (DEFERRED_UPDATE_MESSAGE), edit_response edite le
     // message d'origine (le challenge de vol) pour afficher le resultat et
     // retirer les boutons.
-    if let Err(e) = component
+    let edit_result = component
         .edit_response(
             &ctx.http,
             serenity::all::EditInteractionResponse::new()
-                .embed(embed)
+                .embed(embed.clone())
                 .components(vec![]),
         )
-        .await
-    {
-        tracing::warn!(error = %e, "Echec edit_response Discord (defend vol)");
+        .await;
+
+    if let Err(e) = edit_result {
+        tracing::warn!(error = %e, thief_id, target_id, guild_id,
+            "Echec edit_response Discord (defend vol) — fallback en followup");
+        // Fallback : poste le resultat en followup public dans le salon
+        // pour que le user voie quand meme le verdict de son roll, meme si
+        // le message original n'est plus editable (supprime, expire, etc.).
+        if let Err(e2) = component
+            .create_followup(
+                &ctx.http,
+                serenity::all::CreateInteractionResponseFollowup::new()
+                    .embed(embed),
+            )
+            .await
+        {
+            tracing::error!(error = %e2, thief_id, target_id, guild_id,
+                "Echec followup defend vol — l utilisateur ne verra rien");
+        }
     }
 
     // Drop le data guard avant le dispatch async (il lock TypeMap).

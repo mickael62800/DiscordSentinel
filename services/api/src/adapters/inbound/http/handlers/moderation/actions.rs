@@ -672,9 +672,11 @@ pub async fn get_modstats(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
+    Query(params): Query<TrendQuery>,
 ) -> Result<Json<Vec<crate::adapters::inbound::http::dto::moderation::actions::ModStatsEntryDto>>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
     check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
+    let days = params.days.unwrap_or(30).clamp(1, 90);
 
     #[derive(sqlx::FromRow)]
     struct StatsRow {
@@ -689,7 +691,7 @@ pub async fn get_modstats(
 
     // Phase 4 : on lit depuis `audit_logs` (event_type='mod_*') et plus
     // depuis `moderation_actions` qui n'est plus alimentee.
-    let rows: Vec<StatsRow> = sqlx::query_as::<_, StatsRow>(
+    let sql = format!(
         "SELECT \
             actor_id AS moderator_id, \
             MAX(actor_name) AS moderator_name, \
@@ -703,11 +705,12 @@ pub async fn get_modstats(
            AND event_type LIKE 'mod_%' \
            AND event_type NOT IN ('mod_unban','mod_unmute') \
            AND actor_id IS NOT NULL \
-           AND created_at >= NOW() - INTERVAL '30 days' \
+           AND created_at >= NOW() - INTERVAL '{days} days' \
          GROUP BY actor_id \
          ORDER BY total DESC \
-         LIMIT 20",
-    )
+         LIMIT 20"
+    );
+    let rows: Vec<StatsRow> = sqlx::query_as::<_, StatsRow>(&sql)
     .bind(&guild_id)
     .fetch_all(&state.pg_pool)
     .await
@@ -731,6 +734,89 @@ pub async fn get_modstats(
     Ok(Json(dtos))
 }
 
+/// GET /api/moderation/modstats/{guild_id}/trend?days=30
+///
+/// Retourne les actions de moderation agregees par jour sur les N derniers
+/// jours (default 30, max 90). Lecture depuis `audit_logs` comme modstats.
+/// Utilise pour la courbe "Tendance moderation" sur la page web /modstats.
+pub async fn get_modstats_trend(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Path(guild_id): Path<String>,
+    Query(params): Query<TrendQuery>,
+) -> Result<Json<Vec<ModstatsTrendDayDto>>, ApiError> {
+    validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
+    check_role(&rbac, Role::Moderator, "moderator+ requis pour voir les stats de moderation")?;
+
+    let days = params.days.unwrap_or(30).clamp(1, 90);
+
+    #[derive(sqlx::FromRow)]
+    struct TrendRow {
+        day: chrono::NaiveDate,
+        warns: i64,
+        mutes: i64,
+        bans: i64,
+        kicks: i64,
+    }
+
+    // generate_series garantit que tous les jours apparaissent meme s'il
+    // n'y a eu aucune action ce jour-la (sinon la courbe a des trous).
+    let sql = format!(
+        "SELECT \
+            d::date AS day, \
+            COALESCE(SUM(CASE WHEN a.event_type = 'mod_warn' THEN 1 ELSE 0 END), 0) AS warns, \
+            COALESCE(SUM(CASE WHEN a.event_type IN ('mod_mute_temp','mod_mute_permanent','mod_mute') THEN 1 ELSE 0 END), 0) AS mutes, \
+            COALESCE(SUM(CASE WHEN a.event_type IN ('mod_ban_temp','mod_ban_permanent','mod_ban') THEN 1 ELSE 0 END), 0) AS bans, \
+            COALESCE(SUM(CASE WHEN a.event_type = 'mod_kick' THEN 1 ELSE 0 END), 0) AS kicks \
+         FROM generate_series( \
+                 (CURRENT_DATE - INTERVAL '{days} days')::date, \
+                 CURRENT_DATE, \
+                 INTERVAL '1 day' \
+              ) AS d \
+         LEFT JOIN audit_logs a \
+             ON a.guild_id = $1 \
+             AND a.event_type LIKE 'mod_%' \
+             AND a.event_type NOT IN ('mod_unban','mod_unmute') \
+             AND a.actor_id IS NOT NULL \
+             AND a.created_at::date = d::date \
+         GROUP BY d \
+         ORDER BY d ASC"
+    );
+
+    let rows: Vec<TrendRow> = sqlx::query_as::<_, TrendRow>(&sql)
+        .bind(&guild_id)
+        .fetch_all(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(crate::domain::errors::DomainError::Internal(format!("modstats trend query: {e}"))))?;
+
+    let dtos = rows
+        .into_iter()
+        .map(|r| ModstatsTrendDayDto {
+            day: r.day.to_string(),
+            warns: r.warns,
+            mutes: r.mutes,
+            bans: r.bans,
+            kicks: r.kicks,
+        })
+        .collect();
+
+    Ok(Json(dtos))
+}
+
+#[derive(serde::Deserialize)]
+pub struct TrendQuery {
+    pub days: Option<i64>,
+}
+
+#[derive(serde::Serialize)]
+pub struct ModstatsTrendDayDto {
+    pub day: String,
+    pub warns: i64,
+    pub mutes: i64,
+    pub bans: i64,
+    pub kicks: i64,
+}
+
 /// DELETE /api/moderation/actions/{id} — annule une action.
 ///
 /// Comportement selon le type d'action :
@@ -746,20 +832,27 @@ pub async fn delete_action(
     let uuid = uuid::Uuid::parse_str(&id)
         .map_err(|_| ApiError(crate::domain::errors::DomainError::ValidationError("ID invalide".into())))?;
 
-    // Fetch l'action pour le gate RBAC + l'eventuel unban Discord.
-    // SQL direct car find_by_id n'est pas expose sur le use case.
-    let row: Option<(String, String, String, String)> = sqlx::query_as(
-        "SELECT guild_id, target_id, target_name, action_type \
-         FROM moderation_actions WHERE id = $1",
+    // Phase 4 : lookup dans `audit_logs` (event_type='mod_*') et plus
+    // dans `moderation_actions` qui n'est plus alimentee. action_id est
+    // stocke dans `details->>'action_id'`. action_type derive de
+    // event_type en strippant le prefixe 'mod_'.
+    let row: Option<(String, Option<String>, Option<String>, String)> = sqlx::query_as(
+        "SELECT guild_id, target_id, target_name, event_type \
+         FROM audit_logs \
+         WHERE event_type LIKE 'mod_%' AND details->>'action_id' = $1 \
+         LIMIT 1",
     )
-    .bind(uuid)
+    .bind(uuid.to_string())
     .fetch_optional(&state.pg_pool)
     .await
     .map_err(|e| ApiError(DomainError::Internal(format!("fetch action: {e}"))))?;
 
-    let Some((guild_id, target_id, target_name, action_type)) = row else {
+    let Some((guild_id, target_id_opt, target_name_opt, event_type)) = row else {
         return Err(ApiError(crate::domain::errors::DomainError::NotFound("Action introuvable".into())));
     };
+    let target_id = target_id_opt.unwrap_or_default();
+    let target_name = target_name_opt.unwrap_or_default();
+    let action_type = event_type.strip_prefix("mod_").unwrap_or(&event_type).to_string();
 
     // Gate RBAC : moderator+ sur la guild concernee.
     check_role_for_guild(
