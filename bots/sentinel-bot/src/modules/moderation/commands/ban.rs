@@ -13,7 +13,6 @@ use sentinel_shared::heartbeat::ApiClientKey;
 use super::api_client::ModerationAction;
 use super::ModerationApiKey;
 use super::risk_check::{
-use crate::domain::entities::system::discord_ids::ChannelId;
     self, PendingKind, RiskyPending, RiskyPendingKey, CANCEL_PREFIX, CONFIRM_PREFIX,
 };
 
@@ -249,7 +248,7 @@ async fn defer_with_confirmation(
 #[allow(clippy::too_many_arguments)]
 pub async fn execute_ban(
     ctx: &Context,
-    channel_id: ChannelId,
+    channel_id: String,
     moderator_id: String,
     moderator_name: String,
     guild_id: serenity::model::id::GuildId,

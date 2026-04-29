@@ -10,13 +10,12 @@ use serde::Deserialize;
 use sentinel_proto::coude::v1 as proto_coude;
 
 use super::{grpc_err_to_string, taunt_event_from_proto, ApiClient, TauntEvent};
-use crate::domain::entities::system::discord_ids::ChannelId;
 
 // ── Migration 139 : DTOs HTTP pour les hooks blackjack + eco ──
 
 #[derive(Debug, Clone, Deserialize)]
 struct TauntEventHttpDto {
-    channel_id: ChannelId,
+    channel_id: String,
     target_user_id: String,
     message: String,
     nickname_suffix: String,

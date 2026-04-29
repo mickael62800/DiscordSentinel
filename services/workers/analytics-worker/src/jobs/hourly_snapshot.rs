@@ -2,11 +2,10 @@ use sqlx::PgPool;
 use tracing::{debug, info, warn};
 
 use sentinel_worker_common::is_worker_enabled;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 #[derive(sqlx::FromRow)]
 struct GuildRow {
-    guild_id: GuildId,
+    guild_id: String,
 }
 
 /// Enregistre un snapshot d'activite horaire pour chaque guild

@@ -7,7 +7,6 @@ use serde::Serialize;
 use tokio::sync::Mutex;
 
 use crate::config::BotConfig;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 /// Publisher Redis pour les events temps reel.
 /// Phase 5B : XADD sur la stream `sentinel:events` (au lieu de PUBLISH pub/sub).
@@ -165,7 +164,7 @@ impl BaseApiClient {
     ) -> Result<(), String> {
         #[derive(Serialize)]
         struct Payload {
-            guild_id: GuildId,
+            guild_id: String,
             name: String,
             member_count: Option<i32>,
             #[serde(skip_serializing_if = "Option::is_none")]

@@ -4,7 +4,6 @@ use sqlx::PgPool;
 use tracing::{info, warn};
 
 use sentinel_worker_common::is_worker_enabled;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 const CACHE_TTL_SECS: u64 = 600; // 10 minutes
 const DAYS: i32 = 30;
@@ -12,7 +11,7 @@ const LIMIT: i64 = 10;
 
 #[derive(sqlx::FromRow)]
 struct GuildRow {
-    guild_id: GuildId,
+    guild_id: String,
 }
 
 #[derive(Serialize)]

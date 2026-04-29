@@ -22,9 +22,9 @@ use sentinel_proto::roles::v1 as proto;
 
 #[derive(Debug, Deserialize)]
 pub struct TempRoleApiEntry {
-    pub guild_id: GuildId,
-    pub user_id: UserId,
-    pub role_id: RoleId,
+    pub guild_id: String,
+    pub user_id: String,
+    pub role_id: String,
     pub expires_at: String,
 }
 
@@ -38,8 +38,8 @@ pub struct RolePanelDetail {
 #[allow(dead_code)]
 pub struct RolePanel {
     pub id: String,
-    pub guild_id: GuildId,
-    pub channel_id: ChannelId,
+    pub guild_id: String,
+    pub channel_id: String,
     pub message_id: Option<String>,
     pub title: String,
     pub description: String,
@@ -52,7 +52,7 @@ pub struct RolePanel {
 #[allow(dead_code)]
 pub struct RolePanelEntry {
     pub id: String,
-    pub role_id: RoleId,
+    pub role_id: String,
     pub role_name: String,
     pub emoji: Option<String>,
     pub label: String,
@@ -63,7 +63,7 @@ pub struct RolePanelEntry {
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 pub struct AutoRole {
-    pub role_id: RoleId,
+    pub role_id: String,
     pub role_name: String,
     pub delay_secs: i32,
     pub enabled: bool,
@@ -334,7 +334,7 @@ fn proto_detail_to_dto(d: proto::RolePanelDetail) -> RolePanelDetail {
         panel: d.panel.map(proto_panel_to_dto).unwrap_or(RolePanel {
             id: String::new(),
             guild_id: String::new(),
-            channel_id: ChannelId::new(),
+            channel_id: String::new(),
             message_id: None,
             title: String::new(),
             description: String::new(),
@@ -356,7 +356,3 @@ fn proto_auto_role_to_dto(r: proto::AutoRole) -> AutoRole {
 }
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
-use sentinel_api::domain::entities::system::discord_ids::RoleId;
-use crate::domain::entities::system::discord_ids::ChannelId;
-use sentinel_api::domain::entities::system::discord_ids::UserId;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;

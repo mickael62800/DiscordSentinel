@@ -4,7 +4,6 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use sentinel_worker_common::is_worker_enabled;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 /// Phase 5B : XADD sur la stream `sentinel:events` (remplace pub/sub PUBLISH).
 /// Doit rester synchronise avec `bots/shared/src/event_bus.rs`.
@@ -15,7 +14,7 @@ const PAYLOAD_FIELD: &str = "payload";
 #[derive(sqlx::FromRow)]
 struct PendingReminder {
     id: Uuid,
-    guild_id: GuildId,
+    guild_id: String,
     moderator_id: String,
     moderator_name: String,
     target_id: String,

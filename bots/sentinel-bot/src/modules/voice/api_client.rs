@@ -18,10 +18,10 @@ use sentinel_proto::voice::v1 as proto;
 
 #[derive(Debug, Serialize)]
 pub struct CreateVoiceChannelRequest {
-    pub guild_id: GuildId,
+    pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: ChannelId,
+    pub channel_id: String,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -58,13 +58,13 @@ pub struct TransferOwnershipRequest {
 
 #[derive(Debug, Serialize)]
 pub struct AddCoAdminRequest {
-    pub user_id: UserId,
+    pub user_id: String,
     pub user_name: String,
 }
 
 #[derive(Debug, Serialize)]
 pub struct AddWhitelistRequest {
-    pub guild_id: GuildId,
+    pub guild_id: String,
     pub owner_id: String,
     pub target_id: String,
     pub target_name: String,
@@ -72,7 +72,7 @@ pub struct AddWhitelistRequest {
 
 #[derive(Debug, Serialize)]
 pub struct BanFromChannelRequest {
-    pub user_id: UserId,
+    pub user_id: String,
     pub user_name: String,
     pub banned_by: String,
     pub reason: Option<String>,
@@ -81,8 +81,8 @@ pub struct BanFromChannelRequest {
 
 #[derive(Debug, Serialize)]
 pub struct LogModerationActionRequest {
-    pub guild_id: GuildId,
-    pub channel_id: ChannelId,
+    pub guild_id: String,
+    pub channel_id: String,
     pub moderator_id: String,
     pub moderator_name: String,
     pub target_id: String,
@@ -98,10 +98,10 @@ pub struct LogModerationActionRequest {
 #[allow(dead_code)]
 pub struct VoiceChannelResponse {
     pub id: String,
-    pub guild_id: GuildId,
+    pub guild_id: String,
     pub owner_id: String,
     pub owner_name: String,
-    pub channel_id: ChannelId,
+    pub channel_id: String,
     pub text_channel_id: Option<String>,
     pub members_channel_id: Option<String>,
     pub queue_channel_id: Option<String>,
@@ -460,6 +460,3 @@ fn proto_to_response(c: proto::VoiceChannel) -> VoiceChannelResponse {
 }
 
 use sentinel_shared::grpc_client::grpc_err_to_string;
-use crate::domain::entities::system::discord_ids::ChannelId;
-use sentinel_api::domain::entities::system::discord_ids::UserId;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;

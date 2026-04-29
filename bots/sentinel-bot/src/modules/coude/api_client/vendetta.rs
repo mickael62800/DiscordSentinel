@@ -3,7 +3,6 @@
 use serde::{Deserialize, Serialize};
 
 use super::ApiClient;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 #[derive(Debug, Serialize)]
 pub struct DeclareVendettaBody<'a> {
@@ -19,7 +18,7 @@ pub struct DeclaredVendettaResp {
 #[derive(Debug, Deserialize, Clone)]
 pub struct ActiveVendettaResp {
     pub id: String,
-    pub guild_id: GuildId,
+    pub guild_id: String,
     pub challenger_id: String,
     pub target_id: String,
     pub declared_at: String,

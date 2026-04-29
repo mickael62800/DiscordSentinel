@@ -6,7 +6,6 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::config::{DEFAULT_SLA_ESCALATION_MINUTES, DEFAULT_SLA_FIRST_RESPONSE_MINUTES};
-use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 /// Phase 6A — Escalade automatique des appels de sanction en breach de SLA.
 ///
@@ -174,7 +173,7 @@ struct GuildSlaConfig {
 async fn load_sla_configs(pool: &PgPool) -> Result<HashMap<String, GuildSlaConfig>, String> {
     #[derive(sqlx::FromRow)]
     struct ConfigRow {
-        guild_id: GuildId,
+        guild_id: String,
         config_key: String,
         config_value: String,
     }

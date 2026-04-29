@@ -6,7 +6,6 @@ use dashmap::DashMap;
 use serenity::all::{Context, GuildId, User};
 use serenity::prelude::TypeMapKey;
 use tracing::warn;
-use crate::domain::entities::system::discord_ids::ChannelId;
 
 /// Age minimum d'un compte avant de considerer qu'il n'est plus "recent".
 const RECENT_ACCOUNT_DAYS: i64 = 7;
@@ -36,8 +35,8 @@ pub enum PendingKind {
 #[derive(Clone)]
 pub struct RiskyPending {
     pub kind: PendingKind,
-    pub guild_id: GuildId,
-    pub channel_id: ChannelId,
+    pub guild_id: String,
+    pub channel_id: String,
     pub target_id: String,
     pub target_name: String,
     pub moderator_id: String,

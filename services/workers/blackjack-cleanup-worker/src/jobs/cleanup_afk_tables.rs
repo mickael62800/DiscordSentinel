@@ -24,8 +24,6 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::config::DEFAULT_AFK_TIMEOUT_SECS;
-use crate::domain::entities::system::discord_ids::ChannelId;
-use sentinel_api::domain::entities::system::discord_ids::GuildId;
 
 const STREAM_KEY: &str = "sentinel:events";
 const STREAM_MAXLEN: usize = 10_000;
@@ -34,8 +32,8 @@ const PAYLOAD_FIELD: &str = "payload";
 #[derive(Debug, sqlx::FromRow)]
 struct AfkTable {
     id: Uuid,
-    guild_id: GuildId,
-    channel_id: ChannelId,
+    guild_id: String,
+    channel_id: String,
     owner_id: String,
     last_activity: DateTime<Utc>,
 }
