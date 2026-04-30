@@ -175,6 +175,11 @@ services:
     pid: host
     security_opt:
       - no-new-privileges:true
+    # GID du groupe `docker` de l'host (proprietaire du socket /var/run/docker.sock).
+    # Sans ca, le user non-root du conteneur n'a pas acces au socket. Override
+    # via DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) dans .env si different.
+    group_add:
+      - "${DOCKER_GID:-988}"
     ports:
       - "3000:3000"     # HTTP/Axum
       - "50051:50051"   # gRPC/tonic interne aux bots
