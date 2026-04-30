@@ -55,7 +55,7 @@ function setTab(t: Tab) {
 let pollHandle: number | null = null;
 function startPoll() {
   if (pollHandle !== null) return;
-  pollHandle = window.setInterval(refreshTab, 10_000);
+  pollHandle = window.setInterval(refreshTab, 120_000);
 }
 function stopPoll() {
   if (pollHandle !== null) {

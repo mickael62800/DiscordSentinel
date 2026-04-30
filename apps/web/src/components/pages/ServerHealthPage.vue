@@ -27,7 +27,7 @@ async function fetchInfo() {
 
 function startPolling() {
   if (pollHandle !== null) return;
-  pollHandle = window.setInterval(fetchInfo, 5_000);
+  pollHandle = window.setInterval(fetchInfo, 120_000);
 }
 function stopPolling() {
   if (pollHandle !== null) {
@@ -94,11 +94,11 @@ const allHealthy = computed(() => {
         <button
           class="auto-toggle"
           :class="{ active: autoRefresh }"
-          :title="autoRefresh ? 'Auto-refresh actif (5s)' : 'Auto-refresh désactivé'"
+          :title="autoRefresh ? 'Auto-refresh actif (2 min)' : 'Auto-refresh désactivé'"
           @click="toggleAutoRefresh"
         >
           <span class="dot" :class="{ pulse: autoRefresh }"></span>
-          {{ autoRefresh ? "Live (5s)" : "Pause" }}
+          {{ autoRefresh ? "Live (2 min)" : "Pause" }}
         </button>
         <button
           class="refresh-btn"
@@ -340,7 +340,7 @@ const allHealthy = computed(() => {
 }
 .dot.pulse {
   background: var(--success, #2ecc71);
-  animation: dot-pulse 1.5s ease-in-out infinite;
+  animation: dot-pulse 1.2 min ease-in-out infinite;
 }
 @keyframes dot-pulse {
   0%, 100% { opacity: 0.5; transform: scale(1); }
