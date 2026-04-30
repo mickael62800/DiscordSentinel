@@ -180,9 +180,14 @@ services:
     # via DOCKER_GID=$(stat -c '%g' /var/run/docker.sock) dans .env si different.
     group_add:
       - "${DOCKER_GID:-988}"
+    # SECURITE — l'API est reachable depuis l'exterieur UNIQUEMENT via le
+    # proxy nginx du service `web` (location /api/). On bind donc 127.0.0.1
+    # pour conserver un acces local debug (curl/SSH tunnel) sans exposer
+    # publiquement. Le gRPC 50051 est utilise par les bots/workers via le
+    # reseau docker interne, idem.
     ports:
-      - "3000:3000"     # HTTP/Axum
-      - "50051:50051"   # gRPC/tonic interne aux bots
+      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:50051:50051"
     healthcheck:
       test: ["CMD", "grpc_health_probe", "-addr=:50051"]
       interval: 10s
@@ -228,8 +233,10 @@ services:
       <<: *build-alpine
       args:
         BIN_NAME: sentinel-gateway
+    # SECURITE — gateway reachable via /ws du proxy nginx, pas de raison
+    # de l'exposer publiquement. 127.0.0.1 = acces local debug uniquement.
     ports:
-      - "3001:3001"
+      - "127.0.0.1:3001:3001"
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://localhost:3001/health || exit 1"]
       interval: 15s
@@ -573,8 +580,10 @@ services:
     container_name: sentinel-pgadmin
     restart: unless-stopped
     logging: *default-logging
+    # SECURITE — pgadmin = panneau admin DB, JAMAIS expose publiquement.
+    # Acces via SSH tunnel : ssh -L 5050:localhost:5050 user@host
     ports:
-      - "5050:80"
+      - "127.0.0.1:5050:80"
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@sentinel.local}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
@@ -589,8 +598,10 @@ services:
     container_name: sentinel-redis-commander
     restart: unless-stopped
     logging: *default-logging
+    # SECURITE — redis-commander = panneau admin Redis, JAMAIS expose
+    # publiquement. Acces SSH tunnel : ssh -L 8081:localhost:8081 user@host
     ports:
-      - "8081:8081"
+      - "127.0.0.1:8081:8081"
     environment:
       REDIS_HOSTS: local:redis:6379:0:${REDIS_PASSWORD:-sentinel_redis}
     depends_on:
