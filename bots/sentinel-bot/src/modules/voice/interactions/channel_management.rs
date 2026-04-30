@@ -3,7 +3,6 @@ use serenity::builder::{
     EditChannel,
 };
 use serenity::model::application::{ComponentInteraction, InputTextStyle, ModalInteraction};
-use serenity::model::id::ChannelId;
 use serenity::model::Permissions;
 use serenity::prelude::*;
 use tracing::{error, info, warn};
@@ -443,30 +442,16 @@ async fn handle_modal_rename(ctx: &Context, modal: &ModalInteraction) {
         return;
     }
 
-    {
-        let data = ctx.data.read().await;
-        let Some(api) = ApiClient::from_data(&data) else {
-            error!("ApiClient ou GrpcClient manquants dans TypeMap");
-            return;
-        };
-        if let Ok(Some(ch)) = api.get_channel(&voice_channel_id.get().to_string()).await {
-            if let Some(cat_id_str) = &ch.category_id {
-                if let Ok(cat_id) = cat_id_str.parse::<u64>() {
-                    let cat_edit = EditChannel::new().name(&new_name);
-                    if let Err(e) = ChannelId::new(cat_id).edit(&ctx.http, cat_edit).await {
-                        error!(error = %e, "Erreur rename categorie Discord");
-                        super::respond_ephemeral_modal(ctx, modal, "Erreur lors du renommage.").await;
-                        return;
-                    }
-                }
-            } else {
-                super::respond_ephemeral_modal(ctx, modal, "Pas de categorie associee.").await;
-                return;
-            }
-        } else {
-            super::respond_ephemeral_modal(ctx, modal, "Salon introuvable.").await;
-            return;
-        }
+    // Renomme directement le salon vocal sur Discord. (L ancien code
+    // tentait de renommer la categorie associee — vestige d une version
+    // ou chaque user avait sa propre categorie. Aujourd hui les salons
+    // temporaires n ont pas de categorie distincte → le rename ne faisait
+    // rien et retournait "Pas de categorie associee".)
+    let edit = EditChannel::new().name(&new_name);
+    if let Err(e) = voice_channel_id.edit(&ctx.http, edit).await {
+        error!(error = %e, voice = %voice_channel_id, "Erreur rename salon vocal Discord");
+        super::respond_ephemeral_modal(ctx, modal, "Erreur lors du renommage.").await;
+        return;
     }
 
     let update = UpdateVoiceChannelRequest {

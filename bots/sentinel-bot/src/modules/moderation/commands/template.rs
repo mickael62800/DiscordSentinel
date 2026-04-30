@@ -2,7 +2,7 @@ use serenity::all::{
     CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateCommand,
     CreateCommandOption, CreateInteractionResponse, CreateInteractionResponseMessage,
 };
-use tracing::{error, warn};
+use tracing::warn;
 
 use sentinel_shared::api_client::BaseApiClient;
 use sentinel_shared::embeds::{info_embed, success_embed};
