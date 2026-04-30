@@ -69,6 +69,12 @@ pub fn routes() -> Router<AppState> {
         .route("/api/docker/prune/volumes", post(handlers::system::docker::prune_volumes))
         .route("/api/docker/prune/networks", post(handlers::system::docker::prune_networks))
         .route("/api/docker/prune/system", post(handlers::system::docker::prune_system))
+        // AI dataset (collecte messages -> CSV pour entrainement)
+        .route(
+            "/api/ai-dataset/messages/{guild_id}",
+            get(handlers::ai::dataset::list_messages)
+                .delete(handlers::ai::dataset::bulk_delete),
+        )
         // RBAC component visibility (overrides UI par role)
         .route(
             "/api/rbac/component-visibility/{guild_id}",
