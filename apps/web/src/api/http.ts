@@ -4,7 +4,14 @@
 import { getApiConfig, getDiscordToken } from "./config";
 
 export function apiBase(): string {
-  return getApiConfig()?.api_url || import.meta.env.VITE_API_URL || "http://localhost:3000";
+  // Priorite : config localStorage utilisateur > VITE_API_URL au build > defaut.
+  // En prod, defaut "" -> URLs relatives -> passent par le proxy nginx (origin courant).
+  // En dev, defaut http://localhost:3000 -> hit l'API directement.
+  const cfg = getApiConfig()?.api_url;
+  if (cfg) return cfg;
+  const env = import.meta.env.VITE_API_URL;
+  if (env) return env;
+  return import.meta.env.PROD ? "" : "http://localhost:3000";
 }
 
 function headers(extra?: Record<string, string>): Record<string, string> {

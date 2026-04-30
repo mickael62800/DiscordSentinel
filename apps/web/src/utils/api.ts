@@ -9,7 +9,10 @@ let cachedUrl: string | null = null;
 export async function getApiBaseUrl(): Promise<string> {
   if (cachedUrl) return cachedUrl;
   const config = configService.getApiConfig();
-  cachedUrl = config?.api_url || "http://localhost:3000";
+  // En prod, fallback URL relative -> passe par le proxy nginx.
+  // En dev, fallback localhost:3000 -> hit l'API directement.
+  const fallback = import.meta.env.PROD ? "" : "http://localhost:3000";
+  cachedUrl = config?.api_url || import.meta.env.VITE_API_URL || fallback;
   return cachedUrl;
 }
 
