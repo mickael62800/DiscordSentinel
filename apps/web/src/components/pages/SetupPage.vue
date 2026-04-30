@@ -12,7 +12,12 @@ const { saveConfig } = useAuth();
 const step = ref(1);
 
 // Step 1: API Backend
-const apiUrl = ref("http://localhost:3000");
+// En prod, prefill avec l'origin courant (ex: https://mickaelverdin.digital)
+// pour que les requetes passent par le proxy nginx local. En dev, localhost.
+const defaultApiUrl = import.meta.env.PROD
+  ? window.location.origin
+  : "http://localhost:3000";
+const apiUrl = ref(defaultApiUrl);
 const apiKey = ref("");
 
 // Step 2: Discord OAuth

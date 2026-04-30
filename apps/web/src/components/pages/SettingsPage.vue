@@ -15,7 +15,7 @@ const { success, error: showError } = useToast();
 const router = useRouter();
 const { clearConfig, logout } = useAuth();
 
-const apiUrl = ref("http://localhost:3000");
+const apiUrl = ref(import.meta.env.PROD ? window.location.origin : "http://localhost:3000");
 const apiKey = ref("");
 const autoRefresh = ref(true);
 const refreshInterval = ref(5);
