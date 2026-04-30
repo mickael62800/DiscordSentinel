@@ -21,6 +21,7 @@ use axum::extract::State;
 use axum::Json;
 use redis::AsyncCommands;
 use serde::Serialize;
+use sysinfo::Disks;
 use sysinfo::ProcessRefreshKind;
 use sysinfo::RefreshKind;
 use sysinfo::System;
@@ -73,12 +74,33 @@ pub struct RedisMetricsDto {
 }
 
 #[derive(Debug, Serialize)]
+pub struct DiskDto {
+    pub name: String,
+    pub mount_point: String,
+    pub fs_type: String,
+    pub total_gb: f64,
+    pub used_gb: f64,
+    pub available_gb: f64,
+    pub usage_percent: f32,
+    pub is_removable: bool,
+}
+
+#[derive(Debug, Serialize)]
+pub struct HealthChecksDto {
+    pub api_responding: bool,
+    pub postgres_responding: bool,
+    pub redis_responding: bool,
+}
+
+#[derive(Debug, Serialize)]
 pub struct SystemInfoDto {
     pub bots: Vec<ServiceStatusDto>,
     pub workers: Vec<ServiceStatusDto>,
     pub host: HostMetricsDto,
     pub process: ProcessMetricsDto,
     pub redis: RedisMetricsDto,
+    pub disks: Vec<DiskDto>,
+    pub health: HealthChecksDto,
     pub uptime_seconds: u64,
     pub db_size_mb: u64,
 }
@@ -185,12 +207,59 @@ pub async fn get_system_info(
         }
     };
 
-    // ── 3. Taille BDD PostgreSQL ──
+    // ── 3. Taille BDD PostgreSQL + health check ──
     let db_size_bytes: i64 = sqlx::query_scalar("SELECT pg_database_size(current_database())")
         .fetch_one(&state.pg_pool)
         .await
-        .unwrap_or(0);
-    let db_size_mb = (db_size_bytes / 1024 / 1024) as u64;
+        .unwrap_or(-1);
+    let postgres_responding = db_size_bytes >= 0;
+    let db_size_mb = if db_size_bytes > 0 {
+        (db_size_bytes / 1024 / 1024) as u64
+    } else {
+        0
+    };
+
+    // ── 4. Health check Redis (PING) ──
+    let redis_responding = if let Ok(mut conn) = state.redis_client.get_multiplexed_async_connection().await {
+        redis::cmd("PING").query_async::<String>(&mut conn).await.is_ok()
+    } else {
+        false
+    };
+
+    // ── 5. Disks / mount points via sysinfo ──
+    // Liste les disques/partitions visibles depuis le process. En conteneur
+    // Docker on voit les volumes mountes. Avec `pid: host` on voit l'host.
+    let disks_info = Disks::new_with_refreshed_list();
+    let disks: Vec<DiskDto> = disks_info
+        .iter()
+        .filter(|d| {
+            // On masque les filesystems "techniques" qu'on n'attend pas
+            // d'un admin (overlay, tmpfs vides, etc.) — sauf si volume reel.
+            let fs = d.file_system().to_string_lossy();
+            !matches!(fs.as_ref(), "overlay" | "shm" | "tmpfs" | "devtmpfs" | "proc" | "sysfs")
+                || d.total_space() > 100 * 1024 * 1024 // garde tmpfs > 100 MB
+        })
+        .map(|d| {
+            let total = d.total_space();
+            let avail = d.available_space();
+            let used = total.saturating_sub(avail);
+            let usage = if total > 0 {
+                ((used as f64 / total as f64) * 100.0) as f32
+            } else {
+                0.0
+            };
+            DiskDto {
+                name: d.name().to_string_lossy().into_owned(),
+                mount_point: d.mount_point().to_string_lossy().into_owned(),
+                fs_type: d.file_system().to_string_lossy().into_owned(),
+                total_gb: bytes_to_gb(total),
+                used_gb: bytes_to_gb(used),
+                available_gb: bytes_to_gb(avail),
+                usage_percent: usage,
+                is_removable: d.is_removable(),
+            }
+        })
+        .collect();
 
     Ok(Json(SystemInfoDto {
         bots,
@@ -206,9 +275,19 @@ pub async fn get_system_info(
             mem_used_mb: proc_mem_mb,
         },
         redis: redis_metrics,
+        disks,
+        health: HealthChecksDto {
+            api_responding: true, // si on est ici, l'API repond
+            postgres_responding,
+            redis_responding,
+        },
         uptime_seconds: uptime_seconds(),
         db_size_mb,
     }))
+}
+
+fn bytes_to_gb(bytes: u64) -> f64 {
+    (bytes as f64) / (1024.0 * 1024.0 * 1024.0)
 }
 
 #[cfg(test)]

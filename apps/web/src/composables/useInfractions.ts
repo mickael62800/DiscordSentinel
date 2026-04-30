@@ -21,9 +21,9 @@ export function useInfractions() {
       await infractionsService.remove(id, source);
       await fetchInfractions();
       if (source === "action") {
-        success("Action annulee (unban Discord applique si ban).");
+        success("Action annulée — unban Discord appliqué si ban + points de conduite restitués.");
       } else {
-        success("Infraction supprimee avec succes.");
+        success("Infraction supprimée — points de conduite restitués.");
       }
     } catch (e) {
       // 404 = la ligne n existe deja plus en BDD (le journal etait stale).
@@ -46,7 +46,12 @@ export function useInfractions() {
     try {
       const result = await infractionsService.purgeAll(guildId);
       await fetchInfractions();
-      success(`${result.deleted} infraction(s) supprimee(s) de la BDD.`);
+      // Compose le message du toast en fonction des points restitues.
+      let msg = `${result.deleted} infraction(s) supprimée(s) de la BDD.`;
+      if (result.points_restored > 0) {
+        msg += ` ${result.points_restored} utilisateur(s) ont récupéré leurs points de conduite.`;
+      }
+      success(msg);
       return result.deleted;
     } catch (e) {
       console.error("Erreur lors de la purge des infractions :", e);

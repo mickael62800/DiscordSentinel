@@ -1,6 +1,8 @@
 pub mod bot_config;
 pub mod bot_persistence;
 pub mod cache_stats;
+pub mod component_visibility;
+pub mod docker;
 pub mod exports;
 pub mod health;
 pub mod info;

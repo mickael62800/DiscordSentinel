@@ -24,12 +24,31 @@ export interface RedisMetrics {
   uptime_seconds: number;
 }
 
+export interface DiskInfo {
+  name: string;
+  mount_point: string;
+  fs_type: string;
+  total_gb: number;
+  used_gb: number;
+  available_gb: number;
+  usage_percent: number;
+  is_removable: boolean;
+}
+
+export interface HealthChecks {
+  api_responding: boolean;
+  postgres_responding: boolean;
+  redis_responding: boolean;
+}
+
 export interface SystemInfo {
   bots: ServiceStatus[];
   workers: ServiceStatus[];
   host: HostMetrics;
   process: ProcessMetrics;
   redis: RedisMetrics;
+  disks: DiskInfo[];
+  health: HealthChecks;
   uptime_seconds: number;
   db_size_mb: number;
 }

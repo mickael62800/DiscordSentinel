@@ -82,6 +82,9 @@ defineProps<{ name: string }>();
     <template v-else-if="name === 'refresh-cw'">
       <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0114.85-3.36L23 10" /><path d="M20.49 15a9 9 0 01-14.85 3.36L1 14" />
     </template>
+    <template v-else-if="name === 'server'">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2" /><rect x="2" y="14" width="20" height="8" rx="2" ry="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" />
+    </template>
   </svg>
 </template>
 

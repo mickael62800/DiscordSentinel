@@ -676,6 +676,14 @@ export interface MyRole {
   discord_user_id: string;
   guild_id: string;
   role: RbacRole;
+  is_superadmin?: boolean;
+}
+
+// Visibilite UI par role applicatif (overrides du defaut frontend)
+export interface ComponentVisibilityEntry {
+  component_key: string;
+  role: RbacRole;
+  visible: boolean;
 }
 
 // ═══════════════════════════════════════════════════

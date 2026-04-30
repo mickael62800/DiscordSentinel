@@ -7,6 +7,7 @@ import { useConfirm } from "../../composables/useConfirm";
 import LoadingState from "../atoms/LoadingState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppBadge from "../atoms/AppBadge.vue";
+import ComponentVisibilityGrid from "../organisms/ComponentVisibilityGrid.vue";
 import type { RbacRole } from "../../types";
 
 const { users, myRole, loading, refresh, grantRole, updateRole, revokeRole } = useRbac();
@@ -196,6 +197,9 @@ function roleVariant(role: RbacRole): BadgeVariant {
       <button v-if="canView && !loading" class="btn-refresh" @click="refresh">
         \u{1f504} Actualiser
       </button>
+
+      <!-- Visibilite des composants par role (owner only) -->
+      <ComponentVisibilityGrid v-if="canEdit" />
     </template>
   </div>
 </template>

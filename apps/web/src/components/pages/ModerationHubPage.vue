@@ -339,11 +339,19 @@ async function onPurgeAll() {
   }
   const total = infractions.value?.length ?? 0;
   const ok1 = await confirm({
-    message: `⚠️ SUPPRESSION DB ⚠️\n\nVous etes sur le point de supprimer DEFINITIVEMENT ${total} infraction(s) de la base de donnees pour ce serveur.\n\nCette action est IRREVERSIBLE.\n\nContinuer ?`,
+    message:
+      `⚠️ Vider le journal (DB seule) ⚠️\n\n` +
+      `Cette action supprime ${total} infraction(s) de la base de données POUR CE SERVEUR.\n\n` +
+      `IMPORTANT : ça ne touche PAS Discord :\n` +
+      `  • les bannissements actifs RESTENT actifs\n` +
+      `  • les mutes / timeouts en cours RESTENT actifs\n` +
+      `  • aucun DM de grâce n'est envoyé\n\n` +
+      `Pour vraiment annuler une sanction (avec unban Discord), utilise le bouton Annuler ligne par ligne.\n\n` +
+      `Cette suppression est IRRÉVERSIBLE. Continuer ?`,
   });
   if (!ok1) return;
   const ok2 = await confirm({
-    message: "Derniere confirmation : toutes les infractions seront effacees en base. Vraiment proceder ?",
+    message: "Dernière confirmation : vider le journal pour ce serveur ? (les sanctions Discord ne seront PAS levées)",
   });
   if (!ok2) return;
   try {
@@ -394,6 +402,65 @@ async function handleUnban(ban: ConfirmedBan) {
     await executeUnban(ban.guild_id, ban.target_id);
   } catch (e) {
     unbanError.value = String(e);
+  }
+}
+
+// --- Bulk unban : debannir tous les bannis actifs visibles ---
+const bulkUnbanning = ref(false);
+const unbanProgress = ref(0);
+const unbanTotal = ref(0);
+
+async function onUnbanAll() {
+  unbanError.value = null;
+  const targets = [...filteredConfirmed.value];
+  if (targets.length === 0) return;
+
+  // Double confirmation : opération sensible et bruyante (peut générer du
+  // rate-limit Discord si la liste est grande).
+  const ok1 = await confirm({
+    message:
+      `⚠️ Tout débannir ⚠️\n\n` +
+      `Vous allez débannir ${targets.length} utilisateur(s) sur Discord.\n\n` +
+      `Chaque débannissement génère un appel à l'API Discord. ` +
+      `Pour de grosses listes, le rate-limit peut ralentir l'opération.\n\n` +
+      `Continuer ?`,
+  });
+  if (!ok1) return;
+  const ok2 = await confirm({
+    message: `Dernière confirmation : débannir ${targets.length} utilisateur(s) ?`,
+  });
+  if (!ok2) return;
+
+  bulkUnbanning.value = true;
+  unbanProgress.value = 0;
+  unbanTotal.value = targets.length;
+  let okCount = 0;
+  let failCount = 0;
+  const errors: string[] = [];
+
+  for (const ban of targets) {
+    try {
+      await executeUnban(ban.guild_id, ban.target_id);
+      okCount++;
+    } catch (e) {
+      failCount++;
+      errors.push(`${ban.target_name}: ${String(e)}`);
+    }
+    unbanProgress.value++;
+    // Petite pause pour ne pas saturer Discord rate-limit (50 req/s
+    // global, mais unban_user a son propre bucket).
+    await new Promise((r) => setTimeout(r, 80));
+  }
+
+  bulkUnbanning.value = false;
+
+  if (failCount === 0) {
+    success(`✅ ${okCount} utilisateur(s) débanni(s) avec succès.`);
+  } else {
+    showError(
+      `${okCount} succès, ${failCount} échecs. ` +
+        (errors.length > 0 ? `Premier échec : ${errors[0]}` : ""),
+    );
   }
 }
 
@@ -555,10 +622,12 @@ async function handleActionSubmit() {
           <button
             class="purge-btn"
             :disabled="purging || !selectedGuildId"
-            :title="selectedGuildId ? 'Supprimer toutes les infractions de la BDD' : 'Selectionnez un serveur'"
+            :title="selectedGuildId
+              ? 'Vide le journal de la base de données. NE débannit PAS et NE retire PAS les mutes sur Discord — pour ça, utilise le bouton Annuler ligne par ligne.'
+              : 'Selectionnez un serveur'"
             @click="onPurgeAll"
           >
-            {{ purging ? "Suppression…" : "Tout supprimer (DB)" }}
+            {{ purging ? "Suppression…" : "Vider le journal (DB seule)" }}
           </button>
           <AppButton variant="primary" @click="openActionModal">
             + Nouvelle action
@@ -676,6 +745,19 @@ async function handleActionSubmit() {
           @click="openBanJournal"
         >
           Voir l'historique →
+        </button>
+        <button
+          type="button"
+          class="unban-all-btn"
+          :disabled="bulkUnbanning || filteredConfirmed.length === 0"
+          :title="filteredConfirmed.length === 0
+            ? 'Aucun banni actif'
+            : `Débannir les ${filteredConfirmed.length} bannis affichés (applique unban Discord pour chacun)`"
+          @click="onUnbanAll"
+        >
+          {{ bulkUnbanning
+            ? `Débannissement… (${unbanProgress}/${unbanTotal})`
+            : `Tout débannir (${filteredConfirmed.length})` }}
         </button>
       </div>
 
@@ -1407,6 +1489,33 @@ async function handleActionSubmit() {
 .link-to-journal:hover {
   color: var(--accent);
   background-color: var(--bg-hover);
+}
+
+.unban-all-btn {
+  background: transparent;
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, var(--border));
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.25s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.25s ease;
+  white-space: nowrap;
+}
+.unban-all-btn:hover:not(:disabled) {
+  color: white;
+  background-color: var(--danger);
+  border-color: var(--danger);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--danger) 30%, transparent);
+  transform: translateY(-1px);
+}
+.unban-all-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.unban-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .column-header {

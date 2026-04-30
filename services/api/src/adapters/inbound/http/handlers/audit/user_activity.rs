@@ -56,6 +56,20 @@ pub async fn create_activity(
     Ok(ok_response())
 }
 
+/// GET /api/user-activity/{guild_id}/by-message/{message_id}
+/// Retourne le `message_sent` correspondant a un message_id Discord.
+/// Utilise par le bot lors d'un edit pour retrouver l'ancien contenu.
+pub async fn get_by_message_id(
+    State(state): State<AppState>,
+    Path((guild_id, message_id)): Path<(String, String)>,
+) -> Result<Json<Option<UserActivity>>, ApiError> {
+    let activity = state
+        .user_activity_repo
+        .find_by_message_id(&guild_id, &message_id)
+        .await?;
+    Ok(Json(activity))
+}
+
 /// GET /api/user-activity/{guild_id}/{user_id} — timeline d'un utilisateur
 pub async fn get_activity(
     State(state): State<AppState>,

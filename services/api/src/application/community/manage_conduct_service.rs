@@ -367,4 +367,35 @@ impl ManageConductUseCase for ManageConductService {
 
         Ok(count)
     }
+
+    async fn restore_for_action(
+        &self,
+        guild_id: &str,
+        user_id: &str,
+        action: &str,
+    ) -> Result<(), DomainError> {
+        // 1. Lit la config guild pour connaitre la penalite associee a
+        //    cette action (warn=1, mute=2, ban=5 par defaut). Si la
+        //    penalite est 0 (ou action inconnue), on ne fait rien.
+        let config = self.get_config(guild_id).await?;
+        let penalty = config.penalty_for_action(action);
+        if penalty == 0 {
+            return Ok(());
+        }
+
+        // 2. Re-ajoute via add_points (qui clamp a max_points + log).
+        let cmd = AddPointsCommand {
+            guild_id: guild_id.to_string().into(),
+            user_id: user_id.to_string().into(),
+            amount: penalty,
+            reason: format!("Annulation infraction: {action} (+{penalty} points restitues)"),
+        };
+        self.add_points(cmd).await?;
+        Ok(())
+    }
+
+    async fn reset_all_points(&self, guild_id: &str) -> Result<u64, DomainError> {
+        let config = self.get_config(guild_id).await?;
+        self.repo.reset_all_to_max(guild_id, config.max_points).await
+    }
 }

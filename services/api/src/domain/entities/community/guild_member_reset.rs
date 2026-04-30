@@ -67,6 +67,23 @@ pub const MEMBER_RESET_TABLES: &[MemberResetTable] = &[
         user_column: "target_id",
         response_key: "sanction_reminders",
     },
+    // ── Donnees de surveillance / activite : a effacer pour qu'un
+    //    re-ajout en surveillance reparte sur une page blanche ──
+    MemberResetTable {
+        sql_table: "user_activity_log",
+        user_column: "user_id",
+        response_key: "activity_log",
+    },
+    MemberResetTable {
+        sql_table: "user_stats",
+        user_column: "user_id",
+        response_key: "user_stats",
+    },
+    MemberResetTable {
+        sql_table: "voice_sessions",
+        user_column: "user_id",
+        response_key: "voice_sessions",
+    },
 ];
 
 #[cfg(test)]

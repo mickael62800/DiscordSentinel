@@ -148,18 +148,22 @@ async function handleReset() {
   const member = selectedMember.value.member;
   const username = member.display_name || member.username;
   const ok1 = await confirmDialog({
-    title: "⚠️ Reinitialiser tout",
+    title: "⚠️ Réinitialiser tout",
     message:
-      `Supprimer DEFINITIVEMENT toutes les donnees de moderation pour ${username} ?\n\n` +
+      `Supprimer DÉFINITIVEMENT toutes les données pour ${username} ?\n\n` +
       "Cela efface :\n" +
       "• Infractions\n" +
-      "• Actions de moderation (warns/mutes/bans)\n" +
+      "• Actions de modération (warns/mutes/bans)\n" +
       "• Points de conduite + historique\n" +
       "• Strikes\n" +
-      "• Notes moderateurs\n" +
-      "• Surveillance\n" +
-      "• Rappels de sanction\n\n" +
-      "Cette action est IRREVERSIBLE.",
+      "• Notes modérateurs\n" +
+      "• Surveillance manuelle\n" +
+      "• Rappels de sanction\n" +
+      "• Logs d'activité (surveillance détaillée)\n" +
+      "• Statistiques utilisateur (messages, vocal)\n" +
+      "• Sessions vocales détaillées\n\n" +
+      "→ Le membre repart vraiment de zéro, page blanche.\n\n" +
+      "Cette action est IRRÉVERSIBLE.",
   });
   if (!ok1) return;
   const ok2 = await confirmDialog({
@@ -311,6 +315,240 @@ function activityVariant(t: string): "default" | "warning" | "danger" | "info" |
   if (t.startsWith("voice_") || t === "message_sent") return "info";
   return "default";
 }
+
+// ── Helpers metadata ─────────────────────────────────────────
+type Meta = Record<string, unknown> | null | undefined;
+function metaStr(m: Meta, ...keys: string[]): string | null {
+  if (!m) return null;
+  for (const k of keys) {
+    const v = m[k];
+    if (typeof v === "string" && v.trim() !== "") return v;
+  }
+  return null;
+}
+function metaArr(m: Meta, key: string): string[] {
+  if (!m) return [];
+  const v = m[key];
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/** Pour les events vocaux : retourne "🔊 nom (id)" ou juste "id" si pas de nom. */
+function voiceChannelLabel(evt: { channel_name?: string | null; channel_id?: string | null; metadata: Meta }): string {
+  const name = evt.channel_name || metaStr(evt.metadata, "channel_name", "voice_channel_name");
+  const id = evt.channel_id || metaStr(evt.metadata, "channel_id", "voice_channel_id");
+  if (name && id) return `🔊 ${name} (${id})`;
+  if (name) return `🔊 ${name}`;
+  if (id) return `🔊 ${id}`;
+  return "";
+}
+
+/** Pour message_edited : extrait le contenu avant/après de la metadata. */
+function editedBeforeAfter(evt: { content: string | null; metadata: Meta }): { before: string | null; after: string | null } {
+  const before = metaStr(evt.metadata, "old_content", "before", "content_before", "previous_content");
+  const after = metaStr(evt.metadata, "new_content", "after", "content_after") || evt.content;
+  return { before, after };
+}
+
+/** Roles diff : retourne added / removed depuis la metadata. */
+function rolesDiff(evt: { metadata: Meta }): { added: string[]; removed: string[] } {
+  const added = metaArr(evt.metadata, "added").length > 0
+    ? metaArr(evt.metadata, "added")
+    : metaArr(evt.metadata, "roles_added");
+  const removed = metaArr(evt.metadata, "removed").length > 0
+    ? metaArr(evt.metadata, "removed")
+    : metaArr(evt.metadata, "roles_removed");
+  return { added, removed };
+}
+
+/** Pseudo / nickname change : retourne l'ancien et le nouveau. */
+function profileDiff(evt: { content: string | null; metadata: Meta }): { before: string | null; after: string | null } {
+  const before = metaStr(evt.metadata, "old", "old_value", "before", "from", "old_nickname", "old_username");
+  const after =
+    metaStr(evt.metadata, "new", "new_value", "after", "to", "new_nickname", "new_username") || evt.content;
+  return { before, after };
+}
+
+/** Avatar change : URL avant / après si stockée. */
+function avatarDiff(evt: { metadata: Meta }): { before: string | null; after: string | null } {
+  return {
+    before: metaStr(evt.metadata, "old_avatar_url", "old_avatar", "before"),
+    after: metaStr(evt.metadata, "new_avatar_url", "new_avatar", "after"),
+  };
+}
+
+// ── Surveillance enrichie : stats / heatmap / top channels / companions ──
+
+const NOW_MS = () => Date.now();
+const ONE_DAY = 86_400_000;
+
+/** Activity dans une fenêtre de N jours (depuis maintenant). N=0 → tout. */
+function activityWithin(days: number) {
+  const list = activityTimeline.value ?? [];
+  if (days <= 0) return list;
+  const since = NOW_MS() - days * ONE_DAY;
+  return list.filter((e) => new Date(e.created_at).getTime() >= since);
+}
+
+/** Compte d'events d'une catégorie sur N jours. */
+function countByCategory(days: number, cat: "text" | "vocal" | "other"): number {
+  return activityWithin(days).filter((e) => eventCategory(e.event_type) === cat).length;
+}
+
+/** Heures vocales : somme des durations (metadata.duration_secs sur voice_leave/move). */
+function voiceHours(days: number): number {
+  let total = 0;
+  for (const e of activityWithin(days)) {
+    if (e.event_type !== "voice_leave" && e.event_type !== "voice_move") continue;
+    const m = e.metadata as Meta;
+    const d = m?.duration_secs;
+    if (typeof d === "number") total += d;
+    else if (typeof d === "string") total += parseInt(d, 10) || 0;
+  }
+  return Math.round((total / 3600) * 10) / 10;
+}
+
+/** Compteurs pièces jointes / liens (depuis activity_log). */
+function attachmentCounts() {
+  const list = activityTimeline.value ?? [];
+  let images = 0;
+  let videos = 0;
+  let files = 0;
+  let links = 0;
+  for (const e of list) {
+    if (typeof e.content === "string" && URL_RE.test(e.content)) links++;
+    const m = e.metadata as Meta;
+    const att = m?.attachments;
+    if (Array.isArray(att)) {
+      for (const a of att) {
+        if (typeof a === "string") {
+          if (/\.(png|jpg|jpeg|gif|webp)/i.test(a)) images++;
+          else if (/\.(mp4|webm|mov)/i.test(a)) videos++;
+          else files++;
+        } else if (a && typeof a === "object") {
+          const ct = (a as Record<string, unknown>).content_type as string | undefined;
+          if (ct?.startsWith("image/")) images++;
+          else if (ct?.startsWith("video/")) videos++;
+          else files++;
+        }
+      }
+    }
+  }
+  return { images, videos, files, links };
+}
+
+/** Top N salons (par nombre de messages dans `activity_log`). */
+function topChannels(limit = 5): Array<{ name: string; id: string; count: number }> {
+  const counts = new Map<string, { name: string; id: string; count: number }>();
+  for (const e of activityTimeline.value ?? []) {
+    if (!TEXT_EVENTS.includes(e.event_type)) continue;
+    const id = e.channel_id ?? "";
+    const name = e.channel_name ?? id ?? "?";
+    if (!id) continue;
+    const cur = counts.get(id) ?? { name, id, count: 0 };
+    cur.count++;
+    counts.set(id, cur);
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+}
+
+/** Top N "compagnons" vocaux : users souvent en vocal en même temps.
+ * On considère qu'un compagnon est listé dans `metadata.companions` au
+ * moment du voice_join/leave (si tracké), sinon fallback : on regarde
+ * les voice_join d'autres users dans le même channel à ±2 minutes. */
+function topVoiceCompanions(limit = 5): Array<{ user_id: string; username: string; count: number }> {
+  const counts = new Map<string, { user_id: string; username: string; count: number }>();
+  for (const e of activityTimeline.value ?? []) {
+    if (!VOCAL_EVENTS.includes(e.event_type)) continue;
+    const m = e.metadata as Meta;
+    const companions = m?.companions;
+    if (Array.isArray(companions)) {
+      for (const c of companions) {
+        if (c && typeof c === "object") {
+          const cid = (c as Record<string, unknown>).user_id as string | undefined;
+          const cname = (c as Record<string, unknown>).username as string | undefined;
+          if (!cid) continue;
+          const cur = counts.get(cid) ?? { user_id: cid, username: cname ?? cid, count: 0 };
+          cur.count++;
+          counts.set(cid, cur);
+        } else if (typeof c === "string") {
+          const cur = counts.get(c) ?? { user_id: c, username: c, count: 0 };
+          cur.count++;
+          counts.set(c, cur);
+        }
+      }
+    }
+  }
+  return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, limit);
+}
+
+/** Heatmap : 7 jours x 24 heures, count messages par cellule. */
+function heatmapData() {
+  const days = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+  const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+  let max = 0;
+  for (const e of activityTimeline.value ?? []) {
+    if (!TEXT_EVENTS.includes(e.event_type)) continue;
+    const d = new Date(e.created_at);
+    const dow = (d.getDay() + 6) % 7; // Lun=0
+    const h = d.getHours();
+    grid[dow][h]++;
+    if (grid[dow][h] > max) max = grid[dow][h];
+  }
+  return { days, grid, max };
+}
+
+function heatColor(value: number, max: number): string {
+  if (value === 0) return "rgba(88, 101, 242, 0.05)";
+  const intensity = Math.min(value / Math.max(1, max), 1);
+  return `rgba(88, 101, 242, ${0.1 + intensity * 0.8})`;
+}
+
+/** Détection de bursts : périodes de 60s avec >= 10 messages. */
+function burstCount(): number {
+  const list = activityTimeline.value
+    ?.filter((e) => e.event_type === "message_sent")
+    .map((e) => new Date(e.created_at).getTime())
+    .sort((a, b) => a - b) ?? [];
+  if (list.length < 10) return 0;
+  let bursts = 0;
+  for (let i = 0; i + 9 < list.length; i++) {
+    if (list[i + 9] - list[i] <= 60_000) {
+      bursts++;
+      i += 9; // skip pour ne pas compter le même burst plusieurs fois
+    }
+  }
+  return bursts;
+}
+
+/** Compteur AutoMod : security_events de type "automod_*". */
+function automodCount(): number {
+  if (!dossier.value) return 0;
+  return dossier.value.security_events.filter(
+    (e) => typeof e.event_type === "string" && e.event_type.toLowerCase().includes("automod"),
+  ).length;
+}
+
+/** Avant/après mise sous surveillance : split events par first_seen_at. */
+function watchSplitStats() {
+  const dossierVal = dossier.value;
+  if (!dossierVal) return null;
+  const since = dossierVal.user.first_seen_at;
+  if (!since) return null;
+  const sinceTs = new Date(since).getTime();
+  let beforeIncidents = 0;
+  let afterIncidents = 0;
+  for (const inf of dossierVal.infractions) {
+    const ts = new Date(inf.created_at).getTime();
+    if (ts < sinceTs) beforeIncidents++;
+    else afterIncidents++;
+  }
+  return { sinceTs, beforeIncidents, afterIncidents };
+}
+
+/** Lien Discord direct vers le profil de l'user. */
+function discordProfileUrl(userId: string): string {
+  return `https://discord.com/users/${userId}`;
+}
 </script>
 
 <template>
@@ -416,6 +654,18 @@ function activityVariant(t: string): "default" | "warning" | "danger" | "info" |
               <h2>{{ selectedMember.member.display_name || selectedMember.member.username }}</h2>
               <span class="profile-id">{{ selectedMember.member.user_id }}</span>
             </div>
+            <a
+              :href="discordProfileUrl(selectedMember.member.user_id)"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="discord-link-btn"
+              title="Ouvrir le profil Discord de l'utilisateur"
+            >
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor">
+                <path d="M20.317 4.37a19.791 19.791 0 00-4.885-1.515.074.074 0 00-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 00-5.487 0 12.64 12.64 0 00-.617-1.25.077.077 0 00-.079-.037A19.736 19.736 0 003.677 4.37a.07.07 0 00-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 00.031.057 19.9 19.9 0 005.993 3.03.078.078 0 00.084-.028 14.09 14.09 0 001.226-1.994.076.076 0 00-.041-.106 13.107 13.107 0 01-1.872-.892.077.077 0 01-.008-.128 10.2 10.2 0 00.372-.292.074.074 0 01.077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 01.078.01c.12.098.246.198.373.292a.077.077 0 01-.006.127 12.299 12.299 0 01-1.873.892.077.077 0 00-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 00.084.028 19.839 19.839 0 006.002-3.03.077.077 0 00.032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 00-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+              </svg>
+              Voir profil Discord
+            </a>
           </div>
 
           <!-- Detail tabs -->
@@ -610,6 +860,105 @@ function activityVariant(t: string): "default" | "warning" | "danger" | "info" |
                   </div>
                 </div>
 
+                <!-- Stats résumé surveillance (depuis activity_log) -->
+                <div v-if="activityTimeline && activityTimeline.length > 0" class="section watch-summary">
+                  <h3>📊 Vue d'ensemble</h3>
+                  <div class="watch-stats-grid">
+                    <div class="watch-stat-card">
+                      <span class="watch-stat-label">Messages</span>
+                      <div class="watch-stat-multi">
+                        <span><strong>{{ countByCategory(0, 'text') }}</strong> total</span>
+                        <span class="muted">{{ countByCategory(30, 'text') }} · 30j</span>
+                        <span class="muted">{{ countByCategory(7, 'text') }} · 7j</span>
+                      </div>
+                    </div>
+                    <div class="watch-stat-card">
+                      <span class="watch-stat-label">Heures vocales</span>
+                      <div class="watch-stat-multi">
+                        <span><strong>{{ voiceHours(0) }}h</strong> total</span>
+                        <span class="muted">{{ voiceHours(30) }}h · 30j</span>
+                        <span class="muted">{{ voiceHours(7) }}h · 7j</span>
+                      </div>
+                    </div>
+                    <div class="watch-stat-card">
+                      <span class="watch-stat-label">Pièces jointes</span>
+                      <div class="watch-stat-multi">
+                        <span>📷 <strong>{{ attachmentCounts().images }}</strong></span>
+                        <span>🎬 <strong>{{ attachmentCounts().videos }}</strong></span>
+                        <span>📎 <strong>{{ attachmentCounts().files }}</strong></span>
+                        <span>🔗 <strong>{{ attachmentCounts().links }}</strong></span>
+                      </div>
+                    </div>
+                    <div class="watch-stat-card">
+                      <span class="watch-stat-label">Modération</span>
+                      <div class="watch-stat-multi">
+                        <span><strong>{{ dossier?.infractions.length ?? 0 }}</strong> infractions</span>
+                        <span class="muted">🤖 {{ automodCount() }} automod</span>
+                        <span class="muted">⚡ {{ burstCount() }} burst{{ burstCount() > 1 ? 's' : '' }} (10msg/60s)</span>
+                      </div>
+                    </div>
+                    <div v-if="watchSplitStats()" class="watch-stat-card">
+                      <span class="watch-stat-label">Sous surveillance depuis</span>
+                      <div class="watch-stat-multi">
+                        <span><strong>{{ formatDate(dossier?.user.first_seen_at as string ?? null) }}</strong></span>
+                        <span class="muted">Avant : {{ watchSplitStats()?.beforeIncidents ?? 0 }} incident(s)</span>
+                        <span class="muted">Depuis : {{ watchSplitStats()?.afterIncidents ?? 0 }} incident(s)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Heatmap activité par jour x heure -->
+                <div v-if="heatmapData().max > 0" class="section">
+                  <h3>🗓️ Heatmap activité (messages par heure)</h3>
+                  <div class="heatmap-wrap">
+                    <table class="watch-heatmap">
+                      <thead>
+                        <tr>
+                          <th></th>
+                          <th v-for="h in 24" :key="h" class="hm-hour">{{ h - 1 }}h</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="(dn, di) in heatmapData().days" :key="di">
+                          <td class="hm-day">{{ dn }}</td>
+                          <td
+                            v-for="hi in 24"
+                            :key="hi"
+                            class="hm-cell"
+                            :style="{ backgroundColor: heatColor(heatmapData().grid[di][hi - 1], heatmapData().max) }"
+                            :title="`${dn} ${hi - 1}h : ${heatmapData().grid[di][hi - 1]} msg`"
+                          ></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <!-- Top salons + compagnons vocaux côte à côte -->
+                <div v-if="topChannels().length > 0 || topVoiceCompanions().length > 0" class="section watch-tops">
+                  <div v-if="topChannels().length > 0" class="watch-tops-col">
+                    <h3>🏆 Top salons</h3>
+                    <ul class="watch-rank">
+                      <li v-for="(c, i) in topChannels()" :key="c.id">
+                        <span class="rank-pos">#{{ i + 1 }}</span>
+                        <span class="rank-name">#{{ c.name }}</span>
+                        <span class="rank-count">{{ c.count }} msg</span>
+                      </li>
+                    </ul>
+                  </div>
+                  <div v-if="topVoiceCompanions().length > 0" class="watch-tops-col">
+                    <h3>👥 Compagnons vocaux</h3>
+                    <ul class="watch-rank">
+                      <li v-for="(c, i) in topVoiceCompanions()" :key="c.user_id">
+                        <span class="rank-pos">#{{ i + 1 }}</span>
+                        <span class="rank-name">{{ c.username }}</span>
+                        <span class="rank-count">{{ c.count }}×</span>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
                 <!-- Activite recente -->
                 <div v-if="activityTimeline && activityTimeline.length > 0" class="section">
                   <h3>Activite recente ({{ filteredActivity.length }} / {{ activityTimeline.length }})</h3>
@@ -667,10 +1016,88 @@ function activityVariant(t: string): "default" | "warning" | "danger" | "info" |
                   >
                     <div class="detail-row-header">
                       <span class="detail-date">{{ fmt(evt.created_at) }}</span>
-                      <AppBadge :label="activityLabel(evt.event_type)" :variant="activityVariant(evt.event_type)" />
-                      <span v-if="evt.channel_name" class="activity-channel">#{{ evt.channel_name }}</span>
+                      <div class="header-badges">
+                        <AppBadge :label="activityLabel(evt.event_type)" :variant="activityVariant(evt.event_type)" />
+                        <span v-if="evt.event_type.startsWith('voice_')" class="activity-channel">
+                          {{ voiceChannelLabel(evt) }}
+                        </span>
+                        <span v-else-if="evt.channel_name" class="activity-channel">
+                          #{{ evt.channel_name }}<span v-if="evt.channel_id" class="channel-id">({{ evt.channel_id }})</span>
+                        </span>
+                        <span v-else-if="evt.channel_id" class="activity-channel">
+                          #{{ evt.channel_id }}
+                        </span>
+                      </div>
                     </div>
-                    <div v-if="evt.content" class="detail-row-body">{{ evt.content }}</div>
+
+                    <!-- Body adapte selon le type d'evenement -->
+                    <template v-if="evt.event_type === 'message_edited'">
+                      <div class="diff-block">
+                        <div class="diff-row diff-before">
+                          <span class="diff-label">Avant :</span>
+                          <span v-if="editedBeforeAfter(evt).before" class="diff-content">{{ editedBeforeAfter(evt).before }}</span>
+                          <span v-else class="diff-content diff-missing">
+                            <em>(message non disponible — n'était pas dans le cache du bot au moment de la modif)</em>
+                          </span>
+                        </div>
+                        <div class="diff-row diff-after">
+                          <span class="diff-label">Après :</span>
+                          <span v-if="editedBeforeAfter(evt).after" class="diff-content">{{ editedBeforeAfter(evt).after }}</span>
+                          <span v-else class="diff-content diff-missing">
+                            <em>(contenu vide)</em>
+                          </span>
+                        </div>
+                      </div>
+                    </template>
+
+                    <template v-else-if="evt.event_type === 'roles_changed'">
+                      <div class="diff-block">
+                        <div v-if="rolesDiff(evt).added.length > 0" class="diff-row diff-after">
+                          <span class="diff-label">+ Ajoutés :</span>
+                          <span class="diff-content">{{ rolesDiff(evt).added.join(', ') }}</span>
+                        </div>
+                        <div v-if="rolesDiff(evt).removed.length > 0" class="diff-row diff-before">
+                          <span class="diff-label">− Retirés :</span>
+                          <span class="diff-content">{{ rolesDiff(evt).removed.join(', ') }}</span>
+                        </div>
+                        <div
+                          v-if="rolesDiff(evt).added.length === 0 && rolesDiff(evt).removed.length === 0 && evt.content"
+                          class="detail-row-body"
+                        >{{ evt.content }}</div>
+                      </div>
+                    </template>
+
+                    <template v-else-if="evt.event_type === 'nickname_changed'">
+                      <div class="diff-block">
+                        <div v-if="profileDiff(evt).before" class="diff-row diff-before">
+                          <span class="diff-label">Ancien pseudo :</span>
+                          <span class="diff-content">{{ profileDiff(evt).before }}</span>
+                        </div>
+                        <div v-if="profileDiff(evt).after" class="diff-row diff-after">
+                          <span class="diff-label">Nouveau :</span>
+                          <span class="diff-content">{{ profileDiff(evt).after }}</span>
+                        </div>
+                      </div>
+                    </template>
+
+                    <template v-else-if="evt.event_type === 'avatar_changed'">
+                      <div class="avatar-diff">
+                        <div v-if="avatarDiff(evt).before" class="avatar-cell">
+                          <span class="diff-label">Avant</span>
+                          <img :src="avatarDiff(evt).before!" alt="ancien avatar" class="avatar-thumb" />
+                        </div>
+                        <span v-if="avatarDiff(evt).before && avatarDiff(evt).after" class="diff-arrow">→</span>
+                        <div v-if="avatarDiff(evt).after" class="avatar-cell">
+                          <span class="diff-label">Après</span>
+                          <img :src="avatarDiff(evt).after!" alt="nouvel avatar" class="avatar-thumb" />
+                        </div>
+                        <span v-if="!avatarDiff(evt).before && !avatarDiff(evt).after && evt.content" class="detail-row-body">{{ evt.content }}</span>
+                      </div>
+                    </template>
+
+                    <template v-else>
+                      <div v-if="evt.content" class="detail-row-body">{{ evt.content }}</div>
+                    </template>
                   </div>
 
                   <PaginationBar
@@ -1048,10 +1475,99 @@ function activityVariant(t: string): "default" | "warning" | "danger" | "info" |
   margin-bottom: 6px;
 }
 
-.detail-row-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
-.detail-date { font-size: 11px; color: var(--text-secondary); font-family: "JetBrains Mono", "Cascadia Code", monospace; }
-.detail-row-body { font-size: 13px; color: var(--text-primary); }
+.detail-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+/* Tous les badges + meta a droite (date a gauche, reste a droite). */
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.detail-date { font-size: 11px; color: var(--text-secondary); font-family: "JetBrains Mono", "Cascadia Code", monospace; flex-shrink: 0; }
+.detail-row-body { font-size: 13px; color: var(--text-primary); white-space: pre-wrap; word-break: break-word; }
 .detail-row-sub { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
+
+/* Bloc avant/apres pour edits, roles, pseudo */
+.diff-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  margin-top: 4px;
+}
+.diff-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border-left: 3px solid transparent;
+}
+.diff-before {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  border-left-color: color-mix(in srgb, var(--danger) 70%, transparent);
+}
+.diff-after {
+  background: color-mix(in srgb, var(--success) 8%, transparent);
+  border-left-color: color-mix(in srgb, var(--success) 70%, transparent);
+}
+.diff-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+  min-width: 90px;
+}
+.diff-content {
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.diff-missing {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Avatar diff (avant/apres en images cote-a-cote) */
+.avatar-diff {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+.avatar-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.avatar-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+.diff-arrow {
+  font-size: 20px;
+  color: var(--text-secondary);
+}
+
+.channel-id {
+  margin-left: 4px;
+  font-size: 10px;
+  opacity: 0.7;
+}
 
 /* Conduite tab */
 .conduct-display { margin-bottom: 20px; text-align: center; }
@@ -1201,6 +1717,137 @@ function activityVariant(t: string): "default" | "warning" | "danger" | "info" |
   background: var(--bg-hover);
   padding: 1px 6px;
   border-radius: var(--radius-sm);
+}
+
+/* ── Surveillance enrichie ─────────────────────────────────── */
+.watch-summary { margin-bottom: 16px; }
+.watch-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+.watch-stat-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.watch-stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.watch-stat-multi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+.watch-stat-multi .muted {
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* Heatmap surveillance */
+.heatmap-wrap { width: 100%; overflow-x: auto; }
+.watch-heatmap {
+  border-collapse: separate;
+  border-spacing: 2px;
+  width: 100%;
+  min-width: 540px;
+  table-layout: fixed;
+}
+.hm-hour {
+  font-size: 9px;
+  color: var(--text-secondary);
+  padding: 1px 0;
+  text-align: center;
+}
+.hm-day {
+  font-size: 11px;
+  color: var(--text-secondary);
+  padding-right: 6px;
+  white-space: nowrap;
+  text-align: right;
+  width: 36px;
+}
+.hm-cell {
+  height: 22px;
+  border-radius: 3px;
+  cursor: default;
+}
+
+/* Top channels + companions */
+.watch-tops {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 700px) {
+  .watch-tops { grid-template-columns: 1fr; }
+}
+.watch-tops-col {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.watch-tops-col h3 { margin: 0 0 8px; font-size: 13px; }
+.watch-rank {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.watch-rank li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+}
+.watch-rank li:last-child { border-bottom: none; }
+.rank-pos {
+  font-weight: 700;
+  color: var(--accent);
+  min-width: 28px;
+}
+.rank-name {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rank-count {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+/* Bouton Discord profile */
+.discord-link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: #5865F2;
+  color: white;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  transition: background 0.2s ease, transform 0.2s ease;
+  white-space: nowrap;
+  margin-left: auto;
+}
+.discord-link-btn:hover {
+  background: #4752c4;
+  transform: translateY(-1px);
 }
 
 .activity-filters {

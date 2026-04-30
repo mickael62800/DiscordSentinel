@@ -6,15 +6,26 @@ const props = defineProps<{
   label: string;
   icon: string;
   sectionKey: string;
+  requiredBot?: string;
 }>();
 
 // Le theme est derive du prefixe de la cle (ex: "moderation.strikes" -> "moderation").
 const theme = props.sectionKey.split(".")[0] || "default";
+
+/** Convertit "moderation-bot" → "moderation" pour un affichage compact. */
+function shortBotName(name: string): string {
+  return name.replace(/-bot$/, "");
+}
 </script>
 
 <template>
   <router-link :to="path" :class="['section-card', `theme-${theme}`]" :data-section-key="sectionKey">
     <div class="gloss" aria-hidden="true"></div>
+    <span
+      v-if="requiredBot"
+      class="component-tag"
+      :title="`Composant requis : ${requiredBot}`"
+    >{{ shortBotName(requiredBot) }}</span>
     <div class="icon-wrap">
       <SectionIcon :name="icon" />
     </div>
@@ -159,6 +170,29 @@ const theme = props.sectionKey.split(".")[0] || "default";
   line-height: 1.2;
   position: relative;
   z-index: 1;
+}
+
+/* Badge composant en haut a droite : toute petite indication discrete
+   du bot requis (sans le suffixe "-bot" pour la compacite). */
+.component-tag {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  z-index: 2;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--theme-color) 18%, transparent);
+  color: var(--theme-color);
+  text-transform: uppercase;
+  pointer-events: none;
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+}
+.section-card:hover .component-tag {
+  opacity: 1;
 }
 
 /* Respect du reduced-motion : on coupe les animations pour ceux qui en

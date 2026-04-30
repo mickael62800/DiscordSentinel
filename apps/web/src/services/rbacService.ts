@@ -1,5 +1,5 @@
-import { httpGet, httpPost, httpPatch, httpDelete } from "@/api/http";
-import type { GuildUserRole, MyRole, RbacRole } from "@/types";
+import { httpGet, httpPost, httpPatch, httpDelete, httpPut } from "@/api/http";
+import type { ComponentVisibilityEntry, GuildUserRole, MyRole, RbacRole } from "@/types";
 
 export const rbacService = {
   listGuildUsers(guildId: string): Promise<GuildUserRole[]> {
@@ -16,5 +16,11 @@ export const rbacService = {
   },
   revokeRole(guildId: string, userId: string): Promise<void> {
     return httpDelete(`/api/rbac/guilds/${guildId}/users/${userId}`);
+  },
+  listComponentVisibility(guildId: string): Promise<ComponentVisibilityEntry[]> {
+    return httpGet(`/api/rbac/component-visibility/${guildId}`);
+  },
+  upsertComponentVisibility(guildId: string, entries: ComponentVisibilityEntry[]): Promise<unknown> {
+    return httpPut(`/api/rbac/component-visibility/${guildId}`, { entries });
   },
 };

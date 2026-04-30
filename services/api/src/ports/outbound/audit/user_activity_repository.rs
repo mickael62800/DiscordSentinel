@@ -14,4 +14,16 @@ pub trait UserActivityRepository: Send + Sync {
         limit: i64,
         offset: i64,
     ) -> Result<Vec<UserActivity>, DomainError>;
+
+    /// Recherche le `message_sent` correspondant a un `message_id` Discord.
+    /// Utilise par le bot lors d'un edit pour retrouver l'ancien contenu si
+    /// son cache RAM ne l'a pas. Default impl `Ok(None)` pour preserver
+    /// les mocks existants.
+    async fn find_by_message_id(
+        &self,
+        _guild_id: &str,
+        _message_id: &str,
+    ) -> Result<Option<UserActivity>, DomainError> {
+        Ok(None)
+    }
 }

@@ -113,4 +113,31 @@ impl UserActivityRepository for PgUserActivityRepository {
         .map_err(pg_err)?;
         Ok(rows.into_iter().map(Into::into).collect())
     }
+
+    async fn find_by_message_id(
+        &self,
+        guild_id: &str,
+        message_id: &str,
+    ) -> Result<Option<UserActivity>, DomainError> {
+        // Recherche le `message_sent` correspondant. Index existant
+        // (guild_id, user_id, event_type) ne couvre pas message_id, mais
+        // la query reste rapide car on borne au guild + le filtre JSON est
+        // tres selectif. Si volume devient un probleme, on creera un
+        // index `(metadata->>'message_id')`.
+        let row = sqlx::query_as::<_, ActivityRow>(
+            r#"SELECT id, guild_id, user_id, event_type, channel_id, channel_name, content, metadata, created_at
+               FROM user_activity_log
+               WHERE guild_id = $1
+                 AND event_type = 'message_sent'
+                 AND metadata->>'message_id' = $2
+               ORDER BY created_at DESC
+               LIMIT 1"#,
+        )
+        .bind(guild_id)
+        .bind(message_id)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(pg_err)?;
+        Ok(row.map(Into::into))
+    }
 }

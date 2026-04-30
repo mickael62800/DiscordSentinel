@@ -39,6 +39,7 @@ import LevelsConfigPage from "../components/pages/LevelsConfigPage.vue";
 import SponsorshipsPage from "../components/pages/SponsorshipsPage.vue";
 import TempRolesPage from "../components/pages/TempRolesPage.vue";
 import SystemOpsPage from "../components/pages/SystemOpsPage.vue";
+import ServerHealthPage from "../components/pages/ServerHealthPage.vue";
 import SlotPage from "../components/pages/SlotPage.vue";
 import WheelPage from "../components/pages/WheelPage.vue";
 import NameHistoryPage from "../components/pages/NameHistoryPage.vue";
@@ -87,6 +88,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/sponsorships", name: "sponsorships", component: SponsorshipsPage },
   { path: "/temp-roles", name: "temp-roles", component: TempRolesPage },
   { path: "/system/operations", name: "system-ops", component: SystemOpsPage },
+  { path: "/server-health", name: "server-health", component: ServerHealthPage },
   { path: "/slot", name: "slot", component: SlotPage },
   { path: "/wheel", name: "wheel", component: WheelPage },
   { path: "/name-history", name: "name-history", component: NameHistoryPage },

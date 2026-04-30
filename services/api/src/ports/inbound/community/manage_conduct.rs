@@ -52,4 +52,24 @@ pub trait ManageConductUseCase: Send + Sync {
     async fn sync_ban_proposals(&self) -> Result<u64, DomainError> {
         Ok(0)
     }
+
+    /// Restitue les points de conduite associes a une action moderee
+    /// (warn/mute/ban/delete) suite a son annulation. Lit la penalite
+    /// depuis la config guild et l'ajoute via `add_points`. Clamp a
+    /// max_points. Default impl no-op pour preserver les mocks.
+    async fn restore_for_action(
+        &self,
+        _guild_id: &str,
+        _user_id: &str,
+        _action: &str,
+    ) -> Result<(), DomainError> {
+        Ok(())
+    }
+
+    /// Reset tous les points de conduite d'une guild a `max_points`.
+    /// Appele lors d'un "Vider le journal" massif. Retourne le nombre de
+    /// users impactes. Default impl `Ok(0)` pour preserver les mocks.
+    async fn reset_all_points(&self, _guild_id: &str) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }

@@ -61,6 +61,9 @@ pub struct MyRoleDto {
     pub discord_user_id: String,
     pub guild_id: GuildId,
     pub role: String,
+    /// True si l'utilisateur figure dans SUPERADMIN_USER_IDS — bypass total.
+    #[serde(default)]
+    pub is_superadmin: bool,
 }
 
 /// POST /api/rbac/guilds/{guild_id}/users/{user_id}
@@ -289,13 +292,20 @@ pub async fn list_guild_users(
 /// role (y compris viewer) — pas besoin de `require_role`. Le desktop l'utilise
 /// pour savoir quoi afficher (masquer les boutons admin si viewer, etc.).
 pub async fn get_my_role(
+    State(state): State<AppState>,
     Extension(ctx): Extension<RoleContext>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<MyRoleDto>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
 
+    let is_super = state
+        .superadmin_user_ids
+        .iter()
+        .any(|id| id == &ctx.discord_user_id);
+
     let role = match ctx.role {
         Some(r) => r,
+        None if is_super => Role::Owner,
         None => {
             return Err(ApiError(crate::domain::errors::DomainError::NotFound(
                 "pas de role pour ce guild (endpoint necessite X-Discord-Token)".into(),
@@ -307,6 +317,7 @@ pub async fn get_my_role(
         discord_user_id: ctx.discord_user_id,
         guild_id: guild_id.into(),
         role: role.as_str().to_string(),
+        is_superadmin: is_super,
     }))
 }
 

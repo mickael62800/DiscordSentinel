@@ -23,7 +23,7 @@ export const infractionsService = {
    * Utilise `/api/purge/infractions` avec `days: 0` (pas de filtre de date).
    * Necessite le role Owner sur la guild ou d'etre superadmin.
    */
-  purgeAll(guildId: string): Promise<{ deleted: number }> {
+  purgeAll(guildId: string): Promise<{ deleted: number; points_restored: number }> {
     return httpDelete(`/api/purge/infractions`, { guild_id: guildId, days: 0 });
   },
 };

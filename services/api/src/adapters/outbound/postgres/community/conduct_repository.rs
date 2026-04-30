@@ -206,6 +206,19 @@ impl ConductRepository for PgConductRepository {
         Ok(())
     }
 
+    async fn reset_all_to_max(&self, guild_id: &str, max_points: i32) -> Result<u64, DomainError> {
+        let result = sqlx::query(
+            "UPDATE user_conduct_points SET points = $1, updated_at = NOW() \
+             WHERE guild_id = $2 AND points < $1",
+        )
+        .bind(max_points)
+        .bind(guild_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
+
     async fn get_leaderboard(&self, guild_id: &str, limit: i64) -> Result<Vec<UserConductPoints>, DomainError> {
         let rows = sqlx::query_as::<_, PointsRow>(
             "SELECT ucp.id, ucp.guild_id, ucp.user_id,

@@ -1,61 +1,104 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import SectionCard from "../molecules/SectionCard.vue";
+import { useBotEnabledStatus } from "@/composables/useBotEnabledStatus";
+import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
 // Sections affichées sur la page d accueil. La clé `sectionKey` est
 // stable et destinée a etre utilisee par le RBAC pour autoriser ou non
 // l acces a chaque tuile selon l utilisateur.
+//
+// `requiredBot` : si défini (string), la tuile est cachée quand ce bot
+//   est désactivé pour la guild courante.
+// `requiredAnyBot` : si défini (array), la tuile est cachée seulement
+//   quand TOUS ces bots sont désactivés (visible si au moins un actif).
+//   Utilisé pour Wallet (dépend de plusieurs jeux).
 type Section = {
   key: string;
   path: string;
   label: string;
   icon: string;
+  requiredBot?: string;
+  requiredAnyBot?: string[];
 };
 
-const sections: Section[] = [
-  { key: "general.stats", path: "/stats", label: "Statistiques serveur", icon: "bar-chart-2" },
-  { key: "general.modstats", path: "/modstats", label: "Statistiques admin", icon: "bar-chart-2" },
+const { isBotEnabled, disabledBots, disabledCount } = useBotEnabledStatus();
 
-  { key: "moderation.hub", path: "/moderation", label: "Moderation", icon: "gavel" },
+const allSections: Section[] = [
+  { key: "general.stats", path: "/stats", label: "Statistiques serveur", icon: "bar-chart-2", requiredBot: "audit-bot" },
+  { key: "general.modstats", path: "/modstats", label: "Statistiques admin", icon: "bar-chart-2", requiredBot: "moderation-bot" },
+
+  { key: "moderation.hub", path: "/moderation", label: "Moderation", icon: "gavel", requiredBot: "moderation-bot" },
   { key: "moderation.members", path: "/members", label: "Membres", icon: "users" },
-  { key: "moderation.rules", path: "/rules", label: "Regles", icon: "shield" },
-  { key: "moderation.strikes", path: "/strikes", label: "Strikes", icon: "alert-triangle" },
-  { key: "moderation.notes", path: "/notes", label: "Notes", icon: "edit-3" },
-  { key: "moderation.reminders", path: "/reminders", label: "Reminders", icon: "clock" },
-  { key: "moderation.evidence", path: "/evidence", label: "Preuves", icon: "paperclip" },
-  { key: "moderation.review", path: "/review", label: "Reviews", icon: "check-circle" },
-  { key: "moderation.name-history", path: "/name-history", label: "Historique pseudos", icon: "user-x" },
+  { key: "moderation.rules", path: "/rules", label: "Regles", icon: "shield", requiredBot: "moderation-bot" },
+  { key: "moderation.strikes", path: "/strikes", label: "Strikes", icon: "alert-triangle", requiredBot: "moderation-bot" },
+  { key: "moderation.notes", path: "/notes", label: "Notes", icon: "edit-3", requiredBot: "moderation-bot" },
+  { key: "moderation.reminders", path: "/reminders", label: "Reminders", icon: "clock", requiredBot: "moderation-bot" },
+  { key: "moderation.evidence", path: "/evidence", label: "Preuves", icon: "paperclip", requiredBot: "moderation-bot" },
+  { key: "moderation.review", path: "/review", label: "Reviews", icon: "check-circle", requiredBot: "moderation-bot" },
+  { key: "moderation.name-history", path: "/name-history", label: "Historique pseudos", icon: "user-x", requiredBot: "audit-bot" },
 
-  { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus" },
-  { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket" },
-  { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic" },
-  { key: "community.voice-themes", path: "/voice-themes", label: "Themes vocaux", icon: "layers" },
-  { key: "community.role-panels", path: "/role-panels", label: "Roles", icon: "users" },
-  { key: "community.levels", path: "/levels", label: "Niveaux", icon: "trending-up" },
-  { key: "community.levels-config", path: "/levels-config", label: "Niveaux config", icon: "sliders" },
-  { key: "community.sponsorships", path: "/sponsorships", label: "Parrainages", icon: "user-check" },
-  { key: "community.temp-roles", path: "/temp-roles", label: "Roles temp.", icon: "clock" },
+  { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus", requiredBot: "welcome-bot" },
+  { key: "community.tickets", path: "/tickets", label: "Tickets", icon: "ticket", requiredBot: "ticket-bot" },
+  { key: "community.voice-channels", path: "/voice-channels", label: "Vocaux", icon: "mic", requiredBot: "voice-bot" },
+  { key: "community.voice-themes", path: "/voice-themes", label: "Themes vocaux", icon: "layers", requiredBot: "voice-bot" },
+  { key: "community.role-panels", path: "/role-panels", label: "Roles", icon: "users", requiredBot: "community-bot" },
+  { key: "community.levels", path: "/levels", label: "Niveaux", icon: "trending-up", requiredBot: "progression-bot" },
+  { key: "community.levels-config", path: "/levels-config", label: "Niveaux config", icon: "sliders", requiredBot: "progression-bot" },
+  { key: "community.sponsorships", path: "/sponsorships", label: "Parrainages", icon: "user-check", requiredBot: "community-bot" },
+  { key: "community.temp-roles", path: "/temp-roles", label: "Roles temp.", icon: "clock", requiredBot: "community-bot" },
 
-  { key: "security.hub", path: "/security", label: "Securite", icon: "zap" },
-  { key: "security.automod", path: "/automod", label: "Automod", icon: "shield" },
-  { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard" },
+  { key: "security.hub", path: "/security", label: "Securite", icon: "zap", requiredBot: "security-bot" },
+  { key: "security.automod", path: "/automod", label: "Automod", icon: "shield", requiredBot: "automod-bot" },
+  { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard", requiredBot: "audit-bot" },
 
   { key: "logs.journal", path: "/logs", label: "Journaux", icon: "list" },
 
-  { key: "games.hub", path: "/games", label: "Jeux", icon: "layers" },
-  { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap" },
-  { key: "games.coude-social", path: "/coude/social", label: "Coude social", icon: "users" },
-  { key: "games.blackjack", path: "/blackjack", label: "Blackjack", icon: "layers" },
-  { key: "games.slot", path: "/slot", label: "Slot machine", icon: "dollar-sign" },
-  { key: "games.wheel", path: "/wheel", label: "Roue du Destin", icon: "refresh-cw" },
-  { key: "games.wallet", path: "/wallet", label: "Wallet", icon: "dollar-sign" },
-  { key: "games.tournaments", path: "/tournaments", label: "Tournoi hebdo", icon: "zap" },
-  { key: "games.taunts", path: "/taunts", label: "Railleries", icon: "zap" },
+  { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
+  { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap", requiredBot: "coude-bot" },
+  { key: "games.coude-social", path: "/coude/social", label: "Coude social", icon: "users", requiredBot: "coude-bot" },
+  { key: "games.blackjack", path: "/blackjack", label: "Blackjack", icon: "layers", requiredBot: "blackjack-bot" },
+  { key: "games.slot", path: "/slot", label: "Slot machine", icon: "dollar-sign", requiredBot: "slot-bot" },
+  { key: "games.wheel", path: "/wheel", label: "Roue du Destin", icon: "refresh-cw", requiredBot: "wheel-bot" },
+  // Wallet : visible tant qu'au moins un jeu utilisant le wallet est actif.
+  // Cache uniquement si coude + blackjack + slot + wheel sont TOUS off.
+  {
+    key: "games.wallet",
+    path: "/wallet",
+    label: "Wallet",
+    icon: "dollar-sign",
+    requiredAnyBot: ["coude-bot", "blackjack-bot", "slot-bot", "wheel-bot"],
+  },
+  { key: "games.tournaments", path: "/tournaments", label: "Tournoi hebdo", icon: "zap", requiredBot: "coude-bot" },
+  { key: "games.taunts", path: "/taunts", label: "Railleries", icon: "zap", requiredBot: "coude-bot" },
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
   { key: "config.rbac", path: "/rbac", label: "Acces RBAC", icon: "shield" },
   { key: "config.system-ops", path: "/system/operations", label: "System ops", icon: "activity" },
+  { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
   { key: "config.settings", path: "/settings", label: "Parametres", icon: "settings" },
 ];
+
+// Sections visibles selon l'etat des bots :
+// - `requiredBot` : visible seulement si le bot est actif (single dep)
+// - `requiredAnyBot` : visible si AU MOINS UN bot de la liste est actif
+// - aucun des deux : toujours visible (autonome)
+// Visibilite RBAC par role (overrides BDD + defauts registry).
+// useComponentVisibility() : si la cle s.key n'est pas declaree dans le
+// registry, retourne true par defaut (zero regression sur boutons existants).
+const { visible: rbacVisible } = useComponentVisibility();
+
+const sections = computed<Section[]>(() =>
+  allSections.filter((s) => {
+    if (s.requiredBot && !isBotEnabled(s.requiredBot)) return false;
+    if (s.requiredAnyBot && s.requiredAnyBot.length > 0) {
+      const anyActive = s.requiredAnyBot.some((b) => isBotEnabled(b));
+      if (!anyActive) return false;
+    }
+    if (!rbacVisible(s.key)) return false;
+    return true;
+  }),
+);
 </script>
 
 <template>
@@ -71,6 +114,25 @@ const sections: Section[] = [
         <p>Panneau d'administration unifié — modération, communauté, jeux.</p>
       </div>
     </header>
+
+    <!-- Indicateur de composants desactives entre la banner et les boutons.
+         N'apparait que s'il y a au moins 1 composant off pour la guild
+         courante — sinon on garde la dashboard epuree. -->
+    <router-link
+      v-if="disabledCount > 0"
+      to="/component-config"
+      class="disabled-banner"
+      :title="`Voir / réactiver dans Composants : ${disabledBots.join(', ')}`"
+    >
+      <span class="disabled-icon">⚠️</span>
+      <span class="disabled-text">
+        <strong>{{ disabledCount }}</strong>
+        composant{{ disabledCount > 1 ? 's' : '' }} désactivé{{ disabledCount > 1 ? 's' : '' }}
+        — certains boutons sont masqués
+      </span>
+      <span class="disabled-arrow">→</span>
+    </router-link>
+
     <div class="section-grid">
       <SectionCard
         v-for="s in sections"
@@ -79,6 +141,7 @@ const sections: Section[] = [
         :label="s.label"
         :icon="s.icon"
         :section-key="s.key"
+        :required-bot="s.requiredBot"
       />
     </div>
   </div>
@@ -344,6 +407,39 @@ const sections: Section[] = [
   margin: 0;
   color: var(--text-muted, #888);
   font-size: 0.95rem;
+}
+
+/* Bandeau "X composants desactives" — discret, cliquable vers /component-config */
+.disabled-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  margin: 0 0 14px;
+  background: color-mix(in srgb, var(--warning, #e67e22) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning, #e67e22) 35%, var(--border));
+  border-radius: 8px;
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 13px;
+  transition: background-color 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+}
+.disabled-banner:hover {
+  background: color-mix(in srgb, var(--warning, #e67e22) 20%, transparent);
+  border-color: var(--warning, #e67e22);
+  transform: translateY(-1px);
+}
+.disabled-icon { font-size: 14px; flex-shrink: 0; }
+.disabled-text { flex: 1; }
+.disabled-text strong {
+  color: var(--warning, #e67e22);
+  font-weight: 700;
+}
+.disabled-arrow {
+  font-size: 16px;
+  color: var(--warning, #e67e22);
+  font-weight: 700;
+  flex-shrink: 0;
 }
 
 .section-grid {

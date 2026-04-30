@@ -166,7 +166,41 @@ pub async fn handle_update(
     let author_id = event.author.as_ref().map(|a| a.id.to_string());
     let author_name = event.author.as_ref().map(|a| a.name.clone());
     let new_content = event.content.clone().unwrap_or_default();
-    let old_content = old.as_ref().map(|m| m.content.clone()).unwrap_or_default();
+    let mut old_content = old.as_ref().map(|m| m.content.clone()).unwrap_or_default();
+
+    // Fallback : si le cache RAM serenity n'avait pas l'ancien message,
+    // on tente une lookup DB via /api/user-activity/{guild}/by-message/{msg_id}.
+    // Permet de retrouver l'ancien contenu meme apres restart du bot ou
+    // pour les messages anciens hors cache.
+    if old_content.is_empty() {
+        let data = ctx.data.read().await;
+        if let Some(api) = data.get::<sentinel_shared::heartbeat::ApiClientKey>() {
+            #[derive(serde::Deserialize)]
+            struct ActivityHit {
+                content: Option<String>,
+            }
+            let url = format!(
+                "/api/user-activity/{}/by-message/{}",
+                gid,
+                event.id
+            );
+            match api.get_json::<Option<ActivityHit>>(&url).await {
+                Ok(Some(hit)) => {
+                    if let Some(c) = hit.content {
+                        if !c.is_empty() {
+                            old_content = c;
+                        }
+                    }
+                }
+                Ok(None) => {} // pas trouve, on garde vide
+                Err(e) => tracing::warn!(
+                    error = %e,
+                    message_id = %event.id,
+                    "Echec fallback DB pour old_content"
+                ),
+            }
+        }
+    }
 
     let name = author_name.as_deref().unwrap_or("?");
     log(ctx, "info", &gid, &format!(

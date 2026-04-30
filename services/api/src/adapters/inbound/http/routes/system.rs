@@ -12,6 +12,7 @@ pub fn routes() -> Router<AppState> {
     Router::new()
         // User activity (surveillance)
         .route("/api/user-activity", post(handlers::audit::user_activity::create_activity))
+        .route("/api/user-activity/{guild_id}/by-message/{message_id}", get(handlers::audit::user_activity::get_by_message_id))
         .route("/api/user-activity/{guild_id}/{user_id}", get(handlers::audit::user_activity::get_activity))
         // Models status (IA)
         .route("/api/models/status", get(handlers::system::models_status::get_models_status))
@@ -49,5 +50,29 @@ pub fn routes() -> Router<AppState> {
         .route(
             "/api/discord-messages/{action_id}/{kind}",
             delete(handlers::audit::discord_action_messages::delete_mapping),
+        )
+        // Phase Docker — administration via /var/run/docker.sock (gate superadmin sur les actions)
+        .route("/api/docker/overview", get(handlers::system::docker::get_overview))
+        .route("/api/docker/containers", get(handlers::system::docker::list_containers))
+        .route("/api/docker/containers/{id}", delete(handlers::system::docker::remove_container))
+        .route("/api/docker/containers/{id}/start", post(handlers::system::docker::start_container))
+        .route("/api/docker/containers/{id}/stop", post(handlers::system::docker::stop_container))
+        .route("/api/docker/containers/{id}/restart", post(handlers::system::docker::restart_container))
+        .route("/api/docker/containers/{id}/logs", get(handlers::system::docker::container_logs))
+        .route("/api/docker/images", get(handlers::system::docker::list_images))
+        .route("/api/docker/images/{id}", delete(handlers::system::docker::remove_image))
+        .route("/api/docker/volumes", get(handlers::system::docker::list_volumes))
+        .route("/api/docker/volumes/{name}", delete(handlers::system::docker::remove_volume))
+        .route("/api/docker/networks", get(handlers::system::docker::list_networks))
+        .route("/api/docker/prune/containers", post(handlers::system::docker::prune_containers))
+        .route("/api/docker/prune/images", post(handlers::system::docker::prune_images))
+        .route("/api/docker/prune/volumes", post(handlers::system::docker::prune_volumes))
+        .route("/api/docker/prune/networks", post(handlers::system::docker::prune_networks))
+        .route("/api/docker/prune/system", post(handlers::system::docker::prune_system))
+        // RBAC component visibility (overrides UI par role)
+        .route(
+            "/api/rbac/component-visibility/{guild_id}",
+            get(handlers::system::component_visibility::list_visibility)
+                .put(handlers::system::component_visibility::upsert_visibility),
         )
 }

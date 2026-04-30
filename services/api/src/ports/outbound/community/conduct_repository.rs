@@ -38,4 +38,16 @@ pub trait ConductRepository: Send + Sync {
     ) -> Result<Vec<UserConductPoints>, DomainError> {
         Ok(Vec::new())
     }
+
+    /// Reset les points de tous les users d'une guild a `max_points`.
+    /// Appele lors d'une purge globale du journal (Vider le journal).
+    /// Retourne le nombre de users mis a jour. Default impl `Ok(0)` pour
+    /// preserver les mocks existants.
+    async fn reset_all_to_max(
+        &self,
+        _guild_id: &str,
+        _max_points: i32,
+    ) -> Result<u64, DomainError> {
+        Ok(0)
+    }
 }

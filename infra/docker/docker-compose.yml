@@ -204,6 +204,11 @@ services:
     volumes:
       - ../../ai/training/vision/exports:/models/vision:ro
       - ../../ai/training/text/exports:/models/text:ro
+      # Socket Docker monte en RW pour /api/docker/* (admin a distance :
+      # liste/start/stop/restart/logs/prune containers, images, volumes, networks).
+      # Toutes les actions destructives sont gardees par require_superadmin
+      # cote API (SUPERADMIN_USER_IDS).
+      - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       postgres:
         condition: service_healthy
