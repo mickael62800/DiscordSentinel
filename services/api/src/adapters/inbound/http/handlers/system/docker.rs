@@ -265,7 +265,10 @@ pub async fn list_containers(
                 .map(|p| {
                     let priv_port = p.private_port;
                     let pub_port = p.public_port.unwrap_or(0);
-                    let typ = format!("{:?}", p.typ.unwrap_or_default()).to_lowercase();
+                    let typ = p
+                        .typ
+                        .map(|t| format!("{:?}", t).to_lowercase())
+                        .unwrap_or_else(|| "tcp".to_string());
                     if pub_port > 0 {
                         format!("{}:{}/{}", pub_port, priv_port, typ)
                     } else {
