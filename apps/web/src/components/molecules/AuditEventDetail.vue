@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { safeImageUrl } from "@/utils/safeUrl";
 
 const props = defineProps<{
   details: Record<string, unknown>;
@@ -104,12 +105,12 @@ const hasDetails = computed(() => Object.keys(props.details).length > 0);
       <div class="detail-avatars">
         <div v-if="details.old_avatar_url" class="avatar-block">
           <span class="detail-label">Avant :</span>
-          <img :src="String(details.old_avatar_url)" class="avatar-preview" alt="Ancien avatar" />
+          <img v-if="safeImageUrl(String(details.old_avatar_url))" :src="safeImageUrl(String(details.old_avatar_url)) ?? ''" class="avatar-preview" alt="Ancien avatar" />
         </div>
         <div v-if="details.old_avatar_url && details.new_avatar_url" class="avatar-arrow">→</div>
         <div v-if="details.new_avatar_url" class="avatar-block">
           <span class="detail-label">{{ details.old_avatar_url ? 'Apres :' : 'Nouvel avatar :' }}</span>
-          <img :src="String(details.new_avatar_url)" class="avatar-preview" alt="Nouvel avatar" />
+          <img v-if="safeImageUrl(String(details.new_avatar_url))" :src="safeImageUrl(String(details.new_avatar_url)) ?? ''" class="avatar-preview" alt="Nouvel avatar" />
         </div>
       </div>
     </template>

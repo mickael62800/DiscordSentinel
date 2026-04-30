@@ -17,6 +17,7 @@ import EmptyState from "../atoms/EmptyState.vue";
 import AppButton from "../atoms/AppButton.vue";
 import FormField from "../atoms/FormField.vue";
 import { infractionTypeVariant } from "../../utils/variants";
+import { safeImageUrl } from "../../utils/safeUrl";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { useBans } from "../../composables/useBans";
 import { useConfirm } from "../../composables/useConfirm";
@@ -870,8 +871,8 @@ async function handleActionSubmit() {
                     @mousedown="selectActionMember(member)"
                   >
                     <img
-                      v-if="member.avatar_url"
-                      :src="member.avatar_url"
+                      v-if="safeImageUrl(member.avatar_url)"
+                      :src="safeImageUrl(member.avatar_url) ?? ''"
                       class="autocomplete-avatar"
                     />
                     <div v-else class="avatar-placeholder autocomplete-avatar-placeholder">

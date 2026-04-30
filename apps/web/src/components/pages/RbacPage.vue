@@ -8,6 +8,7 @@ import LoadingState from "../atoms/LoadingState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import ComponentVisibilityGrid from "../organisms/ComponentVisibilityGrid.vue";
+import { safeImageUrl } from "../../utils/safeUrl";
 import type { RbacRole } from "../../types";
 
 const { users, myRole, loading, refresh, grantRole, updateRole, revokeRole } = useRbac();
@@ -157,8 +158,8 @@ function roleVariant(role: RbacRole): BadgeVariant {
             <td>
               <div class="user-cell">
                 <img
-                  v-if="user.avatar_url"
-                  :src="user.avatar_url"
+                  v-if="safeImageUrl(user.avatar_url)"
+                  :src="safeImageUrl(user.avatar_url) ?? ''"
                   :alt="user.display_name"
                   class="avatar"
                 />

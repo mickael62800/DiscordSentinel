@@ -261,6 +261,15 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
             header::CACHE_CONTROL,
             HeaderValue::from_static("no-store"),
         ))
+        // Content-Security-Policy strict : l'API ne sert que du JSON, aucune
+        // execution de script / chargement de ressource n'est legitime sur ce
+        // domaine. Bloque tout XSS reflechi residuel.
+        .layer(SetResponseHeaderLayer::overriding(
+            header::CONTENT_SECURITY_POLICY,
+            HeaderValue::from_static(
+                "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
+            ),
+        ))
         .layer(build_cors(allowed_origins))
         .with_state(state)
 }

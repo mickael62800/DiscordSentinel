@@ -6,6 +6,7 @@ import { usePagination } from "../../composables/usePagination";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { useToast } from "../../composables/useToast";
 import { useConfirm } from "../../composables/useConfirm";
+import { safeImageUrl } from "../../utils/safeUrl";
 
 const { success, error: showError } = useToast();
 const { confirm: confirmDialog } = useConfirm();
@@ -1082,14 +1083,14 @@ function discordProfileUrl(userId: string): string {
 
                     <template v-else-if="evt.event_type === 'avatar_changed'">
                       <div class="avatar-diff">
-                        <div v-if="avatarDiff(evt).before" class="avatar-cell">
+                        <div v-if="safeImageUrl(avatarDiff(evt).before)" class="avatar-cell">
                           <span class="diff-label">Avant</span>
-                          <img :src="avatarDiff(evt).before!" alt="ancien avatar" class="avatar-thumb" />
+                          <img :src="safeImageUrl(avatarDiff(evt).before) ?? ''" alt="ancien avatar" class="avatar-thumb" />
                         </div>
-                        <span v-if="avatarDiff(evt).before && avatarDiff(evt).after" class="diff-arrow">→</span>
-                        <div v-if="avatarDiff(evt).after" class="avatar-cell">
+                        <span v-if="safeImageUrl(avatarDiff(evt).before) && safeImageUrl(avatarDiff(evt).after)" class="diff-arrow">→</span>
+                        <div v-if="safeImageUrl(avatarDiff(evt).after)" class="avatar-cell">
                           <span class="diff-label">Après</span>
-                          <img :src="avatarDiff(evt).after!" alt="nouvel avatar" class="avatar-thumb" />
+                          <img :src="safeImageUrl(avatarDiff(evt).after) ?? ''" alt="nouvel avatar" class="avatar-thumb" />
                         </div>
                         <span v-if="!avatarDiff(evt).before && !avatarDiff(evt).after && evt.content" class="detail-row-body">{{ evt.content }}</span>
                       </div>

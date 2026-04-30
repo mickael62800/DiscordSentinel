@@ -3,6 +3,7 @@ import { ref } from "vue";
 import { useGuildMembers } from "../../composables/useGuildMembers";
 import { useToast } from "../../composables/useToast";
 import { getApiBaseUrl } from "../../utils/api";
+import { safeImageUrl } from "../../utils/safeUrl";
 import type { GuildMember } from "../../types";
 
 const { success, error: showError } = useToast();
@@ -108,7 +109,7 @@ async function confirmAddWatch() {
                 class="autocomplete-item"
                 @mousedown="selectAddMember(member)"
               >
-                <img v-if="member.avatar_url" :src="member.avatar_url" class="autocomplete-avatar" />
+                <img v-if="safeImageUrl(member.avatar_url)" :src="safeImageUrl(member.avatar_url) ?? ''" class="autocomplete-avatar" />
                 <div v-else class="avatar-placeholder autocomplete-avatar-placeholder">
                   {{ (member.display_name || member.username).charAt(0).toUpperCase() }}
                 </div>
@@ -121,7 +122,7 @@ async function confirmAddWatch() {
           </div>
 
           <div v-if="addSelectedMember" class="selected-member">
-            <img v-if="addSelectedMember.avatar_url" :src="addSelectedMember.avatar_url" class="selected-avatar" />
+            <img v-if="safeImageUrl(addSelectedMember.avatar_url)" :src="safeImageUrl(addSelectedMember.avatar_url) ?? ''" class="selected-avatar" />
             <div v-else class="avatar-placeholder autocomplete-avatar-placeholder">
               {{ (addSelectedMember.display_name || addSelectedMember.username).charAt(0).toUpperCase() }}
             </div>
