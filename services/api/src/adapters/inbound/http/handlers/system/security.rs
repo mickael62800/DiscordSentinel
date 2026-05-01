@@ -17,6 +17,7 @@ use serde::Serialize;
 
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::middleware::rbac::require_role;
+use crate::adapters::inbound::http::middleware::rbac::require_superadmin;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::enums::system::role::Role;
@@ -30,11 +31,23 @@ fn forbid(s: StatusCode, msg: &str) -> ApiError {
     })
 }
 
-fn gate_admin(rbac: &Option<Extension<RoleContext>>) -> Result<(), ApiError> {
+/// Gate admin+ pour les endpoints globaux (non scopes par guild).
+/// Comme le middleware RBAC ne peut pas resoudre le role sans guild_id
+/// dans l'URL, on bypass pour les superadmins (env SUPERADMIN_USER_IDS).
+/// Pour les non-superadmins, il faudrait soit ajouter un guild_id dans
+/// l'URL, soit passer par un endpoint scope par guild.
+fn gate_admin(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result<(), ApiError> {
     let Some(Extension(ctx)) = rbac else {
         return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
     };
-    require_role(ctx, Role::Admin).map_err(|s| forbid(s, "admin+ requis"))
+    // Superadmin bypass : pour les endpoints globaux comme /api/security/*,
+    // c'est le seul check possible sans contexte de guild.
+    if require_superadmin(state, ctx).is_ok() {
+        return Ok(());
+    }
+    // Sinon : require admin role explicit (necessite que le middleware ait
+    // resolu ctx.role, ce qui demande un guild_id quelque part).
+    require_role(ctx, Role::Admin).map_err(|s| forbid(s, "superadmin requis"))
 }
 
 // ── 1. Top IPs par requetes ─────────────────────────────────────────────
@@ -67,7 +80,7 @@ pub async fn top_ips(
     rbac: Option<Extension<RoleContext>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<TopIpEntry>>, ApiError> {
-    gate_admin(&rbac)?;
+    gate_admin(&state, &rbac)?;
     let interval = window_to_interval(q.window.as_deref().unwrap_or("1h"));
     let limit = q.limit.unwrap_or(20).clamp(1, 100);
 
@@ -116,7 +129,7 @@ pub async fn auth_failures(
     rbac: Option<Extension<RoleContext>>,
     Query(q): Query<WindowQuery>,
 ) -> Result<Json<Vec<AuthFailureEntry>>, ApiError> {
-    gate_admin(&rbac)?;
+    gate_admin(&state, &rbac)?;
     let interval = window_to_interval(q.window.as_deref().unwrap_or("24h"));
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
 
@@ -165,9 +178,10 @@ pub struct BannedIpsResponse {
 }
 
 pub async fn banned_ips(
+    State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<BannedIpsResponse>, ApiError> {
-    gate_admin(&rbac)?;
+    gate_admin(&state, &rbac)?;
     // fail2ban necessite une installation host + acces au socket. Pas implemente
     // dans cette version. Retourne un placeholder informatif.
     Ok(Json(BannedIpsResponse {
@@ -207,7 +221,7 @@ pub async fn audit_logs(
     rbac: Option<Extension<RoleContext>>,
     Query(q): Query<AuditQuery>,
 ) -> Result<Json<Vec<AuditEntry>>, ApiError> {
-    gate_admin(&rbac)?;
+    gate_admin(&state, &rbac)?;
     let limit = q.limit.unwrap_or(100).clamp(1, 500);
 
     // Construction dynamique safe : seuls les noms de colonnes/tables sont
@@ -292,9 +306,10 @@ pub struct TlsCertInfo {
 }
 
 pub async fn tls_cert(
+    State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<TlsCertInfo>, ApiError> {
-    gate_admin(&rbac)?;
+    gate_admin(&state, &rbac)?;
     let domain = std::env::var("WEB_DOMAIN").unwrap_or_default();
     if domain.is_empty() {
         return Err(ApiError(DomainError::Internal(
