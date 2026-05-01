@@ -291,8 +291,16 @@ mkdir -p /var/lib/sentinel
 NOW=$(date -Iseconds)
 EXPECTED_PORTS="22 2222 80 443"
 
-# Scan localhost (rapide)
-PORTS=$(nmap -p- -T4 --open localhost 2>/dev/null | grep -E "^[0-9]+/" | head -50 || true)
+# Scan de l'IP publique : on ne veut voir que la surface d'attaque externe,
+# pas les services bindes sur 127.0.0.1 (containerd, postfix local, etc).
+# Si l'IP publique est injoignable depuis l'host (hairpin NAT KO), le scan
+# renverra 0 port et "unexpected_count" sera 0 -- a verifier au deploiement.
+TARGET=$(curl -s --max-time 5 https://api.ipify.org 2>/dev/null || true)
+if [ -z "$TARGET" ]; then
+    echo "WARN: IP publique non resolue, fallback sur localhost" >&2
+    TARGET=localhost
+fi
+PORTS=$(nmap -p- -T4 --open "$TARGET" 2>/dev/null | grep -E "^[0-9]+/" | head -50 || true)
 UNEXPECTED=0
 
 {
