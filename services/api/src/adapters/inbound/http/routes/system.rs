@@ -75,6 +75,20 @@ pub fn routes() -> Router<AppState> {
             get(handlers::ai::dataset::list_messages)
                 .delete(handlers::ai::dataset::bulk_delete),
         )
+        // Invitations a usage unique (owner+ pour gerer, auth pour redeem)
+        .route("/api/invitations", post(handlers::system::invitations::create_invitation))
+        .route(
+            "/api/invitations/{guild_id}",
+            get(handlers::system::invitations::list_invitations),
+        )
+        .route(
+            "/api/invitations/code/{code}",
+            delete(handlers::system::invitations::revoke_invitation),
+        )
+        .route(
+            "/api/auth/redeem-invitation",
+            post(handlers::system::invitations::redeem_invitation),
+        )
         // Security monitoring (admin+) : top IPs, auth failures, audit logs, TLS
         .route("/api/security/top-ips", get(handlers::system::security::top_ips))
         .route("/api/security/auth-failures", get(handlers::system::security::auth_failures))
