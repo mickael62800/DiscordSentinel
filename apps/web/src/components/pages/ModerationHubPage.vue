@@ -37,7 +37,7 @@ const { confirm } = useConfirm();
 // --- Tabs ---
 const activeTab = ref<"journal" | "bans" | "tracking" | "workflow">("journal");
 const bulkMenuOpen = ref(false);
-const trackingSubTab = ref<"strikes" | "notes" | "evidence">("strikes");
+const trackingSubTab = ref<"strikes" | "notes-evidence">("strikes");
 const workflowSubTab = ref<"review" | "reminders">("review");
 function closeBulkMenu() { bulkMenuOpen.value = false; }
 onMounted(() => document.addEventListener("click", closeBulkMenu));
@@ -857,17 +857,23 @@ async function handleActionSubmit() {
           @click="trackingSubTab = 'strikes'"
         >Avertissements</button>
         <button
-          :class="['sub-tab', { active: trackingSubTab === 'notes' }]"
-          @click="trackingSubTab = 'notes'"
-        >Notes mod</button>
-        <button
-          :class="['sub-tab', { active: trackingSubTab === 'evidence' }]"
-          @click="trackingSubTab = 'evidence'"
-        >Preuves</button>
+          :class="['sub-tab', { active: trackingSubTab === 'notes-evidence' }]"
+          @click="trackingSubTab = 'notes-evidence'"
+        >Notes &amp; Preuves</button>
       </div>
       <StrikesPage v-if="trackingSubTab === 'strikes'" />
-      <NotesPage v-else-if="trackingSubTab === 'notes'" />
-      <EvidencePage v-else-if="trackingSubTab === 'evidence'" />
+      <div v-else-if="trackingSubTab === 'notes-evidence'" class="stacked-sections">
+        <section class="stacked-block">
+          <h2 class="stacked-title">📝 Notes de modération</h2>
+          <p class="stacked-hint">Notes libres attachées à un utilisateur (visibles entre modérateurs).</p>
+          <NotesPage />
+        </section>
+        <section class="stacked-block">
+          <h2 class="stacked-title">📎 Preuves</h2>
+          <p class="stacked-hint">Pièces jointes (URL/description) attachées à une action de modération précise.</p>
+          <EvidencePage />
+        </section>
+      </div>
     </div>
 
     <!-- ============================================ -->
@@ -1555,6 +1561,33 @@ async function handleActionSubmit() {
 .sub-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+.stacked-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1100px) {
+  .stacked-sections { grid-template-columns: 1fr; }
+}
+.stacked-block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  background: var(--bg-secondary);
+}
+.stacked-title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 6px 0;
+  color: var(--text-primary);
+}
+.stacked-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0 0 14px 0;
 }
 
 .bulk-menu-wrap { position: relative; display: inline-block; }
