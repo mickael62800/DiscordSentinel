@@ -52,18 +52,39 @@ onMounted(async () => {
     message.value = `Application du code d'invitation ${pendingCode}…`;
     try {
       const r = await invitationsService.redeem(pendingCode);
-      message.value = `✅ Code accepté ! Rôle ${r.role} sur la guild ${r.guild_id}. Redirection…`;
+      message.value = `✅ Code accepté ! Rôle ${r.role}. Redirection…`;
       status.value = "ok";
     } catch (e: any) {
-      // Echec : on continue quand meme (l'utilisateur peut deja avoir un role
-      // pour cette guild ou un superadmin status). Si vraiment pas autorise,
-      // l'enforcement futur (commit 4/4) le bloquera proprement.
       const msg = e?.message ?? String(e);
       message.value = `⚠️ Code refusé : ${msg}`;
       status.value = "error";
-      // Pause pour que l'utilisateur lise le message avant de continuer
+      // Pause pour que l'utilisateur lise le message
       await new Promise((r) => setTimeout(r, 2500));
     }
+  }
+
+  // Verifie que le user est bien autorise a acceder au site.
+  // Si pas de row dans api_user_guilds + pas superadmin -> retour login
+  // avec un message explicatif pour proposer la saisie d'un code.
+  status.value = "redeeming";
+  message.value = "Vérification des accès…";
+  try {
+    const access = await invitationsService.checkAccess();
+    if (!access.is_authorized) {
+      message.value = "Accès refusé. Tu n'es pas dans la liste des utilisateurs autorisés.";
+      status.value = "error";
+      // Cleanup le token pour ne pas laisser une session "fantome"
+      setDiscordToken("");
+      setDiscordUser(null);
+      store.$patch({ user: null, hasConfig: true, initialized: true });
+      await new Promise((r) => setTimeout(r, 2500));
+      router.replace({ name: "login", query: { error: "not_invited" } });
+      return;
+    }
+  } catch (e: any) {
+    // Si check-access echoue (rate limit Discord, etc.), on laisse passer
+    // pour ne pas bloquer un user legitime sur une erreur transitoire.
+    console.warn("check-access failed, proceeding anyway:", e);
   }
 
   // Injecte directement dans le store Pinia pour eviter un re-check async.

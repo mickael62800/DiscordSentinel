@@ -292,6 +292,65 @@ pub async fn revoke_invitation(
     Ok(Json(serde_json::json!({ "ok": true })))
 }
 
+// ── Check access (apres OAuth, avant dashboard) ──
+
+#[derive(Debug, Serialize)]
+pub struct CheckAccessResponse {
+    pub is_authorized: bool,
+    pub is_superadmin: bool,
+    /// Nombre de guilds pour lesquelles l'utilisateur a un role
+    pub guild_count: i64,
+    pub message: String,
+}
+
+/// GET /api/auth/check-access
+/// Auth requis : X-Discord-Token. Le middleware injecte RoleContext avec
+/// au minimum discord_user_id. Pas besoin d'avoir un role pour appeler.
+///
+/// Retourne is_authorized=true si :
+/// - user est dans SUPERADMIN_USER_IDS, OU
+/// - user a au moins un row dans api_user_guilds
+///
+/// Sinon is_authorized=false (le frontend redirige vers Login avec erreur
+/// pour proposer la saisie d'un code d'invitation).
+pub async fn check_access(
+    State(state): State<AppState>,
+    rbac: Option<axum::Extension<RoleContext>>,
+) -> Result<Json<CheckAccessResponse>, ApiError> {
+    let Some(axum::Extension(ctx)) = rbac else {
+        return Err(ApiError(DomainError::Forbidden(
+            "auth Discord requise (X-Discord-Token manquant ou invalide)".into(),
+        )));
+    };
+
+    let is_superadmin = state
+        .superadmin_user_ids
+        .iter()
+        .any(|id| id == &ctx.discord_user_id);
+
+    let guild_count: i64 = sqlx::query_scalar(
+        "SELECT COUNT(*)::bigint FROM api_user_guilds WHERE discord_user_id = $1",
+    )
+    .bind(&ctx.discord_user_id)
+    .fetch_one(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("count guilds: {e}"))))?;
+
+    let is_authorized = is_superadmin || guild_count > 0;
+    let message = if is_authorized {
+        "Acces autorise".to_string()
+    } else {
+        "Acces non autorise. Utilise un code d'invitation pour rejoindre.".to_string()
+    };
+
+    Ok(Json(CheckAccessResponse {
+        is_authorized,
+        is_superadmin,
+        guild_count,
+        message,
+    }))
+}
+
 // ── Redeem (par l'utilisateur invite) ──
 
 #[derive(Debug, Deserialize)]

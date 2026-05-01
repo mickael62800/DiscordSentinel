@@ -31,6 +31,13 @@ export interface RedeemInvitationResponse {
   message: string;
 }
 
+export interface CheckAccessResponse {
+  is_authorized: boolean;
+  is_superadmin: boolean;
+  guild_count: number;
+  message: string;
+}
+
 export const invitationsService = {
   create(params: CreateInvitationParams): Promise<InvitationDto> {
     return httpPost("/api/invitations", params);
@@ -43,5 +50,8 @@ export const invitationsService = {
   },
   redeem(code: string): Promise<RedeemInvitationResponse> {
     return httpPost("/api/auth/redeem-invitation", { code });
+  },
+  checkAccess(): Promise<CheckAccessResponse> {
+    return httpGet("/api/auth/check-access");
   },
 };

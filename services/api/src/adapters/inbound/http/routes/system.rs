@@ -89,6 +89,10 @@ pub fn routes() -> Router<AppState> {
             "/api/auth/redeem-invitation",
             post(handlers::system::invitations::redeem_invitation),
         )
+        .route(
+            "/api/auth/check-access",
+            get(handlers::system::invitations::check_access),
+        )
         // Security monitoring (admin+) : top IPs, auth failures, audit logs, TLS
         .route("/api/security/top-ips", get(handlers::system::security::top_ips))
         .route("/api/security/auth-failures", get(handlers::system::security::auth_failures))

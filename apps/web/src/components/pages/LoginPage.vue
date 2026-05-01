@@ -1,11 +1,27 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useRouter } from "vue-router";
+import { computed, ref } from "vue";
+import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import AppButton from "../atoms/AppButton.vue";
 
 const router = useRouter();
+const route = useRoute();
 const { loading, error, login, user } = useAuth();
+
+// Affiche un message specifique si l'auth a refuse (ex: not_invited)
+const queryError = computed<string | null>(() => {
+  const e = route.query.error;
+  if (e === "not_invited") {
+    return "Accès refusé : tu n'es pas dans la liste des utilisateurs autorisés. Si tu as un code d'invitation, colle-le ci-dessous et reconnecte-toi.";
+  }
+  if (e === "callback_invalide") {
+    return "Erreur OAuth : le callback Discord est invalide. Réessaie.";
+  }
+  if (typeof e === "string") {
+    return `Erreur : ${e}`;
+  }
+  return null;
+});
 
 // Champ code d'invitation : optionnel. Si renseigne, on le stocke en
 // sessionStorage et apres OAuth callback la page /auth/callback le
@@ -40,6 +56,11 @@ async function handleLogin() {
       </div>
       <h1>DiscordSentinel</h1>
       <p class="subtitle">Panneau d'administration</p>
+
+      <!-- Message d'erreur si redirection avec ?error=... -->
+      <div v-if="queryError" class="query-error">
+        ⚠️ {{ queryError }}
+      </div>
 
       <!-- Champ code d'invitation (optionnel, replie par defaut) -->
       <div class="invite-toggle">
@@ -131,6 +152,18 @@ h1 {
   color: var(--text-secondary);
   font-size: 14px;
   margin-bottom: var(--space-2xl);
+}
+
+.query-error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  margin-bottom: var(--space-lg);
+  font-size: 12px;
+  color: var(--danger);
+  line-height: 1.4;
+  text-align: left;
 }
 
 .invite-toggle {
