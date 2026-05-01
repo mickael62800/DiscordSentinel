@@ -29,6 +29,7 @@ import { useConfirm } from "../../composables/useConfirm";
 import { useModeration } from "../../composables/useModeration";
 import { useGuildSelector } from "../../composables/useGuildSelector";
 import { useGuildMembers } from "../../composables/useGuildMembers";
+import { useSharedUserLookup } from "../../composables/useSharedUserLookup";
 
 const { success, error: showError } = useToast();
 const { formatShortDateTime: fmt } = useFormatDate();
@@ -38,6 +39,15 @@ const { confirm } = useConfirm();
 const activeTab = ref<"journal" | "bans" | "tracking" | "workflow">("journal");
 const bulkMenuOpen = ref(false);
 const trackingSubTab = ref<"strikes" | "notes-evidence">("strikes");
+const { sharedUserId } = useSharedUserLookup();
+
+/** Bouton de la ligne du Journal -> bascule vers Notes & Preuves avec l'ID user pre-rempli. */
+function openNotesEvidence(userId: string) {
+  if (!userId) return;
+  sharedUserId.value = userId;
+  activeTab.value = "tracking";
+  trackingSubTab.value = "notes-evidence";
+}
 const workflowSubTab = ref<"review" | "reminders">("review");
 function closeBulkMenu() { bulkMenuOpen.value = false; }
 onMounted(() => document.addEventListener("click", closeBulkMenu));
@@ -723,6 +733,17 @@ async function handleActionSubmit() {
         <template #cell-actions="{ row }">
           <div class="action-buttons">
             <button
+              class="notes-btn"
+              title="Voir / ajouter notes et preuves pour cet utilisateur"
+              @click.stop="openNotesEvidence(String((row as Record<string, unknown>).user_id))"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
+              <span>📎</span>
+            </button>
+            <button
               v-if="(row as Record<string, unknown>).source === 'detection'
                     && !isDetection(String((row as Record<string, unknown>).infraction_type))"
               class="apply-btn"
@@ -1395,6 +1416,26 @@ async function handleActionSubmit() {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+
+.notes-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast);
+}
+.notes-btn:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+  background-color: var(--bg-hover);
+}
+.notes-btn svg { width: 14px; height: 14px; }
 
 .apply-btn {
   display: inline-flex;

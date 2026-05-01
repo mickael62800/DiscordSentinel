@@ -2,6 +2,7 @@
 import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
 import { useInfractions } from "@/composables/useInfractions";
+import { useSharedUserLookup } from "@/composables/useSharedUserLookup";
 import { evidenceService } from "@/services/moderationAdvancedService";
 import type { EvidenceEntry } from "@/types/moderation-advanced";
 import type { Infraction } from "@/types";
@@ -9,7 +10,9 @@ import type { Infraction } from "@/types";
 const { success, error: showError } = useToast();
 
 // Flow : user_id -> liste des actions de ce user -> selection d'une action -> preuves attachees
-const lookupUserId = ref("");
+// L'ID user est partage avec NotesPage via useSharedUserLookup pour qu'un
+// seul champ saisi en haut du sous-onglet "Notes & Preuves" alimente les 2.
+const { sharedUserId: lookupUserId } = useSharedUserLookup();
 const { infractions, loading: infractionsLoading, fetchInfractions } = useInfractions();
 
 const selectedActionId = ref<string | null>(null);
