@@ -290,6 +290,11 @@ services:
       # Cert Let's Encrypt en RO pour endpoint /api/security/tls-cert
       # (lecture de cert.pem pour afficher l'expiration sur la page Securite).
       - letsencrypt_etc:/etc/letsencrypt:ro
+      # Fail2ban status export (host) en RO pour /api/security/banned-ips.
+      # Genere par /usr/local/bin/fail2ban-export.sh via cron (toutes les 2 min).
+      # Si le fichier n'existe pas, l'endpoint retourne installed=false avec
+      # les instructions de setup.
+      - /var/lib/sentinel:/var/lib/sentinel:ro
     depends_on:
       postgres:
         condition: service_healthy

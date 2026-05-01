@@ -168,29 +168,83 @@ pub async fn auth_failures(
     Ok(Json(out))
 }
 
-// ── 3. IPs bannies (placeholder fail2ban) ───────────────────────────────
+// ── 3. IPs bannies (lecture fichier export fail2ban) ───────────────────
+
+#[derive(Debug, Serialize)]
+pub struct Fail2banJail {
+    pub name: String,
+    pub total_banned: i64,
+    pub banned_ips: Vec<String>,
+}
 
 #[derive(Debug, Serialize)]
 pub struct BannedIpsResponse {
     pub installed: bool,
+    pub updated_at: Option<String>,
     pub message: String,
-    pub bans: Vec<String>,
+    pub jails: Vec<Fail2banJail>,
 }
+
+const F2B_STATUS_PATH: &str = "/var/lib/sentinel/fail2ban-status.json";
 
 pub async fn banned_ips(
     State(state): State<AppState>,
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<BannedIpsResponse>, ApiError> {
     gate_admin(&state, &rbac)?;
-    // fail2ban necessite une installation host + acces au socket. Pas implemente
-    // dans cette version. Retourne un placeholder informatif.
+
+    // Lit le fichier expose par le cron host /usr/local/bin/fail2ban-export.sh
+    let raw = match std::fs::read_to_string(F2B_STATUS_PATH) {
+        Ok(s) => s,
+        Err(_) => {
+            return Ok(Json(BannedIpsResponse {
+                installed: false,
+                updated_at: None,
+                message: format!(
+                    "fail2ban status non disponible. Pour activer : 1) installer fail2ban sur l'host (apt install fail2ban) ; 2) creer le script /usr/local/bin/fail2ban-export.sh + cron pour exporter dans {F2B_STATUS_PATH} ; 3) monter /var/lib/sentinel:/var/lib/sentinel:ro dans le conteneur api du compose."
+                ),
+                jails: vec![],
+            }));
+        }
+    };
+
+    #[derive(serde::Deserialize)]
+    struct RawJail {
+        name: String,
+        total_banned: i64,
+        banned_ips: String,
+    }
+    #[derive(serde::Deserialize)]
+    struct RawStatus {
+        updated_at: String,
+        jails: Vec<RawJail>,
+    }
+
+    let parsed: RawStatus = serde_json::from_str(&raw).map_err(|e| {
+        ApiError(DomainError::Internal(format!("parse fail2ban-status.json: {e}")))
+    })?;
+
+    let jails = parsed
+        .jails
+        .into_iter()
+        .map(|j| Fail2banJail {
+            name: j.name,
+            total_banned: j.total_banned,
+            banned_ips: j
+                .banned_ips
+                .split_whitespace()
+                .filter(|s| !s.is_empty())
+                .map(|s| s.to_string())
+                .collect(),
+        })
+        .collect::<Vec<_>>();
+
+    let total: usize = jails.iter().map(|j| j.banned_ips.len()).sum();
     Ok(Json(BannedIpsResponse {
-        installed: false,
-        message: "fail2ban non installe sur l'host. Pour activer : \
-            sudo apt install fail2ban && configurer /etc/fail2ban/jail.local. \
-            L'integration cote API necessite un acces au socket fail2ban-client."
-            .into(),
-        bans: vec![],
+        installed: true,
+        updated_at: Some(parsed.updated_at),
+        message: format!("{} IPs actuellement bannies sur {} jail(s)", total, jails.len()),
+        jails,
     }))
 }
 

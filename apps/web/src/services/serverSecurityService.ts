@@ -21,10 +21,17 @@ export interface AuthFailureEntry {
   user_agent: string;
 }
 
+export interface Fail2banJail {
+  name: string;
+  total_banned: number;
+  banned_ips: string[];
+}
+
 export interface BannedIpsResponse {
   installed: boolean;
+  updated_at: string | null;
   message: string;
-  bans: string[];
+  jails: Fail2banJail[];
 }
 
 export interface AuditEntry {

@@ -254,33 +254,77 @@ const tlsBadgeClass = computed(() => {
       <div v-if="banned && !banned.installed" class="info">
         <p>{{ banned.message }}</p>
         <details class="hint">
-          <summary>Setup rapide fail2ban</summary>
-          <pre>sudo apt install fail2ban
+          <summary>Setup rapide (export fail2ban -&gt; fichier JSON)</summary>
+          <pre>
+# 1. Installer fail2ban si pas deja fait
+sudo apt install fail2ban
 sudo systemctl enable --now fail2ban
 
-# Jail nginx (rate limit)
+# 2. Configurer une jail SSH (recommande)
 sudo tee /etc/fail2ban/jail.local &lt;&lt;EOF
 [sshd]
 enabled = true
 maxretry = 3
 bantime = 1h
-
-[nginx-http-auth]
-enabled = true
-maxretry = 5
-bantime = 1h
 EOF
-
 sudo systemctl restart fail2ban
-sudo fail2ban-client status</pre>
+
+# 3. Script export pour l'API DiscordSentinel
+sudo tee /usr/local/bin/fail2ban-export.sh &lt;&lt;'EOF'
+#!/bin/bash
+OUT=/var/lib/sentinel/fail2ban-status.json
+mkdir -p /var/lib/sentinel && chmod 755 /var/lib/sentinel
+JAILS=$(fail2ban-client status 2&gt;/dev/null | grep "Jail list:" | sed 's/.*://;s/,/ /g')
+echo "{" &gt; $OUT
+echo "  \"updated_at\": \"$(date -Iseconds)\"," &gt;&gt; $OUT
+echo "  \"jails\": [" &gt;&gt; $OUT
+FIRST=1
+for JAIL in $JAILS; do
+    JAIL=$(echo $JAIL | xargs); [ -z "$JAIL" ] &amp;&amp; continue
+    BANNED=$(fail2ban-client status $JAIL 2&gt;/dev/null | grep "Banned IP list:" | sed 's/.*://' | xargs)
+    TOTAL=$(fail2ban-client status $JAIL 2&gt;/dev/null | grep "Total banned:" | sed 's/.*://' | xargs)
+    [ $FIRST -eq 0 ] &amp;&amp; echo "    ," &gt;&gt; $OUT
+    echo "    {" &gt;&gt; $OUT
+    echo "      \"name\": \"$JAIL\"," &gt;&gt; $OUT
+    echo "      \"total_banned\": ${TOTAL:-0}," &gt;&gt; $OUT
+    echo "      \"banned_ips\": \"$BANNED\"" &gt;&gt; $OUT
+    echo "    }" &gt;&gt; $OUT
+    FIRST=0
+done
+echo "  ]" &gt;&gt; $OUT
+echo "}" &gt;&gt; $OUT
+chmod 644 $OUT
+EOF
+sudo chmod +x /usr/local/bin/fail2ban-export.sh
+sudo /usr/local/bin/fail2ban-export.sh
+
+# 4. Cron toutes les 2 min
+echo "*/2 * * * * root /usr/local/bin/fail2ban-export.sh" | sudo tee /etc/cron.d/fail2ban-export
+
+# 5. Recreate l'API pour monter /var/lib/sentinel
+docker compose up -d --force-recreate api</pre>
         </details>
       </div>
-      <div v-else-if="banned && banned.bans.length > 0">
-        <ul>
-          <li v-for="ip in banned.bans" :key="ip"><code>{{ ip }}</code></li>
-        </ul>
+      <div v-else-if="banned && banned.jails.length > 0">
+        <p class="muted small">
+          Maj : {{ fmtDate(banned.updated_at!) }} ·
+          {{ banned.message }}
+        </p>
+        <div v-for="jail in banned.jails" :key="jail.name" class="jail-card">
+          <div class="jail-head">
+            <strong>🔒 {{ jail.name }}</strong>
+            <span class="badge" :class="jail.banned_ips.length > 0 ? 'danger' : 'ok'">
+              {{ jail.banned_ips.length }} IP{{ jail.banned_ips.length > 1 ? 's' : '' }} bannie{{ jail.banned_ips.length > 1 ? 's' : '' }}
+              · total cumul {{ jail.total_banned }}
+            </span>
+          </div>
+          <ul v-if="jail.banned_ips.length > 0" class="ip-list">
+            <li v-for="ip in jail.banned_ips" :key="ip"><code>{{ ip }}</code></li>
+          </ul>
+          <div v-else class="muted small">Aucune IP actuellement bannie sur cette jail.</div>
+        </div>
       </div>
-      <div v-else class="empty">Aucune IP actuellement bannie.</div>
+      <div v-else class="empty">fail2ban actif mais aucune jail configurée.</div>
     </section>
 
     <!-- ── 4. Audit log admin ── -->
@@ -553,6 +597,37 @@ select {
   font-size: 13px;
 }
 .error code { background: rgba(0,0,0,0.2); padding: 1px 6px; border-radius: 3px; }
+
+.jail-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+.jail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.ip-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.ip-list li code {
+  background: var(--bg-card);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+}
 
 .tls-info { display: flex; flex-direction: column; gap: 10px; }
 .tls-row {
