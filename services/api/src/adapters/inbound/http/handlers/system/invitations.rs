@@ -99,7 +99,7 @@ pub async fn create_invitation(
         .map_err(|e| ApiError(DomainError::Internal(format!("query role: {e}"))))?;
         let role_str = row.map(|r| r.0).unwrap_or_default();
         let role = Role::from_str(&role_str).unwrap_or(Role::Viewer);
-        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role) }, Role::Owner)
+        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
             .map_err(|s| forbid(s, "owner+ requis pour generer une invitation"))?;
     }
 
@@ -185,7 +185,7 @@ pub async fn list_invitations(
         .await
         .map_err(|e| ApiError(DomainError::Internal(format!("query role: {e}"))))?;
         let role = Role::from_str(&row.map(|r| r.0).unwrap_or_default()).unwrap_or(Role::Viewer);
-        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role) }, Role::Owner)
+        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
             .map_err(|s| forbid(s, "owner+ requis"))?;
     }
 
@@ -279,7 +279,7 @@ pub async fn revoke_invitation(
         .ok()
         .flatten();
         let role = Role::from_str(&r.map(|x| x.0).unwrap_or_default()).unwrap_or(Role::Viewer);
-        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role) }, Role::Owner)
+        require_role(&RoleContext { discord_user_id: ctx.discord_user_id.clone(), role: Some(role), guild_id: None }, Role::Owner)
             .map_err(|s| forbid(s, "owner+ requis"))?;
     }
 
