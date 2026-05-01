@@ -73,15 +73,18 @@ services:
   grpc-certs-init:
     image: alpine:3.20
     container_name: sentinel-grpc-certs-init
-    command: ["sh", "/init/gen-grpc-certs.sh"]
     environment:
       CERT_DIR: /grpc-certs
       CN_SERVER: api
     volumes:
       - grpc_certs:/grpc-certs
       - ./scripts:/init:ro
-    # Installer openssl avant le script. alpine:3.20 fournit busybox sans openssl.
-    entrypoint: ["sh", "-c", "apk add --no-cache openssl >/dev/null && sh /init/gen-grpc-certs.sh"]
+    # alpine:3.20 fournit busybox sans openssl, on l'installe au boot puis on
+    # lance le script. Pas de `command:` ici, l'entrypoint fait tout.
+    entrypoint:
+      - sh
+      - -c
+      - "apk add --no-cache openssl >/dev/null && sh /init/gen-grpc-certs.sh"
 
   # ──────────────────────────────────────────────────────────────────────────
   # Infrastructure
