@@ -195,6 +195,13 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         .route("/auth/discord/authorize", get(handlers::system::oauth::authorize))
         .route("/auth/discord/callback", get(handlers::system::oauth::callback));
 
+    // Helper : true pour les endpoints bruyants (heartbeat des bots toutes
+    // les 1-3s, /health du frontend toutes les 90s). On veut les voir en
+    // DEBUG pour ne pas polluer les logs INFO.
+    fn is_low_verbosity_path(p: &str) -> bool {
+        p.contains("/heartbeat") || p == "/health"
+    }
+
     // TraceLayer configure pour inclure le request_id dans chaque span
     let trace_layer = TraceLayer::new_for_http().make_span_with(|request: &axum::http::Request<_>| {
         let request_id = request
@@ -202,19 +209,35 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
             .get("x-request-id")
             .and_then(|v| v.to_str().ok())
             .unwrap_or("-");
+        let path = request.uri().path();
+        let low = is_low_verbosity_path(path);
 
-        tracing::info_span!(
-            "http_request",
-            method = %request.method(),
-            uri = %request.uri(),
-            request_id = %request_id,
-        )
-    }).on_response(|response: &axum::http::Response<_>, latency: std::time::Duration, _span: &Span| {
-        tracing::info!(
-            status = response.status().as_u16(),
-            latency_ms = latency.as_millis() as u64,
-            "response"
-        );
+        if low {
+            tracing::debug_span!(
+                "http_request",
+                method = %request.method(),
+                uri = %request.uri(),
+                request_id = %request_id,
+                low_verbosity = true,
+            )
+        } else {
+            tracing::info_span!(
+                "http_request",
+                method = %request.method(),
+                uri = %request.uri(),
+                request_id = %request_id,
+            )
+        }
+    }).on_response(|response: &axum::http::Response<_>, latency: std::time::Duration, span: &Span| {
+        let status = response.status().as_u16();
+        let latency_ms = latency.as_millis() as u64;
+        // Si la span est marquee low_verbosity (heartbeat/health), on emet en DEBUG.
+        // Sinon INFO. tracing-subscriber filtre selon RUST_LOG.
+        if span.field("low_verbosity").is_some() {
+            tracing::debug!(status = status, latency_ms = latency_ms, "response");
+        } else {
+            tracing::info!(status = status, latency_ms = latency_ms, "response");
+        }
     });
 
     let log_repo = state.log_repo.clone();
