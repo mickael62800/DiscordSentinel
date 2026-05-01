@@ -8,6 +8,7 @@ import LoadingState from "../atoms/LoadingState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import ComponentVisibilityGrid from "../organisms/ComponentVisibilityGrid.vue";
+import InvitationsManager from "../organisms/InvitationsManager.vue";
 import { safeImageUrl } from "../../utils/safeUrl";
 import type { RbacRole } from "../../types";
 
@@ -198,6 +199,9 @@ function roleVariant(role: RbacRole): BadgeVariant {
       <button v-if="canView && !loading" class="btn-refresh" @click="refresh">
         \u{1f504} Actualiser
       </button>
+
+      <!-- Codes d'invitation (owner only) -->
+      <InvitationsManager v-if="canEdit" />
 
       <!-- Visibilite des composants par role (owner only) -->
       <ComponentVisibilityGrid v-if="canEdit" />
