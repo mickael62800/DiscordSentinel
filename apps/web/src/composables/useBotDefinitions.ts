@@ -1,58 +1,28 @@
-import { ref } from "vue";
-import { botConfigService } from "@/services/botConfigService";
-import type { BotDefinition } from "@/types";
+import { storeToRefs } from "pinia";
+import { useBotDefinitionsStore } from "@/stores/botDefinitionsStore";
 
 /**
- * Singleton bot definitions — donnees stables (rarement changent).
- *
- * Avant : chaque page (ComponentConfigPage, useBotEnabledStatus indirect, etc.)
- * appelait /api/bots/definitions independamment a son onMounted -> 3-4 requetes
- * pour le meme JSON identique.
- *
- * Maintenant : une seule requete partagee en module-scope. Backend a deja un
- * cache Redis 1h, mais autant ne pas le solliciter inutilement.
+ * Wrapper composable : delegue au store Pinia botDefinitions.
+ * API publique identique a la version singleton precedente.
  */
-
-const definitions = ref<BotDefinition[]>([]);
-const loaded = ref(false);
-const loading = ref(false);
-let inFlight: Promise<BotDefinition[]> | null = null;
-
-async function load(): Promise<BotDefinition[]> {
-  if (loaded.value) return definitions.value;
-  if (inFlight) return inFlight;
-
-  loading.value = true;
-  inFlight = (async () => {
-    try {
-      const list = await botConfigService.getDefinitions();
-      definitions.value = list;
-      loaded.value = true;
-      return list;
-    } finally {
-      loading.value = false;
-      inFlight = null;
-    }
-  })();
-  return inFlight;
-}
-
-export async function preloadBotDefinitions(): Promise<void> {
-  await load();
-}
-
 export function useBotDefinitions() {
-  // Trigger load si pas encore fait. Composants peuvent attendre via `loaded`
-  // ou directement appeler `await load()` via `ensure()`.
-  if (!loaded.value && !inFlight) {
-    void load();
+  const store = useBotDefinitionsStore();
+  const { definitions, loaded, loading } = storeToRefs(store);
+
+  // Trigger load au 1er appel si pas encore fait.
+  if (!loaded.value) {
+    void store.ensure();
   }
 
   return {
     definitions,
     loaded,
     loading,
-    /** Force la chargement et attend le resultat. */
-    ensure: load,
+    ensure: () => store.ensure(),
   };
+}
+
+/** Helper appele depuis useAppInit (router.beforeEach) pour prefetch. */
+export async function preloadBotDefinitions(): Promise<void> {
+  await useBotDefinitionsStore().ensure();
 }
