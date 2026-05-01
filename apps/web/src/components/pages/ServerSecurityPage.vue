@@ -6,6 +6,7 @@ import {
   type BannedIpsResponse,
   type SecurityWindow,
   type ServerEventDto,
+  type SuccessfulLoginEntry,
   type TlsCertInfo,
   type TopIpEntry,
 } from "@/services/serverSecurityService";
@@ -39,6 +40,7 @@ const serverEvents = ref<ServerEventDto[]>([]);
 const eventsFilter = ref<"all" | "docker" | "security" | "rbac">("all");
 const tls = ref<TlsCertInfo | null>(null);
 const tlsError = ref<string | null>(null);
+const lastLogins = ref<SuccessfulLoginEntry[]>([]);
 
 // ── Loaders ──
 async function loadTopIps() {
@@ -58,6 +60,10 @@ async function loadServerEvents() {
     const prefix = eventsFilter.value === "all" ? undefined : eventsFilter.value;
     serverEvents.value = await serverSecurityService.serverEvents({ action_prefix: prefix, limit: 100 });
   } catch (e: any) { showError(`Events serveur : ${e?.message ?? e}`); }
+}
+async function loadLastLogins() {
+  try { lastLogins.value = await serverSecurityService.lastLogins(20); }
+  catch (e: any) { showError(`Logins : ${e?.message ?? e}`); }
 }
 async function loadTls() {
   tlsError.value = null;
@@ -87,7 +93,7 @@ async function unbanIp(ip: string) {
 
 async function refreshAll() {
   refreshing.value = true;
-  await Promise.allSettled([loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls()]);
+  await Promise.allSettled([loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls(), loadLastLogins()]);
   refreshing.value = false;
 }
 
@@ -332,9 +338,28 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         <h2>⚡ Rate limit dynamique</h2>
         <p class="muted small">À venir : ban automatique d'une IP qui dépasse 100 req/min sur 5 min.</p>
       </section>
-      <section class="card placeholder-card">
-        <h2>✅ Last successful logins</h2>
-        <p class="muted small">À venir : 10 derniers logins Discord OAuth réussis (qui / quand / IP).</p>
+      <!-- Last successful logins -->
+      <section class="card">
+        <div class="card-head">
+          <h2>✅ Derniers logins Discord OAuth ({{ lastLogins.length }})</h2>
+          <button class="btn xs" @click="loadLastLogins">↻</button>
+        </div>
+        <p class="muted small">20 derniers utilisateurs qui se sont connectés via OAuth Discord.</p>
+        <table v-if="lastLogins.length > 0" class="data-table">
+          <thead>
+            <tr><th>Quand</th><th>Username</th><th>Discord ID</th><th>IP</th><th>User-Agent</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="(l, i) in lastLogins" :key="i">
+              <td class="small muted">{{ fmtDate(l.timestamp) }}</td>
+              <td><strong>{{ l.username ?? "—" }}</strong></td>
+              <td class="small mono">{{ l.discord_user_id }}</td>
+              <td class="small mono">{{ l.client_ip ?? "—" }}</td>
+              <td class="small muted ua">{{ truncate(l.user_agent ?? "", 80) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty">Aucun login enregistré. Connecte-toi pour générer le premier event.</div>
       </section>
     </div>
 

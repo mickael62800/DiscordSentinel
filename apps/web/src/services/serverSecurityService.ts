@@ -70,6 +70,14 @@ export interface TlsCertInfo {
 
 export type SecurityWindow = "1h" | "24h" | "7d";
 
+export interface SuccessfulLoginEntry {
+  timestamp: string;
+  discord_user_id: string;
+  username: string | null;
+  client_ip: string | null;
+  user_agent: string | null;
+}
+
 export interface TrafficDatapoint {
   timestamp: string;
   total: number;
@@ -113,6 +121,9 @@ export const serverSecurityService = {
   },
   trafficTrend(window: SecurityWindow | "6h" = "24h", bucket_minutes = 5): Promise<TrafficTrendResponse> {
     return httpGet(`/api/security/traffic-trend?window=${window}&bucket_minutes=${bucket_minutes}`);
+  },
+  lastLogins(limit = 20): Promise<SuccessfulLoginEntry[]> {
+    return httpGet(`/api/security/last-logins?limit=${limit}`);
   },
   banIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
     return httpPost("/api/security/ban-ip", { ip, reason });

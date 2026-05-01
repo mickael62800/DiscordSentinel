@@ -142,6 +142,7 @@ struct DiscordMe {
 /// `GET /auth/discord/callback` — Discord nous renvoie l'utilisateur ici.
 pub async fn callback(
     State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
     Query(q): Query<CallbackQuery>,
 ) -> Response {
     let front = if state.web_front_url.is_empty() {
@@ -248,6 +249,43 @@ pub async fn callback(
             return front_error_redirect(&front, "discord_me_parse");
         }
     };
+
+    // 3.5. Trace le login reussi pour la page Securite serveur (best-effort).
+    let client_ip = headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .or_else(|| {
+            headers
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "-".to_string());
+    let user_agent = headers
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.chars().take(500).collect::<String>())
+        .unwrap_or_default();
+    let pool = state.pg_pool.clone();
+    let user_id = me.id.clone();
+    let username = me.username.clone();
+    tokio::spawn(async move {
+        let res = sqlx::query(
+            "INSERT INTO successful_logins (discord_user_id, username, client_ip, user_agent) \
+             VALUES ($1, $2, $3, $4)",
+        )
+        .bind(&user_id)
+        .bind(&username)
+        .bind(&client_ip)
+        .bind(&user_agent)
+        .execute(&pool)
+        .await;
+        if let Err(e) = res {
+            tracing::warn!(error = %e, "Echec insert successful_logins");
+        }
+    });
 
     // 4. Rediriger le navigateur vers le front avec les infos dans le FRAGMENT
     //    (apres `#`) pour eviter que le token n'apparaisse dans les logs serveur,

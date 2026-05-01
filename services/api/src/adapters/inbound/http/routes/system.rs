@@ -100,6 +100,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/security/audit-logs", get(handlers::system::security::audit_logs))
         .route("/api/security/tls-cert", get(handlers::system::security::tls_cert))
         .route("/api/security/traffic-trend", get(handlers::system::security::traffic_trend))
+        .route("/api/security/last-logins", get(handlers::system::security::last_successful_logins))
         .route(
             "/api/security/cleanup",
             delete(handlers::system::security::cleanup_security_logs),

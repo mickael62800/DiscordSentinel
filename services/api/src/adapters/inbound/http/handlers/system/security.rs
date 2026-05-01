@@ -503,6 +503,55 @@ pub async fn unban_ip(
     }))
 }
 
+// ── Last successful logins ──────────────────────────────────────────────
+
+#[derive(Debug, Serialize)]
+pub struct SuccessfulLoginEntry {
+    pub timestamp: String,
+    pub discord_user_id: String,
+    pub username: Option<String>,
+    pub client_ip: Option<String>,
+    pub user_agent: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct LimitQuery {
+    pub limit: Option<i64>,
+}
+
+pub async fn last_successful_logins(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Query(q): Query<LimitQuery>,
+) -> Result<Json<Vec<SuccessfulLoginEntry>>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let limit = q.limit.unwrap_or(20).clamp(1, 200);
+
+    let rows = sqlx::query_as::<_, (String, String, Option<String>, Option<String>, Option<String>)>(
+        "SELECT to_char(logged_at, 'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"'), \
+                discord_user_id, username, client_ip, user_agent \
+         FROM successful_logins \
+         ORDER BY logged_at DESC \
+         LIMIT $1",
+    )
+    .bind(limit)
+    .fetch_all(&state.pg_pool)
+    .await
+    .map_err(|e| ApiError(DomainError::Internal(format!("query: {e}"))))?;
+
+    let out = rows
+        .into_iter()
+        .map(|(ts, uid, name, ip, ua)| SuccessfulLoginEntry {
+            timestamp: ts,
+            discord_user_id: uid,
+            username: name,
+            client_ip: ip,
+            user_agent: ua,
+        })
+        .collect();
+    Ok(Json(out))
+}
+
 // ── Trafic anormal : graphe req/s sur N heures ─────────────────────────
 
 #[derive(Debug, Deserialize)]
