@@ -35,6 +35,11 @@ export default defineConfig({
         },
       },
     },
+    // Desactive le polyfill modulePreload qui injecte du JS inline dans
+    // index.html. Les navigateurs modernes supportent <link rel="modulepreload">
+    // nativement (Chrome 66+, Firefox 115+, Safari 15+). Sans polyfill, plus
+    // aucun inline script -> on peut retirer 'unsafe-inline' du CSP nginx.
+    modulePreload: { polyfill: false },
     // Genere un manifest pour debug du splitting (optionnel mais utile).
     reportCompressedSize: true,
     chunkSizeWarningLimit: 500,

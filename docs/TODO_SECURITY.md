@@ -50,10 +50,18 @@ Compromis recommandé : `sessionStorage`. La clé API du Setup peut rester en `l
 
 ---
 
-### 3. CSP frontend trop permissif
+### 3. CSP frontend trop permissif ✅ RÉSOLU 2026-05-01 (approche simple)
 
 **Sévérité** : 🟡 Moyenne
-**Effort** : ~3 h (gros chantier Vite)
+**Effort** : ~3 h (gros chantier Vite) — **résolu en 30 min** via approche pragmatique
+
+**Solution appliquée** : `vite.config.ts` `build.modulePreload.polyfill = false`
+ce qui supprime tous les scripts inline générés par Vite. Du coup `script-src 'self'`
+suffit (no `'unsafe-inline'`). Bonus : ajout de `object-src 'none'`, `base-uri 'self'`,
+`form-action 'self'`, `frame-ancestors 'none'` à la CSP nginx.
+
+`style-src` garde `'unsafe-inline'` (Vue + chart.js génèrent du style
+dynamique inline, gain marginal vs effort prohibitif).
 
 **Description**
 La CSP nginx du frontend autorise `'unsafe-inline'` pour scripts ET styles, ce qui annule une grande partie de la protection CSP contre les XSS. Vite injecte des scripts/styles inline au build, donc on est obligé d'autoriser pour l'instant.
