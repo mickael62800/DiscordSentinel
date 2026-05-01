@@ -16,6 +16,9 @@ redis = { workspace = true }
 # HTTP Client
 reqwest = { workspace = true }
 
+# Comparaison constant-time pour le token WebSocket (anti-timing-attack)
+subtle = "2"
+
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }

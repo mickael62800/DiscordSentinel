@@ -4,6 +4,7 @@ use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{ConnectInfo, Query, State, WebSocketUpgrade};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
+use subtle::ConstantTimeEq;
 use tracing::{info, warn};
 
 use crate::broadcaster::EventBroadcaster;
@@ -31,14 +32,17 @@ pub async fn ws_handler(
     ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>,
     State(state): State<GatewayState>,
 ) -> Response {
-    // Auth check
+    // Auth check : comparaison constant-time (subtle) pour prevenir un
+    // timing attack qui devinerait le token caractere par caractere.
     if !state.api_key.is_empty() {
-        match query.token {
-            Some(ref t) if t == &state.api_key => {}
-            _ => {
-                warn!(client_ip = %addr, "WebSocket rejected: invalid token");
-                return StatusCode::UNAUTHORIZED.into_response();
-            }
+        let valid = query
+            .token
+            .as_ref()
+            .map(|t| t.as_bytes().ct_eq(state.api_key.as_bytes()).into())
+            .unwrap_or(false);
+        if !valid {
+            warn!(client_ip = %addr, "WebSocket rejected: invalid token");
+            return StatusCode::UNAUTHORIZED.into_response();
         }
     }
 
