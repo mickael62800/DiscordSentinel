@@ -3,6 +3,7 @@ pub mod bot_persistence;
 pub mod cache_stats;
 pub mod component_visibility;
 pub mod docker;
+pub mod security;
 pub mod exports;
 pub mod health;
 pub mod info;

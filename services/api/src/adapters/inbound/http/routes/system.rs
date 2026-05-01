@@ -75,6 +75,12 @@ pub fn routes() -> Router<AppState> {
             get(handlers::ai::dataset::list_messages)
                 .delete(handlers::ai::dataset::bulk_delete),
         )
+        // Security monitoring (admin+) : top IPs, auth failures, audit logs, TLS
+        .route("/api/security/top-ips", get(handlers::system::security::top_ips))
+        .route("/api/security/auth-failures", get(handlers::system::security::auth_failures))
+        .route("/api/security/banned-ips", get(handlers::system::security::banned_ips))
+        .route("/api/security/audit-logs", get(handlers::system::security::audit_logs))
+        .route("/api/security/tls-cert", get(handlers::system::security::tls_cert))
         // RBAC component visibility (overrides UI par role)
         .route(
             "/api/rbac/component-visibility/{guild_id}",

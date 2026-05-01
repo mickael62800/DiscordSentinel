@@ -284,6 +284,9 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Certs mTLS gRPC (genere par grpc-certs-init au boot, partage en RO).
       - grpc_certs:/grpc-certs:ro
+      # Cert Let's Encrypt en RO pour endpoint /api/security/tls-cert
+      # (lecture de cert.pem pour afficher l'expiration sur la page Securite).
+      - letsencrypt_etc:/etc/letsencrypt:ro
     depends_on:
       postgres:
         condition: service_healthy

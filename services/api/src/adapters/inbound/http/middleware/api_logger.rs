@@ -18,6 +18,28 @@ pub async fn api_logger_middleware(
 ) -> Response {
     let method = request.method().to_string();
     let uri = request.uri().path().to_string();
+    // Extrait l'IP client : derriere nginx, X-Forwarded-For est l'autoritative.
+    // Sinon X-Real-IP ou peer addr (cas dev direct).
+    let client_ip = request
+        .headers()
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.split(',').next())
+        .map(|s| s.trim().to_string())
+        .or_else(|| {
+            request
+                .headers()
+                .get("x-real-ip")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string())
+        })
+        .unwrap_or_else(|| "-".to_string());
+    let user_agent = request
+        .headers()
+        .get("user-agent")
+        .and_then(|v| v.to_str().ok())
+        .map(|s| s.chars().take(200).collect::<String>())
+        .unwrap_or_default();
     let start = Instant::now();
 
     let response = next.run(request).await;
@@ -46,6 +68,8 @@ pub async fn api_logger_middleware(
             "status_code": status,
             "status_text": status_text,
             "latency_ms": latency.as_millis() as u64,
+            "client_ip": client_ip,
+            "user_agent": user_agent,
         });
 
         let entry = LogEntry {
