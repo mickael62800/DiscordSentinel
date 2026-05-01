@@ -103,7 +103,21 @@ impl SentinelGrpcClient {
 
     /// Construit un client en pointant explicitement une URL gRPC.
     pub async fn connect(url: &str, api_key: &str) -> Result<Self, tonic::transport::Error> {
-        let endpoint = Endpoint::from_shared(url.to_string())?
+        // Si mTLS active, force https:// dans l'URL. tonic exige https
+        // pour declencher le handshake TLS lors du connect.
+        let effective_url = if sentinel_proto::tls::tls_dir().is_some() {
+            if let Some(rest) = url.strip_prefix("http://") {
+                format!("https://{rest}")
+            } else if !url.starts_with("https://") {
+                format!("https://{url}")
+            } else {
+                url.to_string()
+            }
+        } else {
+            url.to_string()
+        };
+
+        let endpoint = Endpoint::from_shared(effective_url)?
             // Phase 7A — tunings raisonnables. Le multiplexage HTTP/2 evite
             // de multiplier les connexions ; un seul Channel suffit pour tous
             // les RPC concurrents d'un meme bot.
@@ -116,9 +130,6 @@ impl SentinelGrpcClient {
 
         // mTLS optionnel : active si GRPC_TLS_DIR defini en env.
         // Domaine SAN du cert serveur = "api" (cf. gen-grpc-certs.sh).
-        // tls_config(self, ...) consomme self -> chaine en une expression.
-        // En cas d'erreur TLS, on fallback en plain (warn) pour ne pas
-        // planter le bot.
         let endpoint = match sentinel_proto::tls::tls_dir() {
             Some(dir) => {
                 let domain = url
@@ -130,7 +141,10 @@ impl SentinelGrpcClient {
                     .unwrap_or("api");
                 match sentinel_proto::tls::client_tls_config(&dir, domain) {
                     Ok(tls) => match endpoint.clone().tls_config(tls) {
-                        Ok(e) => e,
+                        Ok(e) => {
+                            info!(domain = %domain, "gRPC client TLS active (mTLS)");
+                            e
+                        }
                         Err(e) => {
                             info!(error = %e, "Echec config TLS client gRPC, fallback plain");
                             endpoint
