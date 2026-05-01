@@ -220,8 +220,20 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
       - "127.0.0.1:50051:50051"
+    # Healthcheck gRPC : avec mTLS active, on doit presenter le cert client
+    # pour passer le check. Si GRPC_TLS_DIR n'est pas defini (mode plain),
+    # ces flags sont ignores en pratique car le serveur n'exige rien.
+    # Note : -tls-server-name="api" car le SAN du cert serveur est "api".
     healthcheck:
-      test: ["CMD", "grpc_health_probe", "-addr=:50051"]
+      test:
+        - "CMD"
+        - "grpc_health_probe"
+        - "-addr=:50051"
+        - "-tls"
+        - "-tls-ca-cert=/grpc-certs/ca.pem"
+        - "-tls-client-cert=/grpc-certs/client.pem"
+        - "-tls-client-key=/grpc-certs/client.key"
+        - "-tls-server-name=api"
       interval: 10s
       timeout: 3s
       retries: 5
