@@ -28,8 +28,8 @@ const tabs: Tab[] = [
       { key: "server", label: "Serveur" },
       { key: "message", label: "Message" },
     ],
-    showSourceFilter: true,
-    sourceLabel: "Toutes les sources",
+    // Plus qu'une seule source en pratique -> filtre inutile, on le cache.
+    showSourceFilter: false,
   },
   {
     key: "bots",

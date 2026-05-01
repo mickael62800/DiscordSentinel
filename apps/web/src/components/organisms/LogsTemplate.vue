@@ -50,7 +50,9 @@ const filters = computed(() => {
       ],
     },
   ];
-  if (props.showSourceFilter) {
+  // Affiche le filtre source uniquement s'il y a au moins 2 sources distinctes.
+  // Avec 0 ou 1 source, le dropdown "Toutes les sources" n'apporte rien.
+  if (props.showSourceFilter && sources.value.length >= 2) {
     list.push({
       modelValue: filterBot.value,
       options: [
