@@ -51,7 +51,6 @@ const allSections: Section[] = [
 
   { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
   { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap", requiredBot: "coude-bot" },
-  { key: "games.coude-social", path: "/coude/social", label: "Coude social", icon: "users", requiredBot: "coude-bot" },
   { key: "games.blackjack", path: "/blackjack", label: "Blackjack", icon: "layers", requiredBot: "blackjack-bot" },
   { key: "games.slot", path: "/slot", label: "Slot machine", icon: "dollar-sign", requiredBot: "slot-bot" },
   { key: "games.wheel", path: "/wheel", label: "Roue du Destin", icon: "refresh-cw", requiredBot: "wheel-bot" },
@@ -64,8 +63,16 @@ const allSections: Section[] = [
     icon: "dollar-sign",
     requiredAnyBot: ["coude-bot", "blackjack-bot", "slot-bot", "wheel-bot"],
   },
-  { key: "games.tournaments", path: "/tournaments", label: "Tournoi hebdo", icon: "zap", requiredBot: "coude-bot" },
-  { key: "games.taunts", path: "/taunts", label: "Railleries", icon: "zap", requiredBot: "coude-bot" },
+  // Railleries : feature partagee entre Coude et Blackjack (TauntEvent
+  // emis par les deux moteurs de jeu, canal Discord unique). Visible
+  // si AU MOINS un des deux bots est actif.
+  {
+    key: "games.taunts",
+    path: "/taunts",
+    label: "Railleries",
+    icon: "zap",
+    requiredAnyBot: ["coude-bot", "blackjack-bot"],
+  },
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
   { key: "config.rbac", path: "/rbac", label: "Acces RBAC", icon: "shield" },
@@ -139,6 +146,7 @@ const sections = computed<Section[]>(() =>
         :icon="s.icon"
         :section-key="s.key"
         :required-bot="s.requiredBot"
+        :required-any-bot="s.requiredAnyBot"
       />
     </div>
   </div>

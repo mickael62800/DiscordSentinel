@@ -7,25 +7,42 @@ const props = defineProps<{
   icon: string;
   sectionKey: string;
   requiredBot?: string;
+  /** Si la feature concerne plusieurs bots (ex: railleries = coude + blackjack),
+   *  on liste tout. Le badge affiche tous les noms joints par " + ". */
+  requiredAnyBot?: string[];
 }>();
 
 // Le theme est derive du prefixe de la cle (ex: "moderation.strikes" -> "moderation").
 const theme = props.sectionKey.split(".")[0] || "default";
 
-/** Convertit "moderation-bot" → "moderation" pour un affichage compact. */
+/** Convertit "moderation-bot" → "moderation" / "blackjack-bot" → "bj" pour le badge. */
+const SHORT_OVERRIDES: Record<string, string> = {
+  "blackjack-bot": "bj",
+};
 function shortBotName(name: string): string {
-  return name.replace(/-bot$/, "");
+  return SHORT_OVERRIDES[name] ?? name.replace(/-bot$/, "");
 }
+
+/** Texte du badge : single bot OU liste joinde de bots (railleries-like). */
+const badgeText = (() => {
+  if (props.requiredAnyBot && props.requiredAnyBot.length > 0) {
+    return props.requiredAnyBot.map(shortBotName).join("+");
+  }
+  if (props.requiredBot) return shortBotName(props.requiredBot);
+  return "";
+})();
 </script>
 
 <template>
   <router-link :to="path" :class="['section-card', `theme-${theme}`]" :data-section-key="sectionKey">
     <div class="gloss" aria-hidden="true"></div>
     <span
-      v-if="requiredBot"
+      v-if="badgeText"
       class="component-tag"
-      :title="`Composant requis : ${requiredBot}`"
-    >{{ shortBotName(requiredBot) }}</span>
+      :title="requiredAnyBot && requiredAnyBot.length > 0
+        ? `Composants : ${requiredAnyBot.join(', ')}`
+        : `Composant requis : ${requiredBot}`"
+    >{{ badgeText }}</span>
     <div class="icon-wrap">
       <SectionIcon :name="icon" />
     </div>

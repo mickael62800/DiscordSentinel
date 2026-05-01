@@ -70,14 +70,12 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   // ── Dashboard : logs / jeux ──
   { key: "logs.journal", label: "Bouton Journal logs", category: "Dashboard", minRole: "admin" },
   { key: "games.hub", label: "Bouton Jeux", category: "Dashboard", minRole: "viewer" },
-  { key: "games.coude", label: "Bouton Coude", category: "Dashboard", minRole: "viewer" },
-  { key: "games.coude-social", label: "Bouton Coude social", category: "Dashboard", minRole: "viewer" },
+  { key: "games.coude", label: "Bouton Coude (hub : stats / social / tournoi)", category: "Dashboard", minRole: "viewer" },
   { key: "games.blackjack", label: "Bouton Blackjack", category: "Dashboard", minRole: "viewer" },
   { key: "games.slot", label: "Bouton Slot", category: "Dashboard", minRole: "viewer" },
   { key: "games.wheel", label: "Bouton Roue", category: "Dashboard", minRole: "viewer" },
   { key: "games.wallet", label: "Bouton Wallet", category: "Dashboard", minRole: "viewer" },
-  { key: "games.tournaments", label: "Bouton Tournois", category: "Dashboard", minRole: "moderator" },
-  { key: "games.taunts", label: "Bouton Taunts", category: "Dashboard", minRole: "admin" },
+  { key: "games.taunts", label: "Bouton Railleries (Coude + Blackjack)", category: "Dashboard", minRole: "admin" },
 
   // ── Dashboard : config (admin) ──
   { key: "config.components", label: "Bouton Config composants", category: "Dashboard", minRole: "admin" },

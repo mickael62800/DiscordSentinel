@@ -56,7 +56,7 @@ export const routes: RouteRecordRaw[] = [
 
   // ── Jeux ──
   { path: "/games", name: "games", component: () => import("../components/pages/GamesPage.vue") },
-  { path: "/coude", name: "coude", component: () => import("../components/pages/CoudePage.vue") },
+  { path: "/coude", name: "coude", component: () => import("../components/pages/CoudeHubPage.vue") },
   { path: "/coude/social", name: "coude-social", component: () => import("../components/pages/CoudeSocialPage.vue") },
   { path: "/taunts", name: "taunts", component: () => import("../components/pages/TauntsConfigPage.vue") },
   { path: "/coude/taunts", redirect: "/taunts" },
