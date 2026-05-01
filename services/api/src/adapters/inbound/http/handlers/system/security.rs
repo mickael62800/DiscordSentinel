@@ -406,18 +406,70 @@ pub async fn tls_cert(
             "WEB_DOMAIN non defini en env".into(),
         )));
     }
-    let path = format!("/etc/letsencrypt/live/{domain}/cert.pem");
-    let pem = std::fs::read_to_string(&path).map_err(|e| {
-        ApiError(DomainError::Internal(format!(
-            "lecture cert {path}: {e} (volume letsencrypt_etc monte ?)"
-        )))
-    })?;
 
-    // Parse minimaliste : on extrait notBefore/notAfter via openssl x509
-    // pas dispo en lib, on utilise une approche simple via x509-parser.
+    // 2 strategies pour recuperer le cert :
+    //
+    // 1. Lecture fichier /etc/letsencrypt/live/{domain}/cert.pem
+    //    -> echoue si volume monte mais perms certbot "live/" en 700 root
+    //
+    // 2. Fallback : openssl s_client connect web:443 -showcerts
+    //    -> recupere le cert directement via TLS handshake interne,
+    //       independant des perms fichier
+    //
+    // On essaye d'abord la lecture (rapide), fallback openssl si KO.
+    let path = format!("/etc/letsencrypt/live/{domain}/cert.pem");
+    let pem = match std::fs::read_to_string(&path) {
+        Ok(p) => p,
+        Err(_) => fetch_cert_via_openssl(&domain).map_err(|e| {
+            ApiError(DomainError::Internal(format!(
+                "lecture cert {path} echouee + fallback openssl echec : {e}"
+            )))
+        })?,
+    };
+
     let info = parse_cert(&pem)
         .map_err(|e| ApiError(DomainError::Internal(format!("parse cert: {e}"))))?;
     Ok(Json(info))
+}
+
+/// Fallback : lance `openssl s_client -connect web:443 -servername {domain}`
+/// pour recuperer le cert via TLS handshake. Necessite openssl dans l'image
+/// (deja dispo dans les images Debian/Alpine standards).
+fn fetch_cert_via_openssl(domain: &str) -> Result<String, String> {
+    use std::io::Write;
+    use std::process::Command;
+    use std::process::Stdio;
+
+    // -connect web:443 = service nginx via DNS interne Docker
+    // -servername = SNI pour que nginx serve le bon vhost
+    // Stdin "" pour fermer la connexion immediatement apres le handshake
+    let mut child = Command::new("openssl")
+        .args(["s_client", "-connect", "web:443", "-servername", domain, "-showcerts"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("spawn openssl: {e}"))?;
+
+    if let Some(mut stdin) = child.stdin.take() {
+        let _ = stdin.write_all(b"");
+    }
+
+    let output = child
+        .wait_with_output()
+        .map_err(|e| format!("wait openssl: {e}"))?;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Extraire le PREMIER bloc -----BEGIN CERTIFICATE----- ... -----END CERTIFICATE-----
+    let begin = stdout
+        .find("-----BEGIN CERTIFICATE-----")
+        .ok_or_else(|| "BEGIN CERTIFICATE marker absent".to_string())?;
+    let end_marker = "-----END CERTIFICATE-----";
+    let end = stdout[begin..]
+        .find(end_marker)
+        .ok_or_else(|| "END CERTIFICATE marker absent".to_string())?;
+    let pem = &stdout[begin..begin + end + end_marker.len()];
+    Ok(pem.to_string())
 }
 
 fn parse_cert(pem: &str) -> Result<TlsCertInfo, String> {
