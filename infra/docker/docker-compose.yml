@@ -111,6 +111,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # SECURITE — postgres isole sur un reseau "data" interne (pas d'acces
+    # internet). Seul pgbouncer peut le joindre (lui-meme bi-network pour
+    # servir de bridge). Un service applicatif compromis ne peut PAS taper
+    # postgres en direct, il doit passer par pgbouncer (auth scram-sha-256).
+    networks:
+      - data
 
   # PgBouncer en transaction pooling devant Postgres (pas de healthcheck CMD :
   # edoburu/pgbouncer n'a ni nc ni pg_isready ; il demarre en ~1s apres postgres
@@ -136,6 +142,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # SECURITE — pgbouncer est le SEUL service bi-network : il joint postgres
+    # via "data" et expose le pool aux clients via "default" (sentinel).
+    networks:
+      - data
+      - default
 
   redis:
     image: redis:7-alpine
@@ -656,8 +667,18 @@ volumes:
   letsencrypt_etc:
   letsencrypt_www:
 
-# Network explicite : isole la stack et donne un nom lisible aux conteneurs.
+# Networks :
+#   - default (sentinel) : reseau applicatif partage par api, gateway,
+#     workers, bot, web, redis. Permet la communication inter-services
+#     standard et l'acces internet (pour Discord/HTTPS).
+#   - data : reseau isole (internal: true) pour postgres. Seul pgbouncer
+#     est bi-network et fait le pont. Un service applicatif compromis
+#     ne peut PAS atteindre postgres directement.
 networks:
   default:
     name: sentinel
     driver: bridge
+  data:
+    name: sentinel-data
+    driver: bridge
+    internal: true
