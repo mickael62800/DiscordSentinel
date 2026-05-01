@@ -946,6 +946,8 @@ fn base_state() -> AppState {
         discord_oauth_client_secret: String::new(),
         discord_oauth_redirect_uri: String::new(),
         web_front_url: String::new(),
+        container_monitor: None,
+        rate_limiter: None,
     }
 }
 

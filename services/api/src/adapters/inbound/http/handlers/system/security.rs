@@ -644,6 +644,94 @@ pub async fn trivy_vulns(
     Ok(Json(data))
 }
 
+// GeoIP lookup via ip-api.com (batch, gratuit 45 req/min)
+#[derive(Debug, Deserialize)]
+pub struct GeoIpQuery {
+    /// IPs separees par virgule, max 100
+    pub ips: String,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct GeoIpEntry {
+    pub query: String,
+    pub status: String,
+    #[serde(default)]
+    pub country: Option<String>,
+    #[serde(default, rename = "countryCode")]
+    pub country_code: Option<String>,
+    #[serde(default)]
+    pub region_name: Option<String>,
+    #[serde(default)]
+    pub city: Option<String>,
+    #[serde(default)]
+    pub isp: Option<String>,
+    #[serde(default, rename = "as")]
+    pub asn: Option<String>,
+}
+
+pub async fn geoip_lookup(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Query(q): Query<GeoIpQuery>,
+) -> Result<Json<Vec<GeoIpEntry>>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let ips: Vec<&str> = q.ips.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).take(100).collect();
+    if ips.is_empty() { return Ok(Json(vec![])); }
+
+    let body: Vec<serde_json::Value> = ips.iter()
+        .map(|ip| serde_json::json!({"query": ip, "fields": "status,country,countryCode,regionName,city,isp,as,query"}))
+        .collect();
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(5))
+        .build()
+        .map_err(|e| ApiError(DomainError::Internal(format!("reqwest build: {e}"))))?;
+
+    let resp = client.post("http://ip-api.com/batch")
+        .json(&body).send().await
+        .map_err(|e| ApiError(DomainError::Internal(format!("geoip lookup: {e}"))))?;
+    let data: Vec<GeoIpEntry> = resp.json().await
+        .map_err(|e| ApiError(DomainError::Internal(format!("geoip parse: {e}"))))?;
+    Ok(Json(data))
+}
+
+// Container changes (snapshot diff via bollard)
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContainerSnapshot {
+    pub id: String,
+    pub name: String,
+    pub image: String,
+    pub state: String,
+    pub started_at: Option<String>,
+}
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ContainerChangeEntry {
+    pub timestamp: String,
+    pub kind: String, // "added" | "removed" | "restarted" | "image_changed" | "state_changed"
+    pub container: ContainerSnapshot,
+    pub previous: Option<ContainerSnapshot>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ContainerChangesResponse {
+    pub last_check: String,
+    pub current: Vec<ContainerSnapshot>,
+    pub changes_24h: Vec<ContainerChangeEntry>,
+}
+
+pub async fn container_changes(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<ContainerChangesResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let monitor = state.container_monitor.clone()
+        .ok_or_else(|| ApiError(DomainError::Internal("container monitor desactive".into())))?;
+    let snap = monitor.read().await;
+    Ok(Json(ContainerChangesResponse {
+        last_check: snap.last_check.clone(),
+        current: snap.current.clone(),
+        changes_24h: snap.recent_changes.clone(),
+    }))
+}
+
 // Nginx suspicious patterns
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SuspiciousEntry {

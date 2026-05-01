@@ -799,5 +799,15 @@ pub async fn build_app_state(
         discord_oauth_client_secret: config.discord_oauth_client_secret.clone(),
         discord_oauth_redirect_uri: config.discord_oauth_redirect_uri.clone(),
         web_front_url: config.web_front_url.clone(),
+        container_monitor: Some(crate::adapters::outbound::system::container_monitor::spawn(pg_pool.clone())),
+        rate_limiter: Some(Arc::new(crate::adapters::outbound::system::rate_limiter::RateLimiter::from_env())),
     }
+}
+
+/// A appeler apres construction de AppState pour lancer les workers de fond.
+pub fn spawn_security_workers(state: &AppState) {
+    crate::adapters::outbound::system::alerts_dispatcher::spawn(
+        state.pg_pool.clone(),
+        state.container_monitor.clone(),
+    );
 }

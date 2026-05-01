@@ -166,6 +166,38 @@ export interface OutboundResponse {
   connections: OutboundConnection[];
 }
 
+// GeoIP
+export interface GeoIpEntry {
+  query: string;
+  status: string;
+  country?: string;
+  countryCode?: string;
+  region_name?: string;
+  city?: string;
+  isp?: string;
+  asn?: string;
+}
+
+// Container changes
+export interface ContainerSnapshot {
+  id: string;
+  name: string;
+  image: string;
+  state: string;
+  started_at: string | null;
+}
+export interface ContainerChangeEntry {
+  timestamp: string;
+  kind: "added" | "removed" | "restarted" | "image_changed" | "state_changed";
+  container: ContainerSnapshot;
+  previous: ContainerSnapshot | null;
+}
+export interface ContainerChangesResponse {
+  last_check: string;
+  current: ContainerSnapshot[];
+  changes_24h: ContainerChangeEntry[];
+}
+
 // Nginx suspicious patterns
 export interface SuspiciousEntry {
   timestamp: string;
@@ -278,6 +310,12 @@ export const serverSecurityService = {
   },
   tlsErrors(): Promise<TlsErrorsResponse> {
     return httpGet("/api/security/tls-errors");
+  },
+  geoip(ips: string[]): Promise<GeoIpEntry[]> {
+    return httpGet(`/api/security/geoip?ips=${encodeURIComponent(ips.join(","))}`);
+  },
+  containerChanges(): Promise<ContainerChangesResponse> {
+    return httpGet("/api/security/container-changes");
   },
   banIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
     return httpPost("/api/security/ban-ip", { ip, reason });

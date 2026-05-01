@@ -49,6 +49,7 @@ async fn main() {
 
     let redis_client = bootstrap::connect_redis(&config).await;
     let state = bootstrap::build_app_state(&config, pg_pool.clone(), redis_client).await;
+    bootstrap::spawn_security_workers(&state);
 
     spawn_grpc_server(state.clone(), &config);
     serve_http(state, &config, pg_pool).await;

@@ -18,6 +18,8 @@ import {
   type TlsErrorsResponse,
   type TopIpEntry,
   type TrivyResponse,
+  type GeoIpEntry,
+  type ContainerChangesResponse,
 } from "@/services/serverSecurityService";
 import { useToast } from "@/composables/useToast";
 import { useMyRole } from "@/composables/useMyRole";
@@ -71,6 +73,9 @@ const suspicious = ref<SuspiciousResponse | null>(null);
 const suspiciousError = ref<string | null>(null);
 const tlsErrors = ref<TlsErrorsResponse | null>(null);
 const tlsErrorsError = ref<string | null>(null);
+const geoMap = ref<Record<string, GeoIpEntry>>({});
+const containers = ref<ContainerChangesResponse | null>(null);
+const containersError = ref<string | null>(null);
 
 // ── Loaders ──
 async function loadTopIps() {
@@ -130,6 +135,21 @@ async function loadOutbound() {
   try { outbound.value = await serverSecurityService.outbound(); }
   catch (e: any) { outboundError.value = e?.message ?? String(e); outbound.value = null; }
 }
+async function loadGeoForTopIps() {
+  const ips = topIps.value.map((i) => i.client_ip).filter((ip) => ip && ip !== "-").slice(0, 50);
+  if (ips.length === 0) return;
+  try {
+    const entries = await serverSecurityService.geoip(ips);
+    const m: Record<string, GeoIpEntry> = { ...geoMap.value };
+    for (const e of entries) m[e.query] = e;
+    geoMap.value = m;
+  } catch { /* lookup IP-API best-effort */ }
+}
+async function loadContainers() {
+  containersError.value = null;
+  try { containers.value = await serverSecurityService.containerChanges(); }
+  catch (e: any) { containersError.value = e?.message ?? String(e); containers.value = null; }
+}
 async function loadSuspicious() {
   suspiciousError.value = null;
   try { suspicious.value = await serverSecurityService.nginxSuspicious(); }
@@ -172,8 +192,9 @@ async function refreshAll() {
     loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls(),
     loadLastLogins(), loadSshFailures(), loadDiskTrend(), loadConnections(),
     loadOpenPorts(), loadTrivy(), loadIntegrity(), loadOutbound(),
-    loadSuspicious(), loadTlsErrors(),
+    loadSuspicious(), loadTlsErrors(), loadContainers(),
   ]);
+  void loadGeoForTopIps();
   refreshing.value = false;
 }
 
@@ -307,11 +328,18 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         </div>
         <table v-if="topIps.length > 0" class="data-table">
           <thead>
-            <tr><th>IP</th><th class="num">Total</th><th class="num">4xx/5xx</th><th>Dernier</th><th class="actions-h">Action</th></tr>
+            <tr><th>IP</th><th>Pays</th><th>FAI</th><th class="num">Total</th><th class="num">4xx/5xx</th><th>Dernier</th><th class="actions-h">Action</th></tr>
           </thead>
           <tbody>
             <tr v-for="ip in topIps" :key="ip.client_ip" :class="{ alert: ip.failed > 10 }">
               <td><code>{{ ip.client_ip }}</code></td>
+              <td class="small">
+                <span v-if="geoMap[ip.client_ip]?.countryCode">
+                  {{ geoMap[ip.client_ip].countryCode }} · {{ geoMap[ip.client_ip].country }}
+                </span>
+                <span v-else class="muted">—</span>
+              </td>
+              <td class="small muted">{{ truncate(geoMap[ip.client_ip]?.isp ?? "—", 30) }}</td>
               <td class="num">{{ ip.total }}</td>
               <td class="num" :class="{ danger: ip.failed > 10 }">{{ ip.failed }}</td>
               <td class="muted small">{{ fmtDate(ip.last_seen) }}</td>
@@ -473,10 +501,19 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         <div v-else class="empty">fail2ban actif mais aucune jail configurée.</div>
       </section>
 
-      <!-- Placeholders -->
-      <section class="card placeholder-card">
+      <!-- Rate limit dynamique (info) -->
+      <section class="card">
         <h2>⚡ Rate limit dynamique</h2>
-        <p class="muted small">À venir : ban automatique d'une IP qui dépasse 100 req/min sur 5 min.</p>
+        <p class="muted small">
+          Actif côté API : chaque IP est trackée en mémoire. Au-delà du seuil
+          configuré, un ban est demandé automatiquement au shim
+          <code>ban-apply</code> qui passe par <code>fail2ban-client set sentinel-api banip</code>.
+        </p>
+        <ul class="muted small">
+          <li>Variables : <code>RATE_LIMIT_THRESHOLD</code> (défaut 200 req), <code>RATE_LIMIT_WINDOW_SECS</code> (défaut 60s).</li>
+          <li>Cooldown : 5 min sans nouveau ban pour la même IP.</li>
+          <li>Vérifier les bans appliqués dans la table « IPs bannies » ci-dessus.</li>
+        </ul>
       </section>
       <!-- Last successful logins -->
       <section class="card">
@@ -649,6 +686,53 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         <div v-else class="empty">Chargement…</div>
       </section>
 
+      <!-- Container changes -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🐳 Conteneurs surveillés</h2>
+          <button class="btn xs" @click="loadContainers">↻</button>
+        </div>
+        <div v-if="containersError" class="info">
+          <p class="small">{{ containersError }}</p>
+        </div>
+        <div v-else-if="containers">
+          <p class="muted small">
+            Dernier check {{ fmtDate(containers.last_check) }} ·
+            {{ containers.current.length }} conteneur(s) ·
+            {{ containers.changes_24h.length }} changement(s) recent(s)
+          </p>
+          <table v-if="containers.changes_24h.length > 0" class="data-table">
+            <thead><tr><th>Quand</th><th>Type</th><th>Conteneur</th><th>Image</th></tr></thead>
+            <tbody>
+              <tr v-for="(c, i) in containers.changes_24h.slice().reverse().slice(0, 20)" :key="i"
+                  :class="{ alert: c.kind === 'removed' || c.kind === 'image_changed' }">
+                <td class="small">{{ fmtDate(c.timestamp) }}</td>
+                <td>
+                  <span class="badge" :class="c.kind === 'removed' ? 'danger' : c.kind === 'image_changed' ? 'warning' : ''">
+                    {{ c.kind }}
+                  </span>
+                </td>
+                <td class="small mono">{{ c.container.name }}</td>
+                <td class="small mono">{{ truncate(c.container.image, 40) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <details v-if="containers.current.length > 0" class="small">
+            <summary class="muted">Liste actuelle ({{ containers.current.length }})</summary>
+            <table class="data-table">
+              <thead><tr><th>Nom</th><th>Image</th><th>État</th></tr></thead>
+              <tbody>
+                <tr v-for="c in containers.current" :key="c.id">
+                  <td class="mono">{{ c.name }}</td>
+                  <td class="mono">{{ truncate(c.image, 40) }}</td>
+                  <td>{{ c.state }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </details>
+        </div>
+      </section>
+
       <!-- Trivy vulnerabilities -->
       <section class="card">
         <div class="card-head">
@@ -777,11 +861,27 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
 
     <!-- ════════ ONGLET 7 : ALERTES ════════ -->
     <div v-if="currentTab === 'alerts'" class="tab-content">
-      <section class="card placeholder-card">
+      <section class="card">
         <h2>🔔 Notifications Discord</h2>
         <p class="muted small">
-          À venir : config d'un channel Discord qui recevra les alertes critiques
-          (10+ échecs auth d'une même IP, conteneur down, certificat &lt; 7j, etc.).
+          Worker côté API qui poll les indicateurs critiques toutes les
+          <code>SECURITY_ALERTS_INTERVAL_SECS</code> (défaut 5 min) et envoie
+          un webhook Discord configuré via <code>SECURITY_ALERTS_WEBHOOK</code>.
+        </p>
+        <h3 class="small">Seuils déclencheurs</h3>
+        <ul class="muted small">
+          <li><strong>Brute-force auth</strong> : &gt; 50 echecs HTTP 401/403 sur 1h</li>
+          <li><strong>Conteneurs</strong> : kind = <code>removed</code> ou <code>image_changed</code></li>
+          <li><strong>TLS expiration</strong> : certificat à moins de 14 jours</li>
+        </ul>
+        <p class="muted small">
+          Anti-spam : chaque alerte n'est envoyée qu'une fois (clef
+          composite), reset après 500 alertes accumulées.
+        </p>
+        <p class="muted small">
+          Pour configurer : créer un webhook Discord (Paramètres canal →
+          Intégrations → Webhooks) et ajouter <code>SECURITY_ALERTS_WEBHOOK=https://discord.com/api/webhooks/...</code>
+          dans <code>.env</code>, puis <code>docker compose restart api</code>.
         </p>
       </section>
     </div>

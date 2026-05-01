@@ -8,14 +8,33 @@ use axum::response::Response;
 
 use tracing::warn;
 
+use crate::adapters::inbound::http::state::AppState;
+use crate::adapters::outbound::system::rate_limiter::RateLimiter;
 use crate::domain::entities::system::log_entry::LogEntry;
 use crate::ports::outbound::system::log_repository::LogRepository;
 
+#[derive(Clone)]
+pub struct ApiLoggerState {
+    pub log_repo: Arc<dyn LogRepository>,
+    pub rate_limiter: Option<Arc<RateLimiter>>,
+}
+
+impl ApiLoggerState {
+    pub fn from_app(state: &AppState) -> Self {
+        Self {
+            log_repo: state.log_repo.clone(),
+            rate_limiter: state.rate_limiter.clone(),
+        }
+    }
+}
+
 pub async fn api_logger_middleware(
-    State(log_repo): State<Arc<dyn LogRepository>>,
+    State(s): State<ApiLoggerState>,
     request: Request,
     next: Next,
 ) -> Response {
+    let log_repo = s.log_repo.clone();
+    let rate_limiter = s.rate_limiter.clone();
     let method = request.method().to_string();
     let uri = request.uri().path().to_string();
     // Extrait l'IP client : derriere nginx, X-Forwarded-For est l'autoritative.
@@ -34,6 +53,16 @@ pub async fn api_logger_middleware(
                 .map(|s| s.to_string())
         })
         .unwrap_or_else(|| "-".to_string());
+
+    // Rate limit dynamique : track + ban auto si seuil franchi
+    if let Some(rl) = &rate_limiter {
+        if rl.observe(&client_ip).await {
+            let rl_clone = rl.clone();
+            let ip = client_ip.clone();
+            tokio::spawn(async move { rl_clone.trigger_ban(ip).await; });
+        }
+    }
+
     let user_agent = request
         .headers()
         .get("user-agent")

@@ -19,7 +19,7 @@ use tracing::Span;
 use super::handlers;
 use super::metrics::metrics_handler;
 use super::metrics::metrics_middleware;
-use super::middleware::api_logger::api_logger_middleware;
+use super::middleware::api_logger::{api_logger_middleware, ApiLoggerState};
 use super::middleware::auth::auth_middleware;
 use super::middleware::rate_limit::rate_limit_middleware;
 use super::middleware::rate_limit::RateLimiter;
@@ -240,12 +240,12 @@ pub fn build(state: AppState, max_body_size: usize, rate_limit_per_sec: u64, all
         }
     });
 
-    let log_repo = state.log_repo.clone();
+    let logger_state = ApiLoggerState::from_app(&state);
 
     Router::new()
         .merge(protected)
         .merge(public)
-        .layer(middleware::from_fn_with_state(log_repo, api_logger_middleware))
+        .layer(middleware::from_fn_with_state(logger_state, api_logger_middleware))
         // Métriques Prometheus : enregistre count + latency par (route, method, status).
         // Doit s'appliquer APRÈS le matching de route pour récupérer le `MatchedPath`.
         .layer(middleware::from_fn(metrics_middleware))

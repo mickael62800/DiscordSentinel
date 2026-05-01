@@ -110,6 +110,8 @@ pub fn routes() -> Router<AppState> {
         .route("/api/security/outbound", get(handlers::system::security::outbound_connections))
         .route("/api/security/nginx-suspicious", get(handlers::system::security::nginx_suspicious))
         .route("/api/security/tls-errors", get(handlers::system::security::tls_errors))
+        .route("/api/security/geoip", get(handlers::system::security::geoip_lookup))
+        .route("/api/security/container-changes", get(handlers::system::security::container_changes))
         .route(
             "/api/security/cleanup",
             delete(handlers::system::security::cleanup_security_logs),

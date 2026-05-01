@@ -131,6 +131,10 @@ pub struct AppState {
     pub discord_oauth_client_secret: String,
     pub discord_oauth_redirect_uri: String,
     pub web_front_url: String,
+    /// Container monitor : poll Docker chaque minute, detecte les changements.
+    pub container_monitor: Option<std::sync::Arc<tokio::sync::RwLock<crate::adapters::outbound::system::container_monitor::ContainerMonitorState>>>,
+    /// Rate limiter dynamique : tracking req/IP en memoire pour ban auto.
+    pub rate_limiter: Option<std::sync::Arc<crate::adapters::outbound::system::rate_limiter::RateLimiter>>,
 }
 
 impl AppState {

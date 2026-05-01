@@ -67,6 +67,7 @@ sysinfo = { version = "0.33", default-features = false, features = ["system", "d
 # Client Docker async natif (socket Unix /var/run/docker.sock).
 # Utilise pour /api/docker/* (overview, containers, images, volumes, prune, logs).
 bollard = "0.18"
+dashmap = { workspace = true }
 # Comparaison constant-time pour les Bearer tokens / API keys.
 # Empeche les timing attacks qui devinent la cle caractere par caractere.
 subtle = "2"
