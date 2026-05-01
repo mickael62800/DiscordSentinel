@@ -328,9 +328,14 @@ services:
     depends_on:
       redis:
         condition: service_healthy
-    # SECURITE — gateway n'a pas besoin d'internet (juste Redis Streams + WS).
+    # NOTE — gateway a besoin de default pour que le port publish 127.0.0.1:3001
+    # fonctionne (Docker requiert un reseau non-internal pour le NAT host).
+    # En pratique, gateway ne fait jamais d'outbound internet (juste Redis +
+    # WebSocket inbound). Sa security depend du firewall externe (port non
+    # ouvert) + auth du token WebSocket.
     networks:
       - internal
+      - default
 
   # ──────────────────────────────────────────────────────────────────────────
   # Workers (13)
@@ -637,11 +642,13 @@ services:
         condition: service_healthy
       gateway:
         condition: service_started
-    # SECURITE — nginx fait du proxying interne uniquement (api/gateway).
-    # Pas besoin d'internet sortant. Le port mapping 80/443 reste fonctionnel
-    # car il opere au niveau host, independant du reseau Docker.
+    # NOTE — web (nginx) a besoin de default pour que le port publish 80/443
+    # fonctionne (Docker requiert un reseau non-internal pour le NAT host).
+    # internal donne acces aux upstreams (api, gateway). nginx ne fait jamais
+    # d'outbound internet -> pas de risque d'exfiltration.
     networks:
       - internal
+      - default
 
   # Certbot Let's Encrypt — active via profile `tls`.
   certbot:
