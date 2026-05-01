@@ -64,18 +64,47 @@ fn gate_super(state: &AppState, rbac: &Option<Extension<RoleContext>>) -> Result
 /// Tracking via tracing::info! structure -> apparait dans les logs API
 /// avec actor.user_id, action, target. Permet de retrouver qui a lance
 /// quoi en cas de probleme post-mortem.
-fn audit_docker(rbac: &Option<Extension<RoleContext>>, action: &str, target: &str) {
+/// Logue en `tracing::info` ET en BDD `server_events` pour qu'il soit visible
+/// sur la page Securite serveur.
+fn audit_docker(
+    state: &AppState,
+    rbac: &Option<Extension<RoleContext>>,
+    action: &str,
+    target: &str,
+) {
     let actor = match rbac {
-        Some(Extension(ctx)) => ctx.discord_user_id.as_str(),
-        None => "anonymous",
+        Some(Extension(ctx)) => ctx.discord_user_id.clone(),
+        None => "anonymous".to_string(),
     };
     tracing::info!(
         target: "audit::docker",
-        actor = actor,
+        actor = %actor,
         action = action,
         target = target,
         "docker admin action"
     );
+    let pool = state.pg_pool.clone();
+    let actor_owned = actor.clone();
+    let action_owned = format!("docker.{}", action);
+    let target_owned = target.to_string();
+    let severity = if action.contains("prune") || action.contains("remove") {
+        "warn"
+    } else {
+        "info"
+    };
+    let sev_owned = severity.to_string();
+    tokio::spawn(async move {
+        crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
+            &pool,
+            &actor_owned,
+            None,
+            &action_owned,
+            Some(&target_owned),
+            &sev_owned,
+            serde_json::json!({}),
+        )
+        .await;
+    });
 }
 
 fn map_err(e: bollard::errors::Error) -> ApiError {
@@ -306,7 +335,7 @@ pub async fn start_container(
     Path(id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "container.start", &id);
+    audit_docker(&state, &rbac, "container.start", &id);
     let d = docker()?;
     d.start_container::<String>(&id, None).await.map_err(map_err)?;
     Ok(ok_response())
@@ -325,7 +354,7 @@ pub async fn stop_container(
     Query(q): Query<StopQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "container.stop", &id);
+    audit_docker(&state, &rbac, "container.stop", &id);
     let d = docker()?;
     let opts = StopContainerOptions {
         t: q.timeout.unwrap_or(10),
@@ -341,7 +370,7 @@ pub async fn restart_container(
     Query(q): Query<StopQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "container.restart", &id);
+    audit_docker(&state, &rbac, "container.restart", &id);
     let d = docker()?;
     let opts = RestartContainerOptions {
         t: q.timeout.unwrap_or(10) as isize,
@@ -365,7 +394,7 @@ pub async fn remove_container(
     Query(q): Query<RemoveContainerQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "container.remove", &id);
+    audit_docker(&state, &rbac, "container.remove", &id);
     let d = docker()?;
     let opts = RemoveContainerOptions {
         force: q.force.unwrap_or(false),
@@ -467,7 +496,7 @@ pub async fn remove_image(
     Query(q): Query<RemoveImageQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "image.remove", &id);
+    audit_docker(&state, &rbac, "image.remove", &id);
     let d = docker()?;
     let opts = RemoveImageOptions {
         force: q.force.unwrap_or(false),
@@ -518,7 +547,7 @@ pub async fn remove_volume(
     Query(q): Query<RemoveImageQuery>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "volume.remove", &name);
+    audit_docker(&state, &rbac, "volume.remove", &name);
     let d = docker()?;
     let opts = bollard::volume::RemoveVolumeOptions {
         force: q.force.unwrap_or(false),
@@ -558,7 +587,7 @@ pub async fn prune_containers(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "prune.containers", "*");
+    audit_docker(&state, &rbac, "prune.containers", "*");
     let d = docker()?;
     let r = d
         .prune_containers(None::<bollard::container::PruneContainersOptions<String>>)
@@ -612,7 +641,7 @@ pub async fn prune_volumes(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "prune.volumes", "*");
+    audit_docker(&state, &rbac, "prune.volumes", "*");
     let d = docker()?;
     let r = d
         .prune_volumes(None::<bollard::volume::PruneVolumesOptions<String>>)
@@ -629,7 +658,7 @@ pub async fn prune_networks(
     rbac: Option<Extension<RoleContext>>,
 ) -> Result<Json<PruneResultDto>, ApiError> {
     gate_super(&state, &rbac)?;
-    audit_docker(&rbac, "prune.networks", "*");
+    audit_docker(&state, &rbac, "prune.networks", "*");
     let d = docker()?;
     let r = d
         .prune_networks(None::<bollard::network::PruneNetworksOptions<String>>)

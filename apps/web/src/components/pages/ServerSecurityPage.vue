@@ -2,10 +2,10 @@
 import { computed, onMounted, ref } from "vue";
 import {
   serverSecurityService,
-  type AuditEntry,
   type AuthFailureEntry,
   type BannedIpsResponse,
   type SecurityWindow,
+  type ServerEventDto,
   type TlsCertInfo,
   type TopIpEntry,
 } from "@/services/serverSecurityService";
@@ -28,8 +28,8 @@ const topIpsWindow = ref<SecurityWindow>("1h");
 const authFailures = ref<AuthFailureEntry[]>([]);
 const authWindow = ref<SecurityWindow>("24h");
 const banned = ref<BannedIpsResponse | null>(null);
-const auditLogs = ref<AuditEntry[]>([]);
-const auditFilter = ref<"all" | "rbac" | "docker" | "moderation" | "ban">("all");
+const serverEvents = ref<ServerEventDto[]>([]);
+const eventsFilter = ref<"all" | "docker" | "security" | "rbac">("all");
 const tls = ref<TlsCertInfo | null>(null);
 const tlsError = ref<string | null>(null);
 
@@ -55,16 +55,39 @@ async function loadBanned() {
     showError(`Bans : ${e?.message ?? e}`);
   }
 }
-async function loadAudit() {
+async function loadServerEvents() {
   try {
-    const prefix = auditFilter.value === "all" ? undefined : auditFilter.value;
-    auditLogs.value = await serverSecurityService.auditLogs({
-      guild_id: selectedGuildId.value ?? undefined,
-      event_type_prefix: prefix,
+    const prefix = eventsFilter.value === "all" ? undefined : eventsFilter.value;
+    serverEvents.value = await serverSecurityService.serverEvents({
+      action_prefix: prefix,
       limit: 100,
     });
   } catch (e: any) {
-    showError(`Audit logs : ${e?.message ?? e}`);
+    showError(`Events serveur : ${e?.message ?? e}`);
+  }
+}
+
+async function banIp(ip: string) {
+  if (!confirm(`Bannir l'IP ${ip} ? Elle ne pourra plus accéder au serveur.`)) return;
+  try {
+    const r = await serverSecurityService.banIp(ip, "ban manuel via panel sécurité");
+    alert(`✅ ${r.message}`);
+    await loadBanned();
+    await loadServerEvents();
+  } catch (e: any) {
+    showError(`Echec ban : ${e?.message ?? e}`);
+  }
+}
+
+async function unbanIp(ip: string) {
+  if (!confirm(`Débannir l'IP ${ip} ?`)) return;
+  try {
+    const r = await serverSecurityService.unbanIp(ip, "unban manuel via panel sécurité");
+    alert(`✅ ${r.message}`);
+    await loadBanned();
+    await loadServerEvents();
+  } catch (e: any) {
+    showError(`Echec unban : ${e?.message ?? e}`);
   }
 }
 async function loadTls() {
@@ -79,7 +102,7 @@ async function loadTls() {
 
 async function refreshAll() {
   refreshing.value = true;
-  await Promise.allSettled([loadTopIps(), loadAuthFailures(), loadBanned(), loadAudit(), loadTls()]);
+  await Promise.allSettled([loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls()]);
   refreshing.value = false;
 }
 
@@ -192,7 +215,7 @@ const tlsBadgeClass = computed(() => {
       </div>
       <table v-if="topIps.length > 0" class="data-table">
         <thead>
-          <tr><th>IP</th><th class="num">Total</th><th class="num">4xx/5xx</th><th>Dernier</th></tr>
+          <tr><th>IP</th><th class="num">Total</th><th class="num">4xx/5xx</th><th>Dernier</th><th class="actions-h">Action</th></tr>
         </thead>
         <tbody>
           <tr v-for="ip in topIps" :key="ip.client_ip" :class="{ alert: ip.failed > 10 }">
@@ -200,6 +223,9 @@ const tlsBadgeClass = computed(() => {
             <td class="num">{{ ip.total }}</td>
             <td class="num" :class="{ danger: ip.failed > 10 }">{{ ip.failed }}</td>
             <td class="muted small">{{ fmtDate(ip.last_seen) }}</td>
+            <td class="actions">
+              <button class="btn xs danger" @click="banIp(ip.client_ip)" title="Bannir cette IP">🚫 Ban</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -228,6 +254,7 @@ const tlsBadgeClass = computed(() => {
             <th>Route</th>
             <th>IP</th>
             <th>User-Agent</th>
+            <th class="actions-h">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -242,6 +269,9 @@ const tlsBadgeClass = computed(() => {
             <td class="small mono">{{ truncate(e.route, 60) }}</td>
             <td class="small mono">{{ e.client_ip }}</td>
             <td class="small muted ua">{{ truncate(e.user_agent, 80) }}</td>
+            <td class="actions">
+              <button v-if="e.client_ip && e.client_ip !== '-'" class="btn xs danger" @click="banIp(e.client_ip)" title="Bannir cette IP">🚫</button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -319,7 +349,10 @@ docker compose up -d --force-recreate api</pre>
             </span>
           </div>
           <ul v-if="jail.banned_ips.length > 0" class="ip-list">
-            <li v-for="ip in jail.banned_ips" :key="ip"><code>{{ ip }}</code></li>
+            <li v-for="ip in jail.banned_ips" :key="ip" class="ip-pill">
+              <code>{{ ip }}</code>
+              <button class="btn xs" @click="unbanIp(ip)" title="Débannir cette IP">↻ Débannir</button>
+            </li>
           </ul>
           <div v-else class="muted small">Aucune IP actuellement bannie sur cette jail.</div>
         </div>
@@ -327,43 +360,51 @@ docker compose up -d --force-recreate api</pre>
       <div v-else class="empty">fail2ban actif mais aucune jail configurée.</div>
     </section>
 
-    <!-- ── 4. Audit log admin ── -->
+    <!-- ── 4. Events serveur (actions admin sur l'infra) ── -->
     <section class="card">
       <div class="card-head">
-        <h2>📋 Audit log ({{ auditLogs.length }})</h2>
+        <h2>📋 Events serveur ({{ serverEvents.length }})</h2>
         <div class="card-actions">
-          <select v-model="auditFilter" @change="loadAudit">
-            <option value="all">Tous événements</option>
-            <option value="rbac">RBAC</option>
-            <option value="docker">Docker admin</option>
-            <option value="moderation">Modération</option>
-            <option value="ban">Bans</option>
+          <select v-model="eventsFilter" @change="loadServerEvents">
+            <option value="all">Toutes actions</option>
+            <option value="docker">Docker (start/stop/prune)</option>
+            <option value="security">Sécurité (ban/unban/cleanup)</option>
+            <option value="rbac">RBAC (grant/revoke)</option>
           </select>
-          <button class="btn xs" @click="loadAudit">↻</button>
+          <button class="btn xs" @click="loadServerEvents">↻</button>
         </div>
       </div>
-      <table v-if="auditLogs.length > 0" class="data-table">
+      <p class="muted small">
+        Actions admin effectuées sur l'infra (pas les events Discord).
+        Inclut Docker (start/stop conteneurs), security (ban IP, cleanup),
+        RBAC (grant/revoke), invitations, etc.
+      </p>
+      <table v-if="serverEvents.length > 0" class="data-table">
         <thead>
-          <tr><th>Quand</th><th>Événement</th><th>Acteur</th><th>Cible</th></tr>
+          <tr>
+            <th>Quand</th>
+            <th>Sévérité</th>
+            <th>Action</th>
+            <th>Acteur</th>
+            <th>Cible</th>
+          </tr>
         </thead>
         <tbody>
-          <tr v-for="e in auditLogs" :key="e.id">
-            <td class="small muted">{{ fmtDate(e.created_at) }}</td>
-            <td><code class="event-type">{{ e.event_type }}</code></td>
-            <td class="small">
-              <span v-if="e.actor_name">{{ e.actor_name }}</span>
-              <code v-if="e.actor_id" class="muted small">{{ e.actor_id }}</code>
-              <span v-if="!e.actor_id && !e.actor_name" class="muted">—</span>
+          <tr v-for="e in serverEvents" :key="e.id">
+            <td class="small muted">{{ fmtDate(e.timestamp) }}</td>
+            <td>
+              <span class="code-pill" :class="{
+                warn: e.severity === 'warn',
+                danger: e.severity === 'critical'
+              }">{{ e.severity }}</span>
             </td>
-            <td class="small">
-              <span v-if="e.target_name">{{ e.target_name }}</span>
-              <code v-if="e.target_id" class="muted small">{{ e.target_id }}</code>
-              <span v-if="!e.target_id && !e.target_name" class="muted">—</span>
-            </td>
+            <td><code class="event-type">{{ e.action }}</code></td>
+            <td class="small mono">{{ e.actor ?? "—" }}</td>
+            <td class="small mono">{{ e.target ?? "—" }}</td>
           </tr>
         </tbody>
       </table>
-      <div v-else class="empty">Aucun événement d'audit pour ce filtre.</div>
+      <div v-else class="empty">Aucun event serveur enregistré.</div>
     </section>
 
     <!-- ── 5. Certificat TLS ── -->
@@ -628,6 +669,17 @@ select {
   font-family: "JetBrains Mono", monospace;
   font-size: 11px;
 }
+.ip-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  padding: 4px 6px 4px 10px;
+  border-radius: 6px;
+}
+.actions-h { text-align: right; }
+.actions { text-align: right; white-space: nowrap; }
 
 .tls-info { display: flex; flex-direction: column; gap: 10px; }
 .tls-row {

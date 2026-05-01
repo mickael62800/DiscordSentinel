@@ -103,6 +103,18 @@ pub fn routes() -> Router<AppState> {
             "/api/security/cleanup",
             delete(handlers::system::security::cleanup_security_logs),
         )
+        .route(
+            "/api/security/server-events",
+            get(handlers::system::server_events::list_server_events),
+        )
+        .route(
+            "/api/security/ban-ip",
+            post(handlers::system::security::ban_ip),
+        )
+        .route(
+            "/api/security/unban-ip",
+            post(handlers::system::security::unban_ip),
+        )
         // RBAC component visibility (overrides UI par role)
         .route(
             "/api/rbac/component-visibility/{guild_id}",

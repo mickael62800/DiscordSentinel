@@ -139,6 +139,78 @@ EXPORT_EOF
     echo ""
 }
 
+# ── Module ban-apply (applique les bans/unbans depuis les fichiers) ─────
+
+setup_ban_apply() {
+    echo "🚫 Setup script ban-apply (lit bans-pending.txt + unbans-pending.txt)"
+    echo ""
+
+    if ! command -v ufw &>/dev/null; then
+        echo "[1/3] Installation ufw…"
+        apt-get update -qq
+        apt-get install -y ufw
+    else
+        echo "[1/3] ufw déjà installé ✓"
+    fi
+
+    echo "[2/3] Création $SCRIPT_DIR/sentinel-apply-bans.sh…"
+    cat > "$SCRIPT_DIR/sentinel-apply-bans.sh" <<'BAN_EOF'
+#!/bin/bash
+# Applique les bans/unbans IPs ecrits par l'API DiscordSentinel.
+# Lit /var/lib/sentinel/bans-pending.txt et unbans-pending.txt,
+# applique via ufw deny/delete deny, puis vide les fichiers.
+set -eu
+DIR=/var/lib/sentinel
+BANS=$DIR/bans-pending.txt
+UNBANS=$DIR/unbans-pending.txt
+LOG=$DIR/bans-applied.log
+mkdir -p $DIR
+touch $BANS $UNBANS $LOG
+
+# Process bans
+if [ -s "$BANS" ]; then
+    while IFS=$'\t' read -r IP TS REASON; do
+        [ -z "$IP" ] && continue
+        if ufw deny from "$IP" 2>/dev/null; then
+            echo "$(date -Iseconds) BAN $IP reason=$REASON" >> $LOG
+        else
+            echo "$(date -Iseconds) BAN_FAIL $IP" >> $LOG
+        fi
+    done < "$BANS"
+    : > "$BANS"  # vide le fichier
+fi
+
+# Process unbans
+if [ -s "$UNBANS" ]; then
+    while IFS=$'\t' read -r IP TS REASON; do
+        [ -z "$IP" ] && continue
+        if ufw delete deny from "$IP" 2>/dev/null; then
+            echo "$(date -Iseconds) UNBAN $IP reason=$REASON" >> $LOG
+        else
+            echo "$(date -Iseconds) UNBAN_FAIL $IP" >> $LOG
+        fi
+    done < "$UNBANS"
+    : > "$UNBANS"
+fi
+BAN_EOF
+    chmod +x "$SCRIPT_DIR/sentinel-apply-bans.sh"
+
+    echo "[3/3] Cron toutes les minutes /etc/cron.d/sentinel-apply-bans…"
+    echo "* * * * * root /usr/local/bin/sentinel-apply-bans.sh" > /etc/cron.d/sentinel-apply-bans
+    chmod 644 /etc/cron.d/sentinel-apply-bans
+
+    echo ""
+    echo "✅ ban-apply configuré."
+    echo ""
+    echo "L'API peut maintenant ecrire dans :"
+    echo "  $DIR/bans-pending.txt   (POST /api/security/ban-ip)"
+    echo "  $DIR/unbans-pending.txt (POST /api/security/unban-ip)"
+    echo ""
+    echo "Le cron applique toutes les minutes via 'ufw deny from <IP>'."
+    echo "Log : tail -f $DIR/bans-applied.log"
+    echo ""
+}
+
 # ── Dispatcher ──────────────────────────────────────────────────────────
 
 main() {
@@ -149,19 +221,26 @@ main() {
         fail2ban)
             setup_fail2ban
             ;;
+        ban-apply)
+            setup_ban_apply
+            ;;
         all)
             setup_fail2ban
+            setup_ban_apply
             ;;
         help|--help|-h)
             cat <<HELP
 Usage: sudo bash setup-host-security.sh <module>
 
 Modules disponibles :
-  fail2ban  Installation fail2ban + jail SSH + cron export JSON pour l'API
-  all       Tous les modules
+  fail2ban   Installation fail2ban + jail SSH + cron export JSON pour l'API
+  ban-apply  Cron qui applique les bans/unbans IPs ecrits par l'API
+             (boutons 🚫 Ban / ↻ Débannir sur la page Sécurité)
+  all        Tous les modules
 
 Exemples :
   sudo bash setup-host-security.sh fail2ban
+  sudo bash setup-host-security.sh ban-apply
   sudo bash setup-host-security.sh all
 HELP
             ;;

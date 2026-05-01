@@ -1,4 +1,15 @@
-import { httpDelete, httpGet } from "@/api/http";
+import { httpDelete, httpGet, httpPost } from "@/api/http";
+
+export interface ServerEventDto {
+  id: string;
+  timestamp: string;
+  actor: string | null;
+  actor_name: string | null;
+  action: string;
+  target: string | null;
+  severity: "info" | "warn" | "critical";
+  details: unknown;
+}
 
 /**
  * Wrapper pour les endpoints /api/security/* (page Securite serveur).
@@ -84,6 +95,19 @@ export const serverSecurityService = {
   },
   tlsCert(): Promise<TlsCertInfo> {
     return httpGet("/api/security/tls-cert");
+  },
+  banIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
+    return httpPost("/api/security/ban-ip", { ip, reason });
+  },
+  unbanIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
+    return httpPost("/api/security/unban-ip", { ip, reason });
+  },
+  serverEvents(params: { action_prefix?: string; severity?: string; limit?: number } = {}): Promise<ServerEventDto[]> {
+    const u = new URLSearchParams();
+    if (params.action_prefix) u.set("action_prefix", params.action_prefix);
+    if (params.severity) u.set("severity", params.severity);
+    u.set("limit", String(params.limit ?? 100));
+    return httpGet(`/api/security/server-events?${u.toString()}`);
   },
   cleanup(opts: { older_than_days?: number; include_audit_logs?: boolean } = {}): Promise<CleanupResponse> {
     const u = new URLSearchParams();

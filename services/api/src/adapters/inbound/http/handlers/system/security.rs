@@ -345,6 +345,164 @@ pub async fn audit_logs(
     Ok(Json(out))
 }
 
+// ── Ban IP : ajoute une IP a la blocklist host ──────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct BanIpDto {
+    pub ip: String,
+    /// Optionnel : raison libre (ex: "trop d'echecs auth")
+    #[serde(default)]
+    pub reason: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct BanIpResponse {
+    pub ok: bool,
+    pub message: String,
+}
+
+const BANS_PENDING_PATH: &str = "/var/lib/sentinel/bans-pending.txt";
+
+/// POST /api/security/ban-ip
+/// Pattern fichier-shim : l'API ecrit l'IP dans /var/lib/sentinel/bans-pending.txt,
+/// un cron host (apply-bans.sh) lit le fichier, applique `ufw deny from <IP>`,
+/// puis vide le fichier.
+pub async fn ban_ip(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Json(dto): Json<BanIpDto>,
+) -> Result<Json<BanIpResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+
+    let ip = dto.ip.trim();
+    // Validation basique : IPv4 ou IPv6
+    let parsed: Result<std::net::IpAddr, _> = ip.parse();
+    if parsed.is_err() {
+        return Err(ApiError(DomainError::ValidationError(format!(
+            "IP invalide : {ip}"
+        ))));
+    }
+    // Refus de banner les IPs LAN/loopback
+    let p = parsed.unwrap();
+    if p.is_loopback() {
+        return Err(ApiError(DomainError::ValidationError(
+            "Refus de bannir une IP loopback".into(),
+        )));
+    }
+    if let std::net::IpAddr::V4(v4) = p {
+        if v4.is_private() {
+            return Err(ApiError(DomainError::ValidationError(
+                "Refus de bannir une IP privee LAN".into(),
+            )));
+        }
+    }
+
+    // Append au fichier (cron host le lit + applique + vide)
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    let parent = std::path::Path::new(BANS_PENDING_PATH).parent().unwrap();
+    if let Err(e) = std::fs::create_dir_all(parent) {
+        return Err(ApiError(DomainError::Internal(format!("mkdir: {e}"))));
+    }
+    let line = format!(
+        "{}\t{}\t{}\n",
+        ip,
+        chrono::Utc::now().to_rfc3339(),
+        dto.reason.as_deref().unwrap_or("")
+    );
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(BANS_PENDING_PATH)
+        .map_err(|e| ApiError(DomainError::Internal(format!("open bans file: {e}"))))?;
+    f.write_all(line.as_bytes())
+        .map_err(|e| ApiError(DomainError::Internal(format!("write bans: {e}"))))?;
+
+    // Audit
+    let actor = rbac
+        .as_ref()
+        .map(|r| r.0.discord_user_id.clone())
+        .unwrap_or_else(|| "unknown".to_string());
+    crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
+        &state.pg_pool,
+        &actor,
+        None,
+        "security.ban_ip",
+        Some(ip),
+        "warn",
+        serde_json::json!({ "reason": dto.reason, "ip": ip }),
+    )
+    .await;
+
+    Ok(Json(BanIpResponse {
+        ok: true,
+        message: format!(
+            "IP {} ajoutee a la blocklist (sera appliquee au prochain tick du cron host)",
+            ip
+        ),
+    }))
+}
+
+// ── Unban IP : retire une IP de la blocklist ────────────────────────────
+
+const UNBANS_PENDING_PATH: &str = "/var/lib/sentinel/unbans-pending.txt";
+
+pub async fn unban_ip(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Json(dto): Json<BanIpDto>,
+) -> Result<Json<BanIpResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+
+    let ip = dto.ip.trim();
+    let parsed: Result<std::net::IpAddr, _> = ip.parse();
+    if parsed.is_err() {
+        return Err(ApiError(DomainError::ValidationError(format!(
+            "IP invalide : {ip}"
+        ))));
+    }
+
+    use std::fs::OpenOptions;
+    use std::io::Write;
+    let parent = std::path::Path::new(UNBANS_PENDING_PATH).parent().unwrap();
+    if let Err(e) = std::fs::create_dir_all(parent) {
+        return Err(ApiError(DomainError::Internal(format!("mkdir: {e}"))));
+    }
+    let line = format!(
+        "{}\t{}\t{}\n",
+        ip,
+        chrono::Utc::now().to_rfc3339(),
+        dto.reason.as_deref().unwrap_or("")
+    );
+    let mut f = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(UNBANS_PENDING_PATH)
+        .map_err(|e| ApiError(DomainError::Internal(format!("open unbans file: {e}"))))?;
+    f.write_all(line.as_bytes())
+        .map_err(|e| ApiError(DomainError::Internal(format!("write unbans: {e}"))))?;
+
+    let actor = rbac
+        .as_ref()
+        .map(|r| r.0.discord_user_id.clone())
+        .unwrap_or_else(|| "unknown".to_string());
+    crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
+        &state.pg_pool,
+        &actor,
+        None,
+        "security.unban_ip",
+        Some(ip),
+        "info",
+        serde_json::json!({ "reason": dto.reason, "ip": ip }),
+    )
+    .await;
+
+    Ok(Json(BanIpResponse {
+        ok: true,
+        message: format!("IP {} retiree de la blocklist (sera applique au prochain tick)", ip),
+    }))
+}
+
 // ── Cleanup : purge des logs de securite ────────────────────────────────
 
 #[derive(Debug, Deserialize)]
@@ -424,6 +582,21 @@ pub async fn cleanup_security_logs(
         days_kept = days,
         "security cleanup executed"
     );
+    crate::adapters::inbound::http::handlers::system::server_events::record_server_event(
+        &state.pg_pool,
+        actor,
+        None,
+        "security.cleanup",
+        Some(&format!("days={}", days)),
+        if include_audit { "warn" } else { "info" },
+        serde_json::json!({
+            "deleted_api_logs": api_logs_deleted,
+            "deleted_audit_logs": audit_deleted,
+            "days_kept": days,
+            "include_audit": include_audit,
+        }),
+    )
+    .await;
 
     Ok(Json(CleanupResponse {
         deleted_api_logs: api_logs_deleted as i64,

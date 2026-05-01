@@ -5,6 +5,7 @@ pub mod component_visibility;
 pub mod docker;
 pub mod invitations;
 pub mod security;
+pub mod server_events;
 pub mod exports;
 pub mod health;
 pub mod info;
