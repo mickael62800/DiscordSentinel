@@ -274,6 +274,9 @@ services:
       # mTLS gRPC : si defini, le serveur exige un cert client signe par
       # notre CA interne. Sinon plain HTTP/2.
       GRPC_TLS_DIR: ${GRPC_TLS_DIR:-/grpc-certs}
+      # Pour l'endpoint /api/security/tls-cert : domaine du cert Let's Encrypt
+      # a lire dans /etc/letsencrypt/live/{WEB_DOMAIN}/cert.pem
+      WEB_DOMAIN: ${WEB_DOMAIN:-localhost}
     volumes:
       - ../../ai/training/vision/exports:/models/vision:ro
       - ../../ai/training/text/exports:/models/text:ro
