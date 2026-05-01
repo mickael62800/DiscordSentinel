@@ -33,7 +33,7 @@ if [ ! -f server.pem ]; then
 
     cat > server.cnf <<EOF
 [req]
-distinguished_name = req
+distinguished_name = req_distinguished_name
 prompt = no
 req_extensions = v3_req
 [req_distinguished_name]
@@ -65,7 +65,7 @@ if [ ! -f client.pem ]; then
 
     cat > client.cnf <<EOF
 [req]
-distinguished_name = req
+distinguished_name = req_distinguished_name
 prompt = no
 req_extensions = v3_req
 [req_distinguished_name]
