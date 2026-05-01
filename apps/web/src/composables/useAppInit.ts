@@ -1,5 +1,7 @@
 import { preloadBotDefinitions } from "./useBotDefinitions";
 import { preloadBotEnabledStatus } from "./useBotEnabledStatus";
+import { preloadComponentVisibility } from "./useComponentVisibility";
+import { preloadMyRole } from "./useMyRole";
 
 /**
  * Prefetch des donnees stables apres login confirme.
@@ -32,8 +34,8 @@ export async function initAppData(guildId: string | null): Promise<void> {
       await Promise.allSettled([
         preloadBotDefinitions(),
         preloadBotEnabledStatus(guildId),
-        // useComponentVisibility se charge tout seul via son watch sur selectedGuildId
-        // (deja singleton). Pas besoin de l'appeler ici.
+        preloadMyRole(guildId),
+        preloadComponentVisibility(guildId),
       ]);
     } finally {
       inFlight = null;

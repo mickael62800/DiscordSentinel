@@ -1,31 +1,43 @@
 import { computed, ref, watch } from "vue";
-import type { ComponentVisibilityEntry, MyRole, RbacRole } from "@/types";
+import type { ComponentVisibilityEntry, RbacRole } from "@/types";
 import { componentByKey, ROLE_RANK } from "@/rbac/componentRegistry";
 import { rbacService } from "@/services/rbacService";
 import { useGuildSelector } from "./useGuildSelector";
+import { useMyRole, preloadMyRole } from "./useMyRole";
 
 // Etat partage (singleton via module scope) — chargement unique par guild.
 const overrides = ref<ComponentVisibilityEntry[]>([]);
-const myRole = ref<MyRole | null>(null);
 const loaded = ref(false);
 const loading = ref(false);
 let lastLoadedGuild: string | null = null;
+let inFlight: Promise<void> | null = null;
 
-async function load(guildId: string) {
-  if (loading.value || lastLoadedGuild === guildId) return;
+async function load(guildId: string): Promise<void> {
+  if (lastLoadedGuild === guildId && !inFlight) return;
+  if (inFlight && lastLoadedGuild === guildId) return inFlight;
+
   loading.value = true;
-  try {
-    const [list, me] = await Promise.all([
-      rbacService.listComponentVisibility(guildId).catch(() => [] as ComponentVisibilityEntry[]),
-      rbacService.getMyRole(guildId).catch(() => null),
-    ]);
-    overrides.value = list;
-    myRole.value = me;
-    lastLoadedGuild = guildId;
-    loaded.value = true;
-  } finally {
-    loading.value = false;
-  }
+  inFlight = (async () => {
+    try {
+      // visibility + myRole en parallele. myRole est lui-meme un singleton :
+      // si deja charge pour cette guild, l'appel retourne instant le cache.
+      const [list] = await Promise.all([
+        rbacService.listComponentVisibility(guildId).catch(() => [] as ComponentVisibilityEntry[]),
+        preloadMyRole(guildId),
+      ]);
+      overrides.value = list;
+      lastLoadedGuild = guildId;
+      loaded.value = true;
+    } finally {
+      loading.value = false;
+      inFlight = null;
+    }
+  })();
+  return inFlight;
+}
+
+export async function preloadComponentVisibility(guildId: string): Promise<void> {
+  await load(guildId);
 }
 
 /**
@@ -49,8 +61,8 @@ function isVisibleFor(key: string, role: RbacRole | null, isSuper: boolean): boo
 
 export function useComponentVisibility() {
   const { selectedGuildId } = useGuildSelector();
+  const { role, isSuper } = useMyRole();
 
-  // Charge a la 1ere utilisation + a chaque changement de guild.
   watch(
     selectedGuildId,
     (gid) => {
@@ -62,9 +74,6 @@ export function useComponentVisibility() {
     },
     { immediate: true },
   );
-
-  const isSuper = computed(() => myRole.value?.is_superadmin === true);
-  const role = computed<RbacRole | null>(() => myRole.value?.role ?? null);
 
   function visible(key: string): boolean {
     return isVisibleFor(key, role.value, isSuper.value);

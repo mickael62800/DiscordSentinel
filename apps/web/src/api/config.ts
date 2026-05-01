@@ -64,7 +64,34 @@ export function listBotTokens(): Array<[string, boolean]> {
 }
 
 // Token Discord OAuth (renseigne apres callback OAuth) envoye en header X-Discord-Token.
+//
+// SECURITE : stocke en sessionStorage (et non localStorage) pour limiter
+// l'exfiltration en cas de XSS persistant. sessionStorage est purge a la
+// fermeture du tab/navigateur -> un attaquant doit voler le token "live"
+// pendant que le tab est ouvert. Migration douce : on lit aussi l'ancienne
+// valeur localStorage pour les sessions existantes, puis on la deplace.
 const K_DISCORD_TOKEN = "ds.discord.token";
-export function getDiscordToken(): string { return localStorage.getItem(K_DISCORD_TOKEN) ?? ""; }
-export function setDiscordToken(t: string) { localStorage.setItem(K_DISCORD_TOKEN, t); }
-export function clearDiscordToken() { localStorage.removeItem(K_DISCORD_TOKEN); }
+
+function migrateFromLocalStorage(): void {
+  const legacy = localStorage.getItem(K_DISCORD_TOKEN);
+  if (legacy && !sessionStorage.getItem(K_DISCORD_TOKEN)) {
+    sessionStorage.setItem(K_DISCORD_TOKEN, legacy);
+  }
+  if (legacy) {
+    localStorage.removeItem(K_DISCORD_TOKEN);
+  }
+}
+
+export function getDiscordToken(): string {
+  migrateFromLocalStorage();
+  return sessionStorage.getItem(K_DISCORD_TOKEN) ?? "";
+}
+export function setDiscordToken(t: string) {
+  sessionStorage.setItem(K_DISCORD_TOKEN, t);
+  // Au cas ou un ancien token traine en localStorage, on le purge.
+  localStorage.removeItem(K_DISCORD_TOKEN);
+}
+export function clearDiscordToken() {
+  sessionStorage.removeItem(K_DISCORD_TOKEN);
+  localStorage.removeItem(K_DISCORD_TOKEN);
+}

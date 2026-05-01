@@ -1,15 +1,18 @@
 import { onMounted, ref, watch, type Ref } from "vue";
-import type { GuildUserRole, MyRole, RbacRole } from "../types";
+import type { GuildUserRole, RbacRole } from "../types";
 import { useGuildSelector } from "./useGuildSelector";
+import { useMyRole } from "./useMyRole";
 import { useToast } from "./useToast";
 import { rbacService } from "@/services/rbacService";
 
 export function useRbac() {
   const { success: toastSuccess, error: toastError } = useToast();
   const { selectedGuildId } = useGuildSelector();
+  // Reutilise le singleton useMyRole (charge ailleurs egalement) -> evite
+  // un GET /api/rbac/me redondant ici.
+  const { myRole, reload: reloadMyRole } = useMyRole();
 
   const users: Ref<GuildUserRole[]> = ref([]);
-  const myRole: Ref<MyRole | null> = ref(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
 
@@ -17,7 +20,6 @@ export function useRbac() {
     const guildId = selectedGuildId.value;
     if (!guildId) {
       users.value = [];
-      myRole.value = null;
       error.value = null;
       return;
     }
@@ -25,12 +27,12 @@ export function useRbac() {
     loading.value = true;
     error.value = null;
     try {
-      const [list, me] = await Promise.all([
+      // listGuildUsers en parallele du refresh de myRole (singleton).
+      const [list] = await Promise.all([
         rbacService.listGuildUsers(guildId),
-        rbacService.getMyRole(guildId).catch(() => null),
+        reloadMyRole(),
       ]);
       users.value = list;
-      myRole.value = me;
     } catch (e) {
       error.value = String(e);
       toastError(`Echec chargement RBAC : ${e}`);
