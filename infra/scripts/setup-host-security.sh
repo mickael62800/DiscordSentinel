@@ -411,33 +411,47 @@ setup_outbound() {
 #!/bin/bash
 set -eu
 OUT=/var/lib/sentinel/outbound.json
+TMP=$(mktemp)
 mkdir -p /var/lib/sentinel
 NOW=$(date -Iseconds)
 
-# Connexions sortantes etablies (filtre out localhost/LAN)
-ENTRIES=$(ss -tnp state established 2>/dev/null | tail -n +2 | \
-    awk '$5 !~ /^127\.|^10\.|^172\.|^192\.168\.|^::1/' || true)
-TOTAL=$(echo "$ENTRIES" | grep -c . || echo 0)
+# ss -tnp state established :
+# colonnes : Recv-Q Send-Q Local-Addr:Port Peer-Addr:Port users:(("name",pid=...,fd=...))
+# On filtre les peers privees (localhost / LAN) sur la colonne $4 et on
+# extrait le nom de process via regex propre (pas de double-quote en sortie).
+ss -H -tnp state established 2>/dev/null \
+    | awk '$4 !~ /^127\.|^10\.|^172\.(1[6-9]|2[0-9]|3[01])\.|^192\.168\.|^::1|^\[::1\]|^\[fe80/' \
+    | head -100 > "$TMP" || true
+
+TOTAL=$(wc -l < "$TMP" | tr -d ' ')
 
 {
     echo "{"
     echo "  \"updated_at\": \"$NOW\","
     echo "  \"total\": $TOTAL,"
     echo "  \"connections\": ["
-    F=1
-    echo "$ENTRIES" | head -100 | while IFS= read -r LINE; do
-        [ -z "$LINE" ] && continue
-        LOCAL=$(echo "$LINE" | awk '{print $4}')
-        REMOTE=$(echo "$LINE" | awk '{print $5}')
-        # Process (champ users:(("name"...)))
-        PROC=$(echo "$LINE" | grep -oE 'users:\(\("[^"]+"' | sed 's/users:(("//' | head -1 || echo "")
-        [ $F -eq 0 ] && echo "    ,"
-        echo "    {\"local_addr\":\"$LOCAL\",\"remote_addr\":\"$REMOTE\",\"remote_host\":null,\"process\":\"$PROC\"}"
-        F=0
-    done
+    awk 'BEGIN { first=1 }
+    {
+        local=$3; remote=$4;
+        # Process : extrait le 1er nom dans users:(("name",pid=...,fd=...))
+        proc="";
+        if (match($0, /users:\(\("[^"]+/)) {
+            proc=substr($0, RSTART, RLENGTH);
+            sub(/users:\(\("/, "", proc);
+        }
+        # Echappe les " et \ pour le JSON
+        gsub(/\\/, "\\\\", local); gsub(/"/, "\\\"", local);
+        gsub(/\\/, "\\\\", remote); gsub(/"/, "\\\"", remote);
+        gsub(/\\/, "\\\\", proc); gsub(/"/, "\\\"", proc);
+        sep = (first==1) ? "" : ",";
+        printf("%s\n    {\"local_addr\":\"%s\",\"remote_addr\":\"%s\",\"remote_host\":null,\"process\":\"%s\"}", sep, local, remote, proc);
+        first=0;
+    }
+    END { if (first==0) print "" }' "$TMP"
     echo "  ]"
     echo "}"
 } > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+rm -f "$TMP"
 chmod 644 "$OUT"
 EOF
     chmod +x "$SCRIPT_DIR/sentinel-outbound.sh"

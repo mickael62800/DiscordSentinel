@@ -194,7 +194,7 @@ async function refreshAll() {
     loadOpenPorts(), loadTrivy(), loadIntegrity(), loadOutbound(),
     loadSuspicious(), loadTlsErrors(), loadContainers(),
   ]);
-  void loadGeoForTopIps();
+  void loadGeoForAll();
   refreshing.value = false;
 }
 
@@ -230,6 +230,55 @@ const totalFailedRequests = computed(() =>
 const totalBannedIps = computed(() =>
   banned.value?.jails.reduce((sum, j) => sum + j.banned_ips.length, 0) ?? 0,
 );
+// Agrege IPs uniques (Top IPs + Auth failures) avec leur geoloc
+interface GeoRow {
+  ip: string;
+  total: number;
+  failed: number;
+  country?: string;
+  countryCode?: string;
+  city?: string;
+  isp?: string;
+  asn?: string;
+}
+const geoRows = computed<GeoRow[]>(() => {
+  const map = new Map<string, GeoRow>();
+  for (const t of topIps.value) {
+    map.set(t.client_ip, { ip: t.client_ip, total: t.total, failed: t.failed });
+  }
+  for (const a of authFailures.value) {
+    if (!a.client_ip || a.client_ip === "-") continue;
+    const ex = map.get(a.client_ip) ?? { ip: a.client_ip, total: 0, failed: 0 };
+    ex.failed = (ex.failed || 0) + 1;
+    map.set(a.client_ip, ex);
+  }
+  for (const r of map.values()) {
+    const g = geoMap.value[r.ip];
+    if (g) {
+      r.country = g.country;
+      r.countryCode = g.countryCode;
+      r.city = g.city;
+      r.isp = g.isp;
+      r.asn = g.asn;
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => b.total + b.failed - (a.total + a.failed));
+});
+
+async function loadGeoForAll() {
+  const ips = Array.from(new Set([
+    ...topIps.value.map((i) => i.client_ip),
+    ...authFailures.value.map((a) => a.client_ip).filter((x) => x && x !== "-"),
+  ])).slice(0, 100);
+  if (ips.length === 0) return;
+  try {
+    const entries = await serverSecurityService.geoip(ips);
+    const m: Record<string, GeoIpEntry> = { ...geoMap.value };
+    for (const e of entries) m[e.query] = e;
+    geoMap.value = m;
+  } catch { /* best-effort */ }
+}
+
 const tlsBadgeClass = computed(() => {
   if (!tls.value) return "";
   if (tls.value.is_expired) return "danger";
@@ -542,6 +591,45 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
 
     <!-- ════════ ONGLET 4 : RÉSEAU ════════ -->
     <div v-if="currentTab === 'network'" class="tab-content">
+      <!-- Géolocalisation IPs (Top IPs + Auth failures) -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🌍 Géolocalisation IPs ({{ geoRows.length }})</h2>
+          <button class="btn xs" @click="loadGeoForAll">↻</button>
+        </div>
+        <p class="muted small">
+          Pays / FAI / ASN pour les IPs vues sur Top IPs et Auth failures.
+          Lookup via ip-api.com (gratuit, 45 req/min, 100 IPs max par requête).
+        </p>
+        <table v-if="geoRows.length > 0" class="data-table">
+          <thead>
+            <tr>
+              <th>IP</th><th>Pays</th><th>Ville</th><th>FAI</th><th>ASN</th>
+              <th class="num">Total</th><th class="num">Failed</th>
+              <th class="actions-h">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in geoRows.slice(0, 100)" :key="r.ip" :class="{ alert: (r.failed ?? 0) > 10 }">
+              <td><code>{{ r.ip }}</code></td>
+              <td class="small">
+                <span v-if="r.countryCode">{{ r.countryCode }} · {{ r.country }}</span>
+                <span v-else class="muted">—</span>
+              </td>
+              <td class="small">{{ r.city ?? "—" }}</td>
+              <td class="small muted">{{ truncate(r.isp ?? "—", 30) }}</td>
+              <td class="small mono">{{ truncate(r.asn ?? "—", 24) }}</td>
+              <td class="num">{{ r.total }}</td>
+              <td class="num" :class="{ danger: (r.failed ?? 0) > 10 }">{{ r.failed ?? 0 }}</td>
+              <td class="actions">
+                <button v-if="canManage" class="btn xs danger" @click="banIp(r.ip)">🚫</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-else class="empty">Aucune IP à géolocaliser pour le moment.</div>
+      </section>
+
       <!-- Connexions actives -->
       <section class="card">
         <div class="card-head">
@@ -853,10 +941,6 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         <div v-else class="empty">Aucun event serveur enregistré.</div>
       </section>
 
-      <section class="card placeholder-card">
-        <h2>🌍 Géolocalisation IPs</h2>
-        <p class="muted small">À venir : pays + ASN (organisation hébergeur) sur les IPs des Top IPs / Auth failures.</p>
-      </section>
     </div>
 
     <!-- ════════ ONGLET 7 : ALERTES ════════ -->
