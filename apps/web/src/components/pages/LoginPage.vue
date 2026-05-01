@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useRouter } from "vue-router";
 import { useAuth } from "../../composables/useAuth";
 import AppButton from "../atoms/AppButton.vue";
@@ -6,7 +7,24 @@ import AppButton from "../atoms/AppButton.vue";
 const router = useRouter();
 const { loading, error, login, user } = useAuth();
 
+// Champ code d'invitation : optionnel. Si renseigne, on le stocke en
+// sessionStorage et apres OAuth callback la page /auth/callback le
+// redeem (consomme + grant role) avant de rediriger sur le dashboard.
+const invitationCode = ref("");
+const showInviteField = ref(false);
+
+const PENDING_INVITE_KEY = "ds.pending_invitation_code";
+
 async function handleLogin() {
+  // Si un code est saisi, on le persist en sessionStorage pour que
+  // AuthCallbackPage puisse le retrouver apres le redirect Discord.
+  const code = invitationCode.value.trim().toUpperCase();
+  if (code) {
+    sessionStorage.setItem(PENDING_INVITE_KEY, code);
+  } else {
+    sessionStorage.removeItem(PENDING_INVITE_KEY);
+  }
+
   await login();
   if (user.value) {
     router.push("/");
@@ -22,6 +40,31 @@ async function handleLogin() {
       </div>
       <h1>DiscordSentinel</h1>
       <p class="subtitle">Panneau d'administration</p>
+
+      <!-- Champ code d'invitation (optionnel, replie par defaut) -->
+      <div class="invite-toggle">
+        <button
+          type="button"
+          class="invite-toggle-btn"
+          @click="showInviteField = !showInviteField"
+        >
+          🎟️ {{ showInviteField ? "Masquer" : "J'ai un code d'invitation" }}
+        </button>
+      </div>
+      <div v-if="showInviteField" class="invite-field">
+        <input
+          v-model="invitationCode"
+          type="text"
+          placeholder="XXXX-XXXX-XXXX"
+          maxlength="14"
+          class="invite-input"
+          autocomplete="off"
+        />
+        <p class="hint">
+          Colle ici ton code d'invitation, puis clique sur "Se connecter avec Discord".
+          Le code sera consommé automatiquement après ton login.
+        </p>
+      </div>
 
       <AppButton
         variant="primary"
@@ -88,6 +131,51 @@ h1 {
   color: var(--text-secondary);
   font-size: 14px;
   margin-bottom: var(--space-2xl);
+}
+
+.invite-toggle {
+  margin-bottom: var(--space-md);
+}
+.invite-toggle-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+.invite-toggle-btn:hover {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.invite-field {
+  margin-bottom: var(--space-lg);
+}
+.invite-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  letter-spacing: 2px;
+  text-align: center;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.invite-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.hint {
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.4;
 }
 
 .discord-btn {
