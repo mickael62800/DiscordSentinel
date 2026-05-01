@@ -5,10 +5,15 @@ import {
   type AuthFailureEntry,
   type BannedIpsResponse,
   type SecurityWindow,
+  type ConnectionsResponse,
+  type DiskTrendResponse,
+  type OpenPortsResponse,
   type ServerEventDto,
+  type SshFailuresResponse,
   type SuccessfulLoginEntry,
   type TlsCertInfo,
   type TopIpEntry,
+  type TrivyResponse,
 } from "@/services/serverSecurityService";
 import { useToast } from "@/composables/useToast";
 import TrafficTrendChart from "@/components/organisms/TrafficTrendChart.vue";
@@ -41,6 +46,16 @@ const eventsFilter = ref<"all" | "docker" | "security" | "rbac">("all");
 const tls = ref<TlsCertInfo | null>(null);
 const tlsError = ref<string | null>(null);
 const lastLogins = ref<SuccessfulLoginEntry[]>([]);
+const sshFailures = ref<SshFailuresResponse | null>(null);
+const sshError = ref<string | null>(null);
+const diskTrend = ref<DiskTrendResponse | null>(null);
+const diskError = ref<string | null>(null);
+const connections = ref<ConnectionsResponse | null>(null);
+const connectionsError = ref<string | null>(null);
+const openPorts = ref<OpenPortsResponse | null>(null);
+const portsError = ref<string | null>(null);
+const trivy = ref<TrivyResponse | null>(null);
+const trivyError = ref<string | null>(null);
 
 // ── Loaders ──
 async function loadTopIps() {
@@ -64,6 +79,31 @@ async function loadServerEvents() {
 async function loadLastLogins() {
   try { lastLogins.value = await serverSecurityService.lastLogins(20); }
   catch (e: any) { showError(`Logins : ${e?.message ?? e}`); }
+}
+async function loadSshFailures() {
+  sshError.value = null;
+  try { sshFailures.value = await serverSecurityService.sshFailures(); }
+  catch (e: any) { sshError.value = e?.message ?? String(e); sshFailures.value = null; }
+}
+async function loadDiskTrend() {
+  diskError.value = null;
+  try { diskTrend.value = await serverSecurityService.diskTrend(); }
+  catch (e: any) { diskError.value = e?.message ?? String(e); diskTrend.value = null; }
+}
+async function loadConnections() {
+  connectionsError.value = null;
+  try { connections.value = await serverSecurityService.connections(); }
+  catch (e: any) { connectionsError.value = e?.message ?? String(e); connections.value = null; }
+}
+async function loadOpenPorts() {
+  portsError.value = null;
+  try { openPorts.value = await serverSecurityService.openPorts(); }
+  catch (e: any) { portsError.value = e?.message ?? String(e); openPorts.value = null; }
+}
+async function loadTrivy() {
+  trivyError.value = null;
+  try { trivy.value = await serverSecurityService.trivy(); }
+  catch (e: any) { trivyError.value = e?.message ?? String(e); trivy.value = null; }
 }
 async function loadTls() {
   tlsError.value = null;
@@ -93,7 +133,11 @@ async function unbanIp(ip: string) {
 
 async function refreshAll() {
   refreshing.value = true;
-  await Promise.allSettled([loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls(), loadLastLogins()]);
+  await Promise.allSettled([
+    loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls(),
+    loadLastLogins(), loadSshFailures(), loadDiskTrend(), loadConnections(),
+    loadOpenPorts(), loadTrivy(),
+  ]);
   refreshing.value = false;
 }
 
@@ -286,10 +330,39 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
       </section>
 
       <!-- Placeholder : SSH failures + Patterns nginx + Trafic anormal -->
-      <section class="card placeholder-card">
-        <h2>🔑 Tentatives SSH échouées</h2>
-        <p class="muted small">À venir : parse de <code>auth.log</code> (host) pour remonter les tentatives SSH ratées.</p>
+      <!-- SSH failures (host fichier-shim) -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🔑 Tentatives SSH échouées</h2>
+          <button class="btn xs" @click="loadSshFailures">↻</button>
+        </div>
+        <div v-if="sshError" class="info">
+          <p class="small">{{ sshError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh ssh-failures</code></p>
+        </div>
+        <div v-else-if="sshFailures">
+          <p class="muted small">
+            <strong>{{ sshFailures.total_24h }}</strong> tentatives sur 24h · Maj {{ fmtDate(sshFailures.updated_at) }}
+          </p>
+          <table v-if="sshFailures.entries.length > 0" class="data-table">
+            <thead>
+              <tr><th>Quand</th><th>Utilisateur</th><th>IP</th><th>Action</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(e, i) in sshFailures.entries.slice(0, 30)" :key="i">
+                <td class="small muted">{{ e.timestamp }}</td>
+                <td class="small mono">{{ e.user }}</td>
+                <td class="small mono">{{ e.ip }}</td>
+                <td class="actions">
+                  <button v-if="e.ip !== '?'" class="btn xs danger" @click="banIp(e.ip)">🚫 Ban</button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">Aucune tentative SSH ratée 🎉</div>
+        </div>
       </section>
+
       <section class="card placeholder-card">
         <h2>🕷 Patterns suspects nginx</h2>
         <p class="muted small">À venir : détection scanners (<code>/wp-admin</code>, <code>/.env</code>), tentatives SQLi/XSS dans les logs nginx.</p>
@@ -365,13 +438,72 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
 
     <!-- ════════ ONGLET 4 : RÉSEAU ════════ -->
     <div v-if="currentTab === 'network'" class="tab-content">
+      <!-- Connexions actives -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🔗 Connexions actives ({{ connections?.total ?? 0 }})</h2>
+          <button class="btn xs" @click="loadConnections">↻</button>
+        </div>
+        <div v-if="connectionsError" class="info">
+          <p class="small">{{ connectionsError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh connections</code></p>
+        </div>
+        <div v-else-if="connections">
+          <p class="muted small">Maj {{ fmtDate(connections.updated_at) }}</p>
+          <table v-if="connections.connections.length > 0" class="data-table">
+            <thead>
+              <tr><th>État</th><th>Local</th><th>Remote</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(c, i) in connections.connections.slice(0, 50)" :key="i">
+                <td><span class="code-pill">{{ c.state }}</span></td>
+                <td class="small mono">{{ c.local_addr }}</td>
+                <td class="small mono">{{ c.remote_addr }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">Aucune connexion établie.</div>
+        </div>
+      </section>
+
+      <!-- Open ports -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🔍 Ports ouverts ({{ openPorts?.ports.length ?? 0 }})</h2>
+          <button class="btn xs" @click="loadOpenPorts">↻</button>
+        </div>
+        <div v-if="portsError" class="info">
+          <p class="small">{{ portsError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh open-ports</code></p>
+        </div>
+        <div v-else-if="openPorts">
+          <p class="muted small">
+            Maj {{ fmtDate(openPorts.updated_at) }} ·
+            <strong v-if="openPorts.unexpected_count > 0" class="alert">⚠️ {{ openPorts.unexpected_count }} port(s) inattendu(s)</strong>
+            <span v-else>✅ Aucun port inattendu</span>
+          </p>
+          <table v-if="openPorts.ports.length > 0" class="data-table">
+            <thead>
+              <tr><th>Port</th><th>Protocole</th><th>Service</th><th>Statut</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="p in openPorts.ports" :key="`${p.port}-${p.protocol}`" :class="{ alert: !p.expected }">
+                <td><code>{{ p.port }}</code></td>
+                <td class="small">{{ p.protocol }}</td>
+                <td class="small">{{ p.service ?? "—" }}</td>
+                <td>
+                  <span v-if="p.expected" class="badge ok">attendu</span>
+                  <span v-else class="badge danger">⚠️ INATTENDU</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="card placeholder-card">
         <h2>🌐 Connexions outbound</h2>
         <p class="muted small">À venir : qui l'API/bot contactent à l'extérieur (détection exfiltration).</p>
-      </section>
-      <section class="card placeholder-card">
-        <h2>🔍 Open ports check</h2>
-        <p class="muted small">À venir : vérification périodique nmap externe que seuls 80/443/SSH sont ouverts.</p>
       </section>
       <section class="card placeholder-card">
         <h2>🔐 TLS handshake errors</h2>
@@ -404,13 +536,51 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         <div v-else class="empty">Chargement…</div>
       </section>
 
+      <!-- Trivy vulnerabilities -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🐳 Vulnérabilités Docker (Trivy)</h2>
+          <button class="btn xs" @click="loadTrivy">↻</button>
+        </div>
+        <div v-if="trivyError" class="info">
+          <p class="small">{{ trivyError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh trivy</code></p>
+        </div>
+        <div v-else-if="trivy">
+          <p class="muted small">
+            Maj {{ fmtDate(trivy.updated_at) }} · Scan automatique 1×/jour à 3h
+          </p>
+          <div class="cve-summary">
+            <div class="cve-stat danger"><span class="lbl">Critical</span><strong>{{ trivy.critical }}</strong></div>
+            <div class="cve-stat warning"><span class="lbl">High</span><strong>{{ trivy.high }}</strong></div>
+            <div class="cve-stat"><span class="lbl">Medium</span><strong>{{ trivy.medium }}</strong></div>
+            <div class="cve-stat ok"><span class="lbl">Low</span><strong>{{ trivy.low }}</strong></div>
+          </div>
+          <table v-if="trivy.vulnerabilities.length > 0" class="data-table">
+            <thead>
+              <tr><th>Image</th><th>CVE</th><th>Sévérité</th><th>Package</th><th>Fix</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="v in trivy.vulnerabilities.filter(v => v.severity === 'CRITICAL' || v.severity === 'HIGH').slice(0, 50)" :key="v.cve + v.image">
+                <td class="small mono">{{ v.image }}</td>
+                <td class="small mono"><a :href="`https://nvd.nist.gov/vuln/detail/${v.cve}`" target="_blank" rel="noopener noreferrer">{{ v.cve }}</a></td>
+                <td>
+                  <span class="badge" :class="{ danger: v.severity === 'CRITICAL', warning: v.severity === 'HIGH' }">
+                    {{ v.severity }}
+                  </span>
+                </td>
+                <td class="small">{{ v.package ?? "—" }}</td>
+                <td class="small">{{ v.fixed_version ?? "—" }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">✅ Aucune vulnérabilité critique/high détectée.</div>
+        </div>
+      </section>
+
       <section class="card placeholder-card">
         <h2>📁 Intégrité fichiers critiques</h2>
         <p class="muted small">À venir : SHA256 nginx.conf, docker-compose.yml, .env. Alerte si modifié hors du process normal.</p>
-      </section>
-      <section class="card placeholder-card">
-        <h2>🐳 Vulnérabilités Docker (Trivy)</h2>
-        <p class="muted small">À venir : scan CVE des images Docker. Affiche les CVE critiques détectées.</p>
       </section>
     </div>
 
@@ -661,6 +831,24 @@ select {
 .badge.ok { background: color-mix(in srgb, var(--success, #2ecc71) 18%, transparent); color: var(--success, #2ecc71); }
 .badge.warning { background: color-mix(in srgb, var(--warning, #e67e22) 18%, transparent); color: var(--warning, #e67e22); }
 .badge.danger { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+
+/* CVE summary cards */
+.cve-summary { display: flex; gap: 14px; margin: 12px 0; flex-wrap: wrap; }
+.cve-stat {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 16px;
+  display: flex; flex-direction: column;
+  min-width: 90px;
+}
+.cve-stat .lbl { font-size: 10px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.4px; }
+.cve-stat strong { font-size: 22px; }
+.cve-stat.danger strong { color: var(--danger); }
+.cve-stat.warning strong { color: var(--warning, #e67e22); }
+.cve-stat.ok strong { color: var(--success, #2ecc71); }
+
+.alert { color: var(--warning, #e67e22); font-weight: 600; }
 
 /* Modal */
 .modal-backdrop {

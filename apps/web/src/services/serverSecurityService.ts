@@ -70,6 +70,75 @@ export interface TlsCertInfo {
 
 export type SecurityWindow = "1h" | "24h" | "7d";
 
+// SSH failures
+export interface SshFailureEntry {
+  timestamp: string;
+  user: string;
+  ip: string;
+  message: string;
+}
+export interface SshFailuresResponse {
+  updated_at: string;
+  total_24h: number;
+  entries: SshFailureEntry[];
+}
+
+// Disk trend
+export interface DiskTrendPoint {
+  timestamp: string;
+  mount: string;
+  used_gb: number;
+  total_gb: number;
+  usage_pct: number;
+}
+export interface DiskTrendResponse {
+  updated_at: string;
+  points: DiskTrendPoint[];
+}
+
+// Active connections
+export interface ConnectionEntry {
+  state: string;
+  local_addr: string;
+  remote_addr: string;
+  process: string | null;
+}
+export interface ConnectionsResponse {
+  updated_at: string;
+  total: number;
+  connections: ConnectionEntry[];
+}
+
+// Open ports
+export interface OpenPort {
+  port: number;
+  protocol: string;
+  service: string | null;
+  expected: boolean;
+}
+export interface OpenPortsResponse {
+  updated_at: string;
+  ports: OpenPort[];
+  unexpected_count: number;
+}
+
+// Trivy
+export interface TrivyVuln {
+  image: string;
+  cve: string;
+  severity: string;
+  package: string | null;
+  fixed_version: string | null;
+}
+export interface TrivyResponse {
+  updated_at: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  vulnerabilities: TrivyVuln[];
+}
+
 export interface SuccessfulLoginEntry {
   timestamp: string;
   discord_user_id: string;
@@ -124,6 +193,21 @@ export const serverSecurityService = {
   },
   lastLogins(limit = 20): Promise<SuccessfulLoginEntry[]> {
     return httpGet(`/api/security/last-logins?limit=${limit}`);
+  },
+  sshFailures(): Promise<SshFailuresResponse> {
+    return httpGet("/api/security/ssh-failures");
+  },
+  diskTrend(): Promise<DiskTrendResponse> {
+    return httpGet("/api/security/disk-trend");
+  },
+  connections(): Promise<ConnectionsResponse> {
+    return httpGet("/api/security/connections");
+  },
+  openPorts(): Promise<OpenPortsResponse> {
+    return httpGet("/api/security/open-ports");
+  },
+  trivy(): Promise<TrivyResponse> {
+    return httpGet("/api/security/trivy");
   },
   banIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
     return httpPost("/api/security/ban-ip", { ip, reason });

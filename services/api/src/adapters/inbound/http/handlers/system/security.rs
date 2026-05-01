@@ -503,6 +503,147 @@ pub async fn unban_ip(
     }))
 }
 
+// ── Lecture de fichiers JSON exposes par les cron host ──────────────────
+
+/// Helper generique : lit un fichier JSON expose par un cron host
+/// (pattern fichier-shim documente dans TODO_SECURITY_MONITORING.md).
+fn read_host_json<T: for<'de> serde::Deserialize<'de>>(
+    path: &str,
+    feature: &str,
+) -> Result<T, ApiError> {
+    let raw = std::fs::read_to_string(path).map_err(|e| {
+        ApiError(DomainError::NotFound(format!(
+            "{feature} non disponible. Setup : sudo bash infra/scripts/setup-host-security.sh {feature}. (lecture {path}: {e})"
+        )))
+    })?;
+    serde_json::from_str(&raw)
+        .map_err(|e| ApiError(DomainError::Internal(format!("parse {path}: {e}"))))
+}
+
+// SSH failures
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SshFailureEntry {
+    pub timestamp: String,
+    pub user: String,
+    pub ip: String,
+    pub message: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SshFailuresResponse {
+    pub updated_at: String,
+    pub total_24h: i64,
+    pub entries: Vec<SshFailureEntry>,
+}
+
+pub async fn ssh_failures(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<SshFailuresResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: SshFailuresResponse = read_host_json("/var/lib/sentinel/ssh-failures.json", "ssh-failures")?;
+    Ok(Json(data))
+}
+
+// Disk trend
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiskTrendPoint {
+    pub timestamp: String,
+    pub mount: String,
+    pub used_gb: f64,
+    pub total_gb: f64,
+    pub usage_pct: f64,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DiskTrendResponse {
+    pub updated_at: String,
+    pub points: Vec<DiskTrendPoint>,
+}
+
+pub async fn disk_trend(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<DiskTrendResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: DiskTrendResponse = read_host_json("/var/lib/sentinel/disk-trend.json", "disk-trend")?;
+    Ok(Json(data))
+}
+
+// Active connections
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConnectionEntry {
+    pub state: String,
+    pub local_addr: String,
+    pub remote_addr: String,
+    pub process: Option<String>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ConnectionsResponse {
+    pub updated_at: String,
+    pub total: i64,
+    pub connections: Vec<ConnectionEntry>,
+}
+
+pub async fn active_connections(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<ConnectionsResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: ConnectionsResponse = read_host_json("/var/lib/sentinel/connections.json", "connections")?;
+    Ok(Json(data))
+}
+
+// Open ports check
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenPort {
+    pub port: i64,
+    pub protocol: String,
+    pub service: Option<String>,
+    pub expected: bool, // true si dans la liste blanche (80,443,22/2222)
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenPortsResponse {
+    pub updated_at: String,
+    pub ports: Vec<OpenPort>,
+    pub unexpected_count: i64,
+}
+
+pub async fn open_ports(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<OpenPortsResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: OpenPortsResponse = read_host_json("/var/lib/sentinel/open-ports.json", "open-ports")?;
+    Ok(Json(data))
+}
+
+// Trivy vulns
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TrivyVuln {
+    pub image: String,
+    pub cve: String,
+    pub severity: String, // CRITICAL / HIGH / MEDIUM / LOW
+    pub package: Option<String>,
+    pub fixed_version: Option<String>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TrivyResponse {
+    pub updated_at: String,
+    pub critical: i64,
+    pub high: i64,
+    pub medium: i64,
+    pub low: i64,
+    pub vulnerabilities: Vec<TrivyVuln>,
+}
+
+pub async fn trivy_vulns(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<TrivyResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: TrivyResponse = read_host_json("/var/lib/sentinel/trivy.json", "trivy")?;
+    Ok(Json(data))
+}
+
 // ── Last successful logins ──────────────────────────────────────────────
 
 #[derive(Debug, Serialize)]

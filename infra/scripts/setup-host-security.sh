@@ -2,15 +2,23 @@
 # ============================================================================
 # Setup helpers HOST pour la page Securite serveur de DiscordSentinel.
 #
-# A lancer en root sur l'host (PAS dans un conteneur).
+# Pattern : chaque module installe un script + cron qui ecrit un fichier
+# JSON dans /var/lib/sentinel/<feature>.json. L'API DiscordSentinel
+# (conteneur) lit ces fichiers en read-only via volume mount.
 #
 # Usage :
 #   sudo bash infra/scripts/setup-host-security.sh fail2ban
 #   sudo bash infra/scripts/setup-host-security.sh all
 #
-# Modules disponibles :
-#   fail2ban  : installe fail2ban + jail SSH/nginx + cron export JSON
-#   all       : tous les modules ci-dessus
+# Modules :
+#   fail2ban      Installation fail2ban + jail SSH + export status
+#   ban-apply     Cron qui applique les bans/unbans IPs ecrits par l'API
+#   ssh-failures  Cron parse journalctl SSH -> ssh-failures.json
+#   disk-trend    Cron snapshot df -> disk-trend.json (historique 7j)
+#   connections   Cron snapshot ss -tn -> connections.json
+#   open-ports    Cron nmap localhost -> open-ports.json (avec whitelist)
+#   trivy         Scan vulns Docker images -> trivy.json (manuel ou cron)
+#   all           Tous les modules ci-dessus
 # ============================================================================
 
 set -euo pipefail
@@ -30,31 +38,26 @@ ensure_data_dir() {
     chmod 755 "$SENTINEL_DATA_DIR"
 }
 
+apt_install() {
+    if ! command -v "$1" &>/dev/null; then
+        echo "→ Installation $1…"
+        apt-get update -qq
+        apt-get install -y "$1"
+    fi
+}
+
 # ── Module fail2ban ─────────────────────────────────────────────────────
 
 setup_fail2ban() {
-    echo "🛡  Setup fail2ban"
-    echo ""
+    echo "🛡  fail2ban"
+    apt_install fail2ban
 
-    # 1. Installation
-    if ! command -v fail2ban-client &>/dev/null; then
-        echo "[1/4] Installation fail2ban…"
-        apt-get update -qq
-        apt-get install -y fail2ban
-    else
-        echo "[1/4] fail2ban déjà installé ✓"
-    fi
-
-    # 2. Configuration jail SSH (si pas déjà configurée)
     if [ ! -f /etc/fail2ban/jail.local ]; then
-        echo "[2/4] Création jail.local (SSH protection)…"
-        cat > /etc/fail2ban/jail.local <<'JAIL_EOF'
+        cat > /etc/fail2ban/jail.local <<'EOF'
 [DEFAULT]
-# Bantime : 1h, ré-attempts max 5 sur 10min
 bantime  = 1h
 findtime = 10m
 maxretry = 5
-# Whitelist LAN privé
 ignoreip = 127.0.0.1/8 ::1 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12
 
 [sshd]
@@ -63,102 +66,50 @@ port    = ssh
 backend = systemd
 maxretry = 3
 bantime  = 1h
-
-# Decommente si tu veux bannir aussi sur attaques nginx
-# [nginx-http-auth]
-# enabled = true
-# port    = http,https
-# logpath = /var/log/nginx/error.log
-# maxretry = 5
-JAIL_EOF
+EOF
         systemctl restart fail2ban
-    else
-        echo "[2/4] jail.local déjà présent (pas écrasé) ✓"
     fi
-
     systemctl enable --now fail2ban
 
-    # 3. Script export JSON pour l'API DiscordSentinel
-    echo "[3/4] Création script export $SCRIPT_DIR/fail2ban-export.sh…"
-    cat > "$SCRIPT_DIR/fail2ban-export.sh" <<'EXPORT_EOF'
+    # Script export
+    cat > "$SCRIPT_DIR/fail2ban-export.sh" <<'EOF'
 #!/bin/bash
-# Export fail2ban status -> JSON (lu par l'API DiscordSentinel)
-# Genere par setup-host-security.sh, ne pas modifier manuellement.
 set -eu
 OUT=/var/lib/sentinel/fail2ban-status.json
-mkdir -p /var/lib/sentinel
-chmod 755 /var/lib/sentinel
-
+mkdir -p /var/lib/sentinel && chmod 755 /var/lib/sentinel
 JAILS=$(fail2ban-client status 2>/dev/null | grep "Jail list:" | sed 's/.*://;s/,/ /g')
-
 {
     echo "{"
     echo "  \"updated_at\": \"$(date -Iseconds)\","
     echo "  \"jails\": ["
-    FIRST=1
-    for JAIL in $JAILS; do
-        JAIL=$(echo "$JAIL" | xargs)
-        [ -z "$JAIL" ] && continue
-        BANNED=$(fail2ban-client status "$JAIL" 2>/dev/null | grep "Banned IP list:" | sed 's/.*://' | xargs || true)
-        TOTAL=$(fail2ban-client status "$JAIL" 2>/dev/null | grep "Total banned:" | sed 's/.*://' | xargs || true)
-        [ $FIRST -eq 0 ] && echo "    ,"
-        echo "    {"
-        echo "      \"name\": \"$JAIL\","
-        echo "      \"total_banned\": ${TOTAL:-0},"
-        echo "      \"banned_ips\": \"${BANNED:-}\""
-        echo "    }"
-        FIRST=0
+    F=1
+    for J in $JAILS; do
+        J=$(echo "$J" | xargs); [ -z "$J" ] && continue
+        B=$(fail2ban-client status "$J" 2>/dev/null | grep "Banned IP list:" | sed 's/.*://' | xargs || true)
+        T=$(fail2ban-client status "$J" 2>/dev/null | grep "Total banned:" | sed 's/.*://' | xargs || true)
+        [ $F -eq 0 ] && echo "    ,"
+        echo "    {\"name\": \"$J\", \"total_banned\": ${T:-0}, \"banned_ips\": \"${B:-}\"}"
+        F=0
     done
     echo "  ]"
     echo "}"
 } > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
-
 chmod 644 "$OUT"
-EXPORT_EOF
+EOF
     chmod +x "$SCRIPT_DIR/fail2ban-export.sh"
-
-    # Premier export
     "$SCRIPT_DIR/fail2ban-export.sh"
-
-    # 4. Cron toutes les 2 min
-    echo "[4/4] Cron /etc/cron.d/fail2ban-export (toutes les 2 min)…"
     echo "*/2 * * * * root /usr/local/bin/fail2ban-export.sh" > /etc/cron.d/fail2ban-export
-    chmod 644 /etc/cron.d/fail2ban-export
-
-    echo ""
-    echo "✅ fail2ban configuré."
-    echo ""
-    echo "Vérifications :"
-    echo "  systemctl status fail2ban --no-pager"
-    echo "  fail2ban-client status"
-    echo "  cat /var/lib/sentinel/fail2ban-status.json"
-    echo ""
-    echo "Pour que l'API DiscordSentinel le voie :"
-    echo "  cd /home/\$USER/DiscordSentinel/infra/docker"
-    echo "  docker compose up -d --force-recreate api"
-    echo ""
+    echo "  ✅ fail2ban configure"
 }
 
-# ── Module ban-apply (applique les bans/unbans depuis les fichiers) ─────
+# ── Module ban-apply ────────────────────────────────────────────────────
 
 setup_ban_apply() {
-    echo "🚫 Setup script ban-apply (lit bans-pending.txt + unbans-pending.txt)"
-    echo ""
+    echo "🚫 ban-apply"
+    apt_install ufw
 
-    if ! command -v ufw &>/dev/null; then
-        echo "[1/3] Installation ufw…"
-        apt-get update -qq
-        apt-get install -y ufw
-    else
-        echo "[1/3] ufw déjà installé ✓"
-    fi
-
-    echo "[2/3] Création $SCRIPT_DIR/sentinel-apply-bans.sh…"
-    cat > "$SCRIPT_DIR/sentinel-apply-bans.sh" <<'BAN_EOF'
+    cat > "$SCRIPT_DIR/sentinel-apply-bans.sh" <<'EOF'
 #!/bin/bash
-# Applique les bans/unbans IPs ecrits par l'API DiscordSentinel.
-# Lit /var/lib/sentinel/bans-pending.txt et unbans-pending.txt,
-# applique via ufw deny/delete deny, puis vide les fichiers.
 set -eu
 DIR=/var/lib/sentinel
 BANS=$DIR/bans-pending.txt
@@ -166,49 +117,282 @@ UNBANS=$DIR/unbans-pending.txt
 LOG=$DIR/bans-applied.log
 mkdir -p $DIR
 touch $BANS $UNBANS $LOG
-
-# Process bans
 if [ -s "$BANS" ]; then
     while IFS=$'\t' read -r IP TS REASON; do
         [ -z "$IP" ] && continue
-        if ufw deny from "$IP" 2>/dev/null; then
-            echo "$(date -Iseconds) BAN $IP reason=$REASON" >> $LOG
-        else
+        ufw deny from "$IP" 2>/dev/null && \
+            echo "$(date -Iseconds) BAN $IP reason=$REASON" >> $LOG || \
             echo "$(date -Iseconds) BAN_FAIL $IP" >> $LOG
-        fi
     done < "$BANS"
-    : > "$BANS"  # vide le fichier
+    : > "$BANS"
 fi
-
-# Process unbans
 if [ -s "$UNBANS" ]; then
     while IFS=$'\t' read -r IP TS REASON; do
         [ -z "$IP" ] && continue
-        if ufw delete deny from "$IP" 2>/dev/null; then
-            echo "$(date -Iseconds) UNBAN $IP reason=$REASON" >> $LOG
-        else
+        ufw delete deny from "$IP" 2>/dev/null && \
+            echo "$(date -Iseconds) UNBAN $IP reason=$REASON" >> $LOG || \
             echo "$(date -Iseconds) UNBAN_FAIL $IP" >> $LOG
-        fi
     done < "$UNBANS"
     : > "$UNBANS"
 fi
-BAN_EOF
+EOF
     chmod +x "$SCRIPT_DIR/sentinel-apply-bans.sh"
-
-    echo "[3/3] Cron toutes les minutes /etc/cron.d/sentinel-apply-bans…"
     echo "* * * * * root /usr/local/bin/sentinel-apply-bans.sh" > /etc/cron.d/sentinel-apply-bans
-    chmod 644 /etc/cron.d/sentinel-apply-bans
+    echo "  ✅ ban-apply configure"
+}
 
-    echo ""
-    echo "✅ ban-apply configuré."
-    echo ""
-    echo "L'API peut maintenant ecrire dans :"
-    echo "  $DIR/bans-pending.txt   (POST /api/security/ban-ip)"
-    echo "  $DIR/unbans-pending.txt (POST /api/security/unban-ip)"
-    echo ""
-    echo "Le cron applique toutes les minutes via 'ufw deny from <IP>'."
-    echo "Log : tail -f $DIR/bans-applied.log"
-    echo ""
+# ── Module ssh-failures ─────────────────────────────────────────────────
+
+setup_ssh_failures() {
+    echo "🔑 ssh-failures"
+
+    cat > "$SCRIPT_DIR/sentinel-ssh-failures.sh" <<'EOF'
+#!/bin/bash
+set -eu
+OUT=/var/lib/sentinel/ssh-failures.json
+mkdir -p /var/lib/sentinel
+# Parse les 24 dernieres heures de journal SSH
+ENTRIES=$(journalctl _SYSTEMD_UNIT=ssh.service --since "24 hours ago" 2>/dev/null | \
+    grep -E "Failed password|Invalid user|authentication failure" | tail -200 || true)
+TOTAL=$(echo "$ENTRIES" | wc -l)
+[ -z "$ENTRIES" ] && TOTAL=0
+
+{
+    echo "{"
+    echo "  \"updated_at\": \"$(date -Iseconds)\","
+    echo "  \"total_24h\": $TOTAL,"
+    echo "  \"entries\": ["
+    F=1
+    while IFS= read -r LINE; do
+        [ -z "$LINE" ] && continue
+        TS=$(echo "$LINE" | awk '{print $1, $2, $3}')
+        # Extract user + IP
+        USER=$(echo "$LINE" | grep -oE "user [a-zA-Z0-9_-]+" | head -1 | awk '{print $2}' || echo "?")
+        IP=$(echo "$LINE" | grep -oE "from [0-9a-f.:]+" | head -1 | awk '{print $2}' || echo "?")
+        MSG=$(echo "$LINE" | sed 's/"/\\"/g' | cut -c1-200)
+        [ $F -eq 0 ] && echo "    ,"
+        echo "    {\"timestamp\": \"$TS\", \"user\": \"${USER:-?}\", \"ip\": \"${IP:-?}\", \"message\": \"$MSG\"}"
+        F=0
+    done <<< "$ENTRIES"
+    echo "  ]"
+    echo "}"
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-ssh-failures.sh"
+    "$SCRIPT_DIR/sentinel-ssh-failures.sh"
+    echo "*/5 * * * * root /usr/local/bin/sentinel-ssh-failures.sh" > /etc/cron.d/sentinel-ssh-failures
+    echo "  ✅ ssh-failures configure"
+}
+
+# ── Module disk-trend ───────────────────────────────────────────────────
+
+setup_disk_trend() {
+    echo "💾 disk-trend"
+
+    cat > "$SCRIPT_DIR/sentinel-disk-trend.sh" <<'EOF'
+#!/bin/bash
+set -eu
+OUT=/var/lib/sentinel/disk-trend.json
+HISTORY=/var/lib/sentinel/.disk-history.json
+mkdir -p /var/lib/sentinel
+
+# Snapshot actuel (lit /, /var, etc.)
+NOW=$(date -Iseconds)
+SNAPSHOT=$(df -BG --output=target,size,used,pcent / /var 2>/dev/null | tail -n +2 | \
+    awk -v ts="$NOW" '{
+        gsub("G","",$2); gsub("G","",$3); gsub("%","",$4);
+        printf "{\"timestamp\":\"%s\",\"mount\":\"%s\",\"used_gb\":%s,\"total_gb\":%s,\"usage_pct\":%s}\n", ts, $1, $3, $2, $4
+    }')
+
+# Append au fichier history (un JSON object par ligne, max 7 jours = 168 entrees a 1/h)
+echo "$SNAPSHOT" >> $HISTORY.tmp
+[ -f $HISTORY ] && cat $HISTORY >> $HISTORY.tmp
+mv $HISTORY.tmp $HISTORY
+# Garde les 1000 plus recentes
+tail -1000 $HISTORY > $HISTORY.tmp && mv $HISTORY.tmp $HISTORY
+
+# Genere le JSON final
+{
+    echo "{"
+    echo "  \"updated_at\": \"$NOW\","
+    echo "  \"points\": ["
+    F=1
+    while IFS= read -r P; do
+        [ -z "$P" ] && continue
+        [ $F -eq 0 ] && echo "    ,"
+        echo "    $P"
+        F=0
+    done < $HISTORY
+    echo "  ]"
+    echo "}"
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-disk-trend.sh"
+    "$SCRIPT_DIR/sentinel-disk-trend.sh"
+    # Toutes les heures
+    echo "0 * * * * root /usr/local/bin/sentinel-disk-trend.sh" > /etc/cron.d/sentinel-disk-trend
+    echo "  ✅ disk-trend configure"
+}
+
+# ── Module connections ──────────────────────────────────────────────────
+
+setup_connections() {
+    echo "🌐 connections"
+    apt_install iproute2
+
+    cat > "$SCRIPT_DIR/sentinel-connections.sh" <<'EOF'
+#!/bin/bash
+set -eu
+OUT=/var/lib/sentinel/connections.json
+mkdir -p /var/lib/sentinel
+NOW=$(date -Iseconds)
+
+ENTRIES=$(ss -tn state established 2>/dev/null | tail -n +2 || true)
+TOTAL=$(echo "$ENTRIES" | grep -c . || echo 0)
+
+{
+    echo "{"
+    echo "  \"updated_at\": \"$NOW\","
+    echo "  \"total\": $TOTAL,"
+    echo "  \"connections\": ["
+    F=1
+    echo "$ENTRIES" | head -100 | while IFS= read -r LINE; do
+        [ -z "$LINE" ] && continue
+        LOCAL=$(echo "$LINE" | awk '{print $3}')
+        REMOTE=$(echo "$LINE" | awk '{print $4}')
+        [ $F -eq 0 ] && echo "    ,"
+        echo "    {\"state\":\"established\",\"local_addr\":\"$LOCAL\",\"remote_addr\":\"$REMOTE\",\"process\":null}"
+        F=0
+    done
+    echo "  ]"
+    echo "}"
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-connections.sh"
+    "$SCRIPT_DIR/sentinel-connections.sh"
+    echo "*/2 * * * * root /usr/local/bin/sentinel-connections.sh" > /etc/cron.d/sentinel-connections
+    echo "  ✅ connections configure"
+}
+
+# ── Module open-ports ───────────────────────────────────────────────────
+
+setup_open_ports() {
+    echo "🔍 open-ports"
+    apt_install nmap
+
+    cat > "$SCRIPT_DIR/sentinel-open-ports.sh" <<'EOF'
+#!/bin/bash
+set -eu
+OUT=/var/lib/sentinel/open-ports.json
+mkdir -p /var/lib/sentinel
+NOW=$(date -Iseconds)
+EXPECTED_PORTS="22 2222 80 443"
+
+# Scan localhost (rapide)
+PORTS=$(nmap -p- -T4 --open localhost 2>/dev/null | grep -E "^[0-9]+/" | head -50 || true)
+UNEXPECTED=0
+
+{
+    echo "{"
+    echo "  \"updated_at\": \"$NOW\","
+    echo "  \"ports\": ["
+    F=1
+    while IFS= read -r LINE; do
+        [ -z "$LINE" ] && continue
+        PORT=$(echo "$LINE" | awk -F'/' '{print $1}')
+        PROTO=$(echo "$LINE" | awk -F'/' '{print $2}' | awk '{print $1}')
+        SERVICE=$(echo "$LINE" | awk '{print $3}')
+        EXPECTED="false"
+        if echo "$EXPECTED_PORTS" | grep -qw "$PORT"; then EXPECTED="true"; else UNEXPECTED=$((UNEXPECTED+1)); fi
+        [ $F -eq 0 ] && echo "    ,"
+        echo "    {\"port\":$PORT,\"protocol\":\"$PROTO\",\"service\":\"$SERVICE\",\"expected\":$EXPECTED}"
+        F=0
+    done <<< "$PORTS"
+    echo "  ],"
+    echo "  \"unexpected_count\": $UNEXPECTED"
+    echo "}"
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-open-ports.sh"
+    "$SCRIPT_DIR/sentinel-open-ports.sh"
+    # 1x par heure (nmap est lent)
+    echo "30 * * * * root /usr/local/bin/sentinel-open-ports.sh" > /etc/cron.d/sentinel-open-ports
+    echo "  ✅ open-ports configure"
+}
+
+# ── Module trivy ────────────────────────────────────────────────────────
+
+setup_trivy() {
+    echo "🐳 trivy"
+
+    if ! command -v trivy &>/dev/null; then
+        echo "  Installation Trivy…"
+        apt-get install -y wget gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | apt-key add - 2>/dev/null
+        echo "deb https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list
+        apt-get update -qq
+        apt-get install -y trivy
+    fi
+
+    cat > "$SCRIPT_DIR/sentinel-trivy-scan.sh" <<'EOF'
+#!/bin/bash
+set -eu
+OUT=/var/lib/sentinel/trivy.json
+mkdir -p /var/lib/sentinel
+NOW=$(date -Iseconds)
+
+# Scan toutes les images discordsentinel-*
+IMAGES=$(docker images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | grep "^discordsentinel-" || true)
+
+CRIT=0; HIGH=0; MED=0; LOW=0
+VULNS_JSON=""
+
+while IFS= read -r IMG; do
+    [ -z "$IMG" ] && continue
+    RAW=$(trivy image --quiet --severity CRITICAL,HIGH,MEDIUM,LOW -f json "$IMG" 2>/dev/null || echo '{}')
+    # Parse via jq si dispo, sinon skip
+    if command -v jq &>/dev/null; then
+        IMG_VULNS=$(echo "$RAW" | jq -c --arg img "$IMG" '
+            .Results[]?.Vulnerabilities[]? |
+            {image:$img, cve:.VulnerabilityID, severity:.Severity,
+             package:.PkgName, fixed_version:.FixedVersion}' 2>/dev/null | tr '\n' ',' || true)
+        VULNS_JSON+="$IMG_VULNS"
+    fi
+done <<< "$IMAGES"
+
+# Compteurs (rough, depuis le json final)
+VULNS_JSON=$(echo "$VULNS_JSON" | sed 's/,$//')
+[ -z "$VULNS_JSON" ] && VULNS_JSON="[]" || VULNS_JSON="[$VULNS_JSON]"
+
+if command -v jq &>/dev/null; then
+    CRIT=$(echo "$VULNS_JSON" | jq '[.[] | select(.severity=="CRITICAL")] | length')
+    HIGH=$(echo "$VULNS_JSON" | jq '[.[] | select(.severity=="HIGH")] | length')
+    MED=$(echo "$VULNS_JSON" | jq '[.[] | select(.severity=="MEDIUM")] | length')
+    LOW=$(echo "$VULNS_JSON" | jq '[.[] | select(.severity=="LOW")] | length')
+fi
+
+{
+    echo "{"
+    echo "  \"updated_at\": \"$NOW\","
+    echo "  \"critical\": $CRIT,"
+    echo "  \"high\": $HIGH,"
+    echo "  \"medium\": $MED,"
+    echo "  \"low\": $LOW,"
+    echo "  \"vulnerabilities\": $VULNS_JSON"
+    echo "}"
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-trivy-scan.sh"
+    apt_install jq
+
+    # Trivy est lent (~1min/image), 1x par jour la nuit
+    echo "0 3 * * * root /usr/local/bin/sentinel-trivy-scan.sh" > /etc/cron.d/sentinel-trivy
+    echo "  ✅ trivy configure (scan 1x/jour 3h du matin, ou lance manuellement /usr/local/bin/sentinel-trivy-scan.sh)"
 }
 
 # ── Dispatcher ──────────────────────────────────────────────────────────
@@ -218,36 +402,40 @@ main() {
     ensure_data_dir
 
     case "${1:-help}" in
-        fail2ban)
-            setup_fail2ban
-            ;;
-        ban-apply)
-            setup_ban_apply
-            ;;
+        fail2ban)     setup_fail2ban ;;
+        ban-apply)    setup_ban_apply ;;
+        ssh-failures) setup_ssh_failures ;;
+        disk-trend)   setup_disk_trend ;;
+        connections)  setup_connections ;;
+        open-ports)   setup_open_ports ;;
+        trivy)        setup_trivy ;;
         all)
             setup_fail2ban
             setup_ban_apply
+            setup_ssh_failures
+            setup_disk_trend
+            setup_connections
+            setup_open_ports
+            setup_trivy
             ;;
-        help|--help|-h)
-            cat <<HELP
+        help|--help|-h|*)
+            cat <<'HELP'
 Usage: sudo bash setup-host-security.sh <module>
 
-Modules disponibles :
-  fail2ban   Installation fail2ban + jail SSH + cron export JSON pour l'API
-  ban-apply  Cron qui applique les bans/unbans IPs ecrits par l'API
-             (boutons 🚫 Ban / ↻ Débannir sur la page Sécurité)
-  all        Tous les modules
+Modules :
+  fail2ban       Installation fail2ban + jail SSH + cron export status
+  ban-apply      Cron qui applique les bans/unbans IPs ecrits par l'API
+  ssh-failures   Cron parse journalctl SSH -> ssh-failures.json (5 min)
+  disk-trend     Cron snapshot df -> disk-trend.json (1h, history 7j)
+  connections    Cron snapshot ss -tn -> connections.json (2 min)
+  open-ports     Cron nmap localhost -> open-ports.json (1h)
+  trivy          Scan vulns Docker images -> trivy.json (1x/jour 3h)
+  all            Tous les modules
 
 Exemples :
   sudo bash setup-host-security.sh fail2ban
-  sudo bash setup-host-security.sh ban-apply
   sudo bash setup-host-security.sh all
 HELP
-            ;;
-        *)
-            echo "❌ Module inconnu : $1"
-            echo "Lance 'sudo bash setup-host-security.sh help' pour la liste."
-            exit 1
             ;;
     esac
 }

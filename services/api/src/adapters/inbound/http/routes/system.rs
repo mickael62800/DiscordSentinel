@@ -101,6 +101,11 @@ pub fn routes() -> Router<AppState> {
         .route("/api/security/tls-cert", get(handlers::system::security::tls_cert))
         .route("/api/security/traffic-trend", get(handlers::system::security::traffic_trend))
         .route("/api/security/last-logins", get(handlers::system::security::last_successful_logins))
+        .route("/api/security/ssh-failures", get(handlers::system::security::ssh_failures))
+        .route("/api/security/disk-trend", get(handlers::system::security::disk_trend))
+        .route("/api/security/connections", get(handlers::system::security::active_connections))
+        .route("/api/security/open-ports", get(handlers::system::security::open_ports))
+        .route("/api/security/trivy", get(handlers::system::security::trivy_vulns))
         .route(
             "/api/security/cleanup",
             delete(handlers::system::security::cleanup_security_logs),
