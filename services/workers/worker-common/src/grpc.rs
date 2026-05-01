@@ -19,14 +19,34 @@ const DEFAULT_CONNECT_TIMEOUT_SECS: u64 = 5;
 const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 30;
 
 /// Connecte un Channel gRPC vers `GRPC_API_URL` avec timeouts par defaut
-/// (connect 5s, request 30s). Retourne une `String` d'erreur prete a
-/// remonter au scheduler.
+/// (connect 5s, request 30s). Active mTLS si `GRPC_TLS_DIR` defini en env.
+/// Retourne une `String` d'erreur prete a remonter au scheduler.
 pub async fn connect() -> Result<Channel, String> {
     let url = std::env::var("GRPC_API_URL").unwrap_or_else(|_| DEFAULT_GRPC_URL.to_string());
-    Endpoint::from_shared(url.clone())
+    let mut endpoint = Endpoint::from_shared(url.clone())
         .map_err(|e| format!("invalid GRPC_API_URL {url}: {e}"))?
         .connect_timeout(Duration::from_secs(DEFAULT_CONNECT_TIMEOUT_SECS))
-        .timeout(Duration::from_secs(DEFAULT_REQUEST_TIMEOUT_SECS))
+        .timeout(Duration::from_secs(DEFAULT_REQUEST_TIMEOUT_SECS));
+
+    // mTLS optionnel : active si GRPC_TLS_DIR defini.
+    if let Some(dir) = sentinel_proto::tls::tls_dir() {
+        let domain = url
+            .strip_prefix("http://")
+            .or_else(|| url.strip_prefix("https://"))
+            .unwrap_or(&url)
+            .split(':')
+            .next()
+            .unwrap_or("api");
+        match sentinel_proto::tls::client_tls_config(&dir, domain) {
+            Ok(tls) => match endpoint.clone().tls_config(tls) {
+                Ok(e) => endpoint = e,
+                Err(e) => return Err(format!("tls_config gRPC: {e}")),
+            },
+            Err(e) => return Err(format!("read TLS certs: {e}")),
+        }
+    }
+
+    endpoint
         .connect()
         .await
         .map_err(|e| format!("connect gRPC {url}: {e}"))

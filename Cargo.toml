@@ -69,7 +69,7 @@ rand = "0.8"
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
 
 # gRPC (Phase 7A)
-tonic = { version = "0.12", features = ["transport", "codegen", "prost", "gzip"] }
+tonic = { version = "0.12", features = ["transport", "codegen", "prost", "gzip", "tls"] }
 
 # Discord
 serenity = { version = "0.12", default-features = false, features = ["client", "gateway", "model", "cache", "rustls_backend"] }

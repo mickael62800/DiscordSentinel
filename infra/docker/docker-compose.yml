@@ -66,6 +66,24 @@ x-worker-deps-db-redis: &worker-deps-db-redis
 services:
 
   # ──────────────────────────────────────────────────────────────────────────
+  # Init mTLS gRPC : genere une CA + cert serveur + cert client partages.
+  # Idempotent (ne regenere pas si deja present). Volume shared en read-only
+  # avec l'API (server) et les clients gRPC (workers + bot).
+  # ──────────────────────────────────────────────────────────────────────────
+  grpc-certs-init:
+    image: alpine:3.20
+    container_name: sentinel-grpc-certs-init
+    command: ["sh", "/init/gen-grpc-certs.sh"]
+    environment:
+      CERT_DIR: /grpc-certs
+      CN_SERVER: api
+    volumes:
+      - grpc_certs:/grpc-certs
+      - ./scripts:/init:ro
+    # Installer openssl avant le script. alpine:3.20 fournit busybox sans openssl.
+    entrypoint: ["sh", "-c", "apk add --no-cache openssl >/dev/null && sh /init/gen-grpc-certs.sh"]
+
+  # ──────────────────────────────────────────────────────────────────────────
   # Infrastructure
   # ──────────────────────────────────────────────────────────────────────────
 
@@ -222,6 +240,9 @@ services:
       TEXT_TOKENIZER_PATH: /models/text/tokenizer.json
       TEXT_MAX_LENGTH: "256"
       RUST_LOG: ${RUST_LOG:-info}
+      # mTLS gRPC : si defini, le serveur exige un cert client signe par
+      # notre CA interne. Sinon plain HTTP/2.
+      GRPC_TLS_DIR: ${GRPC_TLS_DIR:-/grpc-certs}
     volumes:
       - ../../ai/training/vision/exports:/models/vision:ro
       - ../../ai/training/text/exports:/models/text:ro
@@ -230,6 +251,8 @@ services:
       # Toutes les actions destructives sont gardees par require_superadmin
       # cote API (SUPERADMIN_USER_IDS).
       - /var/run/docker.sock:/var/run/docker.sock
+      # Certs mTLS gRPC (genere par grpc-certs-init au boot, partage en RO).
+      - grpc_certs:/grpc-certs:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -237,6 +260,8 @@ services:
         condition: service_healthy
       pgbouncer:
         condition: service_started
+      grpc-certs-init:
+        condition: service_completed_successfully
 
   gateway:
     <<: *rust-base
@@ -373,10 +398,15 @@ services:
     environment:
       <<: *worker-env
       GRPC_API_URL: http://api:50051
+      GRPC_TLS_DIR: /grpc-certs
       EXPORT_SCAN_INTERVAL: ${EXPORT_SCAN_INTERVAL:-5}
+    volumes:
+      - grpc_certs:/grpc-certs:ro
     depends_on:
       pgbouncer:
         condition: service_started
+      grpc-certs-init:
+        condition: service_completed_successfully
 
   audit-cache-worker:
     <<: *rust-base
@@ -446,12 +476,17 @@ services:
     environment:
       <<: *worker-env
       GRPC_API_URL: http://api:50051
+      GRPC_TLS_DIR: /grpc-certs
       COMBAT_EXPIRY_CHECK_SECS: ${COMBAT_EXPIRY_CHECK_SECS:-86400}
       BETTING_CHECK_SECS: ${BETTING_CHECK_SECS:-30}
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
+    volumes:
+      - grpc_certs:/grpc-certs:ro
     depends_on:
       pgbouncer:
         condition: service_started
+      grpc-certs-init:
+        condition: service_completed_successfully
 
   # ──────────────────────────────────────────────────────────────────────────
   # Bot unifie
@@ -486,6 +521,7 @@ services:
       SENTINEL_DISCORD_TOKEN: ${SENTINEL_DISCORD_TOKEN:-${DISCORD_TOKEN:-}}
       API_BASE_URL: http://api:3000
       GRPC_API_URL: http://api:50051
+      GRPC_TLS_DIR: /grpc-certs
       API_KEY: ${API_KEY:-}
       REDIS_URL: redis://:${REDIS_PASSWORD:-sentinel_redis}@redis:6379
       REDIS_CHANNEL: sentinel:events
@@ -497,11 +533,15 @@ services:
       TICKET_CHANNEL_ID: ${TICKET_CHANNEL_ID:-}
       SHARD_MODE: ${SHARD_MODE:-single}
       RUST_LOG: ${RUST_LOG:-info}
+    volumes:
+      - grpc_certs:/grpc-certs:ro
     depends_on:
       api:
         condition: service_healthy
       redis:
         condition: service_healthy
+      grpc-certs-init:
+        condition: service_completed_successfully
 
   # ──────────────────────────────────────────────────────────────────────────
   # Web (SPA Vue 3 servie par nginx, HTTPS)
@@ -666,6 +706,10 @@ volumes:
   grafana_data:
   letsencrypt_etc:
   letsencrypt_www:
+  # Certs mTLS gRPC (CA + server + client) generes au boot par grpc-certs-init.
+  # Persistent : pas de regeneration au redemarrage. Pour rotater : delete le
+  # volume et relance le compose.
+  grpc_certs:
 
 # Networks :
 #   - default (sentinel) : reseau applicatif partage par api, gateway,

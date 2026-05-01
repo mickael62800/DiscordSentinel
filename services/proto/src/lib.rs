@@ -99,3 +99,5 @@ pub mod export {
         tonic::include_proto!("sentinel.export.v1");
     }
 }
+
+pub mod tls;

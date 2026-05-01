@@ -247,9 +247,33 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
         .set_serving::<CommunityServiceServer<CommunityGrpc>>()
         .await;
 
+    // mTLS optionnel : active si GRPC_TLS_DIR defini en env. Sinon plain HTTP/2
+    // (mode dev / migration progressive). Le serveur exige un cert client signe
+    // par notre CA interne -> empeche un attaquant qui sniffe le bridge Docker
+    // de voler le Bearer token API_KEY.
+    let mut server_builder = Server::builder();
+    if let Some(dir) = sentinel_proto::tls::tls_dir() {
+        match sentinel_proto::tls::server_tls_config(&dir) {
+            Ok(cfg) => {
+                info!(dir = %dir.display(), "gRPC mTLS active (server + client cert verification)");
+                match server_builder.tls_config(cfg) {
+                    Ok(b) => server_builder = b,
+                    Err(e) => {
+                        error!(error = %e, "Echec config TLS serveur, fallback plain HTTP/2");
+                    }
+                }
+            }
+            Err(e) => {
+                error!(error = %e, "Echec lecture certs TLS, fallback plain HTTP/2");
+            }
+        }
+    } else {
+        info!("gRPC plain HTTP/2 (GRPC_TLS_DIR non defini)");
+    }
+
     info!(addr = %bind, "Sentinel gRPC pret (compression Gzip + health)");
 
-    if let Err(e) = Server::builder()
+    if let Err(e) = server_builder
         .add_service(health_service)
         .add_service(progression_svc)
         .add_service(stats_svc)
