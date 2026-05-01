@@ -47,12 +47,9 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "config.ai-dataset", label: "Bouton Dataset IA", category: "Dashboard", minRole: "admin" },
 
   // ── Dashboard : modération (sous-pages) ──
+  // Strikes / Notes / Rappels / Preuves / Reviews ont ete fusionnes
+  // dans /moderation (onglets Suivi utilisateur + Workflow).
   { key: "moderation.rules", label: "Bouton Règles", category: "Dashboard", minRole: "moderator" },
-  { key: "moderation.strikes", label: "Bouton Strikes", category: "Dashboard", minRole: "moderator" },
-  { key: "moderation.notes", label: "Bouton Notes", category: "Dashboard", minRole: "moderator" },
-  { key: "moderation.reminders", label: "Bouton Rappels", category: "Dashboard", minRole: "moderator" },
-  { key: "moderation.evidence", label: "Bouton Preuves", category: "Dashboard", minRole: "moderator" },
-  { key: "moderation.review", label: "Bouton Reviews", category: "Dashboard", minRole: "moderator" },
   { key: "moderation.members", label: "Bouton Membres", category: "Dashboard", minRole: "moderator" },
   { key: "moderation.name-history", label: "Bouton Historique noms", category: "Dashboard", minRole: "moderator" },
 
