@@ -700,7 +700,15 @@ services:
       - monitoring
 
 volumes:
+  # Postgres : bind sur /data/postgres (disque 500GB dedie a la DB).
+  # Permet d'isoler l'I/O DB du disque OS et facilitera un futur disque
+  # de backup separe. Override possible via env POSTGRES_DATA_DIR.
   postgres_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: ${POSTGRES_DATA_DIR:-/data/postgres}
   redis_data:
   prometheus_data:
   grafana_data:
