@@ -9,7 +9,7 @@
 
 use sqlx::PgPool;
 use tonic::metadata::MetadataValue;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tonic::Request;
 use tracing::{error, info};
 
@@ -17,17 +17,11 @@ use sentinel_proto::coude::v1::coude_social_service_client::CoudeSocialServiceCl
 use sentinel_proto::coude::v1::RedistributeDueRequest;
 
 pub async fn run(_pool: &PgPool, min_days: i64) -> Result<(), String> {
-    let url = std::env::var("GRPC_API_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
-    let channel: Channel = Endpoint::from_shared(url.clone())
-        .map_err(|e| format!("invalid GRPC_API_URL {url}: {e}"))?
-        .connect_timeout(std::time::Duration::from_secs(5))
-        .timeout(std::time::Duration::from_secs(60))
-        .connect()
-        .await
-        .map_err(|e| format!("connect gRPC {url}: {e}"))?;
+    // Delegue a sentinel_worker_common::grpc::connect() pour beneficier
+    // du mTLS optionnel (GRPC_TLS_DIR) en coherence avec les autres callers.
+    let channel: Channel = sentinel_worker_common::grpc::connect().await?;
 
     let auth: MetadataValue<_> = format!("Bearer {api_key}")
         .parse()

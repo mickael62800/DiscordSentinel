@@ -11,7 +11,6 @@
 //! en cas de gros export (next tick dans scan_interval_secs).
 
 use sqlx::PgPool;
-use tonic::transport::Endpoint;
 use tonic::metadata::MetadataValue;
 use tonic::Request;
 use tracing::{debug, info, warn};
@@ -132,15 +131,11 @@ async fn call_export_api(
     format: &str,
     filters: &serde_json::Value,
 ) -> Result<(String, usize), String> {
-    let grpc_url = std::env::var("GRPC_API_URL")
-        .unwrap_or_else(|_| "http://127.0.0.1:50051".to_string());
     let api_key = std::env::var("API_KEY").unwrap_or_default();
 
-    let channel = Endpoint::from_shared(grpc_url.clone())
-        .map_err(|e| format!("bad grpc endpoint: {e}"))?
-        .connect()
-        .await
-        .map_err(|e| format!("gRPC connect failed ({}): {e}", grpc_url))?;
+    // Delegue a sentinel_worker_common::grpc::connect() pour beneficier
+    // du mTLS optionnel (GRPC_TLS_DIR) en coherence avec les autres callers.
+    let channel = sentinel_worker_common::grpc::connect().await?;
 
     let mut client = ExportServiceClient::new(channel);
     let mut req = Request::new(ExecuteExportRequest {

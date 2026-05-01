@@ -11,7 +11,7 @@
 //!    `taunts_dispatch` (meme pattern que `tournament_resolved`).
 
 use sqlx::PgPool;
-use tonic::transport::{Channel, Endpoint};
+use tonic::transport::Channel;
 use tonic::metadata::MetadataValue;
 use tonic::Request;
 use tracing::{info, warn};
@@ -144,15 +144,10 @@ async fn publish_taunts(
     }
 }
 
-async fn connect_grpc(api_url: &str) -> Result<Channel, String> {
-    let grpc_url = std::env::var("GRPC_API_URL")
-        .unwrap_or_else(|_| api_url.replace("http://", "http://").to_string());
-    let endpoint = Endpoint::from_shared(grpc_url.clone())
-        .map_err(|e| format!("bad grpc endpoint: {e}"))?;
-    endpoint
-        .connect()
-        .await
-        .map_err(|e| format!("gRPC connect failed ({}): {e}", grpc_url))
+async fn connect_grpc(_api_url: &str) -> Result<Channel, String> {
+    // Delegue a sentinel_worker_common::grpc::connect() pour beneficier du
+    // mTLS optionnel (GRPC_TLS_DIR) en coherence avec les autres callers.
+    sentinel_worker_common::grpc::connect().await
 }
 
 async fn fetch_guild_ids(pool: &PgPool) -> Result<Vec<String>, String> {
