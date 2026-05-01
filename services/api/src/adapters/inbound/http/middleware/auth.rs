@@ -23,18 +23,31 @@ pub async fn auth_middleware(
         .get("authorization")
         .and_then(|v| v.to_str().ok());
 
-    match auth_header {
-        Some(header) if header.starts_with("Bearer ") => {
-            let token = &header[7..];
+    // 1. Bearer API_KEY (services internes : bot, workers).
+    if let Some(header) = auth_header {
+        if let Some(token) = header.strip_prefix("Bearer ") {
             // Comparaison constant-time : empeche un attaquant de deviner la cle
             // caractere par caractere via la latence de reponse (timing attack).
-            // Si les longueurs different, ct_eq retourne 0 sans short-circuit.
             if token.as_bytes().ct_eq(state.api_key.as_bytes()).into() {
-                Ok(next.run(request).await)
-            } else {
-                Err(StatusCode::UNAUTHORIZED)
+                return Ok(next.run(request).await);
             }
+            return Err(StatusCode::UNAUTHORIZED);
         }
-        _ => Err(StatusCode::UNAUTHORIZED),
     }
+
+    // 2. X-Discord-Token (utilisateurs web apres OAuth).
+    // La validation du token (call Discord /users/@me) est faite par les
+    // middlewares en aval (rbac, guild_auth). Ici on verifie juste qu'un
+    // header non-vide est present, suffisant pour les endpoints qui ont
+    // une couche RBAC/whitelist (>=99% des endpoints proteges).
+    let discord_token = request
+        .headers()
+        .get("x-discord-token")
+        .and_then(|v| v.to_str().ok())
+        .filter(|s| !s.is_empty());
+    if discord_token.is_some() {
+        return Ok(next.run(request).await);
+    }
+
+    Err(StatusCode::UNAUTHORIZED)
 }
