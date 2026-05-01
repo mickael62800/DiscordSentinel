@@ -1,42 +1,64 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed, watch } from "vue";
 import { useToast } from "@/composables/useToast";
+import { useInfractions } from "@/composables/useInfractions";
 import { evidenceService } from "@/services/moderationAdvancedService";
 import type { EvidenceEntry } from "@/types/moderation-advanced";
+import type { Infraction } from "@/types";
 
 const { success, error: showError } = useToast();
 
-const lookupActionId = ref("");
-const entries = ref<EvidenceEntry[]>([]);
-const loading = ref(false);
+// Flow : user_id -> liste des actions de ce user -> selection d'une action -> preuves attachees
+const lookupUserId = ref("");
+const { infractions, loading: infractionsLoading, fetchInfractions } = useInfractions();
 
-const draft = ref({
-  url: "",
-  description: "",
+const selectedActionId = ref<string | null>(null);
+const evidenceEntries = ref<EvidenceEntry[]>([]);
+const evidenceLoading = ref(false);
+
+// Filtre les infractions sur le user saisi, garde uniquement les actions
+// effectivement appliquees (source == "action"), pas les detections automod.
+const userActions = computed<Infraction[]>(() => {
+  const uid = lookupUserId.value.trim();
+  if (!uid) return [];
+  return (infractions.value ?? []).filter(
+    (i) => i.user_id === uid && i.source === "action"
+  );
 });
 
-async function fetchEvidence() {
-  if (!lookupActionId.value.trim()) {
-    entries.value = [];
-    return;
-  }
-  loading.value = true;
+const selectedAction = computed<Infraction | null>(() => {
+  if (!selectedActionId.value) return null;
+  return userActions.value.find((a) => a.id === selectedActionId.value) ?? null;
+});
+
+const draft = ref({ url: "", description: "" });
+
+async function searchUser() {
+  if (!lookupUserId.value.trim()) return;
+  selectedActionId.value = null;
+  evidenceEntries.value = [];
+  await fetchInfractions();
+}
+
+async function selectAction(actionId: string) {
+  selectedActionId.value = actionId;
+  evidenceLoading.value = true;
   try {
-    entries.value = await evidenceService.list(lookupActionId.value.trim());
+    evidenceEntries.value = await evidenceService.list(actionId);
   } catch (e) {
     console.error(e);
     showError("Erreur chargement preuves.");
-    entries.value = [];
+    evidenceEntries.value = [];
   } finally {
-    loading.value = false;
+    evidenceLoading.value = false;
   }
 }
 
 async function onAdd() {
-  if (!lookupActionId.value.trim() || !draft.value.url.trim()) return;
+  if (!selectedActionId.value || !draft.value.url.trim()) return;
   try {
     await evidenceService.add({
-      action_id: lookupActionId.value.trim(),
+      action_id: selectedActionId.value,
       url: draft.value.url.trim(),
       description: draft.value.description.trim() || null,
       uploaded_by: "desktop",
@@ -45,7 +67,7 @@ async function onAdd() {
     draft.value.url = "";
     draft.value.description = "";
     success("Preuve ajoutée.");
-    await fetchEvidence();
+    await selectAction(selectedActionId.value);
   } catch (e) {
     console.error(e);
     showError("Erreur lors de l'ajout.");
@@ -55,6 +77,12 @@ async function onAdd() {
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("fr-FR");
 }
+
+// Reset si l'user change
+watch(lookupUserId, () => {
+  selectedActionId.value = null;
+  evidenceEntries.value = [];
+});
 </script>
 
 <template>
@@ -62,26 +90,71 @@ function formatDate(iso: string): string {
     <header class="page-header">
       <h1>📎 Preuves modération</h1>
       <p class="lede">
-        Joins URLs (screenshots, links, transcripts) à une action de modération
-        existante. L'<code>action_id</code> est l'UUID renvoyé par
-        <code>POST /api/moderation/actions</code> ou affiché dans le journal.
+        Recherche un utilisateur, choisis une de ses actions de modération,
+        joins-y une URL (screenshot, lien Discord, paste, etc.) avec
+        description optionnelle.
       </p>
     </header>
 
+    <!-- Étape 1 : recherche user -->
     <section class="card">
-      <h2>Action ciblée</h2>
+      <h2>1. Utilisateur ciblé</h2>
       <div class="lookup">
         <input
-          v-model="lookupActionId"
-          placeholder="UUID de l'action de modération"
-          @keyup.enter="fetchEvidence"
+          v-model="lookupUserId"
+          placeholder="ID Discord de l'utilisateur (ex: 123456789012345678)"
+          @keyup.enter="searchUser"
         />
-        <button class="btn-secondary" @click="fetchEvidence">Rechercher</button>
+        <button class="btn-secondary" :disabled="!lookupUserId.trim() || infractionsLoading" @click="searchUser">
+          {{ infractionsLoading ? "Recherche…" : "Rechercher" }}
+        </button>
       </div>
     </section>
 
-    <section v-if="lookupActionId" class="card">
-      <h2>Ajouter une preuve</h2>
+    <!-- Étape 2 : liste des actions de l'user -->
+    <section v-if="lookupUserId.trim() && !infractionsLoading" class="card">
+      <h2>2. Action de modération à documenter</h2>
+      <div v-if="userActions.length === 0" class="empty">
+        Aucune action appliquée trouvée pour cet utilisateur.
+      </div>
+      <table v-else class="table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Type</th>
+            <th>Raison</th>
+            <th>Modérateur</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="a in userActions"
+            :key="a.id"
+            :class="{ 'row-selected': selectedActionId === a.id }"
+          >
+            <td>{{ formatDate(a.created_at) }}</td>
+            <td><strong>{{ a.action ?? a.infraction_type }}</strong></td>
+            <td>{{ a.reason }}</td>
+            <td>{{ a.moderator }}</td>
+            <td>
+              <button class="btn-secondary" @click="selectAction(a.id)">
+                {{ selectedActionId === a.id ? "✓ Sélectionnée" : "Choisir" }}
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Étape 3 : ajouter preuve à l'action sélectionnée -->
+    <section v-if="selectedAction" class="card">
+      <h2>3. Joindre une preuve à cette action</h2>
+      <p class="muted small">
+        Action ciblée : <strong>{{ selectedAction.action ?? selectedAction.infraction_type }}</strong>
+        — {{ selectedAction.reason }}
+        <span class="mono"> (id : {{ selectedAction.id.slice(0, 8) }}…)</span>
+      </p>
       <form class="add-form" @submit.prevent="onAdd">
         <label>
           URL (lien Discord, imgur, paste, etc.)
@@ -104,10 +177,11 @@ function formatDate(iso: string): string {
       </form>
     </section>
 
-    <section v-if="lookupActionId" class="card">
+    <!-- Liste des preuves de l'action sélectionnée -->
+    <section v-if="selectedAction" class="card">
       <h2>Preuves attachées</h2>
-      <div v-if="loading" class="loading">Chargement…</div>
-      <div v-else-if="entries.length === 0" class="empty">
+      <div v-if="evidenceLoading" class="loading">Chargement…</div>
+      <div v-else-if="evidenceEntries.length === 0" class="empty">
         Aucune preuve attachée à cette action.
       </div>
       <table v-else class="table">
@@ -120,7 +194,7 @@ function formatDate(iso: string): string {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="e in entries" :key="e.id">
+          <tr v-for="e in evidenceEntries" :key="e.id">
             <td>{{ formatDate(e.uploaded_at) }}</td>
             <td><a :href="e.url" target="_blank" rel="noopener">{{ e.url }}</a></td>
             <td>{{ e.description ?? "—" }}</td>
@@ -134,4 +208,11 @@ function formatDate(iso: string): string {
 
 <style scoped>
 @import "./_moderation-advanced-shared.css";
+
+.row-selected {
+  background-color: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.muted { color: var(--text-secondary); }
+.small { font-size: 12px; }
+.mono { font-family: "JetBrains Mono", monospace; opacity: 0.7; }
 </style>
