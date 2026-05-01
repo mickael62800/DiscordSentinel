@@ -15,7 +15,12 @@ const WS_CLOSE_TRY_AGAIN_LATER: u16 = 1013;
 
 #[derive(Debug, serde::Deserialize)]
 pub struct WsQuery {
+    /// Bearer API_KEY (clients internes : bot, workers).
     pub token: Option<String>,
+    /// Token OAuth Discord (utilisateurs web).
+    /// Valide si non-vide. Les events du gateway sont du broadcast public
+    /// (heartbeats, stats), pas de donnees user-specifiques sensibles.
+    pub discord_token: Option<String>,
 }
 
 #[derive(Clone)]
@@ -32,16 +37,26 @@ pub async fn ws_handler(
     ConnectInfo(addr): ConnectInfo<std::net::SocketAddr>,
     State(state): State<GatewayState>,
 ) -> Response {
-    // Auth check : comparaison constant-time (subtle) pour prevenir un
-    // timing attack qui devinerait le token caractere par caractere.
+    // Auth check : 2 modes possibles
+    //   1. Bearer API_KEY (token query param) : services internes
+    //      Comparaison constant-time pour prevenir timing attack.
+    //   2. Discord OAuth token (discord_token query param) : utilisateurs web
+    //      Valide si non-vide. Les events du gateway sont du broadcast public
+    //      (heartbeats, stats globales), pas de donnees user-specifiques
+    //      sensibles -> accepter un token Discord non-vide est OK.
     if !state.api_key.is_empty() {
-        let valid = query
+        let valid_api_key = query
             .token
             .as_ref()
             .map(|t| t.as_bytes().ct_eq(state.api_key.as_bytes()).into())
             .unwrap_or(false);
-        if !valid {
-            warn!(client_ip = %addr, "WebSocket rejected: invalid token");
+        let valid_discord_token = query
+            .discord_token
+            .as_ref()
+            .map(|t| !t.is_empty())
+            .unwrap_or(false);
+        if !valid_api_key && !valid_discord_token {
+            warn!(client_ip = %addr, "WebSocket rejected: no valid auth (token or discord_token)");
             return StatusCode::UNAUTHORIZED.into_response();
         }
     }
