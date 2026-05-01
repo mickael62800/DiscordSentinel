@@ -42,6 +42,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "system.rbac", label: "Bouton RBAC", category: "Dashboard", minRole: "owner" },
   { key: "system.systemops", label: "Bouton SystemOps", category: "Dashboard", minRole: "admin" },
   { key: "system.server_health", label: "Bouton État serveur", category: "Dashboard", minRole: "admin" },
+  { key: "config.server-security", label: "Bouton Sécurité serveur", category: "Dashboard", minRole: "admin" },
   { key: "system.members", label: "Bouton Membres", category: "Dashboard", minRole: "moderator" },
   { key: "config.ai-dataset", label: "Bouton Dataset IA", category: "Dashboard", minRole: "admin" },
 

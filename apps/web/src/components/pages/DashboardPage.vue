@@ -76,6 +76,7 @@ const allSections: Section[] = [
   { key: "config.rbac", path: "/rbac", label: "Acces RBAC", icon: "shield" },
   { key: "config.system-ops", path: "/system/operations", label: "System ops", icon: "activity" },
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
+  { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
   { key: "config.settings", path: "/settings", label: "Parametres", icon: "settings" },
 ];
