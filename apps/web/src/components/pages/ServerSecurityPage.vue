@@ -17,7 +17,9 @@ const { selectedGuildId } = useGuildSelector();
 
 const refreshing = ref(false);
 const cleaning = ref(false);
-const cleanupOpts = ref({ days: 0, includeAudit: false });
+// Defaut : tout vider (jours=0) ET audit logs Discord inclus pour que
+// "Tout nettoyer" fasse vraiment ce qu'il dit.
+const cleanupOpts = ref({ days: 0, includeAudit: true });
 const showCleanupModal = ref(false);
 
 // Sections data
@@ -90,7 +92,12 @@ async function runCleanup() {
     });
     showCleanupModal.value = false;
     await refreshAll();
-    alert(`✅ ${r.message}`);
+    alert(
+      `✅ Nettoyage terminé\n\n` +
+      `• Logs API supprimés : ${r.deleted_api_logs}\n` +
+      `• Audit logs Discord supprimés : ${r.deleted_audit_logs}\n\n` +
+      `${r.message}`,
+    );
   } catch (e: any) {
     showError(`Echec cleanup : ${e?.message ?? e}`);
   } finally {
@@ -141,8 +148,9 @@ const tlsBadgeClass = computed(() => {
       <div class="modal-card">
         <h3>🗑 Nettoyer les logs de sécurité</h3>
         <p class="muted">
-          Supprime les entrées de logs API (Top IPs / Échecs auth) selon le critère choisi.
-          Optionnellement aussi les audit logs Discord.
+          Vide la table <code>logs</code> (Top IPs + Échecs auth) selon le délai
+          choisi, et optionnellement la table <code>audit_logs</code> (events Discord).
+          <strong>0 jours = tout supprimer.</strong>
         </p>
         <div class="modal-form">
           <label>
