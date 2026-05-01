@@ -7,7 +7,7 @@ Audit réalisé le 2026-05-01.
 
 ## 🔴 Critique — à fixer en priorité
 
-### 1. Timing attack sur la comparaison Bearer API key
+### 1. Timing attack sur la comparaison Bearer API key ✅ RÉSOLU 2026-05-01
 
 **Sévérité** : 🔴 Critique
 **Effort** : ~15 min
@@ -32,7 +32,7 @@ if provided.as_bytes().ct_eq(expected.as_bytes()).into() {
 
 ## 🟡 Moyenne — à fixer dans la foulée
 
-### 2. Token Discord en localStorage
+### 2. Token Discord en localStorage ✅ RÉSOLU 2026-05-01
 
 **Sévérité** : 🟡 Moyenne
 **Effort** : ~30 min
@@ -68,7 +68,7 @@ Configurer Vite pour utiliser des nonces ou hashes CSP (`vite-plugin-csp` ou éq
 
 ---
 
-### 4. Docker socket monté en RW sans audit log applicatif
+### 4. Docker socket monté en RW sans audit log applicatif ✅ RÉSOLU 2026-05-01
 
 **Sévérité** : 🟡 Moyenne
 **Effort** : ~45 min
