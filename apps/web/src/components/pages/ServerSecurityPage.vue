@@ -135,16 +135,6 @@ async function loadOutbound() {
   try { outbound.value = await serverSecurityService.outbound(); }
   catch (e: any) { outboundError.value = e?.message ?? String(e); outbound.value = null; }
 }
-async function loadGeoForTopIps() {
-  const ips = topIps.value.map((i) => i.client_ip).filter((ip) => ip && ip !== "-").slice(0, 50);
-  if (ips.length === 0) return;
-  try {
-    const entries = await serverSecurityService.geoip(ips);
-    const m: Record<string, GeoIpEntry> = { ...geoMap.value };
-    for (const e of entries) m[e.query] = e;
-    geoMap.value = m;
-  } catch { /* lookup IP-API best-effort */ }
-}
 async function loadContainers() {
   containersError.value = null;
   try { containers.value = await serverSecurityService.containerChanges(); }
