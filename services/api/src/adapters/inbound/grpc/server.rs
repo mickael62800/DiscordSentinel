@@ -251,25 +251,31 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     // (mode dev / migration progressive). Le serveur exige un cert client signe
     // par notre CA interne -> empeche un attaquant qui sniffe le bridge Docker
     // de voler le Bearer token API_KEY.
-    let mut server_builder = Server::builder();
-    if let Some(dir) = sentinel_proto::tls::tls_dir() {
-        match sentinel_proto::tls::server_tls_config(&dir) {
-            Ok(cfg) => {
-                info!(dir = %dir.display(), "gRPC mTLS active (server + client cert verification)");
-                match server_builder.tls_config(cfg) {
-                    Ok(b) => server_builder = b,
-                    Err(e) => {
-                        error!(error = %e, "Echec config TLS serveur, fallback plain HTTP/2");
-                    }
+    //
+    // tls_config(self, ...) consomme self -> on doit construire le builder
+    // final en une expression avant de chainer add_service.
+    let server_builder = match sentinel_proto::tls::tls_dir() {
+        Some(dir) => match sentinel_proto::tls::server_tls_config(&dir) {
+            Ok(cfg) => match Server::builder().tls_config(cfg) {
+                Ok(b) => {
+                    info!(dir = %dir.display(), "gRPC mTLS active (server + client cert verification)");
+                    b
                 }
-            }
+                Err(e) => {
+                    error!(error = %e, "Echec config TLS serveur, fallback plain HTTP/2");
+                    Server::builder()
+                }
+            },
             Err(e) => {
                 error!(error = %e, "Echec lecture certs TLS, fallback plain HTTP/2");
+                Server::builder()
             }
+        },
+        None => {
+            info!("gRPC plain HTTP/2 (GRPC_TLS_DIR non defini)");
+            Server::builder()
         }
-    } else {
-        info!("gRPC plain HTTP/2 (GRPC_TLS_DIR non defini)");
-    }
+    };
 
     info!(addr = %bind, "Sentinel gRPC pret (compression Gzip + health)");
 

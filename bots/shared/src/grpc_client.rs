@@ -103,7 +103,7 @@ impl SentinelGrpcClient {
 
     /// Construit un client en pointant explicitement une URL gRPC.
     pub async fn connect(url: &str, api_key: &str) -> Result<Self, tonic::transport::Error> {
-        let mut endpoint = Endpoint::from_shared(url.to_string())?
+        let endpoint = Endpoint::from_shared(url.to_string())?
             // Phase 7A — tunings raisonnables. Le multiplexage HTTP/2 evite
             // de multiplier les connexions ; un seul Channel suffit pour tous
             // les RPC concurrents d'un meme bot.
@@ -116,27 +116,34 @@ impl SentinelGrpcClient {
 
         // mTLS optionnel : active si GRPC_TLS_DIR defini en env.
         // Domaine SAN du cert serveur = "api" (cf. gen-grpc-certs.sh).
-        // Si l'URL utilise un autre hostname, on extrait quand meme via parse.
-        if let Some(dir) = sentinel_proto::tls::tls_dir() {
-            let domain = url
-                .strip_prefix("http://")
-                .or_else(|| url.strip_prefix("https://"))
-                .unwrap_or(url)
-                .split(':')
-                .next()
-                .unwrap_or("api");
-            match sentinel_proto::tls::client_tls_config(&dir, domain) {
-                Ok(tls) => match endpoint.clone().tls_config(tls) {
-                    Ok(e) => endpoint = e,
+        // tls_config(self, ...) consomme self -> chaine en une expression.
+        // En cas d'erreur TLS, on fallback en plain (warn) pour ne pas
+        // planter le bot.
+        let endpoint = match sentinel_proto::tls::tls_dir() {
+            Some(dir) => {
+                let domain = url
+                    .strip_prefix("http://")
+                    .or_else(|| url.strip_prefix("https://"))
+                    .unwrap_or(url)
+                    .split(':')
+                    .next()
+                    .unwrap_or("api");
+                match sentinel_proto::tls::client_tls_config(&dir, domain) {
+                    Ok(tls) => match endpoint.clone().tls_config(tls) {
+                        Ok(e) => e,
+                        Err(e) => {
+                            info!(error = %e, "Echec config TLS client gRPC, fallback plain");
+                            endpoint
+                        }
+                    },
                     Err(e) => {
-                        info!(error = %e, "Echec config TLS client gRPC, fallback plain");
+                        info!(error = %e, "Echec lecture certs TLS gRPC, fallback plain");
+                        endpoint
                     }
-                },
-                Err(e) => {
-                    info!(error = %e, "Echec lecture certs TLS gRPC, fallback plain");
                 }
             }
-        }
+            None => endpoint,
+        };
 
         let channel = endpoint.connect_lazy();
         info!(url = %url, "SentinelGrpcClient initialise (lazy connect)");

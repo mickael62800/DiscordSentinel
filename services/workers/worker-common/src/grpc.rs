@@ -23,28 +23,31 @@ const DEFAULT_REQUEST_TIMEOUT_SECS: u64 = 30;
 /// Retourne une `String` d'erreur prete a remonter au scheduler.
 pub async fn connect() -> Result<Channel, String> {
     let url = std::env::var("GRPC_API_URL").unwrap_or_else(|_| DEFAULT_GRPC_URL.to_string());
-    let mut endpoint = Endpoint::from_shared(url.clone())
+    let endpoint = Endpoint::from_shared(url.clone())
         .map_err(|e| format!("invalid GRPC_API_URL {url}: {e}"))?
         .connect_timeout(Duration::from_secs(DEFAULT_CONNECT_TIMEOUT_SECS))
         .timeout(Duration::from_secs(DEFAULT_REQUEST_TIMEOUT_SECS));
 
     // mTLS optionnel : active si GRPC_TLS_DIR defini.
-    if let Some(dir) = sentinel_proto::tls::tls_dir() {
-        let domain = url
-            .strip_prefix("http://")
-            .or_else(|| url.strip_prefix("https://"))
-            .unwrap_or(&url)
-            .split(':')
-            .next()
-            .unwrap_or("api");
-        match sentinel_proto::tls::client_tls_config(&dir, domain) {
-            Ok(tls) => match endpoint.clone().tls_config(tls) {
-                Ok(e) => endpoint = e,
-                Err(e) => return Err(format!("tls_config gRPC: {e}")),
-            },
-            Err(e) => return Err(format!("read TLS certs: {e}")),
+    // tls_config(self, ...) consomme self -> on construit la chaine en
+    // une seule expression.
+    let endpoint = match sentinel_proto::tls::tls_dir() {
+        Some(dir) => {
+            let domain = url
+                .strip_prefix("http://")
+                .or_else(|| url.strip_prefix("https://"))
+                .unwrap_or(&url)
+                .split(':')
+                .next()
+                .unwrap_or("api");
+            let tls = sentinel_proto::tls::client_tls_config(&dir, domain)
+                .map_err(|e| format!("read TLS certs: {e}"))?;
+            endpoint
+                .tls_config(tls)
+                .map_err(|e| format!("tls_config gRPC: {e}"))?
         }
-    }
+        None => endpoint,
+    };
 
     endpoint
         .connect()
