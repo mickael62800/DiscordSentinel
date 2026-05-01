@@ -31,11 +31,6 @@ const allSections: Section[] = [
   { key: "moderation.hub", path: "/moderation", label: "Moderation", icon: "gavel", requiredBot: "moderation-bot" },
   { key: "moderation.members", path: "/members", label: "Membres", icon: "users" },
   { key: "moderation.rules", path: "/rules", label: "Regles", icon: "shield", requiredBot: "moderation-bot" },
-  { key: "moderation.strikes", path: "/strikes", label: "Strikes", icon: "alert-triangle", requiredBot: "moderation-bot" },
-  { key: "moderation.notes", path: "/notes", label: "Notes", icon: "edit-3", requiredBot: "moderation-bot" },
-  { key: "moderation.reminders", path: "/reminders", label: "Reminders", icon: "clock", requiredBot: "moderation-bot" },
-  { key: "moderation.evidence", path: "/evidence", label: "Preuves", icon: "paperclip", requiredBot: "moderation-bot" },
-  { key: "moderation.review", path: "/review", label: "Reviews", icon: "check-circle", requiredBot: "moderation-bot" },
   { key: "moderation.name-history", path: "/name-history", label: "Historique pseudos", icon: "user-x", requiredBot: "audit-bot" },
 
   { key: "community.welcome", path: "/welcome", label: "Bienvenue", icon: "user-plus", requiredBot: "welcome-bot" },

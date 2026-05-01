@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onMounted, onBeforeUnmount } from "vue";
 import { useToast } from "../../composables/useToast";
 import { useInfractions } from "../../composables/useInfractions";
 import { useRealtimeRefresh } from "../../composables/useRealtimeRefresh";
@@ -10,6 +10,11 @@ import AppInput from "../atoms/AppInput.vue";
 import AppSelect from "../atoms/AppSelect.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import BanModal from "../molecules/BanModal.vue";
+import StrikesPage from "./StrikesPage.vue";
+import NotesPage from "./NotesPage.vue";
+import EvidencePage from "./EvidencePage.vue";
+import ReviewPage from "./ReviewPage.vue";
+import RemindersPage from "./RemindersPage.vue";
 import CancelConductBanModal from "../molecules/CancelConductBanModal.vue";
 import { conductService } from "@/services/conductService";
 import ErrorState from "../atoms/ErrorState.vue";
@@ -30,13 +35,13 @@ const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm } = useConfirm();
 
 // --- Tabs ---
-const activeTab = ref<"journal" | "bans">("journal");
-
-/** Bascule vers le journal pre-filtre sur les bans (acces depuis le tab Bannis actifs). */
-function openBanJournal() {
-  journalType.value = "ban";
-  activeTab.value = "journal";
-}
+const activeTab = ref<"journal" | "bans" | "tracking" | "workflow">("journal");
+const bulkMenuOpen = ref(false);
+const trackingSubTab = ref<"strikes" | "notes" | "evidence">("strikes");
+const workflowSubTab = ref<"review" | "reminders">("review");
+function closeBulkMenu() { bulkMenuOpen.value = false; }
+onMounted(() => document.addEventListener("click", closeBulkMenu));
+onBeforeUnmount(() => document.removeEventListener("click", closeBulkMenu));
 
 // --- Journal : donnees + filtres ---
 const {
@@ -566,6 +571,18 @@ async function handleActionSubmit() {
       >
         Bannis actifs
       </button>
+      <button
+        :class="['hub-tab', { active: activeTab === 'tracking' }]"
+        @click="activeTab = 'tracking'"
+      >
+        Suivi utilisateur
+      </button>
+      <button
+        :class="['hub-tab', { active: activeTab === 'workflow' }]"
+        @click="activeTab = 'workflow'"
+      >
+        Workflow
+      </button>
     </div>
 
     <!-- ============================================ -->
@@ -620,16 +637,26 @@ async function handleActionSubmit() {
           >
             Reinitialiser
           </button>
-          <button
-            class="purge-btn"
-            :disabled="purging || !selectedGuildId"
-            :title="selectedGuildId
-              ? 'Vide le journal de la base de données. NE débannit PAS et NE retire PAS les mutes sur Discord — pour ça, utilise le bouton Annuler ligne par ligne.'
-              : 'Selectionnez un serveur'"
-            @click="onPurgeAll"
-          >
-            {{ purging ? "Suppression…" : "Vider le journal (DB seule)" }}
-          </button>
+          <div class="bulk-menu-wrap" @click.stop>
+            <button
+              class="bulk-menu-btn"
+              :disabled="!selectedGuildId"
+              :title="selectedGuildId ? 'Actions de masse' : 'Selectionnez un serveur'"
+              @click="bulkMenuOpen = !bulkMenuOpen"
+            >
+              ⋯ Actions de masse ▾
+            </button>
+            <div v-if="bulkMenuOpen" class="bulk-menu">
+              <button
+                class="bulk-item danger"
+                :disabled="purging"
+                title="Vide le journal de la base de données. NE débannit PAS et NE retire PAS les mutes sur Discord."
+                @click="bulkMenuOpen = false; onPurgeAll()"
+              >
+                🗑 {{ purging ? "Suppression…" : "Vider le journal (DB seule)" }}
+              </button>
+            </div>
+          </div>
           <AppButton variant="primary" @click="openActionModal">
             + Nouvelle action
           </AppButton>
@@ -741,14 +768,6 @@ async function handleActionSubmit() {
         />
         <button
           type="button"
-          class="link-to-journal"
-          title="Voir l'historique complet des bans (incluant les anciens unbans)"
-          @click="openBanJournal"
-        >
-          Voir l'historique →
-        </button>
-        <button
-          type="button"
           class="unban-all-btn"
           :disabled="bulkUnbanning || filteredConfirmed.length === 0"
           :title="filteredConfirmed.length === 0
@@ -826,6 +845,47 @@ async function handleActionSubmit() {
         @close="closeBanModal"
         @confirm="onBanConfirm"
       />
+    </div>
+
+    <!-- ============================================ -->
+    <!-- SUIVI UTILISATEUR — strikes / notes / preuves -->
+    <!-- ============================================ -->
+    <div v-if="activeTab === 'tracking'" class="tab-content">
+      <div class="sub-tabs">
+        <button
+          :class="['sub-tab', { active: trackingSubTab === 'strikes' }]"
+          @click="trackingSubTab = 'strikes'"
+        >Avertissements</button>
+        <button
+          :class="['sub-tab', { active: trackingSubTab === 'notes' }]"
+          @click="trackingSubTab = 'notes'"
+        >Notes mod</button>
+        <button
+          :class="['sub-tab', { active: trackingSubTab === 'evidence' }]"
+          @click="trackingSubTab = 'evidence'"
+        >Preuves</button>
+      </div>
+      <StrikesPage v-if="trackingSubTab === 'strikes'" />
+      <NotesPage v-else-if="trackingSubTab === 'notes'" />
+      <EvidencePage v-else-if="trackingSubTab === 'evidence'" />
+    </div>
+
+    <!-- ============================================ -->
+    <!-- WORKFLOW — file de revue + rappels           -->
+    <!-- ============================================ -->
+    <div v-if="activeTab === 'workflow'" class="tab-content">
+      <div class="sub-tabs">
+        <button
+          :class="['sub-tab', { active: workflowSubTab === 'review' }]"
+          @click="workflowSubTab = 'review'"
+        >Revue AutoMod</button>
+        <button
+          :class="['sub-tab', { active: workflowSubTab === 'reminders' }]"
+          @click="workflowSubTab = 'reminders'"
+        >Rappels</button>
+      </div>
+      <ReviewPage v-if="workflowSubTab === 'review'" />
+      <RemindersPage v-else-if="workflowSubTab === 'reminders'" />
     </div>
 
     <!-- Modale d annulation des propositions "Points de conduite" :
@@ -1475,7 +1535,30 @@ async function handleActionSubmit() {
   flex: 1;
   min-width: 240px;
 }
-.link-to-journal {
+.sub-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+.sub-tab {
+  background: transparent;
+  border: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-weight: 600;
+}
+.sub-tab:hover { color: var(--text-primary); }
+.sub-tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.bulk-menu-wrap { position: relative; display: inline-block; }
+.bulk-menu-btn {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1484,13 +1567,43 @@ async function handleActionSubmit() {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: color var(--transition-fast), background-color var(--transition-fast);
   white-space: nowrap;
+  transition: color var(--transition-fast), background-color var(--transition-fast), border-color var(--transition-fast);
 }
-.link-to-journal:hover {
+.bulk-menu-btn:hover:not(:disabled) {
   color: var(--accent);
+  border-color: var(--accent);
   background-color: var(--bg-hover);
 }
+.bulk-menu-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.bulk-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 240px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+  padding: 4px;
+  z-index: 50;
+}
+.bulk-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+.bulk-item:hover:not(:disabled) { background: var(--bg-hover); }
+.bulk-item.danger { color: var(--danger); }
+.bulk-item.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 10%, transparent); }
+.bulk-item:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .unban-all-btn {
   background: transparent;
