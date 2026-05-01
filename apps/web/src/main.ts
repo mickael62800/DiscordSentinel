@@ -12,9 +12,25 @@ const router = createRouter({
   routes,
 });
 
+// En production, l'app a une URL API relative auto (window.location.origin)
+// et le user n'a plus a saisir API URL / API key / Discord secret. La page
+// Setup n'est plus le passage oblige - on va directement au Login.
+// La page /setup reste accessible manuellement pour les superadmins qui
+// veulent override la config (debug, instance multi-domaine).
+import { setApiConfig, getApiConfig } from "./api/config";
+function ensureProdConfig() {
+  if (import.meta.env.PROD && !getApiConfig()) {
+    // Bootstrap : config par defaut = origin courant + pas de Bearer (les
+    // browser users s'auth via X-Discord-Token, pas via API key).
+    setApiConfig({ api_url: window.location.origin, api_key: "" });
+  }
+}
+
 router.beforeEach(async (to, _from, next) => {
+  ensureProdConfig();
   const { user, hasConfig, checkSession } = useAuth();
   await checkSession();
+  // Setup uniquement si vraiment pas de config (cas dev sans defaults).
   if (!hasConfig.value && to.name !== "setup") { next({ name: "setup" }); return; }
   if (!to.meta.public && !user.value) { next({ name: "login" }); return; }
   if (user.value && (to.name === "login" || to.name === "setup")) { next({ name: "dashboard" }); return; }
