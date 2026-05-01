@@ -16,6 +16,9 @@ const { error: showError } = useToast();
 const { selectedGuildId } = useGuildSelector();
 
 const refreshing = ref(false);
+const cleaning = ref(false);
+const cleanupOpts = ref({ days: 0, includeAudit: false });
+const showCleanupModal = ref(false);
 
 // Sections data
 const topIps = ref<TopIpEntry[]>([]);
@@ -78,6 +81,23 @@ async function refreshAll() {
   refreshing.value = false;
 }
 
+async function runCleanup() {
+  cleaning.value = true;
+  try {
+    const r = await serverSecurityService.cleanup({
+      older_than_days: cleanupOpts.value.days,
+      include_audit_logs: cleanupOpts.value.includeAudit,
+    });
+    showCleanupModal.value = false;
+    await refreshAll();
+    alert(`✅ ${r.message}`);
+  } catch (e: any) {
+    showError(`Echec cleanup : ${e?.message ?? e}`);
+  } finally {
+    cleaning.value = false;
+  }
+}
+
 onMounted(refreshAll);
 
 // ── Helpers ──
@@ -106,9 +126,47 @@ const tlsBadgeClass = computed(() => {
           audit des actions administratives.
         </p>
       </div>
-      <button class="btn primary" :disabled="refreshing" @click="refreshAll">
-        {{ refreshing ? "Actualisation…" : "↻ Actualiser tout" }}
-      </button>
+      <div class="header-actions">
+        <button class="btn danger" :disabled="cleaning" @click="showCleanupModal = true">
+          🗑 Tout nettoyer
+        </button>
+        <button class="btn primary" :disabled="refreshing" @click="refreshAll">
+          {{ refreshing ? "Actualisation…" : "↻ Actualiser tout" }}
+        </button>
+      </div>
+    </div>
+
+    <!-- Modale confirmation cleanup -->
+    <div v-if="showCleanupModal" class="modal-backdrop" @click.self="showCleanupModal = false">
+      <div class="modal-card">
+        <h3>🗑 Nettoyer les logs de sécurité</h3>
+        <p class="muted">
+          Supprime les entrées de logs API (Top IPs / Échecs auth) selon le critère choisi.
+          Optionnellement aussi les audit logs Discord.
+        </p>
+        <div class="modal-form">
+          <label>
+            Ne garder que les logs de moins de :
+            <select v-model.number="cleanupOpts.days">
+              <option :value="0">0 jours (TOUT supprimer)</option>
+              <option :value="1">1 jour</option>
+              <option :value="7">7 jours</option>
+              <option :value="30">30 jours</option>
+              <option :value="90">90 jours</option>
+            </select>
+          </label>
+          <label class="checkbox">
+            <input type="checkbox" v-model="cleanupOpts.includeAudit" />
+            Inclure aussi les audit logs Discord (member_join, etc.)
+          </label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn" :disabled="cleaning" @click="showCleanupModal = false">Annuler</button>
+          <button class="btn danger" :disabled="cleaning" @click="runCleanup">
+            {{ cleaning ? "Nettoyage…" : "🗑 Confirmer" }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- ── 1. Top IPs ── -->
@@ -345,6 +403,61 @@ sudo fail2ban-client status</pre>
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
 .btn.primary:hover:not(:disabled) { filter: brightness(1.1); color: white; }
+.btn.danger { border-color: color-mix(in srgb, var(--danger) 50%, var(--border)); color: var(--danger); }
+.btn.danger:hover:not(:disabled) { background: color-mix(in srgb, var(--danger) 15%, var(--bg-secondary)); }
+
+.header-actions { display: flex; gap: 8px; align-items: center; }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 30px;
+}
+.modal-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 24px 28px;
+  max-width: 500px;
+  width: 100%;
+}
+.modal-card h3 { margin: 0 0 12px; font-size: 17px; }
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 18px 0;
+}
+.modal-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.modal-form label.checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.modal-form select {
+  padding: 7px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 .btn.xs { padding: 3px 8px; font-size: 11px; }
 
 select {

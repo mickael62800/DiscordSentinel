@@ -1,4 +1,4 @@
-import { httpGet } from "@/api/http";
+import { httpDelete, httpGet } from "@/api/http";
 
 /**
  * Wrapper pour les endpoints /api/security/* (page Securite serveur).
@@ -52,6 +52,12 @@ export interface TlsCertInfo {
 
 export type SecurityWindow = "1h" | "24h" | "7d";
 
+export interface CleanupResponse {
+  deleted_api_logs: number;
+  deleted_audit_logs: number;
+  message: string;
+}
+
 export const serverSecurityService = {
   topIps(window: SecurityWindow = "1h", limit = 20): Promise<TopIpEntry[]> {
     return httpGet(`/api/security/top-ips?window=${window}&limit=${limit}`);
@@ -71,5 +77,12 @@ export const serverSecurityService = {
   },
   tlsCert(): Promise<TlsCertInfo> {
     return httpGet("/api/security/tls-cert");
+  },
+  cleanup(opts: { older_than_days?: number; include_audit_logs?: boolean } = {}): Promise<CleanupResponse> {
+    const u = new URLSearchParams();
+    if (opts.older_than_days !== undefined) u.set("older_than_days", String(opts.older_than_days));
+    if (opts.include_audit_logs !== undefined) u.set("include_audit_logs", String(opts.include_audit_logs));
+    const qs = u.toString();
+    return httpDelete(`/api/security/cleanup${qs ? `?${qs}` : ""}`);
   },
 };

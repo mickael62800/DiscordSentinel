@@ -291,6 +291,96 @@ pub async fn audit_logs(
     Ok(Json(out))
 }
 
+// ── Cleanup : purge des logs de securite ────────────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct CleanupQuery {
+    /// Nb de jours a garder. 0 = tout supprimer. Defaut 0.
+    #[serde(default)]
+    pub older_than_days: Option<i64>,
+    /// True = purger aussi audit_logs (events Discord). Defaut false.
+    #[serde(default)]
+    pub include_audit_logs: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct CleanupResponse {
+    pub deleted_api_logs: i64,
+    pub deleted_audit_logs: i64,
+    pub message: String,
+}
+
+/// DELETE /api/security/cleanup
+/// Supprime les entrees de logs (table `logs` cat='api') et optionnellement
+/// `audit_logs`. Gate superadmin uniquement (operation destructive).
+pub async fn cleanup_security_logs(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Query(q): Query<CleanupQuery>,
+) -> Result<Json<CleanupResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let days = q.older_than_days.unwrap_or(0).max(0);
+    let include_audit = q.include_audit_logs.unwrap_or(false);
+
+    let api_logs_deleted: u64 = if days == 0 {
+        sqlx::query("DELETE FROM logs WHERE category = 'api'")
+            .execute(&state.pg_pool)
+            .await
+            .map_err(|e| ApiError(DomainError::Internal(format!("delete logs: {e}"))))?
+            .rows_affected()
+    } else {
+        sqlx::query(&format!(
+            "DELETE FROM logs WHERE category = 'api' AND timestamp < NOW() - INTERVAL '{days} days'"
+        ))
+        .execute(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("delete logs: {e}"))))?
+        .rows_affected()
+    };
+
+    let audit_deleted: u64 = if include_audit {
+        if days == 0 {
+            sqlx::query("DELETE FROM audit_logs")
+                .execute(&state.pg_pool)
+                .await
+                .map_err(|e| ApiError(DomainError::Internal(format!("delete audit: {e}"))))?
+                .rows_affected()
+        } else {
+            sqlx::query(&format!(
+                "DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '{days} days'"
+            ))
+            .execute(&state.pg_pool)
+            .await
+            .map_err(|e| ApiError(DomainError::Internal(format!("delete audit: {e}"))))?
+            .rows_affected()
+        }
+    } else {
+        0
+    };
+
+    let actor = rbac
+        .as_ref()
+        .map(|r| r.0.discord_user_id.as_str())
+        .unwrap_or("unknown");
+    tracing::info!(
+        target: "audit::security",
+        actor = actor,
+        api_logs = api_logs_deleted,
+        audit_logs = audit_deleted,
+        days_kept = days,
+        "security cleanup executed"
+    );
+
+    Ok(Json(CleanupResponse {
+        deleted_api_logs: api_logs_deleted as i64,
+        deleted_audit_logs: audit_deleted as i64,
+        message: format!(
+            "{} logs API + {} audit logs supprimes",
+            api_logs_deleted, audit_deleted
+        ),
+    }))
+}
+
 // ── 5. Certificat TLS ───────────────────────────────────────────────────
 
 #[derive(Debug, Serialize)]

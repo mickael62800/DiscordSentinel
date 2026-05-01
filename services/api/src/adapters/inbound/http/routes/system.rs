@@ -99,6 +99,10 @@ pub fn routes() -> Router<AppState> {
         .route("/api/security/banned-ips", get(handlers::system::security::banned_ips))
         .route("/api/security/audit-logs", get(handlers::system::security::audit_logs))
         .route("/api/security/tls-cert", get(handlers::system::security::tls_cert))
+        .route(
+            "/api/security/cleanup",
+            delete(handlers::system::security::cleanup_security_logs),
+        )
         // RBAC component visibility (overrides UI par role)
         .route(
             "/api/rbac/component-visibility/{guild_id}",
