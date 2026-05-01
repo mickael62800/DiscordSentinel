@@ -254,7 +254,7 @@ pub async fn serve_grpc(state: AppState, bind: SocketAddr) {
     //
     // tls_config(self, ...) consomme self -> on doit construire le builder
     // final en une expression avant de chainer add_service.
-    let server_builder = match sentinel_proto::tls::tls_dir() {
+    let mut server_builder = match sentinel_proto::tls::tls_dir() {
         Some(dir) => match sentinel_proto::tls::server_tls_config(&dir) {
             Ok(cfg) => match Server::builder().tls_config(cfg) {
                 Ok(b) => {
