@@ -6,30 +6,9 @@ import { modstatsService } from "@/services/moderationAdvancedService";
 import type { ModStatsEntry } from "@/types/moderation-advanced";
 import type { ModstatsTrendDay } from "@/services/moderationAdvancedService";
 import { Bar, Line } from "vue-chartjs";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-} from "chart.js";
+import { registerChartJs } from "@/utils/chartjs";
 
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  Title,
-  Tooltip,
-  Legend,
-  Filler,
-);
+registerChartJs();
 
 const { guildIdFilter } = useGuildSelector();
 const { error: showError } = useToast();

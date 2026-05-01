@@ -2,10 +2,14 @@
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 import { compression } from "vite-plugin-compression2";
+import { visualizer } from "rollup-plugin-visualizer";
 import { fileURLToPath, URL } from "node:url";
 
 // App web standalone : la couche Vue parle directement a l'API Axum via fetch.
 // Aucune dependance Tauri : tout passe par src/api/*.
+//
+// Build : `npm run build`
+// Analyse bundle : `npm run build:analyze` -> genere dist/stats.html
 export default defineConfig({
   plugins: [
     vue(),
@@ -13,7 +17,15 @@ export default defineConfig({
     // sans compresser a chaque requete. Threshold 1 KB : pas la peine pour
     // les petits fichiers.
     compression({ algorithm: "gzip", threshold: 1024 }),
-  ],
+    // Visualizer du bundle : actif uniquement avec ANALYZE=1.
+    // Ouvre dist/stats.html apres build pour voir treemap des chunks.
+    process.env.ANALYZE === "1" && visualizer({
+      filename: "dist/stats.html",
+      gzipSize: true,
+      brotliSize: true,
+      template: "treemap",
+    }),
+  ].filter(Boolean) as any,
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
