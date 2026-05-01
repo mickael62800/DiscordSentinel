@@ -34,8 +34,25 @@ async function handle<T>(resp: Response): Promise<T> {
   try { return JSON.parse(txt) as T; } catch { return txt as unknown as T; }
 }
 
+/**
+ * Retry exponentiel sur 503 (rate limit Discord, brefs incidents reseau).
+ * Uniquement sur GET (idempotents). 3 tentatives max : 0ms / 500ms / 1500ms.
+ * Evite les pages blanches quand le 503 dure < 2s (cas typique du middleware
+ * guild_auth qui rebound apres un cache miss + Discord 429).
+ */
+async function fetchWithRetry503(url: string, init?: RequestInit): Promise<Response> {
+  const delays = [0, 500, 1500];
+  let last: Response | null = null;
+  for (const d of delays) {
+    if (d > 0) await new Promise((r) => setTimeout(r, d));
+    last = await fetch(url, init);
+    if (last.status !== 503) return last;
+  }
+  return last as Response;
+}
+
 export async function httpGet<T>(path: string): Promise<T> {
-  const r = await fetch(`${apiBase()}${path}`, { headers: headers() });
+  const r = await fetchWithRetry503(`${apiBase()}${path}`, { headers: headers() });
   return handle<T>(r);
 }
 export async function httpPost<T>(path: string, body?: unknown): Promise<T> {

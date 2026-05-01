@@ -2,6 +2,7 @@ use axum::extract::Request;
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::Response;
+use subtle::ConstantTimeEq;
 
 use crate::adapters::inbound::http::state::AppState;
 
@@ -25,7 +26,10 @@ pub async fn auth_middleware(
     match auth_header {
         Some(header) if header.starts_with("Bearer ") => {
             let token = &header[7..];
-            if token == state.api_key {
+            // Comparaison constant-time : empeche un attaquant de deviner la cle
+            // caractere par caractere via la latence de reponse (timing attack).
+            // Si les longueurs different, ct_eq retourne 0 sans short-circuit.
+            if token.as_bytes().ct_eq(state.api_key.as_bytes()).into() {
                 Ok(next.run(request).await)
             } else {
                 Err(StatusCode::UNAUTHORIZED)

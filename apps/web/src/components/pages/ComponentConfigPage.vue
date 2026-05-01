@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from "vue";
 import { botConfigService } from "@/services/botConfigService";
 import type { BotDefinition, BotGuildConfig, ConfigField } from "../../types";
 import { useGuildSelector } from "../../composables/useGuildSelector";
+import { useBotDefinitions } from "../../composables/useBotDefinitions";
 import { useToast } from "../../composables/useToast";
 import AppToggle from "../atoms/AppToggle.vue";
 import ConfigFieldRow from "../molecules/ConfigFieldRow.vue";
@@ -148,7 +149,10 @@ function fieldStatus(field: ConfigField): { text: string; source: "db" | "defaul
 
 async function fetchDefinitions() {
   try {
-    definitions.value = await botConfigService.getDefinitions();
+    // Singleton partage : evite les appels redondants entre pages.
+    // Backend cache 1h cote Redis, frontend cache module-scope.
+    const { ensure } = useBotDefinitions();
+    definitions.value = await ensure();
   } catch (e) {
     console.error("Erreur chargement definitions:", e);
   }
