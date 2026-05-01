@@ -293,10 +293,17 @@ pub async fn list_guild_users(
 /// pour savoir quoi afficher (masquer les boutons admin si viewer, etc.).
 pub async fn get_my_role(
     State(state): State<AppState>,
-    Extension(ctx): Extension<RoleContext>,
+    rbac: Option<axum::Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<MyRoleDto>, ApiError> {
     validation::validate_discord_id("guild_id", &guild_id).map_err(ApiError)?;
+
+    // Si pas de RoleContext (middleware n'a pas pu resoudre = pas auth), 401.
+    let Some(axum::Extension(ctx)) = rbac else {
+        return Err(ApiError(crate::domain::errors::DomainError::Forbidden(
+            "auth Discord requise".into(),
+        )));
+    };
 
     let is_super = state
         .superadmin_user_ids
