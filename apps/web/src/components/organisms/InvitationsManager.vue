@@ -102,14 +102,6 @@ function roleLabel(r: string): string {
   return { viewer: "Viewer", moderator: "Modérateur", admin: "Admin", owner: "Owner" }[r] ?? r;
 }
 
-function expiresLabel(hours: number): string {
-  if (hours === 0) return "Jamais";
-  if (hours === 24) return "1 jour";
-  if (hours === 168) return "7 jours";
-  if (hours === 720) return "30 jours";
-  return `${hours} h`;
-}
-
 onMounted(load);
 watch(selectedGuildId, load);
 </script>
