@@ -63,6 +63,16 @@ x-worker-deps-db-redis: &worker-deps-db-redis
   redis:
     condition: service_healthy
 
+# Reseaux par defaut pour les workers : "internal" uniquement (PAS d'internet).
+# Override avec [internal, default] pour les workers qui ont besoin de Discord
+# (coude-worker, discord-audit-sync-worker).
+x-worker-networks-internal: &worker-networks-internal
+  - internal
+
+x-worker-networks-with-internet: &worker-networks-with-internet
+  - internal
+  - default
+
 services:
 
   # ──────────────────────────────────────────────────────────────────────────
@@ -85,6 +95,9 @@ services:
       - sh
       - -c
       - "apk add --no-cache openssl >/dev/null && sh /init/gen-grpc-certs.sh"
+    # Besoin d'internet pour `apk add openssl` au premier boot.
+    networks:
+      - default
 
   # ──────────────────────────────────────────────────────────────────────────
   # Infrastructure
@@ -163,11 +176,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # SECURITE — pgbouncer est le SEUL service bi-network : il joint postgres
-    # via "data" et expose le pool aux clients via "default" (sentinel).
+    # SECURITE — pgbouncer est bi-network : il joint postgres via "data"
+    # (isole) et expose le pool aux clients via "internal" (no-internet).
     networks:
       - data
-      - default
+      - internal
 
   redis:
     image: redis:7-alpine
@@ -188,6 +201,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    # SECURITE — Redis n'a PAS besoin d'internet, isole sur "internal".
+    networks:
+      - internal
 
   # ──────────────────────────────────────────────────────────────────────────
   # Backend
@@ -277,6 +293,12 @@ services:
         condition: service_started
       grpc-certs-init:
         condition: service_completed_successfully
+    # SECURITE — API a besoin d'internet (Discord OAuth, get_user_guilds).
+    # internal : Redis + pgbouncer + autres services internes.
+    # default : sortie internet (Discord).
+    networks:
+      - internal
+      - default
 
   gateway:
     <<: *rust-base
@@ -306,6 +328,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # SECURITE — gateway n'a pas besoin d'internet (juste Redis Streams + WS).
+    networks:
+      - internal
 
   # ──────────────────────────────────────────────────────────────────────────
   # Workers (13)
@@ -324,6 +349,7 @@ services:
     environment:
       <<: *worker-env
     depends_on: *worker-deps-db-redis
+    networks: *worker-networks-internal
 
   analytics-worker:
     <<: *rust-base
@@ -337,6 +363,7 @@ services:
     depends_on:
       pgbouncer:
         condition: service_started
+    networks: *worker-networks-internal
 
   monitoring-worker:
     <<: *rust-base
@@ -351,6 +378,7 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    networks: *worker-networks-internal
 
   cache-worker:
     <<: *rust-base
@@ -365,6 +393,7 @@ services:
       DASHBOARD_CACHE_REFRESH: ${DASHBOARD_CACHE_REFRESH:-600}
       VOICE_STATS_CACHE_REFRESH: ${VOICE_STATS_CACHE_REFRESH:-3600}
     depends_on: *worker-deps-db-redis
+    networks: *worker-networks-internal
 
   ai-worker:
     <<: *rust-base
@@ -378,6 +407,7 @@ services:
       AI_POLL_INTERVAL: ${AI_POLL_INTERVAL:-2}
       AI_JOB_TIMEOUT: ${AI_JOB_TIMEOUT:-120}
     depends_on: *worker-deps-db-redis
+    networks: *worker-networks-internal
 
   temp-roles-worker:
     <<: *rust-base
@@ -390,6 +420,7 @@ services:
       <<: *worker-env
       TEMP_ROLES_SCAN_INTERVAL: ${TEMP_ROLES_SCAN_INTERVAL:-60}
     depends_on: *worker-deps-db-redis
+    networks: *worker-networks-internal
 
   appeal-sla-worker:
     <<: *rust-base
@@ -402,6 +433,7 @@ services:
       <<: *worker-env
       APPEAL_SLA_SCAN_INTERVAL: ${APPEAL_SLA_SCAN_INTERVAL:-120}
     depends_on: *worker-deps-db-redis
+    networks: *worker-networks-internal
 
   export-worker:
     <<: *rust-base
@@ -422,6 +454,8 @@ services:
         condition: service_started
       grpc-certs-init:
         condition: service_completed_successfully
+    # export-worker : pas de Discord, juste gRPC interne + DB -> internal seul.
+    networks: *worker-networks-internal
 
   audit-cache-worker:
     <<: *rust-base
@@ -434,6 +468,7 @@ services:
       <<: *worker-env
       AUDIT_CACHE_REFRESH_INTERVAL: ${AUDIT_CACHE_REFRESH_INTERVAL:-60}
     depends_on: *worker-deps-db-redis
+    networks: *worker-networks-internal
 
   blackjack-cleanup-worker:
     <<: *rust-base
@@ -446,6 +481,7 @@ services:
       <<: *worker-env
       BLACKJACK_CLEANUP_SCAN_INTERVAL: ${BLACKJACK_CLEANUP_SCAN_INTERVAL:-60}
     depends_on: *worker-deps-db-redis
+    networks: *worker-networks-internal
 
   discord-audit-sync-worker:
     <<: *rust-base
@@ -461,6 +497,8 @@ services:
     depends_on:
       pgbouncer:
         condition: service_started
+    # discord-audit-sync : a besoin de Discord -> internet + interne.
+    networks: *worker-networks-with-internet
 
   cleanup-worker:
     <<: *rust-base
@@ -480,6 +518,7 @@ services:
     depends_on:
       pgbouncer:
         condition: service_started
+    networks: *worker-networks-internal
 
   coude-worker:
     <<: *rust-base
@@ -502,6 +541,8 @@ services:
         condition: service_started
       grpc-certs-init:
         condition: service_completed_successfully
+    # coude-worker : a besoin de Discord -> internet + interne.
+    networks: *worker-networks-with-internet
 
   # ──────────────────────────────────────────────────────────────────────────
   # Bot unifie
@@ -557,6 +598,10 @@ services:
         condition: service_healthy
       grpc-certs-init:
         condition: service_completed_successfully
+    # sentinel-bot : connexion Discord Gateway + REST -> internet + interne.
+    networks:
+      - internal
+      - default
 
   # ──────────────────────────────────────────────────────────────────────────
   # Web (SPA Vue 3 servie par nginx, HTTPS)
@@ -592,6 +637,11 @@ services:
         condition: service_healthy
       gateway:
         condition: service_started
+    # SECURITE — nginx fait du proxying interne uniquement (api/gateway).
+    # Pas besoin d'internet sortant. Le port mapping 80/443 reste fonctionnel
+    # car il opere au niveau host, independant du reseau Docker.
+    networks:
+      - internal
 
   # Certbot Let's Encrypt — active via profile `tls`.
   certbot:
@@ -636,6 +686,9 @@ services:
     depends_on:
       web:
         condition: service_started
+    # certbot a besoin d'internet (Let's Encrypt ACME).
+    networks:
+      - default
     profiles:
       - tls
 
@@ -658,6 +711,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # pgadmin a besoin de joindre postgres (sur "data") direct.
+    networks:
+      - data
     profiles:
       - monitoring
 
@@ -675,6 +731,9 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    # redis-commander a besoin de joindre Redis (sur "internal").
+    networks:
+      - internal
     profiles:
       - monitoring
 
@@ -693,6 +752,9 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.retention.time=15d'
       - '--web.enable-lifecycle'
+    # prometheus scrape /metrics sur les workers (tous sur "internal").
+    networks:
+      - internal
     profiles:
       - monitoring
 
@@ -713,6 +775,9 @@ services:
       - ../../infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+    # grafana query prometheus (sur "internal").
+    networks:
+      - internal
     profiles:
       - monitoring
 
@@ -728,17 +793,31 @@ volumes:
   # volume et relance le compose.
   grpc_certs:
 
-# Networks :
-#   - default (sentinel) : reseau applicatif partage par api, gateway,
-#     workers, bot, web, redis. Permet la communication inter-services
-#     standard et l'acces internet (pour Discord/HTTPS).
-#   - data : reseau isole (internal: true) pour postgres. Seul pgbouncer
-#     est bi-network et fait le pont. Un service applicatif compromis
-#     ne peut PAS atteindre postgres directement.
+# Networks (defense en profondeur, 3 niveaux d'isolation) :
+#
+#   - default (sentinel) : reseau AVEC internet sortant. Reserve aux services
+#     qui ont besoin de joindre Discord ou Let's Encrypt :
+#       api, sentinel-bot, certbot, coude-worker, discord-audit-sync-worker
+#     Les autres services n'ont PAS d'acces internet (defense exfiltration
+#     de donnees en cas de zero-day).
+#
+#   - internal : reseau SANS internet (internal: true) pour communication
+#     inter-services (Redis, gRPC, healthchecks, etc.). Tous les services
+#     y sont sauf postgres (sur "data").
+#
+#   - data : reseau isole pour postgres uniquement. Seul pgbouncer est
+#     bi-network (data + internal) pour faire le pont.
+#
+# Resultat : un worker compromis sur "internal" seulement ne peut ni
+# atteindre postgres directement, ni exfiltrer des donnees vers internet.
 networks:
   default:
     name: sentinel
     driver: bridge
+  internal:
+    name: sentinel-internal
+    driver: bridge
+    internal: true
   data:
     name: sentinel-data
     driver: bridge
