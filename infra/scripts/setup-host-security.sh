@@ -420,7 +420,7 @@ NOW=$(date -Iseconds)
 # On filtre les peers privees (localhost / LAN) sur la colonne $4 et on
 # extrait le nom de process via regex propre (pas de double-quote en sortie).
 ss -H -tnp state established 2>/dev/null \
-    | awk '$4 !~ /^127\.|^10\.|^172\.(1[6-9]|2[0-9]|3[01])\.|^192\.168\.|^::1|^\[::1\]|^\[fe80/' \
+    | awk '$4 !~ /^127\.|^10\.|^172\.(1[6-9]|2[0-9]|3[01])\.|^192\.168\.|^::1|^\[::1\]|^\[fe80|^\[::ffff:127\.|^\[::ffff:10\.|^\[::ffff:172\.(1[6-9]|2[0-9]|3[01])\.|^\[::ffff:192\.168\./' \
     | head -100 > "$TMP" || true
 
 TOTAL=$(wc -l < "$TMP" | tr -d ' ')
