@@ -108,6 +108,8 @@ pub fn routes() -> Router<AppState> {
         .route("/api/security/trivy", get(handlers::system::security::trivy_vulns))
         .route("/api/security/file-integrity", get(handlers::system::security::file_integrity))
         .route("/api/security/outbound", get(handlers::system::security::outbound_connections))
+        .route("/api/security/nginx-suspicious", get(handlers::system::security::nginx_suspicious))
+        .route("/api/security/tls-errors", get(handlers::system::security::tls_errors))
         .route(
             "/api/security/cleanup",
             delete(handlers::system::security::cleanup_security_logs),

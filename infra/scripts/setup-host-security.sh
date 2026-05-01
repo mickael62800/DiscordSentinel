@@ -517,6 +517,127 @@ EOF
     echo "  ✅ trivy configure (scan 1x/jour 3h du matin, ou lance manuellement /usr/local/bin/sentinel-trivy-scan.sh)"
 }
 
+# ── Module nginx-suspicious ─────────────────────────────────────────────
+
+setup_nginx_suspicious() {
+    echo "🚨 nginx-suspicious"
+    apt_install jq
+
+    cat > "$SCRIPT_DIR/sentinel-nginx-suspicious.sh" <<'EOF'
+#!/bin/bash
+set -e
+OUT=/var/lib/sentinel/nginx-suspicious.json
+NOW=$(date -Is)
+CONTAINER=$(docker ps --filter name=web --format '{{.Names}}' | head -n1)
+[ -z "$CONTAINER" ] && CONTAINER=$(docker ps --filter name=nginx --format '{{.Names}}' | head -n1)
+if [ -z "$CONTAINER" ]; then
+    echo "{\"updated_at\":\"$NOW\",\"total_24h\":0,\"by_category\":{},\"entries\":[],\"error\":\"container web/nginx introuvable\"}" > "$OUT"
+    chmod 644 "$OUT"; exit 0
+fi
+
+LOGS=$(docker logs --since 24h "$CONTAINER" 2>&1 || true)
+ENTRIES=""
+TOTAL=0
+declare -A CATS
+CATS[scanner]=0; CATS[sqli]=0; CATS[xss]=0; CATS[traversal]=0
+
+while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    # nginx combined: IP - - [time] "METHOD URL HTTP/x" status size "ref" "UA"
+    IP=$(echo "$line" | awk '{print $1}')
+    METHOD=$(echo "$line" | grep -oP '"\K[A-Z]+(?= )' | head -n1)
+    URL=$(echo "$line" | grep -oP '"[A-Z]+ \K[^ ]+' | head -n1)
+    STATUS=$(echo "$line" | grep -oP '" \K[0-9]{3}' | head -n1)
+    UA=$(echo "$line" | grep -oP '"[^"]*"$' | tr -d '"')
+    [ -z "$IP" ] || [ -z "$URL" ] && continue
+
+    CAT=""
+    LURL=$(echo "$URL" | tr 'A-Z' 'a-z')
+    LUA=$(echo "$UA" | tr 'A-Z' 'a-z')
+
+    # Path traversal
+    if echo "$URL" | grep -qE '\.\./|/\.\.|\%2e\%2e' ; then CAT="traversal"
+    # SQLi
+    elif echo "$LURL" | grep -qE '(union[+ ]select|select[+ ].*from|or[+ ]1=1|sleep\(|benchmark\(|information_schema|--[+ ]|/\*\*/)' ; then CAT="sqli"
+    # XSS
+    elif echo "$LURL" | grep -qE '(<script|javascript:|onerror=|onload=|alert\()' ; then CAT="xss"
+    # Scanners (paths bien connus + UA)
+    elif echo "$LURL" | grep -qE '(/\.env|/\.git|/wp-admin|/wp-login|/phpmyadmin|/admin\.php|\.aspx|/vendor/phpunit|/cgi-bin|/owa/|/autodiscover|/\.aws|/\.ssh)' ; then CAT="scanner"
+    elif echo "$LUA" | grep -qE '(nmap|sqlmap|nikto|masscan|zgrab|nuclei|gobuster|dirbuster|wpscan|acunetix|nessus|openvas|hydra)' ; then CAT="scanner"
+    fi
+
+    [ -z "$CAT" ] && continue
+    CATS[$CAT]=$((CATS[$CAT]+1))
+    TOTAL=$((TOTAL+1))
+
+    # Limite a 200 entrees
+    if [ $TOTAL -le 200 ]; then
+        IPESC=$(echo "$IP" | jq -Rs '.' 2>/dev/null || echo "\"$IP\"")
+        URLESC=$(echo "$URL" | jq -Rs '.' 2>/dev/null || echo "\"\"")
+        UAESC=$(echo "$UA" | jq -Rs '.' 2>/dev/null || echo "\"\"")
+        ENTRY="{\"timestamp\":\"$NOW\",\"ip\":$IPESC,\"method\":\"${METHOD:-?}\",\"url\":$URLESC,\"status\":${STATUS:-0},\"category\":\"$CAT\",\"user_agent\":$UAESC}"
+        [ -z "$ENTRIES" ] && ENTRIES="$ENTRY" || ENTRIES="$ENTRIES,$ENTRY"
+    fi
+done <<< "$LOGS"
+
+BY_CAT="{\"scanner\":${CATS[scanner]},\"sqli\":${CATS[sqli]},\"xss\":${CATS[xss]},\"traversal\":${CATS[traversal]}}"
+
+cat > "$OUT.tmp" <<JSON
+{"updated_at":"$NOW","total_24h":$TOTAL,"by_category":$BY_CAT,"entries":[$ENTRIES]}
+JSON
+mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-nginx-suspicious.sh"
+    echo "*/10 * * * * root /usr/local/bin/sentinel-nginx-suspicious.sh" > /etc/cron.d/sentinel-nginx-suspicious
+    echo "  ✅ nginx-suspicious configure (toutes les 10 min)"
+}
+
+# ── Module tls-errors ───────────────────────────────────────────────────
+
+setup_tls_errors() {
+    echo "🔒 tls-errors"
+    apt_install jq
+
+    cat > "$SCRIPT_DIR/sentinel-tls-errors.sh" <<'EOF'
+#!/bin/bash
+set -e
+OUT=/var/lib/sentinel/tls-errors.json
+NOW=$(date -Is)
+CONTAINER=$(docker ps --filter name=web --format '{{.Names}}' | head -n1)
+[ -z "$CONTAINER" ] && CONTAINER=$(docker ps --filter name=nginx --format '{{.Names}}' | head -n1)
+if [ -z "$CONTAINER" ]; then
+    echo "{\"updated_at\":\"$NOW\",\"total_24h\":0,\"entries\":[],\"error\":\"container web introuvable\"}" > "$OUT"
+    chmod 644 "$OUT"; exit 0
+fi
+
+LOGS=$(docker logs --since 24h "$CONTAINER" 2>&1 | grep -iE 'ssl|tls|handshake' | grep -iE 'error|fail|alert' || true)
+ENTRIES=""
+TOTAL=0
+while IFS= read -r line; do
+    [ -z "$line" ] && continue
+    CLIENT=$(echo "$line" | grep -oP 'client: \K[0-9.:a-fA-F]+' | head -n1)
+    [ -z "$CLIENT" ] && CLIENT="?"
+    ERR=$(echo "$line" | sed 's/"/\\"/g' | head -c 240)
+    TOTAL=$((TOTAL+1))
+    if [ $TOTAL -le 100 ]; then
+        ERRESC=$(echo "$ERR" | jq -Rs '.' 2>/dev/null || echo "\"$ERR\"")
+        ENTRY="{\"timestamp\":\"$NOW\",\"client\":\"$CLIENT\",\"error\":$ERRESC}"
+        [ -z "$ENTRIES" ] && ENTRIES="$ENTRY" || ENTRIES="$ENTRIES,$ENTRY"
+    fi
+done <<< "$LOGS"
+
+cat > "$OUT.tmp" <<JSON
+{"updated_at":"$NOW","total_24h":$TOTAL,"entries":[$ENTRIES]}
+JSON
+mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-tls-errors.sh"
+    echo "*/15 * * * * root /usr/local/bin/sentinel-tls-errors.sh" > /etc/cron.d/sentinel-tls-errors
+    echo "  ✅ tls-errors configure (toutes les 15 min)"
+}
+
 # ── Dispatcher ──────────────────────────────────────────────────────────
 
 main() {
@@ -531,8 +652,10 @@ main() {
         connections)  setup_connections ;;
         open-ports)   setup_open_ports ;;
         trivy)          setup_trivy ;;
-        file-integrity) setup_file_integrity ;;
-        outbound)       setup_outbound ;;
+        file-integrity)    setup_file_integrity ;;
+        outbound)          setup_outbound ;;
+        nginx-suspicious)  setup_nginx_suspicious ;;
+        tls-errors)        setup_tls_errors ;;
         all)
             setup_fail2ban
             setup_ban_apply
@@ -543,6 +666,8 @@ main() {
             setup_trivy
             setup_file_integrity
             setup_outbound
+            setup_nginx_suspicious
+            setup_tls_errors
             ;;
         help|--help|-h|*)
             cat <<'HELP'
@@ -558,6 +683,8 @@ Modules :
   trivy          Scan vulns Docker images -> trivy.json (1x/jour 3h)
   file-integrity SHA256 fichiers critiques -> file-integrity.json (30 min)
   outbound       Connexions sortantes -> outbound.json (3 min)
+  nginx-suspicious Patterns SQLi/XSS/scanners nginx -> nginx-suspicious.json (10 min)
+  tls-errors     Erreurs handshake TLS nginx -> tls-errors.json (15 min)
   all            Tous les modules
 
 Exemples :

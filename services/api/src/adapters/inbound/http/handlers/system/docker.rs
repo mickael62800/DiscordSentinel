@@ -614,6 +614,7 @@ pub async fn prune_images(
 ) -> Result<Json<PruneResultDto>, ApiError> {
     gate_super(&state, &rbac)?;
     audit_docker(
+        &state,
         &rbac,
         "prune.images",
         if q.all.unwrap_or(false) { "all=true" } else { "dangling=true" },
@@ -696,6 +697,7 @@ pub async fn prune_system(
 ) -> Result<Json<PruneSystemDto>, ApiError> {
     gate_super(&state, &rbac)?;
     audit_docker(
+        &state,
         &rbac,
         "prune.system",
         &format!(

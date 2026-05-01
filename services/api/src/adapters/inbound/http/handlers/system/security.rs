@@ -644,6 +644,57 @@ pub async fn trivy_vulns(
     Ok(Json(data))
 }
 
+// Nginx suspicious patterns
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SuspiciousEntry {
+    pub timestamp: String,
+    pub ip: String,
+    pub method: String,
+    pub url: String,
+    pub status: i64,
+    pub category: String, // "scanner" | "sqli" | "xss" | "path-traversal"
+    pub user_agent: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SuspiciousResponse {
+    pub updated_at: String,
+    pub total_24h: i64,
+    pub by_category: serde_json::Value,
+    pub entries: Vec<SuspiciousEntry>,
+}
+
+pub async fn nginx_suspicious(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<SuspiciousResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: SuspiciousResponse = read_host_json("/var/lib/sentinel/nginx-suspicious.json", "nginx-suspicious")?;
+    Ok(Json(data))
+}
+
+// TLS handshake errors
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TlsErrorEntry {
+    pub timestamp: String,
+    pub client: String,
+    pub error: String,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TlsErrorsResponse {
+    pub updated_at: String,
+    pub total_24h: i64,
+    pub entries: Vec<TlsErrorEntry>,
+}
+
+pub async fn tls_errors(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<TlsErrorsResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: TlsErrorsResponse = read_host_json("/var/lib/sentinel/tls-errors.json", "tls-errors")?;
+    Ok(Json(data))
+}
+
 // File integrity
 #[derive(Debug, Serialize, Deserialize)]
 pub struct FileIntegrityEntry {

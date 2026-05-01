@@ -13,14 +13,19 @@ import {
   type ServerEventDto,
   type SshFailuresResponse,
   type SuccessfulLoginEntry,
+  type SuspiciousResponse,
   type TlsCertInfo,
+  type TlsErrorsResponse,
   type TopIpEntry,
   type TrivyResponse,
 } from "@/services/serverSecurityService";
 import { useToast } from "@/composables/useToast";
+import { useMyRole } from "@/composables/useMyRole";
 import TrafficTrendChart from "@/components/organisms/TrafficTrendChart.vue";
 
 const { error: showError } = useToast();
+const { role, isSuper } = useMyRole();
+const canManage = computed(() => isSuper.value || role.value === "owner");
 
 type TabKey =
   | "overview"
@@ -62,6 +67,10 @@ const integrity = ref<FileIntegrityResponse | null>(null);
 const integrityError = ref<string | null>(null);
 const outbound = ref<OutboundResponse | null>(null);
 const outboundError = ref<string | null>(null);
+const suspicious = ref<SuspiciousResponse | null>(null);
+const suspiciousError = ref<string | null>(null);
+const tlsErrors = ref<TlsErrorsResponse | null>(null);
+const tlsErrorsError = ref<string | null>(null);
 
 // ── Loaders ──
 async function loadTopIps() {
@@ -121,6 +130,16 @@ async function loadOutbound() {
   try { outbound.value = await serverSecurityService.outbound(); }
   catch (e: any) { outboundError.value = e?.message ?? String(e); outbound.value = null; }
 }
+async function loadSuspicious() {
+  suspiciousError.value = null;
+  try { suspicious.value = await serverSecurityService.nginxSuspicious(); }
+  catch (e: any) { suspiciousError.value = e?.message ?? String(e); suspicious.value = null; }
+}
+async function loadTlsErrors() {
+  tlsErrorsError.value = null;
+  try { tlsErrors.value = await serverSecurityService.tlsErrors(); }
+  catch (e: any) { tlsErrorsError.value = e?.message ?? String(e); tlsErrors.value = null; }
+}
 async function loadTls() {
   tlsError.value = null;
   try { tls.value = await serverSecurityService.tlsCert(); }
@@ -153,6 +172,7 @@ async function refreshAll() {
     loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls(),
     loadLastLogins(), loadSshFailures(), loadDiskTrend(), loadConnections(),
     loadOpenPorts(), loadTrivy(), loadIntegrity(), loadOutbound(),
+    loadSuspicious(), loadTlsErrors(),
   ]);
   refreshing.value = false;
 }
@@ -215,7 +235,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         <p class="muted small">Surveillance des attaques, intégrité et protections actives.</p>
       </div>
       <div class="header-actions">
-        <button class="btn danger" :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</button>
+        <button v-if="canManage" class="btn danger" :disabled="cleaning" @click="showCleanupModal = true">🗑 Tout nettoyer</button>
         <button class="btn primary" :disabled="refreshing" @click="refreshAll">
           {{ refreshing ? "Actualisation…" : "↻ Actualiser tout" }}
         </button>
@@ -296,7 +316,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
               <td class="num" :class="{ danger: ip.failed > 10 }">{{ ip.failed }}</td>
               <td class="muted small">{{ fmtDate(ip.last_seen) }}</td>
               <td class="actions">
-                <button class="btn xs danger" @click="banIp(ip.client_ip)" title="Bannir cette IP">🚫 Ban</button>
+                <button v-if="canManage" class="btn xs danger" @click="banIp(ip.client_ip)" title="Bannir cette IP">🚫 Ban</button>
               </td>
             </tr>
           </tbody>
@@ -337,7 +357,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
               <td class="small mono">{{ e.client_ip }}</td>
               <td class="small muted ua">{{ truncate(e.user_agent, 80) }}</td>
               <td class="actions">
-                <button v-if="e.client_ip && e.client_ip !== '-'" class="btn xs danger" @click="banIp(e.client_ip)" title="Bannir">🚫</button>
+                <button v-if="canManage && e.client_ip && e.client_ip !== '-'" class="btn xs danger" @click="banIp(e.client_ip)" title="Bannir">🚫</button>
               </td>
             </tr>
           </tbody>
@@ -370,7 +390,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
                 <td class="small mono">{{ e.user }}</td>
                 <td class="small mono">{{ e.ip }}</td>
                 <td class="actions">
-                  <button v-if="e.ip !== '?'" class="btn xs danger" @click="banIp(e.ip)">🚫 Ban</button>
+                  <button v-if="canManage && e.ip !== '?'" class="btn xs danger" @click="banIp(e.ip)">🚫 Ban</button>
                 </td>
               </tr>
             </tbody>
@@ -379,9 +399,40 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         </div>
       </section>
 
-      <section class="card placeholder-card">
-        <h2>🕷 Patterns suspects nginx</h2>
-        <p class="muted small">À venir : détection scanners (<code>/wp-admin</code>, <code>/.env</code>), tentatives SQLi/XSS dans les logs nginx.</p>
+      <!-- Patterns suspects nginx -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🕷 Patterns suspects nginx (24h)</h2>
+          <button class="btn xs" @click="loadSuspicious">↻</button>
+        </div>
+        <div v-if="suspiciousError" class="info">
+          <p class="small">{{ suspiciousError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh nginx-suspicious</code></p>
+        </div>
+        <div v-else-if="suspicious">
+          <p class="muted small">Maj {{ fmtDate(suspicious.updated_at) }} · {{ suspicious.total_24h }} requête(s) suspecte(s)</p>
+          <div class="cve-summary">
+            <div class="cve-stat danger"><span class="lbl">SQLi</span><strong>{{ suspicious.by_category?.sqli ?? 0 }}</strong></div>
+            <div class="cve-stat warning"><span class="lbl">XSS</span><strong>{{ suspicious.by_category?.xss ?? 0 }}</strong></div>
+            <div class="cve-stat warning"><span class="lbl">Traversal</span><strong>{{ suspicious.by_category?.traversal ?? 0 }}</strong></div>
+            <div class="cve-stat"><span class="lbl">Scanners</span><strong>{{ suspicious.by_category?.scanner ?? 0 }}</strong></div>
+          </div>
+          <table v-if="suspicious.entries.length > 0" class="data-table">
+            <thead><tr><th>IP</th><th>Méth.</th><th>URL</th><th>Status</th><th>Catégorie</th><th>UA</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="(e, i) in suspicious.entries.slice(0, 50)" :key="i">
+                <td class="small mono">{{ e.ip }}</td>
+                <td class="small">{{ e.method }}</td>
+                <td class="small mono">{{ truncate(e.url, 60) }}</td>
+                <td class="small">{{ e.status }}</td>
+                <td><span class="badge" :class="e.category === 'sqli' ? 'danger' : 'warning'">{{ e.category }}</span></td>
+                <td class="small">{{ truncate(e.user_agent, 30) }}</td>
+                <td><button v-if="canManage" class="btn xs danger" @click="banIp(e.ip)">🚫</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">Aucun pattern suspect détecté 🎉</div>
+        </div>
       </section>
       <!-- Trafic anormal (vrai composant) -->
       <TrafficTrendChart />
@@ -413,7 +464,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
             <ul v-if="jail.banned_ips.length > 0" class="ip-list">
               <li v-for="ip in jail.banned_ips" :key="ip" class="ip-pill">
                 <code>{{ ip }}</code>
-                <button class="btn xs" @click="unbanIp(ip)" title="Débannir cette IP">↻ Débannir</button>
+                <button v-if="canManage" class="btn xs" @click="unbanIp(ip)" title="Débannir cette IP">↻ Débannir</button>
               </li>
             </ul>
             <div v-else class="muted small">Aucune IP actuellement bannie sur cette jail.</div>
@@ -546,9 +597,30 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
           <div v-else class="empty">Aucune connexion sortante détectée.</div>
         </div>
       </section>
-      <section class="card placeholder-card">
-        <h2>🔐 TLS handshake errors</h2>
-        <p class="muted small">À venir : compteur des erreurs SSL handshake (signe de scan TLS).</p>
+      <!-- TLS handshake errors -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🔐 Erreurs handshake TLS (24h)</h2>
+          <button class="btn xs" @click="loadTlsErrors">↻</button>
+        </div>
+        <div v-if="tlsErrorsError" class="info">
+          <p class="small">{{ tlsErrorsError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh tls-errors</code></p>
+        </div>
+        <div v-else-if="tlsErrors">
+          <p class="muted small">Maj {{ fmtDate(tlsErrors.updated_at) }} · {{ tlsErrors.total_24h }} erreur(s)</p>
+          <table v-if="tlsErrors.entries.length > 0" class="data-table">
+            <thead><tr><th>Client</th><th>Erreur</th><th></th></tr></thead>
+            <tbody>
+              <tr v-for="(e, i) in tlsErrors.entries.slice(0, 30)" :key="i">
+                <td class="small mono">{{ e.client }}</td>
+                <td class="small">{{ truncate(e.error, 120) }}</td>
+                <td><button v-if="canManage && e.client !== '?'" class="btn xs danger" @click="banIp(e.client)">🚫</button></td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">Aucune erreur TLS handshake 🎉</div>
+        </div>
       </section>
     </div>
 

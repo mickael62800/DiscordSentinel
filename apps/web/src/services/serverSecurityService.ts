@@ -166,6 +166,37 @@ export interface OutboundResponse {
   connections: OutboundConnection[];
 }
 
+// Nginx suspicious patterns
+export interface SuspiciousEntry {
+  timestamp: string;
+  ip: string;
+  method: string;
+  url: string;
+  status: number;
+  category: "scanner" | "sqli" | "xss" | "traversal";
+  user_agent: string;
+}
+export interface SuspiciousResponse {
+  updated_at: string;
+  total_24h: number;
+  by_category: Record<string, number>;
+  entries: SuspiciousEntry[];
+  error?: string;
+}
+
+// TLS handshake errors
+export interface TlsErrorEntry {
+  timestamp: string;
+  client: string;
+  error: string;
+}
+export interface TlsErrorsResponse {
+  updated_at: string;
+  total_24h: number;
+  entries: TlsErrorEntry[];
+  error?: string;
+}
+
 export interface SuccessfulLoginEntry {
   timestamp: string;
   discord_user_id: string;
@@ -241,6 +272,12 @@ export const serverSecurityService = {
   },
   outbound(): Promise<OutboundResponse> {
     return httpGet("/api/security/outbound");
+  },
+  nginxSuspicious(): Promise<SuspiciousResponse> {
+    return httpGet("/api/security/nginx-suspicious");
+  },
+  tlsErrors(): Promise<TlsErrorsResponse> {
+    return httpGet("/api/security/tls-errors");
   },
   banIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
     return httpPost("/api/security/ban-ip", { ip, reason });
