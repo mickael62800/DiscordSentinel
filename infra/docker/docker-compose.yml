@@ -580,7 +580,9 @@ services:
       - letsencrypt_etc:/etc/letsencrypt
       - letsencrypt_www:/var/www/certbot
     healthcheck:
-      test: ["CMD-SHELL", "wget --spider -q http://localhost/healthz || exit 1"]
+      # 127.0.0.1 explicit : evite que wget resolve localhost en IPv6 [::1]
+      # alors que nginx ecoute en IPv4 -> faux positif "unhealthy".
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/healthz || exit 1"]
       interval: 30s
       timeout: 3s
       retries: 3
