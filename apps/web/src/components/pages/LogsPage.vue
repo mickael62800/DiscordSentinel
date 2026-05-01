@@ -2,6 +2,7 @@
 import { ref } from "vue";
 import type { TableColumn } from "../../types";
 import LogsTemplate from "../organisms/LogsTemplate.vue";
+import LogsColumn from "../organisms/LogsColumn.vue";
 
 interface Tab {
   key: string;
@@ -14,7 +15,7 @@ interface Tab {
   clearConfirmMessage?: string;
 }
 
-const activeTab = ref("discord");
+const activeTab = ref<string>("discord");
 
 const tabs: Tab[] = [
   {
@@ -31,64 +32,8 @@ const tabs: Tab[] = [
     // Plus qu'une seule source en pratique -> filtre inutile, on le cache.
     showSourceFilter: false,
   },
-  {
-    key: "bots",
-    label: "Bots",
-    category: "bot",
-    columns: [
-      { key: "timestamp", label: "Date" },
-      { key: "level", label: "Niveau" },
-      { key: "bot", label: "Bot" },
-      { key: "message", label: "Message" },
-      { key: "details", label: "Détails" },
-    ],
-    showSourceFilter: true,
-    sourceLabel: "Tous les bots",
-    showClearButton: true,
-    clearConfirmMessage: "Supprimer tous les journaux bots ?",
-  },
-  {
-    key: "workers",
-    label: "Workers",
-    category: "worker",
-    columns: [
-      { key: "timestamp", label: "Date" },
-      { key: "level", label: "Niveau" },
-      { key: "bot", label: "Worker" },
-      { key: "message", label: "Message" },
-      { key: "details", label: "Détails" },
-    ],
-    showSourceFilter: true,
-    sourceLabel: "Tous les workers",
-    showClearButton: true,
-    clearConfirmMessage: "Supprimer tous les journaux workers ?",
-  },
-  {
-    key: "api",
-    label: "API",
-    category: "api",
-    columns: [
-      { key: "timestamp", label: "Date" },
-      { key: "level", label: "Niveau" },
-      { key: "message", label: "Message" },
-      { key: "details", label: "Détails" },
-    ],
-    showClearButton: true,
-    clearConfirmMessage: "Supprimer tous les journaux API ?",
-  },
-  {
-    key: "websocket",
-    label: "WebSocket",
-    category: "websocket",
-    columns: [
-      { key: "timestamp", label: "Date" },
-      { key: "level", label: "Niveau" },
-      { key: "message", label: "Message" },
-      { key: "details", label: "Détails" },
-    ],
-    showClearButton: true,
-    clearConfirmMessage: "Supprimer tous les journaux WebSocket ?",
-  },
+  // Bots / Workers / API / WebSocket sont fusionnes dans l'onglet "Système"
+  // qui les affiche en 4 colonnes cote a cote (cf composant LogsColumn).
 ];
 
 function statusClass(code: unknown): string {
@@ -113,9 +58,24 @@ function statusClass(code: unknown): string {
       >
         {{ tab.label }}
       </button>
+      <button
+        class="tab-btn"
+        :class="{ active: activeTab === 'system' }"
+        @click="activeTab = 'system'"
+      >
+        Système
+      </button>
     </div>
 
-    <div class="tab-content">
+    <!-- Onglet Système : 4 colonnes cote a cote (Bots / Workers / API / WS) -->
+    <div v-if="activeTab === 'system'" class="system-grid">
+      <LogsColumn title="Bots" category="bot" />
+      <LogsColumn title="Workers" category="worker" />
+      <LogsColumn title="API" category="api" />
+      <LogsColumn title="WebSocket" category="websocket" />
+    </div>
+
+    <div v-else class="tab-content">
       <template v-for="tab in tabs" :key="tab.key">
         <LogsTemplate
           v-if="activeTab === tab.key"
@@ -222,6 +182,20 @@ function statusClass(code: unknown): string {
 
 .tab-content {
   min-height: 0;
+}
+
+/* Onglet Système : 4 colonnes responsives. */
+.system-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+@media (max-width: 1400px) {
+  .system-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 800px) {
+  .system-grid { grid-template-columns: 1fr; }
 }
 
 /* Detail tag styles for API and WebSocket tabs */
