@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from "vue";
 import { systemService, type SystemInfo } from "@/services/systemService";
 import { useToast } from "@/composables/useToast";
 import DockerAdminSection from "@/components/organisms/DockerAdminSection.vue";
+import DiskTrendChart from "@/components/organisms/DiskTrendChart.vue";
 
 const { error: showError } = useToast();
 
@@ -280,6 +281,9 @@ const allHealthy = computed(() => {
           </div>
         </div>
       </section>
+
+      <!-- ── Disque tendance 7j (depuis cron host) ── -->
+      <DiskTrendChart />
 
       <!-- ── Administration Docker (overview, conteneurs, images, volumes, networks, prune) ── -->
       <DockerAdminSection />

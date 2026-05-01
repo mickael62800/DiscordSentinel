@@ -644,6 +644,55 @@ pub async fn trivy_vulns(
     Ok(Json(data))
 }
 
+// File integrity
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileIntegrityEntry {
+    pub path: String,
+    pub sha256: String,
+    pub modified_at: String,
+    pub status: String, // "ok" | "modified" | "missing"
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct FileIntegrityResponse {
+    pub updated_at: String,
+    pub baseline_at: Option<String>,
+    pub modified_count: i64,
+    pub files: Vec<FileIntegrityEntry>,
+}
+
+pub async fn file_integrity(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<FileIntegrityResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: FileIntegrityResponse = read_host_json("/var/lib/sentinel/file-integrity.json", "file-integrity")?;
+    Ok(Json(data))
+}
+
+// Outbound connections
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OutboundConnection {
+    pub local_addr: String,
+    pub remote_addr: String,
+    pub remote_host: Option<String>,
+    pub process: Option<String>,
+}
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OutboundResponse {
+    pub updated_at: String,
+    pub total: i64,
+    pub connections: Vec<OutboundConnection>,
+}
+
+pub async fn outbound_connections(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+) -> Result<Json<OutboundResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let data: OutboundResponse = read_host_json("/var/lib/sentinel/outbound.json", "outbound")?;
+    Ok(Json(data))
+}
+
 // ── Last successful logins ──────────────────────────────────────────────
 
 #[derive(Debug, Serialize)]

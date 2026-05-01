@@ -7,7 +7,9 @@ import {
   type SecurityWindow,
   type ConnectionsResponse,
   type DiskTrendResponse,
+  type FileIntegrityResponse,
   type OpenPortsResponse,
+  type OutboundResponse,
   type ServerEventDto,
   type SshFailuresResponse,
   type SuccessfulLoginEntry,
@@ -56,6 +58,10 @@ const openPorts = ref<OpenPortsResponse | null>(null);
 const portsError = ref<string | null>(null);
 const trivy = ref<TrivyResponse | null>(null);
 const trivyError = ref<string | null>(null);
+const integrity = ref<FileIntegrityResponse | null>(null);
+const integrityError = ref<string | null>(null);
+const outbound = ref<OutboundResponse | null>(null);
+const outboundError = ref<string | null>(null);
 
 // ── Loaders ──
 async function loadTopIps() {
@@ -105,6 +111,16 @@ async function loadTrivy() {
   try { trivy.value = await serverSecurityService.trivy(); }
   catch (e: any) { trivyError.value = e?.message ?? String(e); trivy.value = null; }
 }
+async function loadIntegrity() {
+  integrityError.value = null;
+  try { integrity.value = await serverSecurityService.fileIntegrity(); }
+  catch (e: any) { integrityError.value = e?.message ?? String(e); integrity.value = null; }
+}
+async function loadOutbound() {
+  outboundError.value = null;
+  try { outbound.value = await serverSecurityService.outbound(); }
+  catch (e: any) { outboundError.value = e?.message ?? String(e); outbound.value = null; }
+}
 async function loadTls() {
   tlsError.value = null;
   try { tls.value = await serverSecurityService.tlsCert(); }
@@ -136,7 +152,7 @@ async function refreshAll() {
   await Promise.allSettled([
     loadTopIps(), loadAuthFailures(), loadBanned(), loadServerEvents(), loadTls(),
     loadLastLogins(), loadSshFailures(), loadDiskTrend(), loadConnections(),
-    loadOpenPorts(), loadTrivy(),
+    loadOpenPorts(), loadTrivy(), loadIntegrity(), loadOutbound(),
   ]);
   refreshing.value = false;
 }
@@ -501,9 +517,34 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         </div>
       </section>
 
-      <section class="card placeholder-card">
-        <h2>🌐 Connexions outbound</h2>
-        <p class="muted small">À venir : qui l'API/bot contactent à l'extérieur (détection exfiltration).</p>
+      <!-- Connexions outbound -->
+      <section class="card">
+        <div class="card-head">
+          <h2>🌐 Connexions outbound ({{ outbound?.total ?? 0 }})</h2>
+          <button class="btn xs" @click="loadOutbound">↻</button>
+        </div>
+        <div v-if="outboundError" class="info">
+          <p class="small">{{ outboundError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh outbound</code></p>
+        </div>
+        <div v-else-if="outbound">
+          <p class="muted small">
+            Maj {{ fmtDate(outbound.updated_at) }} · IPs externes contactées par les services serveur
+          </p>
+          <table v-if="outbound.connections.length > 0" class="data-table">
+            <thead>
+              <tr><th>Local</th><th>Remote (IP externe)</th><th>Process</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="(c, i) in outbound.connections" :key="i">
+                <td class="small mono">{{ c.local_addr }}</td>
+                <td class="small mono">{{ c.remote_addr }}</td>
+                <td class="small">{{ c.process ?? "—" }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="empty">Aucune connexion sortante détectée.</div>
+        </div>
       </section>
       <section class="card placeholder-card">
         <h2>🔐 TLS handshake errors</h2>
@@ -578,9 +619,44 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         </div>
       </section>
 
-      <section class="card placeholder-card">
-        <h2>📁 Intégrité fichiers critiques</h2>
-        <p class="muted small">À venir : SHA256 nginx.conf, docker-compose.yml, .env. Alerte si modifié hors du process normal.</p>
+      <!-- Intégrité fichiers -->
+      <section class="card">
+        <div class="card-head">
+          <h2>📁 Intégrité fichiers critiques ({{ integrity?.files.length ?? 0 }})</h2>
+          <button class="btn xs" @click="loadIntegrity">↻</button>
+        </div>
+        <div v-if="integrityError" class="info">
+          <p class="small">{{ integrityError }}</p>
+          <p class="hint small">Setup : <code>sudo bash infra/scripts/setup-host-security.sh file-integrity</code></p>
+        </div>
+        <div v-else-if="integrity">
+          <p class="muted small">
+            Maj {{ fmtDate(integrity.updated_at) }} ·
+            <strong v-if="integrity.modified_count > 0" class="alert">⚠️ {{ integrity.modified_count }} fichier(s) modifié(s)</strong>
+            <span v-else>✅ Tous les fichiers correspondent au baseline</span>
+          </p>
+          <table v-if="integrity.files.length > 0" class="data-table">
+            <thead>
+              <tr><th>Chemin</th><th>SHA256</th><th>Modifié</th><th>Statut</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="f in integrity.files" :key="f.path" :class="{ alert: f.status === 'modified' }">
+                <td class="small mono">{{ f.path }}</td>
+                <td class="small mono muted">{{ f.sha256.slice(0, 16) }}…</td>
+                <td class="small muted">{{ f.modified_at }}</td>
+                <td>
+                  <span class="badge" :class="{
+                    ok: f.status === 'ok',
+                    danger: f.status === 'modified',
+                    warning: f.status === 'missing'
+                  }">
+                    {{ f.status === 'ok' ? '✅ OK' : f.status === 'modified' ? '⚠️ MODIFIÉ' : '❌ MANQUANT' }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
 

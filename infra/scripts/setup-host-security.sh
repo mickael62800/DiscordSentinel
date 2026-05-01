@@ -324,6 +324,128 @@ EOF
     echo "  ✅ open-ports configure"
 }
 
+# ── Module file-integrity ──────────────────────────────────────────────
+
+setup_file_integrity() {
+    echo "📁 file-integrity"
+
+    cat > "$SCRIPT_DIR/sentinel-file-integrity.sh" <<'EOF'
+#!/bin/bash
+set -eu
+OUT=/var/lib/sentinel/file-integrity.json
+BASELINE=/var/lib/sentinel/.integrity-baseline.txt
+mkdir -p /var/lib/sentinel
+
+# Liste des fichiers a surveiller (modifie selon ton setup)
+FILES=(
+    "/etc/nginx/conf.d/default.conf"
+    "/etc/fail2ban/jail.local"
+    "/etc/cron.d/fail2ban-export"
+    "/etc/cron.d/sentinel-apply-bans"
+    "/etc/cron.d/sentinel-ssh-failures"
+    "/usr/local/bin/sentinel-apply-bans.sh"
+    "/usr/local/bin/fail2ban-export.sh"
+    "/etc/ufw/user.rules"
+)
+
+# Au premier run, etablit le baseline
+if [ ! -f $BASELINE ]; then
+    : > $BASELINE
+    for F in "${FILES[@]}"; do
+        if [ -f "$F" ]; then
+            HASH=$(sha256sum "$F" | awk '{print $1}')
+            echo -e "$F\t$HASH" >> $BASELINE
+        fi
+    done
+fi
+
+NOW=$(date -Iseconds)
+BASELINE_AT=$(stat -c %y $BASELINE 2>/dev/null | cut -d. -f1 || echo "")
+MODIFIED=0
+
+{
+    echo "{"
+    echo "  \"updated_at\": \"$NOW\","
+    echo "  \"baseline_at\": \"$BASELINE_AT\","
+    echo "  \"files\": ["
+    F_FIRST=1
+    for FILE in "${FILES[@]}"; do
+        STATUS="missing"
+        HASH=""
+        MTIME=""
+        if [ -f "$FILE" ]; then
+            HASH=$(sha256sum "$FILE" | awk '{print $1}')
+            MTIME=$(stat -c %y "$FILE" 2>/dev/null | cut -d. -f1)
+            BASELINE_HASH=$(grep -F "$FILE" $BASELINE 2>/dev/null | awk '{print $2}' || echo "")
+            if [ -z "$BASELINE_HASH" ] || [ "$HASH" = "$BASELINE_HASH" ]; then
+                STATUS="ok"
+            else
+                STATUS="modified"
+                MODIFIED=$((MODIFIED+1))
+            fi
+        fi
+        [ $F_FIRST -eq 0 ] && echo "    ,"
+        echo "    {\"path\":\"$FILE\",\"sha256\":\"$HASH\",\"modified_at\":\"$MTIME\",\"status\":\"$STATUS\"}"
+        F_FIRST=0
+    done
+    echo "  ],"
+    echo "  \"modified_count\": $MODIFIED"
+    echo "}"
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-file-integrity.sh"
+    "$SCRIPT_DIR/sentinel-file-integrity.sh"
+    echo "*/30 * * * * root /usr/local/bin/sentinel-file-integrity.sh" > /etc/cron.d/sentinel-file-integrity
+    echo "  ✅ file-integrity configure (baseline initial cree)"
+    echo "  ℹ Pour re-baseliner apres modif legitime : rm /var/lib/sentinel/.integrity-baseline.txt"
+}
+
+# ── Module outbound ────────────────────────────────────────────────────
+
+setup_outbound() {
+    echo "🌐 outbound"
+    apt_install iproute2
+
+    cat > "$SCRIPT_DIR/sentinel-outbound.sh" <<'EOF'
+#!/bin/bash
+set -eu
+OUT=/var/lib/sentinel/outbound.json
+mkdir -p /var/lib/sentinel
+NOW=$(date -Iseconds)
+
+# Connexions sortantes etablies (filtre out localhost/LAN)
+ENTRIES=$(ss -tnp state established 2>/dev/null | tail -n +2 | \
+    awk '$5 !~ /^127\.|^10\.|^172\.|^192\.168\.|^::1/' || true)
+TOTAL=$(echo "$ENTRIES" | grep -c . || echo 0)
+
+{
+    echo "{"
+    echo "  \"updated_at\": \"$NOW\","
+    echo "  \"total\": $TOTAL,"
+    echo "  \"connections\": ["
+    F=1
+    echo "$ENTRIES" | head -100 | while IFS= read -r LINE; do
+        [ -z "$LINE" ] && continue
+        LOCAL=$(echo "$LINE" | awk '{print $4}')
+        REMOTE=$(echo "$LINE" | awk '{print $5}')
+        # Process (champ users:(("name"...)))
+        PROC=$(echo "$LINE" | grep -oE 'users:\(\("[^"]+"' | sed 's/users:(("//' | head -1 || echo "")
+        [ $F -eq 0 ] && echo "    ,"
+        echo "    {\"local_addr\":\"$LOCAL\",\"remote_addr\":\"$REMOTE\",\"remote_host\":null,\"process\":\"$PROC\"}"
+        F=0
+    done
+    echo "  ]"
+    echo "}"
+} > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
+chmod 644 "$OUT"
+EOF
+    chmod +x "$SCRIPT_DIR/sentinel-outbound.sh"
+    "$SCRIPT_DIR/sentinel-outbound.sh"
+    echo "*/3 * * * * root /usr/local/bin/sentinel-outbound.sh" > /etc/cron.d/sentinel-outbound
+    echo "  ✅ outbound configure"
+}
+
 # ── Module trivy ────────────────────────────────────────────────────────
 
 setup_trivy() {
@@ -408,7 +530,9 @@ main() {
         disk-trend)   setup_disk_trend ;;
         connections)  setup_connections ;;
         open-ports)   setup_open_ports ;;
-        trivy)        setup_trivy ;;
+        trivy)          setup_trivy ;;
+        file-integrity) setup_file_integrity ;;
+        outbound)       setup_outbound ;;
         all)
             setup_fail2ban
             setup_ban_apply
@@ -417,6 +541,8 @@ main() {
             setup_connections
             setup_open_ports
             setup_trivy
+            setup_file_integrity
+            setup_outbound
             ;;
         help|--help|-h|*)
             cat <<'HELP'
@@ -430,6 +556,8 @@ Modules :
   connections    Cron snapshot ss -tn -> connections.json (2 min)
   open-ports     Cron nmap localhost -> open-ports.json (1h)
   trivy          Scan vulns Docker images -> trivy.json (1x/jour 3h)
+  file-integrity SHA256 fichiers critiques -> file-integrity.json (30 min)
+  outbound       Connexions sortantes -> outbound.json (3 min)
   all            Tous les modules
 
 Exemples :

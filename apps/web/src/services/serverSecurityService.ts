@@ -139,6 +139,33 @@ export interface TrivyResponse {
   vulnerabilities: TrivyVuln[];
 }
 
+// File integrity
+export interface FileIntegrityEntry {
+  path: string;
+  sha256: string;
+  modified_at: string;
+  status: "ok" | "modified" | "missing";
+}
+export interface FileIntegrityResponse {
+  updated_at: string;
+  baseline_at: string | null;
+  modified_count: number;
+  files: FileIntegrityEntry[];
+}
+
+// Outbound connections
+export interface OutboundConnection {
+  local_addr: string;
+  remote_addr: string;
+  remote_host: string | null;
+  process: string | null;
+}
+export interface OutboundResponse {
+  updated_at: string;
+  total: number;
+  connections: OutboundConnection[];
+}
+
 export interface SuccessfulLoginEntry {
   timestamp: string;
   discord_user_id: string;
@@ -208,6 +235,12 @@ export const serverSecurityService = {
   },
   trivy(): Promise<TrivyResponse> {
     return httpGet("/api/security/trivy");
+  },
+  fileIntegrity(): Promise<FileIntegrityResponse> {
+    return httpGet("/api/security/file-integrity");
+  },
+  outbound(): Promise<OutboundResponse> {
+    return httpGet("/api/security/outbound");
   },
   banIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
     return httpPost("/api/security/ban-ip", { ip, reason });

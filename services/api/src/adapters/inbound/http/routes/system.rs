@@ -106,6 +106,8 @@ pub fn routes() -> Router<AppState> {
         .route("/api/security/connections", get(handlers::system::security::active_connections))
         .route("/api/security/open-ports", get(handlers::system::security::open_ports))
         .route("/api/security/trivy", get(handlers::system::security::trivy_vulns))
+        .route("/api/security/file-integrity", get(handlers::system::security::file_integrity))
+        .route("/api/security/outbound", get(handlers::system::security::outbound_connections))
         .route(
             "/api/security/cleanup",
             delete(handlers::system::security::cleanup_security_logs),
