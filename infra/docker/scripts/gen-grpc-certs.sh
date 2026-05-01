@@ -82,8 +82,8 @@ EOF
     rm -f client.csr client.cnf
 fi
 
-# Permissions : lecture pour tous (les conteneurs Rust lancent en uid 1000).
-chmod 644 ca.pem server.pem client.pem
-chmod 640 server.key client.key
+# Permissions : lecture pour tous (les conteneurs Rust lancent en uid 1000,
+# le volume Docker est isole aux services montes, pas de risque externe).
+chmod 644 ca.pem server.pem client.pem server.key client.key
 echo "[gen-grpc-certs] Done. Files in $CERT_DIR:"
 ls -la "$CERT_DIR"
