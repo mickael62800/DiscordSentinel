@@ -883,17 +883,41 @@ async function handleActionSubmit() {
         >Notes &amp; Preuves</button>
       </div>
       <StrikesPage v-if="trackingSubTab === 'strikes'" />
-      <div v-else-if="trackingSubTab === 'notes-evidence'" class="stacked-sections">
-        <section class="stacked-block">
-          <h2 class="stacked-title">📝 Notes de modération</h2>
-          <p class="stacked-hint">Notes libres attachées à un utilisateur (visibles entre modérateurs).</p>
-          <NotesPage />
+      <div v-else-if="trackingSubTab === 'notes-evidence'">
+        <!-- Champ ID user partagé entre Notes et Preuves -->
+        <section class="card shared-user-bar">
+          <h2>👤 Utilisateur ciblé</h2>
+          <p class="muted small">
+            Saisis un ID Discord — les notes et les preuves de modération
+            de cet utilisateur s'affichent dans les deux panneaux ci-dessous.
+          </p>
+          <div class="lookup">
+            <input
+              v-model="sharedUserId"
+              placeholder="ID Discord de l'utilisateur (ex: 123456789012345678)"
+              type="text"
+            />
+            <button v-if="sharedUserId" class="btn-secondary" @click="sharedUserId = ''">
+              Effacer
+            </button>
+          </div>
         </section>
-        <section class="stacked-block">
-          <h2 class="stacked-title">📎 Preuves</h2>
-          <p class="stacked-hint">Pièces jointes (URL/description) attachées à une action de modération précise.</p>
-          <EvidencePage />
-        </section>
+
+        <div v-if="sharedUserId.trim()" class="stacked-sections">
+          <section class="stacked-block">
+            <h2 class="stacked-title">📝 Notes de modération</h2>
+            <p class="stacked-hint">Notes libres attachées à cet utilisateur (visibles entre modérateurs).</p>
+            <NotesPage embedded />
+          </section>
+          <section class="stacked-block">
+            <h2 class="stacked-title">📎 Preuves</h2>
+            <p class="stacked-hint">Pièces jointes (URL/description) attachées à une action de modération précise.</p>
+            <EvidencePage embedded />
+          </section>
+        </div>
+        <div v-else class="empty-shared">
+          Saisis un ID utilisateur ci-dessus pour voir ses notes et preuves.
+        </div>
       </div>
     </div>
 
@@ -1602,6 +1626,28 @@ async function handleActionSubmit() {
 .sub-tab.active {
   color: var(--accent);
   border-bottom-color: var(--accent);
+}
+
+.shared-user-bar { margin-bottom: 20px; }
+.shared-user-bar .lookup { display: flex; gap: 10px; margin-top: 12px; }
+.shared-user-bar .lookup input {
+  flex: 1;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: "JetBrains Mono", monospace;
+}
+.shared-user-bar .lookup input:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+.empty-shared {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-style: italic;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
 }
 
 .stacked-sections {

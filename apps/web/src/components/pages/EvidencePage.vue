@@ -7,6 +7,13 @@ import { evidenceService } from "@/services/moderationAdvancedService";
 import type { EvidenceEntry } from "@/types/moderation-advanced";
 import type { Infraction } from "@/types";
 
+interface Props {
+  /** Quand true, cache l'en-tete et le champ de recherche (utilise dans le
+   *  sous-onglet "Notes & Preuves" ou l'ID est saisi au niveau parent). */
+  embedded?: boolean;
+}
+const props = defineProps<Props>();
+
 const { success, error: showError } = useToast();
 
 // Flow : user_id -> liste des actions de ce user -> selection d'une action -> preuves attachees
@@ -81,16 +88,19 @@ function formatDate(iso: string): string {
   return new Date(iso).toLocaleString("fr-FR");
 }
 
-// Reset si l'user change
-watch(lookupUserId, () => {
+// Reset si l'user change. En embedded, fetch automatiquement les actions.
+watch(lookupUserId, async (id) => {
   selectedActionId.value = null;
   evidenceEntries.value = [];
+  if (props.embedded && id.trim()) {
+    await fetchInfractions();
+  }
 });
 </script>
 
 <template>
   <div class="page">
-    <header class="page-header">
+    <header v-if="!props.embedded" class="page-header">
       <h1>📎 Preuves modération</h1>
       <p class="lede">
         Recherche un utilisateur, choisis une de ses actions de modération,
@@ -99,8 +109,8 @@ watch(lookupUserId, () => {
       </p>
     </header>
 
-    <!-- Étape 1 : recherche user -->
-    <section class="card">
+    <!-- Étape 1 : recherche user (cachee en embedded, le parent gere) -->
+    <section v-if="!props.embedded" class="card">
       <h2>1. Utilisateur ciblé</h2>
       <div class="lookup">
         <input

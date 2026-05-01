@@ -1,10 +1,22 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useNotes } from "@/composables/useNotes";
 
+interface Props {
+  /** Quand true, cache le bloc de recherche (utilise quand monte dans le sous-onglet
+   *  "Notes & Preuves" ou un seul champ ID user est expose au niveau parent). */
+  embedded?: boolean;
+}
+const props = defineProps<Props>();
+
 const { guildIdFilter } = useGuildSelector();
 const { notes, lookupUserId, loading, fetch, add, remove } = useNotes();
+
+// En mode embedded, fetch automatiquement quand l'ID partage change.
+watch(lookupUserId, (id) => {
+  if (props.embedded && id.trim()) void fetch(id);
+});
 
 const draft = ref({
   content: "",
@@ -64,7 +76,7 @@ function formatDate(iso: string): string {
 
 <template>
   <div class="notes-page">
-    <header class="page-header">
+    <header v-if="!props.embedded" class="page-header">
       <h1>📝 Notes modération</h1>
       <p class="lede">
         Notes internes attachées à un utilisateur — invisibles pour lui,
@@ -73,7 +85,7 @@ function formatDate(iso: string): string {
       </p>
     </header>
 
-    <section class="card">
+    <section v-if="!props.embedded" class="card">
       <h2>Recherche</h2>
       <div class="lookup">
         <input
