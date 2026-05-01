@@ -68,7 +68,8 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "community.temp-roles", label: "Bouton Rôles temporaires", category: "Dashboard", minRole: "moderator" },
 
   // ── Dashboard : logs / jeux ──
-  { key: "logs.journal", label: "Bouton Journal logs", category: "Dashboard", minRole: "admin" },
+  { key: "logs.journal", label: "Bouton Journal logs Discord", category: "Dashboard", minRole: "admin" },
+  { key: "logs.system", label: "Bouton Logs système (bots/workers/API/WS)", category: "Dashboard", minRole: "admin" },
   { key: "games.hub", label: "Bouton Jeux", category: "Dashboard", minRole: "viewer" },
   { key: "games.coude", label: "Bouton Coude (hub : stats / social / tournoi)", category: "Dashboard", minRole: "viewer" },
   { key: "games.blackjack", label: "Bouton Blackjack", category: "Dashboard", minRole: "viewer" },

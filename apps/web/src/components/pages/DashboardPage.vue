@@ -48,6 +48,7 @@ const allSections: Section[] = [
   { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard", requiredBot: "audit-bot" },
 
   { key: "logs.journal", path: "/logs", label: "Journaux", icon: "list" },
+  { key: "logs.system", path: "/system-logs", label: "Logs système", icon: "activity" },
 
   { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
   { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap", requiredBot: "coude-bot" },

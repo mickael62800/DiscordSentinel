@@ -2,7 +2,6 @@
 import { ref } from "vue";
 import type { TableColumn } from "../../types";
 import LogsTemplate from "../organisms/LogsTemplate.vue";
-import LogsColumn from "../organisms/LogsColumn.vue";
 
 interface Tab {
   key: string;
@@ -25,9 +24,8 @@ const tabs: Tab[] = [
     columns: [
       { key: "timestamp", label: "Date" },
       { key: "level", label: "Niveau" },
-      { key: "bot", label: "Source" },
-      { key: "server", label: "Serveur" },
       { key: "message", label: "Message" },
+      { key: "details", label: "Détails" },
     ],
     // Plus qu'une seule source en pratique -> filtre inutile, on le cache.
     showSourceFilter: false,
@@ -48,34 +46,7 @@ function statusClass(code: unknown): string {
   <div class="logs-page">
     <h1 class="page-title">Journaux</h1>
 
-    <div class="tab-bar">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        class="tab-btn"
-        :class="{ active: activeTab === tab.key }"
-        @click="activeTab = tab.key"
-      >
-        {{ tab.label }}
-      </button>
-      <button
-        class="tab-btn"
-        :class="{ active: activeTab === 'system' }"
-        @click="activeTab = 'system'"
-      >
-        Système
-      </button>
-    </div>
-
-    <!-- Onglet Système : 4 colonnes cote a cote (Bots / Workers / API / WS) -->
-    <div v-if="activeTab === 'system'" class="system-grid">
-      <LogsColumn title="Bots" category="bot" />
-      <LogsColumn title="Workers" category="worker" />
-      <LogsColumn title="API" category="api" />
-      <LogsColumn title="WebSocket" category="websocket" />
-    </div>
-
-    <div v-else class="tab-content">
+    <div class="tab-content">
       <template v-for="tab in tabs" :key="tab.key">
         <LogsTemplate
           v-if="activeTab === tab.key"

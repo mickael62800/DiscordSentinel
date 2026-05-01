@@ -22,6 +22,7 @@ export const routes: RouteRecordRaw[] = [
   { path: "/stats", name: "stats", component: () => import("../components/pages/StatsPage.vue") },
   { path: "/modstats", name: "modstats", component: () => import("../components/pages/ModstatsPage.vue") },
   { path: "/logs", name: "logs", component: () => import("../components/pages/LogsPage.vue") },
+  { path: "/system-logs", name: "system-logs", component: () => import("../components/pages/SystemLogsPage.vue") },
   { path: "/audit", name: "audit", component: () => import("../components/pages/AuditPage.vue") },
   { path: "/name-history", name: "name-history", component: () => import("../components/pages/NameHistoryPage.vue") },
 
