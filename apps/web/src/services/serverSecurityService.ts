@@ -70,6 +70,21 @@ export interface TlsCertInfo {
 
 export type SecurityWindow = "1h" | "24h" | "7d";
 
+export interface TrafficDatapoint {
+  timestamp: string;
+  total: number;
+  errors: number;
+}
+
+export interface TrafficTrendResponse {
+  datapoints: TrafficDatapoint[];
+  baseline_avg: number;
+  peak: number;
+  peak_at: string | null;
+  alert: boolean;
+  alert_reason: string | null;
+}
+
 export interface CleanupResponse {
   deleted_api_logs: number;
   deleted_audit_logs: number;
@@ -95,6 +110,9 @@ export const serverSecurityService = {
   },
   tlsCert(): Promise<TlsCertInfo> {
     return httpGet("/api/security/tls-cert");
+  },
+  trafficTrend(window: SecurityWindow | "6h" = "24h", bucket_minutes = 5): Promise<TrafficTrendResponse> {
+    return httpGet(`/api/security/traffic-trend?window=${window}&bucket_minutes=${bucket_minutes}`);
   },
   banIp(ip: string, reason?: string): Promise<{ ok: boolean; message: string }> {
     return httpPost("/api/security/ban-ip", { ip, reason });

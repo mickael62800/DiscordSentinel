@@ -10,6 +10,7 @@ import {
   type TopIpEntry,
 } from "@/services/serverSecurityService";
 import { useToast } from "@/composables/useToast";
+import TrafficTrendChart from "@/components/organisms/TrafficTrendChart.vue";
 
 const { error: showError } = useToast();
 
@@ -287,10 +288,8 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
         <h2>🕷 Patterns suspects nginx</h2>
         <p class="muted small">À venir : détection scanners (<code>/wp-admin</code>, <code>/.env</code>), tentatives SQLi/XSS dans les logs nginx.</p>
       </section>
-      <section class="card placeholder-card">
-        <h2>📈 Trafic anormal</h2>
-        <p class="muted small">À venir : graphe req/s sur 24h + alerte si pic &gt; 3× moyenne mobile.</p>
-      </section>
+      <!-- Trafic anormal (vrai composant) -->
+      <TrafficTrendChart />
     </div>
 
     <!-- ════════ ONGLET 3 : BANS & PROTECTIONS ════════ -->

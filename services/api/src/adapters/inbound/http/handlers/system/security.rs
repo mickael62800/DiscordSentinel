@@ -503,6 +503,100 @@ pub async fn unban_ip(
     }))
 }
 
+// ── Trafic anormal : graphe req/s sur N heures ─────────────────────────
+
+#[derive(Debug, Deserialize)]
+pub struct TrafficTrendQuery {
+    /// Fenetre : "1h", "6h", "24h", "7d"
+    pub window: Option<String>,
+    /// Bucket : taille en minutes (5 par defaut)
+    pub bucket_minutes: Option<i32>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TrafficDatapoint {
+    pub timestamp: String,
+    pub total: i64,
+    pub errors: i64, // 4xx + 5xx
+}
+
+#[derive(Debug, Serialize)]
+pub struct TrafficTrendResponse {
+    pub datapoints: Vec<TrafficDatapoint>,
+    pub baseline_avg: f64,
+    pub peak: i64,
+    pub peak_at: Option<String>,
+    pub alert: bool,
+    pub alert_reason: Option<String>,
+}
+
+pub async fn traffic_trend(
+    State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
+    Query(q): Query<TrafficTrendQuery>,
+) -> Result<Json<TrafficTrendResponse>, ApiError> {
+    gate_admin(&state, &rbac)?;
+    let window = q.window.as_deref().unwrap_or("24h");
+    let interval = window_to_interval(window);
+    let bucket_min = q.bucket_minutes.unwrap_or(5).max(1).min(60) as i64;
+
+    // Bucket par tranches de N minutes via date_trunc + arithmetique
+    let sql = format!(
+        "SELECT \
+            to_char(date_trunc('hour', timestamp) + \
+                INTERVAL '{bucket_min} min' * \
+                FLOOR(EXTRACT(MINUTE FROM timestamp) / {bucket_min}), \
+                'YYYY-MM-DD\"T\"HH24:MI:SS\"Z\"') AS bucket, \
+            COUNT(*)::bigint AS total, \
+            SUM(CASE WHEN level IN ('warn', 'error') THEN 1 ELSE 0 END)::bigint AS errors \
+         FROM logs \
+         WHERE category = 'api' \
+           AND timestamp > NOW() - INTERVAL '{interval}' \
+         GROUP BY bucket \
+         ORDER BY bucket ASC"
+    );
+
+    let rows = sqlx::query_as::<_, (String, i64, i64)>(&sql)
+        .fetch_all(&state.pg_pool)
+        .await
+        .map_err(|e| ApiError(DomainError::Internal(format!("query traffic: {e}"))))?;
+
+    let datapoints: Vec<TrafficDatapoint> = rows
+        .into_iter()
+        .map(|(ts, total, errors)| TrafficDatapoint { timestamp: ts, total, errors })
+        .collect();
+
+    let totals: Vec<i64> = datapoints.iter().map(|d| d.total).collect();
+    let n = totals.len() as f64;
+    let sum: i64 = totals.iter().sum();
+    let baseline_avg = if n > 0.0 { sum as f64 / n } else { 0.0 };
+    let peak = totals.iter().copied().max().unwrap_or(0);
+    let peak_at = datapoints
+        .iter()
+        .max_by_key(|d| d.total)
+        .map(|d| d.timestamp.clone());
+
+    // Alerte si pic > 3x moyenne (et data > 10 buckets pour avoir du sens)
+    let alert = baseline_avg > 0.0 && datapoints.len() > 10 && (peak as f64) > baseline_avg * 3.0;
+    let alert_reason = if alert {
+        Some(format!(
+            "Pic à {} req sur 1 bucket (3× moyenne {:.1})",
+            peak, baseline_avg
+        ))
+    } else {
+        None
+    };
+
+    Ok(Json(TrafficTrendResponse {
+        datapoints,
+        baseline_avg,
+        peak,
+        peak_at,
+        alert,
+        alert_reason,
+    }))
+}
+
 // ── Cleanup : purge des logs de securite ────────────────────────────────
 
 #[derive(Debug, Deserialize)]
