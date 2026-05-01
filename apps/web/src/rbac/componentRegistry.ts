@@ -46,6 +46,49 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "system.members", label: "Bouton Membres", category: "Dashboard", minRole: "moderator" },
   { key: "config.ai-dataset", label: "Bouton Dataset IA", category: "Dashboard", minRole: "admin" },
 
+  // ── Dashboard : modération (sous-pages) ──
+  { key: "moderation.rules", label: "Bouton Règles", category: "Dashboard", minRole: "moderator" },
+  { key: "moderation.strikes", label: "Bouton Strikes", category: "Dashboard", minRole: "moderator" },
+  { key: "moderation.notes", label: "Bouton Notes", category: "Dashboard", minRole: "moderator" },
+  { key: "moderation.reminders", label: "Bouton Rappels", category: "Dashboard", minRole: "moderator" },
+  { key: "moderation.evidence", label: "Bouton Preuves", category: "Dashboard", minRole: "moderator" },
+  { key: "moderation.review", label: "Bouton Reviews", category: "Dashboard", minRole: "moderator" },
+  { key: "moderation.members", label: "Bouton Membres", category: "Dashboard", minRole: "moderator" },
+  { key: "moderation.name-history", label: "Bouton Historique noms", category: "Dashboard", minRole: "moderator" },
+
+  // ── Dashboard : sécurité ──
+  { key: "security.automod", label: "Bouton Automod", category: "Dashboard", minRole: "admin" },
+
+  // ── Dashboard : community ──
+  { key: "community.welcome", label: "Bouton Welcome", category: "Dashboard", minRole: "admin" },
+  { key: "community.tickets", label: "Bouton Tickets", category: "Dashboard", minRole: "moderator" },
+  { key: "community.voice-channels", label: "Bouton Salons vocaux", category: "Dashboard", minRole: "moderator" },
+  { key: "community.voice-themes", label: "Bouton Thèmes vocaux", category: "Dashboard", minRole: "admin" },
+  { key: "community.role-panels", label: "Bouton Role panels", category: "Dashboard", minRole: "admin" },
+  { key: "community.levels", label: "Bouton Niveaux", category: "Dashboard", minRole: "viewer" },
+  { key: "community.levels-config", label: "Bouton Config niveaux", category: "Dashboard", minRole: "admin" },
+  { key: "community.sponsorships", label: "Bouton Parrainages", category: "Dashboard", minRole: "moderator" },
+  { key: "community.temp-roles", label: "Bouton Rôles temporaires", category: "Dashboard", minRole: "moderator" },
+
+  // ── Dashboard : logs / jeux ──
+  { key: "logs.journal", label: "Bouton Journal logs", category: "Dashboard", minRole: "admin" },
+  { key: "games.hub", label: "Bouton Jeux", category: "Dashboard", minRole: "viewer" },
+  { key: "games.coude", label: "Bouton Coude", category: "Dashboard", minRole: "viewer" },
+  { key: "games.coude-social", label: "Bouton Coude social", category: "Dashboard", minRole: "viewer" },
+  { key: "games.blackjack", label: "Bouton Blackjack", category: "Dashboard", minRole: "viewer" },
+  { key: "games.slot", label: "Bouton Slot", category: "Dashboard", minRole: "viewer" },
+  { key: "games.wheel", label: "Bouton Roue", category: "Dashboard", minRole: "viewer" },
+  { key: "games.wallet", label: "Bouton Wallet", category: "Dashboard", minRole: "viewer" },
+  { key: "games.tournaments", label: "Bouton Tournois", category: "Dashboard", minRole: "moderator" },
+  { key: "games.taunts", label: "Bouton Taunts", category: "Dashboard", minRole: "admin" },
+
+  // ── Dashboard : config (admin) ──
+  { key: "config.components", label: "Bouton Config composants", category: "Dashboard", minRole: "admin" },
+  { key: "config.rbac", label: "Bouton Config RBAC", category: "Dashboard", minRole: "owner" },
+  { key: "config.system-ops", label: "Bouton System Ops", category: "Dashboard", minRole: "admin" },
+  { key: "config.server-health", label: "Bouton État serveur (config)", category: "Dashboard", minRole: "admin" },
+  { key: "config.settings", label: "Bouton Paramètres (config)", category: "Dashboard", minRole: "admin" },
+
   // ── Docker ──
   { key: "docker.section", label: "Section Docker (visibilité)", category: "Docker", minRole: "admin" },
   { key: "docker.action.start", label: "Démarrer un conteneur", category: "Docker", minRole: "owner" },
