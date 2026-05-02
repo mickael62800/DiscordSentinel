@@ -23,6 +23,7 @@ impl ContainerRuntime for NoopContainerRuntime {
     async fn pull_image_if_missing(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
     async fn create_container(&self, _: &ContainerSpec) -> Result<String, DomainError> { Err(err()) }
     async fn start_container(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
+    async fn upload_file_to_container(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Err(err()) }
     async fn stop_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Err(err()) }
     async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Err(err()) }
     async fn remove_container(&self, _: &str) -> Result<(), DomainError> { Err(err()) }

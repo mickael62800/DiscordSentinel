@@ -45,6 +45,34 @@ use crate::ports::outbound::system::bot_config_repository::BotConfigRepository;
 
 const STOP_TIMEOUT_SECS: u32 = 30;
 
+/// Substitue `{{KEY}}` (avec spaces tolerees) par `env[KEY]`. Si la cle
+/// n'existe pas, le placeholder est remplace par une chaine vide (comme
+/// Docker compose pour les env unset). Volontairement minimaliste : pas
+/// de logique conditionnelle, pas d'echappement. Suffit pour seed des
+/// fichiers de config jeu.
+fn render_template(input: &str, env: &HashMap<String, String>) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut rest = input;
+    while let Some(start) = rest.find("{{") {
+        out.push_str(&rest[..start]);
+        let after = &rest[start + 2..];
+        if let Some(end) = after.find("}}") {
+            let key = after[..end].trim();
+            if let Some(v) = env.get(key) {
+                out.push_str(v);
+            }
+            rest = &after[end + 2..];
+        } else {
+            // Placeholder non ferme : on emet le tail tel quel et on sort.
+            out.push_str("{{");
+            out.push_str(after);
+            return out;
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 pub struct ManageGameServersService {
     pub server_repo: Arc<dyn GameServerRepository>,
     pub template_repo: Arc<dyn GameTemplateRepository>,
@@ -198,6 +226,13 @@ impl ManageGameServersService {
         );
         labels.insert("sentinel.owner".to_string(), server.owner_user_id.clone());
 
+        // Command (templated) : si le template definit un override CMD, on
+        // substitue les {{KEY}} par les env effectives (defaults + overrides
+        // utilisateur), puis on passe au runtime. Sinon None.
+        let command = template.command.as_ref().map(|tmpl| {
+            tmpl.iter().map(|arg| render_template(arg, &env)).collect::<Vec<_>>()
+        });
+
         ContainerSpec {
             image: template.image.clone(),
             name: server
@@ -220,7 +255,31 @@ impl ManageGameServersService {
             // tracer chaque crash dans audit_log et appliquer du backoff.
             restart_policy: RestartPolicy::None,
             labels,
+            command,
         }
+    }
+
+    /// Construit la map env effective (defaults + overrides) pour rendre
+    /// les templates init_files / command. Reproduit la meme logique que
+    /// `build_spec` mais sans injecter MEMORY/RCON (qui ne servent pas pour
+    /// les fichiers de config jeu).
+    fn render_env(
+        template: &GameTemplate,
+        overrides: &HashMap<String, String>,
+    ) -> HashMap<String, String> {
+        let mut env: HashMap<String, String> = template
+            .default_env
+            .as_object()
+            .map(|m| {
+                m.iter()
+                    .map(|(k, v)| (k.clone(), v.as_str().map(String::from).unwrap_or_default()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        for (k, v) in overrides {
+            env.insert(k.clone(), v.clone());
+        }
+        env
     }
 
     async fn audit(
@@ -480,6 +539,37 @@ impl ManageGameServersUseCase for ManageGameServersService {
         let cid = server.container_id.as_ref().ok_or_else(|| {
             DomainError::Internal("container_id absent apres create".into())
         })?;
+
+        // Init files : pour les jeux dont l'image ne genere pas elle-meme
+        // ses fichiers de config (ex Terraria/ryshe + /tshock/config.json).
+        // On rend les {{KEY}} a partir des env effectives (defaults +
+        // overrides) et on upload chaque fichier dans le container *avant*
+        // start. Reupload systematique = la modif des champs UI prend
+        // effet au prochain start sans recreer le container.
+        if !template.init_files.is_empty() {
+            let overrides = self.config_repo.get_all(id).await.unwrap_or_default();
+            let render_env = Self::render_env(&template, &overrides);
+            for f in &template.init_files {
+                let path = render_template(&f.path, &render_env);
+                let content = render_template(&f.content, &render_env);
+                if let Err(e) = self
+                    .container_runtime
+                    .upload_file_to_container(cid, &path, &content)
+                    .await
+                {
+                    error!(error = %e, path = %path, "init_file upload echoue");
+                    self.server_repo
+                        .update_status(
+                            id,
+                            GameServerStatus::Error,
+                            Some(&format!("init_file {path}: {e}")),
+                        )
+                        .await?;
+                    return Err(e);
+                }
+            }
+        }
+
         if let Err(e) = self.container_runtime.start_container(cid).await {
             self.server_repo
                 .update_status(

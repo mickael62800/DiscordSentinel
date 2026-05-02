@@ -36,6 +36,10 @@ pub struct ContainerSpec {
     pub restart_policy: RestartPolicy,
     /// Labels Docker pour traçabilite (sentinel.* — lecture par le reconciler).
     pub labels: HashMap<String, String>,
+    /// Override de la commande Docker (Cmd). None = laisse l'image decider.
+    /// Cas d'usage : Terraria/ryshe ou il faut passer -autocreate, -world,
+    /// etc. via flags CLI car l'image ne lit pas tout depuis l'env.
+    pub command: Option<Vec<String>>,
 }
 
 #[derive(Debug, Clone)]
@@ -109,6 +113,18 @@ pub trait ContainerRuntime: Send + Sync {
 
     /// Demarre un container existant.
     async fn start_container(&self, container_id: &str) -> Result<(), DomainError>;
+
+    /// Pose un fichier (utf-8) sur le filesystem du container, a un chemin
+    /// absolu. A appeler entre `create_container` et `start_container` —
+    /// les volumes nommes sont deja montes a ce stade. Les sous-repertoires
+    /// inexistants sont crees. Permet de seed des fichiers de config que
+    /// l'image ne genere pas elle-meme (ex : ryshe/terraria + config.json).
+    async fn upload_file_to_container(
+        &self,
+        container_id: &str,
+        path: &str,
+        content: &str,
+    ) -> Result<(), DomainError>;
 
     /// Arrete proprement (SIGTERM puis SIGKILL apres `timeout_secs`).
     async fn stop_container(

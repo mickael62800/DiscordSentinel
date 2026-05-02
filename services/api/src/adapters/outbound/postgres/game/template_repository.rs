@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use sqlx::{FromRow, PgPool};
 use uuid::Uuid;
 
-use crate::domain::entities::game::template::{ConfigField, GameTemplate, PortProtocol};
+use crate::domain::entities::game::template::{ConfigField, GameTemplate, InitFile, PortProtocol};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::game::game_template_repository::GameTemplateRepository;
 
@@ -40,6 +40,8 @@ struct TemplateRow {
     supports_rcon: bool,
     supports_mods: bool,
     idle_shutdown_days: i32,
+    init_files: serde_json::Value,
+    command_template: Option<String>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -49,6 +51,14 @@ impl TryFrom<TemplateRow> for GameTemplate {
     fn try_from(r: TemplateRow) -> Result<Self, DomainError> {
         let config_schema: Vec<ConfigField> = serde_json::from_value(r.config_schema)
             .map_err(|e| DomainError::Internal(format!("config_schema parse: {e}")))?;
+        let init_files: Vec<InitFile> = serde_json::from_value(r.init_files)
+            .map_err(|e| DomainError::Internal(format!("init_files parse: {e}")))?;
+        let command: Option<Vec<String>> = match r.command_template.as_deref() {
+            None | Some("") => None,
+            Some(s) => Some(serde_json::from_str(s).map_err(|e| {
+                DomainError::Internal(format!("command_template parse: {e}"))
+            })?),
+        };
         let port = u16::try_from(r.container_port)
             .map_err(|_| DomainError::Internal("container_port hors range u16".into()))?;
         Ok(GameTemplate {
@@ -73,6 +83,8 @@ impl TryFrom<TemplateRow> for GameTemplate {
             supports_rcon: r.supports_rcon,
             supports_mods: r.supports_mods,
             idle_shutdown_days: r.idle_shutdown_days,
+            init_files,
+            command,
             created_at: r.created_at,
             updated_at: r.updated_at,
         })
@@ -84,7 +96,7 @@ const SELECT_COLS: &str =
      container_port, port_protocol, volume_path, run_as_root, \
      default_memory_mb, min_memory_mb, max_memory_mb, \
      default_env, config_schema, supports_rcon, supports_mods, idle_shutdown_days, \
-     created_at, updated_at";
+     init_files, command_template, created_at, updated_at";
 
 #[async_trait]
 impl GameTemplateRepository for PgGameTemplateRepository {

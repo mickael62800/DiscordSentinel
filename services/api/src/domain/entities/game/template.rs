@@ -86,8 +86,24 @@ pub struct GameTemplate {
     pub supports_rcon: bool,
     pub supports_mods: bool,
     pub idle_shutdown_days: i32,
+    /// Fichiers a poser sur le volume avant `start_container`. Le content
+    /// peut contenir des `{{KEY}}` substitues par les env vars effectives.
+    /// Vide pour la majorite des jeux (env vars suffisent).
+    pub init_files: Vec<InitFile>,
+    /// Override de la commande Docker (CMD). JSON array. Templatable via
+    /// `{{KEY}}`. None = utilise le CMD de l'image (cas par defaut).
+    pub command: Option<Vec<String>>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// Fichier seed a uploader dans le container apres create / avant start.
+/// Le `content` est un template avec `{{KEY}}` substitues a partir des env
+/// vars (defaults du template + overrides utilisateur). Cf. `init_files`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InitFile {
+    pub path: String,
+    pub content: String,
 }
 
 impl GameTemplate {

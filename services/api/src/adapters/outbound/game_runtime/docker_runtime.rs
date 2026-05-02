@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use bollard::container::{
     Config as BollardConfig, CreateContainerOptions, ListContainersOptions, LogsOptions,
     RemoveContainerOptions, StartContainerOptions, Stats as BollardStats, StatsOptions,
-    StopContainerOptions,
+    StopContainerOptions, UploadToContainerOptions,
 };
 use bollard::image::{CreateImageOptions, ListImagesOptions};
 use bollard::models::{
@@ -239,6 +239,10 @@ impl ContainerRuntime for DockerContainerRuntime {
             exposed_ports: Some(exposed_ports),
             user: spec.user.clone(),
             host_config: Some(host_config),
+            // Override CMD si le template le precise (ex : Terraria/ryshe
+            // qui exige -autocreate, -world... en flags). None = laisse
+            // l'ENTRYPOINT/CMD de l'image inchange.
+            cmd: spec.command.clone(),
             ..Default::default()
         };
 
@@ -259,6 +263,77 @@ impl ContainerRuntime for DockerContainerRuntime {
             .start_container(container_id, None::<StartContainerOptions<String>>)
             .await
             .map_err(|e| DomainError::Internal(format!("start container: {e}")))?;
+        Ok(())
+    }
+
+    async fn upload_file_to_container(
+        &self,
+        container_id: &str,
+        path: &str,
+        content: &str,
+    ) -> Result<(), DomainError> {
+        // bollard attend un tar pose sur un chemin du container. On poste
+        // a "/" et on inclut le chemin COMPLET dans l'entry tar (les
+        // repertoires intermediaires sont implicitement materialises par
+        // tar). Ex : path = "/tshock/config.json" -> entry "tshock/config.json"
+        // genere /tshock/config.json (et /tshock si absent).
+        let rel_path = path.trim_start_matches('/');
+        if rel_path.is_empty() || rel_path.ends_with('/') {
+            return Err(DomainError::Internal(format!(
+                "upload_file: path invalide '{path}'"
+            )));
+        }
+
+        // On ajoute aussi des entries directory pour chaque parent, en mode
+        // 0755, pour s'assurer que les permissions sont correctes meme si
+        // tar standard n'exige pas ces entries.
+        let bytes = content.as_bytes();
+        let mut buf = Vec::with_capacity(bytes.len() + 2048);
+        {
+            let mut builder = tar::Builder::new(&mut buf);
+
+            // Entries dir pour chaque segment parent (ex: "tshock/" pour
+            // "tshock/config.json"). Idempotent cote tar.
+            let parts: Vec<&str> = rel_path.split('/').collect();
+            for i in 1..parts.len() {
+                let dir = format!("{}/", parts[..i].join("/"));
+                let mut h = tar::Header::new_gnu();
+                h.set_path(&dir).map_err(|e| {
+                    DomainError::Internal(format!("tar dir set_path: {e}"))
+                })?;
+                h.set_size(0);
+                h.set_mode(0o755);
+                h.set_entry_type(tar::EntryType::Directory);
+                h.set_cksum();
+                builder
+                    .append(&h, std::io::empty())
+                    .map_err(|e| DomainError::Internal(format!("tar dir append: {e}")))?;
+            }
+
+            // Entry du fichier lui-meme.
+            let mut header = tar::Header::new_gnu();
+            header.set_path(rel_path).map_err(|e| {
+                DomainError::Internal(format!("tar file set_path: {e}"))
+            })?;
+            header.set_size(bytes.len() as u64);
+            header.set_mode(0o644);
+            header.set_cksum();
+            builder
+                .append(&header, bytes)
+                .map_err(|e| DomainError::Internal(format!("tar file append: {e}")))?;
+            builder
+                .finish()
+                .map_err(|e| DomainError::Internal(format!("tar finish: {e}")))?;
+        }
+
+        let opts = UploadToContainerOptions {
+            path: "/".to_string(),
+            no_overwrite_dir_non_dir: "0".to_string(),
+        };
+        self.docker
+            .upload_to_container(container_id, Some(opts), buf.into())
+            .await
+            .map_err(|e| DomainError::Internal(format!("upload_to_container: {e}")))?;
         Ok(())
     }
 
