@@ -267,8 +267,11 @@ impl VoiceChannelRepository for PgVoiceChannelRepository {
     }
 
     async fn find_by_channel_id(&self, channel_id: &str) -> Result<Option<VoiceChannel>, DomainError> {
+        // BUG FIX : on ne filtre plus sur channel_status='open' pour permettre
+        // l'acces aux details des salons fermes (historique). Si un appelant
+        // a besoin uniquement des salons actifs, qu'il filtre cote applicatif.
         let row = sqlx::query_as::<_, VoiceChannelRow>(
-            "SELECT * FROM voice_channels WHERE channel_id = $1 AND channel_status = 'open'",
+            "SELECT * FROM voice_channels WHERE channel_id = $1 ORDER BY created_at DESC LIMIT 1",
         )
         .bind(channel_id)
         .fetch_optional(&self.pool)
