@@ -1,29 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from "vue";
-
-type ServerStatus = "running" | "starting" | "stopped" | "error";
-
-interface GameTemplate {
-  id: string;
-  name: string;
-  category: string;
-  image: string;
-  accent: string;
-  icon: string;
-  description: string;
-}
-
-interface RunningServer {
-  id: string;
-  templateId: string;
-  name: string;
-  status: ServerStatus;
-  players: string;
-  port: number;
-  uptime: string;
-  cpu: number;
-  ram: number;
-}
+import {
+  gamePortalService,
+  type GameServer,
+  type GameTemplate,
+} from "@/services/gamePortalService";
+import { useGuildSelector } from "@/composables/useGuildSelector";
+import { useToast } from "@/composables/useToast";
+import { useConfirm } from "@/composables/useConfirm";
+import { useAuth } from "@/composables/useAuth";
+import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
 interface LogLine {
   time: string;
@@ -32,115 +18,268 @@ interface LogLine {
   text: string;
 }
 
-const MAX_SLOTS = 10;
+const { selectedGuildId } = useGuildSelector();
+const { success, error: toastError } = useToast();
+const { confirm } = useConfirm();
+const { user } = useAuth();
+const { visible } = useComponentVisibility();
 
-const templates: GameTemplate[] = [
-  { id: "minecraft", name: "Minecraft", category: "Survie", image: "itzg/minecraft-server", accent: "#5cb85c", icon: "⛏️", description: "Survie vanilla, modpacks Forge/Fabric supportés." },
-  { id: "valheim", name: "Valheim", category: "Survie", image: "lloesche/valheim-server", accent: "#d4a017", icon: "🪓", description: "Survie viking coopérative jusqu'à 10 joueurs." },
-  { id: "rust", name: "Rust", category: "Survie PvP", image: "didstopia/rust-server", accent: "#cd412b", icon: "🔧", description: "Survie hardcore PvP, wipes hebdomadaires." },
-  { id: "ark", name: "ARK: Survival", category: "Survie", image: "hermsi/ark-server", accent: "#3a7ca5", icon: "🦖", description: "Survie dinosaures, mods Steam Workshop." },
-  { id: "palworld", name: "Palworld", category: "Survie", image: "thijsvanloef/palworld", accent: "#7d5fff", icon: "🐾", description: "Survie créatures, jusqu'à 32 joueurs." },
-  { id: "terraria", name: "Terraria", category: "Aventure", image: "ryshe/terraria", accent: "#46b1c9", icon: "🌳", description: "Bac à sable 2D, exploration et boss." },
-  { id: "factorio", name: "Factorio", category: "Gestion", image: "factoriotools/factorio", accent: "#f39c12", icon: "⚙️", description: "Automatisation et logistique industrielle." },
-  { id: "csgo", name: "CS2", category: "FPS", image: "joedwards32/cs2", accent: "#e67e22", icon: "🎯", description: "Serveur compétitif Counter-Strike 2." },
-];
+const templates = ref<GameTemplate[]>([]);
+const servers = ref<GameServer[]>([]);
+const loading = ref(false);
+const busy = ref<string | null>(null);
 
-const servers = ref<RunningServer[]>([
-  { id: "srv-01", templateId: "minecraft", name: "Survie-Amis", status: "running", players: "4/20", port: 25565, uptime: "2j 14h", cpu: 23, ram: 58 },
-  { id: "srv-02", templateId: "valheim", name: "Vikings-FR", status: "running", players: "2/10", port: 2456, uptime: "6h 12m", cpu: 11, ram: 32 },
-  { id: "srv-03", templateId: "terraria", name: "Hardmode", status: "starting", players: "0/8", port: 7777, uptime: "0m", cpu: 4, ram: 9 },
-]);
-
-const selectedServerId = ref<string>("srv-01");
+const selectedServerId = ref<string | null>(null);
 const selectedServer = computed(() =>
   servers.value.find((s) => s.id === selectedServerId.value) ?? null,
 );
 
 const slotsUsed = computed(() => servers.value.length);
-const slotsFree = computed(() => MAX_SLOTS - slotsUsed.value);
-const runningCount = computed(() => servers.value.filter((s) => s.status === "running").length);
+const runningCount = computed(
+  () => servers.value.filter((s) => s.status === "running").length,
+);
 
-const templateById = (id: string) => templates.find((t) => t.id === id);
+const templateById = (id: string) => templates.value.find((t) => t.id === id);
+const templateBySlug = (slug: string) =>
+  templates.value.find((t) => t.slug === slug);
 
-const logs = ref<LogLine[]>([
-  { time: "14:02:11", source: "docker", level: "sys", text: "docker engine connecté (v25.0.3)" },
-  { time: "14:02:14", source: "srv-01", level: "info", text: "Démarrage container itzg/minecraft-server…" },
-  { time: "14:02:21", source: "srv-01", level: "info", text: "Loading properties" },
-  { time: "14:02:24", source: "srv-01", level: "info", text: "Default game type: SURVIVAL" },
-  { time: "14:02:29", source: "srv-01", level: "info", text: "Done (5.1s)! For help, type \"help\"" },
-  { time: "14:05:02", source: "srv-02", level: "info", text: "Valheim server listening on 2456" },
-  { time: "14:11:48", source: "srv-03", level: "warn", text: "World file not found, generating new world…" },
-]);
-
+// ── Console ──────────────────────────────────────────────────────────
+const logs = ref<LogLine[]>([]);
 const consoleEl = ref<HTMLElement | null>(null);
 const cmd = ref("");
 
 function pushLog(line: LogLine) {
   logs.value.push(line);
-  if (logs.value.length > 300) logs.value.splice(0, logs.value.length - 300);
+  if (logs.value.length > 500) logs.value.splice(0, logs.value.length - 500);
 }
-
 function nowHHMMSS() {
   return new Date().toTimeString().slice(0, 8);
 }
 
-function sendCommand() {
-  const text = cmd.value.trim();
-  if (!text || !selectedServer.value) return;
-  pushLog({ time: nowHHMMSS(), source: selectedServer.value.id, level: "sys", text: `> ${text}` });
-  cmd.value = "";
-}
-
-function toggleServer(s: RunningServer) {
-  if (s.status === "running") {
-    s.status = "stopped";
-    pushLog({ time: nowHHMMSS(), source: s.id, level: "sys", text: "Container stoppé" });
-  } else {
-    s.status = "starting";
-    pushLog({ time: nowHHMMSS(), source: s.id, level: "info", text: "Démarrage…" });
-    setTimeout(() => {
-      s.status = "running";
-      pushLog({ time: nowHHMMSS(), source: s.id, level: "info", text: "Container prêt" });
-    }, 1500);
+// ── Fetchers ────────────────────────────────────────────────────────
+async function fetchAll() {
+  if (!selectedGuildId.value) return;
+  loading.value = true;
+  try {
+    const [tpl, srv] = await Promise.all([
+      gamePortalService.listTemplates(selectedGuildId.value),
+      gamePortalService.listServers(selectedGuildId.value),
+    ]);
+    templates.value = tpl;
+    servers.value = srv;
+    if (
+      !selectedServerId.value ||
+      !srv.some((s) => s.id === selectedServerId.value)
+    ) {
+      selectedServerId.value = srv[0]?.id ?? null;
+    }
+  } catch (e) {
+    toastError(`Erreur chargement: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    loading.value = false;
   }
 }
 
-function launchTemplate(t: GameTemplate) {
-  if (slotsFree.value <= 0) {
-    pushLog({ time: nowHHMMSS(), source: "portal", level: "error", text: `Slots pleins (${MAX_SLOTS}/${MAX_SLOTS})` });
+async function fetchLogs(serverId: string) {
+  try {
+    const lines = await gamePortalService.getLogs(serverId, 100);
+    logs.value = lines.map((raw) => parseLogLine(raw, serverId));
+  } catch (e) {
+    pushLog({
+      time: nowHHMMSS(),
+      source: serverId.slice(0, 8),
+      level: "error",
+      text: `Erreur logs: ${e instanceof Error ? e.message : String(e)}`,
+    });
+  }
+}
+
+function parseLogLine(raw: string, serverId: string): LogLine {
+  // Format Docker logs avec timestamp ISO devant.
+  const tsMatch = raw.match(/^(\S+T\S+)\s+(.*)$/);
+  const time = tsMatch
+    ? new Date(tsMatch[1]!).toLocaleTimeString("fr-FR")
+    : nowHHMMSS();
+  const text = tsMatch ? tsMatch[2]! : raw;
+  let level: LogLine["level"] = "info";
+  if (/\b(WARN|warning)\b/i.test(text)) level = "warn";
+  else if (/\b(ERROR|FATAL|fail)\b/i.test(text)) level = "error";
+  return { time, source: serverId.slice(0, 8), level, text };
+}
+
+// ── Actions ─────────────────────────────────────────────────────────
+async function toggleServer(s: GameServer) {
+  busy.value = s.id;
+  const actorId = user.value?.id;
+  try {
+    if (s.status === "running") {
+      await gamePortalService.stopServer(s.id, actorId);
+      success(`${s.name} arrêté`);
+    } else if (
+      s.status === "stopped" ||
+      s.status === "created" ||
+      s.status === "error"
+    ) {
+      pushLog({
+        time: nowHHMMSS(),
+        source: s.id.slice(0, 8),
+        level: "sys",
+        text: "Démarrage…",
+      });
+      await gamePortalService.startServer(s.id, actorId);
+      success(`${s.name} démarré`);
+    } else {
+      toastError(`Transition impossible depuis ${s.status}`);
+      return;
+    }
+    await fetchAll();
+  } catch (e) {
+    toastError(`Echec: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    busy.value = null;
+  }
+}
+
+async function launchTemplate(t: GameTemplate) {
+  if (!selectedGuildId.value) {
+    toastError("Sélectionne une guild d'abord.");
     return;
   }
-  const id = `srv-${String(servers.value.length + 1).padStart(2, "0")}`;
-  const s: RunningServer = {
-    id, templateId: t.id, name: `${t.name}-${id}`, status: "starting",
-    players: "0/-", port: 25000 + servers.value.length, uptime: "0m", cpu: 0, ram: 0,
-  };
-  servers.value.push(s);
-  selectedServerId.value = id;
-  pushLog({ time: nowHHMMSS(), source: id, level: "sys", text: `docker run ${t.image}` });
-  setTimeout(() => {
-    s.status = "running";
-    pushLog({ time: nowHHMMSS(), source: id, level: "info", text: "Serveur en ligne" });
-  }, 2000);
+  const actorId = user.value?.id;
+  if (!actorId) {
+    toastError("Authentification Discord requise.");
+    return;
+  }
+  // Nom suggere base sur le template + count
+  const suggested = `${t.name}-${servers.value.length + 1}`;
+  const name = window.prompt(
+    `Nom du nouveau serveur ${t.name} ?`,
+    suggested,
+  );
+  if (!name) return;
+  busy.value = t.id;
+  try {
+    const created = await gamePortalService.createServer(
+      selectedGuildId.value,
+      {
+        template_slug: t.slug,
+        name,
+        owner_user_id: actorId,
+      },
+    );
+    success(`${name} créé. Démarrage…`);
+    selectedServerId.value = created.id;
+    pushLog({
+      time: nowHHMMSS(),
+      source: created.id.slice(0, 8),
+      level: "sys",
+      text: `docker create ${t.slug}`,
+    });
+    // Auto-start derriere create
+    await gamePortalService.startServer(created.id, actorId);
+    await fetchAll();
+  } catch (e) {
+    toastError(`Echec création: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    busy.value = null;
+  }
 }
 
-let tick: number | undefined;
-onMounted(() => {
-  tick = window.setInterval(() => {
-    const running = servers.value.filter((s) => s.status === "running");
-    if (running.length === 0) return;
-    const s = running[Math.floor(Math.random() * running.length)];
-    s.cpu = Math.max(2, Math.min(95, s.cpu + (Math.random() * 10 - 5)));
-    s.ram = Math.max(5, Math.min(95, s.ram + (Math.random() * 6 - 3)));
-    const samples = ["Player joined the game", "Saving world…", "Keepalive ok", "Chunk generated", "Tick took 38ms"];
-    pushLog({ time: nowHHMMSS(), source: s.id, level: "info", text: samples[Math.floor(Math.random() * samples.length)] });
-  }, 2500);
-});
-onUnmounted(() => { if (tick) window.clearInterval(tick); });
+async function deleteServer(s: GameServer) {
+  const ok = await confirm({
+    title: "Supprimer le serveur",
+    message: `Supprimer définitivement "${s.name}" ?\n\nLe container Docker et le volume (monde) seront supprimés. Cette action est irréversible.`,
+  });
+  if (!ok) return;
+  busy.value = s.id;
+  try {
+    await gamePortalService.deleteServer(s.id, user.value?.id);
+    success(`${s.name} supprimé`);
+    if (selectedServerId.value === s.id) selectedServerId.value = null;
+    await fetchAll();
+  } catch (e) {
+    toastError(`Echec suppression: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    busy.value = null;
+  }
+}
 
-watch(() => logs.value.length, () => {
-  nextTick(() => { if (consoleEl.value) consoleEl.value.scrollTop = consoleEl.value.scrollHeight; });
+async function sendCommand() {
+  const text = cmd.value.trim();
+  if (!text || !selectedServer.value) return;
+  const sid = selectedServer.value.id;
+  pushLog({ time: nowHHMMSS(), source: sid.slice(0, 8), level: "sys", text: `> ${text}` });
+  cmd.value = "";
+  try {
+    const resp = await gamePortalService.executeCommand(
+      sid,
+      text,
+      user.value?.id,
+    );
+    pushLog({
+      time: nowHHMMSS(),
+      source: sid.slice(0, 8),
+      level: "info",
+      text: resp.response || "(pas de réponse)",
+    });
+  } catch (e) {
+    pushLog({
+      time: nowHHMMSS(),
+      source: sid.slice(0, 8),
+      level: "error",
+      text: `RCON: ${e instanceof Error ? e.message : String(e)}`,
+    });
+  }
+}
+
+// ── Polling ─────────────────────────────────────────────────────────
+let pollTick: number | undefined;
+onMounted(async () => {
+  await fetchAll();
+  pollTick = window.setInterval(fetchAll, 10_000);
 });
+onUnmounted(() => {
+  if (pollTick) window.clearInterval(pollTick);
+});
+
+watch(selectedGuildId, fetchAll);
+watch(selectedServerId, async (sid) => {
+  logs.value = [];
+  if (sid) await fetchLogs(sid);
+});
+watch(
+  () => logs.value.length,
+  () => {
+    nextTick(() => {
+      if (consoleEl.value)
+        consoleEl.value.scrollTop = consoleEl.value.scrollHeight;
+    });
+  },
+);
+
+// ── Helpers UI ──────────────────────────────────────────────────────
+function formatUptime(server: GameServer): string {
+  if (!server.started_at || server.status !== "running") return "—";
+  const ms = Date.now() - new Date(server.started_at).getTime();
+  const h = Math.floor(ms / 3_600_000);
+  const m = Math.floor((ms % 3_600_000) / 60_000);
+  if (h >= 24) {
+    const d = Math.floor(h / 24);
+    return `${d}j ${h % 24}h`;
+  }
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+}
+
+function templateAccent(slug: string | undefined): string {
+  if (!slug) return "var(--accent)";
+  const t = templateBySlug(slug);
+  return t?.accent_color ? `#${t.accent_color}` : "var(--accent)";
+}
+
+function templateIcon(slug: string | undefined): string {
+  if (!slug) return "🎮";
+  return templateBySlug(slug)?.icon ?? "🎮";
+}
 </script>
 
 <template>
@@ -155,24 +294,26 @@ watch(() => logs.value.length, () => {
       </div>
       <div class="kpis">
         <div class="kpi"><span class="kpi-val">{{ runningCount }}</span><span class="kpi-lbl">en ligne</span></div>
-        <div class="kpi"><span class="kpi-val">{{ slotsUsed }}/{{ MAX_SLOTS }}</span><span class="kpi-lbl">slots utilisés</span></div>
-        <div class="kpi ok"><span class="kpi-val">●</span><span class="kpi-lbl">docker connecté</span></div>
+        <div class="kpi"><span class="kpi-val">{{ slotsUsed }}</span><span class="kpi-lbl">serveurs</span></div>
+        <div class="kpi ok"><span class="kpi-val">●</span><span class="kpi-lbl">api connectée</span></div>
       </div>
     </header>
 
-    <main class="grid">
+    <div v-if="!selectedGuildId" class="empty" style="padding: 40px; text-align: center;">
+      Sélectionne une guild dans la barre latérale.
+    </div>
+
+    <main v-else class="grid">
       <section class="panel servers">
         <div class="panel-head">
           <h2>Serveurs actifs</h2>
-          <div class="slots-bar" :title="`${slotsUsed} / ${MAX_SLOTS}`">
-            <div v-for="i in MAX_SLOTS" :key="i" class="slot" :class="{ filled: i <= slotsUsed }" />
-          </div>
+          <span class="hint">{{ slotsUsed }} total</span>
         </div>
         <div class="server-list">
           <div v-for="s in servers" :key="s.id" class="server"
                :class="{ active: s.id === selectedServerId }" @click="selectedServerId = s.id">
-            <div class="server-icon" :style="{ background: templateById(s.templateId)?.accent }">
-              {{ templateById(s.templateId)?.icon }}
+            <div class="server-icon" :style="{ background: templateAccent(templateById(s.template_id)?.slug) }">
+              {{ templateIcon(templateById(s.template_id)?.slug) }}
             </div>
             <div class="server-info">
               <div class="server-name">
@@ -180,35 +321,56 @@ watch(() => logs.value.length, () => {
                 <span class="status" :class="s.status">{{ s.status }}</span>
               </div>
               <div class="server-meta">
-                {{ templateById(s.templateId)?.name }} · port {{ s.port }} · {{ s.players }} · up {{ s.uptime }}
+                {{ templateById(s.template_id)?.name ?? '?' }} ·
+                <template v-if="s.host_port">port {{ s.host_port }} · </template>
+                {{ s.last_player_count }} joueur(s) · up {{ formatUptime(s) }}
               </div>
-              <div class="bars">
-                <div class="bar"><span :style="{ width: s.cpu + '%' }" /></div>
-                <div class="bar"><span :style="{ width: s.ram + '%' }" /></div>
-              </div>
+              <div v-if="s.last_error" class="server-error">⚠ {{ s.last_error }}</div>
             </div>
-            <button class="btn-icon" @click.stop="toggleServer(s)">
+            <button
+              class="btn-icon"
+              :disabled="busy === s.id"
+              :title="s.status === 'running' ? 'Arrêter' : 'Démarrer'"
+              @click.stop="toggleServer(s)"
+            >
               {{ s.status === 'running' ? '⏹' : '▶' }}
             </button>
+            <button
+              v-if="visible('game.server.delete')"
+              class="btn-icon btn-icon-danger"
+              :disabled="busy === s.id"
+              title="Supprimer"
+              @click.stop="deleteServer(s)"
+            >
+              🗑
+            </button>
           </div>
-          <div v-if="servers.length === 0" class="empty">Aucun serveur lancé</div>
+          <div v-if="!loading && servers.length === 0" class="empty">Aucun serveur lancé</div>
+          <div v-if="loading && servers.length === 0" class="empty">Chargement…</div>
         </div>
       </section>
 
       <section class="panel catalog">
         <div class="panel-head">
           <h2>Catalogue de jeux</h2>
-          <span class="hint">{{ slotsFree }} slot(s) libre(s)</span>
+          <span class="hint">{{ templates.length }} template(s)</span>
         </div>
         <div class="game-grid">
-          <article v-for="t in templates" :key="t.id" class="game-card" :style="{ '--accent': t.accent }">
-            <div class="game-icon">{{ t.icon }}</div>
+          <article v-for="t in templates" :key="t.id" class="game-card" :style="{ '--accent': '#' + (t.accent_color ?? '5865f2') }">
+            <div class="game-icon">{{ t.icon ?? '🎮' }}</div>
             <div class="game-body">
-              <div class="game-title">{{ t.name }} <span class="cat">{{ t.category }}</span></div>
-              <p class="game-desc">{{ t.description }}</p>
-              <code class="img">{{ t.image }}</code>
+              <div class="game-title">{{ t.name }} <span v-if="t.category" class="cat">{{ t.category }}</span></div>
+              <p class="game-desc">{{ t.description ?? '' }}</p>
+              <code class="img">{{ t.slug }}</code>
             </div>
-            <button class="btn-launch" :disabled="slotsFree <= 0" @click="launchTemplate(t)">Lancer</button>
+            <button
+              v-if="visible('game.server.create')"
+              class="btn-launch"
+              :disabled="busy === t.id"
+              @click="launchTemplate(t)"
+            >
+              {{ busy === t.id ? "…" : "Lancer" }}
+            </button>
           </article>
         </div>
       </section>
@@ -344,7 +506,11 @@ watch(() => logs.value.length, () => {
   display: grid; place-items: center;
   transition: var(--transition-fast);
 }
-.btn-icon:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-icon:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-icon-danger { margin-left: 4px; }
+.btn-icon-danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: #fff; }
+.server-error { font-size: 11px; color: var(--danger); margin-top: 4px; word-break: break-word; }
 .empty { color: var(--text-secondary); text-align: center; padding: var(--space-xl); font-size: 13px; }
 .game-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
