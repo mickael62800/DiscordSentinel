@@ -431,7 +431,17 @@ function templateIcon(slug: string | undefined): string {
         </div>
         <div class="game-grid">
           <article v-for="t in templates" :key="t.id" class="game-card" :style="{ '--accent': '#' + (t.accent_color ?? '5865f2') }">
-            <div class="game-icon">{{ t.icon ?? '🎮' }}</div>
+            <div class="game-cover">
+              <img
+                v-if="t.cover_image_url"
+                :src="t.cover_image_url"
+                :alt="t.name"
+                class="game-cover-img"
+                loading="lazy"
+                @error="($event.target as HTMLImageElement).style.display = 'none'"
+              />
+              <div v-else class="game-cover-fallback">{{ t.icon ?? '🎮' }}</div>
+            </div>
             <div class="game-body">
               <div class="game-title">{{ t.name }} <span v-if="t.category" class="cat">{{ t.category }}</span></div>
               <p class="game-desc">{{ t.description ?? '' }}</p>
@@ -620,8 +630,13 @@ function templateIcon(slug: string | undefined): string {
   border-radius: var(--radius-sm);
   background: var(--bg-primary); color: var(--text-primary);
   border: 1px solid var(--border);
-  cursor: pointer; font-size: 14px;
-  display: grid; place-items: center;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: var(--transition-fast);
 }
 .btn-icon:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -657,6 +672,28 @@ function templateIcon(slug: string | undefined): string {
   opacity: 0.12; pointer-events: none;
 }
 .game-icon { font-size: 26px; }
+.game-cover {
+  width: 100%;
+  aspect-ratio: 460 / 215;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--accent), var(--bg-card));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+.game-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.game-cover-fallback {
+  font-size: 48px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+}
 .game-title { font-weight: 700; font-size: 14px; display: flex; gap: var(--space-sm); align-items: center; color: var(--text-primary); }
 .cat {
   font-size: 9px; font-weight: 600;

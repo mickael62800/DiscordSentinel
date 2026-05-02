@@ -69,6 +69,7 @@ pub struct GameTemplate {
     pub category: Option<String>,
     pub icon: Option<String>,
     pub accent_color: Option<String>,
+    pub cover_image_url: Option<String>,
     pub container_port: u16,
     pub port_protocol: PortProtocol,
     pub default_memory_mb: i32,
