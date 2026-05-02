@@ -1,6 +1,7 @@
 pub mod batching;
 pub mod cache_helpers;
 pub mod discord_api;
+pub mod game_runtime;
 pub mod inference_service;
 pub mod job_client;
 pub mod postgres;

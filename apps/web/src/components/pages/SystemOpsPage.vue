@@ -175,4 +175,19 @@ onUnmounted(() => {
   background: linear-gradient(90deg, var(--accent), #2ECC71);
   transition: width 0.3s ease;
 }
+
+@media (max-width: 768px) {
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    font-size: 12px;
+    width: 100%;
+  }
+  table th,
+  table td {
+    padding: 6px 8px !important;
+  }
+}
 </style>

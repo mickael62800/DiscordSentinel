@@ -575,4 +575,31 @@ function formatPermissions(perms: string): string {
 }
 .btn-save:hover { opacity: 0.9; }
 .btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
+
+@media (max-width: 768px) {
+  /* Header de la page : empile titre + actions */
+  .header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .cross-link {
+    margin-left: 0;
+    flex: 1;
+    text-align: center;
+  }
+  /* Toolbar (recherche + Creer un role) : empilage */
+  .toolbar {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .toolbar input {
+    max-width: 100%;
+  }
+  .btn-create {
+    width: 100%;
+  }
+  .roles-grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

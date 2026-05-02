@@ -173,6 +173,19 @@ watch(selectedGuildId, () => {
 
 <template>
   <div class="dataset-page">
+    <!-- Bloque l'usage en mobile : page d'export AI = desktop only -->
+    <div class="mobile-only-block">
+      <div class="mobile-block-card">
+        <div class="mobile-block-icon">🖥️</div>
+        <h2>Disponible sur desktop uniquement</h2>
+        <p>
+          La collecte et l'export du dataset IA nécessitent un grand écran
+          (tableau dense, sélection multi-lignes, export CSV).
+        </p>
+        <p class="muted">Ouvre cette page depuis ton ordinateur pour continuer.</p>
+      </div>
+    </div>
+
     <div class="page-header">
       <h1>📚 Dataset IA — collecte de messages</h1>
       <p class="muted">
@@ -350,5 +363,45 @@ tr.row-severe { background: color-mix(in srgb, var(--danger) 7%, transparent); }
   align-items: center;
   gap: 16px;
   margin-top: 16px;
+}
+
+/* Mobile : on cache toute la page sauf le bloc d'avertissement.
+   La page est trop dense pour etre utilisable en mobile (export CSV =
+   desktop only). */
+.mobile-only-block { display: none; }
+
+@media (max-width: 768px) {
+  .mobile-only-block {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+  }
+  .dataset-page > :not(.mobile-only-block) {
+    display: none !important;
+  }
+  .mobile-block-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 32px 20px;
+    text-align: center;
+    max-width: 360px;
+  }
+  .mobile-block-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+  }
+  .mobile-block-card h2 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    color: var(--text-primary);
+  }
+  .mobile-block-card p {
+    margin: 0 0 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
 }
 </style>

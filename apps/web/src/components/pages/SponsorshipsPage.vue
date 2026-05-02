@@ -120,7 +120,7 @@ function formatDate(iso: string): string {
 @import "./_moderation-advanced-shared.css";
 .form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 .form label {
@@ -131,12 +131,12 @@ function formatDate(iso: string): string {
 .form input {
   background: var(--bg-card);
   border: 1px solid var(--border);
-  border-radius: 4px;
-  padding: 6px 10px;
+  border-radius: 6px;
+  padding: 8px 12px;
   color: inherit;
+  font-size: 13px;
 }
 .actions.full {
-  grid-column: span 2;
   justify-content: flex-end;
 }
 </style>

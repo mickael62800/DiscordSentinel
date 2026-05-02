@@ -2227,4 +2227,29 @@ async function handleActionSubmit() {
   }
   .ban-card:hover { transform: none; }
 }
+
+@media (max-width: 768px) {
+  /* Onglets : passe en scroll horizontal au lieu de wrap (preserve l'animation
+     active) avec width: 100% et overflow-x. */
+  .hub-tabs {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+  .hub-tab {
+    padding: 8px 14px;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  /* Filtres : empilage en colonne */
+  .filters {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .filters > * {
+    width: 100%;
+  }
+}
 </style>

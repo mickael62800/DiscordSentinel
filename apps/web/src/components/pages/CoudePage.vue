@@ -1308,5 +1308,23 @@ onMounted(() => fetchCombats());
     flex: 1 1 auto;
     min-width: unset;
   }
+  /* Hero : empile titre + actions sur petit ecran */
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .hero-actions > * {
+    flex: 1;
+  }
+  .tabs {
+    flex-wrap: wrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 </style>

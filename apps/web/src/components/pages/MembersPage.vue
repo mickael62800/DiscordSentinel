@@ -1197,10 +1197,12 @@ function discordProfileUrl(userId: string): string {
   color: white;
 }
 
-/* Filters */
+/* Filters : empilage vertical par defaut (3 inputs sur 3 lignes,
+   plus lisible et evite tout debordement). */
 .filters {
   display: flex;
-  gap: 12px;
+  flex-direction: column;
+  gap: 8px;
   margin-bottom: 20px;
 }
 
@@ -1273,17 +1275,44 @@ function discordProfileUrl(userId: string): string {
   margin-bottom: 8px;
 }
 
-.member-identity { display: flex; align-items: center; gap: 10px; }
+.member-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
 
 .member-avatar {
   width: 36px;
   height: 36px;
   font-size: 14px;
+  flex-shrink: 0;
 }
 
-.member-names { display: flex; flex-direction: column; gap: 1px; }
-.member-name { font-weight: 600; font-size: 14px; color: var(--text-primary); }
-.member-id { font-size: 11px; color: var(--text-secondary); font-family: "JetBrains Mono", "Cascadia Code", monospace; }
+.member-names {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+.member-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-id {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: "JetBrains Mono", "Cascadia Code", monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .member-badges { display: flex; gap: 6px; }
 .member-card-footer { display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); }
 

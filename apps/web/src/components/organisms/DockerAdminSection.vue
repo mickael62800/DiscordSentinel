@@ -707,4 +707,29 @@ async function pruneSystem(includeVolumes: boolean, allImages: boolean) {
 .center { padding: 30px; text-align: center; }
 .muted { color: var(--text-secondary); font-size: 12px; }
 .small { font-size: 11px; }
+
+@media (max-width: 768px) {
+  /* Tableaux Docker (containers / images / volumes / networks) :
+     scroll horizontal pour eviter le debordement en mobile. */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    font-size: 12px;
+    width: 100%;
+  }
+  table th,
+  table td {
+    padding: 6px 8px !important;
+  }
+  /* Tabs Docker en row scrollable */
+  .tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+  .tabs > * {
+    flex-shrink: 0;
+  }
+}
 </style>

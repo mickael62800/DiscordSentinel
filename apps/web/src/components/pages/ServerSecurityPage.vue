@@ -1184,4 +1184,36 @@ select {
 .modal-form label.checkbox { flex-direction: row; align-items: center; gap: 8px; }
 .modal-form select { padding: 7px 10px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg-secondary); color: var(--text-primary); font-size: 13px; }
 .modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+@media (max-width: 768px) {
+  /* Tous les tableaux : scroll horizontal pour eviter le debordement */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    font-size: 12px;
+    width: 100%;
+  }
+  table th,
+  table td {
+    padding: 6px 8px !important;
+  }
+  /* SHA-256, hash longs : tronquer + ellipsis */
+  td .mono,
+  td code {
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  /* Onglets : scroll horizontal */
+  .tabs,
+  .tab-list,
+  [role="tablist"] {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+  }
+}
 </style>

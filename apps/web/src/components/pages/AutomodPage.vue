@@ -510,5 +510,18 @@ function severityLabel(s: number): { label: string; color: string } {
     grid-column: 1 / -1;
     font-size: 0.75rem;
   }
+  /* Timeline : empile titre + filtres */
+  .timeline-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .filters {
+    flex-direction: column;
+    width: 100%;
+  }
+  .filters input {
+    width: 100%;
+  }
 }
 </style>

@@ -262,4 +262,35 @@ async function handlePurgeAll() {
   padding: 40px;
   text-align: center;
 }
+
+/* Texte des entrees audit : autorise le wrap des longues IDs (snowflakes
+   19 chiffres) pour eviter le debordement de la card. */
+.entry-content,
+.entry-content * {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .filters {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .filters > * {
+    width: 100%;
+  }
+  .audit-entry {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .event-icon {
+    width: 28px;
+    height: 28px;
+    font-size: 13px;
+  }
+  /* Reduction taille texte des details */
+  .audit-entry {
+    font-size: 13px;
+  }
+}
 </style>

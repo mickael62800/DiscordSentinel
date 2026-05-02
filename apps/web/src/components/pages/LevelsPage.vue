@@ -1088,4 +1088,49 @@ function levelToXp(level: number): string {
   background: var(--accent); color: white; border-color: var(--accent);
 }
 .btn-primary:hover:not(:disabled) { filter: brightness(1.1); }
+
+@media (max-width: 768px) {
+  /* Stats cards : densifier */
+  .config-bar {
+    gap: 8px;
+  }
+  .config-item {
+    min-width: 0;
+    flex: 1 1 calc(50% - 4px);
+    padding: 10px 12px;
+  }
+  .config-value {
+    font-size: 15px;
+  }
+  /* Mode XP : empile label + select */
+  .xp-mode-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .xp-mode-select {
+    max-width: 100%;
+    width: 100%;
+  }
+  /* Convertisseur : layout vertical key/value */
+  .converter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .converter-input {
+    width: 100%;
+  }
+  .converter-results {
+    grid-template-columns: 1fr;
+  }
+  /* Definition niveau / recherche role : stack */
+  .level-row,
+  .role-row,
+  .reward-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+}
 </style>

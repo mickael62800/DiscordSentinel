@@ -786,6 +786,21 @@ onMounted(() => fetchWallets());
   }
 }
 
+@media (max-width: 768px) {
+  /* Danger zone : empile icone, info, actions verticalement */
+  .danger-zone {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+  .danger-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+}
+
 @media (max-width: 480px) {
   .kpi-grid {
     gap: 10px;

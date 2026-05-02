@@ -1005,5 +1005,17 @@ onMounted(() => { fetchGames(); fetchTables(); });
     flex: 1 1 auto;
     min-width: unset;
   }
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .hero-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .hero-actions > * {
+    flex: 1;
+  }
 }
 </style>

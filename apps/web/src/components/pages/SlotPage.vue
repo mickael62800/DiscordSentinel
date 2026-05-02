@@ -210,5 +210,18 @@ tr.jp {
     grid-template-columns: 1fr;
     gap: 12px;
   }
+  /* Table spins recents : scroll horizontal */
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    white-space: nowrap;
+    font-size: 12px;
+    width: 100%;
+  }
+  table th,
+  table td {
+    padding: 6px 8px !important;
+  }
 }
 </style>

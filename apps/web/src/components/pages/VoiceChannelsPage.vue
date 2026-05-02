@@ -723,4 +723,36 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Wrappers pour scroll horizontal sur tous les tableaux Voice */
+:deep(.table-wrap),
+.history-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  /* KPI cards : grille auto-fit pour s'adapter */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  .stat-card {
+    min-width: 0;
+    padding: 10px 14px;
+  }
+  .stat-value {
+    font-size: 22px;
+  }
+  /* Tables debordent : on encapsule en overflow-x via :deep() le PaginationBar */
+  table {
+    font-size: 12px;
+  }
+  table th,
+  table td {
+    padding: 6px 8px !important;
+  }
+}
 </style>
