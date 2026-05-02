@@ -6,6 +6,33 @@ import NumberInputWithUnit from "../atoms/NumberInputWithUnit.vue";
 import EnumSelect from "../atoms/EnumSelect.vue";
 import ChannelSelect from "../atoms/ChannelSelect.vue";
 import RoleSelect from "../atoms/RoleSelect.vue";
+import IdMultiplierMapField from "./IdMultiplierMapField.vue";
+import IdsListPickerField from "./IdsListPickerField.vue";
+
+// Champs config qui stockent un mapping "id:valeur" en lignes/CSV. On
+// remplace le textarea brut par un picker (channel ou role) + valeur +
+// liste des entrees avec nom resolu et bouton supprimer.
+const CHANNEL_MAP_KEYS = new Set<string>([
+  "xp_channel_multipliers",
+  "channel_thresholds",
+  "channel_vision_thresholds",
+]);
+const ROLE_MAP_KEYS = new Set<string>(["xp_role_multipliers"]);
+
+// Champs config qui stockent une liste plate d'IDs en CSV (sans valeur
+// associee). On remplace le textarea brut par un multi-picker + chips.
+const CHANNEL_LIST_KEYS = new Set<string>([
+  "ignored_channels",
+  "excluded_channels",
+  "whitelist_channels",
+  "exempt_channels",
+]);
+const ROLE_LIST_KEYS = new Set<string>([
+  "ignored_roles",
+  "excluded_roles",
+  "whitelist_roles",
+  "exempt_roles",
+]);
 
 const props = defineProps<{
   field: ConfigField;
@@ -27,6 +54,32 @@ function update(v: string) {
 const isMultilineText = computed(
   () => props.field.type === "text" && props.field.key.endsWith("_message"),
 );
+
+const isChannelMap = computed(
+  () => props.field.type === "text" && CHANNEL_MAP_KEYS.has(props.field.key),
+);
+const isRoleMap = computed(
+  () => props.field.type === "text" && ROLE_MAP_KEYS.has(props.field.key),
+);
+const isChannelList = computed(
+  () => props.field.type === "text" && CHANNEL_LIST_KEYS.has(props.field.key),
+);
+const isRoleList = computed(
+  () => props.field.type === "text" && ROLE_LIST_KEYS.has(props.field.key),
+);
+
+const mapDefaults = computed(() => {
+  switch (props.field.key) {
+    case "xp_channel_multipliers":
+    case "xp_role_multipliers":
+      return { label: "Multiplicateur", step: 0.25, min: 0, default: 1 };
+    case "channel_thresholds":
+    case "channel_vision_thresholds":
+      return { label: "Seuil", step: 0.05, min: 0, max: 1, default: 0.7 };
+    default:
+      return { label: "Valeur", step: 1, default: 1 };
+  }
+});
 </script>
 
 <template>
@@ -83,6 +136,27 @@ const isMultilineText = computed(
       :id="field.key"
       :model-value="modelValue"
       :guild-id="guildId"
+      @update:model-value="update"
+    />
+
+    <IdsListPickerField
+      v-else-if="isChannelList || isRoleList"
+      :model-value="modelValue"
+      :guild-id="guildId"
+      :kind="isRoleList ? 'role' : 'channel'"
+      @update:model-value="update"
+    />
+
+    <IdMultiplierMapField
+      v-else-if="isChannelMap || isRoleMap"
+      :model-value="modelValue"
+      :guild-id="guildId"
+      :kind="isRoleMap ? 'role' : 'channel'"
+      :value-label="mapDefaults.label"
+      :value-step="mapDefaults.step"
+      :value-min="mapDefaults.min"
+      :value-max="mapDefaults.max"
+      :value-default="mapDefaults.default"
       @update:model-value="update"
     />
 
