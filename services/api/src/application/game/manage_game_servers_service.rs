@@ -151,14 +151,21 @@ impl ManageGameServersService {
 
         let mut port_mappings = vec![];
         if let Some(host_port) = server.host_port {
+            // Protocole defini par le template (TCP : Minecraft, Terraria ;
+            // UDP : Valheim, Factorio, Palworld).
+            let proto = match template.port_protocol {
+                crate::domain::entities::game::template::PortProtocol::Tcp => PortProtocol::Tcp,
+                crate::domain::entities::game::template::PortProtocol::Udp => PortProtocol::Udp,
+            };
             port_mappings.push(PortMapping {
                 host_port,
                 container_port: template.container_port,
-                protocol: PortProtocol::Tcp,
+                protocol: proto,
             });
         }
         if template.supports_rcon && cfg.rcon_enabled {
             if let Some(rcon_host_port) = server.rcon_port {
+                // RCON est toujours TCP.
                 port_mappings.push(PortMapping {
                     host_port: rcon_host_port,
                     container_port: 25575,

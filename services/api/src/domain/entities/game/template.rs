@@ -34,6 +34,30 @@ pub struct ConfigField {
     pub max_length: Option<u32>,
 }
 
+/// Protocole reseau du port jeu (TCP : Minecraft, Terraria... ; UDP :
+/// Valheim, Factorio, Palworld...).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PortProtocol {
+    Tcp,
+    Udp,
+}
+
+impl PortProtocol {
+    pub fn from_str(s: &str) -> Self {
+        match s {
+            "udp" => Self::Udp,
+            _ => Self::Tcp,
+        }
+    }
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Tcp => "tcp",
+            Self::Udp => "udp",
+        }
+    }
+}
+
 /// Template de jeu — entree du catalogue.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameTemplate {
@@ -46,6 +70,7 @@ pub struct GameTemplate {
     pub icon: Option<String>,
     pub accent_color: Option<String>,
     pub container_port: u16,
+    pub port_protocol: PortProtocol,
     pub default_memory_mb: i32,
     pub min_memory_mb: i32,
     pub max_memory_mb: i32,

@@ -40,6 +40,7 @@ export interface GameTemplate {
   icon: string | null;
   accent_color: string | null;
   container_port: number;
+  port_protocol: "tcp" | "udp";
   default_memory_mb: number;
   min_memory_mb: number;
   max_memory_mb: number;

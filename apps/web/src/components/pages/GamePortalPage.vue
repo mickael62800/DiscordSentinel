@@ -544,7 +544,10 @@ function templateIcon(slug: string | undefined): string {
   display: grid;
   grid-template-columns: minmax(320px, 380px) 1fr minmax(380px, 480px);
   gap: var(--space-lg);
-  min-height: calc(100vh - 240px);
+  /* Hauteur fixe pour forcer le scroll interne des panels (sinon les
+     logs et le catalogue font deborder la page sur 300vh). */
+  height: calc(100vh - 240px);
+  min-height: 500px;
 }
 .panel {
   background: var(--bg-secondary);
@@ -583,12 +586,26 @@ function templateIcon(slug: string | undefined): string {
   box-shadow: var(--shadow-sm);
 }
 .server-info { flex: 1; min-width: 0; }
-.server-name { font-weight: 600; font-size: 13px; display: flex; gap: var(--space-sm); align-items: center; color: var(--text-primary); }
-.server-meta { color: var(--text-secondary); font-size: 11px; margin-top: 2px; }
+.server-name {
+  font-weight: 600; font-size: 13px;
+  color: var(--text-primary);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  /* Eviter les retours a la ligne sur le nom du serveur tant que possible */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.server-meta {
+  color: var(--text-secondary);
+  font-size: 11px;
+  margin-top: 2px;
+  word-break: break-word;
+}
 .status {
   font-size: 9px; padding: 2px 6px;
   border-radius: var(--radius-sm);
   text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;
+  flex-shrink: 0;
 }
 .status.running { background: var(--success-bg); color: var(--success); }
 .status.starting { background: var(--warning-bg); color: var(--warning); }
