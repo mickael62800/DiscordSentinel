@@ -27,18 +27,45 @@ export const useAuthStore = defineStore("auth", () => {
     hasConfig.value = configService.getApiConfig() !== null;
     if (!hasConfig.value) return;
 
+    // Restore le user depuis le storage (rapide).
     try {
       const currentUser = authService.getCurrentUser();
       if (currentUser) {
         user.value = currentUser;
-        return;
+      } else {
+        const store = await getKv();
+        const stored = await store.get<DiscordUser>(USER_KEY);
+        if (stored) user.value = stored;
       }
-
-      const store = await getKv();
-      const stored = await store.get<DiscordUser>(USER_KEY);
-      if (stored) user.value = stored;
     } catch {
-      // No session
+      // Pas de session locale.
+    }
+
+    // Si on a un user en cache, valide que le token Discord est encore
+    // accepte par l'API. Si l'endpoint refuse (401/403/503), on purge la
+    // session pour forcer une re-authentification. Evite que le user reste
+    // "connecte" cote front avec un token expire qui spam des 401.
+    if (user.value) {
+      try {
+        const { httpGet } = await import("@/api/http");
+        // /api/auth/check-access exige X-Discord-Token valide. Sur token
+        // expire, l'API retourne 401 -> http.ts purge auto + redirige
+        // vers /login. Sur 403, on purge manuellement aussi.
+        await httpGet("/api/auth/check-access");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes("session expired") || msg.includes("403")) {
+          // http.ts a deja redirige sur 401. Sur 403, on clear ici.
+          if (!msg.includes("session expired")) {
+            user.value = null;
+            try {
+              const store = await getKv();
+              await store.delete(USER_KEY);
+            } catch { /* ignore */ }
+          }
+        }
+        // Autres erreurs (network) : on laisse passer, l'app re-essayera.
+      }
     }
   }
 

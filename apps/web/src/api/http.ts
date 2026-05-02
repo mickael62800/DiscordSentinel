@@ -1,7 +1,7 @@
 // Wrapper fetch qui embarque bearer API key + header X-Discord-Token, comme le fait
 // ApiAdapter cote desktop. L'URL base est lue depuis la config stockee dans localStorage.
 
-import { getApiConfig, getDiscordToken } from "./config";
+import { getApiConfig, getDiscordToken, clearDiscordToken } from "./config";
 
 export function apiBase(): string {
   // Priorite : config localStorage utilisateur > VITE_API_URL au build > defaut.
@@ -25,7 +25,23 @@ function headers(extra?: Record<string, string>): Record<string, string> {
 
 async function handle<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
-    if (resp.status === 401) throw new Error("Unauthorized: invalid API key");
+    if (resp.status === 401) {
+      // Token invalide/expire : on purge la session locale et on redirige
+      // vers /login pour forcer une re-authentification. Evite la boucle
+      // infinie ou le user reste "logge" cote front mais 401 cote API.
+      try {
+        clearDiscordToken();
+        localStorage.removeItem("ds.discord.user");
+      } catch { /* storage quota / cookies disabled : ignore */ }
+      const path = window.location.pathname;
+      // Skip si deja sur login/setup/auth-callback (eviter boucle de redir).
+      if (path !== "/login" && path !== "/setup" && !path.startsWith("/auth/")) {
+        // Soft redirect via window.location pour reset l'app entiere
+        // (Pinia stores, composables singletons, etc.).
+        window.location.href = "/login?expired=1";
+      }
+      throw new Error("Unauthorized: session expired");
+    }
     const body = await resp.text().catch(() => "");
     throw new Error(`API error ${resp.status}: ${body}`);
   }
