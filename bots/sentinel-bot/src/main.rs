@@ -3,6 +3,7 @@
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
+mod command_registry;
 mod config;
 mod handler;
 mod modules;

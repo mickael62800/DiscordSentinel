@@ -77,36 +77,23 @@ impl EventHandler for Handler {
 
         register_guilds(&ctx, &ready).await;
 
-        // Enregistrer toutes les commandes slash en une fois.
-        let mut commands = Vec::new();
-        commands.extend(modules::cleanup::register_commands());
-        commands.extend(modules::games::register_commands());
-        commands.extend(modules::community::register_commands());
-        commands.extend(modules::audit::register_commands());
-        commands.extend(modules::progression::register_commands());
-        commands.extend(modules::blackjack::register_commands());
-        commands.extend(modules::slot::register_commands());
-        commands.extend(modules::wheel::register_commands());
-        commands.extend(modules::security::register_commands());
-        commands.extend(modules::automod::register_commands());
-        commands.extend(modules::moderation::register_commands());
-        commands.extend(modules::voice::register_commands());
-        commands.extend(modules::coude::register_commands());
-        commands.extend(modules::tickets::register_commands());
-
-        if let Err(e) = serenity::model::application::Command::set_global_commands(
+        // Enregistrement per-guild des slash commands : filtre les modules
+        // desactives via command_registry. Remplace l'ancien set_global_commands
+        // qui enregistrait tout pour tout le monde -> impossible de cacher
+        // une commande d'un module desactive.
+        // On vide aussi les commandes globales heritees (set vide) car elles
+        // sont visibles partout meme apres bascule per-guild.
+        let _ = serenity::model::application::Command::set_global_commands(
             &ctx.http,
-            commands,
+            Vec::new(),
         )
-        .await
-        {
-            tracing::error!(error = %e, "Erreur enregistrement commandes");
-        } else {
-            info!("Slash commands enregistrees (sentinel-bot unifie)");
-        }
-
-        // Charger les roles temporaires actifs + spawn cleanup
+        .await;
         let guild_ids: Vec<_> = ready.guilds.iter().map(|g| g.id).collect();
+        crate::command_registry::refresh_all_guilds(&ctx, &guild_ids).await;
+
+        // Listener Redis pour les events bot_enabled_changed -> re-register
+        // les commandes guild a la volee quand un admin toggle on/off.
+        crate::command_registry::spawn_consumer(ctx.clone());
         modules::community::load_temp_roles(&ctx, &guild_ids).await;
         modules::community::spawn_temp_role_cleanup(ctx.clone());
 

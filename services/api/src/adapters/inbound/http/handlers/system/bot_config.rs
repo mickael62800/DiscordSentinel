@@ -156,6 +156,21 @@ pub async fn set_config(
         }
     }
 
+    // Toggle module : broadcast pour que le bot re-register les slash
+    // commands de cette guild. Cache/decache les commandes Discord
+    // instantanement (au lieu d'attendre un restart).
+    if dto.config_key == "enabled" {
+        let enabled = dto.config_value == "true" || dto.config_value == "1";
+        state.broadcaster.broadcast(
+            "bot_enabled_changed",
+            serde_json::json!({
+                "guild_id": &dto.guild_id,
+                "bot_name": &dto.bot_name,
+                "enabled": enabled,
+            }),
+        );
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -193,6 +208,19 @@ pub async fn delete_config(
         if let Err(e) = conn.del::<_, ()>(format!("bot:config:{}:{}", dto.guild_id, dto.bot_name)).await {
             warn!(error = %e, guild_id = %dto.guild_id, "Echec invalidation cache config bot");
         }
+    }
+
+    // Si suppression de la cle "enabled" : retour au default true ->
+    // re-register pour que les commandes du module reapparaissent.
+    if dto.config_key == "enabled" {
+        state.broadcaster.broadcast(
+            "bot_enabled_changed",
+            serde_json::json!({
+                "guild_id": &dto.guild_id,
+                "bot_name": &dto.bot_name,
+                "enabled": true,
+            }),
+        );
     }
 
     Ok(StatusCode::NO_CONTENT)
