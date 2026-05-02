@@ -4,6 +4,7 @@ import { useGuildSelector } from "@/composables/useGuildSelector";
 import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
 import { useMyRole } from "@/composables/useMyRole";
+import { useRealtimeRefresh } from "@/composables/useRealtimeRefresh";
 import {
   confessionsService,
   type Confession,
@@ -42,6 +43,22 @@ async function fetchAll() {
 }
 onMounted(fetchAll);
 watch([selectedGuildId, showDeleted], fetchAll);
+
+// Sync bidirectionnelle : si une confession est creee/editee/supprimee
+// cote Discord (slash command admin) ou si un nouveau signalement arrive,
+// on rafraichit automatiquement la page web. Permet aussi a 2 admins web
+// d'avoir la meme vue en temps reel.
+useRealtimeRefresh(
+  [
+    "confession_created",
+    "confession_edited",
+    "confession_deleted",
+    "confession_reply_created",
+    "confession_reply_deleted",
+    "confession_report_created",
+  ],
+  fetchAll,
+);
 
 // ── Replies preview ────────────────────────────────────────────────────
 

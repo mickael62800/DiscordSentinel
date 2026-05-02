@@ -159,6 +159,10 @@ impl EventHandler for Handler {
         // Announcements : consumer Redis stream pour les annonces planifiees
         // publiees par announcement-worker.
         modules::announcements::spawn(ctx.clone());
+
+        // Confessions : consumer Redis stream pour synchroniser les
+        // suppressions web -> Discord (delete confession ou reply).
+        modules::confessions::spawn_consumer(ctx.clone());
     }
 
     async fn message(&self, ctx: Context, msg: Message) {

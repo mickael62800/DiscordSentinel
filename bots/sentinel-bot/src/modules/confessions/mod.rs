@@ -610,3 +610,118 @@ pub fn module_name() -> &'static str {
 pub fn ensure_used(_ctx: &Context, _g: GuildId) {
     info!("confessions module loaded");
 }
+
+// ── Consumer Redis stream pour sync bidirectionnelle Web -> Discord ─────
+
+/// Spawn le consumer durable Redis stream sentinel:events filtre sur les
+/// events "confession_deleted" et "confession_reply_deleted". Quand un
+/// admin supprime une confession via la page web, l'API broadcast un event
+/// avec message_id+channel_id, et ce consumer supprime le message Discord
+/// pour garder la sync.
+pub fn spawn_consumer(ctx: Context) {
+    tokio::spawn(async move {
+        let consumer = sentinel_shared::event_bus::default_consumer_name();
+        sentinel_shared::event_bus::listen_stream_group(
+            "sentinel-bot-confessions".to_string(),
+            consumer,
+            move |payload_json| {
+                let ctx = ctx.clone();
+                async move { handle_event(&ctx, &payload_json).await }
+            },
+        )
+        .await;
+    });
+}
+
+async fn handle_event(ctx: &Context, payload_json: &str) {
+    let envelope: serde_json::Value = match serde_json::from_str(payload_json) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+    let event = envelope.get("event").and_then(|v| v.as_str()).unwrap_or("");
+    let data = match envelope.get("data") {
+        Some(d) => d.clone(),
+        None => return,
+    };
+    match event {
+        "confession_deleted" => {
+            let channel_id_str = data
+                .get("channel_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let message_id_str = data
+                .get("message_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            if channel_id_str.is_empty() || message_id_str.is_empty() {
+                return;
+            }
+            let (Ok(c), Ok(m)) = (channel_id_str.parse::<u64>(), message_id_str.parse::<u64>())
+            else {
+                return;
+            };
+            let ch = ChannelId::new(c);
+            let mid = MessageId::new(m);
+            // Idempotent : si deja supprime, on ignore l'erreur 404.
+            match ch.delete_message(&ctx.http, mid).await {
+                Ok(_) => info!(channel_id = c, message_id = m, "Confession message deleted (sync from web)"),
+                Err(e) => {
+                    let s = e.to_string();
+                    if !s.contains("404") {
+                        warn!(error = %e, "Echec delete message confession (sync web)");
+                    }
+                }
+            }
+        }
+        "confession_reply_deleted" => {
+            // Le reply est dans le thread - on doit retrouver le channel.
+            // L'API broadcast n'envoie pas le channel_id du thread, donc on
+            // recupere via la confession parent.
+            let confession_id = data
+                .get("confession_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            let message_id_str = data
+                .get("message_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            if confession_id.is_empty() || message_id_str.is_empty() {
+                return;
+            }
+            let api = match api_client(ctx).await {
+                Some(a) => a,
+                None => return,
+            };
+            let conf: Result<serde_json::Value, String> = api
+                .get_json(&format!("/api/confessions/by-id/{}", confession_id))
+                .await;
+            let thread_id_str = match conf {
+                Ok(c) => c
+                    .get("thread_id")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default(),
+                Err(_) => return,
+            };
+            if thread_id_str.is_empty() {
+                return;
+            }
+            let (Ok(c), Ok(m)) = (thread_id_str.parse::<u64>(), message_id_str.parse::<u64>())
+            else {
+                return;
+            };
+            let ch = ChannelId::new(c);
+            let mid = MessageId::new(m);
+            match ch.delete_message(&ctx.http, mid).await {
+                Ok(_) => info!(thread_id = c, message_id = m, "Reply message deleted (sync web)"),
+                Err(e) => {
+                    let s = e.to_string();
+                    if !s.contains("404") {
+                        warn!(error = %e, "Echec delete reply message (sync web)");
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+}
