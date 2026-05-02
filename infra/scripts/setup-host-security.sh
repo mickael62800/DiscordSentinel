@@ -194,16 +194,25 @@ setup_disk_trend() {
 #!/bin/bash
 set -eu
 OUT=/var/lib/sentinel/disk-trend.json
+CURRENT=/var/lib/sentinel/disks-current.json
 HISTORY=/var/lib/sentinel/.disk-history.json
 mkdir -p /var/lib/sentinel
 
-# Snapshot actuel (lit /, /var, etc.)
+# Snapshot actuel : liste tous les filesystems locaux REELS (exclut tmpfs,
+# devtmpfs, overlay, squashfs, fuse.snapfuse). On garde uniquement les
+# devices /dev/* pour ignorer les pseudo-FS et les bind mounts internes a
+# Docker. Si plusieurs disques physiques sont montes (ex: / et /mnt/data),
+# ils apparaissent tous.
 NOW=$(date -Iseconds)
-SNAPSHOT=$(df -BG --output=target,size,used,pcent / /var 2>/dev/null | tail -n +2 | \
-    awk -v ts="$NOW" '{
-        gsub("G","",$2); gsub("G","",$3); gsub("%","",$4);
-        printf "{\"timestamp\":\"%s\",\"mount\":\"%s\",\"used_gb\":%s,\"total_gb\":%s,\"usage_pct\":%s}\n", ts, $1, $3, $2, $4
-    }')
+SNAPSHOT=$(df -BG --output=source,target,size,used,pcent \
+        -x tmpfs -x devtmpfs -x overlay -x squashfs -x fuse.snapfuse \
+        -x proc -x sysfs -x cgroup -x cgroup2 -x autofs \
+        2>/dev/null | tail -n +2 | \
+    awk -v ts="$NOW" '
+        $1 ~ /^\/dev\// && $1 !~ /\/loop/ {
+            gsub("G","",$3); gsub("G","",$4); gsub("%","",$5);
+            printf "{\"timestamp\":\"%s\",\"mount\":\"%s\",\"used_gb\":%s,\"total_gb\":%s,\"usage_pct\":%s}\n", ts, $2, $4, $3, $5
+        }')
 
 # Append au fichier history (un JSON object par ligne, max 7 jours = 168 entrees a 1/h)
 echo "$SNAPSHOT" >> $HISTORY.tmp
@@ -228,6 +237,25 @@ tail -1000 $HISTORY > $HISTORY.tmp && mv $HISTORY.tmp $HISTORY
     echo "}"
 } > "$OUT.tmp" && mv "$OUT.tmp" "$OUT"
 chmod 644 "$OUT"
+
+# Snapshot instantane lisible par l'API live (/api/system/info). L'API
+# dans son container Docker ne voit que son rootfs via sysinfo, donc on
+# expose ici la photo host (tous les disques /dev/*).
+{
+    echo "{"
+    echo "  \"updated_at\": \"$NOW\","
+    echo "  \"disks\": ["
+    F=1
+    while IFS= read -r P; do
+        [ -z "$P" ] && continue
+        [ $F -eq 0 ] && echo "    ,"
+        echo "    $P"
+        F=0
+    done <<< "$SNAPSHOT"
+    echo "  ]"
+    echo "}"
+} > "$CURRENT.tmp" && mv "$CURRENT.tmp" "$CURRENT"
+chmod 644 "$CURRENT"
 EOF
     chmod +x "$SCRIPT_DIR/sentinel-disk-trend.sh"
     "$SCRIPT_DIR/sentinel-disk-trend.sh"

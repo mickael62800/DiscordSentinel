@@ -226,40 +226,46 @@ pub async fn get_system_info(
         false
     };
 
-    // ── 5. Disks / mount points via sysinfo ──
-    // Liste les disques/partitions visibles depuis le process. En conteneur
-    // Docker on voit les volumes mountes. Avec `pid: host` on voit l'host.
-    let disks_info = Disks::new_with_refreshed_list();
-    let disks: Vec<DiskDto> = disks_info
-        .iter()
-        .filter(|d| {
-            // On masque les filesystems "techniques" qu'on n'attend pas
-            // d'un admin (overlay, tmpfs vides, etc.) — sauf si volume reel.
-            let fs = d.file_system().to_string_lossy();
-            !matches!(fs.as_ref(), "overlay" | "shm" | "tmpfs" | "devtmpfs" | "proc" | "sysfs")
-                || d.total_space() > 100 * 1024 * 1024 // garde tmpfs > 100 MB
-        })
-        .map(|d| {
-            let total = d.total_space();
-            let avail = d.available_space();
-            let used = total.saturating_sub(avail);
-            let usage = if total > 0 {
-                ((used as f64 / total as f64) * 100.0) as f32
-            } else {
-                0.0
-            };
-            DiskDto {
-                name: d.name().to_string_lossy().into_owned(),
-                mount_point: d.mount_point().to_string_lossy().into_owned(),
-                fs_type: d.file_system().to_string_lossy().into_owned(),
-                total_gb: bytes_to_gb(total),
-                used_gb: bytes_to_gb(used),
-                available_gb: bytes_to_gb(avail),
-                usage_percent: usage,
-                is_removable: d.is_removable(),
-            }
-        })
-        .collect();
+    // ── 5. Disks / mount points ──
+    // En priorite : on lit /var/lib/sentinel/disks-current.json genere par
+    // le cron host `sentinel-disk-trend.sh` (toutes les heures). Ca permet
+    // d'exposer TOUS les disques physiques de l'host meme depuis le
+    // container API (qui ne voit que son rootfs via sysinfo).
+    //
+    // Fallback : sysinfo dans le container (limite mais ne casse rien si
+    // setup-host-security.sh n'est pas deploye).
+    let disks: Vec<DiskDto> = read_host_disks_snapshot()
+        .unwrap_or_else(|| {
+            let disks_info = Disks::new_with_refreshed_list();
+            disks_info
+                .iter()
+                .filter(|d| {
+                    let fs = d.file_system().to_string_lossy();
+                    !matches!(fs.as_ref(), "overlay" | "shm" | "tmpfs" | "devtmpfs" | "proc" | "sysfs")
+                        || d.total_space() > 100 * 1024 * 1024
+                })
+                .map(|d| {
+                    let total = d.total_space();
+                    let avail = d.available_space();
+                    let used = total.saturating_sub(avail);
+                    let usage = if total > 0 {
+                        ((used as f64 / total as f64) * 100.0) as f32
+                    } else {
+                        0.0
+                    };
+                    DiskDto {
+                        name: d.name().to_string_lossy().into_owned(),
+                        mount_point: d.mount_point().to_string_lossy().into_owned(),
+                        fs_type: d.file_system().to_string_lossy().into_owned(),
+                        total_gb: bytes_to_gb(total),
+                        used_gb: bytes_to_gb(used),
+                        available_gb: bytes_to_gb(avail),
+                        usage_percent: usage,
+                        is_removable: d.is_removable(),
+                    }
+                })
+                .collect()
+        });
 
     Ok(Json(SystemInfoDto {
         bots,
@@ -288,6 +294,53 @@ pub async fn get_system_info(
 
 fn bytes_to_gb(bytes: u64) -> f64 {
     (bytes as f64) / (1024.0 * 1024.0 * 1024.0)
+}
+
+/// Lit /var/lib/sentinel/disks-current.json (genere par le cron host
+/// `sentinel-disk-trend.sh`). Format :
+/// `{"updated_at":"...","disks":[{"timestamp":...,"mount":"/","used_gb":N,"total_gb":N,"usage_pct":N},...]}`
+///
+/// Retourne None si le fichier n'existe pas / est illisible / mal forme.
+/// L'appelant fallback alors sur sysinfo (vue container).
+fn read_host_disks_snapshot() -> Option<Vec<DiskDto>> {
+    use serde::Deserialize;
+
+    #[derive(Deserialize)]
+    struct HostDisk {
+        mount: String,
+        #[serde(default)]
+        used_gb: f64,
+        #[serde(default)]
+        total_gb: f64,
+        #[serde(default)]
+        usage_pct: f32,
+    }
+    #[derive(Deserialize)]
+    struct HostDisks {
+        disks: Vec<HostDisk>,
+    }
+
+    let raw = std::fs::read_to_string("/var/lib/sentinel/disks-current.json").ok()?;
+    let parsed: HostDisks = serde_json::from_str(&raw).ok()?;
+    if parsed.disks.is_empty() {
+        return None;
+    }
+    Some(
+        parsed
+            .disks
+            .into_iter()
+            .map(|d| DiskDto {
+                name: d.mount.clone(),
+                mount_point: d.mount,
+                fs_type: "host".to_string(),
+                total_gb: d.total_gb,
+                used_gb: d.used_gb,
+                available_gb: (d.total_gb - d.used_gb).max(0.0),
+                usage_percent: d.usage_pct,
+                is_removable: false,
+            })
+            .collect(),
+    )
 }
 
 #[cfg(test)]
