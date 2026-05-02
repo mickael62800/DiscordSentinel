@@ -154,6 +154,10 @@ impl EventHandler for Handler {
         // Progression: hydrate voice sessions + tick periodique credit XP
         modules::progression::on_ready(&ctx, &ready).await;
         modules::progression::spawn_voice_tick(ctx.clone());
+
+        // Announcements : consumer Redis stream pour les annonces planifiees
+        // publiees par announcement-worker.
+        modules::announcements::spawn(ctx.clone());
     }
 
     async fn message(&self, ctx: Context, msg: Message) {

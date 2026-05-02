@@ -1,5 +1,6 @@
 //! Modules du bot sentinel unifie.
 
+pub mod announcements;
 pub mod audit;
 pub mod automod;
 pub mod blackjack;
