@@ -15,9 +15,9 @@ import IdsListPickerField from "./IdsListPickerField.vue";
 const CHANNEL_MAP_KEYS = new Set<string>([
   "xp_channel_multipliers",
   "channel_thresholds",
-  "channel_vision_thresholds",
+  "vision_channel_thresholds",
 ]);
-const ROLE_MAP_KEYS = new Set<string>(["xp_role_multipliers"]);
+const ROLE_MAP_KEYS = new Set<string>(["xp_role_multipliers", "temp_roles"]);
 
 // Champs config qui stockent une liste plate d'IDs en CSV (sans valeur
 // associee). On remplace le textarea brut par un multi-picker + chips.
@@ -32,6 +32,7 @@ const ROLE_LIST_KEYS = new Set<string>([
   "excluded_roles",
   "whitelist_roles",
   "exempt_roles",
+  "double_xp_roles",
 ]);
 
 const props = defineProps<{
@@ -74,8 +75,10 @@ const mapDefaults = computed(() => {
     case "xp_role_multipliers":
       return { label: "Multiplicateur", step: 0.25, min: 0, default: 1 };
     case "channel_thresholds":
-    case "channel_vision_thresholds":
+    case "vision_channel_thresholds":
       return { label: "Seuil", step: 0.05, min: 0, max: 1, default: 0.7 };
+    case "temp_roles":
+      return { label: "Durée (s)", step: 60, min: 1, default: 3600 };
     default:
       return { label: "Valeur", step: 1, default: 1 };
   }
