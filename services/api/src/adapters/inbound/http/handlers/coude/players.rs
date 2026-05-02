@@ -161,7 +161,10 @@ pub async fn reset_stats(
     Path((guild_id, user_id)): Path<(String, String)>,
     Json(dto): Json<ResetStatsDto>,
 ) -> Result<Json<FullPlayerDto>, ApiError> {
-    check_role_for_guild(&state, &rbac, &guild_id, Role::Owner, "owner uniquement pour reset_stats").await?;
+    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
+        &state, &rbac, &guild_id, "db.reset.coude_stats",
+        "role insuffisant pour reset_stats",
+    ).await?;
     let player = state
         .coude_players_uc
         .reset_stats(&guild_id, &user_id, dto.cost)

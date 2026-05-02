@@ -23,4 +23,32 @@ export const rbacService = {
   upsertComponentVisibility(guildId: string, entries: ComponentVisibilityEntry[]): Promise<unknown> {
     return httpPut(`/api/rbac/component-visibility/${guildId}`, { entries });
   },
+
+  // Gates RBAC granulaires (purges, resets — ce que peut faire chaque role).
+  listComponentMinRoles(guildId: string): Promise<ComponentMinRoleEntry[]> {
+    return httpGet(`/api/rbac/component-min-role/${guildId}`);
+  },
+  upsertComponentMinRole(
+    guildId: string,
+    componentKey: string,
+    minRole: RbacRole,
+  ): Promise<unknown> {
+    return httpPut(`/api/rbac/component-min-role/${guildId}`, {
+      component_key: componentKey,
+      min_role: minRole,
+    });
+  },
+  deleteComponentMinRole(guildId: string, componentKey: string): Promise<void> {
+    return httpDelete(`/api/rbac/component-min-role/${guildId}/${componentKey}`);
+  },
 };
+
+export interface ComponentMinRoleEntry {
+  component_key: string;
+  default_role: RbacRole;
+  floor_role: RbacRole;
+  /** Role effectif applique (override si present, sinon default). */
+  effective_role: RbacRole;
+  /** Override explicite stocke en DB, null si default. */
+  override_role: RbacRole | null;
+}

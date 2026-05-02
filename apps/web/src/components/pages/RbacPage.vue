@@ -8,6 +8,7 @@ import LoadingState from "../atoms/LoadingState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
 import AppBadge from "../atoms/AppBadge.vue";
 import ComponentVisibilityGrid from "../organisms/ComponentVisibilityGrid.vue";
+import ComponentMinRoleGrid from "../organisms/ComponentMinRoleGrid.vue";
 import InvitationsManager from "../organisms/InvitationsManager.vue";
 import { safeImageUrl } from "../../utils/safeUrl";
 import type { RbacRole } from "../../types";
@@ -202,6 +203,9 @@ function roleVariant(role: RbacRole): BadgeVariant {
 
       <!-- Codes d'invitation (owner only) -->
       <InvitationsManager v-if="canEdit" />
+
+      <!-- Permissions sensibles : qui peut purger / reset (owner only) -->
+      <ComponentMinRoleGrid v-if="canEdit" />
 
       <!-- Visibilite des composants par role (owner only) -->
       <ComponentVisibilityGrid v-if="canEdit" />

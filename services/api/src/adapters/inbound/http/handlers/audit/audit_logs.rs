@@ -11,8 +11,6 @@ use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::normalize_offset;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::domain::errors::DomainError;
@@ -33,9 +31,9 @@ pub async fn purge_audit_logs(
     rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
-        &state, &rbac, &guild_id, Role::Owner,
-        "owner uniquement pour purger les audit logs",
+    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
+        &state, &rbac, &guild_id, "db.purge.audit_logs",
+        "role insuffisant pour purger les audit logs",
     )
     .await?;
 

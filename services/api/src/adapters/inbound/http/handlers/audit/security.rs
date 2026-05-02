@@ -10,8 +10,6 @@ use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::errors_helpers::sqlx_internal;
 use crate::adapters::inbound::http::helpers::map_to_dtos;
 use crate::adapters::inbound::http::helpers::single_dto;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
-use crate::domain::enums::system::role::Role;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
@@ -55,9 +53,9 @@ pub async fn purge_events(
     rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
-        &state, &rbac, &guild_id, Role::Owner,
-        "owner uniquement pour purger les evenements de securite",
+    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
+        &state, &rbac, &guild_id, "db.purge.security_events",
+        "role insuffisant pour purger les evenements de securite",
     )
     .await?;
 

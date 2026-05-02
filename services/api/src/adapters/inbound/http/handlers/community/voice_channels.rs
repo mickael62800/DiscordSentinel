@@ -152,7 +152,22 @@ pub async fn purge_channel(
     rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Owner, "owner uniquement pour purger un voice channel").await?;
+    // Resolution component-gate par lookup guild via channel_id puis check.
+    if rbac.is_some() {
+        if let Ok(Some((gid,))) = sqlx::query_as::<_, (String,)>(
+            "SELECT guild_id FROM voice_channels WHERE channel_id = $1",
+        )
+        .bind(&channel_id)
+        .fetch_optional(&state.pg_pool)
+        .await
+        {
+            crate::adapters::inbound::http::middleware::component_gates::check_component_role(
+                &state, &rbac, &gid, "db.purge.voice_channel",
+                "role insuffisant pour purger un voice channel",
+            )
+            .await?;
+        }
+    }
 
     let res = sqlx::query(
         "DELETE FROM voice_channels WHERE channel_id = $1 AND channel_status = 'closed'",
@@ -183,9 +198,9 @@ pub async fn purge_history(
     rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
-        &state, &rbac, &guild_id, Role::Owner,
-        "owner uniquement pour purger l'historique voice",
+    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
+        &state, &rbac, &guild_id, "db.purge.voice_history",
+        "role insuffisant pour purger l'historique voice",
     )
     .await?;
 

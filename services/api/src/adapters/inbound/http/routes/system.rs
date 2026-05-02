@@ -134,4 +134,15 @@ pub fn routes() -> Router<AppState> {
             get(handlers::system::component_visibility::list_visibility)
                 .put(handlers::system::component_visibility::upsert_visibility),
         )
+        // RBAC component min_role (gates API granulaires : qui a le droit
+        // de purger quoi). Source de verite securite, pas juste UI.
+        .route(
+            "/api/rbac/component-min-role/{guild_id}",
+            get(handlers::system::component_min_role::list_min_roles)
+                .put(handlers::system::component_min_role::upsert_min_role),
+        )
+        .route(
+            "/api/rbac/component-min-role/{guild_id}/{component_key}",
+            axum::routing::delete(handlers::system::component_min_role::delete_min_role),
+        )
 }

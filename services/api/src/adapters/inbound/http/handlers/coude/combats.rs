@@ -216,12 +216,12 @@ pub async fn purge_all(
     rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    check_role_for_guild(
+    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
         &state,
         &rbac,
         &guild_id,
-        Role::Owner,
-        "owner uniquement pour purger les donnees coude",
+        "db.purge.coude",
+        "role insuffisant pour purger les donnees coude",
     )
     .await?;
 

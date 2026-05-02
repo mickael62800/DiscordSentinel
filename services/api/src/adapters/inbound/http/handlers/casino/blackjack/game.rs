@@ -14,10 +14,8 @@ use super::dto::BlackjackGameDto;
 use super::dto::StartGameDto;
 use super::parse_uuid;
 use crate::adapters::inbound::http::errors::ApiError;
-use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
 use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
-use crate::domain::enums::system::role::Role;
 use crate::domain::entities::casino::blackjack::BlackjackGame;
 
 /// Diffuse un événement `blackjack_result` pour la partie terminée.
@@ -185,9 +183,9 @@ pub async fn purge_all(
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     use crate::domain::errors::DomainError;
-    check_role_for_guild(
-        &state, &rbac, &guild_id, Role::Owner,
-        "owner uniquement pour purger blackjack",
+    crate::adapters::inbound::http::middleware::component_gates::check_component_role(
+        &state, &rbac, &guild_id, "db.purge.blackjack",
+        "role insuffisant pour purger blackjack",
     )
     .await?;
 

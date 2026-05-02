@@ -2,7 +2,7 @@ import { defineStore } from "pinia";
 import { ref } from "vue";
 import type { ComponentVisibilityEntry, RbacRole } from "@/types";
 import { componentByKey, ROLE_RANK } from "@/rbac/componentRegistry";
-import { rbacService } from "@/services/rbacService";
+import { rbacService, type ComponentMinRoleEntry } from "@/services/rbacService";
 import { useMyRoleStore } from "./myRoleStore";
 
 /**
@@ -16,6 +16,9 @@ import { useMyRoleStore } from "./myRoleStore";
  */
 export const useComponentVisibilityStore = defineStore("componentVisibility", () => {
   const overrides = ref<ComponentVisibilityEntry[]>([]);
+  /** Gates RBAC granulaires (purge/reset) — synchronises avec ce que l'API
+   *  applique reellement (table rbac_component_min_role). */
+  const minRoles = ref<ComponentMinRoleEntry[]>([]);
   const loaded = ref(false);
   const loading = ref(false);
 
@@ -31,14 +34,18 @@ export const useComponentVisibilityStore = defineStore("componentVisibility", ()
     loading.value = true;
     inFlight = (async () => {
       try {
-        // Charge visibility + myRole en parallele.
-        const [list] = await Promise.all([
+        // Charge visibility + myRole + min_roles en parallele.
+        const [vis, minRolesList] = await Promise.all([
           rbacService
             .listComponentVisibility(guildId)
             .catch(() => [] as ComponentVisibilityEntry[]),
+          rbacService
+            .listComponentMinRoles(guildId)
+            .catch(() => [] as ComponentMinRoleEntry[]),
           myRoleStore.load(guildId),
         ]);
-        overrides.value = list;
+        overrides.value = vis;
+        minRoles.value = minRolesList;
         lastLoadedGuild = guildId;
         loaded.value = true;
       } finally {
@@ -56,9 +63,14 @@ export const useComponentVisibilityStore = defineStore("componentVisibility", ()
 
   /**
    * Resout la visibilite d'un composant pour le role courant.
-   *  - superadmin -> toujours true
-   *  - override pour (role, key) -> sa valeur
-   *  - sinon -> role >= minRole du registry
+   *
+   * Priorite (ordre):
+   *  1. superadmin -> toujours true (bypass complet)
+   *  2. min_role API gate (rbac_component_min_role) -> source de verite
+   *     securite. Si le user n'a pas le role minimum, false.
+   *  3. override visibility UI (rbac_component_visibility) -> peut cacher
+   *     un bouton meme si le user a le role.
+   *  4. registry default (componentRegistry.minRole)
    */
   function visible(key: string): boolean {
     const myRoleStore = useMyRoleStore();
@@ -72,12 +84,20 @@ export const useComponentVisibilityStore = defineStore("componentVisibility", ()
       console.warn(`[visibility] composant inconnu: ${key}`);
       return true; // failsafe
     }
-    const override = overrides.value.find(
+
+    // 1. Gate API : si le composant est protege par min_role (purge/reset),
+    //    on utilise l'effective_role retourne par l'API. Sinon registry.minRole.
+    const gate = minRoles.value.find((m) => m.component_key === key);
+    const minRole = gate ? gate.effective_role : def.minRole;
+    if (ROLE_RANK[role] < ROLE_RANK[minRole]) return false;
+
+    // 2. Override visibility (peut cacher davantage, jamais elargir).
+    const visOverride = overrides.value.find(
       (o) => o.component_key === key && o.role === role,
     );
-    if (override) return override.visible;
-    return ROLE_RANK[role] >= ROLE_RANK[def.minRole];
+    if (visOverride) return visOverride.visible;
+    return true;
   }
 
-  return { overrides, loaded, loading, load, invalidate, visible };
+  return { overrides, minRoles, loaded, loading, load, invalidate, visible };
 });
