@@ -12,6 +12,7 @@ members = [
     # Workers
     "services/workers/worker-common",
     "services/workers/ai-worker",
+    "services/workers/announcement-worker",
     "services/workers/analytics-worker",
     "services/workers/appeal-sla-worker",
     "services/workers/audit-cache-worker",

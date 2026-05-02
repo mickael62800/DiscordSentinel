@@ -3058,6 +3058,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "sentinel-announcement-worker"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "dotenvy",
+ "redis",
+ "reqwest",
+ "sentinel-worker-common",
+ "serde",
+ "serde_json",
+ "tikv-jemallocator",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "sentinel-api"
 version = "0.1.0"
 dependencies = [
