@@ -373,15 +373,43 @@ onMounted(() => {
 }
 
 @media (max-width: 700px) {
-  .user-info {
-    display: none;
-  }
-  .logo-text {
-    display: none;
-  }
+  .user-info { display: none; }
+  .logo-text { display: none; }
   .topbar {
-    padding: 10px 12px;
+    padding: 8px 10px;
+    gap: 8px;
   }
+  .guild-select {
+    min-width: 0;
+    max-width: 160px;
+    padding: 6px 28px 6px 10px;
+    font-size: 12px;
+  }
+  .brand { flex-shrink: 0; padding: 0; }
+  .logo-icon { width: 36px; height: 36px; }
+  .user-block {
+    padding-left: 8px;
+    margin-left: 0;
+    border-left: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .user-avatar { width: 28px; height: 28px; }
+  .bell-btn { width: 32px; height: 32px; }
+  /* Spacer compressible pour laisser la place a l'avatar user. */
+  .spacer { min-width: 0; flex-shrink: 1; }
+}
+
+/* Tres petit mobile : encore plus compact */
+@media (max-width: 420px) {
+  .topbar {
+    padding: 6px 8px;
+    gap: 6px;
+  }
+  .guild-select {
+    max-width: 130px;
+    font-size: 11px;
+  }
+  .status-indicator { display: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

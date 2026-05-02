@@ -461,11 +461,63 @@ const sections = computed<Section[]>(() =>
   gap: 12px;
 }
 
+/* Tablette : hero plus compact mais reste en ligne. */
+@media (max-width: 768px) {
+  .dash-hero {
+    padding: 18px 16px;
+    gap: 14px;
+    margin-bottom: 16px;
+  }
+  .hero-logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+  .hero-logo-wrap::before { inset: -8px; }
+  .hero-text h1 { font-size: 1.3rem; }
+  .hero-text p { font-size: 0.85rem; }
+  /* Pattern et gloss inutiles sur petit ecran : on simplifie. */
+  .hero-pattern { display: none; }
+  .hero-gloss { display: none; }
+}
+
 @media (max-width: 640px) {
   .dash-hero {
-    flex-direction: column;
-    text-align: center;
-    padding: 20px;
+    padding: 14px 12px;
+    gap: 10px;
+    border-radius: 12px;
   }
+  .hero-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+  }
+  .hero-text { min-width: 0; flex: 1; }
+  .hero-text h1 { font-size: 1.1rem; margin-bottom: 2px; }
+  .hero-text p {
+    font-size: 0.78rem;
+    line-height: 1.3;
+    /* Tronque a 2 lignes max pour ne pas pousser les boutons. */
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  /* Grille 2 colonnes fixes sur mobile (sinon avec auto-fill on peut
+     tomber a 1 col tres etroite + 1 col vide). */
+  .section-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 100px;
+    gap: 8px;
+  }
+}
+
+/* Tres petit ecran (iPhone SE etc.) : reste lisible. */
+@media (max-width: 380px) {
+  .hero-logo { width: 38px; height: 38px; }
+  .hero-text h1 { font-size: 1rem; }
+  .hero-text p { font-size: 0.74rem; }
+  .section-grid { grid-auto-rows: 90px; gap: 6px; }
 }
 </style>

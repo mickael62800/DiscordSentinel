@@ -36,11 +36,15 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Mobile : empeche les pages enfants de pousser horizontalement le viewport
+     a cause d'un overflow imprevisible (textes longs, embeds, etc.) */
+  min-width: 0;
 }
 
 .main-content {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   padding: 32px;
   min-width: 0;
 }
@@ -53,7 +57,7 @@ onUnmounted(() => {
 
 @media (max-width: 600px) {
   .main-content {
-    padding: 16px 12px;
+    padding: 14px 10px;
   }
 }
 </style>
