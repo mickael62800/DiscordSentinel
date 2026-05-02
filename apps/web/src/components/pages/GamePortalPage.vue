@@ -94,15 +94,38 @@ async function fetchAll() {
 }
 
 async function fetchLogs(serverId: string) {
+  // Skip si le serveur n'a pas encore de container (jamais demarre).
+  const srv = servers.value.find((s) => s.id === serverId);
+  if (!srv || srv.status === "created" || !srv.started_at) {
+    pushLog({
+      time: nowHHMMSS(),
+      source: serverId.slice(0, 8),
+      level: "sys",
+      text: "Aucun log : serveur jamais démarré.",
+    });
+    return;
+  }
   try {
     const lines = await gamePortalService.getLogs(serverId, 100);
     logs.value = lines.map((raw) => parseLogLine(raw, serverId));
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    // Le 409 "container_id non defini" est un cas connu (race entre create
+    // et premier start) — pas la peine de polluer la console avec.
+    if (msg.includes("409") || msg.includes("container_id")) {
+      pushLog({
+        time: nowHHMMSS(),
+        source: serverId.slice(0, 8),
+        level: "sys",
+        text: "Aucun log disponible (container pas encore créé).",
+      });
+      return;
+    }
     pushLog({
       time: nowHHMMSS(),
       source: serverId.slice(0, 8),
       level: "error",
-      text: `Erreur logs: ${e instanceof Error ? e.message : String(e)}`,
+      text: `Erreur logs: ${msg}`,
     });
   }
 }
