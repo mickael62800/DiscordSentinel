@@ -175,12 +175,14 @@ impl ManageGameServersService {
         }
 
         let volumes = if cfg.auto_create_world_volume {
+            // Path interne specifique au template (Minecraft: /data,
+            // Terraria: /root/.local/share/Terraria/Worlds, etc.)
             vec![VolumeMount {
                 volume_name: server
                     .volume_name
                     .clone()
                     .unwrap_or_else(|| GameServer::docker_volume_name(server.id)),
-                container_path: "/data".to_string(),
+                container_path: template.volume_path.clone(),
                 read_only: false,
             }]
         } else {
@@ -207,7 +209,13 @@ impl ManageGameServersService {
             volumes,
             memory_bytes,
             network: cfg.docker_network_name.clone(),
-            user: Some(cfg.container_user.clone()),
+            // Si run_as_root=true (Terraria, Valheim, Factorio), on ne
+            // passe pas --user et l'image utilise son user par defaut.
+            user: if template.run_as_root {
+                None
+            } else {
+                Some(cfg.container_user.clone())
+            },
             // L'auto-restart est gere par notre worker (pas Docker), pour
             // tracer chaque crash dans audit_log et appliquer du backoff.
             restart_policy: RestartPolicy::None,

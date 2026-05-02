@@ -72,6 +72,12 @@ pub struct GameTemplate {
     pub cover_image_url: Option<String>,
     pub container_port: u16,
     pub port_protocol: PortProtocol,
+    /// Path interne du container ou le volume nomme est monte. Defaut /data
+    /// (Minecraft). Override par jeu (Terraria : /root/.local/share/...).
+    pub volume_path: String,
+    /// Si TRUE, l'API ne passe pas --user 1000:1000 et laisse l'image
+    /// utiliser son user par defaut (root pour Terraria/Valheim/Factorio).
+    pub run_as_root: bool,
     pub default_memory_mb: i32,
     pub min_memory_mb: i32,
     pub max_memory_mb: i32,

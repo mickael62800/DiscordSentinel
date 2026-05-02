@@ -30,6 +30,8 @@ struct TemplateRow {
     cover_image_url: Option<String>,
     container_port: i32,
     port_protocol: String,
+    volume_path: String,
+    run_as_root: bool,
     default_memory_mb: i32,
     min_memory_mb: i32,
     max_memory_mb: i32,
@@ -61,6 +63,8 @@ impl TryFrom<TemplateRow> for GameTemplate {
             cover_image_url: r.cover_image_url,
             container_port: port,
             port_protocol: PortProtocol::from_str(&r.port_protocol),
+            volume_path: r.volume_path,
+            run_as_root: r.run_as_root,
             default_memory_mb: r.default_memory_mb,
             min_memory_mb: r.min_memory_mb,
             max_memory_mb: r.max_memory_mb,
@@ -77,7 +81,8 @@ impl TryFrom<TemplateRow> for GameTemplate {
 
 const SELECT_COLS: &str =
     "id, slug, name, description, image, category, icon, accent_color, cover_image_url, \
-     container_port, port_protocol, default_memory_mb, min_memory_mb, max_memory_mb, \
+     container_port, port_protocol, volume_path, run_as_root, \
+     default_memory_mb, min_memory_mb, max_memory_mb, \
      default_env, config_schema, supports_rcon, supports_mods, idle_shutdown_days, \
      created_at, updated_at";
 
