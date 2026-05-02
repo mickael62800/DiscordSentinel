@@ -69,7 +69,6 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
 
   // ── Dashboard : logs / jeux ──
   { key: "logs.journal", label: "Bouton Journal logs Discord", category: "Dashboard", minRole: "admin" },
-  { key: "logs.system", label: "Bouton Logs système (bots/workers/API/WS)", category: "Dashboard", minRole: "admin" },
   { key: "games.hub", label: "Bouton Jeux", category: "Dashboard", minRole: "viewer" },
   { key: "games.coude", label: "Bouton Coude (hub : stats / social / tournoi)", category: "Dashboard", minRole: "viewer" },
   { key: "games.blackjack", label: "Bouton Blackjack", category: "Dashboard", minRole: "viewer" },
@@ -83,6 +82,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "config.rbac", label: "Bouton Config RBAC", category: "Dashboard", minRole: "owner" },
   { key: "config.system-ops", label: "Bouton System Ops", category: "Dashboard", minRole: "admin" },
   { key: "config.server-health", label: "Bouton État serveur (config)", category: "Dashboard", minRole: "admin" },
+  { key: "config.system-logs", label: "Bouton Logs système (bots/workers/API/WS)", category: "Dashboard", minRole: "admin" },
   { key: "config.settings", label: "Bouton Paramètres (config)", category: "Dashboard", minRole: "admin" },
 
   // ── Docker ──

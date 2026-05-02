@@ -48,7 +48,6 @@ const allSections: Section[] = [
   { key: "security.audit", path: "/audit", label: "Audit", icon: "clipboard", requiredBot: "audit-bot" },
 
   { key: "logs.journal", path: "/logs", label: "Journaux", icon: "list" },
-  { key: "logs.system", path: "/system-logs", label: "Logs système", icon: "activity" },
 
   { key: "games.hub", path: "/games", label: "Jeux", icon: "layers", requiredBot: "game-bot" },
   { key: "games.coude", path: "/coude", label: "Coup de Coude", icon: "zap", requiredBot: "coude-bot" },
@@ -75,11 +74,16 @@ const allSections: Section[] = [
     requiredAnyBot: ["coude-bot", "blackjack-bot"],
   },
 
+  { key: "games.portal", path: "/game-portal", label: "Game Portal", icon: "server" },
+
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
   { key: "config.rbac", path: "/rbac", label: "Acces RBAC", icon: "shield" },
   { key: "config.system-ops", path: "/system/operations", label: "System ops", icon: "activity" },
   { key: "config.server-health", path: "/server-health", label: "État serveur", icon: "server" },
   { key: "config.server-security", path: "/server-security", label: "Sécurité serveur", icon: "shield" },
+  // Logs systeme : place dans le groupe admin/config (bots/workers/API/WS),
+  // pas dans le groupe Journaux (qui est metier Discord uniquement).
+  { key: "config.system-logs", path: "/system-logs", label: "Logs système", icon: "list" },
   { key: "config.ai-dataset", path: "/ai-dataset", label: "Dataset IA", icon: "cpu" },
   { key: "config.settings", path: "/settings", label: "Parametres", icon: "settings" },
 ];
