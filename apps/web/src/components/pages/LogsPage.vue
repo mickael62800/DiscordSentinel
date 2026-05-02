@@ -12,6 +12,7 @@ interface Tab {
   sourceLabel?: string;
   showClearButton?: boolean;
   clearConfirmMessage?: string;
+  showTypeColumn?: boolean;
 }
 
 const activeTab = ref<string>("discord");
@@ -24,11 +25,11 @@ const tabs: Tab[] = [
     columns: [
       { key: "timestamp", label: "Date" },
       { key: "level", label: "Niveau" },
+      { key: "type", label: "Type" },
       { key: "message", label: "Message" },
-      { key: "details", label: "Détails" },
     ],
-    // Plus qu'une seule source en pratique -> filtre inutile, on le cache.
     showSourceFilter: false,
+    showTypeColumn: true,
   },
   // Bots / Workers / API / WebSocket sont fusionnes dans l'onglet "Système"
   // qui les affiche en 4 colonnes cote a cote (cf composant LogsColumn).
@@ -58,6 +59,8 @@ function statusClass(code: unknown): string {
           :source-label="tab.sourceLabel ?? 'Toutes les sources'"
           :show-clear-button="tab.showClearButton ?? false"
           :clear-confirm-message="tab.clearConfirmMessage ?? 'Supprimer tous les journaux ?'"
+          :show-type-column="tab.showTypeColumn ?? false"
+          :hide-title="true"
         >
           <!-- API custom details slot -->
           <template v-if="tab.key === 'api'" #details="{ value }">
