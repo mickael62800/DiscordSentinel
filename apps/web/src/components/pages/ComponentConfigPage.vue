@@ -819,12 +819,12 @@ watch(selectedComponent, loadFormValues);
 
 .form-input {
   width: 100%;
-  padding: 11px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-primary);
+  border-radius: 6px;
+  background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   font-family: "JetBrains Mono", "Cascadia Code", monospace;
   margin-top: auto;
 }
@@ -874,10 +874,10 @@ watch(selectedComponent, loadFormValues);
 .form-input-number {
   -moz-appearance: textfield;
   text-align: center;
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.5px;
-  padding: 12px 14px;
+  padding: 8px 12px;
 }
 
 .form-input-number::-webkit-inner-spin-button,

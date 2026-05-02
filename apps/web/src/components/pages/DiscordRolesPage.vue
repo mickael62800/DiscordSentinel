@@ -494,8 +494,8 @@ function formatPermissions(perms: string): string {
 .modal-field { margin-bottom: 16px; }
 .modal-field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-secondary); margin-bottom: 8px; }
 .modal-input {
-  width: 100%; padding: 11px 14px; background: var(--bg-primary); border: 1px solid var(--border);
-  border-radius: 8px; color: var(--text-primary); font-size: 14px; box-sizing: border-box;
+  width: 100%; padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--text-primary); font-size: 13px; box-sizing: border-box;
 }
 .modal-input:focus { border-color: var(--accent); outline: none; box-shadow: var(--focus-ring); }
 .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }

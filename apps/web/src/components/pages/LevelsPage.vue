@@ -549,11 +549,11 @@ function levelToXp(level: number): string {
 .converter-input {
   width: 80px;
   padding: 8px 12px;
-  background: var(--bg-secondary);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 700;
   text-align: center;
   font-family: "JetBrains Mono", monospace;
@@ -666,10 +666,10 @@ function levelToXp(level: number): string {
 }
 
 .xp-mode-select {
-  background: var(--bg-secondary);
+  background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;
   flex: 1;
@@ -967,8 +967,8 @@ function levelToXp(level: number): string {
 
 .level-input {
   width: 70px;
-  padding: 6px 8px;
-  background: var(--bg-secondary);
+  padding: 8px 12px;
+  background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: 6px;
   color: var(--text-primary);

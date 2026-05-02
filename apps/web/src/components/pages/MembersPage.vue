@@ -1206,9 +1206,9 @@ function discordProfileUrl(userId: string): string {
 
 .search-input {
   flex: 1;
-  padding: 10px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
@@ -1222,9 +1222,9 @@ function discordProfileUrl(userId: string): string {
 }
 
 .sort-select {
-  padding: 10px 14px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--bg-card);
   color: var(--text-primary);
   font-size: 13px;
@@ -1583,12 +1583,12 @@ function discordProfileUrl(userId: string): string {
 
 .adjust-input {
   width: 60px;
-  padding: 8px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg-secondary);
+  border-radius: 6px;
+  background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
 }
 
@@ -1898,12 +1898,12 @@ function discordProfileUrl(userId: string): string {
 }
 
 .activity-date-input {
-  padding: 4px 8px;
+  padding: 8px 12px;
   border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border-radius: 6px;
   background: var(--bg-card);
   color: var(--text-primary);
-  font-size: 12px;
+  font-size: 13px;
 }
 .activity-date-input:focus {
   outline: none;
