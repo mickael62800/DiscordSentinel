@@ -319,6 +319,30 @@ impl ContainerRuntime for DockerContainerRuntime {
         Ok(())
     }
 
+    async fn remove_image(&self, image: &str, force: bool) -> Result<bool, DomainError> {
+        let opts = bollard::image::RemoveImageOptions {
+            force,
+            noprune: false,
+        };
+        match self.docker.remove_image(image, Some(opts), None).await {
+            Ok(_) => Ok(true),
+            Err(e) => {
+                let msg = e.to_string();
+                // Image absente -> on considere ca comme deja propre, pas une erreur.
+                if msg.contains("404") || msg.contains("No such image") {
+                    return Ok(false);
+                }
+                // Image encore utilisee par un container -> on log et retourne false
+                // sans crash (cas attendu si delete pas tout-a-fait fini).
+                if msg.contains("conflict") || msg.contains("being used") {
+                    tracing::warn!(image, "remove_image: image encore utilisee, skip");
+                    return Ok(false);
+                }
+                Err(DomainError::Internal(format!("remove image {image}: {e}")))
+            }
+        }
+    }
+
     async fn inspect(
         &self,
         container_id: &str,

@@ -27,6 +27,10 @@ pub struct GamePortalConfig {
     pub auto_create_world_volume: bool,
     pub rcon_enabled: bool,
     pub log_channel_id: Option<String>,
+    /// Active la suppression auto des images Docker non utilisees.
+    pub auto_remove_unused_images: bool,
+    /// Nombre de jours sans aucun serveur actif avant suppression de l'image.
+    pub unused_image_grace_days: i32,
 }
 
 fn find<'a>(items: &'a [BotGuildConfig], key: &str) -> Option<&'a str> {
@@ -77,7 +81,10 @@ pub async fn load_game_portal_config(
         port_range_end: parse_u16(find(&entries, "port_range_end"), 25599),
         rcon_port_range_start: parse_u16(find(&entries, "rcon_port_range_start"), 25700),
         rcon_port_range_end: parse_u16(find(&entries, "rcon_port_range_end"), 25799),
-        allowed_templates: parse_csv(find(&entries, "allowed_templates"), "minecraft-vanilla"),
+        allowed_templates: parse_csv(
+            find(&entries, "allowed_templates"),
+            "minecraft-vanilla,valheim,terraria,factorio,palworld",
+        ),
         default_idle_shutdown_days: parse_i32(find(&entries, "default_idle_shutdown_days"), 7),
         docker_network_name: parse_string(
             find(&entries, "docker_network_name"),
@@ -88,5 +95,7 @@ pub async fn load_game_portal_config(
         auto_create_world_volume: parse_bool(find(&entries, "auto_create_world_volume"), true),
         rcon_enabled: parse_bool(find(&entries, "rcon_enabled"), true),
         log_channel_id: find(&entries, "log_channel_id").map(String::from),
+        auto_remove_unused_images: parse_bool(find(&entries, "auto_remove_unused_images"), true),
+        unused_image_grace_days: parse_i32(find(&entries, "unused_image_grace_days"), 7),
     })
 }

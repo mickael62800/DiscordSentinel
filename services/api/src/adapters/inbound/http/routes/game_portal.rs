@@ -77,5 +77,9 @@ pub fn routes() -> Router<AppState> {
             "/api/games/internal/jobs/reconcile",
             post(handlers::game::jobs::job_reconcile),
         )
+        .route(
+            "/api/games/internal/jobs/image-cleanup",
+            post(handlers::game::jobs::job_image_cleanup),
+        )
 }
 

@@ -11,12 +11,14 @@ use std::sync::Arc;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::state::AppState;
 use crate::application::game::worker_jobs::{
-    run_health_check, run_idle_shutdown, run_reconciler, JobContext, JobReport,
+    run_health_check, run_idle_shutdown, run_image_cleanup, run_reconciler, JobContext,
+    JobReport,
 };
 
 fn ctx(state: &AppState) -> JobContext {
     JobContext {
         server_repo: state.game_server_repo.clone(),
+        template_repo: state.game_template_repo.clone(),
         audit_repo: state.game_audit_repo.clone(),
         session_repo: state.game_session_repo.clone(),
         container_runtime: state.game_container_runtime.clone(),
@@ -42,6 +44,12 @@ pub async fn job_reconcile(
     State(state): State<AppState>,
 ) -> Result<Json<JobReport>, ApiError> {
     Ok(Json(run_reconciler(&ctx(&state)).await?))
+}
+
+pub async fn job_image_cleanup(
+    State(state): State<AppState>,
+) -> Result<Json<JobReport>, ApiError> {
+    Ok(Json(run_image_cleanup(&ctx(&state)).await?))
 }
 
 #[allow(dead_code)]

@@ -6,7 +6,7 @@ use uuid::Uuid;
 use crate::domain::entities::game::server::{GameServer, GameServerStatus};
 use crate::domain::errors::DomainError;
 use crate::ports::outbound::game::game_server_repository::{
-    GameServerRepository, GameServerRuntimeUpdate, NewGameServer,
+    GameServerRepository, GameServerRuntimeUpdate, NewGameServer, TemplateUsage,
 };
 
 pub struct PgGameServerRepository {
@@ -312,5 +312,28 @@ impl GameServerRepository for PgGameServerRepository {
         let count = i32::try_from(row.0).unwrap_or(i32::MAX);
         let mem = i32::try_from(row.1.unwrap_or(0)).unwrap_or(i32::MAX);
         Ok((count, mem))
+    }
+
+    async fn template_usage(
+        &self,
+        template_id: uuid::Uuid,
+    ) -> Result<TemplateUsage, DomainError> {
+        // active_count : serveurs non-deletes utilisant ce template.
+        // last_activity : MAX(updated_at) sur TOUS les serveurs ayant utilise
+        // le template (incluant deletes), pour respecter la grace period.
+        let row: (i64, Option<chrono::DateTime<chrono::Utc>>) = sqlx::query_as(
+            "SELECT \
+                 (SELECT COUNT(*)::bigint FROM game_servers \
+                  WHERE template_id = $1 AND deleted_at IS NULL), \
+                 (SELECT MAX(updated_at) FROM game_servers WHERE template_id = $1)",
+        )
+        .bind(template_id)
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| DomainError::Internal(format!("template_usage: {e}")))?;
+        Ok(TemplateUsage {
+            active_count: i32::try_from(row.0).unwrap_or(i32::MAX),
+            last_activity_at: row.1,
+        })
     }
 }

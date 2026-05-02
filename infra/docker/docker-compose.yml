@@ -56,11 +56,15 @@ x-build-alpine: &build-alpine
   context: ../..
   dockerfile: infra/docker/Dockerfile.rust-alpine
 
-# depends_on standard pour les workers DB-bound : pgbouncer + redis.
+# depends_on standard pour les workers DB-bound : pgbouncer + redis + api.
+# L'API doit etre healthy avant les workers, sinon ils echouent au boot
+# (heartbeat 401, lifecycle log timeout, /api/.../internal/jobs/* refuses).
 x-worker-deps-db-redis: &worker-deps-db-redis
   pgbouncer:
     condition: service_started
   redis:
+    condition: service_healthy
+  api:
     condition: service_healthy
 
 # Reseaux par defaut pour les workers : "internal" uniquement (PAS d'internet).
@@ -376,9 +380,7 @@ services:
     healthcheck: *worker-healthcheck
     environment:
       <<: *worker-env
-    depends_on:
-      pgbouncer:
-        condition: service_started
+    depends_on: *worker-deps-db-redis
     networks: *worker-networks-internal
 
   monitoring-worker:
@@ -391,9 +393,7 @@ services:
     environment:
       <<: *worker-env
       MONITOR_CHECK_INTERVAL: ${MONITOR_CHECK_INTERVAL:-30}
-    depends_on:
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
     networks: *worker-networks-internal
 
   cache-worker:
@@ -470,6 +470,8 @@ services:
         condition: service_started
       grpc-certs-init:
         condition: service_completed_successfully
+      api:
+        condition: service_healthy
     # export-worker : pas de Discord, juste gRPC interne + DB -> internal seul.
     networks: *worker-networks-internal
 
@@ -513,6 +515,8 @@ services:
     depends_on:
       pgbouncer:
         condition: service_started
+      api:
+        condition: service_healthy
     # discord-audit-sync : a besoin de Discord -> internet + interne.
     networks: *worker-networks-with-internet
 
@@ -534,6 +538,8 @@ services:
     depends_on:
       pgbouncer:
         condition: service_started
+      api:
+        condition: service_healthy
     networks: *worker-networks-internal
 
   announcement-worker:
@@ -545,11 +551,7 @@ services:
     healthcheck: *worker-healthcheck
     environment:
       <<: *worker-env
-    depends_on:
-      pgbouncer:
-        condition: service_started
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
     networks: *worker-networks-internal
 
   game-portal-worker:
@@ -561,11 +563,7 @@ services:
     healthcheck: *worker-healthcheck
     environment:
       <<: *worker-env
-    depends_on:
-      pgbouncer:
-        condition: service_started
-      redis:
-        condition: service_healthy
+    depends_on: *worker-deps-db-redis
     networks: *worker-networks-internal
 
   coude-worker:
@@ -589,6 +587,8 @@ services:
         condition: service_started
       grpc-certs-init:
         condition: service_completed_successfully
+      api:
+        condition: service_healthy
     # coude-worker : a besoin de Discord -> internet + interne.
     networks: *worker-networks-with-internet
 

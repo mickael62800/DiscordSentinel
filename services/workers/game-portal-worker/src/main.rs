@@ -65,14 +65,24 @@ async fn main() {
         Duration::from_secs(3600),
     );
     let h3 = spawn_job(
-        http,
-        api_url,
-        api_key,
+        http.clone(),
+        api_url.clone(),
+        api_key.clone(),
         "reconcile",
         Duration::from_secs(3600),
     );
+    // Image cleanup : 1 fois par jour. Supprime les images Docker des
+    // templates non utilises depuis unused_image_grace_days (config bot
+    // game-portal, defaut 7j).
+    let h4 = spawn_job(
+        http,
+        api_url,
+        api_key,
+        "image-cleanup",
+        Duration::from_secs(86400),
+    );
 
-    let _ = tokio::join!(h1, h2, h3);
+    let _ = tokio::join!(h1, h2, h3, h4);
 }
 
 fn spawn_job(

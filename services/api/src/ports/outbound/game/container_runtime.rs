@@ -131,6 +131,11 @@ pub trait ContainerRuntime: Send + Sync {
     /// retourne une erreur dans ce cas).
     async fn remove_volume(&self, name: &str) -> Result<(), DomainError>;
 
+    /// Supprime une image Docker. Retourne true si supprimee, false si
+    /// l'image n'existait pas / etait encore utilisee. force=true tente
+    /// la suppression meme si des containers stoppes l'utilisent.
+    async fn remove_image(&self, image: &str, force: bool) -> Result<bool, DomainError>;
+
     /// Inspect : retourne le status courant.
     async fn inspect(&self, container_id: &str) -> Result<Option<ContainerStatus>, DomainError>;
 

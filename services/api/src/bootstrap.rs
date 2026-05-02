@@ -760,6 +760,7 @@ pub async fn build_app_state(
         crate::adapters::outbound::postgres::game::player_session_repository::PgPlayerSessionRepository::new(pg_pool.clone()),
     );
     let game_server_repo_dyn: Arc<dyn crate::ports::outbound::game::game_server_repository::GameServerRepository> = game_server_repo.clone();
+    let game_template_repo_dyn: Arc<dyn crate::ports::outbound::game::game_template_repository::GameTemplateRepository> = game_template_repo.clone();
     let game_audit_repo_dyn: Arc<dyn crate::ports::outbound::game::game_audit_repository::GameAuditRepository> = game_audit_repo.clone();
     let game_servers_uc: Arc<dyn crate::ports::inbound::game::manage_game_servers::ManageGameServersUseCase> = Arc::new(
         crate::application::game::manage_game_servers_service::ManageGameServersService {
@@ -857,6 +858,7 @@ pub async fn build_app_state(
         game_servers_uc,
         game_templates_uc,
         game_server_repo: game_server_repo_dyn,
+        game_template_repo: game_template_repo_dyn,
         game_audit_repo: game_audit_repo_dyn,
         game_session_repo,
         game_container_runtime: container_runtime,

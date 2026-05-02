@@ -130,6 +130,7 @@ pub struct AppState {
     /// Game Portal : adapters exposes pour les endpoints internes /jobs/*
     /// appeles par game-portal-worker (health/idle/reconcile).
     pub game_server_repo: Arc<dyn crate::ports::outbound::game::game_server_repository::GameServerRepository>,
+    pub game_template_repo: Arc<dyn crate::ports::outbound::game::game_template_repository::GameTemplateRepository>,
     pub game_audit_repo: Arc<dyn crate::ports::outbound::game::game_audit_repository::GameAuditRepository>,
     pub game_session_repo: Arc<dyn crate::ports::outbound::game::player_session_repository::PlayerSessionRepository>,
     pub game_container_runtime: Arc<dyn crate::ports::outbound::game::container_runtime::ContainerRuntime>,

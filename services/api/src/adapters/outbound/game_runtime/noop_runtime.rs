@@ -27,6 +27,7 @@ impl ContainerRuntime for NoopContainerRuntime {
     async fn restart_container(&self, _: &str, _: u32) -> Result<(), DomainError> { Err(err()) }
     async fn remove_container(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
     async fn remove_volume(&self, _: &str) -> Result<(), DomainError> { Err(err()) }
+    async fn remove_image(&self, _: &str, _: bool) -> Result<bool, DomainError> { Ok(false) }
     async fn inspect(&self, _: &str) -> Result<Option<ContainerStatus>, DomainError> { Ok(None) }
     async fn stats(&self, _: &str) -> Result<ContainerStats, DomainError> { Err(err()) }
     async fn logs(&self, _: &str, _: u32) -> Result<Vec<String>, DomainError> { Err(err()) }

@@ -42,6 +42,21 @@ pub trait GameServerRepository: Send + Sync {
         &self,
         guild_id: &str,
     ) -> Result<(i32, i32), DomainError>;
+
+    /// Pour un template donne, retourne (nb_servers_actifs, derniere_activite).
+    /// derniere_activite = MAX(updated_at) sur tous les serveurs (incluant
+    /// soft-deleted) qui ont utilise ce template. Utilise par le job
+    /// image-cleanup pour decider si l'image Docker peut etre supprimee.
+    async fn template_usage(
+        &self,
+        template_id: uuid::Uuid,
+    ) -> Result<TemplateUsage, DomainError>;
+}
+
+#[derive(Debug, Clone)]
+pub struct TemplateUsage {
+    pub active_count: i32,
+    pub last_activity_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 /// Donnees pour creer un nouveau serveur.
