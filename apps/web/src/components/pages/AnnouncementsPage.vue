@@ -218,21 +218,57 @@ function toggleRole(id: string) {
 
 const channelSearch = ref("");
 const roleSearch = ref("");
+const channelPickerOpen = ref(false);
+const rolePickerOpen = ref(false);
 
-const filteredChannels = computed(() =>
-  channelSearch.value
-    ? channels.value.filter((c) =>
-        c.name.toLowerCase().includes(channelSearch.value.toLowerCase()),
-      )
-    : channels.value,
-);
-const filteredRoles = computed(() =>
-  roleSearch.value
-    ? roles.value.filter((r) =>
-        r.name.toLowerCase().includes(roleSearch.value.toLowerCase()),
-      )
-    : roles.value,
-);
+// Liste des roles/channels NON deja selectionnes + filtree par la recherche.
+// Pas de checkbox grid -> dropdown avec ajout par clic, le dropdown reste
+// ouvert tant que l'user veut, on ferme via la fleche ou en cliquant ailleurs.
+const availableChannels = computed(() => {
+  const selected = new Set(form.value.selected_channel_ids);
+  const search = channelSearch.value.toLowerCase();
+  return channels.value.filter(
+    (c) =>
+      !selected.has(c.id) && (search === "" || c.name.toLowerCase().includes(search)),
+  );
+});
+const availableRoles = computed(() => {
+  const selected = new Set(form.value.selected_role_ids);
+  const search = roleSearch.value.toLowerCase();
+  return roles.value.filter(
+    (r) =>
+      !selected.has(r.id) && (search === "" || r.name.toLowerCase().includes(search)),
+  );
+});
+
+// Lookup par id pour rendre les chips avec le nom + couleur.
+const channelsById = computed(() => {
+  const m: Record<string, DiscordTextChannel> = {};
+  for (const c of channels.value) m[c.id] = c;
+  return m;
+});
+const rolesById = computed(() => {
+  const m: Record<string, DiscordRole> = {};
+  for (const r of roles.value) m[r.id] = r;
+  return m;
+});
+
+function addRole(id: string) {
+  if (!form.value.selected_role_ids.includes(id)) {
+    form.value.selected_role_ids.push(id);
+  }
+  // Vide la recherche pour permettre d'ajouter le suivant facilement.
+  // Mais on ne ferme PAS le dropdown.
+  roleSearch.value = "";
+}
+
+function addChannel(id: string) {
+  if (!form.value.selected_channel_ids.includes(id)) {
+    form.value.selected_channel_ids.push(id);
+  }
+  channelSearch.value = "";
+}
+
 
 async function saveForm() {
   if (!selectedGuildId.value) return;
@@ -514,47 +550,108 @@ const formCanSave = computed(() => {
             </label>
           </div>
 
+          <!-- Pickers : input recherche + dropdown qui reste ouvert + chips en bas -->
           <div class="picker-section">
-            <h4>Rôles à mentionner</h4>
-            <input v-model="roleSearch" type="text" placeholder="🔍 Rechercher un rôle..." class="picker-search" />
-            <div class="picker-grid">
-              <label
-                v-for="r in filteredRoles"
-                :key="r.id"
-                class="picker-item"
-                :class="{ selected: form.selected_role_ids.includes(r.id) }"
-              >
-                <input
-                  type="checkbox"
-                  :checked="form.selected_role_ids.includes(r.id)"
-                  @change="toggleRole(r.id)"
-                />
-                <span class="role-color" :style="{ background: r.color ? '#' + r.color.toString(16).padStart(6, '0') : '#888' }" />
-                <span class="picker-label">@{{ r.name }}</span>
-              </label>
-              <p v-if="filteredRoles.length === 0" class="muted small">Aucun rôle trouvé.</p>
+            <h4>
+              Rôles à mentionner
+              <span class="req-count">({{ form.selected_role_ids.length }} sélectionné{{ form.selected_role_ids.length > 1 ? "s" : "" }})</span>
+            </h4>
+            <div class="multi-picker">
+              <input
+                v-model="roleSearch"
+                type="text"
+                placeholder="🔍 Rechercher un rôle..."
+                class="picker-input"
+                @focus="rolePickerOpen = true"
+              />
+              <button
+                type="button"
+                class="picker-toggle"
+                :title="rolePickerOpen ? 'Fermer la liste' : 'Ouvrir la liste'"
+                @click="rolePickerOpen = !rolePickerOpen"
+              >{{ rolePickerOpen ? '▲' : '▼' }}</button>
+              <ul v-if="rolePickerOpen" class="picker-dropdown">
+                <li v-if="availableRoles.length === 0" class="picker-empty">
+                  {{ roleSearch ? "Aucun rôle ne correspond." : "Tous les rôles sont déjà sélectionnés." }}
+                </li>
+                <li
+                  v-for="r in availableRoles"
+                  :key="r.id"
+                  class="picker-option"
+                  @click="addRole(r.id)"
+                >
+                  <span class="role-color" :style="{ background: r.color ? '#' + r.color.toString(16).padStart(6, '0') : '#888' }" />
+                  <span class="picker-option-label">@{{ r.name }}</span>
+                  <span class="picker-add">+</span>
+                </li>
+              </ul>
             </div>
-            <p class="muted small">Sélectionnés : {{ form.selected_role_ids.length }}</p>
+            <div v-if="form.selected_role_ids.length > 0" class="chips">
+              <span
+                v-for="rid in form.selected_role_ids"
+                :key="rid"
+                class="chip role-chip"
+                @click="toggleRole(rid)"
+                title="Cliquer pour retirer"
+              >
+                <span
+                  class="role-color"
+                  :style="{
+                    background: rolesById[rid]?.color
+                      ? '#' + rolesById[rid].color.toString(16).padStart(6, '0')
+                      : '#888',
+                  }"
+                />
+                @{{ rolesById[rid]?.name ?? rid }}
+                <span class="chip-remove">×</span>
+              </span>
+            </div>
           </div>
 
           <div class="picker-section">
-            <h4>Salons cibles * <span class="req-count">({{ form.selected_channel_ids.length }} sélectionné{{ form.selected_channel_ids.length > 1 ? "s" : "" }})</span></h4>
-            <input v-model="channelSearch" type="text" placeholder="🔍 Rechercher un salon..." class="picker-search" />
-            <div class="picker-grid">
-              <label
-                v-for="c in filteredChannels"
-                :key="c.id"
-                class="picker-item"
-                :class="{ selected: form.selected_channel_ids.includes(c.id) }"
+            <h4>
+              Salons cibles *
+              <span class="req-count">({{ form.selected_channel_ids.length }} sélectionné{{ form.selected_channel_ids.length > 1 ? "s" : "" }})</span>
+            </h4>
+            <div class="multi-picker">
+              <input
+                v-model="channelSearch"
+                type="text"
+                placeholder="🔍 Rechercher un salon..."
+                class="picker-input"
+                @focus="channelPickerOpen = true"
+              />
+              <button
+                type="button"
+                class="picker-toggle"
+                @click="channelPickerOpen = !channelPickerOpen"
+              >{{ channelPickerOpen ? '▲' : '▼' }}</button>
+              <ul v-if="channelPickerOpen" class="picker-dropdown">
+                <li v-if="availableChannels.length === 0" class="picker-empty">
+                  {{ channelSearch ? "Aucun salon ne correspond." : "Tous les salons sont déjà sélectionnés." }}
+                </li>
+                <li
+                  v-for="c in availableChannels"
+                  :key="c.id"
+                  class="picker-option"
+                  @click="addChannel(c.id)"
+                >
+                  <span class="picker-option-label">#{{ c.name }}</span>
+                  <span class="picker-add">+</span>
+                </li>
+              </ul>
+            </div>
+            <div v-if="form.selected_channel_ids.length > 0" class="chips">
+              <span
+                v-for="cid in form.selected_channel_ids"
+                :key="cid"
+                class="chip channel-chip"
+                @click="toggleChannel(cid)"
+                title="Cliquer pour retirer"
               >
-                <input
-                  type="checkbox"
-                  :checked="form.selected_channel_ids.includes(c.id)"
-                  @change="toggleChannel(c.id)"
-                />
-                <span class="picker-label">#{{ c.name }}</span>
-              </label>
-              <p v-if="filteredChannels.length === 0" class="muted small">Aucun salon trouvé.</p>
+                #{{ channelsById[cid]?.name ?? cid }}
+                <span class="chip-remove">×</span>
+              </span>
             </div>
           </div>
 
@@ -782,49 +879,142 @@ const formCanSave = computed(() => {
 .prev-img { max-width: 100%; border-radius: 6px; margin-top: 8px; }
 .prev-thumb { max-width: 80px; max-height: 80px; border-radius: 6px; float: right; margin-left: 10px; }
 
-/* Pickers visuels (channels / roles) */
+/* Pickers visuels (channels / roles) — multi-picker dropdown + chips */
 .picker-section { margin-bottom: 18px; }
-.picker-section h4 { margin: 0 0 6px 0; font-size: 13px; }
-.picker-section .req-count { color: var(--text-secondary); font-weight: 400; font-size: 12px; }
-.picker-search {
-  width: 100%; box-sizing: border-box;
+.picker-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.picker-section .req-count {
+  color: var(--text-secondary);
+  font-weight: 400;
+  font-size: 11px;
+}
+
+.multi-picker {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+}
+.picker-input {
+  flex: 1;
+  width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 6px 0 0 6px;
   color: var(--text-primary);
-  font-size: 12px;
-  margin-bottom: 8px;
+  font-size: 13px;
 }
-.picker-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 6px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 6px;
+.picker-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.picker-toggle {
+  width: 36px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  border-radius: 6px;
-  margin-bottom: 6px;
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
 }
-.picker-item {
+.picker-toggle:hover {
+  color: var(--accent);
+}
+
+.picker-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+}
+.picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.picker-option:hover {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.picker-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.picker-add {
+  font-weight: 700;
+  color: var(--accent);
+  padding-left: 6px;
+}
+.picker-empty {
+  padding: 12px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-style: italic;
+  text-align: center;
+}
+
+.role-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Chips selectionnees, cliquables pour retirer */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
-  border-radius: 5px;
+  padding: 4px 10px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   user-select: none;
-  margin-bottom: 0;
+  transition: background-color 0.15s, border-color 0.15s;
 }
-.picker-item:hover { background: var(--bg-hover); }
-.picker-item.selected { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
-.picker-item input { width: auto; margin: 0; }
-.picker-item .picker-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.role-color { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.chip:hover {
+  background: color-mix(in srgb, var(--danger, #ef4444) 18%, transparent);
+  border-color: var(--danger, #ef4444);
+  color: var(--danger, #ef4444);
+}
+.chip-remove {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1;
+}
 
 /* Section boutons */
 .buttons-section { margin-bottom: 18px; }
