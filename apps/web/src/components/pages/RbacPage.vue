@@ -145,8 +145,8 @@ function roleVariant(role: RbacRole): BadgeVariant {
         message="Ajoutez un premier owner via SQL direct, ou via l'interface si vous etes deja owner."
       />
 
-      <div class="rbac-table-wrap">
-      <table v-else class="rbac-table">
+      <div v-else-if="users.length > 0" class="rbac-table-wrap">
+      <table class="rbac-table">
         <thead>
           <tr>
             <th>Utilisateur</th>
