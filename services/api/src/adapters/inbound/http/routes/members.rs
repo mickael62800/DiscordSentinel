@@ -25,4 +25,5 @@ pub fn routes() -> Router<AppState> {
         .route("/api/guilds/{guild_id}/members", get(handlers::community::guild_members::list_members))
         // Guild text channels (direct Discord API, Phase 9 Part E)
         .route("/api/guilds/{guild_id}/channels", get(handlers::community::guild_channels::list_text_channels))
+        .route("/api/guilds/{guild_id}/channels/all", get(handlers::community::guild_channels::list_all_channels))
 }

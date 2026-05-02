@@ -154,7 +154,13 @@ const mapDefaults = computed(() => {
       v-else-if="isChannelMap || isRoleMap"
       :model-value="modelValue"
       :guild-id="guildId"
-      :kind="isRoleMap ? 'role' : 'channel'"
+      :kind="
+        isRoleMap
+          ? 'role'
+          : field.key === 'xp_channel_multipliers'
+            ? 'channel-all'
+            : 'channel'
+      "
       :value-label="mapDefaults.label"
       :value-step="mapDefaults.step"
       :value-min="mapDefaults.min"

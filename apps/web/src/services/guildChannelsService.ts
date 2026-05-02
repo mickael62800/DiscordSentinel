@@ -9,4 +9,12 @@ export const guildChannelsService = {
   listTextChannels(guildId: string): Promise<DiscordChannelInfo[]> {
     return httpGet(`/api/guilds/${guildId}/channels`);
   },
+  /**
+   * Liste tous les salons (texte + voice + stage) avec un champ `kind`.
+   * Utilise par les pickers config qui s'appliquent aux deux types
+   * (xp_channel_multipliers, etc.).
+   */
+  listAllChannels(guildId: string): Promise<DiscordChannelInfo[]> {
+    return httpGet(`/api/guilds/${guildId}/channels/all`);
+  },
 };

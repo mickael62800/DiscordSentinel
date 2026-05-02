@@ -4,7 +4,20 @@ import { guildChannelsService } from "@/services/guildChannelsService";
 import { discordRolesService } from "@/services/discordRolesService";
 import type { DiscordChannelInfo, DiscordRole } from "@/types";
 
-type Kind = "channel" | "role";
+type Kind = "channel" | "channel-all" | "role";
+
+function channelLabel(c: DiscordChannelInfo): string {
+  switch (c.kind) {
+    case "voice":
+      return `🔊 ${c.name}`;
+    case "stage":
+      return `🎙️ ${c.name}`;
+    case "announcement":
+      return `📢 ${c.name}`;
+    default:
+      return `# ${c.name}`;
+  }
+}
 
 const props = defineProps<{
   modelValue: string;
@@ -50,6 +63,8 @@ async function load() {
   try {
     if (props.kind === "channel") {
       channels.value = await guildChannelsService.listTextChannels(props.guildId);
+    } else if (props.kind === "channel-all") {
+      channels.value = await guildChannelsService.listAllChannels(props.guildId);
     } else {
       roles.value = await discordRolesService.getAll(props.guildId);
     }
@@ -65,8 +80,8 @@ watch(() => props.kind, load);
 onMounted(load);
 
 const options = computed<Option[]>(() => {
-  if (props.kind === "channel") {
-    return channels.value.map((c) => ({ id: c.id, label: `# ${c.name}` }));
+  if (props.kind === "channel" || props.kind === "channel-all") {
+    return channels.value.map((c) => ({ id: c.id, label: channelLabel(c) }));
   }
   const sorted = [...roles.value].sort((a, b) => (b.position ?? 0) - (a.position ?? 0));
   return sorted.map((r) => ({
@@ -135,7 +150,7 @@ function updateValue(id: string, value: number) {
 const valueLabel = computed(() => props.valueLabel ?? "Multiplicateur");
 const step = computed(() => props.valueStep ?? 0.25);
 const placeholderTxt = computed(() =>
-  props.kind === "channel" ? "— Choisir un salon —" : "— Choisir un rôle —",
+  props.kind === "role" ? "— Choisir un rôle —" : "— Choisir un salon —",
 );
 </script>
 
@@ -233,7 +248,7 @@ const placeholderTxt = computed(() =>
     </div>
 
     <p v-else class="empty">
-      Aucun {{ kind === "channel" ? "salon" : "rôle" }} configuré — utilise le sélecteur ci-dessus
+      Aucun {{ kind === "role" ? "rôle" : "salon" }} configuré — utilise le sélecteur ci-dessus
       pour ajouter un {{ valueLabel.toLowerCase() }}.
     </p>
   </div>

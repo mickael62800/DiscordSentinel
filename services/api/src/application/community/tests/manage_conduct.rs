@@ -38,6 +38,7 @@ struct SpyDiscordApi {
 #[async_trait]
 impl DiscordApi for SpyDiscordApi {
     async fn list_text_channels(&self, _: &str) -> Result<Vec<DiscordChannel>, DomainError> { Ok(vec![]) }
+    async fn list_all_channels(&self, _: &str) -> Result<Vec<DiscordChannel>, DomainError> { Ok(vec![]) }
     async fn upload_emoji(&self, _: &str, _: &str, _: &[u8], _: &str) -> Result<(String, String, bool), DomainError> { unimplemented!() }
     async fn ban_user(&self, _: &str, _: &str, _: &str) -> Result<(), DomainError> { Ok(()) }
     async fn list_members(&self, _: &str, _: u32) -> Result<Vec<DiscordMember>, DomainError> { Ok(vec![]) }

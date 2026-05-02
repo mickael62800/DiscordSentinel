@@ -8,6 +8,10 @@ use crate::domain::errors::DomainError;
 #[async_trait]
 pub trait DiscordApi: Send + Sync {
     async fn list_text_channels(&self, guild_id: &str) -> Result<Vec<DiscordChannel>, DomainError>;
+    /// Liste tous les salons utiles d'une guild (texte + voice + stage),
+    /// chacun annote avec son `kind`. Utilise par les pickers config qui
+    /// s'appliquent aux deux types (xp_channel_multipliers).
+    async fn list_all_channels(&self, guild_id: &str) -> Result<Vec<DiscordChannel>, DomainError>;
     async fn upload_emoji(
         &self,
         guild_id: &str,
@@ -73,12 +77,21 @@ pub struct DiscordUser {
     pub avatar: Option<String>,
 }
 
-/// Phase 9 Part E — Salon texte d'une guild (pour channel picker web).
+/// Phase 9 Part E — Salon d'une guild (pour channel picker web).
+/// `kind` : "text" | "announcement" | "voice" | "stage". Permet aux
+/// pickers web d'afficher l'icone correcte (# pour le texte, 🔊 pour le
+/// voice) et sert aussi de filtre.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct DiscordChannel {
     pub id: String,
     pub name: String,
     pub position: i64,
+    #[serde(default = "default_text_kind")]
+    pub kind: String,
+}
+
+fn default_text_kind() -> String {
+    "text".to_string()
 }
 
 /// Service pour les appels a l'API Discord.
@@ -111,6 +124,32 @@ impl DiscordApiService {
     }
 }
 
+/// Parse une reponse `GET /guilds/{id}/channels` Discord et convertit chaque
+/// salon en `DiscordChannel`. `kind_for_type` retourne `Some(label)` pour les
+/// types de salons a inclure et `None` pour les autres (categorie, thread...).
+async fn parse_channels(
+    resp: reqwest::Response,
+    kind_for_type: impl Fn(u64) -> Option<&'static str>,
+) -> Result<Vec<DiscordChannel>, DomainError> {
+    let raw: Vec<serde_json::Value> = resp
+        .json()
+        .await
+        .map_err(|e| DomainError::Internal(format!("Discord list channels parse: {e}")))?;
+    let mut channels: Vec<DiscordChannel> = raw
+        .into_iter()
+        .filter_map(|c| {
+            let ty = c.get("type").and_then(|v| v.as_u64()).unwrap_or(999);
+            let kind = kind_for_type(ty)?.to_string();
+            let id = c.get("id").and_then(|v| v.as_str())?.to_string();
+            let name = c.get("name").and_then(|v| v.as_str())?.to_string();
+            let position = c.get("position").and_then(|v| v.as_i64()).unwrap_or(0);
+            Some(DiscordChannel { id, name, position, kind })
+        })
+        .collect();
+    channels.sort_by_key(|c| c.position);
+    Ok(channels)
+}
+
 #[async_trait]
 impl DiscordApi for DiscordApiService {
     /// Liste les salons texte d'un serveur Discord (id + name).
@@ -139,28 +178,45 @@ impl DiscordApi for DiscordApiService {
             )));
         }
 
-        // Type 0 = GUILD_TEXT, type 5 = GUILD_ANNOUNCEMENT. On inclut les
-        // deux, les autres (voice, stage, forum, category, thread) sont
-        // filtres.
-        let raw: Vec<serde_json::Value> = resp
-            .json()
+        parse_channels(resp, |ty| match ty {
+            0 => Some("text"),
+            5 => Some("announcement"),
+            _ => None,
+        })
+        .await
+    }
+
+    async fn list_all_channels(
+        &self,
+        guild_id: &str,
+    ) -> Result<Vec<DiscordChannel>, DomainError> {
+        self.ensure_configured()?;
+
+        let url = format!("https://discord.com/api/v10/guilds/{}/channels", guild_id);
+        let resp = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("Bot {}", self.token))
+            .send()
             .await
-            .map_err(|e| DomainError::Internal(format!("Discord list channels parse: {e}")))?;
-        let mut channels: Vec<DiscordChannel> = raw
-            .into_iter()
-            .filter_map(|c| {
-                let ty = c.get("type").and_then(|v| v.as_u64()).unwrap_or(999);
-                if ty != 0 && ty != 5 {
-                    return None;
-                }
-                let id = c.get("id").and_then(|v| v.as_str())?.to_string();
-                let name = c.get("name").and_then(|v| v.as_str())?.to_string();
-                let position = c.get("position").and_then(|v| v.as_i64()).unwrap_or(0);
-                Some(DiscordChannel { id, name, position })
-            })
-            .collect();
-        channels.sort_by_key(|c| c.position);
-        Ok(channels)
+            .map_err(|e| DomainError::Internal(format!("Discord API error: {e}")))?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(DomainError::Internal(format!(
+                "Discord list channels failed ({status}): {body}"
+            )));
+        }
+
+        parse_channels(resp, |ty| match ty {
+            0 => Some("text"),
+            5 => Some("announcement"),
+            2 => Some("voice"),
+            13 => Some("stage"),
+            _ => None,
+        })
+        .await
     }
 
     /// Upload un emoji custom sur un serveur Discord.
