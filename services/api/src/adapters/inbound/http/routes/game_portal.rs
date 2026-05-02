@@ -59,6 +59,10 @@ pub fn routes() -> Router<AppState> {
             "/api/games/servers/{server_id}/command",
             post(handlers::game::servers::execute_rcon),
         )
+        .route(
+            "/api/games/servers/{server_id}/sessions",
+            get(handlers::game::sessions::list_sessions),
+        )
         // Endpoints internes pour game-portal-worker (auth via API key,
         // pas de RBAC user — le worker est de confiance).
         .route(

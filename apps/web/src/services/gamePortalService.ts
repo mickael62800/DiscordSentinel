@@ -92,6 +92,15 @@ export interface RconResponse {
   response: string;
 }
 
+export interface PlayerSession {
+  id: string;
+  server_id: string;
+  player_name: string;
+  joined_at: string;
+  left_at: string | null;
+  duration_seconds: number | null;
+}
+
 // ── Service ────────────────────────────────────────────────────────────
 
 export const gamePortalService = {
@@ -161,5 +170,16 @@ export const gamePortalService = {
   ): Promise<RconResponse> {
     const q = actorId ? `?actor_id=${encodeURIComponent(actorId)}` : "";
     return httpPost(`/api/games/servers/${serverId}/command${q}`, { command });
+  },
+
+  // Sessions joueurs
+  listSessions(
+    serverId: string,
+    limit = 100,
+    offset = 0,
+  ): Promise<PlayerSession[]> {
+    return httpGet(
+      `/api/games/servers/${serverId}/sessions?limit=${limit}&offset=${offset}`,
+    );
   },
 };

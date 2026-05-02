@@ -10,6 +10,9 @@ import { useToast } from "@/composables/useToast";
 import { useConfirm } from "@/composables/useConfirm";
 import { useAuth } from "@/composables/useAuth";
 import { useComponentVisibility } from "@/composables/useComponentVisibility";
+import GameServerConfigModal from "@/components/molecules/GameServerConfigModal.vue";
+import GameServerStatsBar from "@/components/molecules/GameServerStatsBar.vue";
+import GameServerSessionsModal from "@/components/molecules/GameServerSessionsModal.vue";
 
 interface LogLine {
   time: string;
@@ -28,6 +31,16 @@ const templates = ref<GameTemplate[]>([]);
 const servers = ref<GameServer[]>([]);
 const loading = ref(false);
 const busy = ref<string | null>(null);
+
+// Modales
+const configModalOpen = ref(false);
+const configModalServer = ref<GameServer | null>(null);
+const configModalDetail = ref<{ template: GameTemplate | null; config: Record<string, string> }>({
+  template: null,
+  config: {},
+});
+const sessionsModalOpen = ref(false);
+const sessionsModalServer = ref<GameServer | null>(null);
 
 const selectedServerId = ref<string | null>(null);
 const selectedServer = computed(() =>
@@ -185,6 +198,26 @@ async function launchTemplate(t: GameTemplate) {
   }
 }
 
+async function openConfigModal(s: GameServer) {
+  busy.value = s.id;
+  try {
+    const detail = await gamePortalService.getServer(s.id);
+    const tpl = templates.value.find((t) => t.id === s.template_id) ?? null;
+    configModalServer.value = s;
+    configModalDetail.value = { template: tpl, config: detail.config };
+    configModalOpen.value = true;
+  } catch (e) {
+    toastError(`Échec : ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    busy.value = null;
+  }
+}
+
+function openSessionsModal(s: GameServer) {
+  sessionsModalServer.value = s;
+  sessionsModalOpen.value = true;
+}
+
 async function deleteServer(s: GameServer) {
   const ok = await confirm({
     title: "Supprimer le serveur",
@@ -327,23 +360,41 @@ function templateIcon(slug: string | undefined): string {
               </div>
               <div v-if="s.last_error" class="server-error">⚠ {{ s.last_error }}</div>
             </div>
-            <button
-              class="btn-icon"
-              :disabled="busy === s.id"
-              :title="s.status === 'running' ? 'Arrêter' : 'Démarrer'"
-              @click.stop="toggleServer(s)"
-            >
-              {{ s.status === 'running' ? '⏹' : '▶' }}
-            </button>
-            <button
-              v-if="visible('game.server.delete')"
-              class="btn-icon btn-icon-danger"
-              :disabled="busy === s.id"
-              title="Supprimer"
-              @click.stop="deleteServer(s)"
-            >
-              🗑
-            </button>
+            <div class="server-actions" @click.stop>
+              <button
+                class="btn-icon"
+                :disabled="busy === s.id"
+                :title="s.status === 'running' ? 'Arrêter' : 'Démarrer'"
+                @click="toggleServer(s)"
+              >
+                {{ s.status === 'running' ? '⏹' : '▶' }}
+              </button>
+              <button
+                v-if="visible('game.server.config_edit')"
+                class="btn-icon"
+                :disabled="busy === s.id"
+                title="Configurer"
+                @click="openConfigModal(s)"
+              >
+                ⚙
+              </button>
+              <button
+                class="btn-icon"
+                title="Sessions joueurs"
+                @click="openSessionsModal(s)"
+              >
+                👥
+              </button>
+              <button
+                v-if="visible('game.server.delete')"
+                class="btn-icon btn-icon-danger"
+                :disabled="busy === s.id"
+                title="Supprimer"
+                @click="deleteServer(s)"
+              >
+                🗑
+              </button>
+            </div>
           </div>
           <div v-if="!loading && servers.length === 0" class="empty">Aucun serveur lancé</div>
           <div v-if="loading && servers.length === 0" class="empty">Chargement…</div>
@@ -384,6 +435,13 @@ function templateIcon(slug: string | undefined): string {
             <span class="dot error" /> error
           </div>
         </div>
+        <!-- Stats live CPU/RAM -->
+        <GameServerStatsBar
+          v-if="selectedServer"
+          :server-id="selectedServer.id"
+          :active="selectedServer.status === 'running'"
+          :interval-ms="5000"
+        />
         <div ref="consoleEl" class="console-out">
           <div v-for="(l, i) in logs" :key="i" class="line" :class="l.level">
             <span class="t">{{ l.time }}</span>
@@ -400,6 +458,26 @@ function templateIcon(slug: string | undefined): string {
         </form>
       </section>
     </main>
+
+    <!-- Modale de configuration du serveur (override des champs config_schema) -->
+    <GameServerConfigModal
+      :open="configModalOpen"
+      :server-id="configModalServer?.id ?? null"
+      :server-name="configModalServer?.name ?? ''"
+      :template="configModalDetail.template"
+      :initial-config="configModalDetail.config"
+      :actor-id="user?.id"
+      @close="configModalOpen = false"
+      @saved="fetchAll"
+    />
+
+    <!-- Modale historique des sessions joueurs -->
+    <GameServerSessionsModal
+      :open="sessionsModalOpen"
+      :server-id="sessionsModalServer?.id ?? null"
+      :server-name="sessionsModalServer?.name ?? ''"
+      @close="sessionsModalOpen = false"
+    />
   </div>
 </template>
 
@@ -508,7 +586,8 @@ function templateIcon(slug: string | undefined): string {
 }
 .btn-icon:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-icon:disabled { opacity: 0.4; cursor: not-allowed; }
-.btn-icon-danger { margin-left: 4px; }
+.server-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.btn-icon-danger { }
 .btn-icon-danger:hover:not(:disabled) { background: var(--danger); border-color: var(--danger); color: #fff; }
 .server-error { font-size: 11px; color: var(--danger); margin-top: 4px; word-break: break-word; }
 .empty { color: var(--text-secondary); text-align: center; padding: var(--space-xl); font-size: 13px; }
