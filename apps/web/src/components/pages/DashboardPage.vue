@@ -76,7 +76,7 @@ const allSections: Section[] = [
     requiredAnyBot: ["coude-bot", "blackjack-bot"],
   },
 
-  { key: "games.portal", path: "/game-portal", label: "Game Portal", icon: "server" },
+  { key: "games.portal", path: "/game-portal", label: "Game Portal", icon: "server", requiredBot: "game-portal" },
 
   { key: "config.components", path: "/component-config", label: "Composants", icon: "cpu" },
   { key: "config.rbac", path: "/rbac", label: "Acces RBAC", icon: "shield" },

@@ -80,6 +80,7 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
   { key: "games.wheel", label: "Bouton Roue", category: "Dashboard", minRole: "viewer" },
   { key: "games.wallet", label: "Bouton Wallet", category: "Dashboard", minRole: "viewer" },
   { key: "games.taunts", label: "Bouton Railleries (Coude + Blackjack)", category: "Dashboard", minRole: "admin" },
+  { key: "games.portal", label: "Bouton Game Portal (serveurs Docker)", category: "Dashboard", minRole: "admin" },
 
   // ── Dashboard : config (admin) ──
   { key: "config.components", label: "Bouton Config composants", category: "Dashboard", minRole: "admin" },
