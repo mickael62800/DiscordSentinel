@@ -10,6 +10,9 @@ import AppButton from "../atoms/AppButton.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
+import { useComponentVisibility } from "@/composables/useComponentVisibility";
+
+const { visible } = useComponentVisibility();
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { selectedGuildId } = useGuildSelector();
@@ -208,8 +211,8 @@ onMounted(() => fetchWallets());
       </div>
     </div>
 
-    <!-- Danger zone : reset global -->
-    <div class="danger-zone">
+    <!-- Danger zone : reset global (owner uniquement) -->
+    <div v-if="visible('db.reset.wallets')" class="danger-zone">
       <div class="danger-icon">⚠️</div>
       <div class="danger-info">
         <h3>Reset global</h3>

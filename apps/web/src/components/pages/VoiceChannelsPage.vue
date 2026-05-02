@@ -8,6 +8,9 @@ import AppBadge from "../atoms/AppBadge.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import PaginationBar from "../molecules/PaginationBar.vue";
 import { useFormatDate } from "../../composables/useFormatDate";
+import { useComponentVisibility } from "@/composables/useComponentVisibility";
+
+const { visible } = useComponentVisibility();
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { confirm: confirmDialog } = useConfirm();
@@ -326,10 +329,10 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
             <p class="history-subtitle">Salons vocaux fermes / archives</p>
           </div>
           <button
-            v-if="historyChannels.length > 0"
+            v-if="historyChannels.length > 0 && visible('db.purge.voice_history')"
             class="cleanup-btn"
             :disabled="purgingAll"
-            title="Supprime definitivement tout l'historique en BDD"
+            title="Supprime definitivement tout l'historique en BDD (owner uniquement)"
             @click="handlePurgeAll"
           >
             {{ purgingAll ? "Suppression…" : `Tout supprimer (${historyChannels.length})` }}
@@ -383,9 +386,10 @@ function kindVariant(kind: string): "info" | "warning" | "default" {
               <td>{{ fmt(ch.created_at) }}</td>
               <td @click.stop>
                 <button
+                  v-if="visible('db.purge.voice_channel')"
                   class="close-row-btn"
                   :disabled="purging === ch.channel_id"
-                  title="Supprimer definitivement cette ligne"
+                  title="Supprimer definitivement cette ligne (owner uniquement)"
                   @click="handlePurge(ch.channel_id, ch.channel_name)"
                 >
                   {{ purging === ch.channel_id ? "…" : "Supprimer" }}

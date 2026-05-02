@@ -220,8 +220,8 @@ pub async fn purge_all(
         &state,
         &rbac,
         &guild_id,
-        Role::Moderator,
-        "moderator+ pour purger les donnees coude",
+        Role::Owner,
+        "owner uniquement pour purger les donnees coude",
     )
     .await?;
 

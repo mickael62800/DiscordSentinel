@@ -152,7 +152,7 @@ pub async fn purge_channel(
     rbac: Option<Extension<RoleContext>>,
     Path(channel_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
-    gate_by_channel_id(&state, &rbac, &channel_id, Role::Moderator, "moderator+ pour purger un voice channel").await?;
+    gate_by_channel_id(&state, &rbac, &channel_id, Role::Owner, "owner uniquement pour purger un voice channel").await?;
 
     let res = sqlx::query(
         "DELETE FROM voice_channels WHERE channel_id = $1 AND channel_status = 'closed'",
@@ -184,8 +184,8 @@ pub async fn purge_history(
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     check_role_for_guild(
-        &state, &rbac, &guild_id, Role::Moderator,
-        "moderator+ pour purger l'historique voice",
+        &state, &rbac, &guild_id, Role::Owner,
+        "owner uniquement pour purger l'historique voice",
     )
     .await?;
 

@@ -14,7 +14,9 @@ import AuditEventDetail from "../molecules/AuditEventDetail.vue";
 import { eventVariant, eventLabel, eventIcon } from "../../utils/variants";
 import { useFormatDate } from "../../composables/useFormatDate";
 import { auditLogsService } from "@/services/auditLogsService";
+import { useComponentVisibility } from "@/composables/useComponentVisibility";
 
+const { visible } = useComponentVisibility();
 const { formatShortDateTime: fmt } = useFormatDate();
 const { logs, filteredLogs, eventTypes, loading, filterEventType, searchQuery, fetchLogs } = useAuditLogs();
 const { selectedGuildId } = useGuildSelector();
@@ -71,10 +73,10 @@ async function handlePurgeAll() {
         </option>
       </select>
       <button
-        v-if="logs.length > 0"
+        v-if="logs.length > 0 && visible('db.purge.audit_logs')"
         class="purge-btn"
         :disabled="purging"
-        title="Supprime totalement le journal d'audit en BDD"
+        title="Supprime totalement le journal d'audit en BDD (owner uniquement)"
         @click="handlePurgeAll"
       >
         {{ purging ? "Nettoyage…" : `Tout supprimer (${logs.length})` }}

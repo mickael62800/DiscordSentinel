@@ -19,6 +19,9 @@ import CancelConductBanModal from "../molecules/CancelConductBanModal.vue";
 import { conductService } from "@/services/conductService";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
+import { useComponentVisibility } from "@/composables/useComponentVisibility";
+
+const { visible: rbacVisible } = useComponentVisibility();
 import AppButton from "../atoms/AppButton.vue";
 import FormField from "../atoms/FormField.vue";
 import { infractionTypeVariant } from "../../utils/variants";
@@ -701,11 +704,11 @@ async function handleActionSubmit() {
           >
             Reinitialiser
           </button>
-          <div class="bulk-menu-wrap" @click.stop>
+          <div v-if="rbacVisible('db.purge.audit_logs')" class="bulk-menu-wrap" @click.stop>
             <button
               class="bulk-menu-btn"
               :disabled="!selectedGuildId"
-              :title="selectedGuildId ? 'Actions de masse' : 'Selectionnez un serveur'"
+              :title="selectedGuildId ? 'Actions de masse (owner uniquement)' : 'Selectionnez un serveur'"
               @click="bulkMenuOpen = !bulkMenuOpen"
             >
               ⋯ Actions de masse ▾
@@ -842,12 +845,13 @@ async function handleActionSubmit() {
           class="search-input"
         />
         <button
+          v-if="rbacVisible('moderation.bulk_unban')"
           type="button"
           class="unban-all-btn"
           :disabled="bulkUnbanning || filteredConfirmed.length === 0"
           :title="filteredConfirmed.length === 0
             ? 'Aucun banni actif'
-            : `Débannir les ${filteredConfirmed.length} bannis affichés (applique unban Discord pour chacun)`"
+            : `Débannir les ${filteredConfirmed.length} bannis affichés (owner uniquement)`"
           @click="onUnbanAll"
         >
           {{ bulkUnbanning

@@ -1002,7 +1002,12 @@ pub async fn cleanup_security_logs(
     rbac: Option<Extension<RoleContext>>,
     Query(q): Query<CleanupQuery>,
 ) -> Result<Json<CleanupResponse>, ApiError> {
-    gate_admin(&state, &rbac)?;
+    // Endpoint cross-guild ultra-destructif (peut DELETE FROM audit_logs
+    // global). Reserve aux superadmins uniquement, pas aux admins de guild.
+    let Some(Extension(ctx)) = &rbac else {
+        return Err(forbid(StatusCode::FORBIDDEN, "auth requise"));
+    };
+    require_superadmin(&state, ctx).map_err(|s| forbid(s, "superadmin requis pour cleanup_security_logs"))?;
     let days = q.older_than_days.unwrap_or(0).max(0);
     let include_audit = q.include_audit_logs.unwrap_or(false);
 

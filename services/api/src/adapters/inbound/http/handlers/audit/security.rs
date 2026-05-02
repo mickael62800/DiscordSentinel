@@ -56,8 +56,8 @@ pub async fn purge_events(
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     check_role_for_guild(
-        &state, &rbac, &guild_id, Role::Moderator,
-        "moderator+ pour purger les evenements de securite",
+        &state, &rbac, &guild_id, Role::Owner,
+        "owner uniquement pour purger les evenements de securite",
     )
     .await?;
 

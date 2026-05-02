@@ -106,8 +106,18 @@ export const COMPONENT_REGISTRY: ComponentDef[] = [
 
   // ── Modération ──
   { key: "moderation.purge", label: "Purge messages", category: "Modération", minRole: "moderator" },
-  { key: "moderation.bulk_unban", label: "Débannissement en masse", category: "Modération", minRole: "admin" },
+  { key: "moderation.bulk_unban", label: "Débannissement en masse", category: "Modération", minRole: "owner" },
   { key: "moderation.delete_action", label: "Supprimer action", category: "Modération", minRole: "admin" },
+
+  // ── Nettoyages base de données (owner uniquement) ──
+  { key: "db.purge.audit_logs", label: "Vider les audit logs (DB)", category: "Nettoyages DB", minRole: "owner" },
+  { key: "db.purge.security_events", label: "Vider les events sécurité (DB)", category: "Nettoyages DB", minRole: "owner" },
+  { key: "db.purge.voice_history", label: "Vider l'historique vocal (DB)", category: "Nettoyages DB", minRole: "owner" },
+  { key: "db.purge.voice_channel", label: "Purger un salon vocal archivé (DB)", category: "Nettoyages DB", minRole: "owner" },
+  { key: "db.purge.coude", label: "Purger les données coude (DB)", category: "Nettoyages DB", minRole: "owner" },
+  { key: "db.purge.blackjack", label: "Purger les données blackjack (DB)", category: "Nettoyages DB", minRole: "owner" },
+  { key: "db.reset.wallets", label: "Reset bulk des wallets (DB)", category: "Nettoyages DB", minRole: "owner" },
+  { key: "db.reset.coude_stats", label: "Reset stats joueur coude (DB)", category: "Nettoyages DB", minRole: "owner" },
 
   // ── Membres ──
   { key: "members.reset", label: "Reset complet d'un membre", category: "Membres", minRole: "owner" },

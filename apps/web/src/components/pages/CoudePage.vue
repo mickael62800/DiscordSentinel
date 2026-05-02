@@ -10,6 +10,9 @@ import AppButton from "../atoms/AppButton.vue";
 import LoadingState from "../atoms/LoadingState.vue";
 import ErrorState from "../atoms/ErrorState.vue";
 import EmptyState from "../atoms/EmptyState.vue";
+import { useComponentVisibility } from "@/composables/useComponentVisibility";
+
+const { visible } = useComponentVisibility();
 
 const { formatShortDateTime: fmt } = useFormatDate();
 const { selectedGuildId } = useGuildSelector();
@@ -255,10 +258,11 @@ onMounted(() => fetchCombats());
           ↻ Rafraichir
         </AppButton>
         <button
+          v-if="visible('db.purge.coude')"
           class="danger-btn"
           :disabled="purging"
           @click="handlePurgeAll"
-          title="Supprime DEFINITIVEMENT toutes les donnees coude de cette guild"
+          title="Supprime DEFINITIVEMENT toutes les donnees coude de cette guild (owner uniquement)"
         >
           {{ purging ? "Purge…" : "🗑 Reset total" }}
         </button>

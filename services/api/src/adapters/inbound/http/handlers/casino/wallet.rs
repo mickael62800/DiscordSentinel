@@ -1,6 +1,7 @@
 use axum::extract::Path;
 use axum::extract::Query;
 use axum::extract::State;
+use axum::Extension;
 use axum::Json;
 use serde::Deserialize;
 use tracing::info;
@@ -8,8 +9,11 @@ use tracing::info;
 use crate::adapters::inbound::http::errors::ApiError;
 use crate::adapters::inbound::http::helpers::normalize_limit;
 use crate::adapters::inbound::http::helpers::ok_response;
+use crate::adapters::inbound::http::middleware::rbac::check_role_for_guild;
+use crate::adapters::inbound::http::middleware::rbac::RoleContext;
 use crate::adapters::inbound::http::state::AppState;
 use crate::adapters::inbound::http::validation;
+use crate::domain::enums::system::role::Role;
 use crate::domain::entities::casino::wallet::validate_positive_amount;
 use crate::domain::entities::casino::wallet::validate_transfer_distinct_users;
 use crate::domain::entities::casino::wallet::Wallet;
@@ -232,10 +236,16 @@ pub async fn reset_wallet(
 /// POST /api/wallet/{guild_id}/reset-all — reset bulk de tous les wallets.
 pub async fn reset_all_wallets(
     State(state): State<AppState>,
+    rbac: Option<Extension<RoleContext>>,
     Path(guild_id): Path<String>,
     Json(dto): Json<ResetWalletDto>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     validation::validate_guild_id_path(&guild_id).map_err(ApiError)?;
+    check_role_for_guild(
+        &state, &rbac, &guild_id, Role::Owner,
+        "owner uniquement pour reset bulk des wallets",
+    )
+    .await?;
 
     let (affected, new_balance) = state
         .wallet_uc

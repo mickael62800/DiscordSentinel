@@ -34,8 +34,8 @@ pub async fn purge_audit_logs(
     Path(guild_id): Path<String>,
 ) -> Result<Json<serde_json::Value>, ApiError> {
     check_role_for_guild(
-        &state, &rbac, &guild_id, Role::Moderator,
-        "moderator+ pour purger les audit logs",
+        &state, &rbac, &guild_id, Role::Owner,
+        "owner uniquement pour purger les audit logs",
     )
     .await?;
 
