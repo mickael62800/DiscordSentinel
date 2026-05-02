@@ -1924,4 +1924,14 @@ function discordProfileUrl(userId: string): string {
   color: var(--danger);
   border-color: var(--danger);
 }
+
+@media (max-width: 480px) {
+  .sort-select {
+    min-width: 0;
+    width: 100%;
+  }
+  .search-input {
+    width: 100%;
+  }
+}
 </style>

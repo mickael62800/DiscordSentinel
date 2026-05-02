@@ -483,4 +483,32 @@ function severityLabel(s: number): { label: string; color: string } {
 .action-btn.btn-mute { border-color: #E67E22; color: #E67E22; }
 .action-btn.btn-warn { border-color: #F1C40F; color: #F1C40F; }
 .action-btn.btn-ignore { border-color: #95A5A6; color: #95A5A6; }
+
+@media (max-width: 640px) {
+  .kpi-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .kpi-card {
+    padding: 12px 14px;
+  }
+  .kpi-value {
+    font-size: 1.4rem;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .card {
+    padding: 14px;
+  }
+  .user-list li {
+    grid-template-columns: 1fr auto;
+    row-gap: 2px;
+  }
+  .user-id {
+    grid-column: 1 / -1;
+    font-size: 0.75rem;
+  }
+}
 </style>

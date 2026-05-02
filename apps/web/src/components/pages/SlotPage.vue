@@ -194,4 +194,21 @@ const rtp = computed(() =>
 tr.jp {
   background: rgba(241, 196, 15, 0.1);
 }
+
+@media (max-width: 640px) {
+  .kpi-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .kpi-card {
+    padding: 12px 14px;
+  }
+  .kpi-value {
+    font-size: 1.3rem;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
 </style>

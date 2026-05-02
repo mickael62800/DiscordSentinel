@@ -280,6 +280,26 @@ function roleVariant(role: RbacRole): BadgeVariant {
   min-width: 180px;
 }
 
+.rbac-table-wrap,
+.rbac-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 480px) {
+  .add-form input[type="text"] {
+    min-width: 0;
+    width: 100%;
+  }
+  .add-form {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .rbac-table {
+    font-size: 0.85rem;
+  }
+}
+
 .add-form button {
   padding: 0.5rem 1rem;
   border: none;

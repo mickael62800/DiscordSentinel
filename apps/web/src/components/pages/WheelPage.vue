@@ -228,4 +228,15 @@ const avgPayout = computed(() =>
   color: #E74C3C;
   font-weight: 600;
 }
+
+@media (max-width: 640px) {
+  .kpi-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
 </style>

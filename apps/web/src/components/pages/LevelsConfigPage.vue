@@ -373,4 +373,18 @@ watch(guildIdFilter, () => {
   color: var(--text-secondary);
   margin-bottom: 12px;
 }
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .form {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .form label.full {
+    grid-column: 1;
+  }
+}
 </style>

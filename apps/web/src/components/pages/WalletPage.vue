@@ -782,4 +782,28 @@ onMounted(() => fetchWallets());
     display: none;
   }
 }
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    gap: 10px;
+  }
+  .kpi-card {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  .kpi-icon {
+    font-size: 1.5rem;
+    width: 38px;
+    height: 38px;
+  }
+  .hero {
+    padding: 14px 16px;
+  }
+  .hero-title {
+    font-size: 1.3rem;
+  }
+  .hero-subtitle {
+    font-size: 0.85rem;
+  }
+}
 </style>

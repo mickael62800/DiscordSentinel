@@ -439,4 +439,16 @@ function eventIcon(type: string): string {
   color: var(--text-primary);
   font-variant-numeric: tabular-nums;
 }
+
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+  }
+  .search-input {
+    min-width: 0;
+    width: 100%;
+    margin-left: 0;
+  }
+}
 </style>
