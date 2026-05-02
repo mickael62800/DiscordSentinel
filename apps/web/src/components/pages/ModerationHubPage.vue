@@ -483,7 +483,7 @@ async function onUnbanAll() {
 // --- Selecteur de guild + modale "Nouvelle action" ---
 const { selectedGuildId } = useGuildSelector();
 const { submitting, logAction } = useModeration();
-const { searchMembers } = useGuildMembers();
+const { members, searchMembers } = useGuildMembers();
 
 const actionModalVisible = ref(false);
 const actionGuildId = ref(selectedGuildId.value || "");
@@ -519,8 +519,32 @@ function closeActionModal() {
   actionError.value = null;
 }
 
+/// Detecte si la valeur saisie ressemble a un snowflake Discord (17-20 chiffres).
+function isSnowflake(s: string): boolean {
+  return /^\d{17,20}$/.test(s.trim());
+}
+
 function onActionSearchInput() {
-  actionSuggestions.value = searchMembers(actionSearch.value);
+  const q = actionSearch.value.trim();
+
+  // Cas 1 : l'user a colle un ID Discord brut (snowflake numerique).
+  // On remplit actionTargetId direct et on tente un lookup local pour
+  // recuperer le username (sinon on met l'ID en fallback name).
+  if (isSnowflake(q)) {
+    actionTargetId.value = q;
+    const member = members.value?.find((m) => m.id === q);
+    if (member) {
+      actionTargetName.value = member.display_name || member.username;
+    } else if (!actionTargetName.value) {
+      actionTargetName.value = q; // fallback : l'ID sera affiche comme name
+    }
+    actionSuggestions.value = [];
+    actionShowSuggestions.value = false;
+    return;
+  }
+
+  // Cas 2 : recherche par nom -> autocomplete normal.
+  actionSuggestions.value = searchMembers(q);
   actionShowSuggestions.value = actionSuggestions.value.length > 0;
 }
 
@@ -536,10 +560,40 @@ function onActionSearchBlur() {
 }
 
 async function handleActionSubmit() {
-  if (!actionGuildId.value || !actionTargetId.value || !actionTargetName.value || !actionReason.value) {
-    actionError.value = "L'ID du serveur, la cible et la raison sont requis.";
+  // Validation : on exige guild_id + raison + au moins un ID OU un nom.
+  // Si l'user a saisi juste un nom (autocomplete sans clic), on essaie
+  // un dernier match exact sur la liste des membres avant d'echouer.
+  if (!actionGuildId.value || !actionReason.value) {
+    actionError.value = "L'ID du serveur et la raison sont requis.";
     return;
   }
+
+  // Resolution finale : si pas d'ID mais un nom, tenter un match exact.
+  if (!actionTargetId.value.trim() && actionTargetName.value.trim()) {
+    const name = actionTargetName.value.trim().toLowerCase();
+    const match = members.value?.find(
+      (m) =>
+        m.username.toLowerCase() === name ||
+        (m.display_name?.toLowerCase() ?? "") === name,
+    );
+    if (match) {
+      actionTargetId.value = match.id;
+    }
+  }
+  // Idem inverse : juste l'ID, pas de nom -> fallback nom = ID.
+  if (actionTargetId.value.trim() && !actionTargetName.value.trim()) {
+    const member = members.value?.find((m) => m.id === actionTargetId.value.trim());
+    actionTargetName.value = member
+      ? (member.display_name || member.username)
+      : actionTargetId.value.trim();
+  }
+
+  if (!actionTargetId.value.trim()) {
+    actionError.value =
+      "Cible introuvable. Saisis un ID Discord (17-20 chiffres) ou choisis un membre dans la liste.";
+    return;
+  }
+
   actionError.value = null;
   try {
     const result = await logAction({
@@ -547,8 +601,8 @@ async function handleActionSubmit() {
       channelId: "web-panel",
       moderatorId: "web-admin",
       moderatorName: "Web Admin",
-      targetId: actionTargetId.value,
-      targetName: actionTargetName.value,
+      targetId: actionTargetId.value.trim(),
+      targetName: actionTargetName.value.trim() || actionTargetId.value.trim(),
       actionType: actionType.value,
       reason: actionReason.value,
       gravity: actionGravity.value,
@@ -963,12 +1017,12 @@ async function handleActionSubmit() {
               <input v-model="actionGuildId" type="text" placeholder="ID du serveur" />
             </FormField>
 
-            <FormField label="Utilisateur cible">
+            <FormField label="Utilisateur cible (nom OU ID Discord)">
               <div class="autocomplete-wrapper">
                 <input
                   v-model="actionSearch"
                   type="text"
-                  placeholder="Rechercher un membre ou saisir un ID…"
+                  placeholder="Tapez un pseudo, ou collez un ID Discord (17-20 chiffres)…"
                   @input="onActionSearchInput"
                   @focus="onActionSearchInput"
                   @blur="onActionSearchBlur"
