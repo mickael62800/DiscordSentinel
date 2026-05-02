@@ -213,6 +213,57 @@ impl BaseApiClient {
         self.send_log_with_category(level, "", message, "bot");
     }
 
+    /// Comme send_bot_log mais avec un payload JSON structurel
+    /// (event_type, command, user_id, etc.). Permet le filtrage cote
+    /// frontend par type de commande / module.
+    pub fn send_bot_log_with_details(
+        &self,
+        level: &str,
+        message: &str,
+        details: serde_json::Value,
+    ) {
+        #[derive(Serialize)]
+        struct LogPayloadWithDetails {
+            level: String,
+            bot: String,
+            server: String,
+            message: String,
+            category: String,
+            details: serde_json::Value,
+        }
+
+        let log_data = LogPayloadWithDetails {
+            level: level.to_string(),
+            bot: self.bot_name.clone(),
+            server: String::new(),
+            message: message.to_string(),
+            category: "bot".to_string(),
+            details: details.clone(),
+        };
+
+        // Publier aussi via Redis pour le temps reel desktop
+        self.publish_event("bot_log", serde_json::json!({
+            "level": log_data.level,
+            "bot": log_data.bot,
+            "server": log_data.server,
+            "message": log_data.message,
+            "category": log_data.category,
+            "details": details,
+        }));
+
+        let req = self
+            .client
+            .post(format!("{}/api/logs", self.base_url))
+            .json(&log_data);
+
+        let req = self.auth(req);
+        tokio::spawn(async move {
+            if let Err(e) = req.send().await {
+                tracing::warn!("Log send failed: {e}");
+            }
+        });
+    }
+
     fn send_log_with_category(
         &self,
         level: &str,

@@ -1,7 +1,10 @@
 //! EventHandler unifie — dispatche vers les modules.
 
+use std::panic::AssertUnwindSafe;
+
+use futures_util::FutureExt;
 use serenity::async_trait;
-use serenity::model::application::Interaction;
+use serenity::model::application::{CommandData, CommandDataOption, CommandDataOptionValue, Interaction};
 use serenity::model::channel::{GuildChannel, Message};
 use serenity::model::event::MessageUpdateEvent;
 use serenity::model::gateway::Ready;
@@ -12,9 +15,53 @@ use serenity::model::voice::VoiceState;
 use serenity::prelude::*;
 use tracing::info;
 
-use sentinel_shared::heartbeat::register_guilds;
+use sentinel_shared::heartbeat::{register_guilds, ApiClientKey};
 
 use crate::modules;
+
+/// Retourne le module fonctionnel associe a une commande slash. Sert a
+/// alimenter le champ `details.module` du log "command.invoked".
+fn command_module(name: &str) -> &'static str {
+    match name {
+        "purge" | "cleanup" => "cleanup",
+        "game" | "game-admin" => "games",
+        "roles-panel" | "parrain" => "community",
+        "audit" => "audit",
+        "level" | "stats" | "progression-resync" => "progression",
+        "blackjack-setup" => "blackjack",
+        "slot-setup" => "slot",
+        "wheel-setup" => "wheel",
+        "security" => "security",
+        "automod" => "automod",
+        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
+        | "note" | "call" | "context" | "appeal" | "expirations" | "compare"
+        | "modstats" | "evidence" | "review" | "template" | "transcript"
+        | "export" | "massmute" | "massban" => "moderation",
+        "ticket" => "tickets",
+        _ if modules::coude::handles_command(name) => "coude",
+        _ => "unknown",
+    }
+}
+
+/// Reconstruit le nom complet de la commande slash y compris
+/// subcommand_group / subcommand (ex: "ticket close all", "audit channel set").
+fn format_full_command(data: &CommandData) -> String {
+    let mut parts = vec![data.name.to_string()];
+    fn descend(opts: &[CommandDataOption], parts: &mut Vec<String>) {
+        for opt in opts {
+            match &opt.value {
+                CommandDataOptionValue::SubCommandGroup(sub_opts)
+                | CommandDataOptionValue::SubCommand(sub_opts) => {
+                    parts.push(opt.name.to_string());
+                    descend(sub_opts, parts);
+                }
+                _ => {}
+            }
+        }
+    }
+    descend(&data.options, &mut parts);
+    format!("/{}", parts.join(" "))
+}
 
 pub struct Handler;
 
@@ -283,28 +330,94 @@ impl EventHandler for Handler {
                     return;
                 }
 
-                match name {
-                    "purge" | "cleanup" => modules::cleanup::handle_command(&ctx, &command).await,
-                    "game" | "game-admin" => modules::games::handle_command(&ctx, &command).await,
-                    "roles-panel" | "parrain" => modules::community::handle_command(&ctx, &command).await,
-                    "audit" => modules::audit::handle_command(&ctx, &command).await,
-                    "level" | "stats" | "progression-resync" => modules::progression::handle_command(&ctx, &command).await,
-                    "blackjack-setup" => modules::blackjack::handle_command(&ctx, &command).await,
-                    "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
-                    "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,
-                    "security" => modules::security::handle_command(&ctx, &command).await,
-                    "automod" => modules::automod::handle_command(&ctx, &command).await,
-                    "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
-                    | "note" | "call" | "context" | "appeal" | "expirations" | "compare"
-                    | "modstats" | "evidence" | "review" | "template" | "transcript"
-                    | "export" | "massmute" | "massban" => {
-                        modules::moderation::handle_command(&ctx, &command).await
+                // ── Telemetrie commande : invoked + success/error ──
+                let api = {
+                    let data = ctx.data.read().await;
+                    data.get::<ApiClientKey>().cloned()
+                };
+                let full_cmd = format_full_command(&command.data);
+                let module = command_module(name);
+                let user_id = command.user.id.to_string();
+                let user_name = command.user.name.clone();
+                let guild_id = command.guild_id.map(|g| g.to_string()).unwrap_or_default();
+
+                if let Some(ref api) = api {
+                    api.send_bot_log_with_details(
+                        "info",
+                        &format!("Commande invoquée : {full_cmd} (par @{user_name})"),
+                        serde_json::json!({
+                            "event_type": "command.invoked",
+                            "command": full_cmd,
+                            "module": module,
+                            "user_id": user_id,
+                            "user_name": user_name,
+                            "guild_id": guild_id,
+                        }),
+                    );
+                }
+
+                let start = std::time::Instant::now();
+
+                let dispatch = AssertUnwindSafe(async {
+                    match name {
+                        "purge" | "cleanup" => modules::cleanup::handle_command(&ctx, &command).await,
+                        "game" | "game-admin" => modules::games::handle_command(&ctx, &command).await,
+                        "roles-panel" | "parrain" => modules::community::handle_command(&ctx, &command).await,
+                        "audit" => modules::audit::handle_command(&ctx, &command).await,
+                        "level" | "stats" | "progression-resync" => modules::progression::handle_command(&ctx, &command).await,
+                        "blackjack-setup" => modules::blackjack::handle_command(&ctx, &command).await,
+                        "slot-setup" => modules::slot::handle_command(&ctx, &command).await,
+                        "wheel-setup" => modules::wheel::handle_command(&ctx, &command).await,
+                        "security" => modules::security::handle_command(&ctx, &command).await,
+                        "automod" => modules::automod::handle_command(&ctx, &command).await,
+                        "warn" | "unwarn" | "mute" | "unmute" | "ban" | "unban" | "history"
+                        | "note" | "call" | "context" | "appeal" | "expirations" | "compare"
+                        | "modstats" | "evidence" | "review" | "template" | "transcript"
+                        | "export" | "massmute" | "massban" => {
+                            modules::moderation::handle_command(&ctx, &command).await
+                        }
+                        "ticket" => modules::tickets::handle_command(&ctx, &command).await,
+                        _ if modules::coude::handles_command(name) => {
+                            modules::coude::handle_command(&ctx, &command).await
+                        }
+                        _ => {}
                     }
-                    "ticket" => modules::tickets::handle_command(&ctx, &command).await,
-                    _ if modules::coude::handles_command(name) => {
-                        modules::coude::handle_command(&ctx, &command).await
+                })
+                .catch_unwind()
+                .await;
+
+                let elapsed_ms = start.elapsed().as_millis() as u64;
+
+                if let Some(ref api) = api {
+                    match dispatch {
+                        Ok(()) => api.send_bot_log_with_details(
+                            "info",
+                            &format!("Commande OK : {full_cmd} ({elapsed_ms} ms)"),
+                            serde_json::json!({
+                                "event_type": "command.success",
+                                "command": full_cmd,
+                                "module": module,
+                                "user_id": user_id,
+                                "user_name": user_name,
+                                "guild_id": guild_id,
+                                "elapsed_ms": elapsed_ms,
+                            }),
+                        ),
+                        Err(_) => api.send_bot_log_with_details(
+                            "error",
+                            &format!("Commande PANIC : {full_cmd}"),
+                            serde_json::json!({
+                                "event_type": "command.error",
+                                "command": full_cmd,
+                                "module": module,
+                                "user_id": user_id,
+                                "user_name": user_name,
+                                "guild_id": guild_id,
+                                "elapsed_ms": elapsed_ms,
+                                "kind": "panic",
+                            }),
+                        ),
                     }
-                    _ => {}
                 }
             }
             Interaction::Component(component) => {

@@ -3164,6 +3164,7 @@ dependencies = [
  "chrono",
  "dashmap 6.1.0",
  "dotenvy",
+ "futures-util",
  "image",
  "once_cell",
  "rand 0.8.6",
